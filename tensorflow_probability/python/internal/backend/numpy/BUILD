@@ -31,6 +31,7 @@ py_library(
     name = "numpy",
     srcs = ["__init__.py"],
     deps = [
+        ":bitwise",
         ":compat",
         ":control_flow",
         ":debugging",
@@ -46,10 +47,23 @@ py_library(
         ":numpy_math",
         ":numpy_signal",
         ":ops",
+        ":private",
         ":random_generators",
+        ":raw_ops",
         ":sets_lib",
         ":sparse_lib",
+        ":tensor_array_ops",
         ":test_lib",
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "bitwise",
+    srcs = ["bitwise.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -70,6 +84,7 @@ py_library(
     srcs = ["control_flow.py"],
     deps = [
         ":_utils",
+        # numpy dep,
         # tensorflow dep,
     ],
 )
@@ -174,7 +189,9 @@ py_library(
     srcs = ["nn.py"],
     deps = [
         ":_utils",
+        ":numpy_array",
         ":numpy_math",
+        ":ops",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -234,11 +251,57 @@ py_library(
 )
 
 py_library(
+    name = "private",
+    srcs = ["private.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "tensor_array_ops",
+    srcs = ["tensor_array_ops.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
+    ],
+)
+
+py_test(
+    name = "tensor_array_ops_test",
+    size = "small",
+    srcs = ["tensor_array_ops_test.py"],
+    tags = ["tfp_numpy"],
+    deps = [
+        ":tensor_array_ops",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
     deps = [
         ":_utils",
+        ":numpy_array",
         ":numpy_math",
+        ":ops",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "raw_ops",
+    srcs = ["raw_ops.py"],
+    deps = [
+        ":_utils",
+        ":numpy_array",
+        ":numpy_math",
+        ":ops",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -274,8 +337,9 @@ py_library(
 
 py_test(
     name = "numpy_test",
+    size = "small",
     srcs = ["numpy_test.py"],
-    shard_count = 5,
+    shard_count = 8,
     tags = ["tfp_numpy"],
     deps = [
         ":numpy",
@@ -283,7 +347,8 @@ py_test(
         # hypothesis dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -294,6 +359,8 @@ py_library(
         ":_utils",
         ":initializers",
         ":ops",
+        ":random_generators",
+        ":tensor_array_ops",
     ],
 )
 
@@ -303,6 +370,7 @@ py_library(
     deps = [
         ":_utils",
         ":ops",
+        ":tensor_array_ops",
         # tensorflow dep,
     ],
 )
@@ -323,6 +391,7 @@ LINOP_FILES = [
     "linear_operator_adjoint",
     "linear_operator_algebra",
     "linear_operator_block_diag",
+    "linear_operator_block_lower_triangular",
     "linear_operator_circulant",
     "linear_operator_composition",
     "linear_operator_diag",
@@ -363,4 +432,42 @@ py_library(
         # scipy dep,
         # tensorflow dep,
     ],
+)
+
+exports_files(
+    [
+        "__init__.py",
+        "_utils.py",
+        "bitwise.py",
+        "compat.py",
+        "control_flow.py",
+        "debugging.py",
+        "dtype.py",
+        "errors.py",
+        "functional_ops.py",
+        "initializers.py",
+        "keras.py",
+        "keras_layers.py",
+        "linalg.py",
+        "linalg_impl.py",
+        "misc.py",
+        "nn.py",
+        "numpy_array.py",
+        "numpy_logging.py",
+        "numpy_math.py",
+        "numpy_signal.py",
+        "numpy_test.py",
+        "ops.py",
+        "private.py",
+        "random_generators.py",
+        "raw_ops.py",
+        "sets_lib.py",
+        "sparse_lib.py",
+        "tensor_array_ops.py",
+        "tensor_array_ops_test.py",
+        "test_lib.py",
+        "v1.py",
+        "v2.py",
+    ],
+    visibility = ["//tensorflow_probability:__subpackages__"],
 )

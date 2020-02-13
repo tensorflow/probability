@@ -29,7 +29,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -86,6 +85,7 @@ class Multinomial(distribution.Distribution):
   #### Pitfalls
 
   The number of classes, `K`, must not exceed:
+
   - the largest integer representable by `self.dtype`, i.e.,
     `2**(mantissa_bits+1)` (IEE754),
   - the maximum `Tensor` index, i.e., `2**31-1`.
@@ -214,15 +214,11 @@ class Multinomial(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -255,14 +251,13 @@ class Multinomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_multinomial_sample_note)
   def _log_prob(self, counts):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(counts)):
-      log_p = (
-          tf.math.log(self._probs)
-          if self._logits is None else tf.math.log_softmax(self._logits))
-      k = tf.convert_to_tensor(self.total_count)
-      return (
-          tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
-          tfp_math.log_combinations(k, counts))  # -log_normalization
+    log_p = (
+        tf.math.log(self._probs)
+        if self._logits is None else tf.math.log_softmax(self._logits))
+    return (
+        tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
+        tfp_math.log_combinations(
+            self.total_count, counts))  # -log_normalization
 
   def _mean(self):
     p = self._probs_parameter_no_checks()
@@ -302,27 +297,15 @@ class Multinomial(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.softmax(self._logits)
 
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `logits` property will return `None` when the distribution is '
-       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
+  def _default_event_space_bijector(self):
+    return
 
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `probs` property will return `None` when the distribution is '
-       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
-
-  def _maybe_assert_valid_sample(self, counts):
+  def _sample_control_dependencies(self, counts):
     """Check counts for proper shape, values, then return tensor version."""
+    assertions = []
     if not self.validate_args:
-      return []
-    assertions = distribution_util.assert_nonnegative_integer_form(counts)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(counts))
     assertions.append(assert_util.assert_equal(
         self.total_count,
         tf.reduce_sum(counts, axis=-1),

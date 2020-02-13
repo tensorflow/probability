@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,15 +26,13 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'assert_same_shallow_tree',
     'flatten_tree',
-    'make_dynamic_array',
     'map_tree',
     'map_tree_up_to',
     'random_categorical',
     'random_normal',
     'random_uniform',
-    'snapshot_dynamic_array',
     'split_seed',
-    'write_dynamic_array',
+    'trace',
 ]
 
 
@@ -61,21 +59,6 @@ def map_tree_up_to(shallow, fn, tree, *rest):
 def assert_same_shallow_tree(shallow, tree):
   """Asserts that `tree` has the same shallow structure as `shallow`."""
   nest.assert_shallow_structure(shallow, tree)
-
-
-def make_dynamic_array(dtype, size, element_shape):
-  """Creates an array that can be written to dynamically."""
-  return tf.TensorArray(dtype=dtype, size=size, element_shape=element_shape)
-
-
-def write_dynamic_array(array, i, e):
-  """Writes to an index in a dynamic array."""
-  return array.write(i, e)
-
-
-def snapshot_dynamic_array(array):
-  """Converts a dynamic array back to a static array."""
-  return array.stack()
 
 
 def value_and_grad(fn, args):
@@ -116,3 +99,68 @@ def random_categorical(logits, num_samples, seed):
   # TODO(siege): Switch to stateless RNG ops.
   return tf.random.categorical(
       logits=logits, num_samples=num_samples, seed=seed)
+
+
+def _eval_shape(fn, input_spec):
+  """Gets output `TensorSpec`s from `fn` given input `TensorSpec`."""
+  raw_compiled_fn = tf.function(
+      fn, autograph=False).get_concrete_function(input_spec)
+
+  def compiled_fn(x):
+    return raw_compiled_fn(*tf.nest.flatten(x))
+
+  output_spec = tf.nest.map_structure(tf.TensorSpec,
+                                      raw_compiled_fn.output_shapes,
+                                      raw_compiled_fn.output_dtypes)
+  return compiled_fn, output_spec
+
+
+def trace(state, fn, num_steps, parallel_iterations=10):
+  """TF implementation of `trace` operator, without the calling convention."""
+  if tf.config.experimental_functions_run_eagerly() or tf.executing_eagerly():
+    state, first_untraced, first_traced = fn(state)
+    arrays = tf.nest.map_structure(
+        lambda v: tf.TensorArray(  # pylint: disable=g-long-lambda
+            v.dtype, size=num_steps, element_shape=v.shape).write(0, v),
+        first_traced)
+    start_idx = 1
+  else:
+    # We need the shapes and dtypes of the outputs of `fn` function to create
+    # the `TensorArray`s etc., we can get it by pre-compiling the wrapper
+    # function.
+    input_spec = tf.nest.map_structure(tf.TensorSpec.from_tensor, state)
+    fn, (_, untraced_spec, traced_spec) = _eval_shape(fn, input_spec)
+
+    arrays = tf.nest.map_structure(
+        lambda spec: tf.TensorArray(  # pylint: disable=g-long-lambda
+            spec.dtype, size=num_steps, element_shape=spec.shape), traced_spec)
+    first_untraced = tf.nest.map_structure(
+        lambda spec: tf.zeros(spec.shape, spec.dtype), untraced_spec)
+    start_idx = 0
+
+  def body(i, state, _, arrays):
+    state, untraced, traced = fn(state)
+    arrays = tf.nest.map_structure(lambda a, e: a.write(i, e), arrays, traced)
+    return i + 1, state, untraced, arrays
+
+  def cond(i, *_):
+    return i < num_steps
+
+  _, state, untraced, arrays = tf.while_loop(
+      cond=cond,
+      body=body,
+      loop_vars=(start_idx, state, first_untraced, arrays),
+      parallel_iterations=parallel_iterations,
+  )
+
+  traced = tf.nest.map_structure(lambda a: a.stack(), arrays)
+
+  static_length = tf.get_static_value(num_steps)
+
+  def _merge_static_length(x):
+    x.set_shape(tf.TensorShape(static_length).concatenate(x.shape[1:]))
+    return x
+
+  traced = tf.nest.map_structure(_merge_static_length, traced)
+
+  return state, untraced, traced

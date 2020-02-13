@@ -35,6 +35,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
 
+
 __all__ = [
     'Bijector',
 ]
@@ -151,7 +152,7 @@ class WeakKeyDefaultDict(dict):
 
   # This is the 'WeakKey' part.
   def __getitem__(self, key):
-    weak_key = HashableWeakRef(key, lambda w: self.pop(w, None))
+    weak_key = HashableWeakRef(key, self.pop)
     return super(WeakKeyDefaultDict, self).__getitem__(weak_key)
 
   # This is the 'DefaultDict' part.
@@ -177,19 +178,52 @@ class WeakKeyDefaultDict(dict):
 
 
 class HashableWeakRef(weakref.ref):
-  """weakref.ref which makes np.array objects hashable."""
+  """weakref.ref which makes np.array objects hashable.
+
+  We take care to ensure that a hash can still be provided in the case that the
+  ref has been cleaned up. This ensures that the WeakKeyDefaultDict doesn't
+  suffer memory leaks by failing to clean up HashableWeakRef key objects whose
+  referrents have gone out of scope and been destroyed (as in
+  https://github.com/tensorflow/probability/issues/647).
+  """
+
+  def __init__(self, referrent, callback=None):
+    # Note that -1 is a safe sentinal value for detecting whether hash has been
+    # initialized, since python doesn't allow hashes of -1. In particular,
+    #
+    # ```python
+    # a = -1
+    # print(hash(a))
+    # ==> -2
+    # ```
+    self._last_known_hash = -1
+    super(HashableWeakRef, self).__init__(referrent, callback)
 
   def __hash__(self):
     x = self()
+    # If the ref has been cleaned up, fall back to the last known hash value.
+    if x is None:
+      if self._last_known_hash == -1:
+        raise ValueError(
+            'HashableWeakRef\'s ref has been cleaned up but the hash was never '
+            'known. It may not be able to be cleaned up as a result. This '
+            'should not happen in typical TFP usage, and constitutes a real '
+            'bug; please file an issue on '
+            'https://github.com/tensorflow/probability/issues or notify '
+            'tfprobability@tensorflow.org.')
+      return self._last_known_hash
     if not isinstance(x, onp.ndarray):
-      return id(x)
-    if isinstance(x, np.generic):
+      result = id(x)
+    elif isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
     # Note: The following logic can never be reached by the public API because
     # the bijector base class always calls `convert_to_tensor` before accessing
     # the cache.
-    x.flags.writeable = False
-    return hash(str(x.__array_interface__) + str(id(x)))
+    else:
+      x.flags.writeable = False
+      result = hash(str(x.__array_interface__) + str(id(x)))
+    self._last_known_hash = result
+    return result
 
   def __repr__(self):
     return repr(self())
@@ -198,16 +232,21 @@ class HashableWeakRef(weakref.ref):
     return str(self())
 
   def __eq__(self, other):
+    # If either ref has been cleaned up, fall back to comparing the
+    # HashableWeakRef instance ids, following what weakref equality checks do
+    # (https://github.com/python/cpython/blob/master/Objects/weakrefobject.c#L196)
+    if self() is None or other() is None:
+      return id(self) == id(other)
     x = self()
     if isinstance(x, np.generic):
       raise ValueError('Unable to weakref np.generic')
     y = other()
     ids_are_equal = id(x) == id(y)
-    if isinstance(x, onp.ndarray):
-      return (isinstance(y, onp.ndarray) and
-              x.__array_interface__ == y.__array_interface__ and
-              ids_are_equal)
-    return ids_are_equal
+    if not isinstance(x, onp.ndarray):
+      return ids_are_equal
+    return (isinstance(y, onp.ndarray) and
+            x.__array_interface__ == y.__array_interface__ and
+            ids_are_equal)
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -481,7 +520,8 @@ class Bijector(tf.Module):
       - `_forward`,
       - `_inverse`,
       - `_inverse_log_det_jacobian`,
-      - `_forward_log_det_jacobian` (optional).
+      - `_forward_log_det_jacobian` (optional),
+      - `_is_increasing` (scalar bijectors only)
 
     The `_forward_log_det_jacobian` is called when the bijector is inverted via
     the `Invert` bijector. If undefined, a slightly less efficiently
@@ -515,12 +555,12 @@ class Bijector(tf.Module):
 
   #### Non Injective Transforms
 
-  **WARNING** Handing of non-injective transforms is subject to change.
+  **WARNING** Handling of non-injective transforms is subject to change.
 
   Non injective maps `g` are supported, provided their domain `D` can be
   partitioned into `k` disjoint subsets, `Union{D1, ..., Dk}`, such that,
   ignoring sets of measure zero, the restriction of `g` to each subset is a
-  differentiable bijection onto `g(D)`.  In particular, this imples that for
+  differentiable bijection onto `g(D)`.  In particular, this implies that for
   `y in g(D)`, the set inverse, i.e. `g^{-1}(y) = {x in D : g(x) = y}`, always
   contains exactly `k` distinct points.
 
@@ -584,6 +624,7 @@ class Bijector(tf.Module):
                dtype=None,
                forward_min_event_ndims=None,
                inverse_min_event_ndims=None,
+               parameters=None,
                name=None):
     """Constructs Bijector.
 
@@ -615,6 +656,8 @@ class Bijector(tf.Module):
       inverse_min_event_ndims: Python `integer` indicating the minimum number of
         dimensions `inverse` operates on. Will be set to
         `forward_min_event_ndims` by default, if no value is provided.
+      parameters: Python `dict` of parameters used to instantiate this
+        `Bijector`.
       name: The name to give Ops created by the initializer.
 
     Raises:
@@ -630,6 +673,7 @@ class Bijector(tf.Module):
     name = name_util.strip_invalid_chars(name)
     super(Bijector, self).__init__(name=name)
     self._name = name
+    self._parameters = self._no_dependency(parameters)
 
     self._graph_parents = self._no_dependency(graph_parents or [])
 
@@ -737,6 +781,15 @@ class Bijector(tf.Module):
     """Returns the string name of this `Bijector`."""
     return self._name
 
+  @property
+  def parameters(self):
+    """Dictionary of parameters used to instantiate this `Bijector`."""
+    # Remove "self", "__class__", or other special variables. These can appear
+    # if the subclass used:
+    # `parameters = dict(locals())`.
+    return {k: v for k, v in self._parameters.items()
+            if not k.startswith('__') and k != 'self'}
+
   def __call__(self, value, name=None, **kwargs):
     """Applies or composes the `Bijector`, depending on input type.
 
@@ -822,7 +875,7 @@ class Bijector(tf.Module):
     if isinstance(value, Bijector):
       return chain.Chain([self, value], name=name, **kwargs)
 
-    return self._call_forward(value, name=name or 'forward', **kwargs)
+    return self.forward(value, name=name or 'forward', **kwargs)
 
   def _forward_event_shape_tensor(self, input_shape):
     """Subclass implementation for `forward_event_shape_tensor` function."""
@@ -962,6 +1015,32 @@ class Bijector(tf.Module):
     """
     return self._call_forward(x, name, **kwargs)
 
+  @classmethod
+  def _is_increasing(cls, **kwargs):
+    """Subclass implementation for `is_increasing` public function."""
+    raise NotImplementedError('`_is_increasing` not implemented.')
+
+  def _call_is_increasing(self, name, **kwargs):
+    """Wraps call to _is_increasing, allowing extra shared logic."""
+    with self._name_and_control_scope(name):
+      return tf.identity(self._is_increasing(**kwargs))
+
+  def _internal_is_increasing(self, name='is_increasing', **kwargs):
+    """For scalar bijectors, returns True where `d forward(x) / d x > 0`.
+
+    This method, like `_is_injective`, is part of a contract with
+    `TransformedDistribution`. This method supports the correctness of scalar
+    `quantile` / `cdf` / `survival_function` for transformed distributions.
+
+    Args:
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      A python `bool` or a `tf.bool` `Tensor`.
+    """
+    return self._call_is_increasing(name, **kwargs)
+
   def _inverse(self, y):
     """Subclass implementation for `inverse` public function."""
     raise NotImplementedError('inverse not implemented')
@@ -1046,8 +1125,14 @@ class Bijector(tf.Module):
         transformation, at whose value the ILDJ is to be computed. Can be
         `None` as long as `x` is not `None`.
       prefer_inverse_ldj_fn: Python `bool`, if `True`, will strictly prefer to
-        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will
-        strictly prefer to use `_forward_log_det_jacobian`.
+        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will strictly
+        prefer to use `_forward_log_det_jacobian`. The switching behavior allows
+        the caller to communicate that one of the inverse or forward LDJ
+        computations may be more efficient (usually because it can avoid an
+        extra call to `inverse` or `forward`). It's only a "preference" because
+        it may not always be possible, namely if the underlying implementation
+        only has one of `_inverse_log_det_jacobian` or
+        `_forward_log_det_jacobian` defined.
       event_ndims: int-like `Tensor`, the number of dims of an event (in the
         pre- or post-transformed space, as appropriate). These need to be summed
         over to compute the total ildj.

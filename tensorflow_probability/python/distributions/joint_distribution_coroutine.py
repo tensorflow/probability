@@ -73,6 +73,11 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   each of the distributions generates samples with the specified sample
   size.
 
+  **Name resolution**: The names of `JointDistributionCoroutine` components
+  may be specified by passing `name` arguments to distribution constructors (
+  `tfd.Normal(0., 1., name='x')). Components without an explicit name will be
+  assigned a dummy name.
+
   #### Examples
 
   ```python
@@ -159,7 +164,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     with tf.name_scope(name or 'JointDistributionCoroutine') as name:
       self._sample_dtype = sample_dtype
       self._model = model
-      self._most_recently_built_distributions = None
+      self._single_sample_distributions = {}
       super(JointDistributionCoroutine, self).__init__(
           dtype=sample_dtype,
           reparameterization_type=None,  # Ignored; we'll override.
@@ -223,7 +228,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """Executes `model`, creating both samples and distributions."""
     ds = []
     values_out = []
-    seed = SeedStream('JointDistributionCoroutine', seed)
+    seed = SeedStream(seed, salt='JointDistributionCoroutine')
     gen = self._model()
     index = 0
     d = next(gen)
@@ -247,7 +252,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           with tf.control_dependencies(
               self._assert_compatible_shape(
                   index, sample_shape, next_value)):
-            values_out.append(tf.identity(next_value))
+            values_out.append(tf.nest.map_structure(tf.identity, next_value))
         else:
           values_out.append(next_value)
 

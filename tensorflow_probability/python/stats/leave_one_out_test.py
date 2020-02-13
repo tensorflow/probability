@@ -24,15 +24,14 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogSooMeanTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogSooMeanTest(test_util.TestCase):
 
   def _make_flatteners(self, old_shape, axis):
     axis = np.array(axis).reshape(-1)
@@ -247,8 +246,8 @@ class LogSooMeanTest(test_case.TestCase):
                         atol=0., rtol=1e-5)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogLooMeanTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogLooMeanTest(test_util.TestCase):
 
   # We skip correctness test since SOO covers LOO.
 

@@ -27,15 +27,13 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PERTTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PERTTest(test_util.TestCase):
 
   def _generate_boilerplate_param(self):
     temperature = np.array([1., 2., 4., 10.])
@@ -48,14 +46,20 @@ class PERTTest(test_case.TestCase):
 
   # Shape and broadcast testing
   def testPertShape(self):
-    dist = tfd.PERT(low=[3.0], peak=[10.0], high=[11.0], temperature=[4.0])
+    dist = tfd.PERT(
+        low=[3.0],
+        peak=[10.0],
+        high=[11.0],
+        temperature=[4.0],
+        validate_args=True)
     self.assertEqual(([1]), self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([1]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testBroadcastingtemperature(self):
-    dist = tfd.PERT(low=1., peak=2., high=3., temperature=[1., 4., 10.])
+    dist = tfd.PERT(
+        low=1., peak=2., high=3., temperature=[1., 4., 10.], validate_args=True)
     self.assertEqual([3], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([3]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
@@ -63,7 +67,11 @@ class PERTTest(test_case.TestCase):
 
   def testBroadcastingParam(self):
     dist = tfd.PERT(
-        low=1., peak=[2., 3., 4., 5., 6., 7., 8., 9.], high=10., temperature=4.)
+        low=1.,
+        peak=[2., 3., 4., 5., 6., 7., 8., 9.],
+        high=10.,
+        temperature=4.,
+        validate_args=True)
     self.assertEqual([8], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([8]), dist.batch_shape)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
@@ -82,7 +90,8 @@ class PERTTest(test_case.TestCase):
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testEdgeRangeOutput(self):
-    dist = tfd.PERT(low=3.0, peak=10.0, high=11.0, temperature=4.0)
+    dist = tfd.PERT(
+        low=3.0, peak=10.0, high=11.0, temperature=4.0, validate_args=False)
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.prob(1.))))
     self.assertEqual(True, self.evaluate(tf.math.is_nan(dist.log_prob(1.))))
     self.assertEqual(1., self.evaluate(dist.cdf(11.)))
@@ -99,13 +108,13 @@ class PERTTest(test_case.TestCase):
   # Statistical property testing
   def testMean(self):
     temperature, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, temperature)
+    dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
     expected_mean = sp_stats.beta.mean(a, b, low, high - low)
     self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
 
   def testVariance(self):
     temperature, low, peak, high, a, b = self._generate_boilerplate_param()
-    dist = tfd.PERT(low, peak, high, temperature)
+    dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
     expected_var = sp_stats.beta.var(a, b, low, high - low)
     self.assertAllClose(expected_var, self.evaluate(dist.variance()))
 
@@ -113,8 +122,8 @@ class PERTTest(test_case.TestCase):
   def testSampleEmpiricalCDF(self):
     num_samples = 300000
     temperature, low, peak, high = 2., 1., 7., 10.
-    dist = tfd.PERT(low, peak, high, temperature)
-    samples = dist.sample(num_samples, seed=tfp_test_util.test_seed())
+    dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
+    samples = dist.sample(num_samples, seed=test_util.test_seed())
 
     check_cdf_agrees = st.assert_true_cdf_equal_by_dkwm(
         samples, dist.cdf, false_fail_rate=1e-6)
@@ -130,10 +139,9 @@ class PERTTest(test_case.TestCase):
     peak = [2., 3., 4.]
     high = [3., 4., 5.]
     self.evaluate(temperature.initializer)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`temperature` must be positive.'):
+    with self.assertRaisesOpError('`temperature` must be positive.'):
       dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
-      self.evaluate(dist.sample(1))
+      self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testTemperaturePositiveAfterMutation(self):
     temperature = tf.Variable(4.)
@@ -142,10 +150,9 @@ class PERTTest(test_case.TestCase):
     high = [3., 4., 5.]
     self.evaluate(temperature.initializer)
     dist = tfd.PERT(low, peak, high, temperature, validate_args=True)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`temperature` must be positive.'):
+    with self.assertRaisesOpError('`temperature` must be positive.'):
       with tf.control_dependencies([temperature.assign(-1.)]):
-        self.evaluate(dist.sample(1))
+        self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testPeakLowInequality(self):
     low = tf.Variable([1., 2., 3.])
@@ -153,10 +160,9 @@ class PERTTest(test_case.TestCase):
     high = [5., 5., 5.]
     self.evaluate(low.initializer)
     self.evaluate(peak.initializer)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`peak` must be greater than `low`.'):
+    with self.assertRaisesOpError('`peak` must be greater than `low`.'):
       dist = tfd.PERT(low, peak, high, validate_args=True)
-      self.evaluate(dist.sample(1))
+      self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testPeakLowInequalityAfterMutation(self):
     low = tf.Variable([1., 2., 3.])
@@ -165,10 +171,9 @@ class PERTTest(test_case.TestCase):
     self.evaluate(low.initializer)
     self.evaluate(peak.initializer)
     dist = tfd.PERT(low, peak, high, validate_args=True)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`peak` must be greater than `low`.'):
+    with self.assertRaisesOpError('`peak` must be greater than `low`.'):
       with tf.control_dependencies([peak.assign([0., 0., 0.])]):
-        self.evaluate(dist.sample(1))
+        self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testHighPeakInequality(self):
     low = [1., 2., 3.]
@@ -176,10 +181,9 @@ class PERTTest(test_case.TestCase):
     high = tf.Variable([5., 5., 4.])
     self.evaluate(high.initializer)
     self.evaluate(peak.initializer)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`high` must be greater than `peak`.'):
+    with self.assertRaisesOpError('`high` must be greater than `peak`.'):
       dist = tfd.PERT(low, peak, high, validate_args=True)
-      self.evaluate(dist.sample(1))
+      self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testHighPeakInequalityAfterMutation(self):
     low = [1., 2., 3.]
@@ -188,11 +192,40 @@ class PERTTest(test_case.TestCase):
     self.evaluate(high.initializer)
     self.evaluate(peak.initializer)
     dist = tfd.PERT(low, peak, high, validate_args=True)
-    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
-                                '`high` must be greater than `peak`.'):
+    with self.assertRaisesOpError('`high` must be greater than `peak`.'):
       with tf.control_dependencies([high.assign([0., 0., 0.])]):
-        self.evaluate(dist.sample(1))
+        self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
+  def testAssertValidSample(self):
+    low = [1., 2., 3.]
+    peak = [2., 3., 4.]
+    high = [3., 4., 5.]
+    dist = tfd.PERT(low, peak, high, validate_args=True)
+    with self.assertRaisesOpError('must be greater than or equal to `low`.'):
+      self.evaluate(dist.prob([1.3, 1., 3.5]))
+    with self.assertRaisesOpError('must be less than or equal to `high`.'):
+      self.evaluate(dist.prob([2.1, 3.2, 5.2]))
+
+  def testPdfAtBoundary(self):
+    low = [1., 2., 3.]
+    peak = [2., 3., 4.]
+    high = [3., 4., 5.]
+    dist = tfd.PERT(low, peak, high, validate_args=True)
+    pdf = self.evaluate(dist.prob([low, high]))
+    log_pdf = self.evaluate(dist.log_prob([low, high]))
+    self.assertAllEqual(pdf, np.zeros_like(pdf))
+    self.assertAllNegativeInf(log_pdf)
+
+  def testSupportBijectorOutsideRange(self):
+    low = np.array([1., 2., 3.])
+    peak = np.array([4., 4., 4.])
+    high = np.array([6., 7., 6.])
+    dist = tfd.PERT(low, peak, high, validate_args=True)
+    eps = 1e-6
+    x = np.array([1. - eps, 1.5, 6. + eps])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == '__main__':
   tf.test.main()

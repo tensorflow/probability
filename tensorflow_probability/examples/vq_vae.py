@@ -44,7 +44,7 @@ from matplotlib import figure
 from matplotlib.backends import backend_agg
 import numpy as np
 from six.moves import urllib
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow_probability import distributions as tfd
 from tensorflow.contrib.learn.python.learn.datasets import mnist

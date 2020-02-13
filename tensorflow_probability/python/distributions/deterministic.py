@@ -33,8 +33,8 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
-    "Deterministic",
-    "VectorDeterministic",
+    'Deterministic',
+    'VectorDeterministic',
 ]
 
 
@@ -50,7 +50,7 @@ class _BaseDeterministic(distribution.Distribution):
                validate_args=False,
                allow_nan_stats=True,
                parameters=None,
-               name="_BaseDeterministic"):
+               name='_BaseDeterministic'):
     """Initialize a batch of `_BaseDeterministic` distributions.
 
     The `atol` and `rtol` parameters allow for some slack in `pmf`, `cdf`
@@ -78,7 +78,7 @@ class _BaseDeterministic(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       parameters: Dict of locals to facilitate copy construction.
@@ -90,18 +90,18 @@ class _BaseDeterministic(distribution.Distribution):
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([loc, atol, rtol], dtype_hint=tf.float32)
       self._loc = tensor_util.convert_nonref_to_tensor(
-          loc, dtype_hint=dtype, name="loc")
+          loc, dtype_hint=dtype, name='loc')
       self._atol = tensor_util.convert_nonref_to_tensor(
-          0 if atol is None else atol, dtype=dtype, name="atol")
+          0 if atol is None else atol, dtype=dtype, name='atol')
       self._rtol = tensor_util.convert_nonref_to_tensor(
-          0 if rtol is None else rtol, dtype=dtype, name="rtol")
+          0 if rtol is None else rtol, dtype=dtype, name='rtol')
       self._is_vector = is_vector
 
       super(_BaseDeterministic, self).__init__(
           dtype=self._loc.dtype,
           reparameterization_type=(
               reparameterization.FULLY_REPARAMETERIZED
-              if self._loc.dtype.is_floating
+              if dtype_util.is_floating(self._loc.dtype)
               else reparameterization.NOT_REPARAMETERIZED),
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
@@ -110,7 +110,7 @@ class _BaseDeterministic(distribution.Distribution):
 
   def _slack(self, loc):
     # Avoid using the large broadcast with self.loc if possible.
-    if self.parameters["rtol"] is None:
+    if self.parameters['rtol'] is None:
       return self.atol
     else:
       return self.atol + self.rtol * tf.abs(loc)
@@ -151,13 +151,16 @@ class _BaseDeterministic(distribution.Distribution):
                    self._event_shape_tensor(loc=loc)],
                   axis=0))
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 
     # In init, we can always build shape and dtype checks because
     # we assume shape doesn't change for Variable backed args.
     if is_init and self._is_vector:
-      msg = "Argument `loc` must be at least rank 1."
+      msg = 'Argument `loc` must be at least rank 1.'
       if tensorshape_util.rank(self.loc.shape) is not None:
         if tensorshape_util.rank(self.loc.shape) < 1:
           raise ValueError(msg)
@@ -172,11 +175,11 @@ class _BaseDeterministic(distribution.Distribution):
     if is_init != tensor_util.is_ref(self.atol):
       assertions.append(
           assert_util.assert_non_negative(
-              self.atol, message="Argument 'atol' must be non-negative"))
+              self.atol, message='Argument "atol" must be non-negative'))
     if is_init != tensor_util.is_ref(self.rtol):
       assertions.append(
           assert_util.assert_non_negative(
-              self.rtol, message="Argument 'rtol' must be non-negative"))
+              self.rtol, message='Argument "rtol" must be non-negative'))
     return assertions
 
 
@@ -225,7 +228,7 @@ class Deterministic(_BaseDeterministic):
                rtol=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="Deterministic"):
+               name='Deterministic'):
     """Initialize a scalar `Deterministic` distribution.
 
     The `atol` and `rtol` parameters allow for some slack in `pmf`, `cdf`
@@ -251,7 +254,7 @@ class Deterministic(_BaseDeterministic):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -290,7 +293,8 @@ class Deterministic(_BaseDeterministic):
   def _prob(self, x):
     loc = tf.convert_to_tensor(self.loc)
     # Enforces dtype of probability to be float, when self.dtype is not.
-    prob_dtype = self.dtype if self.dtype.is_floating else tf.float32
+    prob_dtype = self.dtype if dtype_util.is_floating(
+        self.dtype) else tf.float32
     return tf.cast(tf.abs(x - loc) <= self._slack(loc), dtype=prob_dtype)
 
   def _cdf(self, x):
@@ -344,10 +348,10 @@ class VectorDeterministic(_BaseDeterministic):
                rtol=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="VectorDeterministic"):
+               name='VectorDeterministic'):
     """Initialize a `VectorDeterministic` distribution on `R^k`, for `k >= 0`.
 
-    Note that there is only one point in `R^0`, the "point" `[]`.  So if `k = 0`
+    Note that there is only one point in `R^0`, the 'point' `[]`.  So if `k = 0`
     then `self.prob([]) == 1`.
 
     The `atol` and `rtol` parameters allow for some slack in `pmf`
@@ -373,7 +377,7 @@ class VectorDeterministic(_BaseDeterministic):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -411,21 +415,21 @@ class VectorDeterministic(_BaseDeterministic):
     return self.loc.shape[-1:]
 
   def _prob(self, x):
-    if self.validate_args:
-      is_vector_check = assert_util.assert_rank_at_least(x, 1)
-      right_vec_space_check = assert_util.assert_equal(
-          self.event_shape_tensor(),
-          tf.gather(tf.shape(x),
-                    tf.rank(x) - 1),
-          message="Argument 'x' not defined in the same space R^k as this distribution"
-      )
-      with tf.control_dependencies([is_vector_check]):
-        with tf.control_dependencies([right_vec_space_check]):
-          x = tf.identity(x)
     loc = tf.convert_to_tensor(self.loc)
     return tf.cast(
         tf.reduce_all(tf.abs(x - loc) <= self._slack(loc), axis=-1),
         dtype=self.dtype)
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_rank_at_least(x, 1))
+    assertions.append(assert_util.assert_equal(
+        self.event_shape_tensor(), tf.gather(tf.shape(x), tf.rank(x) - 1),
+        message=('Argument `x` not defined in the same space '
+                 'R**k as this distribution')))
+    return assertions
 
 
 @kullback_leibler.RegisterKL(_BaseDeterministic, distribution.Distribution)
@@ -436,10 +440,10 @@ def _kl_deterministic_distribution(a, b, name=None):
     a: instance of a Deterministic distribution object.
     b: instance of a Distribution distribution object.
     name: (optional) Name to use for created operations. Default is
-      "kl_deterministic_distribution".
+      'kl_deterministic_distribution'.
 
   Returns:
     Batchwise `KL(a || b)`.
   """
-  with tf.name_scope(name or "kl_deterministic_distribution"):
+  with tf.name_scope(name or 'kl_deterministic_distribution'):
     return -b.log_prob(a.loc)

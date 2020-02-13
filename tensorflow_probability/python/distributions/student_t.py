@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -357,3 +358,8 @@ class StudentT(distribution.Distribution):
       assertions.append(assert_util.assert_positive(
           self._df, message='Argument `df` must be positive.'))
     return assertions
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector (consider one that
+    # transforms away the heavy tails).
+    return identity_bijector.Identity(validate_args=self.validate_args)

@@ -24,14 +24,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts import SemiLocalLinearTrendStateSpaceModel
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
-
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _SemiLocalLinearTrendStateSpaceModelTest(object):
 
   def test_logprob(self):
@@ -166,7 +164,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
     if self.use_static_shape:
       y_batch_shape = y.shape.as_list()[:-2]
     else:
-      y_batch_shape = self.evaluate(tf.shape(input=y))[:-2]
+      y_batch_shape = self.evaluate(tf.shape(y))[:-2]
     self.assertAllEqual(y_batch_shape, batch_shape)
 
   def _build_placeholder(self, ndarray):
@@ -183,26 +181,26 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SemiLocalLinearTrendStateSpaceModelTestStaticShape32(
-    test_case.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SemiLocalLinearTrendStateSpaceModelTestDynamicShape32(
-    test_case.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SemiLocalLinearTrendStateSpaceModelTestStaticShape64(
-    test_case.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _SemiLocalLinearTrendStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 

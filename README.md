@@ -34,16 +34,13 @@ __Layer 1: Statistical Building Blocks__
 
 __Layer 2: Model Building__
 
-* Edward2 ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/edward2)):
-  A probabilistic programming language for specifying flexible probabilistic
-  models as programs. See the
-  [Edward2 `README.md`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/experimental/edward2/README.md).
+* Joint Distributions (e.g., [`tfp.distributions.JointDistributionSequential`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/joint_distribution_sequential.py)):
+    Joint distributions over one or more possibly-interdependent distributions.
+    For an introduction to modeling with TFP's `JointDistribution`s, check out
+    [this colab](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Modeling_with_JointDistribution.ipynb)
 * Probabilistic Layers ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
   Neural network layers with uncertainty over the functions they represent,
   extending TensorFlow Layers.
-* Trainable Distributions ([`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions)):
-  Probability distributions parameterized by a single Tensor, making it easy to
-  build neural nets that output probability distributions.
 
 __Layer 3: Probabilistic Inference__
 
@@ -100,7 +97,6 @@ It also includes example scripts such as:
   Representation learning over productions in a context-free grammar.
 * Latent Dirichlet Allocation
   ([Distributions version](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation_distributions.py),
-  [Edward2 version](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation_edward2.py)).
   Mixed membership modeling for capturing topics in a document.
 + [Deep Exponential Family](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/deep_exponential_family.py).
   A deep, sparse generative model for discovering a hierarchy of topics.
@@ -187,7 +183,7 @@ environment.
   or answer technical questions.
 * [GitHub](https://github.com/tensorflow/probability/issues): Report bugs or
   make feature requests.
-* [TensorFlow Blog](https://medium.com/tensorflow): Stay up to date on content
+* [TensorFlow Blog](https://blog.tensorflow.org/): Stay up to date on content
   from the TensorFlow team and best articles from the community.
 * [Youtube Channel](http://youtube.com/tensorflow/): Follow TensorFlow shows.
 * [tfprobability@tensorflow.org](https://groups.google.com/a/tensorflow.org/forum/#!forum/tfprobability):

@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
 """Estimating the volume of the correlation matrices with bounded determinant.
 
 Why?  Because lkj_test.py tests the sampler for the LKJ distribution
@@ -104,7 +90,7 @@ def _psd_mask(x):
   # have an exponential condition number.
   eigenvalues, _ = tf.linalg.eigh(x)
   return tf.cast(
-      tf.reduce_min(input_tensor=eigenvalues, axis=-1) >= 0, dtype=x.dtype)
+      tf.reduce_min(eigenvalues, axis=-1) >= 0, dtype=x.dtype)
 
 
 def _det_large_enough_mask(x, det_bounds):
@@ -154,7 +140,7 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
       along the bottom two dimensions is symmetric and has 1s on the
       main diagonal.
   """
-  num_entries = num_rows * (num_rows + 1) / 2
+  num_entries = num_rows * (num_rows + 1) // 2
   ones = tf.ones(shape=[num_entries], dtype=dtype)
   # It seems wasteful to generate random values for the diagonal since
   # I am going to throw them away, but `fill_triangular` fills the
@@ -276,6 +262,10 @@ def _clopper_pearson_confidence_interval(samples, error_rate):
   n = len(samples)
   low = np.amin(samples)
   high = np.amax(samples)
+  if low == high:
+    msg = ("Cannot compute Clopper-Pearson interval: all samples "
+           "are equal to {}.".format(low))
+    raise ValueError(msg)
   successes = np.count_nonzero(samples - low)
   failures = np.count_nonzero(samples - high)
   if successes + failures != n:
@@ -289,10 +279,8 @@ def _clopper_pearson_confidence_interval(samples, error_rate):
   def p_big_enough(p):
     prob = stats.binom.logsf(successes, n, p)
     return prob - np.log(error_rate / 2.)
-  high_p = optimize.brentq(
-      p_small_enough, float(successes) / n, 1., rtol=1e-9)
-  low_p = optimize.brentq(
-      p_big_enough, 0., float(successes) / n, rtol=1e-9)
+  high_p = optimize.brentq(p_small_enough, successes / n, 1., rtol=1e-9)
+  low_p = optimize.brentq(p_big_enough, 0., successes / n, rtol=1e-9)
   low_interval = low + (high - low) * low_p
   high_interval = low + (high - low) * high_p
   return (low_interval, high_interval)

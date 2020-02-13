@@ -25,15 +25,14 @@ import functools
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorCompositionTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorCompositionTest(test_util.TestCase):
 
   def testComposeFromChainBijector(self):
     x = tf.constant([-5., 0., 5.])

@@ -131,16 +131,20 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = super(MaternOneHalf, self)._init_params(amplitude, length_scale)
       super(MaternOneHalf, self).__init__(
-          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
 
-  def _apply(self, x1, x2, example_ndims=0):
+  def _apply_with_distance(
+      self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
-    norm = util.sqrt_with_finite_grads(
-        util.sum_rightmost_ndims_preserving_shape(
-            tf.math.squared_difference(x1, x2), self.feature_ndims))
+    norm = util.sqrt_with_finite_grads(pairwise_square_distance)
     if self.length_scale is not None:
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
@@ -154,6 +158,25 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
           amplitude, ndims=example_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
+
+  def _apply(self, x1, x2, example_ndims=0):
+    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
+        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
+
+  def _matrix(self, x1, x2):
+    pairwise_square_distance = util.pairwise_square_distance_matrix(
+        x1, x2, self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=2)
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    pairwise_square_distance = util.pairwise_square_distance_tensor(
+        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance,
+        example_ndims=(x1_example_ndims + x2_example_ndims))
 
 
 class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
@@ -194,17 +217,21 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = super(MaternThreeHalves, self)._init_params(
           amplitude, length_scale)
       super(MaternThreeHalves, self).__init__(
-          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
 
-  def _apply(self, x1, x2, example_ndims=0):
+  def _apply_with_distance(
+      self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
-    norm = util.sqrt_with_finite_grads(
-        util.sum_rightmost_ndims_preserving_shape(
-            tf.math.squared_difference(x1, x2), self.feature_ndims))
+    norm = util.sqrt_with_finite_grads(pairwise_square_distance)
     if self.length_scale is not None:
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
@@ -218,6 +245,25 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
       amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
+
+  def _apply(self, x1, x2, example_ndims=0):
+    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
+        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
+
+  def _matrix(self, x1, x2):
+    pairwise_square_distance = util.pairwise_square_distance_matrix(
+        x1, x2, self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=2)
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    pairwise_square_distance = util.pairwise_square_distance_tensor(
+        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance,
+        example_ndims=(x1_example_ndims + x2_example_ndims))
 
 
 class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
@@ -258,17 +304,21 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = super(MaternFiveHalves, self)._init_params(
           amplitude, length_scale)
       super(MaternFiveHalves, self).__init__(
-          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
 
-  def _apply(self, x1, x2, example_ndims=0):
+  def _apply_with_distance(
+      self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
-    norm = util.sqrt_with_finite_grads(
-        util.sum_rightmost_ndims_preserving_shape(
-            tf.math.squared_difference(x1, x2), self.feature_ndims))
+    norm = util.sqrt_with_finite_grads(pairwise_square_distance)
     if self.length_scale is not None:
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
@@ -282,3 +332,22 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
       amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
       log_result += 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
+
+  def _apply(self, x1, x2, example_ndims=0):
+    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
+        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
+
+  def _matrix(self, x1, x2):
+    pairwise_square_distance = util.pairwise_square_distance_matrix(
+        x1, x2, self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=2)
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    pairwise_square_distance = util.pairwise_square_distance_tensor(
+        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance,
+        example_ndims=(x1_example_ndims + x2_example_ndims))

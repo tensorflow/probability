@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
@@ -115,6 +116,9 @@ class Exponential(gamma.Gamma):
   def rate(self):
     return self._rate
 
+  def _cdf(self, value):
+    return -tf.math.expm1(-self.rate * value)
+
   def _log_survival_function(self, value):
     rate = tf.convert_to_tensor(self._rate)
     return self._log_prob(value, rate=rate) - tf.math.log(rate)
@@ -140,3 +144,6 @@ class Exponential(gamma.Gamma):
 
   def _quantile(self, value):
     return -tf.math.log1p(-value) / self.rate
+
+  def _default_event_space_bijector(self):
+    return softplus_bijector.Softplus(validate_args=self.validate_args)

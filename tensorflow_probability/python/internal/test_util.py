@@ -12,39 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Utilities for testing distributions and/or bijectors."""
+"""Utilities for testing TFP code."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import os
-
-# Dependency imports
 
 from absl import flags
 from absl import logging
+from absl.testing import parameterized
 import numpy as np
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'numpy_disable_gradient_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
+    'test_all_tf_execution_regimes',
+    'test_graph_and_eager_modes',
+    'test_graph_mode_only',
     'test_seed',
     'test_seed_stream',
+    'floats_near',
     'DiscreteScalarDistributionTestHelpers',
+    'TestCase',
     'VectorDistributionTestHelpers',
 ]
 
 
-FLAGS = flags.FLAGS
-
+# Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
                    'With --runs_per_test=N, produces N iid runs.'))
@@ -52,6 +60,305 @@ flags.DEFINE_bool('vary_seed', False,
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
                      'Takes precedence over --vary-seed when both appear.'))
+
+
+class TestCase(tf.test.TestCase, parameterized.TestCase):
+  """Class to provide TensorFlow Probability specific test features."""
+
+  def maybe_static(self, x, is_static):
+    """If `not is_static`, return placeholder_with_default with unknown shape.
+
+    Args:
+      x: A `Tensor`
+      is_static: a Python `bool`; if True, x is returned unchanged. If False, x
+        is wrapped with a tf1.placeholder_with_default with fully dynamic shape.
+
+    Returns:
+      maybe_static_x: `x`, possibly wrapped with in a
+      `placeholder_with_default` of unknown shape.
+    """
+    if is_static:
+      return x
+    else:
+      return tf1.placeholder_with_default(x, shape=None)
+
+  def assertAllFinite(self, a):
+    """Assert that all entries in a `Tensor` are finite.
+
+    Args:
+      a: A `Tensor` whose entries are checked for finiteness.
+    """
+    is_finite = np.isfinite(self._GetNdArray(a))
+    all_true = np.ones_like(is_finite, dtype=np.bool)
+    self.assertAllEqual(all_true, is_finite)
+
+  def assertAllPositiveInf(self, a):
+    """Assert that all entries in a `Tensor` are equal to positive infinity.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as positive infinity.
+    """
+    is_positive_inf = np.isposinf(self._GetNdArray(a))
+    all_true = np.ones_like(is_positive_inf, dtype=np.bool)
+    self.assertAllEqual(all_true, is_positive_inf)
+
+  def assertAllNegativeInf(self, a):
+    """Assert that all entries in a `Tensor` are negative infinity.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as negative infinity.
+    """
+    is_negative_inf = np.isneginf(self._GetNdArray(a))
+    all_true = np.ones_like(is_negative_inf, dtype=np.bool)
+    self.assertAllEqual(all_true, is_negative_inf)
+
+  def assertAllNan(self, a):
+    """Assert that every entry in a `Tensor` is NaN.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as NaN.
+    """
+    is_nan = np.isnan(self._GetNdArray(a))
+    all_true = np.ones_like(is_nan, dtype=np.bool)
+    self.assertAllEqual(all_true, is_nan)
+
+  def assertAllNotNone(self, a):
+    """Assert that no entry in a collection is None.
+
+    Args:
+      a: A Python iterable collection, whose entries must be verified as not
+      being `None`.
+    """
+    each_not_none = [x is not None for x in a]
+    if all(each_not_none):
+      return
+
+    msg = (
+        'Expected no entry to be `None` but found `None` in positions {}'
+        .format([i for i, x in enumerate(each_not_none) if not x]))
+    raise AssertionError(msg)
+
+  def assertAllIs(self, a, b):
+    """Assert that each element of `a` `is` `b`.
+
+    Args:
+      a: A Python iterable collection, whose entries must be elementwise `is b`.
+      b: A Python iterable collection, whose entries must be elementwise `is a`.
+    """
+    if len(a) != len(b):
+      raise AssertionError(
+          'Arguments `a` and `b` must have the same number of elements '
+          'but found len(a)={} and len(b)={}.'.format(len(a), len(b)))
+    each_is = [a is b for a, b in zip(a, b)]
+    if all(each_is):
+      return
+    msg = (
+        'For each element expected `a is b` but found `not is` in positions {}'
+        .format([i for i, x in enumerate(each_is) if not x]))
+    raise AssertionError(msg)
+
+  def compute_max_gradient_error(self, f, args, delta=1e-3):
+    """Wrapper around TF's gradient_checker_v2.
+
+    `gradient_checker_v2` depends on there being a default session, but our test
+    setup, using test_combinations, doesn't run the test function under a global
+    `self.test_session()` context. Thus, when running
+    `gradient_checker_v2.compute_gradient`, we need to ensure we're in a
+    `self.test_session()` context when not in eager mode. This function bundles
+    up the relevant logic, and ultimately returns the max error across autodiff
+    and finite difference gradient calculations.
+
+    Args:
+      f: callable function whose gradient to compute.
+      args: Python `list` of independent variables with respect to which to
+      compute gradients.
+      delta: floating point value to use for finite difference calculation.
+
+    Returns:
+      err: the maximum error between all components of the numeric and
+      autodiff'ed gradients.
+    """
+    def _compute_error():
+      return gradient_checker_v2.max_error(
+          *gradient_checker_v2.compute_gradient(f, x=args, delta=delta))
+    if tf.executing_eagerly():
+      return _compute_error()
+    else:
+      # Make sure there's a global default session in graph mode.
+      with self.test_session():
+        return _compute_error()
+
+
+@contextlib.contextmanager
+def _tf_function_mode_context(tf_function_mode):
+  """Context manager controlling `tf.function` behavior (enabled/disabled).
+
+  Before activating, the previously set mode is stored. Then the mode is changed
+  to the given `tf_function_mode` and control yielded back to the caller. Upon
+  exiting the context, the mode is returned to its original state.
+
+  Args:
+    tf_function_mode: a Python `str`, either 'no_tf_function' or ''.
+    If '', `@tf.function`-decorated code behaves as usual (ie, a
+    background graph is created). If 'no_tf_function', `@tf.function`-decorated
+    code will behave as if it had not been `@tf.function`-decorated. Since users
+    will be able to do this (e.g., to debug library code that has been
+    `@tf.function`-decorated), we need to ensure our tests cover the behavior
+    when this is the case.
+
+  Yields:
+    None
+  """
+  if tf_function_mode not in ['', 'no_tf_function']:
+    raise ValueError(
+        'Only allowable values for tf_function_mode_context are "" '
+        'and "no_tf_function"; but got "{}"'.format(tf_function_mode))
+  original_mode = tf.config.experimental_functions_run_eagerly()
+  try:
+    tf.config.experimental_run_functions_eagerly(tf_function_mode ==
+                                                 'no_tf_function')
+    yield
+  finally:
+    tf.config.experimental_run_functions_eagerly(original_mode)
+
+
+class EagerGraphCombination(test_combinations.TestCombination):
+  """Run the test in Graph or Eager mode.  Graph is the default.
+
+  The optional `mode` parameter controls the test's execution mode.  Its
+  accepted values are "graph" or "eager" literals.
+  """
+
+  def context_managers(self, kwargs):
+    # TODO(isaprykin): Switch the default to eager.
+    mode = kwargs.pop('mode', 'graph')
+    if mode == 'eager':
+      return [context.eager_mode()]
+    elif mode == 'graph':
+      return [tf1.Graph().as_default(), context.graph_mode()]
+    else:
+      raise ValueError(
+          '`mode` must be "eager" or "graph". Got: "{}"'.format(mode))
+
+  def parameter_modifiers(self):
+    return [test_combinations.OptionalParameter('mode')]
+
+
+class ExecuteFunctionsEagerlyCombination(test_combinations.TestCombination):
+  """A `TestCombinationi` for enabling/disabling `tf.function` execution modes.
+
+  For more on `TestCombination`, check out
+  'tensorflow/python/framework/test_combinations.py' in the TensorFlow code
+  base.
+
+  This `TestCombination` supports two values for the `tf_function` combination
+  argument: 'no_tf_function' and ''. The mode switching is performed using
+  `tf.experimental_run_functions_eagerly(mode)`.
+  """
+
+  def context_managers(self, kwargs):
+    mode = kwargs.pop('tf_function', '')
+    return [_tf_function_mode_context(mode)]
+
+  def parameter_modifiers(self):
+    return [test_combinations.OptionalParameter('tf_function')]
+
+
+def test_all_tf_execution_regimes(test_class_or_method=None):
+  """Decorator for generating a collection of tests in various contexts.
+
+  Must be applied to subclasses of `parameterized.TestCase` (from
+  `absl/testing`), or a method of such a subclass.
+
+  When applied to a test method, this decorator results in the replacement of
+  that method with a collection of new test methods, each executed under a
+  different set of context managers that control some aspect of the execution
+  model. This decorator generates three test scenario combinations:
+
+    1. Eager mode with `tf.function` decorations enabled
+    2. Eager mode with `tf.function` decorations disabled
+    3. Graph mode (eveything)
+
+  When applied to a test class, all the methods in the class are affected.
+
+  Args:
+    test_class_or_method: the `TestCase` class or method to decorate.
+
+  Returns:
+    decorator: A generated TF `test_combinations` decorator, or if
+    `test_class_or_method` is not `None`, the generated decorator applied to
+    that function.
+  """
+  decorator = test_combinations.generate(
+      (test_combinations.combine(mode='graph',
+                                 tf_function='') +
+       test_combinations.combine(
+           mode='eager', tf_function=['', 'no_tf_function'])),
+      test_combinations=[
+          EagerGraphCombination(),
+          ExecuteFunctionsEagerlyCombination(),
+      ])
+
+  if test_class_or_method:
+    return decorator(test_class_or_method)
+  return decorator
+
+
+def test_graph_and_eager_modes(test_class_or_method=None):
+  """Decorator for generating graph and eager mode tests from a single test.
+
+  Must be applied to subclasses of `parameterized.TestCase` (from
+  absl/testing), or a method of such a subclass.
+
+  When applied to a test method, this decorator results in the replacement of
+  that method with a two new test methods, one executed in graph mode and the
+  other in eager mode.
+
+  When applied to a test class, all the methods in the class are affected.
+
+  Args:
+    test_class_or_method: the `TestCase` class or method to decorate.
+
+  Returns:
+    decorator: A generated TF `test_combinations` decorator, or if
+    `test_class_or_method` is not `None`, the generated decorator applied to
+    that function.
+  """
+  decorator = test_combinations.generate(
+      test_combinations.combine(mode=['graph', 'eager']),
+      test_combinations=[EagerGraphCombination()])
+
+  if test_class_or_method:
+    return decorator(test_class_or_method)
+  return decorator
+
+
+def test_graph_mode_only(test_class_or_method=None):
+  """Decorator for ensuring tests run in graph mode.
+
+  Must be applied to subclasses of `parameterized.TestCase` (from
+  absl/testing), or a method of such a subclass.
+
+  When applied to a test method, this decorator results in the replacement of
+  that method with one new test method, executed in graph mode.
+
+  When applied to a test class, all the methods in the class are affected.
+
+  Args:
+    test_class_or_method: the `TestCase` class or method to decorate.
+
+  Returns:
+    decorator: A generated TF `test_combinations` decorator, or if
+    `test_class_or_method` is not `None`, the generated decorator applied to
+    that function.
+  """
+  decorator = test_combinations.generate(
+      test_combinations.combine(mode=['graph']),
+      test_combinations=[EagerGraphCombination()])
+
+  if test_class_or_method:
+    return decorator(test_class_or_method)
+  return decorator
 
 
 JAX_MODE = False
@@ -84,6 +391,25 @@ def jax_disable_variable_test(test_fn):
   return new_test
 
 
+def numpy_disable_test_missing_functionality(issue_link):
+  """Disable a test for unimplemented numpy functionality."""
+
+  def f(test_fn):
+    """Decorator."""
+    if JAX_MODE:
+      return test_fn
+
+    def new_test(self, *args, **kwargs):
+      if tf.Variable == ops.NumpyVariable:
+        msg = 'Test disabled for numpy missing functionality: {}'
+        self.skipTest(msg.format(issue_link))
+      return test_fn(self, *args, **kwargs)
+
+    return new_test
+
+  return f
+
+
 def jax_disable_test_missing_functionality(issue_link):
   """Disable a test for unimplemented JAX functionality."""
 
@@ -99,6 +425,17 @@ def jax_disable_test_missing_functionality(issue_link):
     return new_test
 
   return f
+
+
+def tf_tape_safety_test(test_fn):
+  """Only run a test of TF2 tape safety against the TF backend."""
+
+  def new_test(self, *args, **kwargs):
+    if JAX_MODE or (tf.Variable == ops.NumpyVariable):
+      self.skipTest('Tape-safety tests are only run against TensorFlow.')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
 
 
 def test_seed(hardcoded_seed=None, set_eager_seed=True):
@@ -124,7 +461,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
   `--fixed_seed` takes precedence over `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  test_case.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_util.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 
@@ -132,16 +469,16 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     hardcoded_seed: Optional Python value.  The seed to use instead of 17 if
       both the `--vary_seed` and `--fixed_seed` flags are unset.  This should
       usually be unnecessary, since a test should pass with any seed.
-    set_eager_seed: Python bool.  If true (default), invoke `tf.set_random_seed`
+    set_eager_seed: Python bool.  If true (default), invoke `tf.random.set_seed`
       in Eager mode to get more reproducibility.  Should become unnecessary
       once b/68017812 is resolved.
 
   Returns:
     seed: 17, unless otherwise specified by arguments or command line flags.
   """
-  if FLAGS.fixed_seed is not None:
-    answer = int(FLAGS.fixed_seed)
-  elif FLAGS.vary_seed:
+  if flags.FLAGS.fixed_seed is not None:
+    answer = int(flags.FLAGS.fixed_seed)
+  elif flags.FLAGS.vary_seed:
     entropy = os.urandom(64)
     # Why does Python make it so hard to just grab a bunch of bytes from
     # /dev/urandom and get them interpreted as an integer?  Oh, well.
@@ -160,7 +497,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
 def _wrap_seed(seed, set_eager_seed):
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
   if tf.executing_eagerly() and set_eager_seed:
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
   return seed
 
 
@@ -185,12 +522,12 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
 
   To those ends, this function returns a `SeedStream` seeded with `test_seed`
   (which see).  The latter respects the command line flags `--fixed_seed=<seed>`
-  and `--vary-seed` (Boolean, default False).  `--vary_seed` uses system entropy
+  and `--vary_seed` (Boolean, default False).  `--vary_seed` uses system entropy
   to produce unpredictable seeds.  `--fixed_seed` takes precedence over
   `--vary_seed` when both are present.
 
   Note that TensorFlow graph mode operations tend to read seed state from two
-  sources: a "graph-level seed" and an "op-level seed".  test_case.TestCase will
+  sources: a "graph-level seed" and an "op-level seed".  test_util.TestCase will
   set the former to a fixed value per test, but in general it may be necessary
   to explicitly set both to ensure reproducibility.
 
@@ -208,12 +545,40 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
   return SeedStream(test_seed(hardcoded_seed), salt=salt)
 
 
+def floats_near(target, how_many, dtype=np.float32):
+  """Returns all the floats nearest the given target.
+
+  This is useful for brute-force testing for situations where round-off errors
+  may violate software invariants (e.g., interpolation result falling outside
+  the interval being interpolated into).
+
+  This implementation may itself have numerical infelicities, so may contain
+  gaps and duplicates, but should be pretty good for non-zero (and non-denormal)
+  targets.
+
+  Args:
+    target: Float near which to produce candidates.
+    how_many: How many candidates to produce.
+    dtype: The floating point type of outputs to emit.  The returned values
+      are supposed to densely cover the space of floats representable in this
+      dtype near the target.
+
+  Returns:
+    floats: A 1-D numpy array of `how_many` floats of the requested type,
+      densely covering the space of representable floats near `target`.
+  """
+  eps = np.finfo(dtype).eps
+  offset = eps * how_many / 2
+  return np.linspace(target * (1. - offset), target * (1. + offset),
+                     how_many, dtype=dtype)
+
+
 class DiscreteScalarDistributionTestHelpers(object):
   """DiscreteScalarDistributionTestHelpers."""
 
   def run_test_sample_consistent_log_prob(
       self, sess_run_fn, dist,
-      num_samples=int(1e5), num_threshold=int(1e3), seed=42,
+      num_samples=int(1e5), num_threshold=int(1e3), seed=None,
       batch_size=None,
       rtol=1e-2, atol=0.):
     """Tests that sample/log_prob are consistent with each other.
@@ -255,11 +620,11 @@ class DiscreteScalarDistributionTestHelpers(object):
       raise ValueError('num_threshold({}) must be at least 1.'.format(
           num_threshold))
     # Histogram only supports vectors so we call it once per batch coordinate.
-    y = dist.sample(num_samples, seed=seed)
+    y = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
     y = tf.reshape(y, shape=[num_samples, -1])
     if batch_size is None:
-      batch_size = tf.reduce_prod(input_tensor=dist.batch_shape_tensor())
-    batch_dims = tf.shape(input=dist.batch_shape_tensor())[0]
+      batch_size = tf.reduce_prod(dist.batch_shape_tensor())
+    batch_dims = tf.shape(dist.batch_shape_tensor())[0]
     edges_expanded_shape = 1 + tf.pad(tensor=[-2], paddings=[[0, batch_dims]])
     for b, x in enumerate(tf.unstack(y, num=batch_size, axis=1)):
       counts, edges = self.histogram(x)
@@ -276,7 +641,7 @@ class DiscreteScalarDistributionTestHelpers(object):
 
   def run_test_sample_consistent_mean_variance(
       self, sess_run_fn, dist,
-      num_samples=int(1e5), seed=24,
+      num_samples=int(1e5), seed=None,
       rtol=1e-2, atol=0.):
     """Tests that sample/mean/variance are consistent with each other.
 
@@ -299,10 +664,11 @@ class DiscreteScalarDistributionTestHelpers(object):
       atol: Python `float`-type indicating the admissible absolute error between
         analytical and sample statistics.
     """
-    x = tf.cast(dist.sample(num_samples, seed=seed), dtype=tf.float32)
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
-    sample_variance = tf.reduce_mean(
-        input_tensor=tf.square(x - sample_mean), axis=0)
+    x = tf.cast(dist.sample(num_samples,
+                            seed=test_seed_stream(hardcoded_seed=seed)),
+                dtype=tf.float32)
+    sample_mean = tf.reduce_mean(x, axis=0)
+    sample_variance = tf.reduce_mean(tf.square(x - sample_mean), axis=0)
     sample_stddev = tf.sqrt(sample_variance)
 
     [
@@ -350,7 +716,7 @@ class DiscreteScalarDistributionTestHelpers(object):
       x = tf.convert_to_tensor(value=x, name='x')
       if value_range is None:
         value_range = [
-            tf.reduce_min(input_tensor=x), 1 + tf.reduce_max(input_tensor=x)
+            tf.reduce_min(x), 1 + tf.reduce_max(x)
         ]
       value_range = tf.convert_to_tensor(value=value_range, name='value_range')
       lo = value_range[0]
@@ -375,7 +741,7 @@ class VectorDistributionTestHelpers(object):
       num_samples=int(1e5),
       radius=1.,
       center=0.,
-      seed=42,
+      seed=None,
       rtol=1e-2,
       atol=0.):
     """Tests that sample/log_prob are mutually consistent.
@@ -451,23 +817,24 @@ class VectorDistributionTestHelpers(object):
       # https://en.wikipedia.org/wiki/Volume_of_an_n-ball
       # Using tf.lgamma because we'd have to otherwise use SciPy which is not
       # a required dependency of core.
-      radius = np.asarray(radius)
       dims = tf.cast(dims, dtype=radius.dtype)
       return tf.exp((dims / 2.) * np.log(np.pi) -
                     tf.math.lgamma(1. + dims / 2.) + dims * tf.math.log(radius))
 
     def monte_carlo_hypersphere_volume(dist, num_samples, radius, center):
       # https://en.wikipedia.org/wiki/Importance_sampling
-      x = dist.sample(num_samples, seed=seed)
+      x = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
       x = tf.identity(x)  # Invalidate bijector cacheing.
       inverse_log_prob = tf.exp(-dist.log_prob(x))
       importance_weights = tf1.where(
           tf.norm(tensor=x - center, axis=-1) <= radius, inverse_log_prob,
           tf.zeros_like(inverse_log_prob))
-      return tf.reduce_mean(input_tensor=importance_weights, axis=0)
+      return tf.reduce_mean(importance_weights, axis=0)
 
     # Build graph.
     with tf.name_scope('run_test_sample_consistent_log_prob'):
+      radius = tf.convert_to_tensor(radius, dist.dtype)
+      center = tf.convert_to_tensor(center, dist.dtype)
       batch_shape = dist.batch_shape_tensor()
       actual_volume = actual_hypersphere_volume(
           dims=dist.event_shape_tensor()[0],
@@ -494,7 +861,7 @@ class VectorDistributionTestHelpers(object):
       sess_run_fn,
       dist,
       num_samples=int(1e5),
-      seed=24,
+      seed=None,
       rtol=1e-2,
       atol=0.1,
       cov_rtol=None,
@@ -525,10 +892,10 @@ class VectorDistributionTestHelpers(object):
         between analytical and sample covariance. Default: atol.
     """
 
-    x = dist.sample(num_samples, seed=seed)
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    x = dist.sample(num_samples, seed=test_seed_stream(hardcoded_seed=seed))
+    sample_mean = tf.reduce_mean(x, axis=0)
     sample_covariance = tf.reduce_mean(
-        input_tensor=_vec_outer_square(x - sample_mean), axis=0)
+        _vec_outer_square(x - sample_mean), axis=0)
     sample_variance = tf.linalg.diag_part(sample_covariance)
     sample_stddev = tf.sqrt(sample_variance)
 

@@ -32,6 +32,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 def _map_fn(  # pylint: disable=unused-argument
     fn,
     elems,
@@ -41,7 +44,22 @@ def _map_fn(  # pylint: disable=unused-argument
     swap_memory=False,
     infer_shape=True,
     name=None):
-  return np.array([fn(x) for x in elems])
+  """Numpy implementation of tf.map_fn."""
+  if JAX_MODE:
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    elems_flat, in_tree = tree_util.tree_flatten(elems)
+    elems_zipped = zip(*elems_flat)
+    def func(flat_args):
+      unflat_args = tree_util.tree_unflatten(in_tree, flat_args)
+      return fn(unflat_args)
+    return np.stack([func(x) for x in elems_zipped])
+
+  if isinstance(elems, np.ndarray):
+    return np.array([fn(x) for x in elems])
+
+  # In the NumPy backend, we do not yet support map_fn over lists, tuples, or
+  # other structures.
+  raise NotImplementedError
 
 
 def _scan(  # pylint: disable=unused-argument

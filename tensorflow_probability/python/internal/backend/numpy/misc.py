@@ -26,11 +26,15 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import floor
+from tensorflow_probability.python.internal.backend.numpy.numpy_math import truediv
+from tensorflow_probability.python.internal.backend.numpy.ops import clip_by_value
 from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
 
 
 __all__ = [
     'argsort',
+    'histogram_fixed_width_bins',
     'is_tensor',
     'sort',
     'tensor_scatter_nd_add',
@@ -38,15 +42,9 @@ __all__ = [
     'tensor_scatter_nd_update',
     'unique',
     # 'clip_by_norm',
-    # 'floormod',
-    # 'meshgrid',
-    # 'mod',
-    # 'norm',
     # 'realdiv',
     # 'scatter_nd',
-    # 'searchsorted',
     # 'strided_slice',
-    # 'truediv',
     # 'truncatediv',
     # 'truncatemod',
     # 'unique_with_counts',
@@ -65,6 +63,19 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
   return np.argsort(values, axis, kind='stable' if stable else 'quicksort')
+
+
+def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=tf.int32,
+                                name=None):
+  """Numpy implementation of `tf.histogram_fixed_width_bins`."""
+  del name
+  nbins_float = np.array(nbins, values.dtype)
+  scaled_values = truediv(
+      values - value_range[0], value_range[1] - value_range[0])
+  indices = floor(nbins_float * scaled_values)
+  indices = clip_by_value(indices, 0, nbins_float - 1).astype(
+      utils.numpy_dtype(dtype))
+  return indices
 
 
 def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable=unused-argument
@@ -137,6 +148,10 @@ def _unique(x, out_idx=tf.int32, name=None):  # pylint: disable=unused-argument
 argsort = utils.copy_docstring(
     tf.argsort,
     _argsort)
+
+histogram_fixed_width_bins = utils.copy_docstring(
+    tf.histogram_fixed_width_bins,
+    _histogram_fixed_width_bins)
 
 sort = utils.copy_docstring(
     tf.sort,

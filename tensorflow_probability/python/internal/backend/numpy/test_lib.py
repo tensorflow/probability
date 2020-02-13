@@ -45,7 +45,7 @@ class TestCase(tf.test.TestCase):
   """Wrapper of `tf.test.TestCase`."""
 
   def evaluate(self, x):
-    return x
+    return tf.nest.map_structure(onp.array, x)
 
   def _GetNdArray(self, a):
     return onp.array(a)
@@ -76,5 +76,9 @@ class TestCase(tf.test.TestCase):
       first = onp.array(first)
 
     return super(TestCase, self).assertEqual(first, second, msg)
+
+  def assertShapeEqual(self, first, second, msg=None):
+    self.assertTupleEqual(first.shape, second.shape, msg=msg)
+
 
 main = tf.test.main

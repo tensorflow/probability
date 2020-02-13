@@ -24,12 +24,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import categorical_to_discrete
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CategoricalToDiscreteTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CategoricalToDiscreteTest(test_util.TestCase):
 
   def testUnsortedValuesRaises(self):
     with self.assertRaisesOpError('map_values is not strictly increasing'):

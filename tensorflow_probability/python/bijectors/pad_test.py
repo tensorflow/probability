@@ -22,14 +22,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PadBijectorTest(test_util.TestCase):
 
   def test_defaults(self):
     b = tfb.Pad(validate_args=True)
@@ -83,7 +80,7 @@ class PadBijectorTest(test_case.TestCase):
     self.assertEqual(0., fldj_)
     self.assertEqual(0., ildj_)
 
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.jax_disable_variable_test
   def test_variable_paddings(self):
     x = tf.Variable([[1, 2]])
     b = tfb.Pad(paddings=x, validate_args=True)

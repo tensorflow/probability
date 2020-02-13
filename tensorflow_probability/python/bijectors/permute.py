@@ -93,6 +93,7 @@ class Permute(bijector.Bijector):
       NotImplementedError: if `axis` is not known prior to graph execution.
       NotImplementedError: if `axis` is not negative.
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'permute') as name:
       axis = tensor_util.convert_nonref_to_tensor(axis, name='axis')
       if not dtype_util.is_integer(axis.dtype):
@@ -119,6 +120,7 @@ class Permute(bijector.Bijector):
           forward_min_event_ndims=forward_min_event_ndims,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

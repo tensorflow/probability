@@ -23,12 +23,12 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class VariationalSGDTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class VariationalSGDTest(test_util.TestCase):
 
   def testBasic(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
@@ -250,7 +250,7 @@ class VariationalSGDTest(test_case.TestCase):
             self.evaluate(lrate.assign_add(-3.))
             self.evaluate(sgd_op)
 
-  @test_util.run_deprecated_v1
+  @tf_test_util.run_deprecated_v1
   def testGradWrtRef(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():

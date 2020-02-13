@@ -25,14 +25,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import diag_jacobian
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class StochasticGradientLangevinDynamicsOptimizerTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
 
   def testBasic(self):
     if tf.executing_eagerly():
@@ -165,7 +165,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_case.TestCase):
             [3. - 3. * grads_scaled, 4. - 3. * grads_scaled],
             self.evaluate(var1))
 
-  @test_util.run_deprecated_v1
+  @tf_test_util.run_deprecated_v1
   def testGradWrtRef(self):
     if tf.executing_eagerly():
       return
@@ -354,7 +354,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_case.TestCase):
 
     with self.cached_session():
       # Set up random seed for the optimizer
-      tf1.set_random_seed(42)
+      tf.random.set_seed(42)
       dtype = np.float32
       true_mean = dtype([0, 0, 0])
       true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
@@ -366,7 +366,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_case.TestCase):
       # Loss function
       def loss_fn():
         var = tf.concat([var_1, var_2], axis=-1)
-        loss_part = tf.linalg.cholesky_solve(chol, tf.expand_dims(var, -1))
+        loss_part = tf.linalg.cholesky_solve(chol, var[..., tf.newaxis])
         return tf.linalg.matvec(loss_part, var, transpose_a=True)
 
       # Set up the learning rate with a polynomial decay
@@ -400,7 +400,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_case.TestCase):
 
     samples_ = np.concatenate(samples, axis=-1)
     sample_mean = np.mean(samples_, 0)
-    self.assertAllClose(sample_mean, true_mean, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_mean, true_mean, atol=0.15, rtol=0.1)
 
 if __name__ == '__main__':
   tf.test.main()

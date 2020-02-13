@@ -20,7 +20,6 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 tfl = tf.linalg
@@ -125,20 +124,22 @@ def moments_of_masked_time_series(time_series_tensor, broadcast_mask):
     variance: float `Tensor` of shape `batch_shape`.
   """
   num_unmasked_entries = tf.cast(
-      tf.reduce_sum(input_tensor=tf.cast(~broadcast_mask, tf.int32), axis=-1),
+      tf.reduce_sum(tf.cast(~broadcast_mask, tf.int32), axis=-1),
       time_series_tensor.dtype)
 
   # Manually compute mean and variance, excluding masked entries.
   mean = (
       tf.reduce_sum(
-          input_tensor=tf1.where(broadcast_mask,
-                                          tf.zeros_like(time_series_tensor),
-                                          time_series_tensor),
+          tf.where(
+              broadcast_mask,
+              tf.zeros([], dtype=time_series_tensor.dtype),
+              time_series_tensor),
           axis=-1) / num_unmasked_entries)
   variance = (
       tf.reduce_sum(
-          input_tensor=tf1.where(
-              broadcast_mask, tf.zeros_like(time_series_tensor),
+          tf.where(
+              broadcast_mask,
+              tf.zeros([], dtype=time_series_tensor.dtype),
               (time_series_tensor - mean[..., tf.newaxis])**2),
           axis=-1) / num_unmasked_entries)
   return mean, variance
@@ -152,14 +153,14 @@ def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
     broadcast_mask: bool `Tensor` of same shape as `time_series`.
   """
 
-  num_timesteps = tf.shape(input=time_series_tensor)[-1]
+  num_timesteps = tf.shape(time_series_tensor)[-1]
 
   # Compute the index of the first unmasked entry for each series in the batch.
   unmasked_negindices = (
       tf.cast(~broadcast_mask, tf.int32) *
       tf.range(num_timesteps, 0, -1))
   first_unmasked_indices = num_timesteps - tf.reduce_max(
-      input_tensor=unmasked_negindices, axis=-1)
+      unmasked_negindices, axis=-1)
 
   if first_unmasked_indices.shape.ndims is None:
     raise NotImplementedError(

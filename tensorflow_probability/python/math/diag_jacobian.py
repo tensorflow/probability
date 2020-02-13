@@ -36,11 +36,12 @@ def diag_jacobian(xs,
                   name=None):
   """Computes diagonal of the Jacobian matrix of `ys=fn(xs)` wrt `xs`.
 
-    If `ys` is a tensor or a list of tensors of the form `(ys_1, .., ys_n)` and
-    `xs` is of the form `(xs_1, .., xs_n)`, the function `jacobians_diag`
-    computes the diagonal of the Jacobian matrix, i.e., the partial derivatives
-    `(dys_1/dxs_1,.., dys_n/dxs_n`). For definition details, see
-    https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant
+  If `ys` is a tensor or a list of tensors of the form `(ys_1, .., ys_n)` and
+  `xs` is of the form `(xs_1, .., xs_n)`, the function `jacobians_diag`
+  computes the diagonal of the Jacobian matrix, i.e., the partial derivatives
+  `(dys_1/dxs_1,.., dys_n/dxs_n`). For definition details, see
+  https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant
+
   #### Example
 
   ##### Diagonal Hessian of the log-density of a 3D Gaussian distribution
@@ -164,8 +165,7 @@ def diag_jacobian(xs,
             # Reshape `event_shape` to 1D
             res = tf.reshape(res, tf.concat([sample_shape, [-1]], -1))
             # Add artificial dimension for the case of zero shape input tensor
-            res = tf.expand_dims(res, 0)
-            res = res[..., j]
+            res = res[tf.newaxis, ..., j]
           return res  # pylint: disable=cell-var-from-loop
 
         # Iterate over all elements of the gradient and compute second order
@@ -210,7 +210,7 @@ def diag_jacobian(xs,
         def _fn(j, result):
           res = value_and_gradient(fn_slice(i, j), xs)[1][i]
           if res is None:
-            res = tf.zeros(tf.concat([sample_shape, [1]], -1), dtype=x.dtype)
+            res = tf.zeros(sample_shape, dtype=x.dtype)
           else:
             res = tf.reshape(res, tf.concat([sample_shape, [-1]], -1))
             res = res[..., j]
@@ -221,10 +221,7 @@ def diag_jacobian(xs,
         # Declare an iterator and tensor array loop variables for the gradients.
         n = tf.size(x) / tf.cast(tf.reduce_prod(sample_shape), dtype=tf.int32)
         n = tf.cast(n, dtype=tf.int32)
-        loop_vars = [
-            0,
-            tf.TensorArray(x.dtype, n)
-        ]
+        loop_vars = (0, tf.TensorArray(x.dtype, n, element_shape=sample_shape))
 
         # Iterate over all elements of the gradient and compute second order
         # derivatives.

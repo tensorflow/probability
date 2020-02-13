@@ -24,21 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-def _reduce_variance(x, axis=None, keepdims=False):
-  sample_mean = tf.math.reduce_mean(input_tensor=x, axis=axis, keepdims=True)
-  return tf.math.reduce_mean(
-      input_tensor=tf.math.squared_difference(x, sample_mean),
-      axis=axis,
-      keepdims=keepdims)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class RWMTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RWMTest(test_util.TestCase):
 
   def testRWM1DUniform(self):
     """Sampling from the Standard Normal Distribution."""
@@ -56,10 +46,10 @@ class RWMTest(test_case.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.math.reduce_mean(samples, axis=0)
     sample_std = tf.math.sqrt(
         tf.math.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
@@ -80,10 +70,10 @@ class RWMTest(test_case.TestCase):
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.math.reduce_mean(samples, axis=0)
     sample_std = tf.math.sqrt(
         tf.math.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
 
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
@@ -121,10 +111,10 @@ class RWMTest(test_case.TestCase):
             seed=42),
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(input_tensor=samples, axis=0)
+    sample_mean = tf.math.reduce_mean(samples, axis=0)
     sample_std = tf.math.sqrt(
         tf.math.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
+            tf.math.squared_difference(samples, sample_mean),
             axis=0))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
@@ -166,15 +156,27 @@ class RWMTest(test_case.TestCase):
         parallel_iterations=1)
 
     states = tf.stack(states, axis=-1)
-    sample_mean = tf.math.reduce_mean(input_tensor=states, axis=[0, 1])
+    sample_mean = tf.math.reduce_mean(states, axis=[0, 1])
     x = states - sample_mean
     sample_cov = tf.math.reduce_mean(
-        input_tensor=tf.linalg.matmul(x, x, transpose_a=True), axis=[0, 1])
+        tf.linalg.matmul(x, x, transpose_a=True), axis=[0, 1])
     [sample_mean_, sample_cov_] = self.evaluate([
         sample_mean, sample_cov])
 
     self.assertAllClose(np.squeeze(sample_mean_), true_mean, atol=0.1, rtol=0.1)
     self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
+
+  def testRWMIsCalibrated(self):
+    rwm = tfp.mcmc.RandomWalkMetropolis(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+    )
+    self.assertTrue(rwm.is_calibrated)
+
+  def testUncalibratedRWIsNotCalibrated(self):
+    uncal_rw = tfp.mcmc.UncalibratedRandomWalk(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
+    )
+    self.assertFalse(uncal_rw.is_calibrated)
 
 
 if __name__ == '__main__':

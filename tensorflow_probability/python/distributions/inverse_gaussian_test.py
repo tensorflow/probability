@@ -21,10 +21,7 @@ from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 def _scipy_invgauss(loc, concentration):
@@ -35,18 +32,19 @@ def _scipy_invgauss(loc, concentration):
   return stats.invgauss(mu=loc/concentration, scale=concentration)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _InverseGaussianTest(object):
 
   def make_tensor(self, x):
     x = tf.cast(x, self.dtype)
     return tf1.placeholder_with_default(
-        input=x, shape=x.shape if self.use_static_shape else None)
+        x, shape=x.shape if self.use_static_shape else None)
 
   def testInverseGaussianShape(self):
     loc = self.make_tensor([2.] * 5)
     concentration = self.make_tensor([2.] * 5)
-    inverse_gaussian = tfd.InverseGaussian(loc, concentration)
+    inverse_gaussian = tfd.InverseGaussian(
+        loc, concentration, validate_args=True)
 
     self.assertEqual(self.evaluate(inverse_gaussian.batch_shape_tensor()), (5,))
     if self.use_static_shape:
@@ -58,7 +56,8 @@ class _InverseGaussianTest(object):
   def testInverseGaussianShapeBroadcast(self):
     loc = self.make_tensor([[4.], [5.], [6.]])
     concentration = self.make_tensor([[3., 2.]])
-    inverse_gaussian = tfd.InverseGaussian(loc, concentration)
+    inverse_gaussian = tfd.InverseGaussian(
+        loc, concentration, validate_args=True)
 
     self.assertAllEqual(self.evaluate(inverse_gaussian.batch_shape_tensor()),
                         (3, 2))
@@ -99,7 +98,8 @@ class _InverseGaussianTest(object):
     x_v = [3., 3.1, 4., 5., 6., 7.]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([loc_v] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_prob = inverse_gaussian.log_prob(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -123,7 +123,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.log_prob(x))
 
   def testInverseGaussianPdfValidateArgs(self):
@@ -134,7 +134,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.prob(x))
 
   def testInverseGaussianLogPdfMultidimensional(self):
@@ -144,7 +144,8 @@ class _InverseGaussianTest(object):
     x_v = np.array([[6., 7., 9.2, 5., 6., 7.]]).T
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([[loc_v]] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_prob = inverse_gaussian.log_prob(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -167,7 +168,8 @@ class _InverseGaussianTest(object):
     x_v = [3., 3.1, 4., 5., 6., 7.]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([loc_v] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_cdf = inverse_gaussian.log_cdf(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -183,6 +185,15 @@ class _InverseGaussianTest(object):
         self.evaluate(cdf),
         _scipy_invgauss(loc_v, concentration_v).cdf(x_v))
 
+  # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
+  # def testInverseGaussianPdfAtBoundary(self):
+  #   dist = tfd.InverseGaussian(loc=1., concentration=[2., 4., 5.],
+  #                              validate_args=True)
+  #   pdf = self.evaluate(dist.prob(0.))
+  #   log_pdf = self.evaluate(dist.log_prob(0.))
+  #   self.assertAllEqual(pdf, np.zeros_like(pdf))
+  #   self.assertTrue(np.isinf(log_pdf).all())
+
   def testInverseGaussianLogCdfValidateArgs(self):
     batch_size = 2
     loc = self.make_tensor([2.] * batch_size)
@@ -191,7 +202,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.log_cdf(x))
 
   def testInverseGaussianCdfValidateArgs(self):
@@ -202,7 +213,7 @@ class _InverseGaussianTest(object):
     inverse_gaussian = tfd.InverseGaussian(loc, concentration,
                                            validate_args=True)
 
-    with self.assertRaisesOpError('must be positive.'):
+    with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(inverse_gaussian.cdf(x))
 
   def testInverseGaussianLogCdfMultidimensional(self):
@@ -212,7 +223,8 @@ class _InverseGaussianTest(object):
     x_v = np.array([[6., 7., 9.2, 5., 6., 7.]]).T
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor([[loc_v]] * batch_size),
-        self.make_tensor([concentration_v] * batch_size))
+        self.make_tensor([concentration_v] * batch_size),
+        validate_args=True)
 
     log_cdf = inverse_gaussian.log_cdf(self.make_tensor(x_v))
     if self.use_static_shape:
@@ -233,7 +245,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.mean().shape, (3,))
     self.assertAllClose(
@@ -245,7 +258,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.mean().shape, (3,))
     self.assertAllClose(
@@ -257,7 +271,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
 
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.variance().shape, (3,))
@@ -270,7 +285,8 @@ class _InverseGaussianTest(object):
     concentration_v = [1.4, 2., 2.5]
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
+        self.make_tensor(concentration_v),
+        validate_args=True)
 
     if self.use_static_shape:
       self.assertEqual(inverse_gaussian.variance().shape, (3,))
@@ -284,8 +300,9 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
+        self.make_tensor(concentration_v),
+        validate_args=True)
+    samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:
@@ -303,8 +320,9 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
+        self.make_tensor(concentration_v),
+        validate_args=True)
+    samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:
@@ -322,8 +340,9 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
+        self.make_tensor(concentration_v),
+        validate_args=True)
+    samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:
@@ -341,8 +360,9 @@ class _InverseGaussianTest(object):
     n = int(1e6)
     inverse_gaussian = tfd.InverseGaussian(
         self.make_tensor(loc_v),
-        self.make_tensor(concentration_v))
-    samples = inverse_gaussian.sample(n, seed=tfp_test_util.test_seed())
+        self.make_tensor(concentration_v),
+        validate_args=True)
+    samples = inverse_gaussian.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     if self.use_static_shape:
@@ -367,26 +387,37 @@ class _InverseGaussianTest(object):
       with tf.control_dependencies([loc.assign(-2.), concentration.assign(2.)]):
         self.evaluate(inverse_gaussian.mean())
 
+  def testSupportBijectorOutsideRange(self):
+    dist = tfd.InverseGaussian(
+        loc=[7., 2., 5.],
+        concentration=2.,
+        validate_args=True)
+    eps = 1e-6
+    x = np.array([[-7.2, -eps, -1.3], [-5., -12., -eps]])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
-class InverseGaussianTestStaticShapeFloat32(test_case.TestCase,
+
+class InverseGaussianTestStaticShapeFloat32(test_util.TestCase,
                                             _InverseGaussianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class InverseGaussianTestDynamicShapeFloat32(test_case.TestCase,
+class InverseGaussianTestDynamicShapeFloat32(test_util.TestCase,
                                              _InverseGaussianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
-class InverseGaussianTestStaticShapeFloat64(test_case.TestCase,
+class InverseGaussianTestStaticShapeFloat64(test_util.TestCase,
                                             _InverseGaussianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
-class InverseGaussianTestDynamicShapeFloat64(test_case.TestCase,
+class InverseGaussianTestDynamicShapeFloat64(test_util.TestCase,
                                              _InverseGaussianTest):
   dtype = tf.float64
   use_static_shape = False

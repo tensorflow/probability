@@ -202,6 +202,7 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `"SchurComplement"`
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [base_kernel, fixed_inputs, diag_shift], tf.float32)
@@ -213,7 +214,10 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
       self._cholesky_bijector = invert.Invert(
           cholesky_outer_product.CholeskyOuterProduct())
       super(SchurComplement, self).__init__(
-          base_kernel.feature_ndims, dtype=dtype, name=name)
+          base_kernel.feature_ndims,
+          dtype=dtype,
+          name=name,
+          parameters=parameters)
 
   def _is_fixed_inputs_empty(self):
     # If fixed_inputs are `None` or have size 0, we consider this empty and fall
@@ -285,22 +289,42 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     div_mat_chol = util.pad_shape_with_ones(div_mat_chol, example_ndims - 1, -3)
     div_mat_chol_linop = tf.linalg.LinearOperatorLowerTriangular(div_mat_chol)
 
+    # Shape: bc(Bz, Bk, B2) + E1 + [ez]
+    cholinv_kz1 = tf.linalg.matrix_transpose(
+        div_mat_chol_linop.solve(k1z, adjoint_arg=True))
     # Shape: bc(Bz, Bk, B2) + E2 + [ez]
-    kzzinv_kz2 = tf.linalg.matrix_transpose(
-        # Shape: bc(Bz, Bk, B2) + E2[:-1] + [ez] + E2[-1]
-        div_mat_chol_linop.solve(
-            # Shape: bc(Bz, Bk, B2) + E2[:-1] + [ez] + E2[-1]
-            div_mat_chol_linop.solve(k2z, adjoint_arg=True),
-            adjoint=True))
+    cholinv_kz2 = tf.linalg.matrix_transpose(
+        div_mat_chol_linop.solve(k2z, adjoint_arg=True))
+    k1z_kzzinv_kz2 = tf.reduce_sum(cholinv_kz1 * cholinv_kz2, axis=-1)
 
     # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
-    k1z_kzzinv_kz2 = tf.reduce_sum(
-        # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2) + [ez]
-        input_tensor=k1z * kzzinv_kz2,
-        axis=-1)  # we can safely always reduce just this one trailing dim,
-                  # since self.fixed_inputs is presumed to have example_ndims
-                  # exactly 1.
+    return k12 - k1z_kzzinv_kz2
 
+  def _matrix(self, x1, x2):
+    k12 = self.base_kernel.matrix(x1, x2)
+    if self._is_fixed_inputs_empty():
+      return k12
+
+    fixed_inputs = tf.convert_to_tensor(self._fixed_inputs)
+
+    # Shape: bc(Bk, B1, Bz) + E1 + [ez]
+    k1z = self.base_kernel.matrix(x1, fixed_inputs)
+
+    # Shape: bc(Bk, B2, Bz) + E2 + [ez]
+    k2z = self.base_kernel.matrix(x2, fixed_inputs)
+
+    # Shape: bc(Bz, Bk) + [ez, ez]
+    div_mat_chol = self._divisor_matrix_cholesky(
+        fixed_inputs=fixed_inputs)
+
+    div_mat_chol_linop = tf.linalg.LinearOperatorLowerTriangular(div_mat_chol)
+
+    # Shape: bc(Bz, Bk, B2) + [ez] + E1
+    cholinv_kz1 = div_mat_chol_linop.solve(k1z, adjoint_arg=True)
+    # Shape: bc(Bz, Bk, B2) + [ez] + E2
+    cholinv_kz2 = div_mat_chol_linop.solve(k2z, adjoint_arg=True)
+    k1z_kzzinv_kz2 = tf.linalg.matmul(
+        cholinv_kz1, cholinv_kz2, transpose_a=True)
     # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
     return k12 - k1z_kzzinv_kz2
 
@@ -340,5 +364,5 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
     return self.cholesky_bijector.forward(
         self._divisor_matrix(fixed_inputs))
 
-  def divisor_matrix_cholesky(self):
-    return self._divisor_matrix_cholesky()
+  def divisor_matrix_cholesky(self, fixed_inputs=None):
+    return self._divisor_matrix_cholesky(fixed_inputs)

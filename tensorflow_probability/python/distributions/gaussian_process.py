@@ -24,6 +24,7 @@ import warnings
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
@@ -32,6 +33,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -134,11 +136,13 @@ class GaussianProcess(distribution.Distribution):
 
   ```python
   import numpy as np
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
 
+  tf.enable_v2_behavior()
+
   tfd = tfp.distributions
-  psd_kernels = tfp.positive_semidefinite_kernels
+  psd_kernels = tfp.math.psd_kernels
 
   num_points = 100
   # Index points should be a collection (100, here) of feature vectors. In this
@@ -176,22 +180,26 @@ class GaussianProcess(distribution.Distribution):
 
   # Define a kernel with trainable parameters.
   kernel = psd_kernels.ExponentiatedQuadratic(
-      amplitude=tf.get_variable('amplitude', shape=(), dtype=np.float64),
-      length_scale=tf.get_variable('length_scale', shape=(), dtype=np.float64))
+      amplitude=tf.Variable(1., dtype=np.float64, name='amplitude'),
+      length_scale=tf.Variable(1., dtype=np.float64, name='length_scale'))
 
   gp = tfd.GaussianProcess(kernel, observed_index_points)
-  neg_log_likelihood = -gp.log_prob(observed_values)
 
-  optimize = tf.train.AdamOptimizer().minimize(neg_log_likelihood)
+  optimizer = tf.optimizers.Adam()
 
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
+  @tf.function
+  def optimize():
+    with tf.GradientTape() as tape:
+      loss = -gp.log_prob(observed_values)
+    grads = tape.gradient(loss, gp.trainable_variables)
+    optimizer.apply_gradients(zip(grads, gp.trainable_variables))
+    return loss
 
-    for i in range(1000):
-      _, neg_log_likelihood_ = sess.run([optimize, neg_log_likelihood])
-      if i % 100 == 0:
-        print("Step {}: NLL = {}".format(i, neg_log_likelihood_))
-    print("Final NLL = {}".format(neg_log_likelihood_))
+  for i in range(1000):
+    neg_log_likelihood = optimize()
+    if i % 100 == 0:
+      print("Step {}: NLL = {}".format(i, neg_log_likelihood))
+  print("Final NLL = {}".format(neg_log_likelihood))
   ```
 
   """
@@ -314,6 +322,8 @@ class GaussianProcess(distribution.Distribution):
       return (tf.squeeze(kernel_matrix, axis=[-2, -1]) +
               self.observation_noise_variance)
     else:
+      observation_noise_variance = tf.convert_to_tensor(
+          self.observation_noise_variance)
       # We are compute K + obs_noise_variance * I. The shape of this matrix
       # is going to be a broadcast of the shapes of K and obs_noise_variance *
       # I.
@@ -321,11 +331,11 @@ class GaussianProcess(distribution.Distribution):
           kernel_matrix,
           # We pad with two single dimension since this represents a batch of
           # scaled identity matrices.
-          self.observation_noise_variance[..., tf.newaxis, tf.newaxis])
+          observation_noise_variance[..., tf.newaxis, tf.newaxis])
 
       kernel_matrix = tf.broadcast_to(kernel_matrix, broadcast_shape)
       return _add_diagonal_shift(
-          kernel_matrix, self.observation_noise_variance[..., tf.newaxis])
+          kernel_matrix, observation_noise_variance[..., tf.newaxis])
 
   def get_marginal_distribution(self, index_points=None):
     """Compute the marginal of this GP over function values at `index_points`.
@@ -420,8 +430,8 @@ class GaussianProcess(distribution.Distribution):
           'an argument and returns a `Normal` or '
           '`MultivariateNormalLinearOperator` instance, whose KL can be '
           'computed.')
-    return index_points if index_points is not None else tf.convert_to_tensor(
-        self._index_points)
+    return tf.convert_to_tensor(
+        index_points if index_points is not None else  self._index_points)
 
   def _log_prob(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).log_prob(value)
@@ -435,7 +445,8 @@ class GaussianProcess(distribution.Distribution):
     ])
 
   def _batch_shape(self, index_points=None):
-    index_points = self._get_index_points(index_points)
+    index_points = (
+        index_points if index_points is not None else self._index_points)
     return functools.reduce(
         tf.broadcast_static_shape,
         [index_points.shape[:-(self.kernel.feature_ndims + 1)],
@@ -452,14 +463,15 @@ class GaussianProcess(distribution.Distribution):
       return tf.shape(index_points)[examples_index:examples_index + 1]
 
   def _event_shape(self, index_points=None):
-    index_points = self._get_index_points(index_points)
+    index_points = (
+        index_points if index_points is not None else self._index_points)
     if self._is_univariate_marginal(index_points):
       return tf.TensorShape([])
     else:
       # The examples index is one position to the left of the feature dims.
       examples_index = -(self.kernel.feature_ndims + 1)
       shape = index_points.shape[examples_index:examples_index + 1]
-      if shape.rank is None:
+      if tensorshape_util.rank(shape) is None:
         return tf.TensorShape([None])
       return shape
 
@@ -480,7 +492,15 @@ class GaussianProcess(distribution.Distribution):
     return self.get_marginal_distribution(index_points).entropy()
 
   def _mean(self, index_points=None):
-    return self.get_marginal_distribution(index_points).mean()
+    index_points = self._get_index_points(index_points)
+    mean = self._mean_fn(index_points)
+    # We need to broadcast with the kernel hparams.
+    batch_shape = self._batch_shape_tensor(index_points=index_points)
+    event_shape = self._event_shape_tensor(index_points=index_points)
+    if self._is_univariate_marginal(index_points):
+      mean = tf.squeeze(mean, axis=-1)
+    mean = tf.broadcast_to(mean, tf.concat([batch_shape, event_shape], axis=0))
+    return mean
 
   def _quantile(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).quantile(value)
@@ -511,6 +531,9 @@ class GaussianProcess(distribution.Distribution):
 
   def _mode(self, index_points=None):
     return self.get_marginal_distribution(index_points).mode()
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
 
 def _assert_kl_compatible(marginal, other):

@@ -22,15 +22,22 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BlockwiseTest(test_case.TestCase):
+def _set_seed(seed):
+  """Helper which uses graph seed if using eager."""
+  # TODO(b/68017812): Deprecate once eager correctly supports seed.
+  if tf.executing_eagerly():
+    tf.random.set_seed(seed)
+    return None
+  return seed
+
+
+@test_util.test_all_tf_execution_regimes
+class BlockwiseTest(test_util.TestCase):
 
   def testDocstring1(self):
     d = tfd.Blockwise(
@@ -81,6 +88,23 @@ class BlockwiseTest(test_case.TestCase):
     self.assertEqual((2, 1), y_.shape)
     self.assertIs(tf.float32, y.dtype)
 
+  def testSampleReproducible(self):
+    Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
+
+    def model():
+      e = yield Root(tfd.Independent(tfd.Exponential(rate=[100, 120]), 1))
+      g = yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
+      n = yield Root(tfd.Normal(loc=0, scale=2.))
+      yield tfd.Normal(loc=n, scale=g)
+
+    joint = tfd.JointDistributionCoroutine(model)
+    d = tfd.Blockwise(joint, validate_args=True)
+
+    x = d.sample([2, 1], seed=_set_seed(42))
+    y = d.sample([2, 1], seed=_set_seed(42))
+    x_, y_ = self.evaluate([x, y])
+    self.assertAllClose(x_, y_)
+
   def testVaryingBatchShapeErrorStatic(self):
     with self.assertRaisesRegexp(
         ValueError, 'Distributions must have the same `batch_shape`'):
@@ -123,27 +147,44 @@ class BlockwiseTest(test_case.TestCase):
       )
       self.evaluate(dist.mean())
 
+  def testAssertValidSample(self):
+    loc1 = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
+    loc2 = tf1.placeholder_with_default(tf.zeros([2]), shape=None)
+    dist = tfd.Blockwise(
+        [
+            tfd.Normal(loc1, tf.ones_like(loc1)),
+            tfd.Normal(loc2, tf.ones_like(loc2)),
+        ],
+        validate_args=True,
+    )
+
+    with self.assertRaisesRegexp(
+        ValueError, 'must have at least one dimension'):
+      self.evaluate(dist.prob(3.))
+
   def testKlBlockwiseIsSum(self):
 
     gamma0 = tfd.Gamma(concentration=[1., 2., 3.], rate=1.)
     gamma1 = tfd.Gamma(concentration=[3., 4., 5.], rate=1.)
 
-    normal0 = tfd.Normal(loc=tf.zeros(3.), scale=2.)
-    normal1 = tfd.Normal(loc=tf.ones(3.), scale=[2., 3., 4.])
+    normal0 = tfd.Normal(loc=tf.zeros(3), scale=2.)
+    normal1 = tfd.Normal(loc=tf.ones(3), scale=[2., 3., 4.])
 
     d0 = tfd.Blockwise([
         tfd.Independent(gamma0, reinterpreted_batch_ndims=1),
         tfd.Independent(normal0, reinterpreted_batch_ndims=1)
-    ])
+    ],
+                       validate_args=True)
 
     d1 = tfd.Blockwise([
         tfd.Independent(gamma1, reinterpreted_batch_ndims=1),
         tfd.Independent(normal1, reinterpreted_batch_ndims=1)
-    ])
+    ],
+                       validate_args=True)
 
     kl_sum = tf.reduce_sum(
-        input_tensor=(tfd.kl_divergence(gamma0, gamma1) +
-                      tfd.kl_divergence(normal0, normal1)))
+        (tfd.kl_divergence(gamma0, gamma1) +
+         tfd.kl_divergence(normal0, normal1)))
 
     blockwise_kl = tfd.kl_divergence(d0, d1)
 
@@ -164,7 +205,8 @@ class BlockwiseTest(test_case.TestCase):
         tfd.MultivariateNormalTriL(
             scale_tril=tf1.placeholder_with_default(
                 tf.eye(2, dtype=tf.float64), shape=None)),
-    ])
+    ],
+                       validate_args=True)
 
     d0_mvn = tfd.MultivariateNormalLinearOperator(
         loc=np.float64([0.] * 6),
@@ -182,7 +224,8 @@ class BlockwiseTest(test_case.TestCase):
             loc=tf.ones(2, dtype=tf.float64),
             scale_tril=tf1.placeholder_with_default(
                 np.float64([[1., 0.], [2., 3.]]), shape=None)),
-    ])
+    ],
+                       validate_args=True)
     d1_mvn = tfd.MultivariateNormalLinearOperator(
         loc=np.float64([1.] * 6),
         scale=tf.linalg.LinearOperatorBlockDiag([
@@ -196,9 +239,20 @@ class BlockwiseTest(test_case.TestCase):
     blockwise_kl_, mvn_kl_ = self.evaluate([blockwise_kl, mvn_kl])
     self.assertAllClose(blockwise_kl_, mvn_kl_)
 
+  def testUnconstrainingBijector(self):
+    dist = tfd.Exponential(rate=[1., 2., 6.], validate_args=True)
+    blockwise_dist = tfd.Blockwise(dist, validate_args=True)
+    x = self.evaluate(
+        dist._experimental_default_event_space_bijector()(
+            tf.ones(dist.batch_shape)))
+    x_blockwise = self.evaluate(
+        blockwise_dist._experimental_default_event_space_bijector()(
+            tf.ones(blockwise_dist.batch_shape)))
+    self.assertAllEqual(x, x_blockwise)
 
-@test_util.run_all_in_graph_and_eager_modes
-class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
+
+@test_util.test_all_tf_execution_regimes
+class BlockwiseTestStaticParams(test_util.TestCase):
   use_static_shape = True
 
   def _input(self, value):
@@ -244,7 +298,7 @@ class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
     """Checks that basic properties work with single Tensor distributions."""
     base = dist_fn(self)
 
-    flat = tfd.Blockwise(base)
+    flat = tfd.Blockwise(base, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],
@@ -253,8 +307,8 @@ class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
       self.assertAllEqual(batch_shape, flat.batch_shape)
     self.assertAllEqual(batch_shape, self.evaluate(flat.batch_shape_tensor()))
 
-    base_sample = self.evaluate(base.sample(3, seed=tfp_test_util.test_seed()))
-    flat_sample = self.evaluate(flat.sample(3, seed=tfp_test_util.test_seed()))
+    base_sample = self.evaluate(base.sample(3, seed=test_util.test_seed()))
+    flat_sample = self.evaluate(flat.sample(3, seed=test_util.test_seed()))
     self.assertAllEqual([3] + batch_shape + [num_elements], flat_sample.shape)
     base_sample = flat_sample.reshape(base_sample.shape)
 
@@ -335,7 +389,7 @@ class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
     base = dist_fn(self)
     num_elements = sum(nums_elements)
 
-    flat = tfd.Blockwise(base)
+    flat = tfd.Blockwise(base, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],
@@ -344,9 +398,9 @@ class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
       self.assertAllEqual(batch_shape, flat.batch_shape)
     self.assertAllEqual(batch_shape, self.evaluate(flat.batch_shape_tensor()))
 
-    base_sample = self.evaluate(base.sample(3, seed=tfp_test_util.test_seed()))
+    base_sample = self.evaluate(base.sample(3, seed=test_util.test_seed()))
     base_sample_list = tf.nest.flatten(base_sample)
-    flat_sample = self.evaluate(flat.sample(3, seed=tfp_test_util.test_seed()))
+    flat_sample = self.evaluate(flat.sample(3, seed=test_util.test_seed()))
     self.assertAllEqual([3] + batch_shape + [num_elements], flat_sample.shape)
 
     split_points = np.cumsum([0] + nums_elements)
@@ -404,7 +458,7 @@ class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
     bases = dists_fn(self)
     num_elements = sum(nums_elements)
 
-    flat = tfd.Blockwise(bases)
+    flat = tfd.Blockwise(bases, validate_args=True)
     if self.use_static_shape:
       self.assertAllEqual([num_elements], flat.event_shape)
     self.assertAllEqual([num_elements],
@@ -414,8 +468,8 @@ class BlockwiseTestStaticParams(test_case.TestCase, parameterized.TestCase):
     self.assertAllEqual(batch_shape, self.evaluate(flat.batch_shape_tensor()))
 
     base_sample_list = self.evaluate(
-        [base.sample(3, seed=tfp_test_util.test_seed()) for base in bases])
-    flat_sample = self.evaluate(flat.sample(3, seed=tfp_test_util.test_seed()))
+        [base.sample(3, seed=test_util.test_seed()) for base in bases])
+    flat_sample = self.evaluate(flat.sample(3, seed=test_util.test_seed()))
     self.assertAllEqual([3] + batch_shape + [num_elements], flat_sample.shape)
 
     split_points = np.cumsum([0] + nums_elements)

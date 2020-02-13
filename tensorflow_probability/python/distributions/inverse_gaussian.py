@@ -22,6 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import scale as scale_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -153,36 +157,33 @@ class InverseGaussian(distribution.Distribution):
     seed = SeedStream(seed, 'inverse_gaussian')
     shape = tf.concat([[n], self._batch_shape_tensor(
         loc=loc, concentration=concentration)], axis=0)
-    sampled_chi2 = (tf.random.normal(
-        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype))**2.
+    sampled_chi2 = tf.square(tf.random.normal(
+        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype))
     sampled_uniform = tf.random.uniform(
         shape, minval=0., maxval=1., seed=seed(), dtype=self.dtype)
     sampled = (
-        loc + loc ** 2. * sampled_chi2 / (2. * concentration) -
+        loc + tf.square(loc) * sampled_chi2 / (2. * concentration) -
         loc / (2. * concentration) *
-        (4. * loc * concentration * sampled_chi2 +
-         (loc * sampled_chi2) ** 2) ** 0.5)
+        tf.sqrt(4. * loc * concentration * sampled_chi2 +
+                tf.square(loc * sampled_chi2)))
     return tf.where(sampled_uniform <= loc / (loc + sampled),
-                    sampled, loc**2 / sampled)
+                    sampled, tf.square(loc) / sampled)
 
   def _log_prob(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      concentration = tf.convert_to_tensor(self.concentration)
-      loc = tf.convert_to_tensor(self.loc)
-      return (0.5 * (tf.math.log(concentration) - np.log(2. * np.pi) -
-                     3. * tf.math.log(x)) + (-concentration * (x - loc)**2.) /
-              (2. * loc**2. * x))
+    concentration = tf.convert_to_tensor(self.concentration)
+    loc = tf.convert_to_tensor(self.loc)
+    return (0.5 * (tf.math.log(concentration) - np.log(2. * np.pi) -
+                   3. * tf.math.log(x)) +
+            (-concentration * tf.math.squared_difference(x, loc)) /
+            (2. * tf.square(loc) * x))
 
   def _cdf(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      concentration = tf.convert_to_tensor(self.concentration)
-      loc = tf.convert_to_tensor(self.loc)
-      return (
-          special_math.ndtr(
-              ((concentration / x) ** 0.5 * (x / loc - 1.))) +
-          tf.exp(2. * concentration / loc) *
-          special_math.ndtr(
-              -(concentration / x) ** 0.5 * (x / loc + 1)))
+    concentration = tf.convert_to_tensor(self.concentration)
+    loc = tf.convert_to_tensor(self.loc)
+    return (
+        special_math.ndtr((tf.math.rsqrt(x / concentration) * (x / loc - 1.))) +
+        tf.exp(2. * concentration / loc) *
+        special_math.ndtr(-tf.math.rsqrt(x / concentration) * (x / loc + 1)))
 
   @distribution_util.AppendDocstring(
       """The mean of inverse Gaussian is the `loc` parameter.""")
@@ -195,10 +196,21 @@ class InverseGaussian(distribution.Distribution):
   def _variance(self):
     return self.loc ** 3 / self.concentration
 
-  def _maybe_assert_valid_sample(self, x):
+  def _default_event_space_bijector(self):
+    return chain_bijector.Chain([
+        softplus_bijector.Softplus(validate_args=self.validate_args),
+        scale_bijector.Scale(scale=-1., validate_args=self.validate_args),
+        exp_bijector.Log(validate_args=self.validate_args),
+        softplus_bijector.Softplus(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return []
-    return [assert_util.assert_positive(x, message='Sample must be positive.')]
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

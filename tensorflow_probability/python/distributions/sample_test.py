@@ -25,18 +25,15 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SampleDistributionTest(test_util.TestCase):
 
   def test_everything_scalar(self):
     s = tfd.Sample(tfd.Normal(loc=0, scale=1), 5, validate_args=True)
-    x = s.sample(seed=tfp_test_util.test_seed())
+    x = s.sample(seed=test_util.test_seed())
     actual_lp = s.log_prob(x)
     # Sample.log_prob will reduce over event space, ie, dims [0, 2]
     # corresponding to sizes concat([[5], [2]]).
@@ -50,7 +47,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
     s = tfd.Sample(
         tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
         validate_args=True)
-    x = s.sample([6, 1], seed=tfp_test_util.test_seed())
+    x = s.sample([6, 1], seed=test_util.test_seed())
     actual_lp = s.log_prob(x)
     # Sample.log_prob will reduce over event space, ie, dims [2, 3, 5]
     # corresponding to sizes concat([[5, 4], [2]]).
@@ -65,7 +62,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
   def test_mixed_scalar(self):
     s = tfd.Sample(tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1),
                    3, validate_args=False)
-    x = s.sample(4, seed=tfp_test_util.test_seed())
+    x = s.sample(4, seed=test_util.test_seed())
     lp = s.log_prob(x)
     self.assertEqual((4, 3, 2), x.shape)
     self.assertEqual((4,), lp.shape)
@@ -99,7 +96,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
     d = tfd.TransformedDistribution(
         tfd.Sample(mvn, sample_shape, validate_args=True),
         bijector=aff)
-    y = d.sample(4, seed=tfp_test_util.test_seed())
+    y = d.sample(4, seed=test_util.test_seed())
     actual_lp = d.log_prob(y)
     self.assertAllEqual((4,) + (sample_shape,) + (2,), y.shape)
     self.assertAllEqual((4,), actual_lp.shape)
@@ -112,7 +109,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
         tfd.TransformedDistribution(mvn, bijector=aff),
         sample_shape,
         validate_args=True)
-    y = d.sample(4, seed=tfp_test_util.test_seed())
+    y = d.sample(4, seed=test_util.test_seed())
     actual_lp = d.log_prob(y)
     self.assertAllEqual((4,) + (sample_shape,) + (2,), y.shape)
     self.assertAllEqual((4,), actual_lp.shape)
@@ -134,7 +131,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
     d = tfd.TransformedDistribution(
         tfd.Sample(mvn, sample_shape, validate_args=True),
         bijector=exp)
-    y = d.sample(4, seed=tfp_test_util.test_seed())
+    y = d.sample(4, seed=test_util.test_seed())
     actual_lp = d.log_prob(y)
     self.assertAllEqual((4,) + (sample_shape,) + (2,), y.shape)
     self.assertAllEqual((4,), actual_lp.shape)
@@ -149,7 +146,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
         tfd.TransformedDistribution(mvn, bijector=exp),
         sample_shape,
         validate_args=True)
-    y = d.sample(4, seed=tfp_test_util.test_seed())
+    y = d.sample(4, seed=test_util.test_seed())
     actual_lp = d.log_prob(y)
     self.assertAllEqual((4,) + (sample_shape,) + (2,), y.shape)
     self.assertAllEqual((4,), actual_lp.shape)
@@ -184,8 +181,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
     actual_entropy = d.entropy()
     self.assertAllEqual(*self.evaluate([expected_entropy, actual_entropy]))
 
-  @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.tf_tape_safety_test
   def test_gradients_through_params(self):
     loc = tf.Variable(tf.zeros([4, 5, 3]), shape=tf.TensorShape(None))
     scale = tf.Variable(tf.ones([]), shape=tf.TensorShape(None))
@@ -204,8 +200,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
     self.assertAllNotNone(grad[:-1])
     self.assertIs(grad[-1], None)
 
-  @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.tf_tape_safety_test
   def test_variable_shape_change(self):
     loc = tf.Variable(tf.zeros([4, 5, 3]), shape=tf.TensorShape(None))
     scale = tf.Variable(tf.ones([]), shape=tf.TensorShape(None))
@@ -220,7 +215,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
     self.evaluate([v.initializer for v in dist.trainable_variables])
 
     x = dist.mean()
-    y = dist.sample([7, 2], seed=tfp_test_util.test_seed())
+    y = dist.sample([7, 2], seed=test_util.test_seed())
     loss_x = -dist.log_prob(x)
     loss_0 = -dist.log_prob(0.)
     batch_shape = dist.batch_shape_tensor()
@@ -241,7 +236,7 @@ class SampleDistributionTest(test_case.TestCase, parameterized.TestCase):
         sample_shape.assign(6),
     ]):
       x = dist.mean()
-      y = dist.sample([7, 2], seed=tfp_test_util.test_seed())
+      y = dist.sample([7, 2], seed=test_util.test_seed())
       loss_x = -dist.log_prob(x)
       loss_0 = -dist.log_prob(0.)
       batch_shape = dist.batch_shape_tensor()

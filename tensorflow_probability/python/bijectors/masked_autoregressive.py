@@ -29,11 +29,11 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
+
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    'AutoregressiveLayer',
     'AutoregressiveNetwork',
     'MaskedAutoregressiveFlow',
     'masked_autoregressive_default_template',
@@ -46,51 +46,49 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
 
   The affine autoregressive flow [(Papamakarios et al., 2016)][3] provides a
   relatively simple framework for user-specified (deep) architectures to learn a
-  distribution over continuous events. Regarding terminology,
+  distribution over continuous events.  Regarding terminology,
 
     'Autoregressive models decompose the joint density as a product of
-    conditionals, and model each conditional in turn. Normalizing flows
+    conditionals, and model each conditional in turn.  Normalizing flows
     transform a base density (e.g. a standard Gaussian) into the target density
     by an invertible transformation with tractable Jacobian.'
     [(Papamakarios et al., 2016)][3]
 
   In other words, the 'autoregressive property' is equivalent to the
   decomposition, `p(x) = prod{ p(x[perm[i]] | x[perm[0:i]]) : i=0, ..., d }`
-  where `perm` is some permutation of `{0, ..., d}`. In the simple case where
+  where `perm` is some permutation of `{0, ..., d}`.  In the simple case where
   the permutation is identity this reduces to:
-  `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
-  `shift_and_log_scale_fn`, `masked_autoregressive_default_template`, achieves
-  this property by zeroing out weights in its `masked_dense` layers.
+  `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`.
 
   In TensorFlow Probability, 'normalizing flows' are implemented as
-  `tfp.bijectors.Bijector`s. The `forward` 'autoregression' is implemented
+  `tfp.bijectors.Bijector`s.  The `forward` 'autoregression' is implemented
   using a `tf.while_loop` and a deep neural network (DNN) with masked weights
   such that the autoregressive property is automatically met in the `inverse`.
 
   A `TransformedDistribution` using `MaskedAutoregressiveFlow(...)` uses the
   (expensive) forward-mode calculation to draw samples and the (cheap)
-  reverse-mode calculation to compute log-probabilities. Conversely, a
+  reverse-mode calculation to compute log-probabilities.  Conversely, a
   `TransformedDistribution` using `Invert(MaskedAutoregressiveFlow(...))` uses
   the (expensive) forward-mode calculation to compute log-probabilities and the
   (cheap) reverse-mode calculation to compute samples.  See 'Example Use'
   [below] for more details.
 
   Given a `shift_and_log_scale_fn`, the forward and inverse transformations are
-  (a sequence of) affine transformations. A 'valid' `shift_and_log_scale_fn`
+  (a sequence of) affine transformations.  A 'valid' `shift_and_log_scale_fn`
   must compute each `shift` (aka `loc` or 'mu' in [Germain et al. (2015)][1])
   and `log(scale)` (aka 'alpha' in [Germain et al. (2015)][1]) such that each
   are broadcastable with the arguments to `forward` and `inverse`, i.e., such
   that the calculations in `forward`, `inverse` [below] are possible.
 
-  For convenience, `masked_autoregressive_default_template` is offered as a
-  possible `shift_and_log_scale_fn` function. It implements the MADE
-  architecture [(Germain et al., 2015)][1]. MADE is a feed-forward network that
-  computes a `shift` and `log(scale)` using `masked_dense` layers in a deep
+  For convenience, `tfp.bijectors.AutoregressiveNetwork` is offered as a
+  possible `shift_and_log_scale_fn` function.  It implements the MADE
+  architecture [(Germain et al., 2015)][1].  MADE is a feed-forward network that
+  computes a `shift` and `log(scale)` using masked dense layers in a deep
   neural network. Weights are masked to ensure the autoregressive property. It
   is possible that this architecture is suboptimal for your task. To build
   alternative networks, either change the arguments to
-  `masked_autoregressive_default_template`, use the `masked_dense` function to
-  roll-out your own, or use some other architecture, e.g., using `tf.layers`.
+  `tfp.bijectors.AutoregressiveNetwork` or use some other architecture, e.g.,
+  using `tf.keras.layers`.
 
   Warning: no attempt is made to validate that the `shift_and_log_scale_fn`
   enforces the 'autoregressive property'.
@@ -116,18 +114,18 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
     return (y - shift) / tf.exp(log_scale)
   ```
 
-  Notice that the `inverse` does not need a for-loop. This is because in the
+  Notice that the `inverse` does not need a for-loop.  This is because in the
   forward pass each calculation of `shift` and `log_scale` is based on the `y`
-  calculated so far (not `x`). In the `inverse`, the `y` is fully known, thus is
-  equivalent to the scaling used in `forward` after `event_size` passes, i.e.,
-  the 'last' `y` used to compute `shift`, `log_scale`. (Roughly speaking, this
-  also proves the transform is bijective.)
+  calculated so far (not `x`).  In the `inverse`, the `y` is fully known, thus
+  is equivalent to the scaling used in `forward` after `event_size` passes,
+  i.e., the 'last' `y` used to compute `shift`, `log_scale`.  (Roughly speaking,
+  this also proves the transform is bijective.)
 
   The `bijector_fn` argument allows specifying a more general coupling relation,
-  such as the LSTM-inspired activation from [4], or Neural Spline Flow [5]. It
+  such as the LSTM-inspired activation from [4], or Neural Spline Flow [5].  It
   must logically operate on each element of the input individually, and still
-  obey the 'autoregressive property' described above. The forward transformation
-  is
+  obey the 'autoregressive property' described above.  The forward
+  transformation is
 
   ```python
   def forward(x):
@@ -153,47 +151,79 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   tfd = tfp.distributions
   tfb = tfp.bijectors
 
-  dims = 5
+  dims = 2
 
   # A common choice for a normalizing flow is to use a Gaussian for the base
-  # distribution. (However, any continuous distribution would work.) E.g.,
+  # distribution.  (However, any continuous distribution would work.) E.g.,
   maf = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
       bijector=tfb.MaskedAutoregressiveFlow(
-          shift_and_log_scale_fn=tfb.masked_autoregressive_default_template(
-              hidden_layers=[512, 512])),
+          shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
+              params=2, hidden_units=[512, 512])),
       event_shape=[dims])
 
   x = maf.sample()  # Expensive; uses `tf.while_loop`, no Bijector caching.
   maf.log_prob(x)   # Almost free; uses Bijector caching.
-  maf.log_prob(0.)  # Cheap; no `tf.while_loop` despite no Bijector caching.
+  # Cheap; no `tf.while_loop` despite no Bijector caching.
+  maf.log_prob(tf.zeros(dims))
 
   # [Papamakarios et al. (2016)][3] also describe an Inverse Autoregressive
   # Flow [(Kingma et al., 2016)][2]:
   iaf = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
       bijector=tfb.Invert(tfb.MaskedAutoregressiveFlow(
-          shift_and_log_scale_fn=tfb.masked_autoregressive_default_template(
-              hidden_layers=[512, 512]))),
+          shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
+              params=2, hidden_units=[512, 512]))),
       event_shape=[dims])
 
   x = iaf.sample()  # Cheap; no `tf.while_loop` despite no Bijector caching.
   iaf.log_prob(x)   # Almost free; uses Bijector caching.
-  iaf.log_prob(0.)  # Expensive; uses `tf.while_loop`, no Bijector caching.
+  # Expensive; uses `tf.while_loop`, no Bijector caching.
+  iaf.log_prob(tf.zeros(dims))
 
   # In many (if not most) cases the default `shift_and_log_scale_fn` will be a
-  # poor choice. Here's an example of using a 'shift only' version and with a
+  # poor choice.  Here's an example of using a 'shift only' version and with a
   # different number/depth of hidden layers.
-  shift_only = True
+  made = tfb.AutoregressiveNetwork(params=1, hidden_units=[32])
   maf_no_scale_hidden2 = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
       bijector=tfb.MaskedAutoregressiveFlow(
-          tfb.masked_autoregressive_default_template(
-              hidden_layers=[32],
-              shift_only=shift_only),
-          is_constant_jacobian=shift_only),
+          lambda y: (made(y)[..., 0], None),
+          is_constant_jacobian=True),
       event_shape=[dims])
+  maf_no_scale_hidden2._made = made  # Ensure maf_no_scale_hidden2.trainable
+  # NOTE: The last line ensures that maf_no_scale_hidden2.trainable_variables
+  # will include all variables from `made`.
   ```
+
+  #### Variable Tracking
+
+  NOTE: Like all subclasses of `tfb.Bijector`, `tfb.MaskedAutoregressiveFlow`
+  subclasses `tf.Module` for variable tracking.
+
+  A `tfb.MaskedAutoregressiveFlow` instance saves a reference to the values
+  passed as `shift_and_log_scale_fn` and `bijector_fn` to its constructor.
+  Thus, for most values passed as `shift_and_log_scale_fn` or `bijector_fn`,
+  variables referenced by those values will be found and tracked by the
+  `tfb.MaskedAutoregressiveFlow` instance.  Please see the `tf.Module`
+  documentation for further details.
+
+  However, if the value passed to `shift_and_log_scale_fn` or `bijector_fn` is a
+  Python function, then `tfb.MaskedAutoregressiveFlow` cannot automatically
+  track variables used inside `shift_and_log_scale_fn` or `bijector_fn`.  To get
+  `tfb.MaskedAutoregressiveFlow` to track such variables, either:
+
+   1. Replace the Python function with a `tf.Module`, `tf.keras.Layer`,
+      or other callable object through which `tf.Module` can find variables.
+
+   2. Or, add a reference to the variables to the `tfb.MaskedAutoregressiveFlow`
+      instance by setting an attribute -- for example:
+      ````
+      made1 = tfb.AutoregressiveNetwork(params=1, hidden_units=[10, 10])
+      made2 = tfb.AutoregressiveNetwork(params=1, hidden_units=[10, 10])
+      maf = tfb.MaskedAutoregressiveFlow(lambda y: (made1(y), made2(y) + 1.))
+      maf._made_variables = made1.variables + made2.variables
+      ````
 
   #### References
 
@@ -230,20 +260,21 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
 
     Args:
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
-        `log_scale` from both the forward domain (`x`) and the inverse domain
-        (`y`). Calculation must respect the 'autoregressive property' (see class
-        docstring). Suggested default
-        `masked_autoregressive_default_template(hidden_layers=...)`.
-        Typically the function contains `tf.Variables` and is wrapped using
-        `tf.make_template`. Returning `None` for either (both) `shift`,
-        `log_scale` is equivalent to (but more efficient than) returning zero.
+        `log_scale` from the inverse domain (`y`). Calculation must respect the
+        'autoregressive property' (see class docstring). Suggested default
+        `tfb.AutoregressiveNetwork(params=2, hidden_layers=...)`.
+        Typically the function contains `tf.Variables`. Returning `None` for
+        either (both) `shift`, `log_scale` is equivalent to (but more efficient
+        than) returning zero. If `shift_and_log_scale_fn` returns a single
+        `Tensor`, the returned value will be unstacked to get the `shift` and
+        `log_scale`: `tf.unstack(shift_and_log_scale_fn(y), num=2, axis=-1)`.
       bijector_fn: Python `callable` which returns a `tfb.Bijector` which
         transforms event tensor with the signature
         `(input, **condition_kwargs) -> bijector`. The bijector must operate on
         scalar events and must not alter the rank of its input. The
-        `bijector_fn` will be called with `Tensors` from both the forward domain
-        (`x`) and the inverse domain (`y`). Calculation must respect the
-        'autoregressive property' (see class docstring).
+        `bijector_fn` will be called with `Tensors` from the inverse domain
+        (`y`). Calculation must respect the 'autoregressive property' (see
+        class docstring).
       is_constant_jacobian: Python `bool`. Default: `False`. When `True` the
         implementation assumes `log_scale` does not depend on the forward domain
         (`x`) or inverse domain (`y`) values. (No validation is made;
@@ -257,7 +288,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
         to `False`.
       event_ndims: Python `integer`, the intrinsic dimensionality of this
         bijector. 1 corresponds to a simple vector autoregressive bijector as
-        implemented by the `masked_autoregressive_default_template`, 2 might be
+        implemented by the `tfp.bijectors.AutoregressiveNetwork`, 2 might be
         useful for a 2D convolutional `shift_and_log_scale_fn` and so on.
       name: Python `str`, name given to ops managed by this object.
 
@@ -265,30 +296,36 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
       ValueError: If both or none of `shift_and_log_scale_fn` and `bijector_fn`
           are specified.
     """
+    parameters = dict(locals())
     name = name or 'masked_autoregressive_flow'
-    self._unroll_loop = unroll_loop
-    self._event_ndims = event_ndims
-    if bool(shift_and_log_scale_fn) == bool(bijector_fn):
-      raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
-                       '`bijector_fn` should be specified.')
-    if shift_and_log_scale_fn:
-      def _bijector_fn(x, **condition_kwargs):
-        shift, log_scale = shift_and_log_scale_fn(x,
-                                                  **condition_kwargs)
-        return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+    with tf.name_scope(name) as name:
+      self._unroll_loop = unroll_loop
+      self._event_ndims = event_ndims
+      if bool(shift_and_log_scale_fn) == bool(bijector_fn):
+        raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
+                         '`bijector_fn` should be specified.')
+      if shift_and_log_scale_fn:
+        def _bijector_fn(x, **condition_kwargs):
+          params = shift_and_log_scale_fn(x, **condition_kwargs)
+          if tf.is_tensor(params):
+            shift, log_scale = tf.unstack(params, num=2, axis=-1)
+          else:
+            shift, log_scale = params
+          return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
 
-      bijector_fn = _bijector_fn
+        bijector_fn = _bijector_fn
 
-    if validate_args:
-      bijector_fn = _validate_bijector_fn(bijector_fn)
-    # Still do this assignment for variable tracking.
-    self._shift_and_log_scale_fn = shift_and_log_scale_fn
-    self._bijector_fn = bijector_fn
-    super(MaskedAutoregressiveFlow, self).__init__(
-        forward_min_event_ndims=self._event_ndims,
-        is_constant_jacobian=is_constant_jacobian,
-        validate_args=validate_args,
-        name=name)
+      if validate_args:
+        bijector_fn = _validate_bijector_fn(bijector_fn)
+      # Still do this assignment for variable tracking.
+      self._shift_and_log_scale_fn = shift_and_log_scale_fn
+      self._bijector_fn = bijector_fn
+      super(MaskedAutoregressiveFlow, self).__init__(
+          forward_min_event_ndims=self._event_ndims,
+          is_constant_jacobian=is_constant_jacobian,
+          validate_args=validate_args,
+          parameters=parameters,
+          name=name)
 
   def _forward(self, x, **kwargs):
     static_event_size = tensorshape_util.num_elements(
@@ -370,7 +407,7 @@ def _gen_mask(num_blocks,
               dtype=tf.float32):
   """Generate the mask for building an autoregressive dense layer."""
   # TODO(b/67594795): Better support of dynamic shape.
-  mask = np.zeros([n_out, n_in], dtype=dtype.as_numpy_dtype())
+  mask = np.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
   slices = _gen_slices(num_blocks, n_in, n_out, mask_type=mask_type)
   for [row_slice, col_slice] in slices:
     mask[row_slice, col_slice] = 1
@@ -450,6 +487,13 @@ def masked_dense(inputs,
     return layer.apply(inputs)
 
 
+@deprecation.deprecated(
+    '2020-02-01',
+    '`masked_autoregressive_default_template` is deprecated; '
+    'use `tfp.bijectors.AutoregressiveNetwork`.  '
+    ' Also, please note the section "Variable Tracking" in the documentation '
+    'for `tfp.bijectors.MaskedAutoregressiveFlow`.',
+    warn_once=True)
 def masked_autoregressive_default_template(hidden_layers,
                                            shift_only=False,
                                            activation=tf.nn.relu,
@@ -581,7 +625,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   for input dimension `i` depends only on inputs `x[batch_idx, j]` where
   `ord(j) < ord(i)`.  The autoregressive property allows us to use
   `output[batch_idx, i]` to parameterize conditional distributions:
-    `p(x[batch_idx, i] | x[batch_idx, ] for ord(j) < ord(i))`
+    `p(x[batch_idx, i] | x[batch_idx, j] for ord(j) < ord(i))`
   which give us a tractable distribution over input `x[batch_idx]`:
     `p(x[batch_idx]) = prod_i p(x[batch_idx, ord(i)] | x[batch_idx, ord(0:i)])`
 
@@ -602,8 +646,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
   distribution = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
-      bijector=tfb.MaskedAutoregressiveFlow(
-          lambda x: tf.unstack(made(x), num=2, axis=-1)),
+      bijector=tfb.MaskedAutoregressiveFlow(made),
       event_shape=[2])
 
   # Construct and fit model.
@@ -662,8 +705,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
                                        hidden_units=[20, 20], activation='relu')
       distribution = tfd.TransformedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=tfb.MaskedAutoregressiveFlow(
-              lambda x: tf.unstack(made(x), num=2, axis=-1)),
+          bijector=tfb.MaskedAutoregressiveFlow(made),
           event_shape=event_shape)
 
       # Construct and fit model.
@@ -939,17 +981,6 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   @property
   def params(self):
     return self._params
-
-
-class AutoregressiveLayer(AutoregressiveNetwork):
-  """Masked Autoencoder for Distribution Estimation [Germain et al. (2015)]."""
-
-  @deprecation.deprecated(
-      '2019-08-01',
-      '`AutoregressiveLayer` has been renamed `AutoregressiveNetwork`.',
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(AutoregressiveLayer, cls).__new__(cls)
 
 
 def _list(xs):

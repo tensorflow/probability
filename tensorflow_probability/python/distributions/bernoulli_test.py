@@ -27,16 +27,13 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def make_bernoulli(batch_shape, dtype=tf.int32):
   p = np.random.uniform(size=list(batch_shape))
   p = tf.constant(p, dtype=tf.float32)
-  return tfd.Bernoulli(probs=p, dtype=dtype)
+  return tfd.Bernoulli(probs=p, dtype=dtype, validate_args=True)
 
 
 def entropy(p):
@@ -44,23 +41,25 @@ def entropy(p):
   return -q * np.log(q) - p * np.log(p)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BernoulliTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     logits = [-42., 42.]
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     self.assertAllClose(logits, self.evaluate(dist.logits))
-    self.assertAllClose(sp_special.expit(logits), self.evaluate(dist.probs))
+    self.assertAllClose(sp_special.expit(logits),
+                        self.evaluate(dist.probs_parameter()))
 
     p = [0.01, 0.99, 0.42]
-    dist = tfd.Bernoulli(probs=p)
-    self.assertAllClose(sp_special.logit(p), self.evaluate(dist.logits))
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
+    self.assertAllClose(sp_special.logit(p),
+                        self.evaluate(dist.logits_parameter()))
 
   def testInvalidP(self):
     invalid_ps = [1.01, 2.]
@@ -77,7 +76,7 @@ class BernoulliTest(test_case.TestCase):
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
-      dist = tfd.Bernoulli(probs=p)
+      dist = tfd.Bernoulli(probs=p, validate_args=True)
       self.assertEqual(p, self.evaluate(dist.probs))  # Should not fail
 
   def testShapes(self):
@@ -92,28 +91,30 @@ class BernoulliTest(test_case.TestCase):
   def testDtype(self):
     dist = make_bernoulli([])
     self.assertEqual(dist.dtype, tf.int32)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.probs.dtype, dist.mean().dtype)
     self.assertEqual(dist.probs.dtype, dist.variance().dtype)
     self.assertEqual(dist.probs.dtype, dist.stddev().dtype)
     self.assertEqual(dist.probs.dtype, dist.entropy().dtype)
     self.assertEqual(dist.probs.dtype, dist.prob(0).dtype)
-    self.assertEqual(dist.probs.dtype, dist.prob(0.5).dtype)
+    self.assertEqual(dist.probs.dtype, dist.prob(1).dtype)
     self.assertEqual(dist.probs.dtype, dist.log_prob(0).dtype)
-    self.assertEqual(dist.probs.dtype, dist.log_prob(0.5).dtype)
+    self.assertEqual(dist.probs.dtype, dist.log_prob(1).dtype)
 
     dist64 = make_bernoulli([], tf.int64)
     self.assertEqual(dist64.dtype, tf.int64)
-    self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
+    self.assertEqual(dist64.dtype, dist64.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
   def testFloatMode(self):
-    dist = tfd.Bernoulli(probs=.6, dtype=tf.float32)
+    dist = tfd.Bernoulli(probs=.6, dtype=tf.float32, validate_args=True)
     self.assertEqual(np.float32(1), self.evaluate(dist.mode()))
 
   def _testPmf(self, **kwargs):
-    dist = tfd.Bernoulli(**kwargs)
+    dist = tfd.Bernoulli(validate_args=True, **kwargs)
     # pylint: disable=bad-continuation
     xs = [
         0,
@@ -137,7 +138,7 @@ class BernoulliTest(test_case.TestCase):
 
   def testPmfCorrectBroadcastDynamicShape(self):
     p = tf1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     event1 = [1, 0, 1]
     event2 = [[1, 0, 1]]
     self.assertAllClose(
@@ -150,7 +151,7 @@ class BernoulliTest(test_case.TestCase):
     dist = tfd.Bernoulli(probs=p, validate_args=True)
     with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(dist.prob([1, 1, -1]))
-    with self.assertRaisesOpError('Elements cannot exceed 1.'):
+    with self.assertRaisesOpError('must be less than or equal to `1`'):
       self.evaluate(dist.prob([2, 0, 1]))
 
   def testPmfWithP(self):
@@ -169,7 +170,7 @@ class BernoulliTest(test_case.TestCase):
 
   def testBroadcasting(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.Bernoulli(probs=probs(p))
+    dist = lambda p: tfd.Bernoulli(probs=probs(p), validate_args=True)
     self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
     self.assertAllClose(
         np.log([0.5, 0.5, 0.5]), self.evaluate(dist(0.5).log_prob([1, 1, 1])))
@@ -178,29 +179,24 @@ class BernoulliTest(test_case.TestCase):
 
   def testPmfShapes(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.Bernoulli(probs=probs(p))
+    dist = lambda p: tfd.Bernoulli(probs=probs(p), validate_args=True)
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
 
-    dist = tfd.Bernoulli(probs=0.5)
+    dist = tfd.Bernoulli(probs=0.5, validate_args=True)
     self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
-    dist = tfd.Bernoulli(probs=0.5)
-    self.assertEqual((), dist.log_prob(1).shape)
-    self.assertEqual((1), dist.log_prob([1]).shape)
-    self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
+    dist = tfd.Bernoulli(probs=0.5, validate_args=True)
+    self.assertAllEqual([], dist.log_prob(1).shape)
+    self.assertAllEqual([1], dist.log_prob([1]).shape)
+    self.assertAllEqual([2, 1], dist.log_prob([[1], [1]]).shape)
 
-    dist = tfd.Bernoulli(probs=[[0.5], [0.5]])
-    self.assertEqual((2, 1), dist.log_prob(1).shape)
-
-  def testBoundaryConditions(self):
-    dist = tfd.Bernoulli(probs=1.0)
-    self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0)))
-    self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1))])
+    dist = tfd.Bernoulli(probs=[[0.5], [0.5]], validate_args=True)
+    self.assertAllEqual([2, 1], dist.log_prob(1).shape)
 
   def testEntropyNoBatch(self):
     p = 0.2
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy(p))
 
   def testEntropyWithBatch(self):
@@ -213,9 +209,9 @@ class BernoulliTest(test_case.TestCase):
 
   def testSampleN(self):
     p = [0.2, 0.6]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     n = 100000
-    samples = dist.sample(n)
+    samples = dist.sample(n, seed=test_util.test_seed())
     tensorshape_util.set_shape(samples, [n, 2])
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
@@ -228,43 +224,49 @@ class BernoulliTest(test_case.TestCase):
     self.assertEqual(set([0, 1]), set(sample_values.flatten()))
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
-    dist = tfd.Bernoulli(np.log([.2, .4]))
-    x = dist.sample(1, seed=tfp_test_util.test_seed())
+    dist = tfd.Bernoulli(np.log([.2, .4]), validate_args=True)
+    x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX does not return None for gradients.')
+  @test_util.numpy_disable_gradient_test
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
     _, grad_p = tfp.math.value_and_gradient(
-        lambda x: tfd.Bernoulli(probs=x).sample(100), p)
+        lambda x: tfd.Bernoulli(probs=x, validate_args=True).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()), p)
     self.assertIsNone(grad_p)
 
   def testSampleDeterministicScalarVsVector(self):
     p = [0.2, 0.6]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     n = 1000
-    def _maybe_seed():
+    def _seed(seed=None):
+      seed = test_util.test_seed() if seed is None else seed
       if tf.executing_eagerly():
-        tf1.set_random_seed(42)
-        return None
-      return 42
+        tf.random.set_seed(seed)
+      return seed
+    seed = _seed()
     self.assertAllEqual(
-        self.evaluate(dist.sample(n, _maybe_seed())),
-        self.evaluate(dist.sample([n], _maybe_seed())))
+        self.evaluate(dist.sample(n, _seed(seed=seed))),
+        self.evaluate(dist.sample([n], _seed(seed=seed))))
     n = tf1.placeholder_with_default(np.int32(1000), shape=None)
-    sample1 = dist.sample(n, _maybe_seed())
-    sample2 = dist.sample([n], _maybe_seed())
+    seed = _seed()
+    sample1 = dist.sample(n, _seed(seed=seed))
+    sample2 = dist.sample([n], _seed(seed=seed))
     sample1, sample2 = self.evaluate([sample1, sample2])
     self.assertAllEqual(sample1, sample2)
 
   def testMean(self):
     p = np.array([[0.2, 0.7], [0.5, 0.4]], dtype=np.float32)
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllEqual(self.evaluate(dist.mean()), p)
 
   def testVarianceAndStd(self):
     var = lambda p: p * (1. - p)
     p = [[0.2, 0.7], [0.5, 0.4]]
-    dist = tfd.Bernoulli(probs=p)
+    dist = tfd.Bernoulli(probs=p, validate_args=True)
     self.assertAllClose(
         self.evaluate(dist.variance()),
         np.array([[var(0.2), var(0.7)], [var(0.5), var(0.4)]],
@@ -275,13 +277,48 @@ class BernoulliTest(test_case.TestCase):
                   [np.sqrt(var(0.5)), np.sqrt(var(0.4))]],
                  dtype=np.float32))
 
+  def testVarianceWhenProbCloseToOne(self):
+    # Prob is very close to 1.0, so the naive 1 - p will be (numerically) 0,
+    # which would make variance zero.  Main point of this test is to verify that
+    # the variance is > 0 ... we also verify that variance is correct.
+
+    # tf.sigmoid(logits) is < float eps away from 1.0, which means the naive
+    # 1 - tf.sigmoid(logits) will result in 0.0, which is a loss of precision.
+    one_minus_prob_64 = np.float64(np.finfo(np.float32).eps) / 2
+    logits_32 = np.float32(np.log((1. - one_minus_prob_64) / one_minus_prob_64))
+
+    # Verify that this value of logits results in loss of precision for a naive
+    # implementation (justifying our "fancy" implementation of sigmoid(-logits))
+    self.assertAllEqual(0., 1 - tf.sigmoid(logits_32))
+
+    # See! This one weird trick fixes everything.  Asserts below check that we
+    # used the trick correctly in our code.
+    self.assertGreater(self.evaluate(tf.sigmoid(-logits_32)), 0.)
+
+    dist = tfd.Bernoulli(logits=logits_32)
+
+    expected_variance = np.float32(one_minus_prob_64 * (1 - one_minus_prob_64))
+
+    self.assertGreater(expected_variance, 0.)
+
+    self.assertAllClose(
+        dist.variance(),
+        expected_variance,
+        # Equivalent to atol=0, rtol=1e-6, but less likely to confuse which
+        # element is being used for the "r" in rtol.
+        # Note this also ensures dist.variance() > 0, which the naive
+        # implementation would not be able to do.
+        atol=expected_variance * 1e-6,
+        rtol=0,
+    )
+
   def testBernoulliBernoulliKL(self):
     batch_size = 6
     a_p = np.array([0.6] * batch_size, dtype=np.float32)
     b_p = np.array([0.4] * batch_size, dtype=np.float32)
 
-    a = tfd.Bernoulli(probs=a_p)
-    b = tfd.Bernoulli(probs=b_p)
+    a = tfd.Bernoulli(probs=a_p, validate_args=True)
+    b = tfd.Bernoulli(probs=b_p, validate_args=True)
 
     kl = tfd.kl_divergence(a, b)
     kl_val = self.evaluate(kl)
@@ -291,6 +328,38 @@ class BernoulliTest(test_case.TestCase):
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
+
+  def testBernoulliBernoulliKLWhenProbOneIsOne(self):
+    # KL[a || b] = Pa * Log[Pa / Pb] + (1 - Pa) * Log[(1 - Pa) / (1 - Pb)]
+    # This is defined iff (Pb = 0 ==> Pa = 0) AND (Pb = 1 ==> Pa = 1).
+    a = tfd.Bernoulli(probs=[1., 1., 1.])
+    b = tfd.Bernoulli(probs=[0.5, 1., 0.])
+    kl_expected = [
+        # The (1 - Pa) term kills the entire second term.
+        1 * np.log(1 / 0.5) + 0,
+        # P[b = 0] = 0, and P[a = 0] = 0, so absolute continuity holds.
+        1 * np.log(1 / 1) + 0,
+        # P[b = 1] = 0, but P[a = 1] != 0, so not absolutely continuous.
+        # Some would argue that NaN would be more correct...
+        np.inf
+    ]
+    self.assertAllClose(self.evaluate(tfd.kl_divergence(a, b)), kl_expected)
+
+  def testBernoulliBernoulliKLWhenProbOneIsZero(self):
+    # KL[a || b] = Pa * Log[Pa / Pb] + (1 - Pa) * Log[(1 - Pa) / (1 - Pb)]
+    # This is defined iff (Pb = 0 ==> Pa = 0) AND (Pb = 1 ==> Pa = 1).
+    a = tfd.Bernoulli(probs=[0., 0., 0.])
+    b = tfd.Bernoulli(probs=[0.5, 1., 0.])
+    kl_expected = [
+        # The Pa term kills the entire first term.
+        0 + 1 * np.log(1 / 0.5),
+        # P[b = 0] = 0, but P[a = 0] != 0, so not absolutely continuous.
+        # Some would argue that NaN would be more correct...
+        np.inf,
+        # P[b = 1] = 0, and P[a = 1] = 0, so absolute continuity holds.
+        0 + 1 * np.log(1 / 1)
+    ]
+    self.assertAllClose(self.evaluate(tfd.kl_divergence(a, b)), kl_expected)
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
@@ -314,6 +383,49 @@ class BernoulliTest(test_case.TestCase):
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
+  def testLogProbWithInfiniteLogits(self):
+    logits = [np.inf, -np.inf]  # probs = [1, 0].
+    dist = tfd.Bernoulli(logits=logits)
+    self.assertAllEqual([0., -np.inf], dist.log_prob([1., 1.]))
+    self.assertAllEqual([-np.inf, 0.], dist.log_prob([0., 0.]))
+    self.assertAllEqual([np.nan, np.nan], dist.log_prob([np.nan, np.nan]))
+
+  def testLogProbWithZeroOrOneProbs(self):
+    probs = [1., 0.]  # logits = [np.inf, -np.inf]
+    dist = tfd.Bernoulli(probs=probs)
+    self.assertAllEqual([0., -np.inf], dist.log_prob([1., 1.]))
+    self.assertAllEqual([-np.inf, 0.], dist.log_prob([0., 0.]))
+    self.assertAllEqual([np.nan, np.nan], dist.log_prob([np.nan, np.nan]))
+
+  @test_util.numpy_disable_gradient_test
+  def testLogProbGrads(self):
+    # probs = [1/2, 1, 0].
+    logits = tf.constant([0., np.inf, -np.inf], dtype=tf.float32)
+    _, grad = tfp.math.value_and_gradient(
+        lambda x: -tfd.Bernoulli(logits=x).log_prob([1., 1., 0.]),
+        logits)
+
+    # For finite logits, the grad is as expected (finite...to get value do math)
+    # For infinite logits, you can reason that a small perturbation of the
+    # logits doesn't change anything (adding epsilon to +-Inf doesn't change
+    # it), and thus gradient = 0 is expected.
+    self.assertAllEqual(grad, [-0.5, 0., 0.])
+
+  def testEntropyWithInfiniteLogits(self):
+    logits = [np.inf, -np.inf]  # probs = [1, 0]
+    dist = tfd.Bernoulli(logits=logits)
+    self.assertAllEqual([0., 0.], dist.entropy())
+
+  def testEntropyWithZeroOneProbs(self):
+    probs = [1., 0.]  # logits = [np.inf, -np.inf]
+    dist = tfd.Bernoulli(probs=probs)
+    self.assertAllEqual([0., 0.], dist.entropy())
+
+  def testMeanWithInfiniteLogits(self):
+    logits = [np.inf, -np.inf]  # probs = [1, 0]
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
+    self.assertAllEqual([1., 0.], dist.mean())
+
 
 class _MakeSlicer(object):
 
@@ -323,23 +435,25 @@ class _MakeSlicer(object):
 make_slicer = _MakeSlicer()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliSlicingTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BernoulliSlicingTest(test_util.TestCase):
 
   def testScalarSlice(self):
-    logits = self.evaluate(tf.random.normal([]))
-    dist = tfd.Bernoulli(logits=logits)
+    logits = self.evaluate(tf.random.normal([], seed=test_util.test_seed()))
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     self.assertAllEqual([], dist.batch_shape)
     self.assertAllEqual([1], dist[tf.newaxis].batch_shape)
     self.assertAllEqual([], dist[...].batch_shape)
     self.assertAllEqual([1, 1], dist[tf.newaxis, ..., tf.newaxis].batch_shape)
 
   def testSlice(self):
-    logits = self.evaluate(tf.random.normal([20, 3, 1, 5]))
-    dist = tfd.Bernoulli(logits=logits)
+    logits = self.evaluate(tf.random.normal(
+        [20, 3, 1, 5], seed=test_util.test_seed()))
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     dist_noshape = tfd.Bernoulli(
-        logits=tf1.placeholder_with_default(logits, shape=None))
+        logits=tf1.placeholder_with_default(logits, shape=None),
+        validate_args=True)
 
     def check(*slicers):
       for ds, assert_static_shape in (dist, True), (dist_noshape, False):
@@ -383,9 +497,10 @@ class BernoulliSlicingTest(test_case.TestCase):
       check(make_slicer[..., 2, :])  # ...,1,5 -> 2 is oob.
 
   def testSliceSequencePreservesOrigVarGradLinkage(self):
-    logits = tf.Variable(tf.random.normal([20, 3, 1, 5]))
+    logits = tf.Variable(tf.random.normal(
+        [20, 3, 1, 5], seed=test_util.test_seed()))
     self.evaluate(logits.initializer)
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     for slicer in [make_slicer[:5], make_slicer[..., -1], make_slicer[:, 1::2]]:
       with tf.GradientTape() as tape:
         dist = slicer(dist)
@@ -396,9 +511,10 @@ class BernoulliSlicingTest(test_case.TestCase):
           self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
 
   def testSliceThenCopyPreservesOrigVarGradLinkage(self):
-    logits = tf.Variable(tf.random.normal([20, 3, 1, 5]))
+    logits = tf.Variable(
+        tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()))
     self.evaluate(logits.initializer)
-    dist = tfd.Bernoulli(logits=logits)
+    dist = tfd.Bernoulli(logits=logits, validate_args=True)
     dist = dist[:5]
     with tf.GradientTape() as tape:
       dist = dist.copy(name='bern2')
@@ -419,15 +535,16 @@ class BernoulliSlicingTest(test_case.TestCase):
 
   def testCopyUnknownRank(self):
     logits = tf1.placeholder_with_default(
-        tf.random.normal([20, 3, 1, 5]), shape=None)
-    dist = tfd.Bernoulli(logits=logits, name='b1')
+        tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()), shape=None)
+    dist = tfd.Bernoulli(logits=logits, name='b1', validate_args=True)
     self.assertIn('b1', dist.name)
     dist = dist.copy(name='b2')
     self.assertIn('b2', dist.name)
 
   def testSliceCopyOverrideNameSliceAgainCopyOverrideLogitsSliceAgain(self):
-    logits = tf.random.normal([20, 3, 2, 5])
-    dist = tfd.Bernoulli(logits=logits, name='b1')
+    seed_stream = test_util.test_seed_stream('slice_bernoulli')
+    logits = tf.random.normal([20, 3, 2, 5], seed=seed_stream())
+    dist = tfd.Bernoulli(logits=logits, name='b1', validate_args=True)
     self.assertIn('b1', dist.name)
     dist = dist[:10].copy(name='b2')
     self.assertAllEqual((10, 3, 2, 5), dist.batch_shape)
@@ -435,20 +552,22 @@ class BernoulliSlicingTest(test_case.TestCase):
     dist = dist.copy(name='b3')[..., 1]
     self.assertAllEqual((10, 3, 2), dist.batch_shape)
     self.assertIn('b3', dist.name)
-    dist = dist.copy(logits=tf.random.normal([2]))
+    dist = dist.copy(logits=tf.random.normal([2], seed=seed_stream()))
     self.assertAllEqual((2,), dist.batch_shape)
     self.assertIn('b3', dist.name)
 
   def testDocstrSliceExample(self):
-    b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]))  # batch shape [3, 5, 7, 9]
+    # batch shape [3, 5, 7, 9]
+    b = tfd.Bernoulli(logits=tf.zeros([3, 5, 7, 9]), validate_args=True)
     self.assertAllEqual((3, 5, 7, 9), b.batch_shape)
     b2 = b[:, tf.newaxis, ..., -2:, 1::2]  # batch shape [3, 1, 5, 2, 4]
     self.assertAllEqual((3, 1, 5, 2, 4), b2.batch_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliFromVariableTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BernoulliFromVariableTest(test_util.TestCase):
 
+  @test_util.tf_tape_safety_test
   def testGradientLogits(self):
     x = tf.Variable([-1., 1])
     self.evaluate(x.initializer)
@@ -459,6 +578,7 @@ class BernoulliFromVariableTest(test_case.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.tf_tape_safety_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7])
     self.evaluate(x.initializer)
@@ -469,6 +589,7 @@ class BernoulliFromVariableTest(test_case.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.jax_disable_variable_test
   def testAssertionsProbs(self):
     x = tf.Variable([0.1, 0.7, 0.0])
     d = tfd.Bernoulli(probs=x, validate_args=True)

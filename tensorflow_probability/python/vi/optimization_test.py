@@ -25,21 +25,19 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class OptimizationTests(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class OptimizationTests(test_util.TestCase):
 
   def test_variational_em(self):
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     num_samples = 10000
     mu, sigma = 3., 5.
@@ -53,7 +51,7 @@ class OptimizationTests(test_case.TestCase):
         1., tfb.Softplus(), name='scale')
     def trainable_log_prob(z):
       lp = tfd.Normal(0., 1.).log_prob(z)
-      lp += tf.reduce_sum(input_tensor=tfd.Normal(
+      lp += tf.reduce_sum(tfd.Normal(
           z[..., tf.newaxis], likelihood_scale).log_prob(x), axis=-1)
       return lp
 
@@ -94,14 +92,14 @@ class OptimizationTests(test_case.TestCase):
 
     # The Q family is a joint distribution that can express any 2D MVN.
     b = tf.Variable([0., 0.])
-    l = tfp.util.TransformedVariable(tf.eye(2), tfb.ScaleTriL())
+    l = tfp.util.TransformedVariable(tf.eye(2), tfb.FillScaleTriL())
     def trainable_q_fn():
       z = yield tfd.JointDistributionCoroutine.Root(
           tfd.Normal(b[0], l[0, 0], name='z'))
       _ = yield tfd.Normal(b[1] + l[1, 0] * z, l[1, 1], name='x')
     q = tfd.JointDistributionCoroutine(trainable_q_fn)
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     loss_curve = tfp.vi.fit_surrogate_posterior(
         p_log_prob, q, num_steps=1000, sample_size=100,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
@@ -115,10 +113,10 @@ class OptimizationTests(test_case.TestCase):
 
   def test_imhogeneous_poisson_process_example(self):
     # Toy 1D data.
-    index_points = np.array([-10., -7.2, -4., -1., 0.8, 4., 6.2, 9.]).reshape(
+    index_points = np.array([-10., -7.2, -4., -0.1, 0.1, 4., 6.2, 9.]).reshape(
         [-1, 1]).astype(np.float32)
     observed_counts = np.array(
-        [100, 90, 60, 1, 4, 37, 55, 42]).astype(np.float32)
+        [100, 90, 60, 13, 18, 37, 55, 42]).astype(np.float32)
 
     # Trainable GP hyperparameters.
     kernel_log_amplitude = tf.Variable(0., name='kernel_log_amplitude')
@@ -128,7 +126,7 @@ class OptimizationTests(test_case.TestCase):
 
     # Generative model.
     def model_fn():
-      kernel = tfp.positive_semidefinite_kernels.ExponentiatedQuadratic(
+      kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
           amplitude=tf.exp(kernel_log_amplitude),
           length_scale=tf.exp(kernel_log_lengthscale))
       latent_log_rates = yield tfd.JointDistributionCoroutine.Root(
@@ -159,7 +157,7 @@ class OptimizationTests(test_case.TestCase):
         surrogate_posterior=q,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
-        seed=tfp_test_util.test_seed(),
+        seed=test_util.test_seed(),
         sample_size=1,
         trace_fn=lambda loss, grads, variables: (loss, q.sample(seed=42)[0]))
 

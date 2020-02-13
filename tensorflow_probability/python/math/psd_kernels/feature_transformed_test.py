@@ -24,9 +24,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels.internal import util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 def _numpy_exp_quad(amplitude, length_scale, x, y, feature_ndims):
@@ -44,8 +43,8 @@ def _numpy_exp_quad_matrix(amplitude, length_scale, x, feature_ndims):
       feature_ndims)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class _FeatureTransformedTest(parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class _FeatureTransformedTest(test_util.TestCase):
 
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
@@ -200,13 +199,11 @@ class _FeatureTransformedTest(parameterized.TestCase):
         self.evaluate(vector_transformed_kernel.matrix(z, z)))
 
 
-class FeatureTransformedFloat32Test(_FeatureTransformedTest,
-                                    test_case.TestCase):
+class FeatureTransformedFloat32Test(_FeatureTransformedTest):
   dtype = np.float32
 
 
-class FeatureTransformedFloat64Test(_FeatureTransformedTest,
-                                    test_case.TestCase):
+class FeatureTransformedFloat64Test(_FeatureTransformedTest):
   dtype = np.float64
 
 

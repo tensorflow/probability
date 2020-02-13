@@ -23,6 +23,7 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -207,7 +208,6 @@ class GammaGamma(distribution.Distribution):
         tf.math.lgamma(concentration + mixing_concentration) -
         mixing_concentration * tf.math.log(mixing_rate))
 
-    x = self._maybe_assert_valid_sample(x)
     log_unnormalized_prob = (tf.math.xlogy(concentration - 1., x) -
                              (concentration + mixing_concentration) *
                              tf.math.log(x + mixing_rate))
@@ -266,13 +266,17 @@ class GammaGamma(distribution.Distribution):
               message='variance undefined when `mixing_concentration` <= 2')]):
         return tf.identity(variance)
 
-  def _maybe_assert_valid_sample(self, x):
+  def _default_event_space_bijector(self):
+    return exp_bijector.Exp(validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
     dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
+    assertions = []
     if not self.validate_args:
-      return x
-    with tf.control_dependencies([
-        assert_util.assert_positive(x)]):
-      return tf.identity(x)
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

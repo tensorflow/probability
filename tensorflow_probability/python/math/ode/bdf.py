@@ -19,10 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math.ode import base
 from tensorflow_probability.python.math.ode import bdf_util
 from tensorflow_probability.python.math.ode import util
@@ -244,7 +247,7 @@ class BDF(base.Solver):
       assert_ops = []
       if previous_solver_internal_state is not None:
         assert_initial_state_matches_previous_solver_internal_state = (
-            tf1.assert_near(
+            tf.debugging.assert_near(
                 tf.norm(
                     initial_state_vec -
                     previous_solver_internal_state.backward_differences[0],
@@ -513,21 +516,33 @@ class BDF(base.Solver):
 
     with tf.name_scope(self._name):
 
-      # (2) Initialize variables.
-      initial_state = tf.convert_to_tensor(initial_state)
-      state_shape = tf.shape(initial_state)
-      state_dtype = initial_state.dtype
-      util.error_if_not_real_or_complex(initial_state, 'initial_state')
-      if jacobian_fn is None and state_dtype.is_complex:
+      # (2) Convert to tensors.
+      error_if_wrong_dtype = functools.partial(
+          util.error_if_not_real_or_complex, identifier='initial_state')
+
+      initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
+      tf.nest.map_structure(error_if_wrong_dtype, initial_state)
+
+      state_shape = tf.nest.map_structure(tf.shape, initial_state)
+      common_state_dtype = dtype_util.common_dtype(initial_state)
+      real_dtype = dtype_util.real_dtype(common_state_dtype)
+
+      if jacobian_fn is None and common_state_dtype.is_complex:
         raise NotImplementedError('The BDF solver does not support automatic '
                                   'Jacobian computations for complex dtypes.')
-      num_odes = tf.size(initial_state)
-      state_tensor_shape = initial_state.get_shape()
-      initial_state_vec = tf.reshape(initial_state, [-1])
+
+      # Convert everything to operate on a single, concatenated vector form.
+      initial_state_vec = util.get_state_vec(initial_state)
       ode_fn_vec = util.get_ode_fn_vec(ode_fn, state_shape)
-      # `real_dtype` is the floating point `dtype` associated with
-      # `initial_state.dtype` (recall that the latter can be complex).
-      real_dtype = tf.abs(initial_state).dtype
+      jacobian_fn_mat = util.get_jacobian_fn_mat(
+          jacobian_fn,
+          ode_fn_vec,
+          state_shape,
+          use_pfor=self._use_pfor_to_compute_jacobian,
+          dtype=common_state_dtype,
+      )
+
+      num_odes = tf.size(initial_state_vec)
       # Use tf.cast instead of tf.convert_to_tensor for differentiable
       # parameters because the tf.custom_gradient decorator converts raw floats
       # into tf.float32, which cannot be converted to tf.float64.
@@ -542,11 +557,6 @@ class BDF(base.Solver):
             solution_times.dtype, size=num_solution_times,
             element_shape=[]).unstack(solution_times)
         util.error_if_not_vector(solution_times, 'solution_times')
-      jacobian_fn_mat = util.get_jacobian_fn_mat(
-          jacobian_fn,
-          ode_fn_vec,
-          state_shape,
-          use_pfor=self._use_pfor_to_compute_jacobian)
       rtol = tf.convert_to_tensor(self._rtol, dtype=real_dtype)
       atol = tf.convert_to_tensor(self._atol, dtype=real_dtype)
       safety_factor = tf.convert_to_tensor(
@@ -571,7 +581,7 @@ class BDF(base.Solver):
           tf.concat(
               [[0.],
                tf.convert_to_tensor(self._bdf_coefficients, dtype=real_dtype)],
-              0), state_dtype)
+              0), common_state_dtype)
       util.error_if_not_vector(bdf_coefficients, 'bdf_coefficients')
       if self._validate_args:
         initial_time = tf.ensure_shape(initial_time, [])
@@ -617,20 +627,20 @@ class BDF(base.Solver):
       if solver_internal_state is None:
         first_order_backward_difference = ode_fn_vec(
             initial_time, initial_state_vec) * tf.cast(first_step_size,
-                                                       state_dtype)
+                                                       common_state_dtype)
         backward_differences = tf.concat([
             initial_state_vec[tf.newaxis, :],
             first_order_backward_difference[tf.newaxis, :],
             tf.zeros(
                 tf.stack([bdf_util.MAX_ORDER + 1, num_odes]),
-                dtype=state_dtype),
+                dtype=common_state_dtype),
         ], 0)
         solver_internal_state = _BDFSolverInternalState(
             backward_differences=backward_differences,
             order=1,
             step_size=first_step_size)
       state_vec_array = tf.TensorArray(
-          state_dtype,
+          common_state_dtype,
           size=num_solution_times,
           dynamic_size=solution_times_chosen_by_solver,
           element_shape=initial_state_vec.get_shape())
@@ -645,7 +655,7 @@ class BDF(base.Solver):
           num_ode_fn_evaluations=0,
           status=0)
       iterand = _BDFIterand(
-          jacobian_mat=tf.zeros([num_odes, num_odes], dtype=state_dtype),
+          jacobian_mat=tf.zeros([num_odes, num_odes], dtype=common_state_dtype),
           jacobian_is_up_to_date=False,
           new_step_size=solver_internal_state.step_size,
           num_steps=0,
@@ -653,8 +663,8 @@ class BDF(base.Solver):
           should_update_jacobian=True,
           should_update_step_size=False,
           time=initial_time,
-          unitary=tf.zeros([num_odes, num_odes], dtype=state_dtype),
-          upper=tf.zeros([num_odes, num_odes], dtype=state_dtype))
+          unitary=tf.zeros([num_odes, num_odes], dtype=common_state_dtype),
+          upper=tf.zeros([num_odes, num_odes], dtype=common_state_dtype))
 
       # (3) Make non-static assertions.
       with tf.control_dependencies(assert_ops()):
@@ -689,13 +699,13 @@ class BDF(base.Solver):
                             ])
 
         # (6) Return `Results` object.
-        states = tf.reshape(state_vec_array.stack(),
-                            tf.concat([[-1], state_shape], 0))
+        states = util.get_state_from_vec(state_vec_array.stack(), state_shape)
         times = time_array.stack()
         if not solution_times_chosen_by_solver:
           times.set_shape(solution_times.get_shape())
-          states.set_shape(
-              solution_times.get_shape().concatenate(state_tensor_shape))
+          tf.nest.map_structure(
+              lambda s, ini_s: s.set_shape(solution_times.get_shape(  # pylint: disable=g-long-lambda
+              ).concatenate(ini_s.shape)), states, initial_state)
         return base.Results(
             times=times,
             states=states,

@@ -23,8 +23,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint:disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 # pylint: disable=protected-access
 
 _DIVERGENCES = kullback_leibler._DIVERGENCES
@@ -33,8 +32,8 @@ _registered_kl = kullback_leibler._registered_kl
 # pylint: enable=protected-access
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KLTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class KLTest(test_util.TestCase):
 
   def testRegistration(self):
 

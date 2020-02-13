@@ -106,6 +106,7 @@ class RationalQuadratic(PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = util.maybe_get_common_dtype(
           [amplitude, scale_mixture_rate, length_scale])
@@ -118,18 +119,22 @@ class RationalQuadratic(PositiveSemidefiniteKernel):
           length_scale, name='length_scale', dtype=dtype)
 
       super(RationalQuadratic, self).__init__(
-          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
 
-  def _apply(self, x1, x2, example_ndims=0):
-    difference = util.sum_rightmost_ndims_preserving_shape(
-        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
-    difference /= 2
+  def _apply_with_distance(
+      self, x1, x2, pairwise_square_distance, example_ndims=0):
+
+    pairwise_square_distance /= 2
 
     if self.length_scale is not None:
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
           length_scale, ndims=example_ndims)
-      difference /= length_scale ** 2
+      pairwise_square_distance /= length_scale ** 2
 
     if self.scale_mixture_rate is None:
       power = 1.
@@ -137,15 +142,34 @@ class RationalQuadratic(PositiveSemidefiniteKernel):
       scale_mixture_rate = tf.convert_to_tensor(self.scale_mixture_rate)
       power = util.pad_shape_with_ones(
           scale_mixture_rate, ndims=example_ndims)
-      difference /= power
+      pairwise_square_distance /= power
 
-    result = (1. + difference) ** -power
+    log_result = -power * tf.math.log1p(pairwise_square_distance)
 
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(amplitude, ndims=example_ndims)
-      result *= amplitude ** 2
-    return result
+      log_result = log_result + 2 * tf.math.log(amplitude)
+    return tf.math.exp(log_result)
+
+  def _apply(self, x1, x2, example_ndims=0):
+    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
+        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
+
+  def _matrix(self, x1, x2):
+    pairwise_square_distance = util.pairwise_square_distance_matrix(
+        x1, x2, self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=2)
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    pairwise_square_distance = util.pairwise_square_distance_tensor(
+        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance,
+        example_ndims=(x1_example_ndims + x2_example_ndims))
 
   @property
   def amplitude(self):

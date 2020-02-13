@@ -24,11 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.monte_carlo.expectation import _get_samples
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal.monte_carlo import _get_samples
 
 
-class GetSamplesTest(test_case.TestCase):
+class GetSamplesTest(tfp_test_util.TestCase):
   """Test the private method 'get_samples'."""
 
   def test_raises_if_both_z_and_n_are_none(self):
@@ -64,7 +64,7 @@ class GetSamplesTest(test_case.TestCase):
     self.assertEqual((10,), z.shape)
 
 
-class ExpectationTest(test_case.TestCase):
+class ExpectationTest(tfp_test_util.TestCase):
 
   def test_works_correctly(self):
     x = tf.constant([-1e6, -100, -10, -1, 1, 10, 100, 1e6])
@@ -78,7 +78,7 @@ class ExpectationTest(test_case.TestCase):
       samples = p.sample(int(1e5), seed=1)
       efx_reparam = tfp.monte_carlo.expectation(f, samples, p.log_prob)
       efx_score = tfp.monte_carlo.expectation(f, samples, p.log_prob,
-                                              use_reparametrization=False)
+                                              use_reparameterization=False)
 
     [
         efx_true_,
@@ -128,8 +128,8 @@ class ExpectationTest(test_case.TestCase):
           f=lambda x: p.log_prob(x) - q.log_prob(x),
           samples=p.sample(num_draws, seed=42),
           log_prob=p.log_prob,
-          use_reparametrization=(p.reparameterization_type ==
-                                 tfd.FULLY_REPARAMETERIZED))
+          use_reparameterization=(p.reparameterization_type ==
+                                  tfd.FULLY_REPARAMETERIZED))
     [exact_kl_normal_normal_, approx_kl_normal_normal_] = self.evaluate([
         exact_kl_normal_normal, approx_kl_normal_normal])
     self.assertEqual(
@@ -172,7 +172,7 @@ class ExpectationTest(test_case.TestCase):
           f=lambda x: p.log_prob(x) - q.log_prob(x),
           samples=p.sample(num_draws, seed=42),
           log_prob=p.log_prob,
-          use_reparametrization=(
+          use_reparameterization=(
               p.reparameterization_type == tfd.FULLY_REPARAMETERIZED))
       approx_kl_bernoulli_bernoulli = tfd.kl_divergence(p, q)
     [
@@ -229,12 +229,12 @@ class ExpectationTest(test_case.TestCase):
         f=lambda d: d['x']**2 + d['y']**2,
         samples=p.sample(1000, seed=42),
         log_prob=p.log_prob,
-        use_reparametrization=True)
+        use_reparameterization=True)
     total_variance_without_reparam = tfp.monte_carlo.expectation(
         f=lambda d: d['x']**2 + d['y']**2,
         samples=p.sample(1000, seed=42),
         log_prob=p.log_prob,
-        use_reparametrization=False)
+        use_reparameterization=False)
     [
         total_variance_with_reparam_,
         total_variance_without_reparam_

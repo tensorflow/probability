@@ -61,7 +61,7 @@ class ProbitBernoulli(distribution.Distribution):
 
     Args:
       probits: An N-D `Tensor` representing the probit-odds of a `1` event. Each
-        entry in the `Tensor` parametrizes an independent ProbitBernoulli
+        entry in the `Tensor` parameterizes an independent ProbitBernoulli
         distribution where the probability of an event is normal_cdf(probits).
         Only one of `probits` or `probs` should be passed in.
       probs: An N-D `Tensor` representing the probability of a `1`
@@ -138,10 +138,6 @@ class ProbitBernoulli(distribution.Distribution):
     return tf.cast(sample, self.dtype)
 
   def _log_prob(self, event):
-    if self.validate_args:
-      event = distribution_util.embed_check_integer_casting_closed(
-          event, target_dtype=tf.bool)
-
     log_probs0, log_probs1 = self._outcome_log_probs()
     event = tf.cast(event, log_probs0.dtype)
     return event * (log_probs1 - log_probs0) + log_probs0
@@ -177,7 +173,7 @@ class ProbitBernoulli(distribution.Distribution):
   def _probits_parameter_no_checks(self):
     if self._probits is None:
       probs = tf.convert_to_tensor(self._probs)
-      return special_math.ndtri(probs)
+      return tf.math.ndtri(probs)
     return tf.identity(self._probits)
 
   def probs_parameter(self, name=None):
@@ -190,9 +186,22 @@ class ProbitBernoulli(distribution.Distribution):
       return tf.identity(self._probs)
     return special_math.ndtr(self._probits)
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_bernoulli_param_correctness(
         is_init, self.validate_args, self._probs, self._probits)
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(
+        assert_util.assert_less_equal(x, tf.ones([], dtype=x.dtype),
+                                      message='Elements cannot exceed 1.'))
+    return assertions
 
 
 def maybe_assert_bernoulli_param_correctness(

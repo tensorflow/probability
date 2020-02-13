@@ -26,6 +26,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 class SeedStream(object):
   """Local PRNG for amplifying seed entropy into seeds for base operations.
 
@@ -175,6 +178,9 @@ class SeedStream(object):
         rationale.
     """
     self._seed = seed.original_seed if isinstance(seed, SeedStream) else seed
+    if JAX_MODE and isinstance(self._seed, int):
+      import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+      self._seed = jaxrand.PRNGKey(self._seed)
     self._salt = salt
     self._counter = 0
 
@@ -207,7 +213,7 @@ class SeedStream(object):
     self._counter += 1
     if self._seed is None:
       raise ValueError('Must provide a PRNGKey for JAX SeedStream.')
-    composite = str((self._seed, self._counter, self._salt)).encode('utf-8')
+    composite = str((self._salt, self._counter)).encode('utf-8')
     import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
     return jaxrand.fold_in(
         self._seed,

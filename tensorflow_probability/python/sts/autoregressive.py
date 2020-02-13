@@ -18,7 +18,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -166,9 +165,7 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       name: Python `str` name prefixed to ops created by this class.
         Default value: "AutoregressiveStateSpaceModel".
     """
-    with tf1.name_scope(
-        name, 'AutoregressiveStateSpaceModel',
-        values=[coefficients, level_scale, observation_noise_scale]) as name:
+    with tf.name_scope(name or 'AutoregressiveStateSpaceModel') as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -330,9 +327,7 @@ class Autoregressive(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'Autoregressive'.
     """
-    with tf1.name_scope(
-        name, 'Autoregressive', values=[observed_time_series]) as name:
-
+    with tf.name_scope(name or 'Autoregressive') as name:
       masked_time_series = None
       if observed_time_series is not None:
         masked_time_series = (
@@ -354,7 +349,7 @@ class Autoregressive(StructuralTimeSeries):
             tf.convert_to_tensor(value=1., dtype=dtype),
             tf.convert_to_tensor(value=0., dtype=dtype))
       batch_ones = tf.ones(tf.concat([
-          tf.shape(input=observed_initial),  # Batch shape
+          tf.shape(observed_initial),  # Batch shape
           [order]], axis=0), dtype=dtype)
 
       # Heuristic default priors. Overriding these may dramatically

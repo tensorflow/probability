@@ -27,14 +27,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class IndependentDistributionTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class IndependentDistributionTest(test_util.TestCase):
 
   def setUp(self):
     super(IndependentDistributionTest, self).setUp()
@@ -53,7 +50,7 @@ class IndependentDistributionTest(test_case.TestCase):
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
-    x = ind.sample([4, 5], seed=tfp_test_util.test_seed(hardcoded_seed=42))
+    x = ind.sample([4, 5], seed=test_util.test_seed(hardcoded_seed=42))
     log_prob_x = ind.log_prob(x)
     x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
@@ -75,7 +72,7 @@ class IndependentDistributionTest(test_case.TestCase):
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
-    x = ind.sample([4, 5], seed=tfp_test_util.test_seed())
+    x = ind.sample([4, 5], seed=test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     x_, actual_log_prob_x = self.evaluate([x, log_prob_x])
 
@@ -114,12 +111,12 @@ class IndependentDistributionTest(test_case.TestCase):
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
-    x = ind.sample(int(n_samp), seed=tfp_test_util.test_seed(hardcoded_seed=42))
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    x = ind.sample(int(n_samp), seed=test_util.test_seed(hardcoded_seed=42))
+    sample_mean = tf.reduce_mean(x, axis=0)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(x, sample_mean), axis=0)
+        tf.math.squared_difference(x, sample_mean), axis=0)
     sample_std = tf.sqrt(sample_var)
-    sample_entropy = -tf.reduce_mean(input_tensor=ind.log_prob(x), axis=0)
+    sample_entropy = -tf.reduce_mean(ind.log_prob(x), axis=0)
 
     [
         sample_mean_,
@@ -152,8 +149,8 @@ class IndependentDistributionTest(test_case.TestCase):
   def testEventNdimsIsStaticWhenPossible(self):
     ind = tfd.Independent(
         distribution=tfd.Normal(
-            loc=tf1.placeholder_with_default(input=[2.], shape=None),
-            scale=tf1.placeholder_with_default(input=1., shape=None)),
+            loc=tf1.placeholder_with_default([2.], shape=None),
+            scale=tf1.placeholder_with_default(1., shape=None)),
         reinterpreted_batch_ndims=1,
         validate_args=True)
     # Even though `event_shape` is not static, event_ndims must equal
@@ -223,7 +220,7 @@ class IndependentDistributionTest(test_case.TestCase):
     normal_kl = tfd.kl_divergence(normal1, normal2)
     ind_kl = tfd.kl_divergence(ind1, ind2)
     self.assertAllClose(
-        self.evaluate(tf.reduce_sum(input_tensor=normal_kl, axis=-1)),
+        self.evaluate(tf.reduce_sum(normal_kl, axis=-1)),
         self.evaluate(ind_kl))
 
   def testKLIdentity(self):
@@ -265,7 +262,7 @@ class IndependentDistributionTest(test_case.TestCase):
     mvn_kl = tfd.kl_divergence(mvn1, mvn2)
     ind_kl = tfd.kl_divergence(ind1, ind2)
     self.assertAllClose(
-        self.evaluate(tf.reduce_sum(input_tensor=mvn_kl, axis=[-1, -2])),
+        self.evaluate(tf.reduce_sum(mvn_kl, axis=[-1, -2])),
         self.evaluate(ind_kl))
 
   def _testMnistLike(self, static_shape):
@@ -279,10 +276,10 @@ class IndependentDistributionTest(test_case.TestCase):
       return (x * logits - np.log1p(np.exp(logits))).sum(-1).sum(-1).sum(-1)
 
     logits_ph = tf1.placeholder_with_default(
-        input=logits, shape=logits.shape if static_shape else None)
+        logits, shape=logits.shape if static_shape else None)
     ind = tfd.Independent(
         distribution=tfd.Bernoulli(logits=logits_ph), validate_args=True)
-    x = ind.sample(sample_shape, seed=tfp_test_util.test_seed())
+    x = ind.sample(sample_shape, seed=test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     [
         x_,
@@ -296,8 +293,8 @@ class IndependentDistributionTest(test_case.TestCase):
         log_prob_x,
         ind.batch_shape_tensor(),
         ind.event_shape_tensor(),
-        tf.shape(input=x),
-        tf.shape(input=log_prob_x),
+        tf.shape(x),
+        tf.shape(log_prob_x),
     ])
 
     if static_shape:
@@ -382,6 +379,7 @@ class IndependentDistributionTest(test_case.TestCase):
     self.assertAllEqual([3, 5], d_sliceable[:3].batch_shape)
     self.assertAllEqual([6], d_sliceable[:3].event_shape)
 
+  @test_util.tf_tape_safety_test
   def testGradientsThroughParams(self):
     loc = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
     scale = tf.Variable(np.ones([]), shape=tf.TensorShape(None))
@@ -421,9 +419,12 @@ class IndependentDistributionTest(test_case.TestCase):
     # `dist.distribution.event_shape_tensor()`.
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'mode', 'stddev', 'sample', 'entropy'):
+                   'mode', 'stddev', 'entropy'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
+      dist.sample(seed=test_util.test_seed())
 
     for method in ('log_prob', 'log_cdf', 'prob', 'cdf'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
@@ -448,9 +449,12 @@ class IndependentDistributionTest(test_case.TestCase):
         reinterpreted_batch_ndims=None, validate_args=True)
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'mean', 'variance', 'sample'):
+                   'mean', 'variance'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
+      dist.sample(seed=test_util.test_seed())
 
     # In addition to the four reads of `loc`, `scale` described above in
     # `testExcessiveConcretizationOfParams`, the methods below have two more
@@ -474,6 +478,8 @@ class IndependentDistributionTest(test_case.TestCase):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=8):
         getattr(dist, method)(np.zeros((4, 5, 2, 3)))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Shape sizes are statically known in JAX.')
   def testChangingVariableShapes(self):
     if not tf.executing_eagerly():
       return

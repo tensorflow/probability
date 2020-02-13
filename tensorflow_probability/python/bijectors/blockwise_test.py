@@ -26,13 +26,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BlockwiseBijectorTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BlockwiseBijectorTest(test_util.TestCase):
 
   @parameterized.parameters((False, []), (True, []), (False, [2]), (True, [2]))
   def testExplicitBlocks(self, dynamic_shape, batch_shape):
@@ -64,13 +62,13 @@ class BlockwiseBijectorTest(test_case.TestCase, parameterized.TestCase):
       self.assertEqual(blockwise_x.shape, batch_shape + [6])
       self.assertEqual(blockwise_ildj.shape, batch_shape + [])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_y)), batch_shape + [6])
+        self.evaluate(tf.shape(blockwise_y)), batch_shape + [6])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_fldj)), batch_shape + [])
+        self.evaluate(tf.shape(blockwise_fldj)), batch_shape + [])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_x)), batch_shape + [6])
+        self.evaluate(tf.shape(blockwise_x)), batch_shape + [6])
     self.assertAllEqual(
-        self.evaluate(tf.shape(input=blockwise_ildj)), batch_shape + [])
+        self.evaluate(tf.shape(blockwise_ildj)), batch_shape + [])
 
     expl_y = tf.concat([
         exp.forward(x[..., :2]),

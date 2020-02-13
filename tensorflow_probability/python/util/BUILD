@@ -16,6 +16,7 @@
 #   TensorFlow Probability utility functions.
 
 # [internal] load python3.bzl
+load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_test", "multi_substrate_py_library")
 
 package(
     default_visibility = [
@@ -27,7 +28,7 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "util",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
@@ -37,7 +38,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "deferred_tensor",
     srcs = ["deferred_tensor.py"],
     srcs_version = "PY2AND3",
@@ -59,22 +60,30 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "seed_stream",
     srcs = ["seed_stream.py"],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "seed_stream_test",
     size = "small",
     srcs = ["seed_stream_test.py"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
+)
+
+exports_files(
+    [
+        "seed_stream.py",
+        "seed_stream_test.py",
+    ],
+    visibility = ["//tensorflow_probability:__subpackages__"],
 )

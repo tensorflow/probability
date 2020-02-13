@@ -468,6 +468,11 @@ class Mixture(distribution.Distribution):
       x = self.cat.probs_parameter()
     return tf.unstack(x, num=self.num_components, axis=-1)
 
+  def _default_event_space_bijector(self):
+    # TODO(b/146456627): Implement `default_event_space_bijector` for mixture
+    # distributions.
+    return
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -494,7 +499,6 @@ class Mixture(distribution.Distribution):
       # argument is `[]`.
       assertions.append(assert_util.assert_equal(
           batch_ranks[i], cat_batch_rank,
-          data=[batch_shapes[i], cat_batch_shape],
           message=check_message.format(i)))
       assertions.append(assert_util.assert_equal(
           batch_shapes[i], cat_batch_shape, message=check_message.format(i)))

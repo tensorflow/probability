@@ -131,24 +131,20 @@ def batch_jacobian(f, xs):
 JAX_MODE = False  # Rewritten by script.
 
 if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
+  import jax.numpy as np  # pylint: disable=g-import-not-at-top
 
   def value_and_gradient(f,  # pylint: disable=function-redefined
                          xs,
                          output_gradients=None,
-                         use_gradient_tape=False,
-                         name=None):
+                         use_gradient_tape=False,  # pylint: disable=unused-argument
+                         name=None):  # pylint: disable=unused-argument
     """Computes `f(*xs)` and its gradients wrt to `*xs`."""
-    del name
-    del use_gradient_tape
-    if output_gradients is not None:
-      raise NotImplementedError('output_gradients: need to implement using vjp')
     xs, is_xs_list_like = _prepare_args(xs)
-    y = f(*xs)
-    import jax  # pylint: disable=g-import-not-at-top
-    g = jax.grad(f, argnums=tuple(range(len(xs))))
-    for _ in y.shape:  # vmap each batch dimension.
-      g = jax.vmap(g)
-    dydx = g(*xs)
+    y, f_vjp = jax.vjp(f, *xs)
+    if output_gradients is None:
+      output_gradients = tf.nest.map_structure(np.ones_like, y)
+    dydx = list(f_vjp(output_gradients))
     if not is_xs_list_like:
       dydx = dydx[0]
     return y, dydx
@@ -159,7 +155,6 @@ if JAX_MODE:
   def batch_jacobian(f, xs):  # pylint: disable=function-redefined
     """Computes the batch jacobian of `f(xs)` w.r.t. `xs`."""
     xs, is_xs_list_like = _prepare_args(xs)
-    import jax  # pylint: disable=g-import-not-at-top
     jacobian = jax.vmap(jax.jacrev(f, argnums=tuple(range(len(xs)))))(*xs)
     if not is_xs_list_like:
       jacobian = jacobian[0]

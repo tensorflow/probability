@@ -18,7 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-# pylint: disable=g-statement-before-imports,g-import-not-at-top
+# pylint: disable=g-statement-before-imports,g-import-not-at-top,g-bad-import-order
 
 
 # Ensure JAX is importable. This needs to happen first, since the imports below
@@ -40,9 +40,12 @@ def _ensure_jax_install():  # pylint: disable=g-statement-before-imports
 _ensure_jax_install()
 del _ensure_jax_install  # Cleanup symbol to avoid polluting namespace.
 
-from tensorflow_probability.python.experimental.substrates.jax import bijectors
-from tensorflow_probability.python.experimental.substrates.jax import distributions
-from tensorflow_probability.python.experimental.substrates.jax import internal
-from tensorflow_probability.python.experimental.substrates.jax import util
+from tensorflow_probability.python.bijectors import _jax as bijectors
+from tensorflow_probability.python.distributions import _jax as distributions
+from tensorflow_probability.python.internal import _jax as internal
+from tensorflow_probability.python.math import _jax as math
+from tensorflow_probability.python.mcmc import _jax as mcmc
+from tensorflow_probability.python.stats import _jax as stats
+from tensorflow_probability.python.util import _jax as util
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax

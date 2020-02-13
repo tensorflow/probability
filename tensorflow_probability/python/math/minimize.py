@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import tensorshape_util
 
 _trace_loss = lambda loss, grads, variables: loss
 
@@ -121,11 +123,10 @@ def minimize(loss_fn,
     return state
 
   with tf.name_scope(name) as name:
-
     # Compute the shape of the trace without executing the graph, if possible.
     concrete_loop_body = train_loop_body.get_concrete_function(
         tf.TensorSpec([]), tf.TensorSpec([]))  # Inputs ignored.
-    if all([shape.is_fully_defined()
+    if all([tensorshape_util.is_fully_defined(shape)
             for shape in tf.nest.flatten(concrete_loop_body.output_shapes)]):
       state_initializer = tf.nest.map_structure(
           lambda shape, dtype: tf.zeros(shape, dtype=dtype),
@@ -149,4 +150,3 @@ def minimize(loss_fn,
           lambda a, b: tf.concat([a[tf.newaxis, ...], b], axis=0),
           initial_trace_step, trace)
     return trace
-

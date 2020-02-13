@@ -26,6 +26,7 @@ from absl import app
 
 def main(argv):
   contents = open(argv[1]).read()
+  contents = contents.replace('._numpy', '._jax')
   contents = contents.replace(
       'tensorflow_probability.python.internal.backend.numpy',
       'tensorflow_probability.python.internal.backend.jax')
@@ -35,15 +36,22 @@ def main(argv):
   contents = contents.replace('scipy.linalg', 'jax.scipy.linalg')
   contents = contents.replace('scipy.special', 'jax.scipy.special')
   contents = contents.replace(
-      'MODE_JAX = False',
-      'MODE_JAX = True\n'
-      'from jax.config import config; config.update("jax_enable_x64", True)')
+      'tf.test.main()',
+      'from jax.config import config; config.update("jax_enable_x64", True); '
+      'tf.test.main()')
   contents = contents.replace('\nimport numpy as np',
                               '\nimport numpy as onp\nimport jax.numpy as np')
   contents = contents.replace('np.bool', 'onp.bool')
   contents = contents.replace('np.dtype', 'onp.dtype')
   contents = contents.replace('np.generic', 'onp.generic')
+
   contents = contents.replace('np.broadcast', 'onp.broadcast')
+  # so as to fixup np.broadcast_arrays or np.broadcast_to
+  contents = contents.replace('onp.broadcast_arrays', 'np.broadcast_arrays')
+  contents = contents.replace('onp.broadcast_to', 'np.broadcast_to')
+
+  contents = contents.replace('np.ndindex', 'onp.ndindex')
+
   contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
   contents = contents.replace('NumpyTest', 'JaxTest')
 

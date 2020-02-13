@@ -41,7 +41,7 @@ MODULE_MAPPINGS = {
     'framework import tensor_shape': 'ops as tensor_shape',
     'module import module': 'ops as module',
     'ops import array_ops': 'numpy_array as array_ops',
-    'ops import check_ops': 'v1 as check_ops',
+    'ops import check_ops': 'debugging as check_ops',
     'ops.signal import fft_ops': 'numpy_signal as fft_ops',
     'ops import control_flow_ops': 'control_flow as control_flow_ops',
     'ops import linalg_ops': 'linalg_impl as linalg_ops',
@@ -63,8 +63,7 @@ DIST_UTIL_IMPORT = """
 from tensorflow.python.util import lazy_loader
 distribution_util = lazy_loader.LazyLoader(
     "distribution_util", globals(),
-    "tensorflow_probability.python.experimental.substrates.numpy.internal."
-    "distribution_util")
+    "tensorflow_probability.python.internal._numpy.distribution_util")
 """
 
 
@@ -105,6 +104,9 @@ def gen_module(module_name):
   code = code.replace(
       'from tensorflow.python.ops.distributions import '
       'util as distribution_util', DIST_UTIL_IMPORT)
+  code = code.replace(
+      'control_flow_ops.with_dependencies',
+      'distribution_util.with_dependencies')
   code = code.replace('.base_dtype', '')
   code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
@@ -117,13 +119,17 @@ def gen_module(module_name):
   code = code.replace('array_ops.broadcast_static_shape',
                       '_ops.broadcast_static_shape_as_tensorshape')
   code = code.replace('array_ops.broadcast_to', '_ops.broadcast_to')
+  code = code.replace('array_ops.matrix_diag', '_linalg.diag')
   code = code.replace('array_ops.matrix_band_part', '_linalg.band_part')
   code = code.replace('array_ops.matrix_diag_part', '_linalg.diag_part')
   code = code.replace('array_ops.matrix_set_diag', '_linalg.set_diag')
   code = code.replace('array_ops.matrix_transpose', '_linalg.matrix_transpose')
-  code = code.replace('math_ops.cast', '_ops.cast')
+  code = code.replace('array_ops.newaxis', '_ops.newaxis')
+  code = code.replace('linalg_ops.matrix_determinant', '_linalg.det')
+  code = code.replace('linalg_ops.matrix_solve', '_linalg.solve')
   code = code.replace('linalg_ops.matrix_triangular_solve',
                       'linalg_ops.triangular_solve')
+  code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
 
   code = code.replace('self.dtype.real_dtype', 'dtypes.real_dtype(self.dtype)')
@@ -134,6 +140,7 @@ def gen_module(module_name):
         'linalg_impl as _linalg')
   print('from tensorflow_probability.python.internal.backend.numpy import '
         'ops as _ops')
+  print(DIST_UTIL_IMPORT)
 
 
 def main(_):

@@ -25,12 +25,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _AffineScalarBijectorTest(object):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 
@@ -166,7 +164,7 @@ class _AffineScalarBijectorTest(object):
         upper_x=self.dtype(2.),
         eval_func=self.evaluate)
 
-  @tfp_test_util.jax_disable_variable_test
+  @test_util.jax_disable_variable_test
   def testVariableGradients(self):
     b = tfb.AffineScalar(
         shift=tf.Variable(1.),
@@ -197,12 +195,12 @@ class _AffineScalarBijectorTest(object):
         _ = self.evaluate(b.forward(1.))
 
 
-class AffineScalarBijectorTestFloat32(test_case.TestCase,
+class AffineScalarBijectorTestFloat32(test_util.TestCase,
                                       _AffineScalarBijectorTest):
   dtype = np.float32
 
 
-class AffineScalarBijectorTestFloat64(test_case.TestCase,
+class AffineScalarBijectorTestFloat64(test_util.TestCase,
                                       _AffineScalarBijectorTest):
   dtype = np.float64
 

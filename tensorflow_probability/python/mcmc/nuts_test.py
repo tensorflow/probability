@@ -29,10 +29,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 @tf.function(autograph=False)
@@ -78,7 +75,7 @@ def assert_univariate_target_conservation(test, target_d, step_size):
   # the sample count.
   num_samples = int(5e4)
   num_steps = 1
-  strm = tfp_test_util.test_seed_stream()
+  strm = test_util.test_seed_stream()
   initialization = target_d.sample([num_samples], seed=strm())
 
   @tf.function(autograph=False)
@@ -117,7 +114,7 @@ def assert_univariate_target_conservation(test, target_d, step_size):
 
 
 def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
-  strm = tfp_test_util.test_seed_stream()
+  strm = test_util.test_seed_stream()
   initialization = tfd.MultivariateNormalFullCovariance(
       loc=tf.zeros(event_size),
       covariance_matrix=tf.eye(event_size)).sample(
@@ -147,11 +144,11 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
   )
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NutsTest(parameterized.TestCase, test_case.TestCase):
+@test_util.test_graph_and_eager_modes
+class NutsTest(test_util.TestCase):
 
   def testReproducibility(self):
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
     s1 = self.evaluate(run_nuts_chain(2, 5, 10, seed=seed)[0])
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
@@ -203,14 +200,14 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     sigmoid_beta_dist = tfb.Identity(tfb.Sigmoid())(
         tfd.Beta(concentration0=1., concentration1=2.))
     self.evaluate(assert_univariate_target_conservation(
-        self, sigmoid_beta_dist, step_size=0.02))
+        self, sigmoid_beta_dist, step_size=1e-3))
 
   @parameterized.parameters(
       (3, 50000,),
       # (5, 2,),
   )
   def testMultivariateNormalNd(self, event_size, batch_size):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     self.evaluate(assert_mvn_target_conservation(event_size, batch_size,
                                                  seed=strm()))
 
@@ -221,56 +218,64 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
       ([2, 5], 100),  # test rank 2 case
   )
   def testLatentsOfMixedRank(self, batch_shape, num_steps):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
 
     init0 = [tf.ones(batch_shape + [6])]
     init1 = [tf.ones(batch_shape + []),
              tf.ones(batch_shape + [1]),
              tf.ones(batch_shape + [2, 2])]
 
-    def log_prob0(x):
-      return tf.squeeze(tfd.Independent(
-          tfd.Normal(tf.range(6, dtype=tf.float32),
-                     tf.constant(1.)),
-          reinterpreted_batch_ndims=1).log_prob(x))
-    kernel0 = tfp.mcmc.NoUTurnSampler(
-        log_prob0,
-        step_size=0.3,
-        parallel_iterations=1,
-        seed=strm())
-    [results0] = tfp.mcmc.sample_chain(
-        num_results=num_steps,
-        num_burnin_steps=10,
-        current_state=init0,
-        kernel=kernel0,
-        trace_fn=None,
-        parallel_iterations=1)
+    @tf.function(autograph=False)
+    def run_two_chains(init0, init1):
 
-    def log_prob1(state0, state1, state2):
-      return tf.squeeze(
-          tfd.Normal(tf.constant(0.), tf.constant(1.)).log_prob(state0)
-          + tfd.Independent(
-              tfd.Normal(tf.constant([1.]), tf.constant(1.)),
-              reinterpreted_batch_ndims=1).log_prob(state1)
-          + tfd.Independent(
-              tfd.Normal(tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
-              reinterpreted_batch_ndims=2).log_prob(state2)
-      )
-    kernel1 = tfp.mcmc.NoUTurnSampler(
-        log_prob1,
-        step_size=0.3,
-        parallel_iterations=1,
-        seed=strm())
-    results1_ = tfp.mcmc.sample_chain(
-        num_results=num_steps,
-        num_burnin_steps=10,
-        current_state=init1,
-        kernel=kernel1,
-        trace_fn=None,
-        parallel_iterations=1)
-    results1 = tf.concat(
-        [tf.reshape(x, [num_steps] + batch_shape + [-1]) for x in results1_],
-        axis=-1)
+      def log_prob0(x):
+        return tf.squeeze(tfd.Independent(
+            tfd.Normal(tf.range(6, dtype=tf.float32),
+                       tf.constant(1.)),
+            reinterpreted_batch_ndims=1).log_prob(x))
+      kernel0 = tfp.mcmc.NoUTurnSampler(
+          log_prob0,
+          step_size=0.3,
+          parallel_iterations=1,
+          seed=strm())
+      [results0] = tfp.mcmc.sample_chain(
+          num_results=num_steps,
+          num_burnin_steps=10,
+          current_state=init0,
+          kernel=kernel0,
+          trace_fn=None,
+          parallel_iterations=1)
+
+      def log_prob1(state0, state1, state2):
+        return tf.squeeze(
+            tfd.Normal(tf.constant(0.), tf.constant(1.)).log_prob(state0)
+            + tfd.Independent(
+                tfd.Normal(tf.constant([1.]), tf.constant(1.)),
+                reinterpreted_batch_ndims=1).log_prob(state1)
+            + tfd.Independent(
+                tfd.Normal(tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
+                reinterpreted_batch_ndims=2).log_prob(state2)
+        )
+      kernel1 = tfp.mcmc.NoUTurnSampler(
+          log_prob1,
+          step_size=0.3,
+          parallel_iterations=1,
+          seed=strm())
+      results1_ = tfp.mcmc.sample_chain(
+          num_results=num_steps,
+          num_burnin_steps=10,
+          current_state=init1,
+          kernel=kernel1,
+          trace_fn=None,
+          parallel_iterations=1)
+      results1 = tf.concat(
+          [tf.reshape(x, [num_steps] + batch_shape + [-1]) for x in results1_],
+          axis=-1)
+
+      return results0, results1
+
+    results0, results1 = run_two_chains(init0, init1)
+
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm_two_sample(results0, results1))
 
@@ -279,7 +284,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
       # (500, 1000, 20),
   )
   def testMultivariateNormalNdConvergence(self, nsamples, nchains, nd):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     theta0 = np.zeros((nchains, nd))
     mu = np.arange(nd)
     w = np.random.randn(nd, nd) * 0.1
@@ -331,7 +336,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
         np.any(np.isin(np.asarray([5, 9, 11, 13]), np.unique(leapfrogs_taken))))
 
   def testCorrelated2dNormalwithinMCError(self):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     nchains = 100
     num_steps = 1000
     mu = np.asarray([0., 3.], dtype=np.float32)
@@ -408,11 +413,13 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
 
   def testDivergence(self):
     """Neals funnel with large step size."""
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     neals_funnel = tfd.JointDistributionSequential(
         [
             tfd.Normal(loc=0., scale=3.),  # b0
-            lambda y: tfd.Sample(tfd.Normal(loc=0., scale=tf.exp(y/2)), 9),
+            lambda y: tfd.Sample(  # pylint: disable=g-long-lambda
+                tfd.Normal(loc=0., scale=tf.math.exp(y / 2)),
+                sample_shape=9),
         ],
         validate_args=True
     )
@@ -440,7 +447,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
 
   def testSampleEndtoEnd(self):
     """An end-to-end test of sampling using NUTS."""
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     predictors = tf.cast([
         201., 244., 47., 287., 203., 58., 210., 202., 198., 158., 165., 201.,
         157., 131., 166., 160., 186., 125., 218., 146.
@@ -462,9 +469,10 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
             tfd.HalfNormal(5.),  # df
             lambda df, b1, b0: tfd.Independent(  # pylint: disable=g-long-lambda
                 tfd.StudentT(  # Likelihood
-                    df=df[:, None],
-                    loc=b0[:, None] + b1[:, None] * predictors[None, :],
-                    scale=y_sigma[None, :])),
+                    df=df[..., tf.newaxis],
+                    loc=(b0[..., tf.newaxis] +
+                         b1[..., tf.newaxis] * predictors[tf.newaxis]),
+                    scale=y_sigma)),
         ],
         validate_args=True)
 
@@ -500,12 +508,6 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
               bijector=unconstraining_bijectors),
           target_accept_prob=.8,
           num_adaptation_steps=burnin,
-          step_size_setter_fn=lambda pkr, new_step_size: pkr._replace(  # pylint: disable=g-long-lambda
-              inner_results=pkr.inner_results._replace(step_size=new_step_size)
-          ),
-          step_size_getter_fn=lambda pkr: pkr.inner_results.step_size,
-          log_accept_prob_getter_fn=lambda pkr: pkr.inner_results.
-          log_accept_ratio,
       )
 
       # Sampling from the chain and get diagnostics
@@ -519,7 +521,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
       rhat = tfp.mcmc.potential_scale_reduction(mcmc_trace)
       return (
           [s[-1] for s in step_size],  # final step size
-          tf.reduce_mean(tf.exp(log_accept_ratio)),
+          tf.math.exp(tfp.math.reduce_logmeanexp(log_accept_ratio)),
           [tf.reduce_mean(rhat_) for rhat_ in rhat],  # average rhat
       )
 
@@ -539,6 +541,7 @@ class NutsTest(parameterized.TestCase, test_case.TestCase):
     # Check that mcmc sample quality is acceptable with tuning
     self.assertAllClose(
         average_rhat, np.ones_like(average_rhat), atol=0.05, rtol=0.05)
+
 
 if __name__ == '__main__':
   tf.test.main()

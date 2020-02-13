@@ -27,8 +27,17 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
+from tensorflow_probability.python.internal.backend.numpy.numpy_array import one_hot
+from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
+from tensorflow_probability.python.internal.backend.numpy.ops import _custom_gradient
 
 scipy_special = utils.try_import('scipy.special')
+
+
+JAX_MODE = False
+
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
 
 
 __all__ = [
@@ -53,7 +62,7 @@ __all__ = [
     'betainc',
     'bincount',
     'ceil',
-    # 'confusion_matrix',
+    'confusion_matrix',
     'conj',
     'cos',
     'cosh',
@@ -66,10 +75,12 @@ __all__ = [
     'equal',
     'erf',
     'erfc',
+    'erfinv',
     'exp',
     'expm1',
     'floor',
     'floordiv',
+    'floormod',
     'greater',
     'greater_equal',
     'igamma',
@@ -97,8 +108,10 @@ __all__ = [
     'logical_xor',
     'maximum',
     'minimum',
+    'mod',
     'multiply',
     'multiply_no_nan',
+    'ndtri',
     'negative',
     # 'nextafter',
     'not_equal',
@@ -147,24 +160,68 @@ __all__ = [
     # 'unsorted_segment_min',
     # 'unsorted_segment_prod',
     # 'unsorted_segment_sqrt_n',
-    # 'unsorted_segment_sum',
+    'unsorted_segment_sum',
     'xdivy',
     'xlogy',
+    'xlog1py',
     # 'zero_fraction',
     'zeta',
 ]
 
 
 def _astuple(x):
+  """Attempt to convert the given argument to be a Python tuple."""
   try:
     return tuple(x)
   except TypeError:
-    return x
+    pass
+
+  # If `x` is a scalar array, then the above call `tuple(x)` will have failed,
+  # because scalar arrays do not support iteration in NumPy or JAX.
+  if getattr(x, 'shape', None) == ():  # pylint: disable=g-explicit-bool-comparison
+    try:
+      return tuple(x[np.newaxis])
+    except TypeError:
+      pass
+
+  return x
 
 
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
               dtype=tf.int32, name=None):  # pylint: disable=unused-argument
-  return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
+  """Counts number of occurences of each value in `arr`."""
+  if not JAX_MODE:
+    return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
+
+  dtype = utils.numpy_dtype(dtype)
+  num_buckets = np.max(arr) + 1
+  if minlength is not None:
+    num_buckets = np.maximum(num_buckets, minlength)
+  if maxlength is not None:
+    num_buckets = np.minimum(num_buckets, maxlength)
+  one_hots = one_hot(arr, num_buckets)
+  # Reduce over every dimension except the last one.
+  axes = tuple(range(0, one_hots.ndim - 1))
+  if weights is not None:
+    return np.sum(
+        one_hots * weights[..., np.newaxis], axis=axes).astype(dtype)
+  return np.sum(one_hots, axis=axes).astype(dtype)
+
+
+def _confusion_matrix(
+    labels, predictions, num_classes=None, weights=None,
+    dtype=tf.int32, name=None):
+  """Return confusion matrix between predictions and labels."""
+  del name
+  if num_classes is None:
+    num_classes = np.maximum(np.max(predictions), np.max(labels)) + 1
+  cmatrix = np.zeros([num_classes, num_classes], dtype=utils.numpy_dtype(dtype))
+  if weights is None:
+    weights = 1
+  if not JAX_MODE:
+    np.add.at(cmatrix, [labels, predictions], weights)
+    return cmatrix
+  return jax.ops.index_add(cmatrix, [labels, predictions], weights)
 
 
 def _cumop(op, x, axis=0, exclusive=False, reverse=False, initial_value=None):
@@ -184,7 +241,7 @@ def _cumop(op, x, axis=0, exclusive=False, reverse=False, initial_value=None):
     slices = [slice(None)] * result.ndim
     for ax in axis:
       slices[ax] = slice(1, None) if reverse else slice(None, -1)
-    result = result[slices]
+    result = result[tuple(slices)]
   return result
 
 
@@ -192,9 +249,17 @@ _cumprod = functools.partial(_cumop, np.cumprod, initial_value=1.)
 _cumsum = functools.partial(_cumop, np.cumsum, initial_value=0.)
 
 
+def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=unused-argument
+  x = _convert_to_tensor(x)
+  return x / np.linalg.norm(x, ord=2, axis=axis, keepdims=True)
+
+
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
   x = np.array(x)
-  return scipy_special.betaln(x[..., 0], x[..., 1])
+  log_prod_gamma_x = np.sum(scipy_special.gammaln(x), axis=-1)
+  sum_x = np.sum(x, axis=-1)
+  log_gamma_sum_x = scipy_special.gammaln(sum_x)
+  return log_prod_gamma_x - log_gamma_sum_x
 
 
 def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
@@ -231,7 +296,25 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
 
 
 def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin
-  raise NotImplementedError
+  n = int(input.shape[-1] - 1)
+  # For the values, we sort the negative entries and choose the smallest ones
+  # and negate. This is equivalent to choosing the largest entries
+  # For the indices, we could argsort and reverse the entries and choose the
+  # first k entries. However, this does not work in the case of ties, since the
+  # first index a value occurs at is preferred. Thus we also reverse the input
+  # to ensure the last tied value becomes first, and subtract this off from the
+  # last index since the list is reversed.
+  return (-np.sort(-input, axis=-1)[..., :k],
+          (n - (np.argsort(input[..., ::-1],
+                           kind='stable', axis=-1)[..., ::-1]))[..., :k])
+
+
+def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
+  del name
+  if not JAX_MODE:
+    raise NotImplementedError
+  sums = np.zeros(num_segments)
+  return jax.ops.index_add(sums, jax.ops.index[segment_ids], data)
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -275,7 +358,8 @@ argmax = utils.copy_docstring(
 argmin = utils.copy_docstring(
     tf.math.argmin,
     lambda input, axis=None, output_type=tf.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmin(input, axis=0 if axis is None else _astuple(axis))
+        np.argmin(_convert_to_tensor(
+            input), axis=0 if axis is None else _astuple(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 asin = utils.copy_docstring(
@@ -319,17 +403,14 @@ betainc = utils.copy_docstring(
     lambda a, b, x, name=None: scipy_special.betainc(a, b, x))
 
 bincount = utils.copy_docstring(
-    tf.math.bincount,
-    _bincount)
+    tf.math.bincount, _bincount)
 
 ceil = utils.copy_docstring(
     tf.math.ceil,
     lambda x, name=None: np.ceil(x))
 
-# confusion_matrix = utils.copy_docstring(
-#     tf.math.confusion_matrix,
-#     lambda labels, predictions, num_classes=None, weights=None,
-#     dtype=tf.int32, name=None: ...)
+confusion_matrix = utils.copy_docstring(
+    tf.math.confusion_matrix, _confusion_matrix)
 
 conj = utils.copy_docstring(
     tf.math.conj,
@@ -364,12 +445,15 @@ divide = utils.copy_docstring(
     tf.math.divide,
     lambda x, y, name=None: np.divide(x, y))
 
+
+def _divide_no_nan(x, y, name=None):  # pylint: disable=unused-argument
+  dtype = np.result_type(x, y)
+  y_is_zero = np.equal(y, 0.)
+  div = np.divide(x, np.where(y_is_zero, np.ones((), dtype=dtype), y))
+  return np.where(y_is_zero, np.zeros((), dtype=dtype), div)
+
 divide_no_nan = utils.copy_docstring(
-    tf.math.divide_no_nan,
-    lambda x, y, name=None: np.where(  # pylint: disable=g-long-lambda
-        np.broadcast_to(np.equal(y, 0.), np.array(x).shape),
-        np.zeros_like(np.divide(x, y)),
-        np.divide(x, y)))
+    tf.math.divide_no_nan, _divide_no_nan)
 
 equal = utils.copy_docstring(
     tf.math.equal,
@@ -382,6 +466,10 @@ erf = utils.copy_docstring(
 erfc = utils.copy_docstring(
     tf.math.erfc,
     lambda x, name=None: scipy_special.erfc(x))
+
+erfinv = utils.copy_docstring(
+    tf.math.erfinv,
+    lambda x, name=None: scipy_special.erfinv(x))
 
 exp = utils.copy_docstring(
     tf.math.exp,
@@ -398,6 +486,10 @@ floor = utils.copy_docstring(
 floordiv = utils.copy_docstring(
     tf.math.floordiv,
     lambda x, y, name=None: np.floor_divide(x, y))
+
+floormod = utils.copy_docstring(
+    tf.math.floormod,
+    lambda x, y, name=None: np.mod(x, y))
 
 greater = utils.copy_docstring(
     tf.math.greater,
@@ -426,7 +518,7 @@ imag = utils.copy_docstring(
 # TODO(b/256095991): Add unit-test.
 invert_permutation = utils.copy_docstring(
     tf.math.invert_permutation,
-    lambda x, name=None: np.argsort)
+    lambda x, name=None: np.argsort(x))
 
 is_finite = utils.copy_docstring(
     tf.math.is_finite,
@@ -448,10 +540,7 @@ is_strictly_increasing = utils.copy_docstring(
     tf.math.is_strictly_increasing,
     lambda x, name=None: np.all(x[1:] > x[:-1]))
 
-l2_normalize = utils.copy_docstring(
-    tf.math.l2_normalize,
-    lambda x, axis=None, epsilon=1e-12, name=None: (  # pylint: disable=g-long-lambda
-        np.linalg.norm(x, ord=2, axis=axis, keepdims=True)))
+l2_normalize = utils.copy_docstring(tf.math.l2_normalize, _l2_normalize)
 
 lbeta = utils.copy_docstring(
     tf.math.lbeta,
@@ -503,24 +592,85 @@ logical_xor = utils.copy_docstring(
     tf.math.logical_xor,
     lambda x, y, name=None: np.logical_xor(x, y))
 
+
+if JAX_MODE:
+
+  @jax.custom_transforms
+  def _maximum_(x, y, name=None):  # pylint: disable=unused-argument
+    return np.maximum(x, y)
+
+  @jax.custom_transforms
+  def _minimum_(x, y, name=None):  # pylint: disable=unused-argument
+    return np.minimum(x, y)
+
+  # TF and Jax have differing behavior
+  # when the inputs to maximum/minimum are equal.
+  # This custom transforms rule
+  # modifies Jax to match TF's behavior.
+
+  def _maximum_vjp(x, y):
+    out_primals = _maximum_(x, y)
+    def vjp(g):
+      gx = g * np.where(x >= y, np.ones_like(x), np.zeros_like(x))
+      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
+    return out_primals, vjp
+  jax.defvjp_all(_maximum_, _maximum_vjp)
+
+  def _minimum_vjp(x, y):
+    out_primals = _minimum_(x, y)
+    def vjp(g):
+      gx = g * np.where(x <= y, np.ones_like(x), np.zeros_like(x))
+      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
+    return out_primals, vjp
+  jax.defvjp_all(_minimum_, _minimum_vjp)
+
+  # Need to wrap in a function because custom_transforms
+  # returns an object, not a function
+  # which breaks docstring wrapping
+
+  def _promote_dtypes(x, y):
+    # Need to explicitly promote types
+    # because of custom_transforms
+    out_dtype = np.result_type(x, y)
+    x = np.array(x, out_dtype)
+    y = np.array(y, out_dtype)
+    return x, y
+
+  _minimum = lambda x, y, name=None: _minimum_(*_promote_dtypes(x, y))
+  _maximum = lambda x, y, name=None: _maximum_(*_promote_dtypes(x, y))
+
+else:
+
+  _minimum = lambda x, y, name=None: np.minimum(x, y)
+  _maximum = lambda x, y, name=None: np.maximum(x, y)
+
 maximum = utils.copy_docstring(
-    tf.math.maximum,
-    lambda x, y, name=None: np.maximum(x, y))
+    tf.math.maximum, _maximum)
 
 minimum = utils.copy_docstring(
-    tf.math.minimum,
-    lambda x, y, name=None: np.minimum(x, y))
+    tf.math.minimum, _minimum)
+
+mod = utils.copy_docstring(
+    tf.math.mod,
+    lambda x, y, name=None: np.mod(x, y))
 
 multiply = utils.copy_docstring(
     tf.math.multiply,
     lambda x, y, name=None: np.multiply(x, y))
 
+
+def _multiply_no_nan(x, y, name=None):  # pylint: disable=unused-argument
+  dtype = np.result_type(x, y)
+  # TODO(b/146385087): The gradient should be
+  # `lambda dz: [multiply_no_nan(dz, y), multiply_no_nan(x, dz)]`.
+  return np.where(np.equal(y, 0.), np.zeros((), dtype=dtype), np.multiply(x, y))
+
 multiply_no_nan = utils.copy_docstring(
-    tf.math.multiply_no_nan,
-    lambda x, y, name=None: np.where(  # pylint: disable=g-long-lambda
-        np.broadcast_to(np.equal(y, 0.), np.array(x).shape),
-        np.zeros_like(np.multiply(x, y)),
-        np.multiply(x, y)))
+    tf.math.multiply_no_nan, _multiply_no_nan)
+
+ndtri = utils.copy_docstring(
+    tf.math.ndtri,
+    lambda x, name=None: scipy_special.ndtri(x))
 
 negative = utils.copy_docstring(
     tf.math.negative,
@@ -665,9 +815,22 @@ softmax = utils.copy_docstring(
     tf.math.softmax,
     _softmax)
 
+
+# TODO(srvasude): Remove this once
+# https://github.com/google/jax/issues/2107 is fixed.
+@_custom_gradient
+def _softplus(x, name=None):  # pylint: disable=unused-argument
+  # TODO(b/146563881): Investigate improving numerical accuracy here.
+  def grad(dy):
+    return dy * scipy_special.expit(x)
+  if not JAX_MODE:
+    return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.), grad
+  return jax.nn.softplus(x), grad
+
+
 softplus = utils.copy_docstring(
     tf.math.softplus,
-    lambda x, name=None: np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.))
+    _softplus)
 
 softsign = utils.copy_docstring(
     tf.math.softsign,
@@ -730,10 +893,9 @@ truediv = utils.copy_docstring(
 #     lambda data, segment_ids, num_segments, name=None: (
 #         np.unsorted_segment_sqrt_n))
 
-# unsorted_segment_sum = utils.copy_docstring(
-#     tf.math.unsorted_segment_sum,
-#     lambda data, segment_ids, num_segments, name=None: (
-#         np.unsorted_segment_sum))
+unsorted_segment_sum = utils.copy_docstring(
+    tf.math.unsorted_segment_sum,
+    _unsorted_segment_sum)
 
 xdivy = utils.copy_docstring(
     tf.math.xdivy,
@@ -744,10 +906,11 @@ xdivy = utils.copy_docstring(
 
 xlogy = utils.copy_docstring(
     tf.math.xlogy,
-    lambda x, y, name=None: (  # pylint: disable=unused-argument,g-long-lambda
-        np.where(np.equal(x, 0.),
-                 np.zeros_like(np.multiply(x, y)),
-                 np.multiply(x, np.log(y)))))
+    lambda x, y, name=None: scipy_special.xlogy(x, y))
+
+xlog1py = utils.copy_docstring(
+    tf.math.xlog1py,
+    lambda x, y, name=None: scipy_special.xlog1py(x, y))
 
 # zero_fraction = utils.copy_docstring(
 #     tf.math.zero_fraction,

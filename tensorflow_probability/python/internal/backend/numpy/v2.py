@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 # pylint: disable=unused-import
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import bitwise
 from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
@@ -33,6 +34,7 @@ from tensorflow_probability.python.internal.backend.numpy import numpy_logging a
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math
 from tensorflow_probability.python.internal.backend.numpy import numpy_signal as signal
 from tensorflow_probability.python.internal.backend.numpy import random_generators as random
+from tensorflow_probability.python.internal.backend.numpy import raw_ops
 from tensorflow_probability.python.internal.backend.numpy import sets_lib as sets
 from tensorflow_probability.python.internal.backend.numpy import sparse_lib as sparse
 from tensorflow_probability.python.internal.backend.numpy import test_lib as test
@@ -43,6 +45,7 @@ from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylin
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 # pylint: enable=unused-import
 
@@ -74,6 +77,5 @@ function = utils.copy_docstring(
 
 eye = linalg.eye
 matmul = linalg.matmul
-
 
 del collections, tf, utils

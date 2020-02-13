@@ -16,6 +16,11 @@
 #   MCMC methods, diagnostics, and related utilities.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_test",
+    "multi_substrate_py_library",
+)
 
 package(
     default_visibility = [
@@ -27,10 +32,16 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":nuts",
+        ":sample_annealed_importance",
+        ":sample_halton_sequence",
+        ":slice_sampler_kernel",
+    ],
     deps = [
         ":diagnostic",
         ":dual_averaging_step_size_adaptation",
@@ -50,35 +61,41 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "diagnostic",
     srcs = ["diagnostic.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/stats",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "diagnostic_test",
-    size = "medium",
+    size = "small",
     srcs = ["diagnostic_test.py"],
+    jax_size = "medium",
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "dual_averaging_step_size_adaptation",
     srcs = ["dual_averaging_step_size_adaptation.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
+        ":simple_step_size_adaptation",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
@@ -87,19 +104,21 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "dual_averaging_step_size_adaptation_test",
+    size = "medium",
     srcs = ["dual_averaging_step_size_adaptation_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "hmc",
     srcs = ["hmc.py"],
     srcs_version = "PY2AND3",
@@ -108,25 +127,29 @@ py_library(
         ":metropolis_hastings",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "hmc_test",
     size = "medium",
     timeout = "long",
     srcs = ["hmc_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 6,
     deps = [
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -139,6 +162,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
         "//tensorflow_probability/python/util:seed_stream",
@@ -157,7 +181,6 @@ py_library(
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -171,7 +194,7 @@ py_test(
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -189,11 +212,11 @@ py_test(
     ],
     deps = [
         ":nuts_testlib",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "langevin",
     srcs = ["langevin.py"],
     srcs_version = "PY2AND3",
@@ -201,27 +224,30 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:diag_jacobian",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "langevin_test",
     size = "medium",
     timeout = "long",
     srcs = ["langevin_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "kernel",
     srcs = ["kernel.py"],
     srcs_version = "PY2AND3",
@@ -230,31 +256,34 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "metropolis_hastings",
     srcs = ["metropolis_hastings.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "metropolis_hastings_test",
     size = "small",
     srcs = ["metropolis_hastings_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "random_walk_metropolis",
     srcs = ["random_walk_metropolis.py"],
     srcs_version = "PY2AND3",
@@ -262,50 +291,60 @@ py_library(
         ":kernel",
         ":metropolis_hastings",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "random_walk_metropolis_test",
     size = "medium",
     srcs = ["random_walk_metropolis_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "replica_exchange_mc",
     srcs = ["replica_exchange_mc.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "replica_exchange_mc_test",
     size = "medium",
     timeout = "long",
     srcs = ["replica_exchange_mc_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 6,
     deps = [
+        # absl/logging dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample",
     srcs = ["sample.py"],
     srcs_version = "PY2AND3",
@@ -316,16 +355,19 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sample_test",
     size = "medium",
     timeout = "long",
     srcs = ["sample_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -336,6 +378,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
@@ -348,7 +391,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -372,7 +415,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:monte_carlo",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -383,7 +426,9 @@ py_library(
     deps = [
         ":kernel",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/mcmc/internal:slice_sampler_utils",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
@@ -400,12 +445,12 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "transformed_kernel",
     srcs = ["transformed_kernel.py"],
     srcs_version = "PY2AND3",
@@ -413,21 +458,24 @@ py_library(
         ":kernel",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "transformed_kernel_test",
     size = "medium",
     timeout = "long",
     srcs = ["transformed_kernel_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -465,7 +513,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "simple_step_size_adaptation",
     srcs = ["simple_step_size_adaptation.py"],
     srcs_version = "PY2AND3",
@@ -473,18 +521,24 @@ py_library(
         ":kernel",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "simple_step_size_adaptation_test",
     srcs = ["simple_step_size_adaptation_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

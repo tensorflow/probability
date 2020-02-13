@@ -68,6 +68,7 @@ class ExponentiatedQuadratic(PositiveSemidefiniteKernel):
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name):
       dtype = util.maybe_get_common_dtype(
           [amplitude, length_scale])
@@ -76,7 +77,11 @@ class ExponentiatedQuadratic(PositiveSemidefiniteKernel):
       self._length_scale = tensor_util.convert_nonref_to_tensor(
           length_scale, name='length_scale', dtype=dtype)
       super(ExponentiatedQuadratic, self).__init__(
-          feature_ndims, dtype=dtype, name=name, validate_args=validate_args)
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
 
   @property
   def amplitude(self):
@@ -99,21 +104,40 @@ class ExponentiatedQuadratic(PositiveSemidefiniteKernel):
         [] if self.amplitude is None else tf.shape(self.amplitude),
         [] if self.length_scale is None else tf.shape(self.length_scale))
 
-  def _apply(self, x1, x2, example_ndims=0):
-    exponent = -0.5 * util.sum_rightmost_ndims_preserving_shape(
-        tf.math.squared_difference(x1, x2), self.feature_ndims)
+  def _apply_with_distance(
+      self, x1, x2, pairwise_square_distance, example_ndims=0):
+    exponent = -0.5 * pairwise_square_distance
     if self.length_scale is not None:
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
           length_scale, example_ndims)
-      exponent /= length_scale**2
+      exponent = exponent / length_scale**2
 
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
-      exponent += 2. * tf.math.log(amplitude)
+      exponent = exponent + 2. * tf.math.log(amplitude)
 
     return tf.exp(exponent)
+
+  def _apply(self, x1, x2, example_ndims=0):
+    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
+        tf.math.squared_difference(x1, x2), self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
+
+  def _matrix(self, x1, x2):
+    pairwise_square_distance = util.pairwise_square_distance_matrix(
+        x1, x2, self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=2)
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    pairwise_square_distance = util.pairwise_square_distance_tensor(
+        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance,
+        example_ndims=(x1_example_ndims + x2_example_ndims))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

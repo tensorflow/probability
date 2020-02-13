@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = ['FeatureTransformed']
@@ -82,6 +83,7 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
       kernel,
       transformation_fn,
       validate_args=False,
+      parameters=None,
       name='FeatureTransformed'):
     """Construct an FeatureTransformed kernel instance.
 
@@ -96,8 +98,10 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
         `transformation_fn` must be broadcastable with parameters of `kernel`.
       validate_args: If `True`, parameters are checked for validity despite
         possibly degrading runtime performance
+      parameters: When subclassing, a dict of constructor arguments.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name):
       self._kernel = kernel
       self._transformation_fn = transformation_fn
@@ -105,7 +109,8 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
           feature_ndims=kernel.feature_ndims,
           dtype=kernel.dtype,
           name=name,
-          validate_args=validate_args)
+          validate_args=validate_args,
+          parameters=parameters)
 
   def _apply(self, x1, x2, example_ndims=0):
     return self._kernel.apply(
@@ -114,6 +119,19 @@ class FeatureTransformed(PositiveSemidefiniteKernel):
         self._transformation_fn(
             x2, self.feature_ndims, example_ndims),
         example_ndims)
+
+  def _matrix(self, x1, x2):
+    return self._kernel.matrix(
+        self._transformation_fn(x1, self.feature_ndims, 1),
+        self._transformation_fn(x2, self.feature_ndims, 1))
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    return self._kernel.tensor(
+        self._transformation_fn(
+            x1, self.feature_ndims, x1_example_ndims),
+        self._transformation_fn(
+            x2, self.feature_ndims, x2_example_ndims),
+        x1_example_ndims, x2_example_ndims)
 
   @property
   def kernel(self):

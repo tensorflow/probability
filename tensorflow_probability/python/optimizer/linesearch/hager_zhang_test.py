@@ -21,12 +21,10 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _is_exact_wolfe(x, f_x, df_x, f_0, df_0, delta, sigma):
@@ -45,8 +43,8 @@ def _is_approx_wolfe(_, f_x, df_x, f_0, df_0, delta, sigma, epsilon):
 ValueAndGradient = collections.namedtuple('ValueAndGradient', ['x', 'f', 'df'])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HagerZhangTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class HagerZhangTest(test_util.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
   def test_quadratic(self):
@@ -108,7 +106,7 @@ class HagerZhangTest(test_case.TestCase):
     # This function has two minima in the direction of positive x.
     # The first is around x=0.46 and the second around 2.65.
     def fdf(x):
-      x = tf.convert_to_tensor(value=x)
+      x = tf.convert_to_tensor(x)
       val = (0.988 * x**5 - 4.96 * x**4 + 4.978 * x**3
              + 5.015 * x**2 - 6.043 * x - 1)
       dval = 4.94 * x**4 - 19.84 * x**3 + 14.934 * x**2 + 10.03 * x - 6.043
@@ -170,7 +168,7 @@ class HagerZhangTest(test_case.TestCase):
       """Value and derivative of Rosenbrock projected along a descent dirn."""
       coord = x0 + t * dirn
       ft, df = rosenbrock(coord)
-      return ValueAndGradient(t, ft, tf.reduce_sum(input_tensor=df * dirn))
+      return ValueAndGradient(t, ft, tf.reduce_sum(df * dirn))
 
     results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
         fdf, initial_step_size=1.0))
@@ -210,8 +208,8 @@ class HagerZhangTest(test_case.TestCase):
         # Enabling locking is critical here. Otherwise, there are race
         # conditions between various call sites which causes some of the
         # invocations to be missed.
-        inc = tf1.assign_add(eval_count, 1, use_locking=True)
-        with tf.control_dependencies([inc]):
+        with tf.control_dependencies(
+            [eval_count.assign_add(1, use_locking=True)]):
           f = x * x - 2 * x + 1
           df = 2 * (x - 1)
           return ValueAndGradient(x, f, df)
@@ -221,13 +219,11 @@ class HagerZhangTest(test_case.TestCase):
       fdf, counter = get_fn()
       results = tfp.optimizer.linesearch.hager_zhang(
           fdf, initial_step_size=tf.constant(start))
-      init = tf1.global_variables_initializer()
-      with self.cached_session() as session:
-        session.run(init)
-        results = session.run(results)
-        actual_evals = session.run(counter)
-        self.assertTrue(results.converged)
-        self.assertEqual(actual_evals, results.func_evals)
+      self.evaluate(counter.initializer)
+      results = self.evaluate(results)
+      actual_evals = self.evaluate(counter)
+      self.assertTrue(results.converged)
+      self.assertEqual(actual_evals, results.func_evals)
 
   def test_approx_wolfe(self):
     """Tests appropriate usage of approximate Wolfe conditions."""

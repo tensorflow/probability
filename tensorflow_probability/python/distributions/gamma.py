@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -212,17 +213,15 @@ class Gamma(distribution.Distribution):
     concentration = tf.convert_to_tensor(
         self.concentration if concentration is None else concentration)
     rate = tf.convert_to_tensor(self.rate if rate is None else rate)
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      log_unnormalized_prob = tf.math.xlogy(concentration - 1., x) - rate * x
-      log_normalization = (tf.math.lgamma(concentration) -
-                           concentration * tf.math.log(rate))
-      return log_unnormalized_prob - log_normalization
+    log_unnormalized_prob = tf.math.xlogy(concentration - 1., x) - rate * x
+    log_normalization = (tf.math.lgamma(concentration) -
+                         concentration * tf.math.log(rate))
+    return log_unnormalized_prob - log_normalization
 
   def _cdf(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      # Note that igamma returns the regularized incomplete gamma function,
-      # which is what we want for the CDF.
-      return tf.math.igamma(self.concentration, self.rate * x)
+    # Note that igamma returns the regularized incomplete gamma function,
+    # which is what we want for the CDF.
+    return tf.math.igamma(self.concentration, self.rate * x)
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -259,10 +258,16 @@ class Gamma(distribution.Distribution):
           mode,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
-  def _maybe_assert_valid_sample(self, x):
+  def _default_event_space_bijector(self):
+    return softplus_bijector.Softplus(validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return []
-    return [assert_util.assert_positive(x, message='Sample must be positive.')]
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

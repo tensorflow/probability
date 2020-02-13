@@ -22,16 +22,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint:disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultinomialTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultinomialTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -39,7 +37,7 @@ class MultinomialTest(test_case.TestCase):
 
   def testSimpleShapes(self):
     p = [.1, .3, .6]
-    dist = tfd.Multinomial(total_count=1., probs=p)
+    dist = tfd.Multinomial(total_count=1., probs=p, validate_args=True)
     self.assertEqual(3, self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([3]), dist.event_shape)
@@ -48,39 +46,41 @@ class MultinomialTest(test_case.TestCase):
   def testComplexShapes(self):
     p = 0.5 * np.ones([3, 2, 2], dtype=np.float32)
     n = [[3., 2], [4, 5], [6, 7]]
-    dist = tfd.Multinomial(total_count=n, probs=p)
+    dist = tfd.Multinomial(total_count=n, probs=p, validate_args=True)
     self.assertEqual(2, self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([3, 2], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([2]), dist.event_shape)
     self.assertEqual(tf.TensorShape([3, 2]), dist.batch_shape)
-    self.assertEqual(tf.TensorShape([17, 3, 2, 2]), dist.sample(17).shape)
+    self.assertEqual(tf.TensorShape([17, 3, 2, 2]), dist.sample(
+        17, seed=test_util.test_seed()).shape)
 
   def testN(self):
     p = [[0.1, 0.2, 0.7], [0.2, 0.3, 0.5]]
     n = [[3.], [4]]
-    dist = tfd.Multinomial(total_count=n, probs=p)
-    self.assertEqual((2, 1), dist.total_count.shape)
+    dist = tfd.Multinomial(total_count=n, probs=p, validate_args=True)
+    self.assertAllEqual([2, 1], dist.total_count.shape)
     self.assertAllClose(n, self.evaluate(dist.total_count))
 
   def testP(self):
     p = [[0.1, 0.2, 0.7]]
-    dist = tfd.Multinomial(total_count=3., probs=p)
-    self.assertEqual((1, 3), dist.probs_parameter().shape)
-    self.assertEqual((1, 3), dist.logits_parameter().shape)
+    dist = tfd.Multinomial(total_count=3., probs=p, validate_args=True)
+    self.assertAllEqual([1, 3], dist.probs_parameter().shape)
+    self.assertAllEqual([1, 3], dist.logits_parameter().shape)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testLogits(self):
     p = np.array([[0.1, 0.2, 0.7]], dtype=np.float32)
     logits = np.log(p) - 50.
-    multinom = tfd.Multinomial(total_count=3., logits=logits)
-    self.assertEqual((1, 3), multinom.probs_parameter().shape)
-    self.assertEqual((1, 3), multinom.logits_parameter().shape)
+    multinom = tfd.Multinomial(
+        total_count=3., logits=logits, validate_args=True)
+    self.assertAllEqual([1, 3], multinom.probs_parameter().shape)
+    self.assertAllEqual([1, 3], multinom.logits_parameter().shape)
     self.assertAllClose(p, self.evaluate(multinom.probs_parameter()))
     self.assertAllClose(logits, self.evaluate(multinom.logits_parameter()))
 
   def testPmfUnderflow(self):
     logits = np.array([[-200, 0]], dtype=np.float32)
-    dist = tfd.Multinomial(total_count=1., logits=logits)
+    dist = tfd.Multinomial(total_count=1., logits=logits, validate_args=True)
     lp = self.evaluate(dist.log_prob([1., 0.]))[0]
     self.assertAllClose(-200, lp, atol=0, rtol=1e-6)
 
@@ -122,47 +122,52 @@ class MultinomialTest(test_case.TestCase):
     # Both zero-batches.  No broadcast
     p = [0.5, 0.5]
     counts = [1., 0]
-    pmf = tfd.Multinomial(total_count=1., probs=p).prob(counts)
+    pmf = tfd.Multinomial(
+        total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose(0.5, self.evaluate(pmf))
-    self.assertEqual((), pmf.shape)
+    self.assertAllEqual([], pmf.shape)
 
   def testPmfBothZeroBatchesNontrivialN(self):
     # Both zero-batches.  No broadcast
     p = [0.1, 0.9]
     counts = [3., 2]
-    dist = tfd.Multinomial(total_count=5., probs=p)
+    dist = tfd.Multinomial(total_count=5., probs=p, validate_args=True)
     pmf = dist.prob(counts)
     # 5 choose 3 = 5 choose 2 = 10. 10 * (.9)^2 * (.1)^3 = 81/10000.
     self.assertAllClose(81. / 10000, self.evaluate(pmf))
-    self.assertEqual((), pmf.shape)
+    self.assertAllEqual([], pmf.shape)
 
   def testPmfPStretchedInBroadcastWhenSameRank(self):
     p = [[0.1, 0.9]]
     counts = [[1., 0], [0, 1]]
-    pmf = tfd.Multinomial(total_count=1., probs=p).prob(counts)
+    pmf = tfd.Multinomial(
+        total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose([0.1, 0.9], self.evaluate(pmf))
-    self.assertEqual((2), pmf.shape)
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfPStretchedInBroadcastWhenLowerRank(self):
     p = [0.1, 0.9]
     counts = [[1., 0], [0, 1]]
-    pmf = tfd.Multinomial(total_count=1., probs=p).prob(counts)
+    pmf = tfd.Multinomial(
+        total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose([0.1, 0.9], self.evaluate(pmf))
-    self.assertEqual((2), pmf.shape)
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenSameRank(self):
     p = [[0.1, 0.9], [0.7, 0.3]]
     counts = [[1., 0]]
-    pmf = tfd.Multinomial(total_count=1., probs=p).prob(counts)
+    pmf = tfd.Multinomial(
+        total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose(self.evaluate(pmf), [0.1, 0.7])
-    self.assertEqual((2), pmf.shape)
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfCountsStretchedInBroadcastWhenLowerRank(self):
     p = [[0.1, 0.9], [0.7, 0.3]]
     counts = [1., 0]
-    pmf = tfd.Multinomial(total_count=1., probs=p).prob(counts)
+    pmf = tfd.Multinomial(
+        total_count=1., probs=p, validate_args=True).prob(counts)
     self.assertAllClose(self.evaluate(pmf), [0.1, 0.7])
-    self.assertEqual(pmf.shape, (2))
+    self.assertAllEqual([2], pmf.shape)
 
   def testPmfShapeCountsStretchedN(self):
     # [2, 2, 2]
@@ -171,22 +176,24 @@ class MultinomialTest(test_case.TestCase):
     n = [[3., 3], [3, 3]]
     # [2]
     counts = [2., 1]
-    pmf = tfd.Multinomial(total_count=n, probs=p).prob(counts)
+    pmf = tfd.Multinomial(
+        total_count=n, probs=p, validate_args=True).prob(counts)
     self.evaluate(pmf)
-    self.assertEqual(pmf.shape, (2, 2))
+    self.assertAllEqual([2, 2], pmf.shape)
 
   def testPmfShapeCountsPStretchedN(self):
     p = [0.1, 0.9]
     counts = [3., 2]
     n = np.full([4, 3], 5., dtype=np.float32)
-    pmf = tfd.Multinomial(total_count=n, probs=p).prob(counts)
+    pmf = tfd.Multinomial(
+        total_count=n, probs=p, validate_args=True).prob(counts)
     self.evaluate(pmf)
     self.assertEqual((4, 3), pmf.shape)
 
   def testMultinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
-    dist = tfd.Multinomial(total_count=n, probs=p)
+    dist = tfd.Multinomial(total_count=n, probs=p, validate_args=True)
     expected_means = 5 * np.array(p, dtype=np.float32)
     self.assertEqual((3,), dist.mean().shape)
     self.assertAllClose(expected_means, self.evaluate(dist.mean()))
@@ -194,7 +201,7 @@ class MultinomialTest(test_case.TestCase):
   def testMultinomialCovariance(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
-    dist = tfd.Multinomial(total_count=n, probs=p)
+    dist = tfd.Multinomial(total_count=n, probs=p, validate_args=True)
     expected_covariances = [[9. / 20, -1 / 10, -7 / 20],
                             [-1 / 10, 4 / 5, -7 / 10],
                             [-7 / 20, -7 / 10, 21 / 20]]
@@ -207,7 +214,7 @@ class MultinomialTest(test_case.TestCase):
     n = [5.] * 2
     # Shape [4, 1, 2]
     p = [[[0.1, 0.9]], [[0.1, 0.9]]] * 2
-    dist = tfd.Multinomial(total_count=n, probs=p)
+    dist = tfd.Multinomial(total_count=n, probs=p, validate_args=True)
     # Shape [2, 2]
     inner_var = [[9. / 20, -9 / 20], [-9 / 20, 9 / 20]]
     # Shape [4, 2, 2, 2]
@@ -225,8 +232,8 @@ class MultinomialTest(test_case.TestCase):
     ns = np.random.randint(low=1, high=11, size=[3, 5]).astype(np.float32)
     ns2 = np.random.randint(low=1, high=11, size=[6, 1]).astype(np.float32)
 
-    dist = tfd.Multinomial(ns, p)
-    dist2 = tfd.Multinomial(ns2, p2)
+    dist = tfd.Multinomial(ns, p, validate_args=True)
+    dist2 = tfd.Multinomial(ns2, p2, validate_args=True)
 
     covariance = dist.covariance()
     covariance2 = dist2.covariance()
@@ -241,8 +248,8 @@ class MultinomialTest(test_case.TestCase):
     theta /= np.sum(theta, 1)[..., tf.newaxis]
     n = np.array([[10., 9.], [8., 7.], [6., 5.]], dtype=np.float32)
     # batch_shape=[3, 2], event_shape=[3]
-    dist = tfd.Multinomial(n, theta)
-    x = dist.sample(int(1000e3), seed=tfp_test_util.test_seed())
+    dist = tfd.Multinomial(n, theta, validate_args=True)
+    x = dist.sample(int(1000e3), seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
@@ -277,9 +284,10 @@ class MultinomialTest(test_case.TestCase):
   def testSampleUnbiasedNonScalarBatch(self):
     dist = tfd.Multinomial(
         total_count=[7., 6., 5.],
-        logits=tf.math.log(2. * self._rng.rand(4, 3, 2).astype(np.float32)))
+        logits=tf.math.log(2. * self._rng.rand(4, 3, 2).astype(np.float32)),
+        validate_args=True)
     n = int(3e4)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    x = dist.sample(n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     # Cyclically rotate event dims left.
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
@@ -305,9 +313,10 @@ class MultinomialTest(test_case.TestCase):
   def testSampleUnbiasedScalarBatch(self):
     dist = tfd.Multinomial(
         total_count=5.,
-        logits=tf.math.log(2. * self._rng.rand(4).astype(np.float32)))
+        logits=tf.math.log(2. * self._rng.rand(4).astype(np.float32)),
+        validate_args=True)
     n = int(5e3)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
+    x = dist.sample(n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
     sample_covariance = tf.matmul(
@@ -333,9 +342,13 @@ class MultinomialTest(test_case.TestCase):
     if tf1.control_flow_v2_enabled():
       self.skipTest('b/138796859')
     total_count = tf.constant(5.0)
-    probs = tf.constant([0.2, 0.6])
+    probs = tf.constant([0.4, 0.6])
     _, [grad_total_count, grad_probs] = tfp.math.value_and_gradient(
-        lambda n, p: tfd.Multinomial(total_count=n, probs=p).sample(100),
+        lambda n, p: tfd.Multinomial(  # pylint: disable=g-long-lambda
+            total_count=n,
+            probs=p,
+            validate_args=True).sample(
+                100, seed=test_util.test_seed()),
         [total_count, probs])
     self.assertIsNone(grad_total_count)
     self.assertIsNone(grad_probs)
@@ -363,9 +376,10 @@ class MultinomialTest(test_case.TestCase):
         atol=0, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultinomialFromVariableTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultinomialFromVariableTest(test_util.TestCase):
 
+  @test_util.jax_disable_variable_test
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])
     d = tfd.Multinomial(total_count=2., logits=x, validate_args=True)
@@ -375,6 +389,7 @@ class MultinomialFromVariableTest(test_case.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.jax_disable_variable_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7, 0.2])
     d = tfd.Multinomial(total_count=2., probs=x, validate_args=True)

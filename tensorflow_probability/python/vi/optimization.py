@@ -31,7 +31,7 @@ _trace_loss = lambda loss, grads, variables: loss
 _reparameterized_elbo = functools.partial(
     csiszar_divergence.monte_carlo_variational_loss,
     discrepancy_fn=csiszar_divergence.kl_reverse,
-    use_reparametrization=True)
+    use_reparameterization=True)
 
 
 def fit_surrogate_posterior(target_log_prob_fn,
@@ -175,7 +175,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   ```python
     import functools
     forward_kl_loss = functools.partial(
-      tfp.vi.monte_carlo_csiszar_f_divergence, tfp.vi.kl_forward)
+      tfp.vi.monte_carlo_variational_loss, discrepancy_fn=tfp.vi.kl_forward)
     losses = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
         surrogate_posterior=q,
@@ -201,10 +201,10 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   ```python
   # Toy 1D data.
-  index_points = np.array(
-      [-10., -7.2, -4., -1., 0.8, 4., 6.2, 9.]).astype(np.float32)
+  index_points = np.array([-10., -7.2, -4., -0.1, 0.1, 4., 6.2, 9.]).reshape(
+      [-1, 1]).astype(np.float32)
   observed_counts = np.array(
-      [100, 90, 60, 1, 4, 37, 55, 42]).astype(np.float32)
+      [100, 90, 60, 13, 18, 37, 55, 42]).astype(np.float32)
 
   # Trainable GP hyperparameters.
   kernel_log_amplitude = tf.Variable(0., name='kernel_log_amplitude')
@@ -215,7 +215,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   # Generative model.
   Root = tfd.JointDistributionCoroutine.Root
   def model_fn():
-    kernel = tfp.positive_semidefinite_kernels.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude=tf.exp(kernel_log_amplitude),
         length_scale=tf.exp(kernel_log_lengthscale))
     latent_log_rates = yield Root(tfd.GaussianProcess(

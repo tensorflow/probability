@@ -53,11 +53,17 @@ class Softsign(bijector.Bijector):
   """
 
   def __init__(self, validate_args=False, name="softsign"):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Softsign, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     return x / (1. + tf.math.abs(x))

@@ -24,13 +24,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_graph_and_eager_modes
 class _ProximalHessianTest(object):
 
   # https://tminka.github.io/papers/logreg/minka-logreg.pdf
@@ -52,7 +51,7 @@ class _ProximalHessianTest(object):
                     batch_shape=None,
                     dtype=np.float32,
                     seed=42):
-    seed = tfd.SeedStream(seed=seed, salt='tfp.glm.proximal_hessian_test')
+    seed = tfp.util.SeedStream(seed=seed, salt='tfp.glm.proximal_hessian_test')
 
     if batch_shape is None:
       batch_shape = []
@@ -67,8 +66,8 @@ class _ProximalHessianTest(object):
         tf.linalg.norm(tensor=model_coefficients, axis=-1)[..., tf.newaxis])
 
     mask = tfd.Bernoulli(probs=0.5, dtype=tf.bool).sample(batch_shape + [d])
-    model_coefficients = tf1.where(mask, model_coefficients,
-                                            tf.zeros_like(model_coefficients))
+    model_coefficients = tf.where(
+        mask, model_coefficients, tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
         loc=np.array(0, dtype), scale=np.array(1, dtype)).sample(
             batch_shape + [n, d], seed=seed())
@@ -91,7 +90,7 @@ class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
     return tf1.placeholder_with_default(
-        input=x, shape=(x.shape if self.use_static_shape else None))
+        x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
     x_ = tf.cast(x, self.dtype)
@@ -172,8 +171,7 @@ class _ProximalHessianTest(object):
 
     def _joint_log_prob(model_coefficients_):
       predicted_linear_response_ = tf.linalg.matvec(x_, model_coefficients_)
-      return tf.reduce_sum(
-          input_tensor=model.log_prob(y_, predicted_linear_response_))
+      return tf.reduce_sum(model.log_prob(y_, predicted_linear_response_))
 
     self.assertAllGreater(
         _joint_log_prob(model_coefficients_2_) -
@@ -217,7 +215,7 @@ class _ProximalHessianTest(object):
     # true coefficients.
     self.assertAllEqual(is_converged_, True)
     self.assertAllClose(
-        model_coefficients_, model_coefficients_true_, atol=0.1, rtol=0.1)
+        model_coefficients_, model_coefficients_true_, atol=0.2, rtol=0.2)
 
   def testFitGLMFromData_SimilarModel(self):
     # Run fit_sparse where the loss function is negative log likelihood of a
@@ -386,25 +384,25 @@ class _ProximalHessianTest(object):
     self._test_compare_batch_to_single_instance(use_sparse_tensor=True)
 
 
-class ProximalHessianTestStaticShapeFloat32(test_case.TestCase,
+class ProximalHessianTestStaticShapeFloat32(test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-class ProximalHessianTestDynamicShapeFloat32(test_case.TestCase,
+class ProximalHessianTestDynamicShapeFloat32(test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
-class ProximalHessianTestStaticShapeFloat64(test_case.TestCase,
+class ProximalHessianTestStaticShapeFloat64(test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
-class ProximalHessianTestDynamicShapeFloat64(test_case.TestCase,
+class ProximalHessianTestDynamicShapeFloat64(test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = False

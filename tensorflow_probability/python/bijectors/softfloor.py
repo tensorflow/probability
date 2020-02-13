@@ -18,16 +18,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "Softfloor",
+    'Softfloor',
 ]
 
 
@@ -99,64 +102,109 @@ class Softfloor(bijector.Bijector):
   def __init__(self,
                temperature,
                validate_args=False,
-               name="softfloor"):
+               name='softfloor'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
-      self._temperature = tf.convert_to_tensor(temperature, name="temperature")
-      if validate_args:
-        self._temperature = distribution_util.with_dependencies([
-            assert_util.assert_positive(
-                self._temperature,
-                message="Argument temperature was not positive")
-        ], self._temperature)
+      dtype = dtype_util.common_dtype(
+          [temperature], dtype_hint=tf.float32)
+      self._temperature = tensor_util.convert_nonref_to_tensor(
+          temperature, name='temperature', dtype=dtype)
       super(Softfloor, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
-          dtype=self._temperature.dtype,
+          dtype=dtype,
+          parameters=parameters,
           name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     # This has a well defined derivative with respect to x.
-    # This is because in the range [a, a + 1.] this is just a rescaled
+    # This is because in the range [0.5, 1.5] this is just a rescaled
     # logit function and hence has a derivative. At the end points, because
     # the logit function satisfies 1 - sigma(-x) = sigma(x), we have that
-    # the derivative is symmetric around the center of the interval (a + 0.5),
+    # the derivative is symmetric around the center of the interval=1.,
     # and hence is continuous at the endpoints.
-    x = x - 0.5
+    t = tf.convert_to_tensor(self.temperature)
     fractional_part = x - tf.math.floor(x)
-    cyclic_part = tf.math.sigmoid((fractional_part - 0.5) / self.temperature)
+    # First, because our function is defined on the interval [0.5, 1.5]
+    # repeated, we need to rescale our input to reflect that. x - floor(x)
+    # will map our input to [0, 1]. However, we need to map inputs whose
+    # fractional part is < 0.5 to the right hand portion of the interval.
+    # We'll also need to adjust the integer part to reflect this.
+    integer_part = tf.math.floor(x)
+    integer_part = tf.where(
+        fractional_part < 0.5, integer_part - 1., integer_part)
+    fractional_part = tf.where(
+        fractional_part < 0.5, fractional_part + 0.5, fractional_part - 0.5)
+
     # Rescale so the left tail is 0., and the right tail is 1. This
     # will also guarantee us continuity. Differentiability comes from the
     # fact that the derivative of the sigmoid is symmetric, and hence
     # the two endpoints will have the same value for derivatives.
-    rescaled_part = (
-        cyclic_part / tf.math.tanh(1. / (self.temperature * 4)) -
-        tf.math.exp(-0.5 / self.temperature) / (
-            -tf.math.expm1(-0.5 / self.temperature)))
-    return tf.math.floor(x) + rescaled_part
+    # The below calculations are just
+    # (sigmoid((f - 0.5) / t) - sigmoid(-0.5 / t)) /
+    # (sigmoid(0.5 / t) - sigmoid(0.5 / t))
+    # We use log_sum_exp and log_sub_exp to make this calculation more
+    # numerically stable.
 
-  # TODO(b/134588121): Improve the numerical stability of this function.
+    log_numerator = tfp_math.log_sub_exp(
+        (0.5 + fractional_part) / t, 0.5 / t)
+    # If fractional_part == 0, then we'll get log(0).
+    log_numerator = tf.where(
+        tf.equal(fractional_part, 0.),
+        dtype_util.as_numpy_dtype(self.dtype)(-np.inf), log_numerator)
+    log_denominator = tfp_math.log_sub_exp(
+        (0.5 + fractional_part) / t, fractional_part / t)
+    # If fractional_part == 0, then we'll get log(0).
+    log_denominator = tf.where(
+        tf.equal(fractional_part, 0.),
+        dtype_util.as_numpy_dtype(self.dtype)(-np.inf), log_denominator)
+    log_denominator = tfp_math.log_add_exp(
+        log_denominator, tfp_math.log_sub_exp(1. / t, 0.5 / t))
+    rescaled_part = tf.math.exp(log_numerator - log_denominator)
+    return integer_part + rescaled_part
+
   def _inverse(self, y):
+    # We undo the transformation from [0, 1] -> [0, 1].
+    # The inverse of the transformation will look like a shifted and scaled
+    # logit function. We rewrite this to be more numerically stable, and will
+    # produce a term log(a / b). log_{numerator, denominator} below is log(a)
+    # and log(b) respectively.
+    t = tf.convert_to_tensor(self.temperature)
     fractional_part = y - tf.math.floor(y)
-    # The naive thing to do is affine scale the fractional part, and apply
-    # a logit function (to invert the _forward). However that has bad numerics
-    # at lower temperatures, whereas this rewriting allows for lower
-    # temperature scaling.
-    new_fractional_part = (
-        tf.math.log1p(fractional_part * -tf.math.expm1(
-            -0.5 / self.temperature)) -
-        tf.math.log(tf.math.exp(-0.5 / self.temperature) -
-                    fractional_part * tf.math.expm1(-0.5 / self.temperature)))
-    new_fractional_part = self.temperature * new_fractional_part + 0.5
+    log_f = tf.math.log(fractional_part)
+    log_numerator = tfp_math.log_sub_exp(0.5 / t + log_f, log_f)
+    log_numerator = tfp_math.log_add_exp(0., log_numerator)
+    # When the fractional part is zero, the numerator is 1.
+    log_numerator = tf.where(
+        tf.equal(fractional_part, 0.),
+        dtype_util.as_numpy_dtype(self.dtype)(0.), log_numerator)
+    log_denominator = tfp_math.log_sub_exp(0.5 / t, log_f + 0.5 / t)
+    log_denominator = tfp_math.log_add_exp(log_f, log_denominator)
+    # When the fractional part is zero, the denominator is 0.5 / t.
+    log_denominator = tf.where(
+        tf.equal(fractional_part, 0.), 0.5 / t, log_denominator)
+
+    new_fractional_part = t * (log_numerator - log_denominator) + 0.5
+    # We finally shift this up since the original transformation was from
+    # [0.5, 1.5] to [0, 1].
+    new_fractional_part = new_fractional_part + 0.5
     return tf.math.floor(y) + new_fractional_part
 
   def _forward_log_det_jacobian(self, x):
-    x = x - 0.5
+    t = tf.convert_to_tensor(self.temperature)
     fractional_part = x - tf.math.floor(x)
-    inner_part = (fractional_part - 0.5) / self.temperature
+    # Because our function is from [0.5, 1.5], we need to transform our
+    # fractional_part to that domain like in the forward transformation.
+    fractional_part = tf.where(
+        fractional_part < 0.5, fractional_part + 0.5, fractional_part - 0.5)
+    inner_part = (fractional_part - 0.5) / t
 
-    offset = (tf.math.log(self.temperature) - tf.math.softplus(
-        0.5 / self.temperature) + tfp_math.softplus_inverse(
-            0.5 / self.temperature))
+    offset = (tf.math.log(t) - tf.math.softplus(0.5 / t) +
+              tfp_math.softplus_inverse(0.5 / t))
 
     return (-tf.math.softplus(-inner_part) -
             tf.math.softplus(inner_part) -
@@ -165,3 +213,14 @@ class Softfloor(bijector.Bijector):
   @property
   def temperature(self):
     return self._temperature
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+    assertions = []
+    if (self.temperature is not None and
+        is_init != tensor_util.is_ref(self.temperature)):
+      assertions.append(assert_util.assert_positive(
+          self._temperature,
+          message='Argument `temperature` was not positive.'))
+    return assertions

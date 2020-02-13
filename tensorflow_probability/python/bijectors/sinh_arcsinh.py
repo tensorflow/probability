@@ -109,6 +109,7 @@ class SinhArcsinh(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       tailweight = 1. if tailweight is None else tailweight
       skewness = 0. if skewness is None else skewness
@@ -122,6 +123,7 @@ class SinhArcsinh(bijector.Bijector):
       super(SinhArcsinh, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property
@@ -137,6 +139,10 @@ class SinhArcsinh(bijector.Bijector):
   def _output_multiplier(self, tailweight):
     return self._scale_number / tf.sinh(
         tf.asinh(self._scale_number) * tailweight)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     tailweight = tf.convert_to_tensor(self.tailweight)

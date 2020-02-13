@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -132,7 +131,7 @@ class DenseVariational(tf.keras.layers.Layer):
       kernel, bias = w, None
 
     kernel = tf.reshape(kernel, shape=tf.concat([
-        tf.shape(input=kernel)[:-1],
+        tf.shape(kernel)[:-1],
         [prev_units, self.units],
     ], axis=0))
     outputs = tf.matmul(inputs, kernel)
@@ -159,13 +158,13 @@ def _make_kl_divergence_penalty(
     def kl_divergence_fn(distribution_a, distribution_b):
       z = test_points_fn(distribution_a)
       return tf.reduce_mean(
-          input_tensor=distribution_a.log_prob(z) - distribution_b.log_prob(z),
+          distribution_a.log_prob(z) - distribution_b.log_prob(z),
           axis=test_points_reduce_axis)
 
   # Closure over: kl_divergence_fn, weight.
   def _fn(distribution_a, distribution_b):
     """Closure that computes KLDiv as a function of `a` as in `KL[a, b]`."""
-    with tf1.name_scope('kldivergence_loss'):
+    with tf.name_scope('kldivergence_loss'):
       kl = kl_divergence_fn(distribution_a, distribution_b)
       if weight is not None:
         kl = tf.cast(weight, dtype=kl.dtype) * kl
@@ -177,7 +176,6 @@ def _make_kl_divergence_penalty(
       # TODO(b/126259176): Add end-to-end Keras/TFP test to ensure the API's
       # align, particularly wrt how losses are aggregated (across batch
       # members).
-      return tf.reduce_sum(input_tensor=kl,
-                           name='batch_total_kl_divergence')
+      return tf.reduce_sum(kl, name='batch_total_kl_divergence')
 
   return _fn

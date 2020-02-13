@@ -24,16 +24,15 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DeferredTensorTest(test_util.TestCase):
 
   def test_docstring_example(self):
     trainable_normal = tfd.Normal(
@@ -125,8 +124,8 @@ class DeferredTensorTest(test_case.TestCase):
       self.assertAllEqual([[-1., 0.], [-2., 0.], [-3., 0.]], y_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TransformedVariableTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TransformedVariableTest(test_util.TestCase):
 
   def test_docstring_1(self):
     trainable_normal = tfd.Normal(
@@ -147,7 +146,7 @@ class TransformedVariableTest(test_case.TestCase):
                    scale=tfp.util.TransformedVariable(
                        [1., 2.], tfb.Softplus(validate_args=True)))
     self.evaluate([v.initializer for v in d.trainable_variables])
-    self.assertAllEqual([1., 2.], self.evaluate(d.stddev()))
+    self.assertAllClose([1., 2.], self.evaluate(d.stddev()), atol=0., rtol=1e-5)
     with tf.control_dependencies([d.scale.assign_add([0.5, 1.])]):
       self.assertAllClose([1.5, 3.], self.evaluate(d.stddev()),
                           atol=0., rtol=1e-5)
@@ -191,6 +190,39 @@ class TransformedVariableTest(test_case.TestCase):
           repr(x),
           '<TransformedVariable: dtype=float32, shape=[], fn="exp">')
 
+  def test_shape_changing_bijector(self):
+    num_tril_nonzero = lambda num_rows: num_rows * (num_rows + 1) // 2
+    num_tril_rows = lambda nnz: (  # pylint: disable=g-long-lambda
+        np.sqrt(0.25 + 2. * nnz) - 0.5).astype(np.int32)
+    pad_eye = tfb.Inline(
+        forward_fn=lambda x: tf.concat([  # pylint: disable=g-long-lambda
+            tfb.FillScaleTriL().inverse(
+                tf.eye(num_tril_rows(tf.compat.dimension_value(x.shape[-1])),
+                       batch_shape=tf.shape(x)[:-2]))[..., tf.newaxis, :],
+            x,
+        ], axis=tf.rank(x) - 2),
+        inverse_fn=lambda y: y[..., 1:, :],
+        inverse_log_det_jacobian_fn=lambda y, event_ndims: 0.,
+        forward_event_shape_fn=lambda in_shape: in_shape + tf.one_hot(  # pylint: disable=g-long-lambda
+            tf.size(in_shape) - 2, depth=tf.size(in_shape), dtype=tf.int32),
+        inverse_event_shape_fn=lambda out_shape: out_shape - tf.one_hot(  # pylint: disable=g-long-lambda
+            tf.size(out_shape) - 2, depth=tf.size(out_shape), dtype=tf.int32),
+        forward_min_event_ndims=2,
+        inverse_min_event_ndims=2,
+        is_constant_jacobian=True,
+        name='PadEyeBijector')
+    scale_tril = tfp.util.TransformedVariable(
+        tf.eye(3, batch_shape=[5, 1, 4]),
+        bijector=tfb.Chain([tfb.FillScaleTriL(), pad_eye]))
+    self.assertAllEqual((5, 1, 4, 3, 3), scale_tril.shape)
+    self.assertAllEqual((5, 1, 4 - 1, num_tril_nonzero(3)),
+                        scale_tril.pretransformed_input.shape)
+    self.evaluate([v.initializer for v in scale_tril.trainable_variables])
+    shape_, scale_tril_ = self.evaluate([
+        tf.shape(scale_tril), tf.convert_to_tensor(scale_tril)])
+    self.assertAllEqual((5, 1, 4, 3, 3), shape_)
+    self.assertAllEqual((5, 1, 4, 3, 3), scale_tril_.shape)
+
   def test_nested_transformed_variable(self):
     x = tfp.util.TransformedVariable(0.25, tfb.Exp())
     self.evaluate(x.initializer)
@@ -211,9 +243,8 @@ class TransformedVariableTest(test_case.TestCase):
     # Different vars have no deps so we needn't test cross-talk.
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
-                                          parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DeferredTensorBehavesLikeTensorTest(test_util.TestCase):
 
   def testArrayPriority(self):
     x = tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp)
@@ -303,6 +334,17 @@ class DeferredTensorBehavesLikeTensorTest(test_case.TestCase,
       with self.assertRaises(TypeError):
         for _ in iter(x):
           pass
+
+  def testMethodNumpy(self):
+    x_ = np.array([0., 1.])
+    x = tfp.util.DeferredTensor(tf.Variable(x_), tf.math.exp)
+
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    if tf.executing_eagerly():
+      self.assertAllEqual(tf.math.exp(x_).numpy(), x.numpy())
+    else:
+      with self.assertRaises(NotImplementedError):
+        x.numpy()
 
 
 if __name__ == '__main__':

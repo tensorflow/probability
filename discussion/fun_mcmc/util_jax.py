@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,66 +22,53 @@ from __future__ import print_function
 import jax
 from jax import lax
 from jax import random
+from jax import tree_util
 from jax.experimental import stax
 import jax.numpy as np
-# TODO(siege): Switch to a JAX-specific nested structure API.
-import tensorflow.compat.v2 as tf
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'assert_same_shallow_tree',
     'flatten_tree',
-    'make_dynamic_array',
     'map_tree',
     'map_tree_up_to',
     'random_categorical',
     'random_normal',
     'random_uniform',
-    'snapshot_dynamic_array',
     'split_seed',
+    'trace',
     'value_and_grad',
-    'write_dynamic_array',
 ]
 
 
 def map_tree(fn, tree, *args):
   """Maps `fn` over the leaves of a nested structure."""
-  return tf.nest.map_structure(fn, tree, *args)
+  return tree_util.tree_multimap(fn, tree, *args)
 
 
 def flatten_tree(tree):
   """Flattens a nested structure to a list."""
-  return tf.nest.flatten(tree)
+  return tree_util.tree_flatten(tree)[0]
 
 
 def unflatten_tree(tree, xs):
   """Inverse operation of `flatten_tree`."""
-  return tf.nest.pack_sequence_as(tree, xs)
+  return tree_util.tree_unflatten(tree_util.tree_structure(tree), xs)
 
 
 def map_tree_up_to(shallow, fn, tree, *rest):
   """`map_tree` with recursion depth defined by depth of `shallow`."""
-  return nest.map_structure_up_to(shallow, fn, tree, *rest)
+
+  def wrapper(_, *rest):
+    return fn(*rest)
+
+  return tree_util.tree_multimap(wrapper, shallow, tree, *rest)
 
 
 def assert_same_shallow_tree(shallow, tree):
   """Asserts that `tree` has the same shallow structure as `shallow`."""
-  nest.assert_shallow_structure(shallow, tree)
-
-
-def make_dynamic_array(dtype, size, element_shape):
-  """Creates an array that can be written to dynamically."""
-  return np.empty((size,) + element_shape, dtype=dtype)
-
-
-def write_dynamic_array(array, i, e):
-  """Writes to an index in a dynamic array."""
-  return jax.ops.index_update(array, i, e)
-
-
-def snapshot_dynamic_array(array):
-  """Converts a dynamic array back to a static array."""
-  return array
+  # Do a dummy multimap for the side-effect of verifying that the structures are
+  # the same. This doesn't catch all the errors we actually care about, sadly.
+  map_tree_up_to(shallow, lambda *args: (), tree)
 
 
 def value_and_grad(fn, args):
@@ -108,6 +95,7 @@ def random_normal(shape, dtype, seed):
 
 def _searchsorted(a, v):
   """Returns where `v` can be inserted so that `a` remains sorted."""
+
   def cond(state):
     low_idx, high_idx = state
     return low_idx < high_idx
@@ -135,3 +123,56 @@ def random_categorical(logits, num_samples, seed):
   flat_cum_sum = cum_sum.reshape([-1, cum_sum.shape[-1]])
   flat_eta = eta.reshape([-1])
   return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T
+
+
+def trace(state, fn, num_steps, **_):
+  """Implementation of `trace` operator, without the calling convention."""
+  # We need the shapes and dtypes of the outputs of `fn`.
+  _, untraced_spec, traced_spec = jax.eval_shape(
+      fn, map_tree(lambda s: jax.ShapeDtypeStruct(s.shape, s.dtype), state))
+  untraced_init = map_tree(lambda spec: np.zeros(spec.shape, spec.dtype),
+                           untraced_spec)
+
+  try:
+    num_steps = int(num_steps)
+    use_scan = True
+  except TypeError:
+    use_scan = False
+    if flatten_tree(traced_spec):
+      raise ValueError(
+          'Cannot trace values when `num_steps` is not statically known. Pass '
+          'False to `trace_mask` or return an empty structure (e.g. `()`) as '
+          'the extra output.')
+
+  if use_scan:
+
+    def wrapper(state_untraced, _):
+      state, _ = state_untraced
+      state, untraced, traced = fn(state)
+      return (state, untraced), traced
+
+    (state, untraced), traced = lax.scan(
+        wrapper,
+        (state, untraced_init),
+        xs=None,
+        length=num_steps,
+    )
+  else:
+    trace_arrays = map_tree(
+        lambda spec: np.zeros((num_steps,) + spec.shape, spec.dtype),
+        traced_spec)
+
+    def wrapper(i, state_untraced_traced):
+      state, _, trace_arrays = state_untraced_traced
+      state, untraced, traced = fn(state)
+      trace_arrays = map_tree(lambda a, e: jax.ops.index_update(a, i, e),
+                              trace_arrays, traced)
+      return (state, untraced, trace_arrays)
+
+    state, untraced, traced = lax.fori_loop(
+        0,
+        num_steps,
+        wrapper,
+        (state, untraced_init, trace_arrays),
+    )
+  return state, untraced, traced

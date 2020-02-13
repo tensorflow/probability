@@ -19,12 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import contextlib
 import functools
 import inspect
-import re
+import sys
 
-from absl import flags
 from absl import logging
 from absl.testing import parameterized
 import hypothesis as hp
@@ -40,16 +38,7 @@ from tensorflow_probability.python.bijectors import hypothesis_testlib as biject
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-
-flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
-                  'TF execution mode to use')
-
-FLAGS = flags.FLAGS
+from tensorflow_probability.python.internal import test_util
 
 
 TF2_FRIENDLY_DISTS = (
@@ -103,6 +92,7 @@ TF2_FRIENDLY_DISTS = (
     'Uniform',
     'VonMises',
     'VonMisesFisher',
+    'WishartTriL',
     'Zipf',
 )
 
@@ -120,6 +110,7 @@ MUTEX_PARAMS = (
 )
 
 SPECIAL_DISTS = (
+    'BatchReshape',
     'Distribution',
     'Empirical',
     'Independent',
@@ -127,9 +118,88 @@ SPECIAL_DISTS = (
     'TransformedDistribution',
 )
 
-EXTRA_TENSOR_CONVERSION_DISTS = (
-    'RelaxedBernoulli',
+# Batch slicing requires implementing `_params_event_ndims`.  Generic
+# instantiation (per `instantiable_base_dists`, below) also requires
+# `_params_event_ndims`, but some special distributions can be instantiated
+# without that.  Of those, this variable lists the ones that do not support
+# batch slicing.
+INSTANTIABLE_BUT_NOT_SLICABLE = (
+    'BatchReshape',
 )
+
+EXTRA_TENSOR_CONVERSION_DISTS = {
+    'Binomial': sys.maxsize,  # binomial rejection sampler converts many times
+    'RelaxedBernoulli': 1,
+    'WishartTriL': 3,  # not concretizing linear operator scale
+    'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter
+}
+
+# Whitelist of underlying distributions for QuantizedDistribution (must have
+# continuous, infinite support -- QuantizedDistribution also works for finite-
+# support distributions for which the length of the support along each dimension
+# is at least 1, though it is difficult to construct draws of these
+# distributions in general, and wouldn't contribute much to test coverage.)
+QUANTIZED_BASE_DISTS = (
+    'Chi2',
+    'Exponential',
+    'LogNormal',
+    'Logistic',
+    'Normal',
+    'Pareto',
+    'Poisson',
+    'StudentT',
+)
+
+
+# TODO(b/130815467) All distributions should be auto-vectorizeable.
+# The lists below contain distributions from INSTANTIABLE_BASE_DISTS that are
+# blacklisted by the autovectorization tests. Since not all distributions are
+# in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
+SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
+    'Binomial',  # No converter for While
+    'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
+    'DirichletMultinomial',  # No converter for TensorListFromTensor
+    'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
+    'Multinomial',  # No converter for TensorListFromTensor
+    'PlackettLuce',  # No converter for TopKV2
+    'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
+    'VonMises',  # No converter for While
+    'VonMisesFisher',  # No converter for While
+    'Zipf',  # No converter for While
+]
+
+LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
+    'Binomial',  # Numeric inconsistency: b/147743999
+    'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
+    'DirichletMultinomial',  # Same as Multinomial.
+    'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
+    'NegativeBinomial',  # Numeric inconsistency: b/147743999
+    'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
+    'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.
+    'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
+    'ProbitBernoulli',  # Seemingly runs, but gives `NaN`s sometimes.
+    'TruncatedNormal',  # Numerical problem: b/145554459
+    'VonMisesFisher',  # No converter for CheckNumerics
+    'Wishart',  # Actually works, but disabled because log_prob of sample is
+                # ill-conditioned for reasons unrelated to pfor.
+    'WishartTriL',  # Same as Wishart.
+]
+
+EVENT_SPACE_BIJECTOR_IS_BROKEN = [
+    'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
+                     # (Reciprocal(Softplus(x)) -> inf for small x)
+]
+
+# Vectorization can rewrite computations in ways that (apparently) lead to
+# minor floating-point inconsistency.
+# TODO(b/142827327): Bring tolerance down to 0 for all distributions.
+VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
+VECTORIZED_LOGPROB_ATOL.update({
+    'CholeskyLKJ': 1e-4,
+    'LKJ': 1e-3,
+    'StudentT': 5e-5,
+    'TruncatedNormal': 1e-1,
+})
 
 
 class DistInfo(collections.namedtuple(
@@ -137,6 +207,7 @@ class DistInfo(collections.namedtuple(
   """Sufficient information to instantiate a Distribution.
 
   To wit
+
   - The Python class `cls` giving the class, and
   - A Python dict `params_event_ndims` giving the event dimensions for the
     parameters (so that parameters can be built with predictable batch shapes).
@@ -152,6 +223,7 @@ def instantiable_base_dists():
   """Computes the table of mechanically instantiable base Distributions.
 
   A Distribution is mechanically instantiable if
+
   - The class appears as a symbol binding in `tfp.distributions`;
   - The class defines a `_params_event_ndims` method (necessary
     to generate parameter Tensors with predictable batch shapes); and
@@ -199,9 +271,11 @@ INSTANTIABLE_BASE_DISTS = instantiable_base_dists()
 del instantiable_base_dists
 
 INSTANTIABLE_META_DISTS = (
+    'BatchReshape',
     'Independent',
     'MixtureSameFamily',
     'TransformedDistribution',
+    'QuantizedDistribution',
 )
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -276,6 +350,7 @@ def stringify_slices(slices):
 
   Each returned string (in order) encodes what to do with one dimension of the
   slicee:
+
   - That number for a single integer slice;
   - 'a:b:c' for a start-stop-step slice, omitting any missing components;
   - 'tf.newaxis' for an axis insertion; or
@@ -339,9 +414,71 @@ def params_used(dist):
 
 
 @hps.composite
+def batch_reshapes(
+    draw, batch_shape=None, event_dim=None,
+    enable_vars=False, depth=None,
+    eligibility_filter=lambda name: True, validate_args=True):
+  """Strategy for drawing `BatchReshape` distributions.
+
+  The underlying distribution is drawn from the `distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `BatchReshape` distribution.  Note that the underlying distribution will
+      in general have a different batch shape, to make the reshaping
+      non-trivial.  Hypothesis will pick one if omitted.
+    event_dim: Optional Python int giving the size of each of the underlying
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `BatchReshape` distributions with the
+      specified `batch_shape` (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes(min_ndims=1, max_side=4))
+
+  # TODO(b/142135119): Wanted to draw general input and output shapes like the
+  # following, but Hypothesis complained about filtering out too many things.
+  # underlying_batch_shape = draw(tfp_hps.shapes(min_ndims=1))
+  # hp.assume(
+  #   batch_shape.num_elements() == underlying_batch_shape.num_elements())
+  underlying_batch_shape = [tf.TensorShape(batch_shape).num_elements()]
+
+  underlying = draw(
+      distributions(
+          batch_shape=underlying_batch_shape,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          depth=depth - 1,
+          eligibility_filter=eligibility_filter,
+          validate_args=validate_args))
+  hp.note('Forming BatchReshape with underlying dist {}; '
+          'parameters {}; batch_shape {}'.format(
+              underlying, params_used(underlying), batch_shape))
+  result_dist = tfd.BatchReshape(
+      underlying, batch_shape=batch_shape, validate_args=True)
+  return result_dist
+
+
+@hps.composite
 def independents(
     draw, batch_shape=None, event_dim=None,
-    enable_vars=False, depth=None):
+    enable_vars=False, depth=None, eligibility_filter=lambda name: True,
+    validate_args=True):
   """Strategy for drawing `Independent` distributions.
 
   The underlying distribution is drawn from the `distributions` strategy.
@@ -362,6 +499,9 @@ def independents(
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     dists: A strategy for drawing `Independent` distributions with the specified
@@ -387,14 +527,16 @@ def independents(
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
-          depth=depth - 1))
+          depth=depth - 1,
+          eligibility_filter=eligibility_filter,
+          validate_args=validate_args))
   hp.note('Forming Independent with underlying dist {}; '
           'parameters {}; reinterpreted_batch_ndims {}'.format(
               underlying, params_used(underlying), reinterpreted_batch_ndims))
   result_dist = tfd.Independent(
       underlying,
       reinterpreted_batch_ndims=reinterpreted_batch_ndims,
-      validate_args=True)
+      validate_args=validate_args)
   expected_shape = batch_shape[:len(batch_shape) - reinterpreted_batch_ndims]
   if expected_shape != result_dist.batch_shape:
     msg = ('Independent strategy generated a bad batch shape '
@@ -408,7 +550,9 @@ def transformed_distributions(draw,
                               batch_shape=None,
                               event_dim=None,
                               enable_vars=False,
-                              depth=None):
+                              depth=None,
+                              eligibility_filter=lambda name: True,
+                              validate_args=True):
   """Strategy for drawing `TransformedDistribution`s.
 
   The transforming bijector is drawn from the
@@ -434,6 +578,9 @@ def transformed_distributions(draw,
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     dists: A strategy for drawing `TransformedDistribution`s with the specified
@@ -456,7 +603,9 @@ def transformed_distributions(draw,
       batch_shape=underlying_batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars,
-      depth=depth - 1).filter(
+      depth=depth - 1,
+      eligibility_filter=eligibility_filter,
+      validate_args=validate_args).filter(
           bijector_hps.distribution_filter_for(bijector))
   to_transform = draw(underlyings)
   hp.note('Forming TransformedDistribution with '
@@ -468,7 +617,7 @@ def transformed_distributions(draw,
       bijector=bijector,
       distribution=to_transform,
       batch_shape=batch_shape_arg,
-      validate_args=True)
+      validate_args=validate_args)
   if batch_shape != result_dist.batch_shape:
     msg = ('TransformedDistribution strategy generated a bad batch shape '
            'for {}, should have been {}.').format(result_dist, batch_shape)
@@ -477,11 +626,113 @@ def transformed_distributions(draw,
 
 
 @hps.composite
+def quantized_distributions(draw,
+                            batch_shape=None,
+                            event_dim=None,
+                            enable_vars=False,
+                            eligibility_filter=lambda name: True,
+                            validate_args=True):
+  """Strategy for drawing `QuantizedDistribution`s.
+
+  The underlying distribution is drawn from the `base_distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `QuantizedDistribution`. Hypothesis will pick a `batch_shape` if omitted.
+    event_dim: Optional Python int giving the size of each of the underlying
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `QuantizedDistribution`s with the specified
+      `batch_shape` (or an arbitrary one if omitted).
+  """
+
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+
+  low_quantile = draw(
+      hps.one_of(
+          hps.just(None),
+          hps.floats(min_value=0.01, max_value=0.7)))
+  high_quantile = draw(
+      hps.one_of(
+          hps.just(None),
+          hps.floats(min_value=0.3, max_value=.99)))
+
+  def ok(name):
+    return eligibility_filter(name) and name in QUANTIZED_BASE_DISTS
+  underlyings = base_distributions(
+      batch_shape=batch_shape,
+      event_dim=event_dim,
+      enable_vars=enable_vars,
+      eligibility_filter=ok,
+  )
+  underlying = draw(underlyings)
+
+  if high_quantile is not None:
+    high_quantile = tf.convert_to_tensor(high_quantile, dtype=underlying.dtype)
+  if low_quantile is not None:
+    low_quantile = tf.convert_to_tensor(low_quantile, dtype=underlying.dtype)
+    if high_quantile is not None:
+      high_quantile = ensure_high_gt_low(low_quantile, high_quantile)
+
+  hp.note('Drawing QuantizedDistribution with underlying distribution'
+          ' {}'.format(underlying))
+
+  try:
+    low = None if low_quantile is None else underlying.quantile(low_quantile)
+    high = None if high_quantile is None else underlying.quantile(high_quantile)
+  except NotImplementedError:
+    # The following code makes ReproducibilityTest flaky in graph mode (but not
+    # eager). Failures are due either to partial mismatch in the samples in
+    # ReproducibilityTest or to `low` and/or `high` being NaN. For now, to avoid
+    # this, we set `low` and `high` to `None` for distributions not implementing
+    # `quantile`.
+
+    # seed = test_util.test_seed(hardcoded_seed=123)
+    # low = (None if low_quantile is None
+    #        else underlying.sample(low_quantile.shape, seed=seed))
+    # high = (None if high_quantile is None else
+    #         underlying.sample(high_quantile.shape, seed=seed))
+    low = None
+    high = None
+
+  # Ensure that `low` and `high` are ints contained in distribution support
+  # and span at least a few bins.
+  if high is not None:
+    high = tf.clip_by_value(high, -2**23, 2**23)
+    high = tf.math.ceil(high + 5.)
+
+  if low is not None:
+    low = tf.clip_by_value(low, -2**23, 2**23)
+    low = tf.math.ceil(low)
+
+  result_dist = tfd.QuantizedDistribution(
+      distribution=underlying,
+      low=low,
+      high=high,
+      validate_args=validate_args)
+
+  return result_dist
+
+
+@hps.composite
 def mixtures_same_family(draw,
                          batch_shape=None,
                          event_dim=None,
                          enable_vars=False,
-                         depth=None):
+                         depth=None,
+                         eligibility_filter=lambda name: True,
+                         validate_args=True):
   """Strategy for drawing `MixtureSameFamily` distributions.
 
   The component distribution is drawn from the `distributions` strategy.
@@ -505,6 +756,9 @@ def mixtures_same_family(draw,
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     dists: A strategy for drawing `MixtureSameFamily` distributions with the
@@ -526,6 +780,7 @@ def mixtures_same_family(draw,
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
+          eligibility_filter=eligibility_filter,
           depth=depth - 1))
   hp.note('Drawing MixtureSameFamily with component {}; parameters {}'.format(
       component, params_used(component)))
@@ -536,14 +791,15 @@ def mixtures_same_family(draw,
       dist_name='Categorical',
       batch_shape=mixture_batch_shape,
       event_dim=tensorshape_util.as_list(batch_shape)[-1],
-      enable_vars=enable_vars))
+      enable_vars=enable_vars,
+      validate_args=validate_args))
   hp.note(('Forming MixtureSameFamily with '
            'mixture distribution {}; parameters {}').format(
                mixture_dist, params_used(mixture_dist)))
   result_dist = tfd.MixtureSameFamily(
       components_distribution=component,
       mixture_distribution=mixture_dist,
-      validate_args=True)
+      validate_args=validate_args)
   if batch_shape[:-1] != result_dist.batch_shape:
     msg = ('MixtureSameFamily strategy generated a bad batch shape '
            'for {}, should have been {}.').format(result_dist, batch_shape[:-1])
@@ -564,7 +820,8 @@ def base_distributions(draw,
                        batch_shape=None,
                        event_dim=None,
                        enable_vars=False,
-                       eligibility_filter=lambda name: True):
+                       eligibility_filter=lambda name: True,
+                       validate_args=True):
   """Strategy for drawing arbitrary base Distributions.
 
   This does not draw compound distributions like `Independent`,
@@ -587,6 +844,7 @@ def base_distributions(draw,
       `tfp.util.TransformedVariable`}.
     eligibility_filter: Optional Python callable.  Blacklists some Distribution
       class names so they will not be drawn at the top level.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     dists: A strategy for drawing Distributions with the specified `batch_shape`
@@ -604,18 +862,24 @@ def base_distributions(draw,
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
 
+  # Draw raw parameters
   params_kwargs = draw(
       broadcasting_params(
           dist_name, batch_shape, event_dim=event_dim, enable_vars=enable_vars))
+  hp.note('Forming dist {} with raw parameters {}'.format(
+      dist_name, params_kwargs))
+
+  # Constrain them to legal values
   params_constrained = constraint_for(dist_name)(params_kwargs)
 
   # Sometimes the "distribution constraint" fn may replace c2t-tracking
   # DeferredTensor params with Tensor params (e.g. fix_triangular). In such
   # cases, we preserve the c2t-tracking DeferredTensors by wrapping them but
-  # ignoring the value.
+  # ignoring the value.  We similarly reinstate raw tf.Variables, so they
+  # appear in the distribution's `variables` list and can be initialized.
   for k in params_constrained:
     if (k in params_kwargs and
-        isinstance(params_kwargs[k], tfp_util.DeferredTensor) and
+        isinstance(params_kwargs[k], (tfp_util.DeferredTensor, tf.Variable)) and
         params_kwargs[k] is not params_constrained[k]):
 
       def constrained_value(v, val=params_constrained[k]):
@@ -628,9 +892,19 @@ def base_distributions(draw,
   hp.note('Forming dist {} with constrained parameters {}'.format(
       dist_name, params_constrained))
   assert_shapes_unchanged(params_kwargs, params_constrained)
-  params_constrained['validate_args'] = True
+  params_constrained['validate_args'] = validate_args
+
+  if dist_name in ['Wishart', 'WishartTriL']:
+    # With the default `input_output_cholesky = False`, Wishart occasionally
+    # produces samples for which the Cholesky decompositions fail, causing
+    # an error in testDistribution when `log_prob` is called on a sample.
+    params_constrained['input_output_cholesky'] = True
+
+  # Actually construct the distribution
   dist_cls = INSTANTIABLE_BASE_DISTS[dist_name].cls
   result_dist = dist_cls(**params_constrained)
+
+  # Check that the batch shape came out as expected
   if batch_shape != result_dist.batch_shape:
     msg = ('Distributions strategy generated a bad batch shape '
            'for {}, should have been {}.').format(result_dist, batch_shape)
@@ -645,7 +919,8 @@ def distributions(draw,
                   event_dim=None,
                   enable_vars=False,
                   depth=None,
-                  eligibility_filter=lambda name: True):
+                  eligibility_filter=lambda name: True,
+                  validate_args=True):
   """Strategy for drawing arbitrary Distributions.
 
   This may draw compound distributions (i.e., `Independent`,
@@ -670,7 +945,8 @@ def distributions(draw,
       If `None`, Hypothesis will bias choose one, with a bias towards shallow
       nests.
     eligibility_filter: Optional Python callable.  Blacklists some Distribution
-      class names so they will not be drawn at the top level.
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     dists: A strategy for drawing Distributions with the specified `batch_shape`
@@ -685,45 +961,58 @@ def distributions(draw,
 
   if dist_name is None and depth > 0:
     bases = hps.just(None)
-    compounds = hps.one_of(
-        map(hps.just, ['Independent', 'MixtureSameFamily',
-                       'TransformedDistribution']))
+    candidates = ['BatchReshape', 'Independent',
+                  'MixtureSameFamily', 'TransformedDistribution']
+    names = [name for name in candidates if eligibility_filter(name)]
+    compounds = hps.one_of(map(hps.just, names))
     dist_name = draw(hps.one_of([bases, compounds]))
 
   if (dist_name is None
       or dist_name in INSTANTIABLE_BASE_DISTS
       or dist_name == 'Empirical'):
     return draw(base_distributions(
-        dist_name, batch_shape, event_dim, enable_vars, eligibility_filter))
+        dist_name, batch_shape, event_dim, enable_vars,
+        eligibility_filter, validate_args))
+  if dist_name == 'BatchReshape':
+    return draw(batch_reshapes(
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
   if dist_name == 'Independent':
     return draw(independents(
-        batch_shape, event_dim, enable_vars, depth))
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
   if dist_name == 'MixtureSameFamily':
     return draw(mixtures_same_family(
-        batch_shape, event_dim, enable_vars, depth))
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
   if dist_name == 'TransformedDistribution':
     return draw(transformed_distributions(
-        batch_shape, event_dim, enable_vars, depth))
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
+  if dist_name == 'QuantizedDistribution':
+    return draw(quantized_distributions(
+        batch_shape, event_dim, enable_vars,
+        eligibility_filter, validate_args))
   raise ValueError('Unknown Distribution name {}'.format(dist_name))
 
 
-def get_event_dim(dist):
-  for param, val in dist.parameters.items():
-    if (param in dist._params_event_ndims() and val is not None and
-        dist._params_event_ndims()[param]):
-      return tf.compat.dimension_value(val.shape[-1])
+def extra_tensor_conversions_allowed(dist):
+  """Returns number of extra tensor conversions allowed for the input dist."""
+  extra_conversions = EXTRA_TENSOR_CONVERSION_DISTS.get(type(dist).__name__)
+  if extra_conversions:
+    return extra_conversions
+  if isinstance(dist, tfd.TransformedDistribution):
+    return 1
+  if isinstance(dist, tfd.BatchReshape):
+    # One for the batch_shape_tensor needed by _call_reshape_input_output.
+    # One to cover inability to turn off validate_args for the base
+    # distribution (b/143297494).
+    return 2
+  return 0
 
 
-def extra_tensor_conversion_allowed(dist):
-  """Returns `True` for dists that are allowed one extra tensor conversion."""
-  if (isinstance(dist, tfd.TransformedDistribution) or
-      (type(dist).__name__ in EXTRA_TENSOR_CONVERSION_DISTS)):
-    return True
-  return False
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DistributionParamsAreVarsTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -731,17 +1020,20 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
-      return
-    seed = tfp_test_util.test_seed()
-    dist = data.draw(distributions(dist_name=dist_name, enable_vars=True))
+    seed = test_util.test_seed()
+    # Explicitly draw event_dim here to avoid relying on _params_event_ndims
+    # later, so this test can support distributions that do not implement the
+    # slicing protocol.
+    event_dim = data.draw(hps.integers(min_value=2, max_value=6))
+    dist = data.draw(distributions(
+        dist_name=dist_name, event_dim=event_dim, enable_vars=True))
     batch_shape = dist.batch_shape
     batch_shape2 = data.draw(tfp_hps.broadcast_compatible_shape(batch_shape))
     dist2 = data.draw(
         distributions(
             dist_name=dist_name,
             batch_shape=batch_shape2,
-            event_dim=get_event_dim(dist),
+            event_dim=event_dim,
             enable_vars=True))
     self.evaluate([var.initializer for var in dist.variables])
 
@@ -755,7 +1047,8 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
     # Check that standard statistics do not read distribution parameters more
     # than twice (once in the stat itself and up to once in any validation
     # assertions).
-    for stat in data.draw(
+    max_permissible = 2 + extra_tensor_conversions_allowed(dist)
+    for stat in sorted(data.draw(
         hps.sets(
             hps.one_of(
                 map(hps.just, [
@@ -763,11 +1056,12 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
                     'variance'
                 ])),
             min_size=3,
-            max_size=3)):
+            max_size=3))):
       hp.note('Testing excessive var usage in {}.{}'.format(dist_name, stat))
       try:
         with tfp_hps.assert_no_excessive_var_usage(
-            'statistic `{}` of `{}`'.format(stat, dist)):
+            'statistic `{}` of `{}`'.format(stat, dist),
+            max_permissible=max_permissible):
           getattr(dist, stat)()
 
       except NotImplementedError:
@@ -779,7 +1073,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
     with tf.GradientTape() as tape:
       # TDs do bijector assertions twice (once by distribution.sample, and once
       # by bijector.forward).
-      max_permissible = 3 if extra_tensor_conversion_allowed(dist) else 2
+      max_permissible = 2 + extra_tensor_conversions_allowed(dist)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `sample` of `{}`'.format(dist),
           max_permissible=max_permissible):
@@ -836,7 +1130,7 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
 
     # Test that all forms of probability evaluation avoid reading distribution
     # parameters more than once.
-    for evaluative in data.draw(
+    for evaluative in sorted(data.draw(
         hps.sets(
             hps.one_of(
                 map(hps.just, [
@@ -844,13 +1138,13 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
                     'log_survival_function', 'survival_function'
                 ])),
             min_size=3,
-            max_size=3)):
+            max_size=3))):
       hp.note('Testing excessive var usage in {}.{}'.format(
           dist_name, evaluative))
       try:
         # No validation => 1 convert. But for TD we allow 2:
         # dist.log_prob(bijector.inverse(samp)) + bijector.ildj(samp)
-        max_permissible = 2 if extra_tensor_conversion_allowed(dist) else 1
+        max_permissible = 2 + extra_tensor_conversions_allowed(dist)
         with tfp_hps.assert_no_excessive_var_usage(
             'evaluative `{}` of `{}`'.format(evaluative, dist),
             max_permissible=max_permissible):
@@ -859,43 +1153,8 @@ class DistributionParamsAreVarsTest(parameterized.TestCase, test_case.TestCase):
         pass
 
 
-@contextlib.contextmanager
-def no_tf_rank_errors():
-  # TODO(axch): Instead of catching and `assume`ing away rank errors, could try
-  # harder to avoid generating them in the first place.  For instance, could add
-  # a parameter to `valid_slices` that limits how much the rank may increase
-  # after the slice.  Trouble is, predicting what limits to set is difficult
-  # because rank handling is non-uniform, and actually meeting them is also
-  # non-trivial because in addition to the batch shape there is the event shape,
-  # and at least one more dimention added by `sample`, and the parameters may
-  # have larger "event" shapes than the distribution itself.
-  rank_bcast_pat = (r'Broadcast between \[([0-9]*,){8,}[0-9]*\] '
-                    r'and \[([0-9]*,){8,}[0-9]*\] is not supported yet')
-  input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
-  input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
-  try:
-    yield
-  except tf.errors.UnimplementedError as e:
-    # TODO(b/138385438): This really shouldn't be so complicated.
-    msg = str(e)
-    if re.search(rank_bcast_pat, msg):
-      # We asked some TF op (SelectV2?) to broadcast Tensors of rank >= 9.
-      # Let's not.
-      hp.assume(False)
-    elif re.search(input_dims_pat, msg):
-      # We asked some TF op (StridedSlice?) to operate on a Tensor of rank >= 8.
-      # Let's not.
-      hp.assume(False)
-    elif re.search(input_rank_pat, msg):
-      # We asked some TF op (PadV2?) to operate on a Tensor of rank >= 7.
-      # Let's not.
-      hp.assume(False)
-    else:
-      raise
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class ReproducibilityTest(parameterized.TestCase, test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ReproducibilityTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -904,21 +1163,120 @@ class ReproducibilityTest(parameterized.TestCase, test_case.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     dist = data.draw(distributions(dist_name=dist_name, enable_vars=False))
-    seed = tfp_test_util.test_seed()
-    s1 = self.evaluate(dist.sample(50, seed=seed))
+    seed = test_util.test_seed()
+    with tfp_hps.no_tf_rank_errors():
+      s1 = self.evaluate(dist.sample(50, seed=seed))
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
-    s2 = self.evaluate(dist.sample(50, seed=seed))
+    with tfp_hps.no_tf_rank_errors():
+      s2 = self.evaluate(dist.sample(50, seed=seed))
     self.assertAllEqual(s1, s2)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DistributionSlicingTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class EventSpaceBijectorsTest(test_util.TestCase):
+
+  def check_bad_loc_scale(self, dist):
+    if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
+      try:
+        loc_ = tf.convert_to_tensor(dist.loc)
+        scale_ = tf.convert_to_tensor(dist.scale)
+      except (ValueError, TypeError):
+        # If they're not Tensor-convertible, don't try to check them.  This is
+        # the case, in, for example, multivariate normal, where the scale is a
+        # `LinearOperator`.
+        return
+      loc, scale = self.evaluate([loc_, scale_])
+      hp.assume(np.all(np.abs(loc / scale) < 1e7))
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, data):
+    enable_vars = data.draw(hps.booleans())
+
+    # TODO(b/146572907): Fix `enable_vars` for metadistributions.
+    broken_dists = EVENT_SPACE_BIJECTOR_IS_BROKEN
+    if enable_vars:
+      broken_dists.extend(INSTANTIABLE_META_DISTS)
+
+    dist = data.draw(
+        distributions(
+            enable_vars=enable_vars,
+            eligibility_filter=(lambda name: name not in broken_dists)))
+    self.evaluate([var.initializer for var in dist.variables])
+    self.check_bad_loc_scale(dist)
+
+    event_space_bijector = dist._experimental_default_event_space_bijector()
+    if event_space_bijector is None:
+      return
+
+    total_sample_shape = tensorshape_util.concatenate(
+        # Draw a sample shape
+        data.draw(tfp_hps.shapes()),
+        # Draw a shape that broadcasts with `[batch_shape, inverse_event_shape]`
+        # where `inverse_event_shape` is the event shape in the bijector's
+        # domain. This is the shape of `y` in R**n, such that
+        # x = event_space_bijector(y) has the event shape of the distribution.
+        data.draw(tfp_hps.broadcasting_shapes(
+            tensorshape_util.concatenate(
+                dist.batch_shape,
+                event_space_bijector.inverse_event_shape(
+                    dist.event_shape)), n=1))[0])
+
+    y = data.draw(
+        tfp_hps.constrained_tensors(
+            tfp_hps.identity_fn, total_sample_shape.as_list()))
+    x = event_space_bijector(y)
+    with tf.control_dependencies(dist._sample_control_dependencies(x)):
+      self.evaluate(tf.identity(x))
+
+
+def _all_ok(thing, one_ok):
+  if isinstance(thing, (tfd.Distribution, tfb.Bijector)):
+    dist = thing
+    answer = True
+    for _, param in dist.parameters.items():
+      answer &= _all_ok(param, one_ok)
+    if isinstance(thing, tfd.TransformedDistribution):
+      answer &= one_ok(thing.batch_shape)
+    return answer
+  elif tf.is_tensor(thing):
+    return one_ok(thing.shape)
+  else:
+    # Assume the thing is some Python constant like a string or a boolean
+    return True
+
+
+def _all_packetized(thing):
+  def one_ok(shape):
+    ans = tf.TensorShape(shape).num_elements() > 1
+    for dim in tf.TensorShape(shape):
+      ans &= dim % 4 == 0
+    if ans:
+      hp.note('Presuming shape {} is packetized'.format(shape))
+    else:
+      hp.note('Not presuming shape {} is packetized'.format(shape))
+    return ans
+  return _all_ok(thing, one_ok)
+
+
+def _all_non_packetized(thing):
+  def one_ok(shape):
+    ans = tf.TensorShape(shape).num_elements() < 4
+    if ans:
+      hp.note('Presuming shape {} is non-packetized'.format(shape))
+    else:
+      hp.note('Not presuming shape {} is non-packetized'.format(shape))
+    return ans
+  return _all_ok(thing, one_ok)
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributionSlicingTest(test_util.TestCase):
 
   def _test_slicing(self, data, dist):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     batch_shape = dist.batch_shape
     slices = data.draw(valid_slices(batch_shape))
     slice_str = 'dist[{}]'.format(', '.join(stringify_slices(slices)))
@@ -928,6 +1286,7 @@ class DistributionSlicingTest(test_case.TestCase):
       return
     sliced_zeros = np.zeros(batch_shape)[slices]
     sliced_dist = dist[slices]
+    hp.note('Using sliced distribution {}.'.format(sliced_dist))
 
     # Check that slicing modifies batch shape as expected.
     self.assertAllEqual(sliced_zeros.shape, sliced_dist.batch_shape)
@@ -938,9 +1297,9 @@ class DistributionSlicingTest(test_case.TestCase):
       return
 
     # Check that sampling of sliced distributions executes.
-    with no_tf_rank_errors():
+    with tfp_hps.no_tf_rank_errors():
       samples = self.evaluate(dist.sample(seed=strm()))
-      sliced_samples = self.evaluate(sliced_dist.sample(seed=strm()))
+      sliced_dist_samples = self.evaluate(sliced_dist.sample(seed=strm()))
 
     # Come up with the slices for samples (which must also include event dims).
     sample_slices = (
@@ -951,16 +1310,18 @@ class DistributionSlicingTest(test_case.TestCase):
     sample_slices += tuple([slice(None)] *
                            tensorshape_util.rank(dist.event_shape))
 
+    sliced_samples = samples[sample_slices]
+
     # Report sub-sliced samples (on which we compare log_prob) to hypothesis.
-    hp.note('Sample(s) for testing log_prob ' + str(samples[sample_slices]))
+    hp.note('Sample(s) for testing log_prob ' + str(sliced_samples))
 
     # Check that sampling a sliced distribution produces the same shape as
     # slicing the samples from the original.
-    self.assertAllEqual(samples[sample_slices].shape, sliced_samples.shape)
+    self.assertAllEqual(sliced_samples.shape, sliced_dist_samples.shape)
 
     # Check that a sliced distribution can compute the log_prob of its own
     # samples (up to numerical validation errors).
-    with no_tf_rank_errors():
+    with tfp_hps.no_tf_rank_errors():
       try:
         lp = self.evaluate(dist.log_prob(samples))
       except tf.errors.InvalidArgumentError:
@@ -968,34 +1329,35 @@ class DistributionSlicingTest(test_case.TestCase):
         #     validate_args checks.
         # We only tolerate this case for the non-sliced dist.
         return
-      sliced_lp = self.evaluate(sliced_dist.log_prob(samples[sample_slices]))
+      sliced_lp = self.evaluate(sliced_dist.log_prob(sliced_samples))
 
     # Check that the sliced dist's log_prob agrees with slicing the original's
     # log_prob.
-    # TODO(b/128708201): Better numerics for Geometric/Beta?
-    # Eigen can return quite different results for packet vs non-packet ops.
-    # To work around this, we use a much larger rtol for the last 3
-    # (assuming packet size 4) elements.
-    packetized_lp = lp[slices].reshape(-1)[:-3]
-    packetized_sliced_lp = sliced_lp.reshape(-1)[:-3]
-    rtol = (0.1 if any(
-        x in dist.name for x in ('Geometric', 'Beta', 'Dirichlet')) else 0.02)
-    self.assertAllClose(packetized_lp, packetized_sliced_lp, rtol=rtol)
-    possibly_nonpacket_lp = lp[slices].reshape(-1)[-3:]
-    possibly_nonpacket_sliced_lp = sliced_lp.reshape(-1)[-3:]
 
-    # TODO(b/140229057): Resolve nan disagreement between eigen vec/scalar paths
-    hasnan = (np.isnan(possibly_nonpacket_lp) |
-              np.isnan(possibly_nonpacket_sliced_lp))
-    possibly_nonpacket_lp = np.where(hasnan, 0, possibly_nonpacket_lp)
-    possibly_nonpacket_sliced_lp = np.where(
-        hasnan, 0, possibly_nonpacket_sliced_lp)
-    self.assertAllClose(
-        possibly_nonpacket_lp, possibly_nonpacket_sliced_lp,
-        rtol=0.4, atol=1e-4)
+    # This `hp.assume` is suppressing array sizes that cause the sliced and
+    # non-sliced distribution to follow different Eigen code paths.  Those
+    # different code paths lead to arbitrarily large variations in the results
+    # at parameter settings that Hypothesis is all too good at finding.  Since
+    # the purpose of this test is just to check that we got slicing right, those
+    # discrepancies are a distraction.
+    # TODO(b/140229057): Remove this `hp.assume`, if and when Eigen's numerics
+    # become index-independent.
+    all_packetized = (
+        _all_packetized(dist) and _all_packetized(sliced_dist) and
+        _all_packetized(samples) and _all_packetized(sliced_samples))
+    hp.note('Packetization check {}'.format(all_packetized))
+    all_non_packetized = (
+        _all_non_packetized(dist) and _all_non_packetized(sliced_dist) and
+        _all_non_packetized(samples) and _all_non_packetized(sliced_samples))
+    hp.note('Non-packetization check {}'.format(all_non_packetized))
+    hp.assume(all_packetized or all_non_packetized)
+
+    self.assertAllClose(lp[slices], sliced_lp, rtol=1e-5)
 
   def _run_test(self, data):
-    dist = data.draw(distributions(enable_vars=False))
+    def ok(name):
+      return name not in INSTANTIABLE_BUT_NOT_SLICABLE
+    dist = data.draw(distributions(enable_vars=False, eligibility_filter=ok))
 
     # Check that all distributions still register as non-iterable despite
     # defining __getitem__.  (Because __getitem__ magically makes an object
@@ -1008,12 +1370,11 @@ class DistributionSlicingTest(test_case.TestCase):
 
     # TODO(bjp): Enable sampling and log_prob checks. Currently, too many errors
     #     from out-of-domain samples.
-    # self.evaluate(dist.log_prob(dist.sample()))
+    # self.evaluate(dist.log_prob(dist.sample(seed=test_util.test_seed())))
 
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistributions(self, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'): return
     self._run_test(data)
 
   def disabled_testFailureCase(self):
@@ -1022,8 +1383,41 @@ class DistributionSlicingTest(test_case.TestCase):
     dist = tfd.TransformedDistribution(
         bijector=tfb.NormalCDF(), distribution=dist, batch_shape=[4])
     dist = tfb.Expm1()(dist)
-    samps = 1.7182817 + tf.zeros_like(dist.sample())
+    samps = 1.7182817 + tf.zeros_like(dist.sample(seed=test_util.test_seed()))
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
+
+  def _test_vectorization(self, dist_name, dist):
+    seed = test_util.test_seed()
+
+    num_samples = 3
+    if dist_name in SAMPLE_AUTOVECTORIZATION_IS_BROKEN:
+      sample = self.evaluate(dist.sample(num_samples, seed=seed))
+    else:
+      sample = self.evaluate(tf.vectorized_map(
+          lambda i: dist.sample(seed=seed), tf.range(num_samples)))
+    hp.note('Drew samples {}'.format(sample))
+
+    if dist_name not in LOGPROB_AUTOVECTORIZATION_IS_BROKEN:
+      pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
+      batch_lp = dist.log_prob(sample)
+      pfor_lp_, batch_lp_ = self.evaluate((pfor_lp, batch_lp))
+      self.assertAllClose(pfor_lp_, batch_lp_,
+                          atol=VECTORIZED_LOGPROB_ATOL[dist_name])
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(INSTANTIABLE_BASE_DISTS.keys())))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testVmap(self, dist_name, data):
+    dist = data.draw(distributions(
+        dist_name=dist_name, enable_vars=False,
+        validate_args=False))  # TODO(b/142826246): Enable validate_args.
+    self._test_vectorization(dist_name, dist)
 
 
 # Functions used to constrain randomly sampled parameter ndarrays.
@@ -1044,14 +1438,14 @@ def ensure_high_gt_low(low, high):
         tensorshape_util.rank(new_high.shape) -
         tensorshape_util.rank(high.shape))
     new_high = tf.math.reduce_max(
-        input_tensor=new_high, axis=reduced_leading_axes)
+        new_high, axis=reduced_leading_axes)
   reduce_dims = [
       d for d in range(tensorshape_util.rank(high.shape))
       if high.shape[d] < new_high.shape[d]
   ]
   if reduce_dims:
     new_high = tf.math.reduce_max(
-        input_tensor=new_high, axis=reduce_dims, keepdims=True)
+        new_high, axis=reduce_dims, keepdims=True)
   return new_high
 
 
@@ -1120,9 +1514,9 @@ CONSTRAINTS = {
     'Zipf.power':
         tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
-        # Capping at 16. so that probability is less than 1, and entropy is
-        # defined.
-        lambda x: tf.minimum(tf.maximum(x, -16.), 16.),  # works around the bug
+        # Capping at 15. so that probability is less than 1, and entropy is
+        # defined. b/147394924
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),  # works around the bug
     'Geometric.probs':
         constrain_between_eps_and_one_minus_eps(),
     'Binomial.probs':
@@ -1175,6 +1569,8 @@ CONSTRAINTS = {
         lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
     'Wishart':
         fix_wishart,
+    'WishartTriL':
+        fix_wishart,
     'Zipf':
         lambda d: dict(d, dtype=tf.float32),
     'FiniteDiscrete':
@@ -1190,4 +1586,8 @@ def constraint_for(dist=None, param=None):
 
 
 if __name__ == '__main__':
+  # Hypothesis often finds numerical near misses.  Debugging them is much aided
+  # by seeing all the digits of every floating point number, instead of the
+  # usual default of truncating the printed representation to 8 digits.
+  np.set_printoptions(floatmode='unique', precision=None)
   tf.test.main()

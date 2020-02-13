@@ -37,7 +37,7 @@ def _ensure_tf_install():  # pylint: disable=g-statement-before-imports
     inadequate.
   """
   try:
-    import tensorflow as tf
+    import tensorflow.compat.v1 as tf
   except ImportError:
     # Print more informative error message, then reraise.
     print("\n\nFailed to import TensorFlow. Please note that TensorFlow is not "
@@ -53,7 +53,8 @@ def _ensure_tf_install():  # pylint: disable=g-statement-before-imports
   #
   # Update this whenever we need to depend on a newer TensorFlow release.
   #
-  required_tensorflow_version = "1.14"
+  required_tensorflow_version = "2.1"
+#   required_tensorflow_version = "1.15"  # Needed internally -- DisableOnExport
 
   if (distutils.version.LooseVersion(tf.__version__) <
       distutils.version.LooseVersion(required_tensorflow_version)):

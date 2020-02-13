@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import itertools
-
 # Dependency imports
 import numpy as np
 
@@ -33,8 +31,7 @@ from tensorflow_probability.python.distributions import MultivariateNormalDiag
 from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _logit(x):
@@ -42,156 +39,8 @@ def _logit(x):
   return np.log(x) - np.log1p(-x)
 
 
-def _powerset(x):
-  s = list(x)
-  return itertools.chain.from_iterable(
-      itertools.combinations(s, r) for r in range(len(s) + 1))
-
-
-def _matrix_diag(d):
-  """Batch version of np.diag."""
-  orig_shape = d.shape
-  d = np.reshape(d, (int(np.prod(d.shape[:-1])), d.shape[-1]))
-  diag_list = []
-  for i in range(d.shape[0]):
-    diag_list.append(np.diag(d[i, ...]))
-  return np.reshape(diag_list, orig_shape + (d.shape[-1],))
-
-
-def _make_tril_scale(
-    loc=None,
-    scale_tril=None,
-    scale_diag=None,
-    scale_identity_multiplier=None,
-    shape_hint=None):
-  if scale_tril is not None:
-    scale_tril = np.tril(scale_tril)
-    if scale_diag is not None:
-      scale_tril += _matrix_diag(np.array(scale_diag, dtype=np.float32))
-    if scale_identity_multiplier is not None:
-      scale_tril += (
-          scale_identity_multiplier * _matrix_diag(np.ones(
-              [scale_tril.shape[-1]], dtype=np.float32)))
-    return scale_tril
-  return _make_diag_scale(
-      loc, scale_diag, scale_identity_multiplier, shape_hint)
-
-
-def _make_diag_scale(
-    loc=None,
-    scale_diag=None,
-    scale_identity_multiplier=None,
-    shape_hint=None):
-  if scale_diag is not None:
-    scale_diag = np.asarray(scale_diag)
-    if scale_identity_multiplier is not None:
-      scale_diag += scale_identity_multiplier
-    return _matrix_diag(scale_diag)
-
-  if loc is None and shape_hint is None:
-    return None
-
-  if shape_hint is None:
-    shape_hint = loc.shape[-1]
-  if scale_identity_multiplier is None:
-    scale_identity_multiplier = 1.
-  return scale_identity_multiplier * np.diag(np.ones(shape_hint))
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class MakeTrilScaleTest(test_case.TestCase):
-
-  def _testLegalInputs(
-      self, loc=None, shape_hint=None, scale_params=None):
-    for args in _powerset(scale_params.items()):
-      args = dict(args)
-
-      scale_args = dict({
-          'loc': loc,
-          'shape_hint': shape_hint}, **args)
-      expected_scale = _make_tril_scale(**scale_args)
-      if expected_scale is None:
-        # Not enough shape information was specified.
-        with self.assertRaisesRegexp(ValueError, ('is specified.')):
-          scale = distribution_util.make_tril_scale(**scale_args)
-          self.evaluate(scale.to_dense())
-      else:
-        scale = distribution_util.make_tril_scale(**scale_args)
-        self.assertAllClose(expected_scale, self.evaluate(scale.to_dense()))
-
-  def testLegalInputs(self):
-    self._testLegalInputs(
-        loc=np.array([-1., -1.], dtype=np.float32),
-        shape_hint=2,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [2., 3.],
-            'scale_tril': [[1., 0.],
-                           [-3., 3.]],
-        })
-
-  def testLegalInputsMultidimensional(self):
-    self._testLegalInputs(
-        loc=np.array([[[-1., -1., 2.], [-2., -3., 4.]]], dtype=np.float32),
-        shape_hint=3,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [[[2., 3., 4.], [3., 4., 5.]]],
-            'scale_tril': [[[[1., 0., 0.],
-                             [-3., 3., 0.],
-                             [1., -2., 1.]],
-                            [[2., 1., 0.],
-                             [-4., 7., 0.],
-                             [1., -1., 1.]]]]
-        })
-
-  def testZeroTriU(self):
-    scale = distribution_util.make_tril_scale(scale_tril=[[1., 1], [1., 1.]])
-    self.assertAllClose([[1., 0], [1., 1.]], self.evaluate(scale.to_dense()))
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class MakeDiagScaleTest(test_case.TestCase):
-
-  def _testLegalInputs(
-      self, loc=None, shape_hint=None, scale_params=None):
-    for args in _powerset(scale_params.items()):
-      args = dict(args)
-
-      scale_args = dict({
-          'loc': loc,
-          'shape_hint': shape_hint}, **args)
-      expected_scale = _make_diag_scale(**scale_args)
-      if expected_scale is None:
-        # Not enough shape information was specified.
-        with self.assertRaisesRegexp(ValueError, ('is specified.')):
-          scale = distribution_util.make_diag_scale(**scale_args)
-          self.evaluate(scale.to_dense())
-      else:
-        scale = distribution_util.make_diag_scale(**scale_args)
-        self.assertAllClose(expected_scale, self.evaluate(scale.to_dense()))
-
-  def testLegalInputs(self):
-    self._testLegalInputs(
-        loc=np.array([-1., -1.], dtype=np.float32),
-        shape_hint=2,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [2., 3.]
-        })
-
-  def testLegalInputsMultidimensional(self):
-    self._testLegalInputs(
-        loc=np.array([[[-1., -1., 2.], [-2., -3., 4.]]], dtype=np.float32),
-        shape_hint=3,
-        scale_params={
-            'scale_identity_multiplier': 2.,
-            'scale_diag': [[[2., 3., 4.], [3., 4., 5.]]]
-        })
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class ShapesFromLocAndScaleTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ShapesFromLocAndScaleTest(test_util.TestCase):
 
   def test_static_loc_static_scale_non_matching_event_size_raises(self):
     loc = tf.zeros([2, 4])
@@ -291,8 +140,8 @@ class ShapesFromLocAndScaleTest(test_case.TestCase):
     self.assertAllEqual([3], event_shape_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GetBroadcastShapeTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GetBroadcastShapeTest(test_util.TestCase):
 
   def test_all_static_shapes_work(self):
     x = tf.ones((2, 1, 3))
@@ -312,8 +161,8 @@ class GetBroadcastShapeTest(test_case.TestCase):
     self.assertAllEqual([2, 5, 3], bcast_shape)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MixtureStddevTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MixtureStddevTest(test_util.TestCase):
 
   def test_mixture_dev(self):
     mixture_weights = np.array([
@@ -347,8 +196,8 @@ class MixtureStddevTest(test_case.TestCase):
     self.assertAllClose(expected_devs, self.evaluate(mix_dev))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadMixtureDimensionsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PadMixtureDimensionsTest(test_util.TestCase):
 
   def test_pad_mixture_dimensions_mixture(self):
     gm = Mixture(
@@ -475,24 +324,24 @@ class _PadTest(object):
         x1_both_, atol=0., rtol=1e-6)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadStaticTest(_PadTest, test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PadStaticTest(_PadTest, test_util.TestCase):
 
   @property
   def is_static_shape(self):
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PadDynamicTest(_PadTest, test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PadDynamicTest(_PadTest, test_util.TestCase):
 
   @property
   def is_static_shape(self):
     return False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PickScalarConditionTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PickScalarConditionTest(test_util.TestCase):
 
   def test_pick_scalar_condition_static(self):
 
@@ -517,9 +366,9 @@ class PickScalarConditionTest(test_case.TestCase):
     neg = -np.exp(np.random.randn(3, 2, 4)).astype(np.float32)
 
     # TF dynamic cond
-    dynamic_true = tf1.placeholder_with_default(input=True, shape=None)
+    dynamic_true = tf1.placeholder_with_default(True, shape=None)
     dynamic_false = tf1.placeholder_with_default(
-        input=False, shape=None)
+        False, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos, neg))
     neg_ = self.evaluate(distribution_util.pick_scalar_condition(
@@ -528,8 +377,8 @@ class PickScalarConditionTest(test_case.TestCase):
     self.assertAllEqual(neg_, neg)
 
     # TF dynamic everything
-    pos_dynamic = tf1.placeholder_with_default(input=pos, shape=None)
-    neg_dynamic = tf1.placeholder_with_default(input=neg, shape=None)
+    pos_dynamic = tf1.placeholder_with_default(pos, shape=None)
+    neg_dynamic = tf1.placeholder_with_default(neg, shape=None)
     pos_ = self.evaluate(distribution_util.pick_scalar_condition(
         dynamic_true, pos_dynamic, neg_dynamic))
     neg_ = self.evaluate(distribution_util.pick_scalar_condition(
@@ -538,12 +387,13 @@ class PickScalarConditionTest(test_case.TestCase):
     self.assertAllEqual(neg_, neg)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestMoveDimension(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TestMoveDimension(test_util.TestCase):
 
   def test_move_dimension_static_shape(self):
 
-    x = tf.random.normal(shape=[200, 30, 4, 1, 6])
+    x = tf.random.normal(
+        shape=[200, 30, 4, 1, 6], seed=test_util.test_seed())
 
     x_perm = distribution_util.move_dimension(x, 1, 1)
     self.assertAllEqual(
@@ -563,8 +413,9 @@ class TestMoveDimension(test_case.TestCase):
 
   def test_move_dimension_dynamic_shape(self):
 
-    x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
-    x = tf1.placeholder_with_default(input=x_, shape=None)
+    x_ = tf.random.normal(
+        shape=[200, 30, 4, 1, 6], seed=test_util.test_seed())
+    x = tf1.placeholder_with_default(x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(x, 1, 1)
     x_perm2 = distribution_util.move_dimension(x, 0, 3)
@@ -573,11 +424,11 @@ class TestMoveDimension(test_case.TestCase):
     x_perm5 = distribution_util.move_dimension(x, -1, 2)
 
     x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate([
-        tf.shape(input=x_perm1),
-        tf.shape(input=x_perm2),
-        tf.shape(input=x_perm3),
-        tf.shape(input=x_perm4),
-        tf.shape(input=x_perm5)
+        tf.shape(x_perm1),
+        tf.shape(x_perm2),
+        tf.shape(x_perm3),
+        tf.shape(x_perm4),
+        tf.shape(x_perm5)
     ])
 
     self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])
@@ -592,35 +443,36 @@ class TestMoveDimension(test_case.TestCase):
 
   def test_move_dimension_dynamic_indices(self):
 
-    x_ = tf.random.normal(shape=[200, 30, 4, 1, 6])
-    x = tf1.placeholder_with_default(input=x_, shape=None)
+    x_ = tf.random.normal(
+        shape=[200, 30, 4, 1, 6], seed=test_util.test_seed())
+    x = tf1.placeholder_with_default(x_, shape=None)
 
     x_perm1 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=1, shape=[]),
-        tf1.placeholder_with_default(input=1, shape=[]))
+        x, tf1.placeholder_with_default(1, shape=[]),
+        tf1.placeholder_with_default(1, shape=[]))
 
     x_perm2 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=0, shape=[]),
-        tf1.placeholder_with_default(input=3, shape=[]))
+        x, tf1.placeholder_with_default(0, shape=[]),
+        tf1.placeholder_with_default(3, shape=[]))
 
     x_perm3 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=0, shape=[]),
-        tf1.placeholder_with_default(input=-2, shape=[]))
+        x, tf1.placeholder_with_default(0, shape=[]),
+        tf1.placeholder_with_default(-2, shape=[]))
 
     x_perm4 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=4, shape=[]),
-        tf1.placeholder_with_default(input=2, shape=[]))
+        x, tf1.placeholder_with_default(4, shape=[]),
+        tf1.placeholder_with_default(2, shape=[]))
 
     x_perm5 = distribution_util.move_dimension(
-        x, tf1.placeholder_with_default(input=-1, shape=[]),
-        tf1.placeholder_with_default(input=2, shape=[]))
+        x, tf1.placeholder_with_default(-1, shape=[]),
+        tf1.placeholder_with_default(2, shape=[]))
 
     x_perm1_, x_perm2_, x_perm3_, x_perm4_, x_perm5_ = self.evaluate([
-        tf.shape(input=x_perm1),
-        tf.shape(input=x_perm2),
-        tf.shape(input=x_perm3),
-        tf.shape(input=x_perm4),
-        tf.shape(input=x_perm5)
+        tf.shape(x_perm1),
+        tf.shape(x_perm2),
+        tf.shape(x_perm3),
+        tf.shape(x_perm4),
+        tf.shape(x_perm5)
     ])
 
     self.assertAllEqual(x_perm1_, [200, 30, 4, 1, 6])
@@ -634,8 +486,8 @@ class TestMoveDimension(test_case.TestCase):
     self.assertAllEqual(x_perm5_, [200, 30, 6, 4, 1])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AssertCloseTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AssertCloseTest(test_util.TestCase):
 
   def testAssertIntegerForm(self):
     # This should only be detected as an integer.
@@ -669,8 +521,8 @@ class AssertCloseTest(test_case.TestCase):
         self.evaluate(tf.identity(w))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaybeGetStaticTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MaybeGetStaticTest(test_util.TestCase):
 
   def testGetStaticInt(self):
     x = 2
@@ -703,158 +555,8 @@ class MaybeGetStaticTest(test_case.TestCase):
         None, distribution_util.maybe_get_static_value(x, dtype=np.float64))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GetLogitsAndProbsTest(test_case.TestCase):
-
-  def testImproperArguments(self):
-    with self.assertRaises(ValueError):
-      distribution_util.get_logits_and_probs(logits=None, probs=None)
-
-    with self.assertRaises(ValueError):
-      distribution_util.get_logits_and_probs(logits=[0.1], probs=[0.1])
-
-  def testLogits(self):
-    p = np.array([0.01, 0.2, 0.5, 0.7, .99], dtype=np.float32)
-    logits = _logit(p)
-
-    new_logits, new_p = distribution_util.get_logits_and_probs(
-        logits=logits, validate_args=True)
-
-    self.assertAllClose(p, self.evaluate(new_p), rtol=1e-5, atol=0.)
-    self.assertAllClose(logits, self.evaluate(new_logits), rtol=1e-5, atol=0.)
-
-  def testLogitsMultidimensional(self):
-    p = np.array([0.2, 0.3, 0.5], dtype=np.float32)
-    logits = np.log(p)
-
-    new_logits, new_p = distribution_util.get_logits_and_probs(
-        logits=logits, multidimensional=True, validate_args=True)
-
-    self.assertAllClose(self.evaluate(new_p), p)
-    self.assertAllClose(self.evaluate(new_logits), logits)
-
-  def testProbability(self):
-    p = np.array([0.01, 0.2, 0.5, 0.7, .99], dtype=np.float32)
-
-    new_logits, new_p = distribution_util.get_logits_and_probs(
-        probs=p, validate_args=True)
-
-    self.assertAllClose(_logit(p), self.evaluate(new_logits))
-    self.assertAllClose(p, self.evaluate(new_p))
-
-  def testProbabilityMultidimensional(self):
-    p = np.array([[0.3, 0.4, 0.3], [0.1, 0.5, 0.4]], dtype=np.float32)
-
-    new_logits, new_p = distribution_util.get_logits_and_probs(
-        probs=p, multidimensional=True, validate_args=True)
-
-    self.assertAllClose(np.log(p), self.evaluate(new_logits))
-    self.assertAllClose(p, self.evaluate(new_p))
-
-  def testProbabilityValidateArgs(self):
-    p = [0.01, 0.2, 0.5, 0.7, .99]
-    # Component less than 0.
-    p2 = [-1, 0.2, 0.5, 0.3, .2]
-    # Component greater than 1.
-    p3 = [2, 0.2, 0.5, 0.3, .2]
-
-    _, prob = distribution_util.get_logits_and_probs(
-        probs=p, validate_args=True)
-    self.evaluate(prob)
-
-    with self.assertRaisesOpError('Condition x >= 0'):
-      _, prob = distribution_util.get_logits_and_probs(
-          probs=p2, validate_args=True)
-      self.evaluate(prob)
-
-    _, prob = distribution_util.get_logits_and_probs(
-        probs=p2, validate_args=False)
-    self.evaluate(prob)
-
-    with self.assertRaisesOpError('probs has components greater than 1'):
-      _, prob = distribution_util.get_logits_and_probs(
-          probs=p3, validate_args=True)
-      self.evaluate(prob)
-
-    _, prob = distribution_util.get_logits_and_probs(
-        probs=p3, validate_args=False)
-    self.evaluate(prob)
-
-  def testProbabilityValidateArgsMultidimensional(self):
-    p = np.array([[0.3, 0.4, 0.3], [0.1, 0.5, 0.4]], dtype=np.float32)
-    # Component less than 0. Still sums to 1.
-    p2 = np.array([[-.3, 0.4, 0.9], [0.1, 0.5, 0.4]], dtype=np.float32)
-    # Component greater than 1. Does not sum to 1.
-    p3 = np.array([[1.3, 0.0, 0.0], [0.1, 0.5, 0.4]], dtype=np.float32)
-    # Does not sum to 1.
-    p4 = np.array([[1.1, 0.3, 0.4], [0.1, 0.5, 0.4]], dtype=np.float32)
-
-    _, prob = distribution_util.get_logits_and_probs(
-        probs=p, multidimensional=True)
-    self.evaluate(prob)
-
-    with self.assertRaisesOpError('Condition x >= 0'):
-      _, prob = distribution_util.get_logits_and_probs(
-          probs=p2, multidimensional=True, validate_args=True)
-      self.evaluate(prob)
-
-    _, prob = distribution_util.get_logits_and_probs(
-        probs=p2, multidimensional=True, validate_args=False)
-    self.evaluate(prob)
-
-    with self.assertRaisesOpError(
-        '(probs has components greater than 1|probs does not sum to 1)'):
-      _, prob = distribution_util.get_logits_and_probs(
-          probs=p3, multidimensional=True, validate_args=True)
-      self.evaluate(prob)
-
-    _, prob = distribution_util.get_logits_and_probs(
-        probs=p3, multidimensional=True, validate_args=False)
-    self.evaluate(prob)
-
-    with self.assertRaisesOpError('probs does not sum to 1'):
-      _, prob = distribution_util.get_logits_and_probs(
-          probs=p4, multidimensional=True, validate_args=True)
-      self.evaluate(prob)
-
-    _, prob = distribution_util.get_logits_and_probs(
-        probs=p4, multidimensional=True, validate_args=False)
-    self.evaluate(prob)
-
-  def testProbsMultidimShape(self):
-    with self.assertRaises(ValueError):
-      p = tf.ones([int(2**11+1)], dtype=tf.float16)
-      distribution_util.get_logits_and_probs(
-          probs=p, multidimensional=True, validate_args=True)
-
-    if tf.executing_eagerly(): return
-
-    with self.assertRaisesOpError(
-        'Number of classes exceeds `dtype` precision'):
-      p = np.ones([int(2**11+1)], dtype=np.float16)
-      p = tf1.placeholder_with_default(p, shape=None)
-      self.evaluate(distribution_util.get_logits_and_probs(
-          probs=p, multidimensional=True, validate_args=True))
-
-  def testLogitsMultidimShape(self):
-    with self.assertRaises(ValueError):
-      l = tf.ones([int(2**11+1)], dtype=tf.float16)
-      distribution_util.get_logits_and_probs(
-          logits=l, multidimensional=True, validate_args=True)
-
-    if tf.executing_eagerly(): return
-
-    with self.assertRaisesOpError(
-        'Number of classes exceeds `dtype` precision'):
-      l = np.ones([int(2**11+1)], dtype=np.float16)
-      l = tf1.placeholder_with_default(l, shape=None)
-      logit, _ = distribution_util.get_logits_and_probs(
-          logits=l, multidimensional=True, validate_args=True)
-      self.evaluate(logit)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class EmbedCheckCategoricalEventShapeTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class EmbedCheckCategoricalEventShapeTest(test_util.TestCase):
 
   def testTooSmall(self):
     with self.assertRaises(ValueError):
@@ -894,8 +596,8 @@ class EmbedCheckCategoricalEventShapeTest(test_case.TestCase):
       distribution_util.embed_check_categorical_event_shape(param)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EmbedCheckIntegerCastingClosedTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class EmbedCheckIntegerCastingClosedTest(test_util.TestCase):
 
   def testCorrectlyAssertsNonnegative(self):
     with self.assertRaisesOpError('Elements must be non-negative'):
@@ -938,8 +640,8 @@ class EmbedCheckIntegerCastingClosedTest(test_case.TestCase):
       self.evaluate(x_checked)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DynamicShapeTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DynamicShapeTest(test_util.TestCase):
 
   def testSameDynamicShape(self):
     scalar = tf.constant(2.)
@@ -1010,8 +712,8 @@ class DynamicShapeTest(test_case.TestCase):
             multidimensional1, multidimensional3)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RotateTransposeTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RotateTransposeTest(test_util.TestCase):
 
   def _np_rotate_transpose(self, x, shift):
     if not isinstance(x, np.ndarray):
@@ -1019,11 +721,7 @@ class RotateTransposeTest(test_case.TestCase):
     return np.transpose(x, np.roll(np.arange(len(x.shape)), shift))
 
   def testRollStatic(self):
-    if tf.executing_eagerly():
-      error_message = r'Attempt to convert a value \(None\)'
-    else:
-      error_message = 'None values not supported.'
-    with self.assertRaisesRegexp(ValueError, error_message):
+    with self.assertRaisesRegexp(Exception, 'None'):
       distribution_util.rotate_transpose(None, 1)
     for x in (np.ones(1), np.ones((2, 1)), np.ones((3, 2, 1))):
       for shift in np.arange(-5, 5):
@@ -1045,8 +743,8 @@ class RotateTransposeTest(test_case.TestCase):
             self.evaluate(distribution_util.rotate_transpose(x, shift)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PickVectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PickVectorTest(test_util.TestCase):
 
   def testCorrectlyPicksVector(self):
     x = np.arange(10, 12)
@@ -1063,8 +761,8 @@ class PickVectorTest(test_case.TestCase):
                             tf.constant(False), x, y))  # No eval.
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PreferStaticRankTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PreferStaticRankTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
     x = tf.zeros([2, 3, 4])
@@ -1109,8 +807,8 @@ class PreferStaticRankTest(test_case.TestCase):
     self.assertAllEqual(0, self.evaluate(rank))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PreferStaticShapeTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PreferStaticShapeTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
     x = tf.zeros((2, 3, 4))
@@ -1152,8 +850,8 @@ class PreferStaticShapeTest(test_case.TestCase):
     self.assertAllEqual([], self.evaluate(shape))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PreferStaticValueTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PreferStaticValueTest(test_util.TestCase):
 
   def testNonEmptyConstantTensor(self):
     x = tf.zeros((2, 3, 4))
@@ -1198,15 +896,15 @@ class PreferStaticValueTest(test_case.TestCase):
 
 
 # No need for eager tests; this function doesn't depend on TF.
-class GenNewSeedTest(test_case.TestCase):
+class GenNewSeedTest(test_util.TestCase):
 
   def testOnlyNoneReturnsNone(self):
     self.assertIsNotNone(distribution_util.gen_new_seed(0, 'salt'))
     self.assertIsNone(distribution_util.gen_new_seed(None, 'salt'))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ArgumentsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ArgumentsTest(test_util.TestCase):
 
   def testNoArguments(self):
     def foo():
@@ -1263,8 +961,8 @@ class ArgumentsTest(test_case.TestCase):
                      foo(1, 2, 3, *[1, 2, 3], unicorn=None))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ExpandToVectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ExpandToVectorTest(test_util.TestCase):
 
   def _check_static(self, expected, actual, dtype=np.int32):
     const_actual = tf.get_static_value(actual)
@@ -1363,13 +1061,13 @@ class ExpandToVectorTest(test_case.TestCase):
         self.evaluate(_expand_tensor([[1, 2]], shape=None, validate_args=True))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class WithDependenciesTestCase(test_util.TensorFlowTestCase):
+@test_util.test_all_tf_execution_regimes
+class WithDependenciesTestCase(test_util.TestCase):
 
   def testTupleDependencies(self):
     counter = tf.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
-        (tf1.assign_add(counter, 1), tf.constant(42)),
+        (counter.assign_add(1), tf.constant(42)),
         tf.constant(7))
 
     self.evaluate(tf1.global_variables_initializer())
@@ -1381,7 +1079,7 @@ class WithDependenciesTestCase(test_util.TensorFlowTestCase):
   def testListDependencies(self):
     counter = tf.Variable(0, name='my_counter')
     const_with_dep = distribution_util.with_dependencies(
-        [tf1.assign_add(counter, 1), tf.constant(42)],
+        [counter.assign_add(1), tf.constant(42)],
         tf.constant(7))
 
     self.evaluate(tf1.global_variables_initializer())

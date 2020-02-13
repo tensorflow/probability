@@ -14,8 +14,6 @@
 # ============================================================================
 # Stats with the numpy backend.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -26,43 +24,9 @@ package(
 
 exports_files(["LICENSE"])
 
-FILENAMES = [
-    "leave_one_out",
-]
-
-# TODO(bjp): Enable the tests
-# TEST_FILENAMES = [filename + "_test" for filename in FILENAMES]
-TEST_FILENAMES = []
-
-[genrule(
-    name = "rewrite_{}".format(filename),
-    srcs = ["//tensorflow_probability/python/stats:{}.py".format(filename)],
-    outs = ["{}.py".format(filename)],
-    cmd = "$(location //tensorflow_probability/python/experimental/substrates/meta:rewrite) $(SRCS) > $@",
-    tools = ["//tensorflow_probability/python/experimental/substrates/meta:rewrite"],
-) for filename in FILENAMES + TEST_FILENAMES]
-
-[py_library(
-    name = filename,
-    srcs = ["{}.py".format(filename)],
-    deps = [
-        "//tensorflow_probability/python/internal/backend/numpy",
-    ],
-) for filename in FILENAMES]
-
-[py_test(
-    name = filename,
-    size = "medium",
-    srcs = ["{}.py".format(filename)],
-    tags = ["tfp_numpy"],
-    deps = [
-        ":stats",
-        "//tensorflow_probability/python/experimental/substrates/numpy/internal:test_case",
-    ],
-) for filename in TEST_FILENAMES]
-
 py_library(
     name = "stats",
     srcs = ["__init__.py"],
-    deps = [":{}".format(filename) for filename in FILENAMES],
+    srcs_version = "PY2AND3",
+    deps = ["//tensorflow_probability/python/stats:stats.numpy"],
 )

@@ -22,12 +22,11 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CholeskyToInvCholeskyTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CholeskyToInvCholeskyTest(test_util.TestCase):
 
   def testBijector(self):
     bijector = tfb.CholeskyToInvCholesky()
@@ -102,7 +101,7 @@ class CholeskyToInvCholeskyTest(test_case.TestCase):
 
   def testJacobian(self):
     cholesky_to_vector = tfb.Invert(
-        tfb.ScaleTriL(diag_bijector=tfb.Exp(), diag_shift=None))
+        tfb.FillScaleTriL(diag_bijector=tfb.Exp(), diag_shift=None))
     bijector = tfb.CholeskyToInvCholesky()
     for x in [np.array([[2.]],
                        dtype=np.float64),

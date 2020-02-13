@@ -24,7 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
 from tensorflow_probability.python.experimental.auto_batching import test_programs
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 def strip_pop_ops(program):
@@ -43,7 +43,7 @@ def strip_pop_ops(program):
     walk_graph(func.graph)
 
 
-class AllocationStrategyTest(test_case.TestCase):
+class AllocationStrategyTest(tfp_test_util.TestCase):
 
   def assertAllocates(self, expected, prog):
     allocated = allocation_strategy.optimize(prog)

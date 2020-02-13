@@ -85,13 +85,19 @@ class Softplus(bijector.Bijector):
                hinge_softness=None,
                validate_args=False,
                name='softplus'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._hinge_softness = tensor_util.convert_nonref_to_tensor(
           hinge_softness, name='hinge_softness')
       super(Softplus, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     if self.hinge_softness is None:

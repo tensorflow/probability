@@ -22,11 +22,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import positive_semidefinite_kernels as psd_kernels
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import psd_kernels
 
 
 def _np_kernel_matrix_fn(amp, len_scale, x, y):
@@ -38,30 +36,32 @@ def _np_kernel_matrix_fn(amp, len_scale, x, y):
 np.random.seed(42)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class _GaussianProcessRegressionModelTest(test_case.TestCase,
-                                          parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class _GaussianProcessRegressionModelTest(test_util.TestCase):
 
   def testShapes(self):
+    # We'll use a batch shape of [2, 3, 5, 7, 11]
+
     # 5x5 grid of index points in R^2 and flatten to 25x2
     index_points = np.linspace(-4., 4., 5, dtype=np.float64)
     index_points = np.stack(np.meshgrid(index_points, index_points), axis=-1)
     index_points = np.reshape(index_points, [-1, 2])
     # ==> shape = [25, 2]
-    batched_index_points = np.expand_dims(np.stack([index_points]*6), -3)
-    # ==> shape = [6, 1, 25, 2]
+    batched_index_points = np.reshape(index_points, [1, 1, 25, 2])
+    batched_index_points = np.stack([batched_index_points] * 5)
+    # ==> shape = [5, 1, 1, 25, 2]
 
-    # Kernel with batch_shape [2, 4, 1, 3]
-    amplitude = np.array([1., 2.], np.float64).reshape([2, 1, 1, 1])
-    length_scale = np.array([.1, .2, .3, .4], np.float64).reshape(
-        [1, 4, 1, 1])
+    # Kernel with batch_shape [2, 3, 1, 1, 1]
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1, 1, 1, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape(
+        [1, 3, 1, 1, 1])
     observation_noise_variance = np.array(
-        [1e-5, 1e-6, 1e-9], np.float64).reshape([1, 1, 1, 3])
+        [1e-9], np.float64).reshape([1, 1, 1, 1, 1])
 
     jitter = np.float64(1e-6)
     observation_index_points = (
-        np.random.uniform(-1., 1., (3, 7, 2)).astype(np.float64))
-    observations = np.random.uniform(-1., 1., (3, 7)).astype(np.float64)
+        np.random.uniform(-1., 1., (7, 1, 7, 2)).astype(np.float64))
+    observations = np.random.uniform(-1., 1., (11, 7)).astype(np.float64)
 
     if not self.is_static:
       amplitude = tf1.placeholder_with_default(amplitude, shape=None)
@@ -81,13 +81,14 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
         observation_index_points,
         observations,
         observation_noise_variance,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
-    batch_shape = [2, 4, 6, 3]
+    batch_shape = [2, 3, 5, 7, 11]
     event_shape = [25]
     sample_shape = [9, 3]
 
-    samples = gprm.sample(sample_shape)
+    samples = gprm.sample(sample_shape, seed=test_util.test_seed())
 
     if self.is_static or tf.executing_eagerly():
       self.assertAllEqual(gprm.batch_shape_tensor(), batch_shape)
@@ -151,7 +152,8 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
         observations=observations,
         observation_noise_variance=observation_noise_variance,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     self.assertAllClose(expected_predictive_covariance_with_noise,
                         self.evaluate(gprm.covariance()))
@@ -168,7 +170,8 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
         observation_noise_variance=observation_noise_variance,
         predictive_noise_variance=0.,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     self.assertAllClose(expected_predictive_covariance_no_noise,
                         self.evaluate(gprm_no_predictive_noise.covariance()))
@@ -191,13 +194,15 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     gprm_nones = tfd.GaussianProcessRegressionModel(
         kernel,
         index_points,
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     gprm_zero_shapes = tfd.GaussianProcessRegressionModel(
         kernel,
@@ -205,7 +210,8 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
         observation_index_points=tf.ones([5, 0, 1], tf.float64),
         observations=tf.ones([5, 0], tf.float64),
         mean_fn=mean_fn,
-        jitter=jitter)
+        jitter=jitter,
+        validate_args=True)
 
     for gprm in [gprm_nones, gprm_zero_shapes]:
       self.assertAllClose(self.evaluate(gp.mean()), self.evaluate(gprm.mean()))
@@ -232,20 +238,20 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
           kernel,
           index_points,
           observation_index_points=None,
-          observations=observations)
+          observations=observations,
+          validate_args=True)
     with self.assertRaises(ValueError):
       tfd.GaussianProcessRegressionModel(
           kernel,
           index_points,
           observation_index_points,
-          observations=None)
+          observations=None,
+          validate_args=True)
 
     # If specified, mean_fn must be a callable.
     with self.assertRaises(ValueError):
       tfd.GaussianProcessRegressionModel(
-          kernel,
-          index_points,
-          mean_fn=0.)
+          kernel, index_points, mean_fn=0., validate_args=True)
 
     # Observation index point and observation counts must be broadcastable.
     # Errors based on conditions of dynamic shape in graph mode cannot be
@@ -256,7 +262,8 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
             kernel,
             index_points,
             observation_index_points=np.ones([2, 2, 2]),
-            observations=np.ones([5, 5]))
+            observations=np.ones([5, 5]),
+            validate_args=True)
 
   def testCopy(self):
     # 5 random index points in R^2
@@ -293,7 +300,8 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
         observation_index_points=observation_index_points_1,
         observations=observations_1,
         mean_fn=mean_fn,
-        jitter=1e-5)
+        jitter=1e-5,
+        validate_args=True)
     gprm2 = gprm1.copy(
         kernel=kernel_2,
         index_points=index_points_2,
@@ -387,6 +395,7 @@ class _GaussianProcessRegressionModelTest(test_case.TestCase,
         observation_index_points=observation_index_points,
         observations=observations,
         jitter=jitter,
+        validate_args=True,
         **noise_kwargs)
 
     # 'Property' means what was passed to CTOR. 'Parameter' is the effective

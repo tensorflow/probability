@@ -27,16 +27,12 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BatchNormTest(tfp_test_util.VectorDistributionTestHelpers,
-                    parameterized.TestCase,
-                    test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BatchNormTest(test_util.TestCase,
+                    test_util.VectorDistributionTestHelpers):
 
   def _reduction_axes(self, input_shape, event_dims):
     if isinstance(event_dims, int):

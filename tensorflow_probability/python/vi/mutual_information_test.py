@@ -22,7 +22,6 @@ import numpy as np
 import scipy
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 mi = tfp.vi.mutual_information
@@ -33,7 +32,7 @@ LOWER_BOUND_MIN_GAP = 0.3
 LOWER_BOUND_MAX_GAP = 0.1
 
 
-class MutualInformationTest(test_case.TestCase):
+class MutualInformationTest(tfp_test_util.TestCase):
 
   def setUp(self):
     super(MutualInformationTest, self).setUp()
@@ -45,7 +44,9 @@ class MutualInformationTest(test_case.TestCase):
         scale=2.0,
         size=[13, 17])
 
-    batch_size, rho, dim = 10000, 0.8, 2
+    batch_size = 1000
+    rho = 0.8
+    dim = 2
     x, eps = tf.split(value=tf.random.normal(shape=(2*batch_size, dim),
                                              seed=self.seed),
                       num_or_size_splits=2, axis=0)

@@ -46,12 +46,13 @@ py_library(
 
 py_test(
     name = "hager_zhang_lib_test",
+    size = "small",
     srcs = ["hager_zhang_lib_test.py"],
     deps = [
         ":hager_zhang_lib",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
     ],
 )

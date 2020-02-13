@@ -29,7 +29,7 @@ def _prefer_static_event_ndims(distribution):
   if distribution.event_shape.ndims is not None:
     return distribution.event_shape.ndims
   else:
-    return tf.size(input=distribution.event_shape_tensor())
+    return tf.size(distribution.event_shape_tensor())
 
 
 def one_step_predictive(model, observed_time_series, parameter_samples):
@@ -96,13 +96,15 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
   samples from the variational posterior:
 
   ```python
-    (variational_loss,
-     variational_distributions) = tfp.sts.build_factored_variational_loss(
-       model=model, observed_time_series=observed_time_series)
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+      model=model)
+    loss_curve = tfp.vi.fit_surrogate_posterior(
+      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      surrogate_posterior=surrogate_posterior,
+      optimizer=tf.optimizers.Adam(learning_rate=0.1),
+      num_steps=200)
+    samples = surrogate_posterior.sample(30)
 
-    # OMITTED: take steps to optimize variational loss
-
-    samples = {k: q.sample(30) for (k, q) in variational_distributions.items()}
     one_step_predictive_dist = tfp.sts.one_step_predictive(
       model, observed_time_series, parameter_samples=samples)
   ```
@@ -155,7 +157,7 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     # Run filtering over the training timesteps to extract the
     # predictive means and variances.
     num_timesteps = dist_util.prefer_static_value(
-        tf.shape(input=observed_time_series))[-2]
+        tf.shape(observed_time_series))[-2]
     lgssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=parameter_samples)
     (_, _, _, _, _, observation_means, observation_covs
@@ -171,7 +173,8 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
 def forecast(model,
              observed_time_series,
              parameter_samples,
-             num_steps_forecast):
+             num_steps_forecast,
+             include_observation_noise=True):
   """Construct predictive distribution over future observations.
 
   Given samples from the posterior over parameters, return the predictive
@@ -193,6 +196,11 @@ def forecast(model,
       model.parameters]`. This may optionally also be a map (Python `dict`) of
       parameter names to `Tensor` values.
     num_steps_forecast: scalar `int` `Tensor` number of steps to forecast.
+    include_observation_noise: Python `bool` indicating whether the forecast
+      distribution should include uncertainty from observation noise. If `True`,
+      the forecast is over future observations, if `False`, the forecast is over
+      future values of the latent noise-free time series.
+      Default value: `True`.
 
   Returns:
     forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
@@ -235,16 +243,18 @@ def forecast(model,
   samples from the variational posterior:
 
   ```python
-    (variational_loss,
-     variational_distributions) = tfp.sts.build_factored_variational_loss(
-       model=model, observed_time_series=observed_time_series)
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+      model=model)
+    loss_curve = tfp.vi.fit_surrogate_posterior(
+      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      surrogate_posterior=surrogate_posterior,
+      optimizer=tf.optimizers.Adam(learning_rate=0.1),
+      num_steps=200)
+    samples = surrogate_posterior.sample(30)
 
-    # OMITTED: take steps to optimize variational loss
-
-    samples = {k: q.sample(30) for (k, q) in variational_distributions.items()}
     forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                         parameter_samples=samples,
-                                         num_steps_forecast=50)
+                                     parameter_samples=samples,
+                                     num_steps_forecast=50)
   ```
 
   We can visualize the forecast by plotting:
@@ -298,7 +308,7 @@ def forecast(model,
     # This is the prior for the forecast model ("today's prior
     # is yesterday's posterior").
     num_observed_steps = dist_util.prefer_static_value(
-        tf.shape(input=observed_time_series))[-2]
+        tf.shape(observed_time_series))[-2]
     observed_data_ssm = model.make_state_space_model(
         num_timesteps=num_observed_steps, param_vals=parameter_samples)
     (_, _, _, predictive_means, predictive_covs, _, _
@@ -338,6 +348,12 @@ def forecast(model,
       kwargs['constant_offset'] = tf.convert_to_tensor(
           value=model.constant_offset,
           dtype=forecast_prior.dtype)[..., tf.newaxis]
+
+    if not include_observation_noise:
+      parameter_samples_with_reordered_batch_dimension[
+          'observation_noise_scale'] = tf.zeros_like(
+              parameter_samples_with_reordered_batch_dimension[
+                  'observation_noise_scale'])
 
     # We assume that any STS model that has a `constant_offset` attribute
     # will allow it to be overridden as a kwarg. This is currently just
@@ -446,7 +462,7 @@ def impute_missing_values(model,
     # Run smoothing over the training timesteps to extract the
     # predictive means and variances.
     num_timesteps = dist_util.prefer_static_value(
-        tf.shape(input=observed_time_series))[-2]
+        tf.shape(observed_time_series))[-2]
     lgssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=parameter_samples)
     posterior_means, posterior_covs = lgssm.posterior_marginals(

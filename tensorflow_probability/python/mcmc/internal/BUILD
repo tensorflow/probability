@@ -15,7 +15,11 @@
 # Description:
 #   MCMC methods, diagnostics, and related utilities.
 
-# [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_test",
+    "multi_substrate_py_library",
+)
 
 package(
     default_visibility = [
@@ -27,10 +31,13 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":slice_sampler_utils",
+    ],
     deps = [
         ":leapfrog_integrator",
         ":slice_sampler_utils",
@@ -47,48 +54,55 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "util",
     srcs = ["util.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":util",
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "leapfrog_integrator",
     srcs = ["leapfrog_integrator.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":util",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "leapfrog_integrator_test",
     size = "small",
     srcs = ["leapfrog_integrator_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         ":leapfrog_integrator",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

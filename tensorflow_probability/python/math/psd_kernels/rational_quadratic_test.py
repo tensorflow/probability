@@ -25,12 +25,11 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RationalQuadraticTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RationalQuadraticTest(test_util.TestCase):
 
   def _rational_quadratic(
       self, amplitude, length_scale, scale_mixture_rate, x, y):
@@ -122,7 +121,7 @@ class RationalQuadraticTest(test_case.TestCase, parameterized.TestCase):
         ).shape)
 
   def testValidateArgs(self):
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('amplitude must be positive'):
       k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=-1.,
           length_scale=1.,
@@ -130,7 +129,7 @@ class RationalQuadraticTest(test_case.TestCase, parameterized.TestCase):
           validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('length_scale must be positive'):
       k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=1.,
           length_scale=-1.,
@@ -138,7 +137,7 @@ class RationalQuadraticTest(test_case.TestCase, parameterized.TestCase):
           validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('scale_mixture_rate must be positive'):
       k = tfp.math.psd_kernels.RationalQuadratic(
           amplitude=1.,
           length_scale=1.,

@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+import numpy as np
 
 import tensorflow.compat.v2 as tf
 
@@ -26,9 +27,10 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
 __all__ = [
+    'cond',
+    'no_op',
     'while_loop',
     # 'case',
-    # 'cond',
     # 'dynamic_partition',
     # 'dynamic_stitch',
     # 'map_fn',
@@ -36,10 +38,37 @@ __all__ = [
 ]
 
 
-def _while_loop(cond, body, loop_vars,
+JAX_MODE = False
+
+
+def _cond_jax(pred, true_fn=None, false_fn=None, name=None):  # pylint: disable=missing-docstring
+  from jax import lax  # pylint: disable=g-import-not-at-top
+
+  del name
+  def overridden_true_fn(x):
+    del x
+    return true_fn()
+
+  def overridden_false_fn(x):
+    del x
+    return false_fn()
+  return lax.cond(pred, None, overridden_true_fn, None, overridden_false_fn)
+
+
+def _cond(pred, true_fn=None, false_fn=None, name=None):
+  del name
+  return true_fn() if pred else false_fn()
+
+
+def _no_op(_):
+  pass
+
+
+def _while_loop(cond, body, loop_vars,  # pylint: disable=redefined-outer-name
                 shape_invariants=None, parallel_iterations=10,  # pylint: disable=unused-argument
                 back_prop=True, swap_memory=False,  # pylint: disable=unused-argument
                 maximum_iterations=None, name=None):  # pylint: disable=unused-argument
+  """Numpy implementation of `tf.while_loop`."""
   i = 0
   while (cond(*loop_vars) and
          (maximum_iterations is None or i < maximum_iterations)):
@@ -47,8 +76,40 @@ def _while_loop(cond, body, loop_vars,
     i += 1
   return loop_vars
 
+
+def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-name
+                    shape_invariants=None, parallel_iterations=10,  # pylint: disable=unused-argument
+                    back_prop=True, swap_memory=False,  # pylint: disable=unused-argument
+                    maximum_iterations=None, name=None):  # pylint: disable=unused-argument
+  """Jax implementation of `tf.while_loop`."""
+  from jax import lax  # pylint: disable=g-import-not-at-top
+  if maximum_iterations is None:
+    def override_body_fn(args):
+      return body(*args)
+    def override_cond_fn(args):
+      return cond(*args)
+    return lax.while_loop(override_cond_fn, override_body_fn, loop_vars)
+  else:  # Use else to avoid linter saying these functions are already defined.
+    def override_body_fn(args):
+      i, args = args
+      return i + 1, body(*args)
+    def override_cond_fn(args):
+      i, args = args
+      return cond(*args) & (i < maximum_iterations)
+    return lax.while_loop(
+        override_cond_fn, override_body_fn, (np.array(0), loop_vars))[1]
+
+
 # --- Begin Public Functions --------------------------------------------------
+
+cond = utils.copy_docstring(
+    tf.cond,
+    _cond_jax if JAX_MODE else _cond)
+
+no_op = utils.copy_docstring(
+    tf.no_op,
+    _no_op)
 
 while_loop = utils.copy_docstring(
     tf.while_loop,
-    _while_loop)
+    _while_loop_jax if JAX_MODE else _while_loop)

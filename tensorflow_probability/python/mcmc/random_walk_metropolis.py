@@ -21,9 +21,9 @@ from __future__ import print_function
 import collections
 # Dependency imports
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -88,8 +88,7 @@ def random_walk_normal_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf1.name_scope(
-        name, 'random_walk_normal_fn', values=[state_parts, scale, seed]):
+    with tf.name_scope(name or 'random_walk_normal_fn'):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
@@ -97,11 +96,11 @@ def random_walk_normal_fn(scale=1., name=None):
         raise ValueError('`scale` must broadcast with `state_parts`.')
       seed_stream = SeedStream(seed, salt='RandomWalkNormalFn')
       next_state_parts = [
-          tf.random.normal(
+          tf.random.normal(  # pylint: disable=g-complex-comprehension
               mean=state_part,
               stddev=scale_part,
-              shape=tf.shape(input=state_part),
-              dtype=state_part.dtype.base_dtype,
+              shape=tf.shape(state_part),
+              dtype=dtype_util.base_dtype(state_part.dtype),
               seed=seed_stream())
           for scale_part, state_part in zip(scales, state_parts)
       ]
@@ -150,8 +149,7 @@ def random_walk_uniform_fn(scale=1., name=None):
     Raises:
       ValueError: if `scale` does not broadcast with `state_parts`.
     """
-    with tf1.name_scope(
-        name, 'random_walk_uniform_fn', values=[state_parts, scale, seed]):
+    with tf.name_scope(name or 'random_walk_uniform_fn'):
       scales = scale if mcmc_util.is_list_like(scale) else [scale]
       if len(scales) == 1:
         scales *= len(state_parts)
@@ -159,11 +157,11 @@ def random_walk_uniform_fn(scale=1., name=None):
         raise ValueError('`scale` must broadcast with `state_parts`.')
       seed_stream = SeedStream(seed, salt='RandomWalkUniformFn')
       next_state_parts = [
-          tf.random.uniform(
+          tf.random.uniform(  # pylint: disable=g-complex-comprehension
               minval=state_part - scale_part,
               maxval=state_part + scale_part,
-              shape=tf.shape(input=state_part),
-              dtype=state_part.dtype.base_dtype,
+              shape=tf.shape(state_part),
+              dtype=dtype_util.base_dtype(state_part.dtype),
               seed=seed_stream())
           for scale_part, state_part in zip(scales, state_parts)
       ]
@@ -200,8 +198,10 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   ```python
   import numpy as np
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
+  tf.enable_v2_behavior()
+
   tfd = tfp.distributions
 
   dtype = np.float32
@@ -219,28 +219,28 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   sample_mean = tf.math.reduce_mean(samples, axis=0)
   sample_std = tf.sqrt(
-      tf.math.reduce_mean(tf.squared_difference(samples, sample_mean),
-                     axis=0))
-  with tf.Session() as sess:
-    [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
+      tf.math.reduce_mean(
+          tf.math.squared_difference(samples, sample_mean),
+          axis=0))
 
-  print('Estimated mean: {}'.format(sample_mean_))
-  print('Estimated standard deviation: {}'.format(sample_std_))
+  print('Estimated mean: {}'.format(sample_mean))
+  print('Estimated standard deviation: {}'.format(sample_std))
   ```
 
   ##### Sampling from a 2-D Normal Distribution.
 
   ```python
   import numpy as np
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
+  tf.enable_v2_behavior()
 
   tfd = tfp.distributions
 
   dtype = np.float32
   true_mean = dtype([0, 0])
   true_cov = dtype([[1, 0.5],
-                   [0.5, 1]])
+                    [0.5, 1]])
   num_results = 500
   num_chains = 100
 
@@ -248,16 +248,8 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   L = tf.linalg.cholesky(true_cov)
   target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=L)
 
-  # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
-  # Then the target log-density is defined as follows:
-  def target_log_prob(x, y):
-    # Stack the input tensors together
-    z = tf.stack([x, y], axis=-1)
-    return target.log_prob(tf.squeeze(z))
-
   # Initial state of the chain
-  init_state = [np.ones([num_chains, 1], dtype=dtype),
-                np.ones([num_chains, 1], dtype=dtype)]
+  init_state = np.ones([num_chains, 2], dtype=dtype)
 
   # Run Random Walk Metropolis with normal proposal for `num_results`
   # iterations for `num_chains` independent chains:
@@ -265,12 +257,11 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
       num_results=num_results,
       current_state=init_state,
       kernel=tfp.mcmc.RandomWalkMetropolis(
-          target_log_prob_fn=target_log_prob,
+          target_log_prob_fn=target.log_prob,
           seed=54),
       num_burnin_steps=200,
       num_steps_between_results=1,  # Thinning.
       parallel_iterations=1)
-  samples = tf.stack(samples, axis=-1)
 
   sample_mean = tf.math.reduce_mean(samples, axis=0)
   x = tf.squeeze(samples - sample_mean)
@@ -283,28 +274,18 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   cov_sample_cov = tf.reshape(tf.matmul(x, x, transpose_a=True) / num_chains,
                               shape=[2 * 2, 2 * 2])
 
-  with tf.Session() as sess:
-    [
-      mean_sample_mean_,
-      mean_sample_cov_,
-      cov_sample_cov_,
-    ] = sess.run([
-      mean_sample_mean,
-      mean_sample_cov,
-      cov_sample_cov,
-    ])
-
-  print('Estimated mean: {}'.format(mean_sample_mean_))
-  print('Estimated avg covariance: {}'.format(mean_sample_cov_))
-  print('Estimated covariance of covariance: {}'.format(cov_sample_cov_))
+  print('Estimated mean: {}'.format(mean_sample_mean))
+  print('Estimated avg covariance: {}'.format(mean_sample_cov))
+  print('Estimated covariance of covariance: {}'.format(cov_sample_cov))
   ```
 
   ##### Sampling from the Standard Normal Distribution using Cauchy proposal.
 
   ```python
   import numpy as np
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
+  tf.enable_v2_behavior()
 
   tfd = tfp.distributions
 
@@ -337,13 +318,12 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   sample_mean = tf.math.reduce_mean(samples, axis=0)
   sample_std = tf.sqrt(
-      tf.math.reduce_mean(tf.squared_difference(samples, sample_mean),
-                     axis=0))
-  with tf.Session() as sess:
-    [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
+      tf.math.reduce_mean(
+          tf.math.squared_difference(samples, sample_mean),
+          axis=0))
 
-  print('Estimated mean: {}'.format(sample_mean_))
-  print('Estimated standard deviation: {}'.format(sample_std_))
+  print('Estimated mean: {}'.format(sample_mean))
+  print('Estimated standard deviation: {}'.format(sample_std))
   ```
 
   """
@@ -502,18 +482,14 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
   @mcmc_util.set_doc(RandomWalkMetropolis.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results):
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'rwm', 'one_step'),
-        values=[
-            self.seed, current_state, previous_kernel_results.target_log_prob
-        ]):
-      with tf1.name_scope('initialize'):
+    with tf.name_scope(mcmc_util.make_name(self.name, 'rwm', 'one_step')):
+      with tf.name_scope('initialize'):
         if mcmc_util.is_list_like(current_state):
           current_state_parts = list(current_state)
         else:
           current_state_parts = [current_state]
         current_state_parts = [
-            tf.convert_to_tensor(value=s, name='current_state')
+            tf.convert_to_tensor(s, name='current_state')
             for s in current_state_parts
         ]
 
@@ -528,20 +504,18 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
       return [
           maybe_flatten(next_state_parts),
           UncalibratedRandomWalkResults(
-              log_acceptance_correction=tf.zeros(
-                  shape=tf.shape(input=next_target_log_prob),
-                  dtype=next_target_log_prob.dtype.base_dtype),
+              log_acceptance_correction=tf.zeros_like(next_target_log_prob),
               target_log_prob=next_target_log_prob,
           ),
       ]
 
   @mcmc_util.set_doc(RandomWalkMetropolis.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf1.name_scope(self.name, 'rwm_bootstrap_results',
-                                 [init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'rwm', 'bootstrap_results')):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
-      init_state = [tf.convert_to_tensor(value=x) for x in init_state]
+      init_state = [tf.convert_to_tensor(x) for x in init_state]
       init_target_log_prob = self.target_log_prob_fn(*init_state)  # pylint:disable=not-callable
       return UncalibratedRandomWalkResults(
           log_acceptance_correction=tf.zeros_like(init_target_log_prob),
@@ -560,7 +534,7 @@ def _maybe_call_fn(fn,
 
   if fn_result is None:
     fn_result = fn(*fn_arg_list)
-  if not fn_result.dtype.is_floating:
+  if not dtype_util.is_floating(fn_result.dtype):
     raise TypeError('`{}` must be a `Tensor` with `float` `dtype`.'.format(
         description))
   return fn_result

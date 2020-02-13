@@ -24,10 +24,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfl = tf.linalg
 
@@ -91,7 +90,7 @@ class _LocalLinearTrendStateSpaceModelTest(object):
     self.assertAllEqual(self.evaluate(ssm.batch_shape_tensor()), batch_shape)
 
     y = ssm.sample()
-    self.assertAllEqual(self.evaluate(tf.shape(input=y))[:-2], batch_shape)
+    self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
 
   def _build_placeholder(self, ndarray):
     """Convert a numpy array to a TF placeholder.
@@ -107,26 +106,26 @@ class _LocalLinearTrendStateSpaceModelTest(object):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLinearTrendStateSpaceModelTestStaticShape32(
-    test_case.TestCase, _LocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLinearTrendStateSpaceModelTestDynamicShape32(
-    test_case.TestCase, _LocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LocalLinearTrendStateSpaceModelTestStaticShape64(
-    test_case.TestCase, _LocalLinearTrendStateSpaceModelTest):
+    test_util.TestCase, _LocalLinearTrendStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 

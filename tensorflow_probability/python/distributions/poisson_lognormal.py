@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -35,7 +36,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -303,28 +303,6 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
     return dist, mixture_dist
 
   @property
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `mixture_distribution` property will be removed. '
-       'Use `poisson_and_mixture_distributions` instead.'),
-      warn_once=True)
-  def mixture_distribution(self):
-    """Distribution which randomly selects a Poisson with quadrature param."""
-    _, mixture_dist = self.poisson_and_mixture_distributions()
-    return mixture_dist
-
-  @property
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `distribution` property will be removed. '
-       'Use `poisson_and_mixture_distributions` instead.'),
-      warn_once=True)
-  def distribution(self):
-    """Base Poisson parameterized by a quadrature grid."""
-    dist, _ = self.poisson_and_mixture_distributions()
-    return dist
-
-  @property
   def loc(self):
     """Location parameter of the LogNormal prior."""
     return self._loc
@@ -393,7 +371,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         delta=self._quadrature_size,
         dtype=ids.dtype)
     ids = ids + offset
-    rate = tf.gather(tf.reshape(dist.rate, shape=[-1]), ids)
+    rate = tf.gather(tf.reshape(dist.rate_parameter(), shape=[-1]), ids)
     rate = tf.reshape(
         rate, shape=concat_vectors([n], self._batch_shape_tensor(
             distributions=distributions)))
@@ -449,6 +427,17 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
         axis=-1)
     return tf.reduce_logsumexp(
         mixture_dist.logits[..., tf.newaxis] + v, axis=[-2, -1])
+
+  def _default_event_space_bijector(self):
+    return
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
 
 def concat_vectors(*args):

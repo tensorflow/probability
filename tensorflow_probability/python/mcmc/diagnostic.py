@@ -22,12 +22,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import stats
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'effective_sample_size',
@@ -39,6 +39,8 @@ def effective_sample_size(states,
                           filter_threshold=0.,
                           filter_beyond_lag=None,
                           filter_beyond_positive_pairs=False,
+                          cross_chain_dims=None,
+                          validate_args=False,
                           name=None):
   """Estimate a lower bound on effective sample size for each independent chain.
 
@@ -46,8 +48,8 @@ def effective_sample_size(states,
   with the same variance as `state`.
 
   More precisely, given a stationary sequence of possibly correlated random
-  variables `X_1, X_2,...,X_N`, each identically distributed ESS is the number
-  such that
+  variables `X_1, X_2, ..., X_N`, identically distributed, ESS is the
+  number such that
 
   ```Variance{ N**-1 * Sum{X_i} } = ESS**-1 * Variance{ X_1 }.```
 
@@ -55,30 +57,83 @@ def effective_sample_size(states,
   auto-correlated, `ESS` will be less than `N`. If there are negative
   correlations, then `ESS` can exceed `N`.
 
+  Some math shows that, with `R_k` the auto-correlation sequence,
+  `R_k := Covariance{X_1, X_{1+k}} / Variance{X_1}`, we have
+
+  ```ESS(N) =  N / [ 1 + 2 * ( (N - 1) / N * R_1 + ... + 1 / N * R_{N-1}  ) ]```
+
+  This function estimates the above by first estimating the auto-correlation.
+  Since `R_k` must be estimated using only `N - k` samples, it becomes
+  progressively noisier for larger `k`.  For this reason, the summation over
+  `R_k` should be truncated at some number `filter_beyond_lag < N`. This
+  function provides two methods to perform this truncation.
+
+  * `filter_threshold` -- since many MCMC methods generate chains where `R_k >
+    0`, a reasonable criterion is to truncate at the first index where the
+    estimated auto-correlation becomes negative. This method does not estimate
+    the `ESS` of super-efficient chains (where `ESS > N`) correctly.
+
+  * `filter_beyond_positive_pairs` -- reversible MCMC chains produce
+    an auto-correlation sequence with the property that pairwise sums of the
+    elements of that sequence are positive [Geyer][1], i.e.
+    `R_{2k} + R_{2k + 1} > 0` for `k in {0, ..., N/2}`. Deviations are only
+    possible due to noise. This method truncates the auto-correlation sequence
+    where the pairwise sums become non-positive.
+
+  The arguments `filter_beyond_lag`, `filter_threshold` and
+  `filter_beyond_positive_pairs` are filters intended to remove noisy tail terms
+  from `R_k`.  You can combine `filter_beyond_lag` with `filter_threshold` or
+  `filter_beyond_positive_pairs. E.g., combining `filter_beyond_lag` and
+  `filter_beyond_positive_pairs` means that terms are removed if they were to be
+  filtered under the `filter_beyond_lag` OR `filter_beyond_positive_pairs`
+  criteria.
+
+  This function can also compute cross-chain ESS following
+  [Vehtari et al. (2019)][2] by specifying the `cross_chain_dims` argument.
+  Cross-chain ESS takes into account the cross-chain variance to reduce the ESS
+  in cases where the chains are not mixing well. In general, this will be a
+  smaller number than computing the ESS for individual chains and then summing
+  them. In an extreme case where the chains have fallen into K non-mixing modes,
+  this function will return ESS ~ K. Even when chains are mixing well it is
+  still preferrable to compute cross-chain ESS via this method because it will
+  reduce the noise in the estimate of `R_k`, reducing the need for truncation.
+
   Args:
     states:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
       identically distributed states.
-    filter_threshold:  `Tensor` or list of `Tensor` objects.
-      Must broadcast with `state`.  The auto-correlation sequence is truncated
-      after the first appearance of a term less than `filter_threshold`.
-      Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
-      setting to any number less than `-1` has the same effect. Ignored if
+    filter_threshold: `Tensor` or list of `Tensor` objects.  Must broadcast with
+      `state`.  The sequence of auto-correlations is truncated after the first
+      appearance of a term less than `filter_threshold`.  Setting to `None`
+      means we use no threshold filter.  Since `|R_k| <= 1`, setting to any
+      number less than `-1` has the same effect. Ignored if
       `filter_beyond_positive_pairs` is `True`.
-    filter_beyond_lag:  `Tensor` or list of `Tensor` objects.  Must be
-      `int`-like and scalar valued.  The auto-correlation sequence is truncated
-      to this length.  Setting to `None` means we do not filter based on number
-      of lags.
+    filter_beyond_lag: `Tensor` or list of `Tensor` objects.  Must be `int`-like
+      and scalar valued.  The sequence of auto-correlations is truncated to this
+      length.  Setting to `None` means we do not filter based on the size of
+      lags.
     filter_beyond_positive_pairs: Python boolean. If `True`, only consider the
       initial auto-correlation sequence where the pairwise sums are positive.
+    cross_chain_dims: An integer `Tensor` or a list of integer `Tensors`
+      corresponding to each state component. If a list of `states` is provided,
+      then this argument should also be a list of the same length. Which
+      dimensions of `states` to treat as independent chains that ESS will be
+      summed over.  If `None`, no summation is performed. Note this requires at
+      least 2 chains.
+    validate_args: Whether to add runtime checks of argument validity. If False,
+      and arguments are incorrect, correct behavior is not guaranteed.
     name:  `String` name to prepend to created ops.
 
   Returns:
     ess:  `Tensor` or list of `Tensor` objects.  The effective sample size of
-      each component of `states`.  Shape will be `states.shape[1:]`.
+      each component of `states`.  If `cross_chain_dims` is None, the shape will
+      be `states.shape[1:]`. Otherwise, the shape is
+      `tf.reduce_mean(states, cross_chain_dims).shape[1:]`.
 
   Raises:
     ValueError:  If `states` and `filter_threshold` or `states` and
       `filter_beyond_lag` are both lists with different lengths.
+    ValueError: If `cross_chain_dims` is not `None` and there are less than 2
+      chains.
 
   #### Examples
 
@@ -110,47 +165,26 @@ def effective_sample_size(states,
   standard_error = tf.sqrt(variance / ess)
   ```
 
-  Some math shows that, with `R_k` the auto-correlation sequence,
-  `R_k := Covariance{X_1, X_{1+k}} / Variance{X_1}`, we have
-
-  ```ESS(N) =  N / [ 1 + 2 * ( (N - 1) / N * R_1 + ... + 1 / N * R_{N-1}  ) ]```
-
-  This function estimates the above by first estimating the auto-correlation.
-  Since `R_k` must be estimated using only `N - k` samples, it becomes
-  progressively noisier for larger `k`.  For this reason, the summation over
-  `R_k` should be truncated at some number `filter_beyond_lag < N`. This
-  function provides two methods to perform this truncation.
-
-  * `filter_threshold` -- since many MCMC methods generate chains where `R_k >
-    0`, a reasonable criteria is to truncate at the first index where the
-    estimated auto-correlation becomes negative. This method does not estimate
-    the `ESS` of super-efficient chains (where `ESS > N`) correctly.
-
-  * `filter_beyond_positive_pairs` -- reversible MCMC chains produce
-    auto-correlation sequence with the property that pairwise sums of the
-    elements of that sequence are positive [1] (i.e. `R_{2k} + R_{2k + 1} > 0`
-    for `k in {0, ..., N/2}`). Deviations are only possible due to noise. This
-    method truncates the auto-correlation sequence where the pairwise sums
-    become non-positive.
-
-  The arguments `filter_beyond_lag`, `filter_threshold` and
-  `filter_beyond_positive_pairs` are filters intended to remove noisy tail terms
-  from `R_k`.  You can combine `filter_beyond_lag` with `filter_threshold` or
-  `filter_beyond_positive_pairs. E.g. combining `filter_beyond_lag` and
-  `filter_beyond_positive_pairs` means that terms are removed if they were to be
-  filtered under the `filter_beyond_lag` OR `filter_beyond_positive_pairs`
-  criteria.
-
   #### References
 
-  [1]: Geyer, C. J. Practical Markov chain Monte Carlo (with discussion).
+  [1]: Charles J. Geyer, Practical Markov chain Monte Carlo (with discussion).
        Statistical Science, 7:473-511, 1992.
+
+  [2]: Aki Vehtari, Andrew Gelman, Daniel Simpson, Bob Carpenter, Paul-Christian
+       Burkner. Rank-normalization, folding, and localization: An improved R-hat
+       for assessing convergence of MCMC, 2019. Retrieved from
+       http://arxiv.org/abs/1903.08008
   """
   states_was_list = _is_list_like(states)
 
   # Convert all args to lists.
-  if not states_was_list:
+  if states_was_list:
+    if cross_chain_dims is None:
+      cross_chain_dims = _broadcast_maybelist_arg(states, cross_chain_dims,
+                                                  'cross_chain_dims')
+  else:
     states = [states]
+    cross_chain_dims = [cross_chain_dims]
 
   filter_beyond_lag = _broadcast_maybelist_arg(states, filter_beyond_lag,
                                                'filter_beyond_lag')
@@ -162,10 +196,9 @@ def effective_sample_size(states,
   # Process items, one at a time.
   with tf.name_scope('effective_sample_size' if name is None else name):
     ess_list = [
-        _effective_sample_size_single_state(s, fbl, ft, fbpp)  # pylint: disable=g-complex-comprehension
-        for (s, fbl, ft,
-             fbpp) in zip(states, filter_beyond_lag, filter_threshold,
-                          filter_beyond_positive_pairs)
+        _effective_sample_size_single_state(*args, validate_args=validate_args)  # pylint: disable=g-complex-comprehension
+        for args in zip(states, filter_beyond_lag, filter_threshold,
+                        filter_beyond_positive_pairs, cross_chain_dims)
     ]
 
   if states_was_list:
@@ -175,7 +208,9 @@ def effective_sample_size(states,
 
 def _effective_sample_size_single_state(states, filter_beyond_lag,
                                         filter_threshold,
-                                        filter_beyond_positive_pairs):
+                                        filter_beyond_positive_pairs,
+                                        cross_chain_dims,
+                                        validate_args):
   """ESS computation for one single Tensor argument."""
 
   with tf.name_scope('effective_sample_size_single_state'):
@@ -184,22 +219,76 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
     dt = states.dtype
 
     # filter_beyond_lag == None ==> auto_corr is the full sequence.
-    auto_corr = stats.auto_correlation(
-        states, axis=0, max_lags=filter_beyond_lag)
+    auto_cov = stats.auto_correlation(
+        states, axis=0, max_lags=filter_beyond_lag, normalize=False)
+    n = _axis_size(states, axis=0)
+
+    if cross_chain_dims is not None:
+      num_chains = _axis_size(states, cross_chain_dims)
+      num_chains_ = tf.get_static_value(num_chains)
+
+      assertions = []
+      msg = ('When `cross_chain_dims` is not `None`, there must be > 1 chain '
+             'in `states`.')
+      if num_chains_ is not None:
+        if num_chains_ < 2:
+          raise ValueError(msg)
+      elif validate_args:
+        assertions.append(
+            assert_util.assert_greater(num_chains, 1., message=msg))
+
+      with tf.control_dependencies(assertions):
+        # We're computing the R[k] from equation 10 of Vehtari et al.
+        # (2019):
+        #
+        # R[k] := 1 - (W - 1/C * Sum_{c=1}^C s_c**2 R[k, c]) / (var^+),
+        #
+        # where:
+        #   C := number of chains
+        #   N := length of chains
+        #   x_hat[c] := 1 / N Sum_{n=1}^N x[n, c], chain mean.
+        #   x_hat := 1 / C Sum_{c=1}^C x_hat[c], overall mean.
+        #   W := 1/C Sum_{c=1}^C s_c**2, within-chain variance.
+        #   B := N / (C - 1) Sum_{c=1}^C (x_hat[c] - x_hat)**2, between chain
+        #     variance.
+        #   s_c**2 := 1 / (N - 1) Sum_{n=1}^N (x[n, c] - x_hat[c])**2, chain
+        #       variance
+        #   R[k, m] := auto_corr[k, m, ...], auto-correlation indexed by chain.
+        #   var^+ := (N - 1) / N * W + B / N
+
+        cross_chain_dims = prefer_static.non_negative_axis(
+            cross_chain_dims, prefer_static.rank(states))
+        # B / N
+        between_chain_variance_div_n = _reduce_variance(
+            tf.reduce_mean(states, axis=0),
+            biased=False,  # This makes the denominator be C - 1.
+            axis=cross_chain_dims - 1)
+        # W * (N - 1) / N
+        biased_within_chain_variance = tf.reduce_mean(auto_cov[0],
+                                                      cross_chain_dims - 1)
+        # var^+
+        approx_variance = (
+            biased_within_chain_variance + between_chain_variance_div_n)
+        # 1/C * Sum_{c=1}^C s_c**2 R[k, c]
+        mean_auto_cov = tf.reduce_mean(auto_cov, cross_chain_dims)
+        auto_corr = 1. - (biased_within_chain_variance -
+                          mean_auto_cov) / approx_variance
+    else:
+      auto_corr = auto_cov / auto_cov[:1]
+      num_chains = 1
 
     # With R[k] := auto_corr[k, ...],
-    # ESS = N / {1 + 2 * Sum_{k=1}^N (N - k) / N * R[k]}
-    #     = N / {-1 + 2 * Sum_{k=0}^N (N - k) / N * R[k]} (since R[0] = 1)
-    #     approx N / {-1 + 2 * Sum_{k=0}^M (N - k) / N * R[k]}
+    # ESS = N / {1 + 2 * Sum_{k=1}^N R[k] * (N - k) / N}
+    #     = N / {-1 + 2 * Sum_{k=0}^N R[k] * (N - k) / N} (since R[0] = 1)
+    #     approx N / {-1 + 2 * Sum_{k=0}^M R[k] * (N - k) / N}
     # where M is the filter_beyond_lag truncation point chosen above.
 
     # Get the factor (N - k) / N, and give it shape [M, 1,...,1], having total
     # ndims the same as auto_corr
-    n = _axis_size(states, axis=0)
     k = tf.range(0., _axis_size(auto_corr, axis=0))
     nk_factor = (n - k) / n
-    if auto_corr.shape.ndims is not None:
-      new_shape = [-1] + [1] * (auto_corr.shape.ndims - 1)
+    if tensorshape_util.rank(auto_corr.shape) is not None:
+      new_shape = [-1] + [1] * (tensorshape_util.rank(auto_corr.shape) - 1)
     else:
       new_shape = tf.concat(
           ([-1],
@@ -219,7 +308,7 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
       # Pairwise sums are all positive for auto-correlation spectra derived from
       # reversible MCMC chains.
       # E.g. imagine the pairwise sums are [0.2, 0.1, -0.1, -0.2]
-      # Step 1: mask = [False, False, True, False]
+      # Step 1: mask = [False, False, True, True]
       mask = _sum_pairs(auto_corr) < 0.
       # Step 2: mask = [0, 0, 1, 1]
       mask = tf.cast(mask, dt)
@@ -242,15 +331,15 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
       #   Assume auto_corr = [1, 0.5, 0.0, 0.3], and filter_threshold = 0.2.
       # Step 1:  mask = [False, False, True, False]
       mask = auto_corr < filter_threshold
-      # Step 2:  mask = [0, 0, 1, 1]
+      # Step 2:  mask = [0, 0, 1, 0]
       mask = tf.cast(mask, dtype=dt)
-      # Step 3:  mask = [0, 0, 1, 2]
+      # Step 3:  mask = [0, 0, 1, 1]
       mask = tf.cumsum(mask, axis=0)
       # Step 4:  mask = [1, 1, 0, 0]
       mask = tf.maximum(1. - mask, 0.)
       weighted_auto_corr *= mask
 
-    return n / (-1 + 2 * tf.reduce_sum(weighted_auto_corr, axis=0))
+    return num_chains * n / (-1 + 2 * tf.reduce_sum(weighted_auto_corr, axis=0))
 
 
 def potential_scale_reduction(chains_states,
@@ -364,8 +453,11 @@ def potential_scale_reduction(chains_states,
 
   [2]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
        Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
-  [3]: Vehtari et al.  Rank-normalization, folding, and localization: An
-       improved Rhat for assessing convergence of MCMC.
+
+  [3]: Aki Vehtari, Andrew Gelman, Daniel Simpson, Bob Carpenter, Paul-Christian
+       Burkner. Rank-normalization, folding, and localization: An improved R-hat
+       for assessing convergence of MCMC, 2019. Retrieved from
+       http://arxiv.org/abs/1903.08008
   """
   chains_states_was_list = _is_list_like(chains_states)
   if not chains_states_was_list:
@@ -414,16 +506,17 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
             'Must provide at least 2 samples.  Found {}'.format(n_samples_))
     elif validate_args:
       if split_chains:
-        state = distribution_util.with_dependencies([
-            tf1.assert_greater(
-                tf.shape(state)[0], 4,
-                message='Must provide at least 4 samples when splitting chains.'
-            )], state)
+        assertions = [assert_util.assert_greater(
+            tf.shape(state)[0], 4,
+            message='Must provide at least 4 samples when splitting chains.')]
+        with tf.control_dependencies(assertions):
+          state = tf.identity(state)
       else:
-        state = distribution_util.with_dependencies([
-            tf1.assert_greater(
-                tf.shape(state)[0], 2,
-                message='Must provide at least 2 samples.')], state)
+        assertions = [assert_util.assert_greater(
+            tf.shape(state)[0], 2,
+            message='Must provide at least 2 samples.')]
+        with tf.control_dependencies(assertions):
+          state = tf.identity(state)
 
     # Define so it's not a magic number.
     # Warning!  `if split_chains` logic assumes this is 1!
@@ -499,8 +592,10 @@ def _reduce_variance(x, axis=None, biased=True, keepdims=False):
 def _axis_size(x, axis=None):
   """Get number of elements of `x` in `axis`, as type `x.dtype`."""
   if axis is None:
-    return tf.cast(tf.size(x), x.dtype)
-  return tf.cast(tf.reduce_prod(tf.gather(tf.shape(x), axis)), x.dtype)
+    return prefer_static.cast(prefer_static.size(x), x.dtype)
+  return prefer_static.cast(
+      prefer_static.reduce_prod(
+          prefer_static.gather(prefer_static.shape(x), axis)), x.dtype)
 
 
 def _is_list_like(x):
@@ -512,8 +607,9 @@ def _broadcast_maybelist_arg(states, secondary_arg, name):
   """Broadcast a listable secondary_arg to that of states."""
   if _is_list_like(secondary_arg):
     if len(secondary_arg) != len(states):
-      raise ValueError('Argument `%s` was a list of different length ({}) than '
-                       '`states` ({})'.format(name, len(states)))
+      raise ValueError('Argument `{}` was a list of different length ({}) than '
+                       '`states` ({})'.format(name, len(secondary_arg),
+                                              len(states)))
   else:
     secondary_arg = [secondary_arg] * len(states)
 

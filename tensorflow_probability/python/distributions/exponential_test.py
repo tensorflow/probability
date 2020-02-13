@@ -26,23 +26,19 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions import exponential as exponential_lib
-
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ExponentialTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ExponentialTest(test_util.TestCase):
 
   def testExponentialLogPDF(self):
     batch_size = 6
     lam = tf.constant([2.0] * batch_size)
     lam_v = 2.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    exponential = exponential_lib.Exponential(rate=lam)
+    exponential = tfd.Exponential(rate=lam, validate_args=True)
 
     log_pdf = exponential.log_prob(x)
     self.assertEqual(log_pdf.shape, (6,))
@@ -57,7 +53,7 @@ class ExponentialTest(test_case.TestCase):
   def testExponentialLogPDFBoundary(self):
     # Check that Log PDF is finite at 0.
     rate = np.array([0.1, 0.5, 1., 2., 5., 10.], dtype=np.float32)
-    exponential = exponential_lib.Exponential(rate=rate)
+    exponential = tfd.Exponential(rate=rate, validate_args=False)
     log_pdf = exponential.log_prob(0.)
     self.assertAllClose(np.log(rate), self.evaluate(log_pdf))
 
@@ -67,7 +63,7 @@ class ExponentialTest(test_case.TestCase):
     lam_v = 2.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    exponential = exponential_lib.Exponential(rate=lam)
+    exponential = tfd.Exponential(rate=lam, validate_args=True)
 
     cdf = exponential.cdf(x)
     self.assertEqual(cdf.shape, (6,))
@@ -81,7 +77,7 @@ class ExponentialTest(test_case.TestCase):
     lam_v = 2.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0, 10.0], dtype=np.float32)
 
-    exponential = exponential_lib.Exponential(rate=lam)
+    exponential = tfd.Exponential(rate=lam, validate_args=True)
 
     log_survival = exponential.log_survival_function(x)
     self.assertEqual(log_survival.shape, (7,))
@@ -91,14 +87,14 @@ class ExponentialTest(test_case.TestCase):
 
   def testExponentialMean(self):
     lam_v = np.array([1.0, 4.0, 2.5])
-    exponential = exponential_lib.Exponential(rate=lam_v)
+    exponential = tfd.Exponential(rate=lam_v, validate_args=True)
     self.assertEqual(exponential.mean().shape, (3,))
     expected_mean = sp_stats.expon.mean(scale=1 / lam_v)
     self.assertAllClose(self.evaluate(exponential.mean()), expected_mean)
 
   def testExponentialVariance(self):
     lam_v = np.array([1.0, 4.0, 2.5])
-    exponential = exponential_lib.Exponential(rate=lam_v)
+    exponential = tfd.Exponential(rate=lam_v, validate_args=True)
     self.assertEqual(exponential.variance().shape, (3,))
     expected_variance = sp_stats.expon.var(scale=1 / lam_v)
     self.assertAllClose(
@@ -106,7 +102,7 @@ class ExponentialTest(test_case.TestCase):
 
   def testExponentialEntropy(self):
     lam_v = np.array([1.0, 4.0, 2.5])
-    exponential = exponential_lib.Exponential(rate=lam_v)
+    exponential = tfd.Exponential(rate=lam_v, validate_args=True)
     self.assertEqual(exponential.entropy().shape, (3,))
     expected_entropy = sp_stats.expon.entropy(scale=1 / lam_v)
     self.assertAllClose(self.evaluate(exponential.entropy()), expected_entropy)
@@ -115,9 +111,9 @@ class ExponentialTest(test_case.TestCase):
     lam = tf.constant([3.0, 4.0])
     lam_v = [3.0, 4.0]
     n = tf.constant(100000)
-    exponential = exponential_lib.Exponential(rate=lam)
+    exponential = tfd.Exponential(rate=lam, validate_args=True)
 
-    samples = exponential.sample(n, seed=tfp_test_util.test_seed())
+    samples = exponential.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 2))
     self.assertFalse(np.any(sample_values < 0.0))
@@ -131,10 +127,10 @@ class ExponentialTest(test_case.TestCase):
     lam_v = [3.0, 22.0]
     lam = tf.constant([lam_v] * batch_size)
 
-    exponential = exponential_lib.Exponential(rate=lam)
+    exponential = tfd.Exponential(rate=lam, validate_args=True)
 
     n = 100000
-    samples = exponential.sample(n, seed=tfp_test_util.test_seed())
+    samples = exponential.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.shape, (n, batch_size, 2))
 
     sample_values = self.evaluate(samples)
@@ -151,7 +147,8 @@ class ExponentialTest(test_case.TestCase):
   def testFullyReparameterized(self):
     lam = tf.constant([0.1, 1.0])
     _, grad_lam = tfp.math.value_and_gradient(
-        lambda l: exponential_lib.Exponential(rate=lam).sample(100), lam)
+        lambda l: tfd.Exponential(rate=lam, validate_args=True).  # pylint: disable=g-long-lambda
+        sample(100, seed=test_util.test_seed()), lam)
     self.assertIsNotNone(grad_lam)
 
   def testExponentialExponentialKL(self):
@@ -162,8 +159,8 @@ class ExponentialTest(test_case.TestCase):
     a_rate = a_rate.reshape((len(a_rate), 1))
     b_rate = b_rate.reshape((1, len(b_rate)))
 
-    a = exponential_lib.Exponential(rate=a_rate)
-    b = exponential_lib.Exponential(rate=b_rate)
+    a = tfd.Exponential(rate=a_rate, validate_args=True)
+    b = tfd.Exponential(rate=b_rate, validate_args=True)
 
     # Consistent with
     # http://www.mast.queensu.ca/~communications/Papers/gil-msc11.pdf, page 108
@@ -171,7 +168,7 @@ class ExponentialTest(test_case.TestCase):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(4e5), seed=tfp_test_util.test_seed())
+    x = a.sample(int(4e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
@@ -182,6 +179,7 @@ class ExponentialTest(test_case.TestCase):
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughRate(self):
     rate = tf.Variable(3.)
     d = tfd.Exponential(rate=rate)
@@ -196,7 +194,7 @@ class ExponentialTest(test_case.TestCase):
     self.evaluate(rate.initializer)
     with self.assertRaisesOpError("Argument `rate` must be positive."):
       d = tfd.Exponential(rate=rate, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveRateAfterMutation(self):
     rate = tf.Variable([1., 2., 3.])
@@ -205,10 +203,10 @@ class ExponentialTest(test_case.TestCase):
     self.evaluate(d.mean())
     with self.assertRaisesOpError("Argument `rate` must be positive."):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testExpontentialQuantile(self):
-    exponential = exponential_lib.Exponential(rate=[1., 2.])
+    exponential = tfd.Exponential(rate=[1., 2.], validate_args=True)
 
     # Corner cases.
     result = self.evaluate(exponential.quantile([0., 1.]))
@@ -219,10 +217,19 @@ class ExponentialTest(test_case.TestCase):
     self.assertAllClose(result, [0.693147, 0.346574])
 
   def testExponentialQuantileIsInverseOfCdf(self):
-    exponential = exponential_lib.Exponential(rate=[1., 2.])
+    exponential = tfd.Exponential(
+        rate=[1., 2.], validate_args=False)
     values = [2 * [t / 10.] for t in range(0, 11)]
     result = self.evaluate(exponential.cdf(exponential.quantile(values)))
     self.assertAllClose(result, values)
+
+  def testSupportBijectorOutsideRange(self):
+    rate = np.array([2., 4., 5.])
+    dist = tfd.Exponential(rate, validate_args=True)
+    x = np.array([-8.3, -0.4, -1e-6])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == "__main__":
   tf.test.main()

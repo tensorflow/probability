@@ -26,10 +26,10 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 
 
@@ -94,9 +94,8 @@ def _grad_neg_log_likelihood_and_fim(model_matrix, linear_response, response,
       & tf.math.is_finite(variance) & (variance > 0.))
 
   def _mask_if_invalid(x, mask):
-    mask = tf.fill(
-        tf.shape(input=x), value=np.array(mask, x.dtype.as_numpy_dtype))
-    return tf1.where(is_valid, x, mask)
+    return tf.where(
+        is_valid, x, np.array(mask, dtype_util.as_numpy_dtype(x.dtype)))
 
   # TODO(b/111923449): Link to derivation once it's available.
   v = (response - mean) * _mask_if_invalid(grad_mean, 1) / _mask_if_invalid(
@@ -204,17 +203,7 @@ def fit_sparse_one_step(model_matrix,
       `tf.size(model_coefficients_start)` iterations, the maximum number of
       updates is `maximum_full_sweeps * tf.size(model_coefficients_start)`.
   """
-  graph_deps = [
-      model_matrix,
-      response,
-      model_coefficients_start,
-      l1_regularizer,
-      l2_regularizer,
-      maximum_full_sweeps,
-      tolerance,
-      learning_rate,
-  ]
-  with tf1.name_scope(name, 'fit_sparse_one_step', graph_deps):
+  with tf.name_scope(name or 'fit_sparse_one_step'):
     predicted_linear_response = sparse_or_dense_matvecmul(
         model_matrix, model_coefficients_start)
     g, h_middle = _grad_neg_log_likelihood_and_fim(
@@ -456,20 +445,7 @@ def fit_sparse(model_matrix,
        Research_, 13, 2012.
        http://www.jmlr.org/papers/volume13/yuan12a/yuan12a.pdf
   """
-  graph_deps = [
-      model_matrix,
-      response,
-      model_coefficients_start,
-      l1_regularizer,
-      l2_regularizer,
-      maximum_iterations,
-      maximum_full_sweeps_per_iteration,
-      # TODO(b/111925792): Replace `tolerance` arg with something like
-      # `convergence_criteria_fn`.
-      tolerance,
-      learning_rate,
-  ]
-  with tf1.name_scope(name, 'fit_sparse', graph_deps):
+  with tf.name_scope(name or 'fit_sparse'):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _grad_neg_log_likelihood_and_fim_fn(x):
       predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)
@@ -501,20 +477,7 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
     maximum_full_sweeps_per_iteration=1,
     learning_rate=None,
     name=None):
-  graph_deps = [
-      model_matrix,
-      response,
-      model_coefficients_start,
-      l1_regularizer,
-      l2_regularizer,
-      maximum_iterations,
-      maximum_full_sweeps_per_iteration,
-      # TODO(b/111925792): Replace `tolerance` arg with something like
-      # `convergence_criteria_fn`.
-      tolerance,
-      learning_rate,
-  ]
-  with tf1.name_scope(name, 'fit_sparse_exact_hessian', graph_deps):
+  with tf.name_scope(name or 'fit_sparse_exact_hessian'):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _neg_log_likelihood(x):
       predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)

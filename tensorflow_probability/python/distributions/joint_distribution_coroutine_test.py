@@ -21,13 +21,13 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 tfb = tfp.bijectors
@@ -37,8 +37,42 @@ tfd = tfp.distributions
 Root = tfd.JointDistributionCoroutine.Root
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class JointDistributionCoroutineTest(test_case.TestCase):
+def basic_model_with_names_fn():
+  yield Root(tfd.Normal(0., 1., name='a'))
+  e = yield Root(tfd.Independent(
+      tfd.Exponential(rate=[100, 120]),
+      reinterpreted_batch_ndims=1, name='e'))
+  yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1], name='x')
+
+
+def nested_lists_with_names_model_fn():
+  abc = yield Root(tfd.JointDistributionSequential([
+      tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
+      tfd.JointDistributionSequential([
+          tfd.StudentT(3., -2., 5.),
+          tfd.Exponential(4.)])], name='abc'))
+  a, (b, c) = abc
+  yield tfd.JointDistributionSequential([tfd.Normal(a * b, c),
+                                         tfd.Normal(a + b, c)], name='de')
+
+
+def singleton_normal_model_fn():
+  yield Root(tfd.Normal(0., 1., name='x'))
+
+
+def singleton_jds_model_fn():
+  yield Root(tfd.JointDistributionSequential(
+      [tfd.Normal(0., 1.), lambda x: tfd.Poisson(tf.exp(x))], name='x'))
+
+
+def singleton_jdn_model_fn():
+  yield Root(tfd.JointDistributionNamed(
+      {'z': tfd.Normal(0., 1.), 'y': lambda z: tfd.Poisson(tf.exp(z))},
+      name='x'))
+
+
+@test_util.test_all_tf_execution_regimes
+class JointDistributionCoroutineTest(test_util.TestCase):
 
   def test_batch_and_event_shape_no_plate(self):
     # The joint distribution specified below corresponds to this
@@ -58,12 +92,12 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    # Neither `event_shape` nor `batch_shape` can be determined
-    # without the underlying distributions being cached.
-    self.assertAllEqual(joint.event_shape, None)
-    self.assertAllEqual(joint.batch_shape, None)
+    # Properties `event_shape` and `batch_shape` should be defined
+    # even before any sampling calls have occurred.
+    self.assertAllEqual(joint.event_shape, [[], [], []])
+    self.assertAllEqual(joint.batch_shape, [[], [], []])
 
-    ds, _ = joint.sample_distributions()
+    ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 3)
     self.assertIsInstance(ds[0], tfd.Bernoulli)
     self.assertIsInstance(ds[1], tfd.Bernoulli)
@@ -79,8 +113,6 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     self.assertAllEqual(event_shape[1], [])
     self.assertAllEqual(event_shape[2], [])
 
-    self.assertAllEqual(joint.event_shape, [[], [], []])
-
     is_batch_scalar = joint.is_scalar_batch()
     self.assertAllEqual(is_batch_scalar[0], True)
     self.assertAllEqual(is_batch_scalar[1], True)
@@ -90,8 +122,6 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     self.assertAllEqual(batch_shape[0], [])
     self.assertAllEqual(batch_shape[1], [])
     self.assertAllEqual(batch_shape[2], [])
-
-    self.assertAllEqual(joint.batch_shape, [[], [], []])
 
   def test_batch_and_event_shape_with_plate(self):
     # The joint distribution specified below corresponds to this
@@ -112,12 +142,12 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    # Neither `event_shape` nor `batch_shape` can be determined
-    # without the underlying distributions being cached.
-    self.assertAllEqual(joint.event_shape, None)
-    self.assertAllEqual(joint.batch_shape, None)
+    # Properties `event_shape` and `batch_shape` should be defined
+    # even before any sampling calls have occurred.
+    self.assertAllEqual(joint.event_shape, [[], [], [20], [20]])
+    self.assertAllEqual(joint.batch_shape, [[], [], [], []])
 
-    ds, _ = joint.sample_distributions()
+    ds, _ = joint.sample_distributions(seed=test_util.test_seed())
     self.assertLen(ds, 4)
     self.assertIsInstance(ds[0], tfd.Gamma)
     self.assertIsInstance(ds[1], tfd.Exponential)
@@ -136,8 +166,6 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     self.assertAllEqual(event_shape[2], [20])
     self.assertAllEqual(event_shape[3], [20])
 
-    self.assertAllEqual(joint.event_shape, [[], [], [20], [20]])
-
     is_batch = joint.is_scalar_batch()
     self.assertAllEqual(is_batch[0], True)
     self.assertAllEqual(is_batch[1], True)
@@ -149,8 +177,6 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     self.assertAllEqual(batch_shape[1], [])
     self.assertAllEqual(batch_shape[2], [])
     self.assertAllEqual(batch_shape[3], [])
-
-    self.assertAllEqual(joint.batch_shape, [[], [], [], []])
 
   def test_sample_shape_no_plate(self):
     # The joint distribution specified below corresponds to this
@@ -170,19 +196,19 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [])
     self.assertAllEqual(tf.shape(z[1]), [])
     self.assertAllEqual(tf.shape(z[2]), [])
 
-    z = joint.sample(2)
+    z = joint.sample(2, seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [2])
     self.assertAllEqual(tf.shape(z[1]), [2])
     self.assertAllEqual(tf.shape(z[2]), [2])
 
-    z = joint.sample([3, 2])
+    z = joint.sample([3, 2], seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [3, 2])
     self.assertAllEqual(tf.shape(z[1]), [3, 2])
@@ -207,21 +233,21 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [])
     self.assertAllEqual(tf.shape(z[1]), [])
     self.assertAllEqual(tf.shape(z[2]), [20])
     self.assertAllEqual(tf.shape(z[3]), [20])
 
-    z = joint.sample(2)
+    z = joint.sample(2, seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [2])
     self.assertAllEqual(tf.shape(z[1]), [2])
     self.assertAllEqual(tf.shape(z[2]), [2, 20])
     self.assertAllEqual(tf.shape(z[3]), [2, 20])
 
-    z = joint.sample([3, 2])
+    z = joint.sample([3, 2], seed=test_util.test_seed())
 
     self.assertAllEqual(tf.shape(z[0]), [3, 2])
     self.assertAllEqual(tf.shape(z[1]), [3, 2])
@@ -246,7 +272,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     log_prob = joint.log_prob(z)
 
@@ -281,7 +307,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
     a, b, c = z  # pylint: disable=unbalanced-tuple-unpacking
 
     log_prob = joint.log_prob(z)
@@ -318,7 +344,65 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'must be wrapped in `Root`'):
-      self.evaluate(joint.sample())
+      self.evaluate(joint.sample(seed=test_util.test_seed()))
+
+  @parameterized.named_parameters(
+      ('basic', basic_model_with_names_fn),
+      ('nested_lists', nested_lists_with_names_model_fn))
+  def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):
+    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+
+    # Destructure vector-valued Tensors into Python lists, to mimic the values
+    # a user might type.
+    def _convert_ndarray_to_list(x):
+      if isinstance(x, np.ndarray) and x.ndim > 0:
+        return list(x)
+      return x
+    value = tf.nest.map_structure(
+        _convert_ndarray_to_list,
+        self.evaluate(d.sample(seed=test_util.test_seed())))
+    value_with_names = list(zip(d._flat_resolve_names(), value))
+
+    lp_value_positional = self.evaluate(d.log_prob(value))
+    lp_value_named = self.evaluate(d.log_prob(value=value))
+    self.assertAllEqual(lp_value_positional, lp_value_named)
+
+    lp_args = self.evaluate(d.log_prob(*value))
+    self.assertAllEqual(lp_value_positional, lp_args)
+
+    lp_kwargs = self.evaluate(d.log_prob(**dict(value_with_names)))
+    self.assertAllEqual(lp_value_positional, lp_kwargs)
+
+    lp_args_then_kwargs = self.evaluate(d.log_prob(
+        *value[:1], **dict(value_with_names[1:])))
+    self.assertAllEqual(lp_value_positional, lp_args_then_kwargs)
+
+    with self.assertRaisesRegexp(
+        ValueError, r'Joint distribution expected values for [0-9] components'):
+      d.log_prob(badvar=27.)
+
+    with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
+      d.log_prob(*value, extra_arg=27.)
+
+  @parameterized.named_parameters(
+      ('singleton_float', singleton_normal_model_fn),
+      ('singleton_tuple', singleton_jds_model_fn),
+      ('singleton_dict', singleton_jdn_model_fn))
+  def test_singleton_model_works_with_args_and_kwargs(self, model_fn):
+    d = tfd.JointDistributionCoroutine(model_fn)
+
+    xs = self.evaluate(
+        d.sample(seed=test_util.test_seed()))  # `xs` is a one-element list.
+
+    lp_from_structure = self.evaluate(d.log_prob(xs))
+    lp_from_structure_kwarg = self.evaluate(d.log_prob(value=xs))
+    self.assertAllEqual(lp_from_structure, lp_from_structure_kwarg)
+
+    lp_from_arg = self.evaluate(d.log_prob(xs[0]))
+    self.assertAllEqual(lp_from_structure, lp_from_arg)
+
+    lp_from_kwarg = self.evaluate(d.log_prob(x=xs[0]))
+    self.assertAllEqual(lp_from_structure, lp_from_kwarg)
 
   def test_check_sample_rank(self):
     def dist():
@@ -336,7 +420,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'are not consistent with `sample_shape`'):
-      self.evaluate(joint.sample([3, 5]))
+      self.evaluate(joint.sample([3, 5], seed=test_util.test_seed()))
 
   def test_check_sample_shape(self):
     def dist():
@@ -354,7 +438,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'are not consistent with `sample_shape`'):
-      self.evaluate(joint.sample([3, 5]))
+      self.evaluate(joint.sample([3, 5], seed=test_util.test_seed()))
 
   def test_log_prob_multiple_samples(self):
     # The joint distribution specified below corresponds to this
@@ -374,7 +458,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample(4)
+    z = joint.sample(4, seed=test_util.test_seed())
 
     log_prob = joint.log_prob(z)
 
@@ -408,7 +492,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample(4)
+    z = joint.sample(4, seed=test_util.test_seed())
 
     prob = joint.prob(z)
 
@@ -443,7 +527,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     a, b, c, d = z  # pylint: disable=unbalanced-tuple-unpacking
 
@@ -479,7 +563,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
 
     joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
 
-    z = joint.sample([3, 5])
+    z = joint.sample([3, 5], seed=test_util.test_seed())
 
     a, b, c, d = z  # pylint: disable=unbalanced-tuple-unpacking
 
@@ -497,7 +581,7 @@ class JointDistributionCoroutineTest(test_case.TestCase):
     log_prob = joint.log_prob(z)
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]),
-                        rtol=1e-5)
+                        rtol=1e-4, atol=1e-5)
 
   def test_sample_dtype_structures_output(self):
     def noncentered_horseshoe_prior(num_features):
@@ -523,11 +607,13 @@ class JointDistributionCoroutineTest(test_case.TestCase):
         sample_dtype=sample_dtype,
         validate_args=True)
     self.assertAllEqual(sorted(sample_dtype._fields),
-                        sorted(joint.sample()._fields))
-    ds, xs = joint.sample_distributions([2, 3])
+                        sorted(joint.sample(
+                            seed=test_util.test_seed())._fields))
+    ds, xs = joint.sample_distributions([2, 3], seed=test_util.test_seed())
     tf.nest.assert_same_structure(sample_dtype, ds)
     tf.nest.assert_same_structure(sample_dtype, xs)
-    self.assertEqual([3, 4], joint.log_prob(joint.sample([3, 4])).shape)
+    self.assertEqual([3, 4], joint.log_prob(
+        joint.sample([3, 4], seed=test_util.test_seed())).shape)
 
   def test_repr_with_custom_sample_dtype(self):
     def model():
@@ -535,20 +621,8 @@ class JointDistributionCoroutineTest(test_case.TestCase):
           tfd.Sample(tfd.InverseGamma(2, 2), 100))
       yield tfd.Independent(tfd.Normal(0, s), 1)
     sd = collections.namedtuple('Model', ['s', 'w'])(None, None)
-    m = tfd.JointDistributionCoroutine(model, sample_dtype=sd)
-    self.assertEqual(
-        ('tfp.distributions.JointDistributionCoroutine('
-         '"JointDistributionCoroutine",'
-         ' dtype=Model(s=?, w=?))'),
-        str(m))
-    self.assertEqual(
-        ('<tfp.distributions.JointDistributionCoroutine'
-         ' \'JointDistributionCoroutine\''
-         ' batch_shape=?'
-         ' event_shape=?'
-         ' dtype=Model(s=?, w=?)>'),
-        repr(m))
-    m.sample()
+    m = tfd.JointDistributionCoroutine(
+        model, sample_dtype=sd, validate_args=True)
     self.assertEqual(
         ('tfp.distributions.JointDistributionCoroutine('
          '"JointDistributionCoroutine",'
@@ -564,6 +638,84 @@ class JointDistributionCoroutineTest(test_case.TestCase):
          ' dtype=Model(s=float32, w=float32)>'),
         repr(m))
 
+  def test_converts_nested_lists_to_tensor(self):
+    def dist():
+      a = yield Root(tfd.MultivariateNormalDiag([0., 0.], [1., 1.]))
+      yield tfd.JointDistributionSequential([
+          tfd.JointDistributionSequential([
+              tfd.Normal(a[..., 0], 1.)]),
+          tfd.Normal(a[..., 1], 1.)])
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    x = [tf.convert_to_tensor([4., 2.]), [[1.], 3.]]
+    x_with_tensor_as_list = [[4., 2.], [[1.], 3.]]
+    lp = self.evaluate(joint.log_prob(x))
+    lp_with_tensor_as_list = self.evaluate(
+        joint.log_prob(x_with_tensor_as_list))
+    self.assertAllClose(lp, lp_with_tensor_as_list)
+
+  def test_matrix_factorization(self):
+    # A matrix factorization model based on
+    # Probabilistic Matrix Factorization by
+    # Ruslan Salakhutdinov and Andriy Mnih
+    # https://papers.nips.cc/paper/3208-probabilistic-matrix-factorization.pdf
+    #
+    #       users
+    # +-----3-+
+    # | U     |
+    # | | +-------+
+    # | | |   |   |
+    # | +-->R<--+ |
+    # |   |   | | |
+    # +---|---+ | |
+    #     |     V |
+    #     +-5-----+
+    #       items
+    def model():
+      n_users = 3
+      n_items = 5
+      n_factors = 2
+
+      user_trait_prior_scale = 10.
+      item_trait_prior_scale = 10.
+      observation_noise_prior_scale = 1.
+
+      # U in paper
+      user_traits = yield Root(
+          tfd.Sample(tfd.Normal(loc=0.,
+                                scale=user_trait_prior_scale),
+                     sample_shape=[n_factors, n_users]))
+
+      # V in paper
+      item_traits = yield Root(
+          tfd.Sample(tfd.Normal(loc=0.,
+                                scale=item_trait_prior_scale),
+                     sample_shape=[n_factors, n_items]))
+
+      # R in paper
+      yield tfd.Independent(
+          tfd.Normal(loc=tf.matmul(user_traits, item_traits,
+                                   adjoint_a=True),
+                     scale=observation_noise_prior_scale),
+          reinterpreted_batch_ndims=2)
+    dist = tfd.JointDistributionCoroutine(model)
+    self.assertAllEqual(dist.event_shape, [[2, 3], [2, 5], [3, 5]])
+
+    z = dist.sample(seed=test_util.test_seed())
+    self.assertAllEqual(tf.shape(z[0]), [2, 3])
+    self.assertAllEqual(tf.shape(z[1]), [2, 5])
+    self.assertAllEqual(tf.shape(z[2]), [3, 5])
+    lp = dist.log_prob(z)
+    self.assertEqual(lp.shape, [])
+
+    z = dist.sample((7, 9), seed=test_util.test_seed())
+    self.assertAllEqual(tf.shape(z[0]), [7, 9, 2, 3])
+    self.assertAllEqual(tf.shape(z[1]), [7, 9, 2, 5])
+    self.assertAllEqual(tf.shape(z[2]), [7, 9, 3, 5])
+    lp = dist.log_prob(z)
+    self.assertEqual(lp.shape, [7, 9])
+
+  @test_util.jax_disable_variable_test
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
@@ -603,11 +755,11 @@ class JointDistributionCoroutineTest(test_case.TestCase):
       yield tfd.Independent(tfd.Multinomial(total_count=z, logits=beta),
                             reinterpreted_batch_ndims=1)
 
-    lda = tfd.JointDistributionCoroutine(lda_model)
+    lda = tfd.JointDistributionCoroutine(lda_model, validate_args=True)
 
     # Now, let's sample some "documents" and compute the log-prob of each.
     docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
-    [n, theta, z, x] = lda.sample(docs_shape)
+    [n, theta, z, x] = lda.sample(docs_shape, seed=test_util.test_seed())
     log_probs = lda.log_prob([n, theta, z, x])
     self.assertEqual(docs_shape, log_probs.shape)
 
@@ -627,6 +779,30 @@ class JointDistributionCoroutineTest(test_case.TestCase):
                         (grads[0].shape, grads[1].shape))
     self.assertAllNotNone(grads)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Graph tensors are unsupported in JAX backend.')
+  def test_cache_doesnt_leak_graph_tensors(self):
+    if not tf.executing_eagerly():
+      return
+
+    def dist():
+      random_rank = tf.cast(3.5 + tf.random.uniform(
+          [], seed=test_util.test_seed()), tf.int32)
+      yield Root(tfd.Normal(loc=0., scale=tf.ones([random_rank])))
+
+    joint = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    @tf.function(autograph=False)
+    def get_batch_shapes():
+      return joint.batch_shape_tensor()
+
+    # Calling the tf.function will put graph Tensors in
+    # `joint._single_sample_distributions`
+    _ = get_batch_shapes()
+
+    # Referring to sampled distributions in eager mode should produce an eager
+    # result. Graph Tensors will throw an error.
+    _ = [s.numpy() for s in joint.batch_shape_tensor()]
 
 if __name__ == '__main__':
   tf.test.main()

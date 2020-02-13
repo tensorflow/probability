@@ -26,7 +26,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'Poisson',
@@ -118,15 +118,11 @@ class Poisson(distribution.Distribution):
   @property
   def rate(self):
     """Rate parameter."""
-    if self._rate is None:
-      return self._rate_deprecated_behavior()
     return self._rate
 
   @property
   def log_rate(self):
     """Log rate parameter."""
-    if self._log_rate is None:
-      return self._log_rate_deprecated_behavior()
     return self._log_rate
 
   @property
@@ -219,21 +215,8 @@ class Poisson(distribution.Distribution):
       return tf.math.log(self._rate)
     return tf.identity(self._log_rate)
 
-  @deprecation.deprecated(
-      '2019-10-01',
-      'The `rate` property will return `None` when the distribution is '
-      'parameterized with `rate=None`. Use `rate_parameter()` instead.',
-      warn_once=True)
-  def _rate_deprecated_behavior(self):
-    return self.rate_parameter()
-
-  @deprecation.deprecated(
-      '2019-10-01',
-      'The `log_rate` property will return `None` when the distribution is '
-      'parameterized with `log_rate=None`. Use `log_rate_parameter()` instead.',
-      warn_once=True)
-  def _log_rate_deprecated_behavior(self):
-    return self.log_rate_parameter()
+  def _default_event_space_bijector(self):
+    return
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
@@ -244,4 +227,11 @@ class Poisson(distribution.Distribution):
         assertions.append(assert_util.assert_positive(
             self._rate,
             message='Argument `rate` must be positive.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
     return assertions

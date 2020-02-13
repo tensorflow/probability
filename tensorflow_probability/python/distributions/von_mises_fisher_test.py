@@ -28,14 +28,12 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
-                         test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
+                         test_util.TestCase):
 
   def testBesselIve(self):
     self.assertRaises(ValueError, lambda: _bessel_ive(2.0, 1.0))
@@ -56,9 +54,9 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
         allow_nan_stats=False)
     self.assertEqual([5, 3], tensorshape_util.as_list(vmf.batch_shape))
     self.assertEqual([2], tensorshape_util.as_list(vmf.event_shape))
-    nsamples = 12000
+    nsamples = int(2e4)
     samples = vmf.sample(
-        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
+        sample_shape=[nsamples], seed=test_util.test_seed())
     self.assertEqual([nsamples, 5, 3, 2],
                      tensorshape_util.as_list(samples.shape))
     sample_mean = self.evaluate(samples).mean(axis=0)
@@ -67,7 +65,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     sample_dir = (
         sample_mean / np.linalg.norm(sample_mean, axis=-1, keepdims=True))
     inner_product = self.evaluate(
-        tf.reduce_sum(input_tensor=sample_dir * vmf.mean_direction, axis=-1))
+        tf.reduce_sum(sample_dir * vmf.mean_direction, axis=-1))
     # All except the 0-concentration distribution should have >0 inner product
     # with the mean direction of the distribution.
     self.assertAllGreater(inner_product[1:], 0.1)
@@ -99,7 +97,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     self.assertEqual([3], tensorshape_util.as_list(vmf.event_shape))
     nsamples = int(2e4)
     samples = vmf.sample(
-        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
+        sample_shape=[nsamples], seed=test_util.test_seed())
     self.assertEqual([nsamples, 5, 2, 3],
                      tensorshape_util.as_list(samples.shape))
     sample_mean = self.evaluate(samples).mean(axis=0)
@@ -108,7 +106,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     sample_dir = (
         sample_mean / np.linalg.norm(sample_mean, axis=-1, keepdims=True))
     inner_product = self.evaluate(
-        tf.reduce_sum(input_tensor=sample_dir * vmf.mean_direction, axis=-1))
+        tf.reduce_sum(sample_dir * vmf.mean_direction, axis=-1))
     # All except the 0-concentration distribution should have >0 inner product
     # with the mean direction of the distribution.
     self.assertAllGreater(inner_product[1:], 0.1)
@@ -147,7 +145,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     uniforms = uniforms.astype(dtype_util.as_numpy_dtype(vmf.dtype))
     # Concatenate in some sampled points from the distribution under test.
     vmf_samples = vmf.sample(
-        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
+        sample_shape=[nsamples], seed=test_util.test_seed())
     samples = tf.concat([uniforms, vmf_samples], axis=0)
     samples = tf.debugging.check_numerics(samples, 'samples')
     samples = self.evaluate(samples)
@@ -180,16 +178,16 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
       rtol: Relative difference tolerable.
     """
     dim = tf.compat.dimension_value(vmf.event_shape[-1])
-    nsamples = 50000
+    nsamples = int(6e4)
     samples = vmf.sample(
-        sample_shape=[nsamples], seed=tfp_test_util.test_seed())
+        sample_shape=[nsamples], seed=test_util.test_seed())
     samples = tf.debugging.check_numerics(samples, 'samples')
     log_prob = vmf.log_prob(samples)
     log_prob = tf.debugging.check_numerics(log_prob, 'log_prob')
     log_importance = -log_prob
     sphere_surface_area_estimate, samples, importance, conc = self.evaluate([
         tf.exp(
-            tf.reduce_logsumexp(input_tensor=log_importance, axis=0) -
+            tf.reduce_logsumexp(log_importance, axis=0) -
             tf.math.log(tf.cast(nsamples, dtype=tf.float32))), samples,
         tf.exp(log_importance), vmf.concentration
     ])
@@ -238,7 +236,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
   def _verifyCovariance(self, vmf):
     dim = tf.compat.dimension_value(vmf.event_shape[-1])
     nsamples = 10000
-    samples = vmf.sample(nsamples, seed=tfp_test_util.test_seed())
+    samples = vmf.sample(nsamples, seed=test_util.test_seed())
     samples = tf.debugging.check_numerics(samples, 'samples')
     cov = vmf.covariance()
     samples, cov = self.evaluate([samples, cov])
@@ -283,8 +281,8 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     self._verifyPdfWithNumpy(vmf)
 
   def testSampleAndPdfConsistency5d(self):
-    mean_dir = tf.math.l2_normalize([[1., 2, 3, 4, 5], [-2, -3, -1, 0, 1]],
-                                    axis=-1)
+    mean_dir = tf.math.l2_normalize(
+        [[1., 2, 3, 4, 5], [-2, -3, -1, 0, 1]], axis=-1)
     # TODO(bjp): Numerical instability 0 < k < 1e-2 concentrations.
     # Should resolve by eliminating the bessel_i recurrence in favor of
     # a more stable algorithm, e.g. cephes.
@@ -306,7 +304,7 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
     vmf = tfp.distributions.VonMisesFisher(
         mean_direction=mean_dir, concentration=concentration,
         validate_args=True, allow_nan_stats=False)
-    self.evaluate(vmf.sample(sample_shape))
+    self.evaluate(vmf.sample(sample_shape, seed=test_util.test_seed()))
 
   def testAssertsValidImmutableParams(self):
     with self.assertRaisesOpError('`concentration` must be non-negative'):
@@ -364,6 +362,51 @@ class VonMisesFisherTest(tfp_test_util.VectorDistributionTestHelpers,
         '`mean_direction` may not have scalar event shape'):
       self.evaluate(vmf.mean())
 
+  def testAssertValidSample(self):
+    mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
+    concentration = [[0.], [2.]]
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
+
+    with self.assertRaisesOpError('Samples must be unit length.'):
+      self.evaluate(vmf.prob([0.5, 0.5, 0.5]))
+
+    msg = 'must have innermost dimension matching'
+    static_shape_assertion = self.assertRaisesRegexp(ValueError, msg)
+    dynamic_shape_assertion = self.assertRaisesOpError(msg)
+
+    x = [[1., 0., 0., 0.]]
+    with static_shape_assertion:
+      self.evaluate(vmf.log_prob(x))
+
+    x_var = tf.Variable(x, shape=tf.TensorShape(None))
+    shape_assertion = (static_shape_assertion if tf.executing_eagerly()
+                       else dynamic_shape_assertion)
+    self.evaluate(x_var.initializer)
+    with shape_assertion:
+      self.evaluate(vmf.log_prob(x_var))
+
+  def testSupportBijectorOutsideRange(self):
+    mean_dir = np.array([[1., 2., 3.], [-2., -3., -1.]]).astype(np.float32)
+    mean_dir /= np.linalg.norm(mean_dir, axis=-1)[:, np.newaxis]
+    concentration = [[0], [0.1], [2], [40], [1000]]
+    dist = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True)
+
+    x = mean_dir
+    x[0][0] += 0.01
+    with self.assertRaisesOpError('must sum to `1`'):
+      self.evaluate(
+          dist._experimental_default_event_space_bijector().inverse(x[0]))
+
+    with self.assertRaisesOpError('must be non-negative'):
+      self.evaluate(
+          dist._experimental_default_event_space_bijector().inverse(x[1]))
 
 if __name__ == '__main__':
   tf.test.main()

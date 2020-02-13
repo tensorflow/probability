@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2019 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,115 +12,92 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for tensorflow_probability.python.internal.test_combinations."""
+"""Tests generating test combinations."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl.testing import parameterized
+from collections import OrderedDict
+
+# Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_combinations
-
-from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.eager import def_function  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import combinations as tf_combinations  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.framework import test_combinations as tf_test_combinations  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-#
-# The are following are "pretend" test case classes, which are actually examined
-# in unit tests below, to verify (and document) the generated test names.
-#
-@test_combinations.test_all_tf_execution_regimes
-class PretendTestCaseClass(parameterized.TestCase):
+class TestingCombinationsTest(test_util.TestCase):
 
-  def test_something(self):
-    self.skipTest('Fake test')
+  def test_combine(self):
+    self.assertEqual([{
+        "a": 1,
+        "b": 2
+    }, {
+        "a": 1,
+        "b": 3
+    }, {
+        "a": 2,
+        "b": 2
+    }, {
+        "a": 2,
+        "b": 3
+    }], test_combinations.combine(a=[1, 2], b=[2, 3]))
 
+  def test_arguments_sorted(self):
+    self.assertEqual([
+        OrderedDict([("aa", 1), ("ab", 2)]),
+        OrderedDict([("aa", 1), ("ab", 3)]),
+        OrderedDict([("aa", 2), ("ab", 2)]),
+        OrderedDict([("aa", 2), ("ab", 3)])
+    ], test_combinations.combine(ab=[2, 3], aa=[1, 2]))
 
-@test_combinations.test_all_tf_execution_regimes
-class PretendParameterizedTestCaseClass(parameterized.TestCase):
+  def test_combine_single_parameter(self):
+    self.assertEqual([{
+        "a": 1,
+        "b": 2
+    }, {
+        "a": 2,
+        "b": 2
+    }], test_combinations.combine(a=[1, 2], b=2))
 
-  @parameterized.named_parameters([dict(testcase_name='p123', p='123')])
-  def test_something(self, p):
-    del p  # avoid unused
-    self.skipTest('Fake test')
-
-
-@test_combinations.test_graph_and_eager_modes
-class PretendTestCaseClassGraphAndEagerOnly(parameterized.TestCase):
-
-  def test_something(self):
-    self.skipTest('Fake test')
-
-
-class TestCombinationsTest(test_case.TestCase, parameterized.TestCase):
-
-  #
-  # These tests check that the generated names are as expected.
-  #
-  def test_generated_test_case_names(self):
-    expected_test_names = [
-        'test_something_test_mode_eager_tffunction_disabled',
-        'test_something_test_mode_eager_tffunction_enabled',
-        'test_something_test_mode_graph_tffunction_enabled',
-    ]
-
-    for expected_test_name in expected_test_names:
-      self.assertIn(expected_test_name, dir(PretendTestCaseClass))
-
-  def test_generated_parameterized_test_case_names(self):
-    expected_test_names = [
-        'test_something_p123_test_mode_eager_tffunction_disabled',
-        'test_something_p123_test_mode_eager_tffunction_enabled',
-        'test_something_p123_test_mode_graph_tffunction_enabled',
-    ]
-
-    for expected_test_name in expected_test_names:
-      self.assertIn(expected_test_name, dir(PretendParameterizedTestCaseClass))
-
-  def test_generated_graph_and_eager_test_case_names(self):
-    expected_test_names = [
-        'test_something_test_mode_eager',
-        'test_something_test_mode_eager',
-        'test_something_test_mode_graph',
-    ]
-
-    for expected_test_name in expected_test_names:
-      self.assertIn(expected_test_name,
-                    dir(PretendTestCaseClassGraphAndEagerOnly))
-
-  #
-  # These tests ensure that the test generators do what they say on the tin.
-  #
-  @tf_test_combinations.generate(
-      tf_test_combinations.combine(mode='graph'),
-      test_combinations=[tf_combinations.EagerGraphCombination()])
-  def test_graph_mode_combination(self):
-    self.assertFalse(context.executing_eagerly())
-
-  @tf_test_combinations.generate(
-      tf_test_combinations.combine(mode='eager'),
-      test_combinations=[tf_combinations.EagerGraphCombination()])
-  def test_eager_mode_combination(self):
-    self.assertTrue(context.executing_eagerly())
-
-  @tf_test_combinations.generate(
-      tf_test_combinations.combine(tf_function='enabled'),
-      test_combinations=[
-          test_combinations.ExecuteFunctionsEagerlyCombination()])
-  def test_tf_function_enabled_mode_combination(self):
-    self.assertFalse(def_function.RUN_FUNCTIONS_EAGERLY)
-
-  @tf_test_combinations.generate(
-      tf_test_combinations.combine(tf_function='disabled'),
-      test_combinations=[
-          test_combinations.ExecuteFunctionsEagerlyCombination()])
-  def test_tf_function_disabled_mode_combination(self):
-    self.assertTrue(def_function.RUN_FUNCTIONS_EAGERLY)
+  def test_add(self):
+    self.assertEqual(
+        [{
+            "a": 1
+        }, {
+            "a": 2
+        }, {
+            "b": 2
+        }, {
+            "b": 3
+        }],
+        (test_combinations.combine(a=[1, 2]) +
+         test_combinations.combine(b=[2, 3])))
 
 
-if __name__ == '__main__':
+@test_combinations.generate(
+    test_combinations.combine(a=[1, 0], b=[2, 3], c=[1]))
+class CombineTheTestSuite(test_util.TestCase):
+
+  def test_add_things(self, a, b, c):
+    self.assertLessEqual(3, a + b + c)
+    self.assertLessEqual(a + b + c, 5)
+
+  def test_add_things_one_more(self, a, b, c):
+    self.assertLessEqual(3, a + b + c)
+    self.assertLessEqual(a + b + c, 5)
+
+  def not_a_test(self, a=0, b=0, c=0):
+    del a, b, c
+    self.fail()
+
+  def _test_but_private(self, a=0, b=0, c=0):
+    del a, b, c
+    self.fail()
+
+  # Check that nothing funny happens to a non-callable that starts with "_test".
+  test_member = 0
+
+
+if __name__ == "__main__":
   tf.test.main()

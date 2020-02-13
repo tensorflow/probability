@@ -28,10 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 _RATE = 1.01
@@ -72,9 +69,10 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
         accepted_results=self.parameters['inner_kernel'].bootstrap_results(
             current_state),
         log_accept_ratio=tf.convert_to_tensor(
-            value=self.parameters['log_accept_ratio']),
+            self.parameters['log_accept_ratio']),
     )
 
+  @property
   def is_calibrated(self):
     return True
 
@@ -98,6 +96,7 @@ class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
         step_size=tf.nest.map_structure(tf.convert_to_tensor,
                                         self.parameters['step_size']))
 
+  @property
   def is_calibrated(self):
     return False
 
@@ -125,12 +124,13 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
     return FakeWrapperKernelResults(
         inner_results=self.inner_kernel.bootstrap_results(current_state))
 
+  @property
   def is_calibrated(self):
-    return self.inner_kernel.is_calibrated()
+    return self.inner_kernel.is_calibrated
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SimpleStepSizeAdaptationTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SimpleStepSizeAdaptationTest(test_util.TestCase):
 
   def testTurnOnStoreParametersInKernelResults(self):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
@@ -350,8 +350,20 @@ class SimpleStepSizeAdaptationTest(test_case.TestCase, parameterized.TestCase):
     else:
       _impl()
 
-  def testExample(self):
-    tf1.random.set_random_seed(tfp_test_util.test_seed())
+  def testIsCalibrated(self):
+    test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
+    self.assertTrue(
+        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(True), 1).is_calibrated)
+    self.assertFalse(
+        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(False), 1).is_calibrated)
+
+
+# Reduce test weight by not running the (slow) `eager_no_tf_function` regime.
+@test_util.test_graph_and_eager_modes()
+class SimpleStepSizeAdaptationExampleTest(test_util.TestCase):
+
+  def test_example(self):
+    tf.random.set_seed(test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
     num_results = 500
@@ -362,26 +374,29 @@ class SimpleStepSizeAdaptationTest(test_case.TestCase, parameterized.TestCase):
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=step_size,
-        seed=_set_seed(tfp_test_util.test_seed()))
+        seed=_set_seed(test_util.test_seed()))
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
 
-    _, log_accept_ratio = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        num_burnin_steps=num_burnin_steps,
-        current_state=tf.zeros(num_chains),
-        kernel=kernel,
-        trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
+    @tf.function(autograph=False)
+    def do_sampling():
+      _, log_accept_ratio = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          num_burnin_steps=num_burnin_steps,
+          current_state=tf.zeros(num_chains),
+          kernel=kernel,
+          trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
+      return log_accept_ratio
 
-    p_accept = tf.reduce_mean(
-        input_tensor=tf.exp(tf.minimum(log_accept_ratio, 0.)))
+    log_accept_ratio = do_sampling()
+    p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
+        tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SimpleStepSizeAdaptationStaticBroadcastingTest(test_case.TestCase,
-                                                     parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SimpleStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
   use_static_shape = True
 
   @parameterized.parameters(
@@ -422,7 +437,7 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(test_case.TestCase,
          [np.log(0.77), np.log(0.77), np.log(0.73)]],
         dtype=tf.float64)
     log_accept_ratio = tf1.placeholder_with_default(
-        input=log_accept_ratio,
+        log_accept_ratio,
         shape=log_accept_ratio.shape if self.use_static_shape else None)
     state = [
         tf.zeros([2, 3], dtype=tf.float64),
@@ -448,7 +463,7 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(test_case.TestCase,
     self.assertAllClose(new_step_size, step_size)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SimpleStepSizeAdaptationDynamicBroadcastingTest(
     SimpleStepSizeAdaptationStaticBroadcastingTest):
   use_static_shape = False

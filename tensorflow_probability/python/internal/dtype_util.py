@@ -82,7 +82,7 @@ def common_dtype(args_list, dtype_hint=None):
       else:
         raise TypeError(
             'Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return dtype_hint if dtype is None else tf.as_dtype(dtype)
+  return dtype_hint if dtype is None else base_dtype(dtype)
 
 
 def is_bool(dtype):
@@ -100,7 +100,7 @@ def is_complex(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_complex'):
     return dtype.is_complex
-  return np.issubdtype(np.dtype(dtype), np.complex)
+  return np.issubdtype(np.dtype(dtype), np.complexfloating)
 
 
 def is_floating(dtype):
@@ -122,7 +122,7 @@ def is_integer(dtype):
 def max(dtype):  # pylint: disable=redefined-builtin
   """Returns the maximum representable value in this data type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'max'):
+  if hasattr(dtype, 'max') and not callable(dtype.max):
     return dtype.max
   use_finfo = is_floating(dtype) or is_complex(dtype)
   return np.finfo(dtype).max if use_finfo else np.iinfo(dtype).max
@@ -131,7 +131,7 @@ def max(dtype):  # pylint: disable=redefined-builtin
 def min(dtype):  # pylint: disable=redefined-builtin
   """Returns the minimum representable value in this data type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'min'):
+  if hasattr(dtype, 'min') and not callable(dtype.min):
     return dtype.min
   use_finfo = is_floating(dtype) or is_complex(dtype)
   return np.finfo(dtype).min if use_finfo else np.iinfo(dtype).min
@@ -150,7 +150,7 @@ def name(dtype):
 def size(dtype):
   """Returns the number of bytes to represent this `dtype`."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'size'):
+  if hasattr(dtype, 'size') and hasattr(dtype, 'as_numpy_dtype'):
     return dtype.size
   return np.dtype(dtype).itemsize
 
@@ -185,7 +185,7 @@ def _assert_same_base_type(items, expected_type=None):
   for item in items:
     if item is not None:
       item_type = base_dtype(item.dtype)
-      if not expected_type:
+      if expected_type is None:
         expected_type = item_type
       elif expected_type != item_type:
         mismatch = True
@@ -203,8 +203,6 @@ def _assert_same_base_type(items, expected_type=None):
           expected_type = item_type
           original_item_str = get_name(item)
         elif expected_type != item_type:
-          if SKIP_DTYPE_CHECKS:
-            return (np.ones([2], expected_type) + np.ones([2], item_type)).dtype
           raise ValueError(
               '{}, type={}, must be of the same type ({}){}.'.format(
                   get_name(item),

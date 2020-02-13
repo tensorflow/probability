@@ -49,13 +49,13 @@ py_library(
 
 py_test(
     name = "missing_values_util_test",
-    size = "medium",
+    size = "small",
     srcs = ["missing_values_util_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -74,12 +74,12 @@ py_library(
 
 py_test(
     name = "util_test",
-    size = "medium",
+    size = "small",
     srcs = ["util_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

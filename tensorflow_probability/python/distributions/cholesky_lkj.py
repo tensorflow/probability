@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import correlation_cholesky as correlation_cholesky_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import assert_util
@@ -44,6 +45,16 @@ class CholeskyLKJ(distribution.Distribution):
   correlation matrices.
 
   In other words, if If `X ~ CholeskyLKJ(c)`, then `X @ X^T ~ LKJ(c)`.
+
+  The distribution is supported on lower triangular N x N matrices which are
+  Cholesky factors of correlation matrices; equivalently, matrices whose rows
+  have Euclidean norm 1 and diagonal entries are positive. The probability
+  density function is given by:
+
+    pdf(X; c) = (1/Z(c)) prod_i X_ii^{n-i+2c-3}  (0 <= i < n)
+
+  where there are n(n-1)/2 independent variables X_ij (0 <= i < j < n) and
+  Z(c) is the normalizing constant; the same one as that of LKJ(c).
 
   For more details on the LKJ distribution, see `tfp.distributions.LKJ`.
 
@@ -162,49 +173,15 @@ class CholeskyLKJ(distribution.Distribution):
         seed=seed,
         name=name)
 
-  def _has_valid_dimensions(self, x):
-    if tensorshape_util.is_fully_defined(x.shape[-2:]):
-      if (tensorshape_util.dims(x.shape)[-2] ==
-          tensorshape_util.dims(x.shape)[-1] ==
-          self.dimension):
-        return []
-      else:
-        raise ValueError(
-            'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
-                self.dimension, self.dimension, tensorshape_util.dims(x.shape)))
-    elif self.validate_args:
-      msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
-          self.dimension, self.dimension, tf.shape(x))
-      return [
-          assert_util.assert_equal(
-              tf.shape(x)[-2], self.dimension, message=msg),
-          assert_util.assert_equal(
-              tf.shape(x)[-1], self.dimension, message=msg)]
-    return []
-
-  def _is_valid_correlation_cholesky(self, x):
-    if not self.validate_args:
-      return []
-    return [
-        assert_util.assert_near(
-            x,
-            tf.linalg.band_part(x, -1, 0),
-            message='Cholesky factors must be lower triangular.')
-    ]
-
   def _log_prob(self, x):
-    with tf.control_dependencies(
-        self._has_valid_dimensions(x) + self._is_valid_correlation_cholesky(x)):
-      concentration = tf.convert_to_tensor(self.concentration)
-      normalizer = self._log_normalization(concentration=concentration)
-      # This log_prob comes from using a change of variables via the Cholesky
-      # decomposition on the LKJ's log_prob.
-      # The first term represents the change of variables of the LKJ's
-      # unnormalized log_prob, the second is the normalization term coming
-      # from the LKJ distribution, and the final is a normalization term
-      # coming from the change of variables.
-      return (self._log_unnorm_prob(x, concentration) -
-              normalizer + self.dimension * np.log(2.))
+    concentration = tf.convert_to_tensor(self.concentration)
+    normalizer = self._log_normalization(concentration=concentration)
+    # This log_prob comes from using a change of variables via the Cholesky
+    # decomposition on the LKJ's log_prob.
+    # The first term represents the change of variables of the LKJ's
+    # unnormalized log_prob and the second is the normalization term coming
+    # from the LKJ distribution.
+    return self._log_unnorm_prob(x, concentration) - normalizer
 
   def _log_unnorm_prob(self, x, concentration, name=None):
     """Returns the unnormalized log density of a CholeskyLKJ distribution.
@@ -226,12 +203,26 @@ class CholeskyLKJ(distribution.Distribution):
       x = tf.convert_to_tensor(x, name='x')
       logdiag = tf.math.log(tf.linalg.diag_part(x))
       # We pick up a weighted sum of the log(diag) due to the jacobian
-      # of the cholesky decomposition. See `tfp.bijectors.CholeskyOuterProduct`
-      # for details.
+      # of the cholesky decomposition. By an argument similar to that of
+      # `tfp.bijectors.CholeskyOuterProduct`, the jacobian is given by:
+      #   prod_i x_ii^{n-i-1} (0 <= i < n).
+      #
+      # To see this, observe that if x @ x^T = p, then p_ij depends only on
+      # those x_kl where k<=i and l<=j. Therefore, on vectorizing the strictly
+      # lower triangular parts of x and p, we get that the jacobian matrix
+      # [d/dvec(x) vec(p)] is lower triangular. The jacobian determinant is then
+      # the product of the n(n-1)/2 diagonal entries:
+      #   J = prod_ij d/dx_ij p_ij  (0 <= j < i < n)
+      #     = prod_ij d/dx_ij (x_i0 * x_j0 + x_i1 * x_j1 + ... + x_ij * x_jj)
+      #     = prod_ij x_jj
+      #     = prod_i x_ii^{n-i-1}
+      #
+      # For more details, see `tfp.bijectors.CholeskyOuterProduct`.
       dimension_range = np.linspace(
+          self.dimension - 1,
+          0.,
           self.dimension,
-          1., self.dimension, dtype=dtype_util.as_numpy_dtype(
-              concentration.dtype))
+          dtype=dtype_util.as_numpy_dtype(concentration.dtype))
       return tf.reduce_sum(
           (2. * concentration[..., tf.newaxis] - 2. + dimension_range) *
           logdiag, axis=-1)
@@ -262,6 +253,10 @@ class CholeskyLKJ(distribution.Distribution):
         ans = ans - tf.math.lgamma(concentration + (self.dimension - 1) / 2.)
       return ans
 
+  def _default_event_space_bijector(self):
+    return correlation_cholesky_bijector.CorrelationCholesky(
+        validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -272,4 +267,27 @@ class CholeskyLKJ(distribution.Distribution):
       assertions.append(assert_util.assert_non_negative(
           self.concentration - 1,
           message='Argument `concentration` must be >= 1.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if tensorshape_util.is_fully_defined(x.shape[-2:]):
+      if not (tensorshape_util.dims(x.shape)[-2] ==
+              tensorshape_util.dims(x.shape)[-1] ==
+              self.dimension):
+        raise ValueError(
+            'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
+                self.dimension, self.dimension, tensorshape_util.dims(x.shape)))
+    elif self.validate_args:
+      msg = 'Input dimension mismatch: expected [..., {}, {}], got {}'.format(
+          self.dimension, self.dimension, tf.shape(x))
+      assertions.append(assert_util.assert_equal(
+          tf.shape(x)[-2], self.dimension, message=msg))
+      assertions.append(assert_util.assert_equal(
+          tf.shape(x)[-1], self.dimension, message=msg))
+
+    if self.validate_args:
+      assertions.append(assert_util.assert_near(
+          x, tf.linalg.band_part(x, -1, 0),
+          message='Cholesky factors must be lower triangular.'))
     return assertions

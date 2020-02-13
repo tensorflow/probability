@@ -39,6 +39,7 @@ py_library(
         ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
+        "//tensorflow_probability/python/optimizer/convergence_criteria",
         "//tensorflow_probability/python/optimizer/linesearch",
     ],
 )
@@ -49,6 +50,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -60,7 +62,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -70,17 +72,18 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
 py_test(
     name = "variational_sgd_test",
-    size = "medium",
+    size = "small",
     srcs = ["variational_sgd_test.py"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -104,7 +107,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -121,7 +124,7 @@ py_library(
 
 py_test(
     name = "lbfgs_test",
-    size = "medium",
+    size = "small",
     timeout = "long",
     srcs = ["lbfgs_test.py"],
     shard_count = 5,
@@ -129,7 +132,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -139,6 +142,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
@@ -149,6 +153,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
@@ -161,7 +166,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -172,6 +177,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/util",
     ],
 )
 
@@ -183,7 +191,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -193,6 +201,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:generic",
     ],
@@ -200,12 +209,12 @@ py_library(
 
 py_test(
     name = "proximal_hessian_sparse_test",
-    size = "medium",
+    size = "small",
     srcs = ["proximal_hessian_sparse_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

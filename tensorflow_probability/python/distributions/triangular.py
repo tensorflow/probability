@@ -23,6 +23,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -214,13 +215,6 @@ class Triangular(distribution.Distribution):
     high = tf.convert_to_tensor(self.high)
     peak = tf.convert_to_tensor(self.peak)
 
-    if self.validate_args:
-      with tf.control_dependencies([
-          assert_util.assert_greater_equal(x, low),
-          assert_util.assert_less_equal(x, high)
-      ]):
-        x = tf.identity(x)
-
     interval_length = high - low
     # This is the pdf function when a low <= high <= x. This looks like
     # a triangle, so we have to treat each line segment separately.
@@ -273,6 +267,10 @@ class Triangular(distribution.Distribution):
             tf.math.squared_difference(high, peak) +
             tf.math.squared_difference(peak, low)) / 36.
 
+  def _default_event_space_bijector(self):
+    return sigmoid_bijector.Sigmoid(
+        low=self.low, high=self.high, validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -286,11 +284,23 @@ class Triangular(distribution.Distribution):
           low, high, message='triangular not defined when low >= high.'))
     if (is_init != tensor_util.is_ref(self.low) and
         is_init != tensor_util.is_ref(self.peak)):
-      assertions.append(assert_util.assert_less(
-          low, peak, message='triangular not defined when low > peak.'))
+      assertions.append(
+          assert_util.assert_less_equal(
+              low, peak, message='triangular not defined when low > peak.'))
     if (is_init != tensor_util.is_ref(self.high) and
         is_init != tensor_util.is_ref(self.peak)):
-      assertions.append(assert_util.assert_less(
-          peak, high, message='triangular not defined when peak > high.'))
+      assertions.append(
+          assert_util.assert_less_equal(
+              peak, high, message='triangular not defined when peak > high.'))
 
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_greater_equal(
+        x, self.low, message='Sample must be greater than or equal to `low`.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, self.high, message='Sample must be less than or equal to `high`.'))
     return assertions

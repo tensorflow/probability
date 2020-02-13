@@ -18,8 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as onp
+
 import tensorflow.compat.v2 as tf
 
+from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import tensor_shape  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -56,6 +60,16 @@ def as_list(x):
     ValueError: If `x` has unknown rank.
   """
   return tf.TensorShape(x).as_list()
+
+
+def _cast_tensorshape(x, x_type):
+  if issubclass(x_type, tf.TensorShape):
+    return x
+  if issubclass(x_type, onp.ndarray):
+    # np.ndarray default constructor will place x
+    # as the shape, which we don't want.
+    return onp.array(as_list(x), dtype=onp.int32)
+  return x_type(as_list(x))
 
 
 def assert_has_rank(x, rank):  # pylint: disable=redefined-outer-name
@@ -114,7 +128,7 @@ def concatenate(x, other):
     new_shape: an object like `x` whose elements are the concatenation of the
       dimensions in `x` and `other`.
   """
-  return type(x)(tf.TensorShape(x).concatenate(other))
+  return _cast_tensorshape(tf.TensorShape(x).concatenate(other), type(x))
 
 
 def constant_value_as_shape(tensor):  # pylint: disable=invalid-name
@@ -138,7 +152,29 @@ def constant_value_as_shape(tensor):  # pylint: disable=invalid-name
   """
   shape = tf.get_static_value(tensor)
   if shape is not None:
-    return [None if dim == -1 else dim for dim in shape]
+    return tensor_shape.as_shape(
+        [None if dim == -1 else dim for dim in shape])
+  try:
+    # Importing here, conditionally, to avoid a hard dependency on
+    # DeferredTensor, because that creates a BUILD dependency cycle.
+    # Why is it necessary to mention DeferredTensor at all?
+    # Because TF's `constant_value_as_shape` barfs on it: b/142254634.
+    # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
+    if isinstance(tensor, DeferredTensor):
+      # Presumably not constant if deferred
+      return tf.TensorShape(None)
+  except ImportError:
+    # If DeferredTensor doesn't even exist, couldn't have been an instance of
+    # it.
+    pass
+  if tf.executing_eagerly():
+    # Working around b/142251799
+    if isinstance(tensor, ops.EagerTensor):
+      return tensor_shape.as_shape(
+          [dim if dim != -1 else None for dim in tensor.numpy()])
+    else:
+      return tf.TensorShape(None)
   return tensor_util.constant_value_as_shape(tensor)
 
 
@@ -209,7 +245,7 @@ def merge_with(x, other):
   Raises:
     ValueError: If `x` and `other` are not compatible.
   """
-  return type(x)(tf.TensorShape(x).merge_with(other))
+  return _cast_tensorshape(tf.TensorShape(x).merge_with(other), type(x))
 
 
 def num_elements(x):
@@ -228,15 +264,21 @@ def num_elements(x):
 
 
 def rank(x):
-  """Returns the rank of this shape, or `None` if it is unspecified.
+  """Returns the rank implied by this shape, or `None` if it is unspecified.
 
   For more details, see `help(tf.TensorShape.rank)`.
 
+  Note: This is not the rank of the shape itself, viewed as a Tensor, which
+  would always be 1; rather, it's the rank of every Tensor of the shape given by
+  `x`.
+
   Args:
-    x: object representing a shape; convertible to `tf.TensorShape`.
+    x: object representing a shape; anything convertible to `tf.TensorShape`,
+      or a `Tensor` (interpreted as an in-graph computed shape).
 
   Returns:
-    rank: `int` representing the number of shape dimensions.
+    rank: `int` representing the number of shape dimensions, or `None` if
+      not statically known.
   """
   return tf.TensorShape(x).rank
 
@@ -301,7 +343,7 @@ def with_rank(x, rank):  # pylint: disable=redefined-outer-name
   Raises:
     ValueError: If `x` does not represent a shape with the given `rank`.
   """
-  return type(x)(tf.TensorShape(x).with_rank(rank))
+  return _cast_tensorshape(tf.TensorShape(x).with_rank(rank), type(x))
 
 
 def with_rank_at_least(x, rank):  # pylint: disable=redefined-outer-name
@@ -322,4 +364,4 @@ def with_rank_at_least(x, rank):  # pylint: disable=redefined-outer-name
     ValueError: If `x` does not represent a shape with at least the given
       `rank`.
   """
-  return type(x)(tf.TensorShape(x).with_rank_at_least(rank))
+  return _cast_tensorshape(tf.TensorShape(x).with_rank_at_least(rank), type(x))

@@ -22,10 +22,9 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 # Define value and gradient namedtuple
@@ -42,8 +41,8 @@ def _interval(val_left, val_right):
   return LineSearchInterval(
       converged=false,
       failed=false,
-      func_evals=tf.constant(value=0),
-      iterations=tf.constant(value=0),
+      func_evals=tf.constant(0),
+      iterations=tf.constant(0),
       left=val_left,
       right=val_right)
 
@@ -62,13 +61,13 @@ def test_function_x_y(x, y):
   batches = y.shape[0] if len(y.shape) == 2 else None
   deg = len(x) - 1
   poly = np.polyfit(x, y.T, deg)
-  poly = [tf.convert_to_tensor(value=c, dtype=tf.float32) for c in poly]
+  poly = [tf.convert_to_tensor(c, dtype=tf.float32) for c in poly]
 
   def f(t):
-    t = tf.convert_to_tensor(value=t, dtype=tf.float32)
+    t = tf.convert_to_tensor(t, dtype=tf.float32)
     if batches is not None and not tuple(t.shape):
       # Broadcast a scalar through all batches.
-      t = tf.tile(tf.expand_dims(t, -1), [batches])
+      t = tf.tile(t[..., tf.newaxis], [batches])
     f, df = value_and_gradient(lambda t_: tf.math.polyval(poly, t_), t)
     return ValueAndGradient(x=t, f=tf.squeeze(f), df=tf.squeeze(df))
 
@@ -85,8 +84,8 @@ def test_function_x_y_dy(x, y, dy, eps=0.01):
       np.concatenate([x1, x2], axis=-1), np.concatenate([y1, y2], axis=-1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HagerZhangLibTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class HagerZhangLibTest(test_util.TestCase):
 
   def test_secant2_batching_vs_mapping(self):
     # We build a simple example function with 2 batches, one where the wolfe

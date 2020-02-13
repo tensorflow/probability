@@ -28,17 +28,15 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TrainableLocationScale(parameterized.TestCase, test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TrainableLocationScale(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': 'ScalarLaplace',
@@ -78,8 +76,8 @@ class TrainableLocationScale(parameterized.TestCase, test_case.TestCase):
     self.assertTrue(all(g is not None for g in grad))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class FactoredSurrogatePosterior(parameterized.TestCase, test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class FactoredSurrogatePosterior(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': 'TensorEvent',
@@ -100,7 +98,7 @@ class FactoredSurrogatePosterior(parameterized.TestCase, test_case.TestCase):
   def test_specifying_event_shape(self, event_shape,
                                   constraining_bijectors,
                                   dtype, use_static_shape):
-    seed = tfp_test_util.test_seed_stream()
+    seed = test_util.test_seed_stream()
     surrogate_posterior = (
         tfp.experimental.vi.build_factored_surrogate_posterior(
             event_shape=tf.nest.map_structure(
@@ -188,7 +186,7 @@ class FactoredSurrogatePosterior(parameterized.TestCase, test_case.TestCase):
     self.evaluate([v.initializer
                    for v in surrogate_posterior.trainable_variables])
     posterior_sample_ = self.evaluate(surrogate_posterior.sample(
-        seed=tfp_test_util.test_seed()))
+        seed=test_util.test_seed()))
     posterior_logprob_ = self.evaluate(
         surrogate_posterior.log_prob(posterior_sample_))
 

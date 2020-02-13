@@ -25,8 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.layers import utils as tf_layers_util
 from tensorflow.python.ops import nn_ops
@@ -178,7 +177,7 @@ class MockKLDivergence(object):
     return self.result
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ConvVariational(object):
 
   def maybe_transpose_inputs(self, inputs):
@@ -194,13 +193,13 @@ class ConvVariational(object):
       del name, trainable, add_variable_fn  # unused
       # Deserialized Keras objects do not perform lexical scoping. Any modules
       # that the function requires must be imported within the function.
-      import tensorflow as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
+      import tensorflow.compat.v2 as tf  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
       import tensorflow_probability as tfp  # pylint: disable=g-import-not-at-top,redefined-outer-name,reimported
       tfd = tfp.distributions  # pylint: disable=redefined-outer-name
 
       dist = tfd.Normal(loc=tf.zeros(shape, dtype),
                         scale=dtype.as_numpy_dtype(1))
-      batch_ndims = tf.size(input=dist.batch_shape_tensor())
+      batch_ndims = tf.size(dist.batch_shape_tensor())
       return tfd.Independent(dist, reinterpreted_batch_ndims=batch_ndims)
 
     if layer_class in (tfp.layers.Convolution1DReparameterization,
@@ -332,7 +331,7 @@ class ConvVariational(object):
     bias_divergence = MockKLDivergence(
         result=tf.random.uniform([], seed=seed()))
 
-    tf1.set_random_seed(5995)
+    tf.random.set_seed(5995)
     layer = layer_class(
         filters=filters,
         kernel_size=kernel_size,
@@ -429,7 +428,7 @@ class ConvVariational(object):
            depth=depth, height=height, width=width, channels=channels,
            filters=filters, seed=44)
 
-      tf1.set_random_seed(5995)
+      tf.random.set_seed(5995)
 
       convolution_op = nn_ops.Convolution(
           tf.TensorShape(inputs.shape),
@@ -447,7 +446,7 @@ class ConvVariational(object):
       expected_outputs = convolution_op(
           inputs, kernel_posterior.distribution.loc)
 
-      input_shape = tf.shape(input=inputs)
+      input_shape = tf.shape(inputs)
       batch_shape = tf.expand_dims(input_shape[0], 0)
       if self.data_format == 'channels_first':
         channels = input_shape[1]
@@ -725,13 +724,13 @@ class ConvVariational(object):
     self.assertAllNotNone(grads)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsFirst(test_case.TestCase, ConvVariational):
+@test_util.test_all_tf_execution_regimes
+class ConvVariationalTestChannelsFirst(test_util.TestCase, ConvVariational):
   data_format = 'channels_first'
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ConvVariationalTestChannelsLast(test_case.TestCase, ConvVariational):
+@test_util.test_all_tf_execution_regimes
+class ConvVariationalTestChannelsLast(test_util.TestCase, ConvVariational):
   data_format = 'channels_last'
 
 if __name__ == '__main__':

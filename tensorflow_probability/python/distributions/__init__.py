@@ -56,14 +56,18 @@ from tensorflow_probability.python.distributions.inverse_gamma import InverseGam
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
+from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionCoroutineAutoBatched
 from tensorflow_probability.python.distributions.joint_distribution_named import JointDistributionNamed
+from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionNamedAutoBatched
 from tensorflow_probability.python.distributions.joint_distribution_sequential import JointDistributionSequential
+from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionSequentialAutoBatched
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.lkj import LKJ
 from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
+from tensorflow_probability.python.distributions.logitnormal import LogitNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
 from tensorflow_probability.python.distributions.multinomial import Multinomial
@@ -78,6 +82,7 @@ from tensorflow_probability.python.distributions.normal import Normal
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
 from tensorflow_probability.python.distributions.pareto import Pareto
 from tensorflow_probability.python.distributions.pert import PERT
+from tensorflow_probability.python.distributions.pixel_cnn import PixelCNN
 from tensorflow_probability.python.distributions.plackett_luce import PlackettLuce
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
@@ -97,21 +102,16 @@ from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
 from tensorflow_probability.python.distributions.vector_diffeomixture import VectorDiffeomixture
 from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
-from tensorflow_probability.python.distributions.vector_laplace_diag import VectorLaplaceDiag
-from tensorflow_probability.python.distributions.vector_sinh_arcsinh_diag import VectorSinhArcsinhDiag
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
-from tensorflow_probability.python.distributions.wishart import Wishart
+from tensorflow_probability.python.distributions.wishart import WishartLinearOperator
+from tensorflow_probability.python.distributions.wishart import WishartTriL
 from tensorflow_probability.python.distributions.zipf import Zipf
 
 # Utilities/Other:
-from tensorflow_probability.python.distributions.deprecated_linalg import matrix_diag_transform
-from tensorflow_probability.python.distributions.deprecated_linalg import tridiag
-from tensorflow_probability.python.distributions.internal.moving_stats import assign_log_moving_mean_exp
-from tensorflow_probability.python.distributions.internal.moving_stats import assign_moving_mean_variance
-from tensorflow_probability.python.distributions.internal.moving_stats import moving_mean_variance
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
+from tensorflow_probability.python.distributions.normal_conjugate_posteriors import mvn_conjugate_linear_update
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_posterior
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_predictive
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_gauss_hermite
@@ -122,39 +122,9 @@ from tensorflow_probability.python.internal.reparameterization import FULLY_REPA
 from tensorflow_probability.python.internal.reparameterization import NOT_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
 
-# Deprecated:
-from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp as _reduce_weighted_logsumexp
-from tensorflow_probability.python.math.generic import softplus_inverse as _softplus_inverse
-from tensorflow_probability.python.math.linalg import fill_triangular as _fill_triangular
-from tensorflow_probability.python.math.linalg import fill_triangular_inverse as _fill_triangular_inverse
-from tensorflow_probability.python.util.seed_stream import SeedStream as _SeedStream
-
 # Module management:
 from tensorflow_probability.python.distributions.kullback_leibler import augment_kl_xent_docs
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
-
-_deprecated = deprecation.deprecated(
-    '2019-10-01',
-    'This function has moved to `tfp.math`.')
-
-fill_triangular = _deprecated(_fill_triangular)
-
-fill_triangular_inverse = _deprecated(_fill_triangular_inverse)
-
-softplus_inverse = _deprecated(_softplus_inverse)
-
-reduce_weighted_logsumexp = _deprecated(_reduce_weighted_logsumexp)
-
-
-class SeedStream(_SeedStream):
-
-  __init__ = deprecation.deprecated(
-      '2019-10-01', 'SeedStream has moved to `tfp.util.SeedStream`.')(
-          _SeedStream.__init__)
-
-
-del deprecation, _deprecated
 
 
 import sys as _sys  # pylint: disable=g-import-not-at-top
@@ -203,21 +173,25 @@ __all__ = [
     'InverseGamma',
     'JointDistribution',
     'JointDistributionCoroutine',
+    'JointDistributionCoroutineAutoBatched',
     'JointDistributionNamed',
+    'JointDistributionNamedAutoBatched',
     'JointDistributionSequential',
+    'JointDistributionSequentialAutoBatched',
     'Kumaraswamy',
     'LinearGaussianStateSpaceModel',
     'Laplace',
     'LKJ',
     'Logistic',
     'LogNormal',
+    'LogitNormal',
     'NegativeBinomial',
     'Normal',
+    'PixelCNN',
     'Poisson',
     'PoissonLogNormalQuadratureCompound',
     'ProbitBernoulli',
     'Sample',
-    'SeedStream',
     'SinhArcsinh',
     'StudentT',
     'StudentTProcess',
@@ -234,11 +208,10 @@ __all__ = [
     'DirichletMultinomial',
     'Multinomial',
     'VectorDiffeomixture',
-    'VectorLaplaceDiag',
-    'VectorSinhArcsinhDiag',
     'VonMises',
     'VonMisesFisher',
-    'Wishart',
+    'WishartLinearOperator',
+    'WishartTriL',
     'TransformedDistribution',
     'QuantizedDistribution',
     'Mixture',
@@ -253,17 +226,9 @@ __all__ = [
     'Zipf',
     'kl_divergence',
     'RegisterKL',
-    'fill_triangular',
-    'fill_triangular_inverse',
-    'matrix_diag_transform',
-    'reduce_weighted_logsumexp',
-    'softplus_inverse',
-    'tridiag',
+    'mvn_conjugate_linear_update',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',
-    'assign_moving_mean_variance',
-    'assign_log_moving_mean_exp',
-    'moving_mean_variance',
     'quadrature_scheme_softmaxnormal_gauss_hermite',
     'quadrature_scheme_softmaxnormal_quantiles',
     'quadrature_scheme_lognormal_gauss_hermite',

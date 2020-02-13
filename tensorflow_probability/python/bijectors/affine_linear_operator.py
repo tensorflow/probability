@@ -23,7 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
-
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'AffineLinearOperator',
@@ -66,6 +66,11 @@ class AffineLinearOperator(bijector.Bijector):
 
   """
 
+  @deprecation.deprecated(
+      '2020-01-01',
+      '`AffineLinearOperator` bijector is deprecated; please use '
+      '`tfb.Shift(loc)(tfb.ScaleMatvecLinearOperator(...))`.',
+      warn_once=True)
   def __init__(self,
                shift=None,
                scale=None,
@@ -90,6 +95,7 @@ class AffineLinearOperator(bijector.Bijector):
       TypeError: if `shift.dtype` does not match `scale.dtype`.
       ValueError: if not `scale.is_non_singular`.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([shift, scale], dtype_hint=tf.float32)
       self._shift = tensor_util.convert_nonref_to_tensor(
@@ -106,6 +112,7 @@ class AffineLinearOperator(bijector.Bijector):
           is_constant_jacobian=True,
           dtype=dtype,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

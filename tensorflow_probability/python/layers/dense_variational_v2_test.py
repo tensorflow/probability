@@ -24,9 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def create_dataset():
@@ -75,8 +73,8 @@ def prior_trainable(kernel_size, bias_size=0, dtype=None):
 negloglik = lambda y, rv_y: -rv_y.log_prob(y)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DenseVariationalLayerTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DenseVariationalLayerTest(test_util.TestCase):
 
   def test_end_to_end(self):
     # Get dataset.

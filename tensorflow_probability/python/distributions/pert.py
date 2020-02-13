@@ -23,7 +23,10 @@ import functools
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import affine_scalar
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import scale as scale_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -146,13 +149,15 @@ class PERT(distribution.Distribution):
             concentration1=concentration1,
             concentration0=concentration0,
             allow_nan_stats=self.allow_nan_stats),
-        bijector=affine_scalar.AffineScalar(
-            shift=low,
+        bijector=chain_bijector.Chain([
+            shift_bijector.Shift(shift=low),
             # Broadcasting scale on affine bijector to match batch dimension.
             # This prevents dimension mismatch for operations like cdf.
             # Note that `concentration1` incorporates the broadcast of all four
             # parameters.
-            scale=tf.broadcast_to(scale, prefer_static.shape(concentration1))))
+            scale_bijector.Scale(
+                scale=tf.broadcast_to(
+                    scale, prefer_static.shape(concentration1)))]))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -226,6 +231,10 @@ class PERT(distribution.Distribution):
   def _quantile(self, value):
     return self._transformed_beta().quantile(value)
 
+  def _default_event_space_bijector(self):
+    return sigmoid_bijector.Sigmoid(
+        low=self.low, high=self.high, validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -245,4 +254,16 @@ class PERT(distribution.Distribution):
       assertions.append(
           assert_util.assert_positive(
               self.temperature, message='`temperature` must be positive.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_greater_equal(
+        x, self.low,
+        message='Sample must be greater than or equal to `low`.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, self.high,
+        message='Sample must be less than or equal to `high`.'))
     return assertions

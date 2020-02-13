@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
@@ -142,13 +143,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
     Raises:
       TypeError: if not `scale.dtype.is_floating`.
-      ValueError: if not `scale.is_positive_definite`.
+      ValueError: if not `scale.is_non_singular`.
     """
     parameters = dict(locals())
     if not dtype_util.is_floating(scale.dtype):
       raise TypeError('`scale` must have floating-point dtype.')
-    if validate_args and not scale.is_positive_definite:
-      raise ValueError('`scale` must be positive definite.')
+    if validate_args and not scale.is_non_singular:
+      raise ValueError('`scale` must be non-singular.')
 
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], dtype_hint=tf.float32)
@@ -303,9 +304,9 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
         tf.concat(
             [tf.shape(self.df),
              tf.ones([statistic_ndims], dtype=tf.int32)], -1))
-    # We need to put the tf.where inside the outer tf1.where to ensure we never
+    # We need to put the tf.where inside the outer tf.where to ensure we never
     # hit a NaN in the gradient.
-    denom = tf.where(df > 2., df - 2., tf.ones_like(df))
+    denom = tf.where(df > 2., df - 2., dtype_util.as_numpy_dtype(df.dtype)(1.))
     statistic = statistic * df_factor_fn(df / denom)
     # When 1 < df <= 2, stddev/variance are infinite.
     result_where_defined = tf.where(
@@ -409,6 +410,9 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     digamma_factor = (num_dims + df) / 2. * (
         tf.math.digamma((num_dims + df) / 2.) - tf.math.digamma(df / 2.))
     return shape_factor + beta_factor + digamma_factor
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

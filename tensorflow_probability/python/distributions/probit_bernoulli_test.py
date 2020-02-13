@@ -27,11 +27,8 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
@@ -39,7 +36,7 @@ tfd = tfp.distributions
 def make_bernoulli(batch_shape, dtype=tf.int32):
   p = np.random.uniform(size=list(batch_shape))
   p = tf.constant(p, dtype=tf.float32)
-  return tfd.ProbitBernoulli(probs=p, dtype=dtype)
+  return tfd.ProbitBernoulli(probs=p, dtype=dtype, validate_args=True)
 
 
 def entropy(p):
@@ -47,23 +44,23 @@ def entropy(p):
   return -q * np.log(q) - p * np.log(p)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProbitBernoulliTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ProbitBernoulliTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testProbits(self):
     probits = [-42., 42.]
-    dist = tfd.ProbitBernoulli(probits=probits)
+    dist = tfd.ProbitBernoulli(probits=probits, validate_args=True)
     self.assertAllClose(probits, self.evaluate(dist.probits))
     self.assertAllClose(
         sp_special.ndtr(probits), self.evaluate(dist.probs_parameter()))
 
     p = [0.01, 0.99, 0.42]
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(
         sp_special.ndtri(p), self.evaluate(dist.probits_parameter()))
 
@@ -82,7 +79,7 @@ class ProbitBernoulliTest(test_case.TestCase):
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
-      dist = tfd.ProbitBernoulli(probs=p)
+      dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
       self.assertEqual(p, self.evaluate(dist.probs))  # Should not fail
 
   def testShapes(self):
@@ -97,24 +94,26 @@ class ProbitBernoulliTest(test_case.TestCase):
   def testDtype(self):
     dist = make_bernoulli([])
     self.assertEqual(dist.dtype, tf.int32)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.probs.dtype, dist.mean().dtype)
     self.assertEqual(dist.probs.dtype, dist.variance().dtype)
     self.assertEqual(dist.probs.dtype, dist.stddev().dtype)
     self.assertEqual(dist.probs.dtype, dist.entropy().dtype)
     self.assertEqual(dist.probs.dtype, dist.prob(0).dtype)
-    self.assertEqual(dist.probs.dtype, dist.prob(0.5).dtype)
+    self.assertEqual(dist.probs.dtype, dist.prob(1).dtype)
     self.assertEqual(dist.probs.dtype, dist.log_prob(0).dtype)
-    self.assertEqual(dist.probs.dtype, dist.log_prob(0.5).dtype)
+    self.assertEqual(dist.probs.dtype, dist.log_prob(1).dtype)
 
     dist64 = make_bernoulli([], tf.int64)
     self.assertEqual(dist64.dtype, tf.int64)
-    self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
+    self.assertEqual(dist64.dtype, dist64.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
   def testFloatMode(self):
-    dist = tfd.ProbitBernoulli(probs=.6, dtype=tf.float32)
+    dist = tfd.ProbitBernoulli(probs=.6, dtype=tf.float32, validate_args=True)
     self.assertEqual(np.float32(1), self.evaluate(dist.mode()))
 
   def _testPmf(self, **kwargs):
@@ -160,8 +159,8 @@ class ProbitBernoulliTest(test_case.TestCase):
 
   def testPmfWithP(self):
     p = [[0.2, 0.4], [0.3, 0.6]]
-    self._testPmf(probs=p)
-    self._testPmf(probits=sp_special.ndtri(p))
+    self._testPmf(probs=p, validate_args=True)
+    self._testPmf(probits=sp_special.ndtri(p), validate_args=True)
 
   def testPmfWithFloatArgReturnsXEntropy(self):
     p = [[0.2], [0.4], [0.3], [0.6]]
@@ -174,7 +173,7 @@ class ProbitBernoulliTest(test_case.TestCase):
 
   def testBroadcasting(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.ProbitBernoulli(probs=probs(p))
+    dist = lambda p: tfd.ProbitBernoulli(probs=probs(p), validate_args=True)
     self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
     self.assertAllClose(
         np.log([0.5, 0.5, 0.5]), self.evaluate(dist(0.5).log_prob([1, 1, 1])))
@@ -183,29 +182,29 @@ class ProbitBernoulliTest(test_case.TestCase):
 
   def testPmfShapes(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.ProbitBernoulli(probs=probs(p))
+    dist = lambda p: tfd.ProbitBernoulli(probs=probs(p), validate_args=True)
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
 
-    dist = tfd.ProbitBernoulli(probs=0.5)
+    dist = tfd.ProbitBernoulli(probs=0.5, validate_args=True)
     self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
-    dist = tfd.ProbitBernoulli(probs=0.5)
-    self.assertEqual((), dist.log_prob(1).shape)
-    self.assertEqual((1), dist.log_prob([1]).shape)
-    self.assertEqual((2, 1), dist.log_prob([[1], [1]]).shape)
+    dist = tfd.ProbitBernoulli(probs=0.5, validate_args=True)
+    self.assertAllEqual([], dist.log_prob(1).shape)
+    self.assertAllEqual([1], dist.log_prob([1]).shape)
+    self.assertAllEqual([2, 1], dist.log_prob([[1], [1]]).shape)
 
-    dist = tfd.ProbitBernoulli(probs=[[0.5], [0.5]])
-    self.assertEqual((2, 1), dist.log_prob(1).shape)
+    dist = tfd.ProbitBernoulli(probs=[[0.5], [0.5]], validate_args=True)
+    self.assertAllEqual([2, 1], dist.log_prob(1).shape)
 
   def testBoundaryConditions(self):
-    dist = tfd.ProbitBernoulli(probs=1.0)
+    dist = tfd.ProbitBernoulli(probs=1.0, validate_args=True)
     self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0)))
     self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1))])
 
   def testEntropyNoBatch(self):
     p = 0.2
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy(p))
 
   def testEntropyWithBatch(self):
@@ -218,9 +217,9 @@ class ProbitBernoulliTest(test_case.TestCase):
 
   def testSampleN(self):
     p = [0.2, 0.6]
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     n = 100000
-    samples = dist.sample(n)
+    samples = dist.sample(n, seed=test_util.test_seed())
     tensorshape_util.set_shape(samples, [n, 2])
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
@@ -233,43 +232,51 @@ class ProbitBernoulliTest(test_case.TestCase):
     self.assertEqual(set([0, 1]), set(sample_values.flatten()))
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
-    dist = tfd.ProbitBernoulli(np.log([.2, .4]))
-    x = dist.sample(1, seed=tfp_test_util.test_seed())
+    dist = tfd.ProbitBernoulli(np.log([.2, .4]), validate_args=True)
+    x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX does not return None for gradients.')
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
     _, grad_p = tfp.math.value_and_gradient(
-        lambda x: tfd.ProbitBernoulli(probs=x).sample(100), p)
+        lambda x: tfd.ProbitBernoulli(  # pylint: disable=g-long-lambda
+            probs=x,
+            validate_args=True).sample(
+                100, seed=test_util.test_seed()),
+        p)
     self.assertIsNone(grad_p)
 
   def testSampleDeterministicScalarVsVector(self):
     p = [0.2, 0.6]
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     n = 1000
-    def _maybe_seed():
+    def _seed(seed=None):
+      seed = test_util.test_seed() if seed is None else seed
       if tf.executing_eagerly():
-        tf1.set_random_seed(42)
-        return None
-      return 42
+        tf.random.set_seed(seed)
+      return seed
+    seed = _seed()
     self.assertAllEqual(
-        self.evaluate(dist.sample(n, _maybe_seed())),
-        self.evaluate(dist.sample([n], _maybe_seed())))
+        self.evaluate(dist.sample(n, seed)),
+        self.evaluate(dist.sample([n], _seed(seed))))
     n = tf1.placeholder_with_default(np.int32(1000), shape=None)
-    sample1 = dist.sample(n, _maybe_seed())
-    sample2 = dist.sample([n], _maybe_seed())
+    seed = _seed()
+    sample1 = dist.sample(n, seed)
+    sample2 = dist.sample([n], _seed(seed=seed))
     sample1, sample2 = self.evaluate([sample1, sample2])
     self.assertAllEqual(sample1, sample2)
 
   def testMean(self):
     p = np.array([[0.2, 0.7], [0.5, 0.4]], dtype=np.float32)
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllEqual(self.evaluate(dist.mean()), p)
 
   def testVarianceAndStd(self):
     var = lambda p: p * (1. - p)
     p = [[0.2, 0.7], [0.5, 0.4]]
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(
         self.evaluate(dist.variance()),
         np.array([[var(0.2), var(0.7)], [var(0.5), var(0.4)]],
@@ -285,8 +292,8 @@ class ProbitBernoulliTest(test_case.TestCase):
     a_p = np.array([0.6] * batch_size, dtype=np.float32)
     b_p = np.array([0.4] * batch_size, dtype=np.float32)
 
-    a = tfd.ProbitBernoulli(probs=a_p)
-    b = tfd.ProbitBernoulli(probs=b_p)
+    a = tfd.ProbitBernoulli(probs=a_p, validate_args=True)
+    b = tfd.ProbitBernoulli(probs=b_p, validate_args=True)
 
     kl = tfd.kl_divergence(a, b)
     kl_val = self.evaluate(kl)
@@ -301,7 +308,7 @@ class ProbitBernoulliTest(test_case.TestCase):
     x = tf.constant([-1., 0.5, 1.])
     d = tfd.ProbitBernoulli(probits=x, validate_args=True)
     self.assertAllClose(
-        *self.evaluate([special_math.ndtri(d.prob(1.)),
+        *self.evaluate([tf.math.ndtri(d.prob(1.)),
                         d.probits_parameter()]),
         atol=0,
         rtol=1e-4)
@@ -312,7 +319,7 @@ class ProbitBernoulliTest(test_case.TestCase):
     x = tf.constant([0.1, 0.5, 0.4])
     d = tfd.ProbitBernoulli(probs=x, validate_args=True)
     self.assertAllClose(
-        *self.evaluate([special_math.ndtri(d.prob(1.)),
+        *self.evaluate([tf.math.ndtri(d.prob(1.)),
                         d.probits_parameter()]),
         atol=0,
         rtol=1e-4)
@@ -320,9 +327,10 @@ class ProbitBernoulliTest(test_case.TestCase):
         *self.evaluate([d.prob(1.), d.probs_parameter()]), atol=0, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProbitBernoulliFromVariableTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ProbitBernoulliFromVariableTest(test_util.TestCase):
 
+  @test_util.tf_tape_safety_test
   def testGradientProbits(self):
     x = tf.Variable([-1., 1])
     self.evaluate(x.initializer)
@@ -333,6 +341,7 @@ class ProbitBernoulliFromVariableTest(test_case.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.tf_tape_safety_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7])
     self.evaluate(x.initializer)

@@ -24,19 +24,21 @@ import warnings
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util
 
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class TestTransitionKernel(tfp.mcmc.TransitionKernel):
+
+  def __init__(self, is_calibrated=True):
+    self._is_calibrated = is_calibrated
 
   def one_step(self, current_state, previous_kernel_results):
     return current_state + 1, TestTransitionKernelResults(
@@ -46,17 +48,19 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
   def bootstrap_results(self, current_state):
     return TestTransitionKernelResults(counter_1=0, counter_2=0)
 
+  @property
   def is_calibrated(self):
-    return True
+    return self._is_calibrated
 
 
-class SampleChainTest(test_case.TestCase):
+class SampleChainTest(test_util.TestCase):
 
   def setUp(self):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf1.random.set_random_seed(10003)
+    super(SampleChainTest, self).setUp()
+    tf.random.set_seed(10003)
     np.random.seed(10003)
 
   def testChainWorksCorrelatedMultivariate(self):
@@ -76,10 +80,10 @@ class SampleChainTest(test_case.TestCase):
               np.linalg.cholesky(true_cov),
               z[..., tf.newaxis]),
           axis=-1)
-      return -0.5 * tf.reduce_sum(input_tensor=z**2., axis=-1)
+      return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
     if tf.executing_eagerly():
-      tf1.set_random_seed(54)
+      tf.random.set_seed(54)
     states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
@@ -95,7 +99,7 @@ class SampleChainTest(test_case.TestCase):
       self.assertAllEqual(dict(target_calls=4), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=0)
+    sample_mean = tf.reduce_mean(states, axis=0)
     x = states - sample_mean
     sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
@@ -109,9 +113,12 @@ class SampleChainTest(test_case.TestCase):
     samples, kernel_results = tfp.mcmc.sample_chain(
         num_results=2, current_state=0, kernel=kernel)
 
-    self.assertAllClose([2], samples.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_2.shape.as_list())
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(samples.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([1, 2], samples)
@@ -123,9 +130,11 @@ class SampleChainTest(test_case.TestCase):
     samples, kernel_results = tfp.mcmc.sample_chain(
         num_results=2, current_state=0, kernel=kernel, num_burnin_steps=1)
 
-    self.assertAllClose([2], samples.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([2, 3], samples)
@@ -140,9 +149,11 @@ class SampleChainTest(test_case.TestCase):
         kernel=kernel,
         num_steps_between_results=2)
 
-    self.assertAllClose([2], samples.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([2], kernel_results.counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([1, 4], samples)
@@ -153,9 +164,11 @@ class SampleChainTest(test_case.TestCase):
     kernel = TestTransitionKernel()
     res = tfp.mcmc.sample_chain(num_results=2, current_state=0, kernel=kernel)
 
-    self.assertAllClose([2], res.all_states.shape.as_list())
-    self.assertAllClose([2], res.trace.counter_1.shape.as_list())
-    self.assertAllClose([2], res.trace.counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace.counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)
@@ -167,7 +180,7 @@ class SampleChainTest(test_case.TestCase):
     samples = tfp.mcmc.sample_chain(
         num_results=2, current_state=0, kernel=kernel, trace_fn=None)
 
-    self.assertAllClose([2], samples.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
 
     samples = self.evaluate(samples)
     self.assertAllClose([1, 2], samples)
@@ -180,10 +193,12 @@ class SampleChainTest(test_case.TestCase):
         kernel=kernel,
         trace_fn=lambda *args: args)
 
-    self.assertAllClose([2], res.all_states.shape.as_list())
-    self.assertAllClose([2], res.trace[0].shape.as_list())
-    self.assertAllClose([2], res.trace[1].counter_1.shape.as_list())
-    self.assertAllClose([2], res.trace[1].counter_2.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
+    self.assertAllClose([2], tensorshape_util.as_list(res.trace[0].shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace[1].counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(res.trace[1].counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)
@@ -200,10 +215,12 @@ class SampleChainTest(test_case.TestCase):
         trace_fn=None,
         return_final_kernel_results=True)
 
-    self.assertAllClose([2], res.all_states.shape.as_list())
+    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertEqual((), res.trace)
-    self.assertAllClose([], res.final_kernel_results.counter_1.shape.as_list())
-    self.assertAllClose([], res.final_kernel_results.counter_2.shape.as_list())
+    self.assertAllClose(
+        [], tensorshape_util.as_list(res.final_kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [], tensorshape_util.as_list(res.final_kernel_results.counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)
@@ -228,6 +245,18 @@ class SampleChainTest(test_case.TestCase):
           trace_fn=lambda current_state, kernel_results: kernel_results)
     self.assertFalse(
         any('Tracing all kernel results by default is deprecated' in str(
+            warning.message) for warning in triggered))
+
+  def testIsCalibrated(self):
+    with warnings.catch_warnings(record=True) as triggered:
+      kernel = TestTransitionKernel(False)
+      tfp.mcmc.sample_chain(
+          num_results=2,
+          current_state=0,
+          kernel=kernel,
+          trace_fn=lambda current_state, kernel_results: kernel_results)
+    self.assertTrue(
+        any('supplied `TransitionKernel` is not calibrated.' in str(
             warning.message) for warning in triggered))
 
 

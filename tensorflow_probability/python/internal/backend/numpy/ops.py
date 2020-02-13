@@ -76,19 +76,32 @@ class _NullContext(object):
     return False  # False values do not suppress exceptions.
 
 
-def _broadcast_static_shape(shape_x, shape_y, as_tensorshape=False):
+def _base_broadcast_static_shape(
+    shape_x, shape_y, as_tensorshape=False, static_shape=False):
   shape_x = TensorShape(shape_x)
   shape_y = TensorShape(shape_y)
   shape_xy = tf.broadcast_static_shape(shape_x, shape_y)
   if as_tensorshape:
     return shape_xy
+  if static_shape:
+    return onp.array(shape_xy.as_list(), dtype=onp.int32)
   return np.array(shape_xy.as_list(), dtype=np.int32)
 
 
+def _broadcast_static_shape(shape_x, shape_y):
+  return _base_broadcast_static_shape(shape_x, shape_y, static_shape=True)
+
+
+def _broadcast_dynamic_shape(shape_x, shape_y):
+  return _base_broadcast_static_shape(shape_x, shape_y, static_shape=False)
+
+
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
-  x = np.array(value, dtype=None if dtype is None else utils.numpy_dtype(dtype))
+  x = convert_to_tensor(value, dtype=dtype)
   if shape is None:
     return x
+  if not x.shape:
+    return np.full(shape, x)
   return np.reshape(x, shape)
 
 
@@ -103,7 +116,7 @@ def _control_dependencies(control_inputs):
 def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
   """Emulates tf.convert_to_tensor."""
   assert not tf.is_tensor(value), value
-  if isinstance(value, np.ndarray):
+  if is_tensor(value):
     if dtype is not None:
       dtype = utils.numpy_dtype(dtype)
       # if np.result_type(value, dtype) != dtype:
@@ -111,8 +124,17 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
       #       dtype, value, value.dtype))
       return value.astype(dtype)
     return value
-  if isinstance(value, TensorShape):
-    value = [int(d) for d in value.as_list()]
+  if isinstance(value, Dimension):
+    value = _dimension_value(value)
+  elif isinstance(value, TensorShape):
+    value = value.as_list()
+  # In JAX mode, onp.ndarray/onp.generic are not identified as Tensor's.
+  # By default, use the dtype of the values passed in.
+  elif hasattr(value, 'dtype'):
+    if dtype is not None:
+      dtype = utils.numpy_dtype(dtype)
+      return np.array(value).astype(dtype)
+    return np.array(value)
   if dtype is None and dtype_hint is not None:
     dtype_hint = utils.numpy_dtype(dtype_hint)
     value = np.array(value)
@@ -122,13 +144,29 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
         if not np.issubdtype(dtype_hint, np.complexfloating):
           return value
       if np.issubdtype(value.dtype, np.floating):
-        if not np.issubdtype(dtype_hint, np.floating):
+        if not (np.issubdtype(dtype_hint, np.floating)
+                or np.issubdtype(dtype_hint, np.complexfloating)):
           return value
       if np.issubdtype(value.dtype, np.integer):
-        if not np.issubdtype(dtype_hint, np.integer):
+        if not (np.issubdtype(dtype_hint, np.integer)
+                or np.issubdtype(dtype_hint, np.floating)
+                or np.issubdtype(dtype_hint, np.complexfloating)):
           return value
     return value.astype(dtype_hint)
-  return np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
+
+  np_value = np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
+  # We have no hints. By default JAX (in x64 mode) and Numpy default to
+  # {int64,float64} which does not match with TF's default.
+  if dtype is None and dtype_hint is None:
+    # If the integer doesn't fit in int32, return an int64. This matches TF.
+    if isinstance(value, int):
+      if value > onp.iinfo(onp.int32).max or value < onp.iinfo(onp.int32).min:
+        return np.array(value, dtype=np.int64)
+    if np.issubdtype(np_value.dtype, np.floating):
+      return np_value.astype(np.float32)
+    if np.issubdtype(np_value.dtype, np.integer):
+      return np_value.astype(np.int32)
+  return np_value
 
 
 def _dimension_value(dimension):
@@ -170,16 +208,14 @@ class GradientTape(object):
 
 
 broadcast_dynamic_shape = utils.copy_docstring(
-    tf.broadcast_dynamic_shape,
-    _broadcast_static_shape)
+    tf.broadcast_static_shape, _broadcast_dynamic_shape)
 
 broadcast_static_shape = utils.copy_docstring(
-    tf.broadcast_static_shape,
-    _broadcast_static_shape)
+    tf.broadcast_static_shape, _broadcast_static_shape)
 
 broadcast_static_shape_as_tensorshape = utils.copy_docstring(
     tf.broadcast_static_shape,
-    functools.partial(_broadcast_static_shape, as_tensorshape=True))
+    functools.partial(_base_broadcast_static_shape, as_tensorshape=True))
 
 broadcast_to = utils.copy_docstring(
     tf.broadcast_to,
@@ -206,9 +242,30 @@ convert_to_tensor = utils.copy_docstring(
     tf.convert_to_tensor,
     _convert_to_tensor)
 
+
+def _custom_gradient(f):
+  """Jax implementation of tf.custom_gradient."""
+  if not JAX_MODE:
+    # Numpy backend ignores custom gradients, so we do too.
+    return lambda *args, **kwargs: f(*args, **kwargs)[0]
+  import jax  # pylint: disable=g-import-not-at-top
+  def f_(*args, **kwargs):
+    value, vjp = f(*args, **kwargs)
+    def vjp_(cts_out):
+      cts_in = vjp(cts_out)
+      if not isinstance(cts_in, tuple):
+        cts_in = (cts_in,)
+      return cts_in
+    return value, vjp_
+  @jax.custom_transforms
+  def wrapped(*args, **kwargs):
+    value, _ = f(*args, **kwargs)
+    return value
+  jax.defvjp_all(wrapped, f_)
+  return wrapped
+
 custom_gradient = utils.copy_docstring(
-    tf.custom_gradient,
-    lambda f: f)
+    tf.custom_gradient, _custom_gradient)
 
 executing_eagerly = utils.copy_docstring(
     tf.executing_eagerly,
@@ -264,8 +321,6 @@ class name_scope(object):  # pylint: disable=invalid-name
   def __init__(self, name, *args, **kwargs):
     del args, kwargs
     self._name = name
-    if self._name is not None and not self._name.endswith('/'):
-      self._name += '/'
 
   def __enter__(self):
     return self._name
@@ -276,9 +331,15 @@ class name_scope(object):  # pylint: disable=invalid-name
 
 newaxis = np.newaxis
 
-stop_gradient = utils.copy_docstring(
-    tf.stop_gradient,
-    lambda input, name=None: np.array(input))
+if JAX_MODE:
+  from jax import lax  # pylint: disable=g-import-not-at-top
+  stop_gradient = utils.copy_docstring(
+      tf.stop_gradient,
+      lambda input, name=None: lax.stop_gradient(input))
+else:
+  stop_gradient = utils.copy_docstring(
+      tf.stop_gradient,
+      lambda input, name=None: np.array(input))
 
 TensorShape = tf.TensorShape
 Dimension = tf1.Dimension
@@ -313,8 +374,13 @@ class NumpyVariable(wrapt.ObjectProxy):
     if dtype is not None:
       v = v.astype(utils.numpy_dtype(dtype))
     super(NumpyVariable, self).__init__(v)
+    self._self_name = name
     self.initializer = None
   # pylint: enable=unused-argument
+
+  @property
+  def name(self):
+    return self._self_name if self._self_name is not None else str(id(self))
 
   def __array__(self, dtype=None):
     if dtype is not None:
@@ -323,6 +389,16 @@ class NumpyVariable(wrapt.ObjectProxy):
 
   def assign(self, value):
     super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
+    return self
+
+  def assign_add(self, value):
+    super(NumpyVariable, self).__init__(
+        onp.array(self, dtype=self.dtype) + onp.array(value, dtype=self.dtype))
+    return self
+
+  def assign_sub(self, value):
+    super(NumpyVariable, self).__init__(
+        onp.array(self, dtype=self.dtype) - onp.array(value, dtype=self.dtype))
     return self
 
 
@@ -341,11 +417,16 @@ class _TensorMeta(type(np.ndarray)):
 
   @classmethod
   def __instancecheck__(cls, instance):
-    return isinstance(instance, (np.ndarray, np.generic))
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      return isinstance(instance, (jax.xla.DeviceArray,
+                                   jax.abstract_arrays.UnshapedArray,
+                                   jax.core.Tracer))
+    return isinstance(instance, np.ndarray)
 
 
 class Tensor(six.with_metaclass(_TensorMeta)):
-  pass
+  OVERLOADABLE_OPERATORS = ()
 
 
 class Module(object):

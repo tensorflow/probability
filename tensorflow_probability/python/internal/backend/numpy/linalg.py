@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal.backend.numpy import solve_registrat
 from tensorflow_probability.python.internal.backend.numpy.linalg_impl import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_block_diag import *
+from tensorflow_probability.python.internal.backend.numpy.linear_operator_block_lower_triangular import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_circulant import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_composition import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_diag import *
@@ -42,7 +43,3 @@ from tensorflow_probability.python.internal.backend.numpy.linear_operator_low_ra
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_lower_triangular import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_toeplitz import *
 from tensorflow_probability.python.internal.backend.numpy.linear_operator_zeros import *
-
-
-
-

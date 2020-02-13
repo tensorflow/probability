@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -204,6 +205,10 @@ class Uniform(distribution.Distribution):
   def _stddev(self):
     return self._range() / np.sqrt(12.)
 
+  def _default_event_space_bijector(self):
+    return sigmoid_bijector.Sigmoid(
+        low=self.low, high=self.high, validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -220,6 +225,16 @@ class Uniform(distribution.Distribution):
       high = tf.convert_to_tensor(self.high) if high is None else high
       assertions.append(assert_util.assert_less(
           low, high, message='uniform not defined when `low` >= `high`.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_greater_equal(
+        x, self.low, message='Sample must be greater than or equal to `low`.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, self.high, message='Sample must be less than or equal to `high`.'))
     return assertions
 
 

@@ -18,9 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math import diag_jacobian
@@ -62,7 +62,7 @@ class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
 
   with tf.Session(graph=tf.Graph()) as sess:
     # Set up random seed for the optimizer
-    tf.set_random_seed(42)
+    tf.random.set_seed(42)
     true_mean = dtype([0, 0, 0])
     true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
     # Loss is defined through the Cholesky decomposition
@@ -73,7 +73,7 @@ class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
 
     def loss_fn():
       var = tf.concat([var_1, var_2], axis=-1)
-      loss_part = tf.linalg.cholesky_solve(chol, tf.expand_dims(var, -1))
+      loss_part = tf.linalg.cholesky_solve(chol, var[..., tf.newaxis])
       return tf.linalg.matvec(loss_part, var, transpose_a=True)
 
     # Set up the learning rate with a polynomial decay
@@ -155,57 +155,54 @@ class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
                name=None,
                parallel_iterations=10):
     default_name = 'StochasticGradientLangevinDynamics'
-    with tf1.name_scope(name, default_name, [
-        learning_rate, preconditioner_decay_rate, data_size, burnin,
-        diagonal_bias
-    ]):
+    with tf.name_scope(name or default_name):
       if tf.executing_eagerly():
         raise NotImplementedError('Eager execution currently not supported for '
                                   ' SGLD optimizer.')
 
       self._preconditioner_decay_rate = tf.convert_to_tensor(
-          value=preconditioner_decay_rate, name='preconditioner_decay_rate')
-      self._data_size = tf.convert_to_tensor(value=data_size, name='data_size')
+          preconditioner_decay_rate, name='preconditioner_decay_rate')
+      self._data_size = tf.convert_to_tensor(data_size, name='data_size')
       self._burnin = tf.convert_to_tensor(
-          value=burnin,
+          burnin,
           name='burnin',
           dtype=dtype_util.common_dtype([burnin], dtype_hint=tf.int64))
       self._diagonal_bias = tf.convert_to_tensor(
-          value=diagonal_bias, name='diagonal_bias')
+          diagonal_bias, name='diagonal_bias')
       # TODO(b/124800185): Consider migrating `learning_rate` to be a
       # hyperparameter handled by the base Optimizer class. This would allow
       # users to plug in a `tf.keras.optimizers.schedules.LearningRateSchedule`
       # object in addition to Tensors.
       self._learning_rate = tf.convert_to_tensor(
-          value=learning_rate, name='learning_rate')
+          learning_rate, name='learning_rate')
       self._parallel_iterations = parallel_iterations
 
       self._preconditioner_decay_rate = distribution_util.with_dependencies([
-          tf1.assert_non_negative(
+          assert_util.assert_non_negative(
               self._preconditioner_decay_rate,
               message='`preconditioner_decay_rate` must be non-negative'),
-          tf1.assert_less_equal(
+          assert_util.assert_less_equal(
               self._preconditioner_decay_rate,
               1.,
               message='`preconditioner_decay_rate` must be at most 1.'),
       ], self._preconditioner_decay_rate)
 
       self._data_size = distribution_util.with_dependencies([
-          tf1.assert_greater(
+          assert_util.assert_greater(
               self._data_size,
               0,
               message='`data_size` must be greater than zero')
       ], self._data_size)
 
       self._burnin = distribution_util.with_dependencies([
-          tf1.assert_non_negative(
+          assert_util.assert_non_negative(
               self._burnin, message='`burnin` must be non-negative'),
-          tf1.assert_integer(
+          assert_util.assert_integer(
               self._burnin, message='`burnin` must be an integer')
       ], self._burnin)
 
       self._diagonal_bias = distribution_util.with_dependencies([
-          tf1.assert_non_negative(
+          assert_util.assert_non_negative(
               self._diagonal_bias,
               message='`diagonal_bias` must be non-negative')
       ], self._diagonal_bias)
@@ -227,14 +224,14 @@ class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
     # want to decay the learning rate dynamically.
     self._learning_rate_tensor = distribution_util.with_dependencies(
         [
-            tf1.assert_non_negative(
+            assert_util.assert_non_negative(
                 self._learning_rate,
                 message='`learning_rate` must be non-negative')
         ],
         tf.convert_to_tensor(
-            value=self._learning_rate, name='learning_rate_tensor'))
+            self._learning_rate, name='learning_rate_tensor'))
     self._decay_tensor = tf.convert_to_tensor(
-        value=self._preconditioner_decay_rate, name='preconditioner_decay_rate')
+        self._preconditioner_decay_rate, name='preconditioner_decay_rate')
 
     super(StochasticGradientLangevinDynamics, self)._prepare(var_list)
 
@@ -262,7 +259,7 @@ class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
   def _apply_noisy_update(self, mom, grad, var, indices=None):
     # Compute and apply the gradient update following
     # preconditioned Langevin dynamics
-    stddev = tf1.where(
+    stddev = tf.where(
         tf.squeeze(self.iterations > tf.cast(self._burnin, tf.int64)),
         tf.cast(tf.math.rsqrt(self._learning_rate), grad.dtype),
         tf.zeros([], grad.dtype))
@@ -287,7 +284,7 @@ class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
                   - preconditioner_grads[0])
     stddev *= tf.sqrt(preconditioner)
     result_shape = tf.broadcast_dynamic_shape(
-        tf.shape(input=mean), tf.shape(input=stddev))
+        tf.shape(mean), tf.shape(stddev))
 
     update_ops = []
     if indices is None:

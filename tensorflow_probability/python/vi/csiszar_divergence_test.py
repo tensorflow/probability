@@ -21,14 +21,11 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
@@ -40,10 +37,11 @@ def tridiag(d, diag_value, offdiag_value):
   return diag_mat + three_bands
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AmariAlphaTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AmariAlphaTest(test_util.TestCase):
 
   def setUp(self):
+    super(AmariAlphaTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -94,10 +92,11 @@ class AmariAlphaTest(test_case.TestCase):
            - alpha * (self._u - 1)) / (alpha * (alpha - 1.)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KLReverseTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class KLReverseTest(test_util.TestCase):
 
   def setUp(self):
+    super(KLReverseTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -117,10 +116,11 @@ class KLReverseTest(test_case.TestCase):
         -self._logu + (self._u - 1.))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KLForwardTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class KLForwardTest(test_util.TestCase):
 
   def setUp(self):
+    super(KLForwardTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -140,10 +140,11 @@ class KLForwardTest(test_case.TestCase):
         self._u * self._logu - (self._u - 1.))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class JensenShannonTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class JensenShannonTest(test_util.TestCase):
 
   def setUp(self):
+    super(JensenShannonTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -177,10 +178,11 @@ class JensenShannonTest(test_case.TestCase):
          - (1 + self._u) * np.log((1 + self._u) / 2)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ArithmeticGeometricMeanTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ArithmeticGeometricMeanTest(test_util.TestCase):
 
   def setUp(self):
+    super(ArithmeticGeometricMeanTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -208,10 +210,11 @@ class ArithmeticGeometricMeanTest(test_case.TestCase):
         (1. + self._u) * np.log(0.5 * (1. + self._u) / np.sqrt(self._u)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TotalVariationTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TotalVariationTest(test_util.TestCase):
 
   def setUp(self):
+    super(TotalVariationTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -224,10 +227,11 @@ class TotalVariationTest(test_case.TestCase):
         0.5 * np.abs(self._u - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PearsonTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PearsonTest(test_util.TestCase):
 
   def setUp(self):
+    super(PearsonTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -240,10 +244,11 @@ class PearsonTest(test_case.TestCase):
         np.square(self._u - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SquaredHellingerTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SquaredHellingerTest(test_util.TestCase):
 
   def setUp(self):
+    super(SquaredHellingerTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -262,10 +267,11 @@ class SquaredHellingerTest(test_case.TestCase):
         np.square(np.sqrt(self._u) - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TriangularTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TriangularTest(test_util.TestCase):
 
   def setUp(self):
+    super(TriangularTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -284,10 +290,11 @@ class TriangularTest(test_case.TestCase):
         np.square(self._u - 1) / (1 + self._u))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TPowerTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TPowerTest(test_util.TestCase):
 
   def setUp(self):
+    super(TPowerTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -328,10 +335,11 @@ class TPowerTest(test_case.TestCase):
         self._u ** 1.1 - 1. - 1.1 * (self._u - 1.))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class Log1pAbsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class Log1pAbsTest(test_util.TestCase):
 
   def setUp(self):
+    super(Log1pAbsTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -344,10 +352,11 @@ class Log1pAbsTest(test_case.TestCase):
         self._u**(np.sign(self._u - 1)) - 1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class JeffreysTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class JeffreysTest(test_util.TestCase):
 
   def setUp(self):
+    super(JeffreysTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -366,10 +375,11 @@ class JeffreysTest(test_case.TestCase):
         0.5 * (self._u * self._logu - self._logu))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ChiSquareTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ChiSquareTest(test_util.TestCase):
 
   def setUp(self):
+    super(ChiSquareTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -382,10 +392,11 @@ class ChiSquareTest(test_case.TestCase):
         self._u**2 - 1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ModifiedGanTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ModifiedGanTest(test_util.TestCase):
 
   def setUp(self):
+    super(ModifiedGanTest, self).setUp()
     self._logu = np.linspace(-10., 10, 100)
     self._u = np.exp(self._logu)
 
@@ -406,10 +417,11 @@ class ModifiedGanTest(test_case.TestCase):
         np.log1p(self._u) - self._logu + 0.5 * (self._u - 1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SymmetrizedCsiszarFunctionTest(test_util.TestCase):
 
   def setUp(self):
+    super(SymmetrizedCsiszarFunctionTest, self).setUp()
     self._logu = np.linspace(-10., 10., 100)
     self._u = np.exp(self._logu)
 
@@ -445,10 +457,11 @@ class SymmetrizedCsiszarFunctionTest(test_case.TestCase):
         self.evaluate(tfp.vi.jeffreys(self._logu)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DualCsiszarFunctionTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DualCsiszarFunctionTest(test_util.TestCase):
 
   def setUp(self):
+    super(DualCsiszarFunctionTest, self).setUp()
     self._logu = np.linspace(-10., 10., 100)
     self._u = np.exp(self._logu)
 
@@ -465,8 +478,8 @@ class DualCsiszarFunctionTest(test_case.TestCase):
         self.evaluate(tfp.vi.kl_forward(self._logu)))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MonteCarloVariationalLossTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MonteCarloVariationalLossTest(test_util.TestCase):
 
   def test_kl_forward(self):
     q = tfd.Normal(
@@ -475,7 +488,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
 
     p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     approx_kl = tfp.vi.monte_carlo_variational_loss(
         discrepancy_fn=tfp.vi.kl_forward,
@@ -510,7 +523,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
 
     p = tfd.Normal(loc=q.loc + 0.1, scale=q.scale - 0.2)
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     approx_kl = tfp.vi.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
@@ -549,7 +562,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
     # "covers" p and thus Var_q[p/q] is smaller.
     q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     approx_kl = tfp.vi.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
@@ -589,7 +602,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
     # smaller.
     q = tfd.MultivariateNormalDiag(scale_diag=[1.]*d)
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     approx_kl = tfp.vi.monte_carlo_variational_loss(
         target_log_prob_fn=p.log_prob,
@@ -633,7 +646,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
         'z': tfd.Normal(0., 1.)
     })
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     reverse_kl_sequential = tfp.vi.monte_carlo_variational_loss(
         target_log_prob_fn=target_log_prob_fn,
@@ -659,7 +672,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
   def test_score_trick(self):
     d = 5  # Dimension
     sample_size = int(4.5e5)
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     # Variance is very high when approximating Forward KL, so we make
     # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
@@ -667,7 +680,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
     s = tf.constant(1.)
 
     def construct_monte_carlo_csiszar_f_divergence(
-        func, use_reparametrization=True):
+        func, use_reparameterization=True):
       def _fn(s):
         p = tfd.MultivariateNormalFullCovariance(
             covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
@@ -677,7 +690,7 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
             surrogate_posterior=q,
             discrepancy_fn=func,
             sample_size=sample_size,
-            use_reparametrization=use_reparametrization,
+            use_reparameterization=use_reparameterization,
             seed=seed)
       return _fn
 
@@ -688,12 +701,12 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
         lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True))
 
     approx_kl_score_trick = construct_monte_carlo_csiszar_f_divergence(
-        tfp.vi.kl_reverse, use_reparametrization=False)
+        tfp.vi.kl_reverse, use_reparameterization=False)
 
     approx_kl_self_normalized_score_trick = (
         construct_monte_carlo_csiszar_f_divergence(
             lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-            use_reparametrization=False))
+            use_reparameterization=False))
 
     def exact_kl(s):
       p = tfd.MultivariateNormalFullCovariance(
@@ -748,8 +761,8 @@ class MonteCarloVariationalLossTest(test_case.TestCase):
         rtol=0.04, atol=0.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CsiszarVIMCOTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CsiszarVIMCOTest(test_util.TestCase):
 
   def _csiszar_vimco_helper(self, logu):
     """Numpy implementation of `csiszar_vimco_helper`."""
@@ -784,7 +797,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
     dims = 5  # Dimension
     num_draws = int(1e3)
     num_batch_draws = int(3)
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     with tf.GradientTape(persistent=True) as tape:
       f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
@@ -812,11 +825,11 @@ class CsiszarVIMCOTest(test_case.TestCase):
       # We want the seed to be the same since we will use computations
       # with the same underlying sample to show correctness of vimco.
       if tf.executing_eagerly():
-        tf1.set_random_seed(seed)
+        tf.random.set_seed(seed)
       x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
       x = tf.stop_gradient(x)
       logu = p.log_prob(x) - q.log_prob(x)
-      f_log_sum_u = f(tfp.vi.csiszar_vimco_helper(logu)[0])
+      f_log_sum_u = f(tfp.stats.log_soomean_exp(logu, axis=0)[::-1][0])
       q_log_prob_x = q.log_prob(x)
 
     grad_vimco = tape.gradient(vimco, s)
@@ -892,7 +905,7 @@ class CsiszarVIMCOTest(test_case.TestCase):
         'z': tfd.Normal(0., 1.)
     })
 
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
     reverse_kl_sequential = tfp.vi.csiszar_vimco(
         f=tfp.vi.kl_reverse,

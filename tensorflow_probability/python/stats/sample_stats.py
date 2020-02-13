@@ -129,7 +129,7 @@ def auto_correlation(x,
     x_rotated = distribution_util.rotate_transpose(x, shift)
 
     if center:
-      x_rotated -= tf.reduce_mean(x_rotated, axis=-1, keepdims=True)
+      x_rotated = x_rotated - tf.reduce_mean(x_rotated, axis=-1, keepdims=True)
 
     # x_len = N / 2 from above explanation.  The length of x along axis.
     # Get a value for x_len that works in all cases.
@@ -197,7 +197,7 @@ def auto_correlation(x,
     if know_static_shape:
       chopped_shape = tensorshape_util.as_list(x_rotated.shape)
       chopped_shape[-1] = min(x_len, max_lags + 1)
-      shifted_product_chopped.set_shape(chopped_shape)
+      tensorshape_util.set_shape(shifted_product_chopped, chopped_shape)
 
     # Recall R[m] is a sum of N / 2 - m nonzero terms x[n] Conj(x[n - m]).  The
     # other terms were zeros arising only due to zero padding.
@@ -376,11 +376,13 @@ def covariance(x,
 
     # If we get lucky and axis is statically defined, we can do some checks.
     if _is_list_like(event_axis) and _is_list_like(sample_axis):
+      event_axis = tuple(map(int, event_axis))
+      sample_axis = tuple(map(int, sample_axis))
       if set(event_axis).intersection(sample_axis):
         raise ValueError(
             'sample_axis ({}) and event_axis ({}) overlapped'.format(
                 sample_axis, event_axis))
-      if (np.diff(sorted(event_axis)) > 1).any():
+      if (np.diff(np.array(sorted(event_axis))) > 1).any():
         raise ValueError(
             'event_axis must be contiguous. Found: {}'.format(event_axis))
       batch_axis = list(

@@ -22,12 +22,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -172,13 +172,16 @@ class HalfNormal(distribution.Distribution):
     return self.scale * np.sqrt(2.0) / np.sqrt(np.pi)
 
   def _quantile(self, p):
-    return np.sqrt(2.0) * self.scale * special_math.erfinv(p)
+    return np.sqrt(2.0) * self.scale * tf.math.erfinv(p)
 
   def _mode(self):
     return tf.zeros(self.batch_shape_tensor())
 
   def _variance(self):
     return self.scale ** 2.0 * (1.0 - 2.0 / np.pi)
+
+  def _default_event_space_bijector(self):
+    return softplus_bijector.Softplus(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
@@ -187,6 +190,15 @@ class HalfNormal(distribution.Distribution):
     if is_init != tensor_util.is_ref(self._scale):
       assertions.append(assert_util.assert_positive(
           self._scale, message='Argument `scale` must be positive.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    """Checks the validity of a sample."""
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
     return assertions
 
 

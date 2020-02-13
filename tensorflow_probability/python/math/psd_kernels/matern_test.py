@@ -25,11 +25,10 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-class _MaternTestCase(parameterized.TestCase, test_case.TestCase):
+class _MaternTestCase(test_util.TestCase):
   """Mixin test for Matern type kernels.
 
   Subclasses must specify _kernel_type and _numpy_kernel.
@@ -55,12 +54,12 @@ class _MaternTestCase(parameterized.TestCase, test_case.TestCase):
     self.assertAllEqual([3, 1, 2], self.evaluate(k.batch_shape_tensor()))
 
   def testValidateArgs(self):
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('amplitude must be positive'):
       k = self._kernel_type(amplitude=-1., length_scale=1., validate_args=True)
       self.evaluate(k.apply([[1.]], [[1.]]))
 
     if not tf.executing_eagerly():
-      with self.assertRaises(tf.errors.InvalidArgumentError):
+      with self.assertRaisesOpError('length_scale must be positive'):
         k = self._kernel_type(
             amplitude=1., length_scale=-1., validate_args=True)
         self.evaluate(k.apply([[1.]], [[1.]]))
@@ -136,18 +135,17 @@ class _MaternTestCase(parameterized.TestCase, test_case.TestCase):
     k = self._kernel_type()
     x = tf.constant(np.arange(3 * 5, dtype=np.float32).reshape(3, 5))
 
-    with tf.GradientTape(persistent=True) as tape:
-      tape.watch(x)
-      kernel_values = k.apply(x, x)
-      kernel_val_slices = [kernel_values[i] for i in range(3)]
-    grads = [tape.gradient(kvs, x) for kvs in kernel_val_slices]
+    grads = [
+        tfp.math.value_and_gradient(
+            lambda x: k.apply(x, x)[i], x)[1]  # pylint: disable=cell-var-from-loop
+        for i in range(3)]
 
     self.assertAllEqual(
-        [np.zeros(grad.shape.as_list(), np.float32) for grad in grads],
+        [np.zeros(np.int32(grad.shape), np.float32) for grad in grads],
         self.evaluate(grads))
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaternOneHalfTest(_MaternTestCase):
 
   _kernel_type = tfp.math.psd_kernels.MaternOneHalf
@@ -157,7 +155,7 @@ class MaternOneHalfTest(_MaternTestCase):
     return amplitude**2 * np.exp(-norm)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaternThreeHalvesTest(_MaternTestCase):
 
   _kernel_type = tfp.math.psd_kernels.MaternThreeHalves
@@ -167,7 +165,7 @@ class MaternThreeHalvesTest(_MaternTestCase):
     return amplitude**2 * (1 + norm) * np.exp(-norm)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class MaternFiveHalvesTest(_MaternTestCase):
 
   _kernel_type = tfp.math.psd_kernels.MaternFiveHalves

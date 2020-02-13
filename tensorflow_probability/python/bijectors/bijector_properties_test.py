@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl import flags
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
@@ -29,14 +28,8 @@ from tensorflow_probability.python.bijectors import hypothesis_testlib as biject
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
-
-flags.DEFINE_enum('tf_mode', 'graph', ['eager', 'graph'],
-                  'TF execution mode to use')
-
-FLAGS = flags.FLAGS
 
 TF2_FRIENDLY_BIJECTORS = (
     'AffineScalar',
@@ -48,40 +41,59 @@ TF2_FRIENDLY_BIJECTORS = (
     'DiscreteCosineTransform',
     'Exp',
     'Expm1',
+    'FillScaleTriL',
     'FillTriangular',
-    'Gumbel',
+    'GumbelCDF',
     'Identity',
     'Inline',
     'Invert',
     'IteratedSigmoidCentered',
-    'Kumaraswamy',
+    'KumaraswamyCDF',
+    'Log',
+    'Log1p',
     'MatvecLU',
+    'MatrixInverseTriL',
     'NormalCDF',
     'Ordered',
     'Permute',
     'PowerTransform',
     'RationalQuadraticSpline',
     'Reciprocal',
+    'Reshape',
+    'Scale',
+    'ScaleMatvecDiag',
+    'ScaleMatvecLU',
+    'ScaleMatvecTriL',
+    'Shift',
     'ScaleTriL',
     'Sigmoid',
     'SinhArcsinh',
+    'SoftClip',
+    'Softfloor',
     'Softplus',
     'Softsign',
     'Square',
     'Tanh',
     'TransformDiagonal',
-    'Weibull',
+    'Transpose',
+    'WeibullCDF',
 )
 
 BIJECTOR_PARAMS_NDIMS = {
     'AffineScalar': dict(shift=0, scale=0, log_scale=0),
-    'Gumbel': dict(loc=0, scale=0),
-    'Kumaraswamy': dict(concentration1=0, concentration0=0),
+    'GumbelCDF': dict(loc=0, scale=0),
+    'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
+    'Scale': dict(scale=0),
+    'ScaleMatvecDiag': dict(scale_diag=1),
+    'ScaleMatvecLU': dict(lower_upper=2, permutation=1),
+    'ScaleMatvecTriL': dict(scale_tril=2),
+    'Shift': dict(shift=0),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
+    'Softfloor': dict(temperature=0),
     'Softplus': dict(hinge_softness=0),
     'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
-    'Weibull': dict(concentration=0, scale=0),
+    'WeibullCDF': dict(concentration=0, scale=0),
 }
 
 MUTEX_PARAMS = (
@@ -96,7 +108,8 @@ INVERT_LDJ = {FLDJ: ILDJ, ILDJ: FLDJ}
 NO_LDJ_GRADS_EXPECTED = {
     'AffineScalar': dict(shift={FLDJ, ILDJ}),
     'BatchNormalization': dict(beta={FLDJ, ILDJ}),
-    'Gumbel': dict(loc={ILDJ}),
+    'GumbelCDF': dict(loc={ILDJ}),
+    'Shift': dict(shift={FLDJ, ILDJ}),
 }
 
 TRANSFORM_DIAGONAL_WHITELIST = {
@@ -105,20 +118,25 @@ TRANSFORM_DIAGONAL_WHITELIST = {
     'DiscreteCosineTransform',
     'Exp',
     'Expm1',
-    'Gumbel',
+    'GumbelCDF',
     'Identity',
     'Inline',
-    'Kumaraswamy',
+    'KumaraswamyCDF',
     'NormalCDF',
     'PowerTransform',
     'Reciprocal',
+    'Scale',
+    'ScaleMatvecDiag',
+    'ScaleMatvecLU',
+    'ScaleMatvecTriL',
+    'Shift',
     'Sigmoid',
     'SinhArcsinh',
     'Softplus',
     'Softsign',
     'Square',
     'Tanh',
-    'Weibull',
+    'WeibullCDF',
 }
 
 
@@ -156,6 +174,17 @@ def broadcasting_params(draw,
           enable_vars=enable_vars,
           constraint_fn_for=_constraint,
           mutex_params=MUTEX_PARAMS))
+
+
+class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
+  """Convenience object for capturing variables closed over by Inline."""
+
+  def __init__(self, fn, varobj):
+    self._fn = fn
+    self._vars = varobj
+
+  def __call__(self, *args, **kwargs):
+    return self._fn(*args, **kwargs)
 
 
 @hps.composite
@@ -201,8 +230,10 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             batch_shape=batch_shape,
             event_dim=event_dim,
             enable_vars=enable_vars))
-    return tfb.Invert(underlying, validate_args=True)
-  if bijector_name == 'TransformDiagonal':
+    bijector_params = {'bijector': underlying}
+    msg = 'Forming Invert bijector with underlying bijector {}.'
+    hp.note(msg.format(underlying))
+  elif bijector_name == 'TransformDiagonal':
     underlying_name = draw(
         hps.sampled_from(sorted(TRANSFORM_DIAGONAL_WHITELIST)))
     underlying = draw(
@@ -211,65 +242,107 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
             batch_shape=(),
             event_dim=event_dim,
             enable_vars=enable_vars))
-    return tfb.TransformDiagonal(underlying, validate_args=True)
-  if bijector_name == 'Inline':
-    if enable_vars:
-      scale = tf.Variable(1., name='scale')
-    else:
-      scale = 2.
-    b = tfb.AffineScalar(scale=scale)
+    bijector_params = {'diag_bijector': underlying}
+    msg = 'Forming TransformDiagonal bijector with underlying bijector {}.'
+    hp.note(msg.format(underlying))
+  elif bijector_name == 'Inline':
+    scale = draw(tfp_hps.maybe_variable(
+        hps.sampled_from(np.float32([1., -1., 2, -2.])), enable_vars))
+    b = tfb.Scale(scale=scale)
 
-    inline = tfb.Inline(
-        forward_fn=b.forward,
+    bijector_params = dict(
+        forward_fn=CallableModule(b.forward, b),
         inverse_fn=b.inverse,
         forward_log_det_jacobian_fn=lambda x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
             x, event_ndims=b.forward_min_event_ndims),
         forward_min_event_ndims=b.forward_min_event_ndims,
         is_constant_jacobian=b.is_constant_jacobian,
+        is_increasing=b._internal_is_increasing,  # pylint: disable=protected-access
     )
-    inline.b = b
-    return inline
-  if bijector_name == 'DiscreteCosineTransform':
-    dct_type = draw(hps.integers(min_value=2, max_value=3))
-    return tfb.DiscreteCosineTransform(
-        validate_args=True, dct_type=dct_type)
-  if bijector_name == 'PowerTransform':
-    power = draw(hps.floats(min_value=0., max_value=10.))
-    return tfb.PowerTransform(validate_args=True, power=power)
-  if bijector_name == 'Permute':
+  elif bijector_name == 'DiscreteCosineTransform':
+    dct_type = hps.integers(min_value=2, max_value=3)
+    bijector_params = {'dct_type': draw(dct_type)}
+  elif bijector_name == 'PowerTransform':
+    power = hps.floats(min_value=1e-6, max_value=10.)
+    bijector_params = {'power': draw(power)}
+  elif bijector_name == 'Permute':
     event_ndims = draw(hps.integers(min_value=1, max_value=2))
-    axis = draw(hps.integers(min_value=-event_ndims, max_value=-1))
-    permutation = draw(hps.permutations(np.arange(event_dim)))
-    return tfb.Permute(permutation, axis=axis)
-
-  bijector_params = draw(
-      broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
-                          enable_vars=enable_vars))
+    axis = hps.integers(min_value=-event_ndims, max_value=-1)
+    # This is a permutation of dimensions within an axis.
+    # (Contrast with `Transpose` below.)
+    bijector_params = {
+        'axis': draw(axis),
+        'permutation': draw(tfp_hps.maybe_variable(
+            hps.permutations(np.arange(event_dim)), enable_vars,
+            dtype=tf.int32))
+    }
+  elif bijector_name == 'Reshape':
+    event_shape_out = draw(tfp_hps.shapes(min_ndims=1))
+    # TODO(b/142135119): Wanted to draw general input and output shapes like the
+    # following, but Hypothesis complained about filtering out too many things.
+    # event_shape_in = draw(tfp_hps.shapes(min_ndims=1))
+    # hp.assume(event_shape_out.num_elements() == event_shape_in.num_elements())
+    event_shape_in = [event_shape_out.num_elements()]
+    bijector_params = {'event_shape_out': event_shape_out,
+                       'event_shape_in': event_shape_in}
+  elif bijector_name == 'Transpose':
+    event_ndims = draw(hps.integers(min_value=0, max_value=2))
+    # This is a permutation of axes.
+    # (Contrast with `Permute` above.)
+    bijector_params = {'perm': draw(hps.permutations(np.arange(event_ndims)))}
+  else:
+    bijector_params = draw(
+        broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
+                            enable_vars=enable_vars))
   ctor = getattr(tfb, bijector_name)
+  hp.note('Forming {} bijector with params {}.'.format(
+      bijector_name, bijector_params))
   return ctor(validate_args=True, **bijector_params)
 
 
-Support = tfp_hps.Support
-
-
 def constrain_forward_shape(bijector, shape):
-  """Constrain the shape so it is compatible with bijector.forward."""
+  """Constrain the shape so it is compatible with bijector.forward.
+
+  Args:
+    bijector: A `Bijector`.
+    shape: A TensorShape or compatible, giving the desired event shape.
+
+  Returns:
+    shape: A TensorShape, giving an event shape compatible with
+      `bijector.forward`, loosely inspired by the input `shape`.
+  """
   if is_invert(bijector):
     return constrain_inverse_shape(bijector.bijector, shape=shape)
 
+  # TODO(b/146897388): Enable bijectors with parameter-dependent support.
   support = bijector_hps.bijector_supports()[
       type(bijector).__name__].forward
   if support == tfp_hps.Support.VECTOR_SIZE_TRIANGULAR:
     # Need to constrain the shape.
     shape[-1] = int(shape[-1] * (shape[-1] + 1) / 2)
-  return shape
+  if isinstance(bijector, tfb.Reshape):
+    # Note: This relies on the out event shape being fully determined
+    shape = tf.get_static_value(bijector._event_shape_in)
+  return tf.TensorShape(shape)
 
 
 def constrain_inverse_shape(bijector, shape):
-  """Constrain the shape so it is compatible with bijector.inverse."""
+  """Constrain the shape so it is compatible with bijector.inverse.
+
+  Args:
+    bijector: A `Bijector`.
+    shape: A TensorShape or compatible, giving the desired event shape.
+
+  Returns:
+    shape: A TensorShape, giving an event shape compatible with
+      `bijector.inverse`, loosely inspired by the input `shape`.
+  """
   if is_invert(bijector):
     return constrain_forward_shape(bijector.bijector, shape=shape)
-  return shape
+  if isinstance(bijector, tfb.Reshape):
+    # Note: This relies on the out event shape being fully determined
+    shape = tf.get_static_value(bijector._event_shape_out)
+  return tf.TensorShape(shape)
 
 
 @hps.composite
@@ -361,8 +434,19 @@ def assert_no_none_grad(bijector, method, wrt_vars, grads):
           'Missing' if expect_grad else 'Unexpected', method, var, bijector))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
+def _ldj_tensor_conversions_allowed(bijector, is_forward):
+  if is_invert(bijector):
+    return _ldj_tensor_conversions_allowed(bijector.bijector, not is_forward)
+  elif is_transform_diagonal(bijector):
+    return _ldj_tensor_conversions_allowed(bijector.diag_bijector, is_forward)
+  elif is_forward:
+    return 2 if hasattr(bijector, '_forward_log_det_jacobian') else 4
+  else:
+    return 2 if hasattr(bijector, '_inverse_log_det_jacobian') else 4
+
+
+@test_util.test_all_tf_execution_regimes
+class BijectorPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}
@@ -370,12 +454,12 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testBijector(self, bijector_name, data):
-    if tf.executing_eagerly() != (FLAGS.tf_mode == 'eager'):
-      return
+    tfp_hps.guitar_skip_if_matches('Tanh', bijector_name, 'b/144163991')
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))
     bijector = data.draw(
         bijectors(bijector_name=bijector_name, event_dim=event_dim,
                   enable_vars=True))
+    self.evaluate(tf.group(*[v.initializer for v in bijector.variables]))
 
     # Forward mapping: Check differentiation through forward mapping with
     # respect to the input and parameter variables.  Also check that any
@@ -406,6 +490,28 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
     grads = tape.gradient(ys, wrt_vars)
     assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
 
+    # For scalar bijectors, verify correctness of the _is_increasing method.
+    # TODO(b/148459057): Except, don't verify Softfloor on Guitar because
+    # of numerical problem.
+    def exception(bijector):
+      if not tfp_hps.running_under_guitar():
+        return False
+      if isinstance(bijector, tfb.Softfloor):
+        return True
+      if isinstance(bijector, tfb.Invert):
+        return exception(bijector.bijector)
+      return False
+    if (bijector.forward_min_event_ndims == 0 and
+        bijector.inverse_min_event_ndims == 0 and
+        not exception(bijector)):
+      dydx = grads[0]
+      hp.note('dydx: {}'.format(dydx))
+      isfinite = tf.math.is_finite(dydx)
+      incr_or_slope_eq0 = bijector._internal_is_increasing() | tf.equal(dydx, 0)  # pylint: disable=protected-access
+      self.assertAllEqual(
+          isfinite & incr_or_slope_eq0,
+          isfinite & (dydx >= 0) | tf.zeros_like(incr_or_slope_eq0))
+
     # FLDJ: Check differentiation through forward log det jacobian with
     # respect to the input and parameter variables.  Also check that any
     # variables are not referenced overmuch.
@@ -414,13 +520,7 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
             min_value=bijector.forward_min_event_ndims,
             max_value=xs.shape.ndims))
     with tf.GradientTape() as tape:
-      max_permitted = 2 if hasattr(bijector, '_forward_log_det_jacobian') else 4
-      if is_invert(bijector):
-        max_permitted = (2 if hasattr(bijector.bijector,
-                                      '_inverse_log_det_jacobian') else 4)
-      elif is_transform_diagonal(bijector):
-        max_permitted = (2 if hasattr(bijector.diag_bijector,
-                                      '_forward_log_det_jacobian') else 4)
+      max_permitted = _ldj_tensor_conversions_allowed(bijector, is_forward=True)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `forward_log_det_jacobian` of {}'.format(bijector),
           max_permissible=max_permitted):
@@ -462,20 +562,15 @@ class BijectorPropertiesTest(test_case.TestCase, parameterized.TestCase):
             min_value=bijector.inverse_min_event_ndims,
             max_value=ys.shape.ndims))
     with tf.GradientTape() as tape:
-      max_permitted = 2 if hasattr(bijector, '_inverse_log_det_jacobian') else 4
-      if is_invert(bijector):
-        max_permitted = (2 if hasattr(bijector.bijector,
-                                      '_forward_log_det_jacobian') else 4)
-      elif is_transform_diagonal(bijector):
-        max_permitted = (2 if hasattr(bijector.diag_bijector,
-                                      '_inverse_log_det_jacobian') else 4)
+      max_permitted = _ldj_tensor_conversions_allowed(
+          bijector, is_forward=False)
       with tfp_hps.assert_no_excessive_var_usage(
           'method `inverse_log_det_jacobian` of {}'.format(bijector),
           max_permissible=max_permitted):
         tape.watch(wrt_vars)
         # TODO(b/73073515): Fix graph mode gradients with bijector caching.
-        xs = bijector.inverse_log_det_jacobian(ys + 0, event_ndims=event_ndims)
-    grads = tape.gradient(xs, wrt_vars)
+        ldj = bijector.inverse_log_det_jacobian(ys + 0, event_ndims=event_ndims)
+    grads = tape.gradient(ldj, wrt_vars)
     assert_no_none_grad(bijector, 'inverse_log_det_jacobian', wrt_vars, grads)
 
 
@@ -496,8 +591,16 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'tailweight':
         tfp_hps.softplus_plus_eps(),
+    'temperature':
+        tfp_hps.softplus_plus_eps(eps=0.5),
     'AffineScalar.scale':
         tfp_hps.softplus_plus_eps(),
+    'Scale.scale':
+        tfp_hps.softplus_plus_eps(),
+    'ScaleMatvecDiag.scale_diag':
+        tfp_hps.softplus_plus_eps(),
+    'ScaleMatvecTriL.scale_tril':
+        tfp_hps.lower_tril_positive_definite,
     'bin_widths':
         bijector_hps.spline_bin_size_constraint,
     'bin_heights':
@@ -520,4 +623,5 @@ def constraint_for(bijector_name=None, param=None):
 
 if __name__ == '__main__':
   tf.enable_v2_behavior()
+  np.set_printoptions(floatmode='unique', precision=None)
   tf.test.main()

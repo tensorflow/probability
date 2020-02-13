@@ -24,15 +24,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 def make_lognormal(mean):
   """Helper which creates a LogNormal with a specific mean."""
   mean = tf.convert_to_tensor(value=mean, name='mean')
-  s2 = np.log(2.).astype(mean.dtype.as_numpy_dtype())
+  s2 = np.log(2.).astype(mean.dtype.as_numpy_dtype)
   return tfd.LogNormal(tf.math.log(mean) - 0.5 * s2, np.sqrt(s2))
 
 
@@ -103,8 +101,8 @@ class _GLMTestHarness(object):
                         atol=1e-6, rtol=1e-4)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class BernoulliTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -113,8 +111,8 @@ class BernoulliTest(test_case.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), tf.nn.sigmoid)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BernoulliNormalCDFTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class BernoulliNormalCDFTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -128,8 +126,8 @@ class BernoulliNormalCDFTest(test_case.TestCase, _GLMTestHarness):
         lambda mu: tfd.Bernoulli(probs=mu), normal_cdf)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GammaExpTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class GammaExpTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -140,8 +138,8 @@ class GammaExpTest(test_case.TestCase, _GLMTestHarness):
         tf.exp)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GammaSoftplusTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class GammaSoftplusTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -152,8 +150,8 @@ class GammaSoftplusTest(test_case.TestCase, _GLMTestHarness):
         tf.nn.softplus)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogNormalTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class LogNormalTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -162,8 +160,8 @@ class LogNormalTest(test_case.TestCase, _GLMTestHarness):
         make_lognormal, tf.exp)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogNormalSoftplusTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class LogNormalSoftplusTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -172,8 +170,8 @@ class LogNormalSoftplusTest(test_case.TestCase, _GLMTestHarness):
         make_lognormal, tf.nn.softplus)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NormalTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class NormalTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -182,8 +180,8 @@ class NormalTest(test_case.TestCase, _GLMTestHarness):
         lambda mu: tfd.Normal(mu, self.dtype(1)), tf.identity)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NormalReciprocalTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class NormalReciprocalTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -192,8 +190,8 @@ class NormalReciprocalTest(test_case.TestCase, _GLMTestHarness):
         lambda mu: tfd.Normal(mu, self.dtype(1)), tf.math.reciprocal)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PoissonTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class PoissonTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32
@@ -202,8 +200,8 @@ class PoissonTest(test_case.TestCase, _GLMTestHarness):
         lambda mu: tfd.Poisson(rate=mu), tf.exp)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PoissonSoftplusTest(test_case.TestCase, _GLMTestHarness):
+@test_util.test_all_tf_execution_regimes
+class PoissonSoftplusTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):
     self.dtype = np.float32

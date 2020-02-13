@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -30,7 +31,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -201,17 +201,6 @@ class Dirichlet(distribution.Distribution):
     """Concentration parameter; expected counts for that coordinate."""
     return self._concentration
 
-  @property
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `total_concentration` property is deprecated; instead use '
-       '`tf.reduce_sum(dist.concentration, axis=-1)`.'),
-      warn_once=True)
-  def total_concentration(self):
-    """Sum of last dim of concentration parameter."""
-    with self._name_and_control_scope('total_concentration'):
-      return tf.reduce_sum(self.concentration, axis=-1)
-
   def _batch_shape_tensor(self):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
     # so we pre-emptively convert-to-tensor.
@@ -237,10 +226,9 @@ class Dirichlet(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      concentration = tf.convert_to_tensor(self.concentration)
-      return (tf.reduce_sum(tf.math.xlogy(concentration - 1., x), axis=-1) -
-              tf.math.lbeta(concentration))
+    concentration = tf.convert_to_tensor(self.concentration)
+    return (tf.reduce_sum(tf.math.xlogy(concentration - 1., x), axis=-1) -
+            tf.math.lbeta(concentration))
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _prob(self, x):
@@ -303,17 +291,23 @@ class Dirichlet(distribution.Distribution):
     with tf.control_dependencies(assertions):
       return tf.identity(mode)
 
-  def _maybe_assert_valid_sample(self, x):
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return softmax_centered_bijector.SoftmaxCentered(
+        validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""
+    assertions = []
     if not self.validate_args:
-      return []
-    return [
-        assert_util.assert_positive(x, message='samples must be positive'),
-        assert_util.assert_near(
-            tf.ones([], dtype=self.dtype),
-            tf.reduce_sum(x, axis=-1),
-            message='sample last-dimension must sum to `1`'),
-    ]
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Samples must be non-negative.'))
+    assertions.append(assert_util.assert_near(
+        tf.ones([], dtype=self.dtype),
+        tf.reduce_sum(x, axis=-1),
+        message='Sample last-dimension must sum to `1`.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     """Checks the validity of the concentration parameter."""

@@ -25,7 +25,6 @@ from tensorflow_probability.python.sts.decomposition import decompose_forecast_b
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegression
 from tensorflow_probability.python.sts.dynamic_regression import DynamicLinearRegressionStateSpaceModel
 from tensorflow_probability.python.sts.fitting import build_factored_surrogate_posterior
-from tensorflow_probability.python.sts.fitting import build_factored_variational_loss
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
 from tensorflow_probability.python.sts.forecast import forecast
@@ -74,7 +73,6 @@ _allowed_symbols = [
     'StructuralTimeSeries',
     'Sum',
     'build_factored_surrogate_posterior',
-    'build_factored_variational_loss',
     'decompose_by_component',
     'decompose_forecast_by_component',
     'fit_with_hmc',

@@ -27,9 +27,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 # pylint: disable=g-error-prone-assert-raises
 
 # This file is testing new assertions, which must of necessity appear in
@@ -37,8 +35,8 @@ from tensorflow.python.framework import test_util  # pylint: disable=g-direct-te
 # violated.
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class StatisticalTestingTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class StatisticalTestingTest(test_util.TestCase):
 
   def assert_design_soundness(self, dtype, min_num_samples, min_discrepancy):
     thresholds = [1e-5, 1e-2, 1.1e-1, 0.9, 1., 1.02, 2., 10., 1e2, 1e5, 1e10]
@@ -116,18 +114,20 @@ class StatisticalTestingTest(test_case.TestCase, parameterized.TestCase):
     # There are repetitions across batch members, which should not
     # confuse the CDF computation.
     # Shape: [batch_size, num_samples]
-    samples = [[1, 1, 2, 2],
-               [1, 2, 3, 4],
-               [1, 3, 3, 3]]
-    expected_low_cdf_values = [[0, 0, 0.5, 0.5],
-                               [0, 0.25, 0.5, 0.75],
-                               [0, 0.25, 0.25, 0.25]]
+    samples = np.array([[1, 1, 2, 2],
+                        [1, 2, 3, 4],
+                        [1, 3, 3, 3]])
+    expected_low_cdf_values = np.array(
+        [[0, 0, 0.5, 0.5],
+         [0, 0.25, 0.5, 0.75],
+         [0, 0.25, 0.25, 0.25]])
     low_empirical_cdfs = self.evaluate(
         st.empirical_cdfs(samples, samples, continuity='left'))
     self.assertAllEqual(expected_low_cdf_values, low_empirical_cdfs)
-    expected_high_cdf_values = [[0.5, 0.5, 1, 1],
-                                [0.25, 0.5, 0.75, 1],
-                                [0.25, 1, 1, 1]]
+    expected_high_cdf_values = np.array(
+        [[0.5, 0.5, 1, 1],
+         [0.25, 0.5, 0.75, 1],
+         [0.25, 1, 1, 1]])
     high_empirical_cdfs = self.evaluate(
         st.empirical_cdfs(samples, samples, continuity='right'))
     self.assertAllEqual(expected_high_cdf_values, high_empirical_cdfs)
@@ -202,12 +202,12 @@ class StatisticalTestingTest(test_case.TestCase, parameterized.TestCase):
   @parameterized.parameters(np.float32, np.float64)
   def test_kolmogorov_smirnov_distance_two_sample(self, dtype):
     del dtype
-    samples1 = [[1, 1, 2, 2],
-                [1, 2, 3, 4],
-                [1, 3, 3, 3]]
-    samples2 = [[1, 2, 2, 1, 1, 2],
-                [4, 4, 3, 2, 1, 1],
-                [2, 2, 2, 1, -4, 7]]
+    samples1 = np.array([[1, 1, 2, 2],
+                         [1, 2, 3, 4],
+                         [1, 3, 3, 3]])
+    samples2 = np.array([[1, 2, 2, 1, 1, 2],
+                         [4, 4, 3, 2, 1, 1],
+                         [2, 2, 2, 1, -4, 7]])
     # Unlike empirical_cdfs, the samples Tensors must come in iid across the
     # leading dimension.
     obtained = self.evaluate(st.kolmogorov_smirnov_distance_two_sample(
@@ -482,7 +482,7 @@ class StatisticalTestingTest(test_case.TestCase, parameterized.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
   def test_random_projections(self, dtype):
-    strm = tfp_test_util.test_seed_stream()
+    strm = test_util.test_seed_stream()
     rng = np.random.RandomState(seed=strm() % 2**31)
     num_samples = 57000
 

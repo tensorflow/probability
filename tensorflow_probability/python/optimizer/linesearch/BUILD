@@ -47,13 +47,13 @@ py_library(
 
 py_test(
     name = "hager_zhang_test",
-    size = "medium",
+    size = "small",
     srcs = ["hager_zhang_test.py"],
     shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

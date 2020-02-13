@@ -44,7 +44,7 @@ def mvn(*args, **kwargs):
 
 def text_messages_joint_log_prob(count_data, lambda_1, lambda_2, tau):
   """Joint log probability function."""
-  alpha = (1. / tf.reduce_mean(input_tensor=count_data))
+  alpha = (1. / tf.reduce_mean(count_data))
   rv_lambda = tfd.Exponential(rate=alpha)
 
   rv_tau = tfd.Uniform()
@@ -52,14 +52,14 @@ def text_messages_joint_log_prob(count_data, lambda_1, lambda_2, tau):
   lambda_ = tf.gather(
       [lambda_1, lambda_2],
       indices=tf.cast(
-          tau * tf.cast(tf.size(input=count_data), dtype=tf.float32) <= tf.cast(
-              tf.range(tf.size(input=count_data)), dtype=tf.float32),
+          tau * tf.cast(tf.size(count_data), dtype=tf.float32) <= tf.cast(
+              tf.range(tf.size(count_data)), dtype=tf.float32),
           dtype=tf.int32))
   rv_observation = tfd.Poisson(rate=lambda_)
 
   return (rv_lambda.log_prob(lambda_1) + rv_lambda.log_prob(lambda_2) +
           rv_tau.log_prob(tau) +
-          tf.reduce_sum(input_tensor=rv_observation.log_prob(count_data)))
+          tf.reduce_sum(rv_observation.log_prob(count_data)))
 
 
 def benchmark_text_messages_hmc(

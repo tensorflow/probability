@@ -26,9 +26,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal.util import is_list_like
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 InnerKernelResultsWithoutCorrection = collections.namedtuple(
 
@@ -130,8 +129,8 @@ def make_bootstrap_results_fn(true_kernel_results):
   return bootstrap_results
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MetropolisHastingsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MetropolisHastingsTest(test_util.TestCase):
 
   def setUp(self):
     self.dtype = np.float32
@@ -139,7 +138,7 @@ class MetropolisHastingsTest(test_case.TestCase):
   def testCorrectlyWorksWithoutCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([
             +100.,
@@ -238,7 +237,7 @@ class MetropolisHastingsTest(test_case.TestCase):
   def testCorrectlyWorksWithCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(s) for s in current_state_]
 
     expected_inner_init_kernel_results = InnerKernelResultsWithCorrection(
         log_acceptance_correction=self.dtype([+300., -300.]),
@@ -337,7 +336,7 @@ class MetropolisHastingsTest(test_case.TestCase):
   def testWarnings(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([100., -100.]),
         grads_target_log_prob=[

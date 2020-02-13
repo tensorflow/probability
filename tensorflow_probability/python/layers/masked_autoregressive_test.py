@@ -23,16 +23,14 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import layers as tfpl
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfk = tf.keras
 tfkl = tf.keras.layers
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveTransformTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AutoregressiveTransformTest(test_util.TestCase):
 
   def test_doc_string(self):
     # Generate data -- as in Figure 1 in [Papamakarios et al. (2017)][1]).
@@ -55,12 +53,12 @@ class AutoregressiveTransformTest(test_case.TestCase):
         # matching batch_shape and event_shape of [2].
         # pylint: disable=g-long-lambda
         tfpl.DistributionLambda(lambda t: tfd.MultivariateNormalDiag(
-            loc=tf.zeros(tf.concat([tf.shape(input=t)[:-1], [2]], axis=0)),
+            loc=tf.zeros(tf.concat([tf.shape(t)[:-1], [2]], axis=0)),
             scale_diag=[1., 1.])),
 
         # Transform the standard normal distribution with event_shape of [2] to
         # the target distribution with event_shape of [2].
-        tfpl.AutoregressiveTransform(tfb.AutoregressiveLayer(
+        tfpl.AutoregressiveTransform(tfb.AutoregressiveNetwork(
             params=2, hidden_units=[10], activation='relu')),
     ])
 

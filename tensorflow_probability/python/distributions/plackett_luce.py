@@ -23,7 +23,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gumbel
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -214,7 +213,6 @@ class PlackettLuce(distribution.Distribution):
     event_size = self._event_size(scores)
 
     x = tf.cast(x, self.dtype)
-    x = self._maybe_assert_valid_sample(x, event_size=event_size)
     # Broadcast scores or x if need be.
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(scores.shape) or
@@ -250,15 +248,19 @@ class PlackettLuce(distribution.Distribution):
     with self._name_and_control_scope(name or 'scores_parameter'):
       return tf.identity(self._scores)
 
-  def _maybe_assert_valid_sample(self, x, event_size):
+  def _default_event_space_bijector(self):
+    return
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return x
-    x = tf.convert_to_tensor(x)
-    return distribution_util.with_dependencies([
-        assert_util.assert_equal(
-            tf.range(event_size, dtype=x.dtype),
-            tf.sort(x, axis=-1)),
-    ], x)
+      return assertions
+    assertions.append(assert_util.assert_equal(
+        tf.range(self._event_size(), dtype=x.dtype),
+        tf.sort(x, axis=-1),
+        message='Sample must be a permutation of `{0, ..., k-1}`, where `k` is '
+                'the size of the last dimension of `scores`.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
@@ -286,12 +288,12 @@ class PlackettLuce(distribution.Distribution):
 
       msg1 = 'Argument `{}` must have final dimension >= 1.'.format(name)
       msg2 = 'Argument `{}` must have final dimension <= {}.'.format(
-          name, tf.int32.max)
+          name, dtype_util.max(tf.int32))
       event_size = shape_static[-1] if shape_static is not None else None
       if event_size is not None:
         if event_size < 1:
           raise ValueError(msg1)
-        if event_size > tf.int32.max:
+        if event_size > dtype_util.max(tf.int32):
           raise ValueError(msg2)
       elif self.validate_args:
         param = tf.convert_to_tensor(param)

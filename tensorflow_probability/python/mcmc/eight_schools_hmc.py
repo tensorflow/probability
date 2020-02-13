@@ -52,7 +52,7 @@ def eight_schools_joint_log_prob(
       loc=tf.zeros_like(school_effects_standard),
       scale=tf.ones_like(school_effects_standard))
   rv_treatment_effects = mvn(
-      loc=(avg_effect + tf.exp(avg_stddev) * school_effects_standard),
+      loc=(avg_effect + tf.math.exp(avg_stddev) * school_effects_standard),
       scale=treatment_stddevs)
   return (
       rv_avg_effect.log_prob(avg_effect) +

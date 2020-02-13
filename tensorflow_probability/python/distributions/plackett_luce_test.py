@@ -25,9 +25,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -38,12 +36,13 @@ def make_plackett_luce(batch_shape,
                        dtype=tf.int32,
                        scores_dtype=tf.float32):
   scores = tf.random.uniform(
-      list(batch_shape) + [num_elements], 0.1, 10, dtype=scores_dtype)
+      list(batch_shape) + [num_elements], 0.1, 10,
+      dtype=scores_dtype, seed=test_util.test_seed())
   return tfd.PlackettLuce(scores, dtype=dtype, validate_args=True)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PlackettLuceTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PlackettLuceTest(test_util.TestCase):
 
   def setUp(self):
     super(PlackettLuceTest, self).setUp()
@@ -83,11 +82,13 @@ class PlackettLuceTest(test_case.TestCase):
   def testDtype(self):
     dist = make_plackett_luce([], 5, dtype=tf.int32)
     self.assertEqual(dist.dtype, tf.int32)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     dist = make_plackett_luce([], 5, dtype=tf.int64)
     self.assertEqual(dist.dtype, tf.int64)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.scores.dtype, tf.float32)
     self.assertEqual(dist.scores.dtype, dist.prob(
@@ -103,9 +104,9 @@ class PlackettLuceTest(test_case.TestCase):
 
   def testUnknownShape(self):
     scores = tf1.placeholder_with_default(
-        input=[[1e-6, 1000.0], [1000.0, 1e-6]], shape=None)
+        [[1e-6, 1000.0], [1000.0, 1e-6]], shape=None)
     dist = tfd.PlackettLuce(scores, validate_args=True)
-    sample = dist.sample()
+    sample = dist.sample(seed=test_util.test_seed())
     # Batch entry 0, 1 will sample permutations [1, 0], [0, 1].
     sample_value_batch = self.evaluate(sample)
     self.assertAllEqual([[1, 0], [0, 1]], sample_value_batch)
@@ -114,7 +115,7 @@ class PlackettLuceTest(test_case.TestCase):
     # Check that distribution with equal scores gives uniform probability.
     scores = self._rng.uniform() * np.ones(shape=(8, 2, 10), dtype=np.float32)
     dist = tfd.PlackettLuce(scores=scores, validate_args=True)
-    np_sample = self.evaluate(dist.sample())
+    np_sample = self.evaluate(dist.sample(seed=test_util.test_seed()))
     np_prob = self.evaluate(dist.log_prob(np_sample))
     n_fac = scipy.special.factorial(scores.shape[-1]).astype(np.float32)
     expected_prob = self.evaluate(-tf.math.log(n_fac) * tf.ones_like(np_prob))
@@ -124,7 +125,7 @@ class PlackettLuceTest(test_case.TestCase):
     # Check that mode has higher probability than any other random sample.
     scores = self._rng.uniform(low=0.1, size=(10)).astype(np.float32)
     dist = tfd.PlackettLuce(scores=scores, validate_args=True)
-    np_sample = self.evaluate(dist.sample())
+    np_sample = self.evaluate(dist.sample(seed=test_util.test_seed()))
     np_prob = self.evaluate(dist.log_prob(np_sample))
     mode = self.evaluate(dist.mode())
     mode_prob = self.evaluate(dist.log_prob(mode))
@@ -132,10 +133,10 @@ class PlackettLuceTest(test_case.TestCase):
 
   def testSample(self):
     scores = np.array([[[0.1, 2.3, 5.], [4.2, 0.5, 3.1]]])
-    dist = tfd.PlackettLuce(scores)
+    dist = tfd.PlackettLuce(scores, validate_args=True)
     n = 100
     k = scores.shape[-1]
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.dtype, tf.int32)
     sample_values = self.evaluate(samples)
     self.assertAllEqual([n, 1, 2, k], sample_values.shape)
@@ -143,9 +144,15 @@ class PlackettLuceTest(test_case.TestCase):
     self.assertFalse(np.any(sample_values > k))
     self.assertTrue(np.all(np.sum(sample_values, axis=-1) == (k-1)*k//2))
 
+  def testAssertValidSample(self):
+    scores = np.array([[[0.1, 2.3, 5.], [4.2, 0.5, 3.1]]])
+    dist = tfd.PlackettLuce(scores, validate_args=True)
+    with self.assertRaisesOpError('Sample must be a permutation'):
+      self.evaluate(dist.log_prob([1, 0, 1]))
 
-@test_util.run_all_in_graph_and_eager_modes
-class PlackettLuceFromVariableTest(test_case.TestCase):
+
+@test_util.test_all_tf_execution_regimes
+class PlackettLuceFromVariableTest(test_util.TestCase):
 
   def testAssertionsProbsAfterMutation(self):
     x = tf.Variable([0.25, 0.25, 0.5])

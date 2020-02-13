@@ -307,12 +307,6 @@ class _DenseVariational(tf.keras.layers.Layer):
         name=name)
     self.add_loss(divergence)
 
-  def _matmul(self, inputs, kernel):
-    if inputs.shape.ndims <= 2:
-      return tf.matmul(inputs, kernel)
-    # To handle broadcasting, we must use `tensordot`.
-    return tf.tensordot(inputs, kernel, axes=[[-1], [0]])
-
 
 class DenseReparameterization(_DenseVariational):
   """Densely-connected layer class with reparameterization estimator.
@@ -427,7 +421,7 @@ class DenseReparameterization(_DenseVariational):
         self.kernel_posterior)
     self.kernel_posterior_affine = None
     self.kernel_posterior_affine_tensor = None
-    return self._matmul(inputs, self.kernel_posterior_tensor)
+    return tf.matmul(inputs, self.kernel_posterior_tensor)
 
 
 class DenseLocalReparameterization(_DenseVariational):
@@ -553,8 +547,8 @@ class DenseLocalReparameterization(_DenseVariational):
           '`tfd.Independent(tfd.Normal)` '
           '(saw: \"{}\").'.format(self.kernel_posterior.name))
     self.kernel_posterior_affine = normal_lib.Normal(
-        loc=self._matmul(inputs, self.kernel_posterior.distribution.loc),
-        scale=tf.sqrt(self._matmul(
+        loc=tf.matmul(inputs, self.kernel_posterior.distribution.loc),
+        scale=tf.sqrt(tf.matmul(
             tf.square(inputs),
             tf.square(self.kernel_posterior.distribution.scale))))
     self.kernel_posterior_affine_tensor = (
@@ -689,7 +683,7 @@ class DenseFlipout(_DenseVariational):
         self.kernel_posterior_tensor_fn(self.kernel_posterior_affine))
     self.kernel_posterior_tensor = None
 
-    input_shape = tf.shape(input=inputs)
+    input_shape = tf.shape(inputs)
     batch_shape = input_shape[:-1]
 
     seed_stream = SeedStream(self.seed, salt='DenseFlipout')
@@ -703,10 +697,10 @@ class DenseFlipout(_DenseVariational):
                    tf.expand_dims(self.units, 0)], 0),
         dtype=inputs.dtype,
         seed=seed_stream())
-    perturbed_inputs = self._matmul(
+    perturbed_inputs = tf.matmul(
         inputs * sign_input, self.kernel_posterior_affine_tensor) * sign_output
 
-    outputs = self._matmul(inputs, self.kernel_posterior.distribution.loc)
+    outputs = tf.matmul(inputs, self.kernel_posterior.distribution.loc)
     outputs += perturbed_inputs
     return outputs
 

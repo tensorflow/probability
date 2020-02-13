@@ -24,13 +24,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.diagnostic import _reduce_variance
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _EffectiveSampleSizeTest(object):
 
   @property
@@ -304,9 +302,90 @@ class _EffectiveSampleSizeTest(object):
 
     self.assertGreater(ess_, 100.)
 
+  def testCrossChainESSWellMixing(self):
+    # For multiple well-mixing chains, summing the ESS computed over individual
+    # chains will be roughly the same as doing the cross-chain ESS.
+    x_ = np.random.randn(500, 4).astype(np.float32)
+    x = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    ess_per_chain = tfp.mcmc.effective_sample_size(x)
+    cross_chain_dims = 1
+    if not self.use_static_shape:
+      cross_chain_dims = tf1.placeholder_with_default(
+          cross_chain_dims, shape=[])
+    ess_cross_chain = tfp.mcmc.effective_sample_size(
+        x, cross_chain_dims=cross_chain_dims)
+    ess_per_chain_, ess_cross_chain_ = self.evaluate(
+        [ess_per_chain, ess_cross_chain])
 
-@test_util.run_all_in_graph_and_eager_modes
-class EffectiveSampleSizeStaticTest(test_case.TestCase,
+    self.assertAllClose(ess_per_chain_.sum(), ess_cross_chain_, rtol=0.05)
+
+  def testCrossChainESSPoorlyMixing(self):
+    # For multiple non-mixing chains, cross-chain ESS will report the number of
+    # modes.
+    x_ = np.random.randn(500, 4).astype(np.float32) + np.array(
+        [-10., -5., 5., 10.])
+    x = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    cross_chain_dims = 1
+    if not self.use_static_shape:
+      cross_chain_dims = tf1.placeholder_with_default(
+          cross_chain_dims, shape=[])
+    ess_cross_chain = tfp.mcmc.effective_sample_size(
+        x, cross_chain_dims=cross_chain_dims)
+    ess_cross_chain_ = self.evaluate(ess_cross_chain)
+
+    self.assertAllClose(4., ess_cross_chain_, rtol=0.05)
+
+  def testCrossChainEssMultipleDims(self):
+    x_ = np.random.randn(500, 2, 2).astype(np.float32)
+    x = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    ess_per_chain = tfp.mcmc.effective_sample_size(x)
+    ess_cross_chain = tfp.mcmc.effective_sample_size(x, cross_chain_dims=[1, 2])
+    ess_per_chain_, ess_cross_chain_ = self.evaluate(
+        [ess_per_chain, ess_cross_chain])
+
+    self.assertAllClose(ess_per_chain_.sum(), ess_cross_chain_, rtol=0.05)
+
+  def testCrossChainEssListArgs(self):
+    x_ = np.random.randn(500, 2, 2).astype(np.float32)
+    x = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    y_ = np.random.randn(500, 4).astype(np.float32)
+    y = tf1.placeholder_with_default(
+        y_, shape=y_.shape if self.use_static_shape else None)
+    ess_per_chain = tfp.mcmc.effective_sample_size([x, y])
+    ess_cross_chain = tfp.mcmc.effective_sample_size([x, y],
+                                                     cross_chain_dims=[
+                                                         [1, 2],
+                                                         1,
+                                                     ])
+    ess_per_chain_, ess_cross_chain_ = self.evaluate(
+        [ess_per_chain, ess_cross_chain])
+
+    self.assertAllClose([e.sum() for e in ess_per_chain_],
+                        ess_cross_chain_,
+                        rtol=0.05)
+
+  def testCrossChainEssNotEnoughChains(self):
+    x_ = np.random.randn(500, 1).astype(np.float32)
+    x = tf1.placeholder_with_default(
+        x_, shape=x_.shape if self.use_static_shape else None)
+    cross_chain_dims = 1
+    if not self.use_static_shape:
+      cross_chain_dims = tf1.placeholder_with_default(
+          cross_chain_dims, shape=[])
+    with self.assertRaisesRegexp(Exception, "there must be > 1 chain"):
+      self.evaluate(
+          tfp.mcmc.effective_sample_size(
+              x,
+              cross_chain_dims=cross_chain_dims,
+              validate_args=True))
+
+
+@test_util.test_all_tf_execution_regimes
+class EffectiveSampleSizeStaticTest(test_util.TestCase,
                                     _EffectiveSampleSizeTest):
 
   @property
@@ -314,8 +393,8 @@ class EffectiveSampleSizeStaticTest(test_case.TestCase,
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class EffectiveSampleSizeDynamicTest(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class EffectiveSampleSizeDynamicTest(test_util.TestCase,
                                      _EffectiveSampleSizeTest):
 
   @property
@@ -323,7 +402,7 @@ class EffectiveSampleSizeDynamicTest(test_case.TestCase,
     return False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _PotentialScaleReductionTest(object):
 
   @property
@@ -509,8 +588,8 @@ class _PotentialScaleReductionTest(object):
               validate_args=True))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PotentialScaleReductionStaticTest(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class PotentialScaleReductionStaticTest(test_util.TestCase,
                                         _PotentialScaleReductionTest):
 
   @property
@@ -526,8 +605,8 @@ class PotentialScaleReductionStaticTest(test_case.TestCase,
           np.random.rand(2, 3, 4), independent_chain_ndims=0)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PotentialScaleReductionDynamicTest(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class PotentialScaleReductionDynamicTest(test_util.TestCase,
                                          _PotentialScaleReductionTest):
 
   @property
@@ -540,7 +619,7 @@ class PotentialScaleReductionDynamicTest(test_case.TestCase,
     return self.assertRaisesOpError(msg)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _ReduceVarianceTest(object):
 
   @property
@@ -593,16 +672,16 @@ class _ReduceVarianceTest(object):
         x_=np.random.randn(2, 3, 4, 5), axis=1, biased=False, keepdims=False)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ReduceVarianceTestStaticShape(test_case.TestCase, _ReduceVarianceTest):
+@test_util.test_all_tf_execution_regimes
+class ReduceVarianceTestStaticShape(test_util.TestCase, _ReduceVarianceTest):
 
   @property
   def use_static_shape(self):
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ReduceVarianceTestDynamicShape(test_case.TestCase, _ReduceVarianceTest):
+@test_util.test_all_tf_execution_regimes
+class ReduceVarianceTestDynamicShape(test_util.TestCase, _ReduceVarianceTest):
 
   @property
   def use_static_shape(self):

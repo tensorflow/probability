@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys
-
 # Dependency imports
 import hypothesis as hp
 import hypothesis.strategies as hps
@@ -30,9 +28,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
@@ -63,11 +59,11 @@ def generalized_paretos(draw, batch_shape=None):
   return dist
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GeneralizedParetoTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GeneralizedParetoTest(test_util.TestCase):
 
   @hp.given(generalized_paretos())
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testShape(self, dist):
     # batch_shape == dist.batch_shape asserted in generalized_paretos()
     self.assertEqual(dist.batch_shape, self.evaluate(dist.batch_shape_tensor()))
@@ -75,16 +71,17 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testLogPDF(self, dist):
-    xs = self.evaluate(dist.sample())
+    loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
+    hp.assume(abs(loc / scale) < 1e7)
+    xs = self.evaluate(dist.sample(seed=test_util.test_seed()))
 
     logp = dist.log_prob(xs)
     self.assertEqual(dist.batch_shape, logp.shape)
     p = dist.prob(xs)
     self.assertEqual(dist.batch_shape, p.shape)
 
-    loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     expected_logp = sp_stats.genpareto(conc, loc=loc, scale=scale).logpdf(xs)
     actual_logp = self.evaluate(logp)
     self.assertAllClose(expected_logp, actual_logp, rtol=1e-5)
@@ -94,48 +91,104 @@ class GeneralizedParetoTest(test_case.TestCase):
     # When loc = concentration = 0, we have an exponential distribution. Check
     # that at 0 we have finite log prob.
     scale = np.array([0.1, 0.5, 1., 2., 5., 10.], dtype=np.float32)
-    dist = tfd.GeneralizedPareto(loc=0, scale=scale, concentration=0)
-    log_pdf = dist.log_prob(0.)
-    self.assertAllClose(-np.log(scale), self.evaluate(log_pdf), rtol=1e-5)
+    dist = tfd.GeneralizedPareto(
+        loc=0, scale=scale, concentration=0, validate_args=True)
+    log_pdf = self.evaluate(dist.log_prob(0.))
+    self.assertAllClose(-np.log(scale), log_pdf, rtol=1e-5)
+
+    # Log prob should be finite on the boundary regardless of parameters.
+    loc = np.array([1., 2., 5.]).astype(np.float32)
+    scale = 2.
+    concentration = np.array([-5., -3.4, -1.]).astype(np.float32)
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+    log_pdf_at_loc = self.evaluate(dist.log_prob(loc))
+    self.assertAllFinite(log_pdf_at_loc)
+
+    # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
+    # boundary = loc - scale / concentration
+    # log_pdf_at_boundary = dist.log_prob(boundary)
+    # self.assertAllFinite(log_pdf_at_boundary)
+
+  def testAssertValidSample(self):
+    loc = np.array([1., 2., 5.]).astype(np.float32)
+    scale = 2.
+    concentration = np.array([-5., -3.4, 1.]).astype(np.float32)
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+
+    with self.assertRaisesOpError('must be greater than or equal to `loc`'):
+      self.evaluate(dist.prob([1.3, 1.3, 6.]))
+
+    with self.assertRaisesOpError(
+        'less than or equal to `loc - scale / concentration`'):
+      self.evaluate(dist.cdf([1.5, 2.3, 6.]))
+
+  def testSupportBijectorOutsideRange(self):
+    loc = np.array([1., 2., 5.]).astype(np.float32)
+    scale = 2.
+    concentration = np.array([-5., -2., 1.]).astype(np.float32)
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+
+    x = np.array([1. - 1e-6, 3.1, 4.9]).astype(np.float32)
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testCDF(self, dist):
-    xs = self.evaluate(dist.sample())
+    xs = self.evaluate(dist.sample(seed=test_util.test_seed()))
     cdf = dist.cdf(xs)
     self.assertEqual(dist.batch_shape, cdf.shape)
 
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
+    hp.assume(abs(loc / scale) < 1e7)
     expected_cdf = sp_stats.genpareto(conc, loc=loc, scale=scale).cdf(xs)
-    self.assertAllClose(expected_cdf, self.evaluate(cdf), rtol=5e-5)
+    actual_cdf = self.evaluate(cdf)
+    msg = ('Location: {}, scale: {}, concentration: {}, xs: {} '
+           'scipy cdf: {}, tfp cdf: {}')
+    hp.note(msg.format(loc, scale, conc, xs, expected_cdf, actual_cdf))
+    self.assertAllClose(expected_cdf, actual_cdf, rtol=5e-5)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testMean(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
+    hp.note('Location: {}, scale: {}, concentration: {}'.format(
+        loc, scale, conc))
     self.assertEqual(dist.batch_shape, dist.mean().shape)
-    if np.abs(conc) < 1e-5 and conc != 0:
-      return  # scipy does badly at small nonzero concentrations.
-    expected = sp_stats.genpareto(conc, loc=loc, scale=scale).mean()
+    # scipy doesn't seem to be very accurate for small concentrations, so use
+    # higher precision.
+    expected = sp_stats.genpareto(np.float64(conc), loc=np.float64(loc),
+                                  scale=np.float64(scale)).mean()
     actual = self.evaluate(dist.mean())
-    self.assertAllClose(expected, actual, rtol=5e-4)
+    # There is an unavoidable catastropic cancellation for means near 0
+    self.assertAllClose(expected, actual, rtol=5e-4, atol=1e-4)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testVariance(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
+    # scipy doesn't seem to be very accurate for small concentrations, so use
+    # higher precision.
+    expected = sp_stats.genpareto(np.float64(conc), loc=np.float64(loc),
+                                  scale=np.float64(scale)).var()
+    # scipy sometimes returns nonsense zero or negative variances.
+    hp.assume(expected > 0)
+    # scipy gets bad answers for very small concentrations even in 64-bit.
+    # https://github.com/scipy/scipy/issues/11168
+    hp.assume(conc > 1e-4)
     self.assertEqual(dist.batch_shape, dist.variance().shape)
-    expected = sp_stats.genpareto(conc, loc=loc, scale=scale).var()
-    if np.abs(conc) < 1e-4 and conc != 0:
-      return  # scipy does badly at small nonzero concentrations.
-    if expected <= 0:
-      return  # scipy sometimes returns nonsense zero or negative variances.
     actual = self.evaluate(dist.variance())
-    print('var', loc, scale, conc, expected, actual, file=sys.stderr)
-    self.assertAllClose(expected, actual, rtol=.01)
+    msg = ('Location: {}, scale: {}, concentration: {}, '
+           'scipy variance: {}, tfp variance: {}')
+    hp.note(msg.format(loc, scale, conc, expected, actual))
+    self.assertAllClose(expected, actual)
 
   @hp.given(generalized_paretos(batch_shape=[]))
-  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  @tfp_hps.tfp_hp_settings()
   def testEntropy(self, dist):
     loc, scale, conc = self.evaluate([dist.loc, dist.scale, dist.concentration])
     self.assertEqual(dist.batch_shape, dist.entropy().shape)
@@ -147,9 +200,10 @@ class GeneralizedParetoTest(test_case.TestCase):
     loc = np.float32(-7.5)
     scale = np.float32(3.5)
     conc = np.float32(0.07)
-    n = 100000
-    dist = tfd.GeneralizedPareto(loc=loc, scale=scale, concentration=conc)
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    n = 10**5
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=conc, validate_args=True)
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), samples.shape)
     self.assertEqual((n,), sample_values.shape)
@@ -157,19 +211,19 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.assertAllClose(
         sp_stats.genpareto.mean(conc, loc=loc, scale=scale),
         sample_values.mean(),
-        rtol=.005)
+        rtol=.02)
     self.assertAllClose(
         sp_stats.genpareto.var(conc, loc=loc, scale=scale),
         sample_values.var(),
-        rtol=.01)
+        rtol=.08)
 
   def testFullyReparameterized(self):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)
     conc = tf.constant(2.0)
     _, grads = tfp.math.value_and_gradient(
-        lambda *args: tfd.GeneralizedPareto(*args).sample(100),
-        [loc, scale, conc])
+        lambda *args: tfd.GeneralizedPareto(*args, validate_args=True).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()), [loc, scale, conc])
     self.assertLen(grads, 3)
     self.assertAllNotNone(grads)
 
@@ -178,9 +232,10 @@ class GeneralizedParetoTest(test_case.TestCase):
     scale = np.linspace(1e-6, 7, 5).reshape(5, 1)
     conc = np.linspace(-1.3, 1.3, 7)
 
-    dist = tfd.GeneralizedPareto(loc=loc, scale=scale, concentration=conc)
-    n = 10000
-    samples = dist.sample(n, seed=tfp_test_util.test_seed())
+    dist = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=conc, validate_args=True)
+    n = 10**4
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n, 3, 5, 7), samples.shape)
     self.assertEqual((n, 3, 5, 7), sample_values.shape)
@@ -193,7 +248,7 @@ class GeneralizedParetoTest(test_case.TestCase):
           samps = sample_values[:, li, si, ci]
           trials += 1
           fails += 0 if self._kstest(l, s, c, samps) else 1
-    self.assertLess(fails, trials * 0.01)
+    self.assertLess(fails, trials * 0.03)
 
   def _kstest(self, loc, scale, conc, samples):
     # Uses the Kolmogorov-Smirnov test for goodness of fit.
@@ -204,9 +259,12 @@ class GeneralizedParetoTest(test_case.TestCase):
 
   def testPdfOfSampleMultiDims(self):
     dist = tfd.GeneralizedPareto(
-        loc=0, scale=[[2.], [3.]], concentration=[-.37, .11])
+        loc=0,
+        scale=[[2.], [3.]],
+        concentration=[-.37, .11],
+        validate_args=True)
     num = 50000
-    samples = dist.sample(num, seed=tfp_test_util.test_seed())
+    samples = dist.sample(num, seed=test_util.test_seed())
     pdfs = dist.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual((num, 2, 2), samples.shape)
@@ -233,9 +291,11 @@ class GeneralizedParetoTest(test_case.TestCase):
           loc=0, scale=scale, concentration=1, validate_args=True)
       self.evaluate(dist.mean())
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
-    d = tfd.GeneralizedPareto(loc=0, scale=1, concentration=concentration)
+    d = tfd.GeneralizedPareto(
+        loc=0, scale=1, concentration=concentration, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -248,7 +308,7 @@ class GeneralizedParetoTest(test_case.TestCase):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       d = tfd.GeneralizedPareto(
           loc=0, scale=scale, concentration=1, validate_args=True)
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
@@ -258,12 +318,14 @@ class GeneralizedParetoTest(test_case.TestCase):
     self.evaluate(d.mean())
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughLocScale(self):
     loc = tf.Variable(1.)
     scale = tf.Variable(2.5)
-    d = tfd.GeneralizedPareto(loc=loc, scale=scale, concentration=.15)
+    d = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=.15, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grads = tape.gradient(loss, d.trainable_variables)

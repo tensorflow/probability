@@ -21,14 +21,11 @@ from __future__ import print_function
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 class _PoissonLogNormalQuadratureCompoundTest(
-    tfp_test_util.DiscreteScalarDistributionTestHelpers):
+    test_util.DiscreteScalarDistributionTestHelpers):
   """Tests the PoissonLogNormalQuadratureCompoundTest distribution."""
 
   def testSampleProbConsistent(self):
@@ -96,6 +93,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
     self.run_test_sample_consistent_mean_variance(
         self.evaluate, pln, rtol=0.1, atol=0.01)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
         loc=tf.Variable([0., -0.5], shape=[2] if self.static_shape
@@ -109,6 +107,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
     self.assertLen(grad, 2)
     self.assertFalse(any([g is None for g in grad]))
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughNonVariableParams(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
         loc=tf.convert_to_tensor([0., -0.5]),
@@ -122,19 +121,44 @@ class _PoissonLogNormalQuadratureCompoundTest(
     self.assertLen(grad, 2)
     self.assertFalse(any([g is None for g in grad]))
 
+  def testAssertValidSample(self):
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf1.placeholder_with_default(
+            0., shape=[] if self.static_shape else None),
+        scale=tf1.placeholder_with_default(
+            1., shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(pln.log_prob([-1.2, 3., 4.2]))
 
-@test_util.run_all_in_graph_and_eager_modes
+  def testPdfBoundary(self):
+    pln = tfd.PoissonLogNormalQuadratureCompound(
+        loc=tf1.placeholder_with_default(
+            0., shape=[] if self.static_shape else None),
+        scale=tf1.placeholder_with_default(
+            1., shape=[] if self.static_shape else None),
+        quadrature_size=10,
+        validate_args=True)
+
+    pdf = self.evaluate(pln.prob(0.))
+    log_pdf = self.evaluate(pln.log_prob(0.))
+    self.assertAllFinite(pdf)
+    self.assertAllFinite(log_pdf)
+
+
+@test_util.test_all_tf_execution_regimes
 class PoissonLogNormalQuadratureCompoundStaticShapeTest(
-    _PoissonLogNormalQuadratureCompoundTest, test_case.TestCase):
+    _PoissonLogNormalQuadratureCompoundTest, test_util.TestCase):
 
   @property
   def static_shape(self):
     return True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class PoissonLogNormalQuadratureCompoundDynamicShapeTest(
-    _PoissonLogNormalQuadratureCompoundTest, test_case.TestCase):
+    _PoissonLogNormalQuadratureCompoundTest, test_util.TestCase):
 
   @property
   def static_shape(self):

@@ -71,6 +71,7 @@ class Cumsum(bijector.Bijector):
       TypeError: if `axis` is not an `int`.
       ValueError: if `axis` is not negative.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       if not isinstance(axis, int):
         raise TypeError(
@@ -84,6 +85,7 @@ class Cumsum(bijector.Bijector):
           # Positive because we verify `axis < 0`.
           forward_min_event_ndims=-axis,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

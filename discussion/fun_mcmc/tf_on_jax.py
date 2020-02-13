@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,8 +25,10 @@ import types
 
 import jax
 from jax import lax
+from jax import tree_util
 from jax.experimental import stax
 import jax.numpy as np
+import numpy as onp
 
 __all__ = [
     'tf',
@@ -131,28 +133,48 @@ def _gather(params, indices):
   return params[indices]
 
 
+@_impl()
+def _range(*args, **kwargs):
+  """Implements tf.range."""
+  # TODO(siege): This is a hack, the correct solution is to fix reduce_sum etc
+  # to correctly handle np.array axes.
+  if any(
+      tree_util.tree_flatten(
+          tree_util.tree_map(lambda x: isinstance(x, np.ndarray),
+                             (args, kwargs)))[0]):
+    return np.arange(*args, **kwargs)
+  else:
+    return onp.arange(*args, **kwargs)
+
+
 _impl(name='add_n')(sum)
 _impl(['nn'], name='softmax')(stax.softmax)
+_impl(name='custom_gradient')(jax.custom_gradient)
 
 tf.newaxis = None
 
+_impl_np()(np.einsum)
 _impl_np()(np.float32)
 _impl_np()(np.int32)
+_impl_np()(np.maximum)
+_impl_np()(np.minimum)
 _impl_np()(np.ones)
 _impl_np()(np.reshape)
 _impl_np()(np.shape)
+_impl_np()(np.sqrt)
 _impl_np()(np.where)
 _impl_np()(np.zeros)
 _impl_np()(np.zeros_like)
 _impl_np(['math'])(np.log)
 _impl_np(['math'])(np.sqrt)
 _impl_np(['math'], name='pow')(np.power)
+_impl_np(['math'], name='reduce_prod')(np.prod)
 _impl_np(['math'], name='reduce_variance')(np.var)
 _impl_np(name='abs')(np.abs)
 _impl_np(name='Tensor')(np.ndarray)
 _impl_np(name='concat')(np.concatenate)
 _impl_np(name='constant')(np.array)
-_impl_np(name='range')(np.arange)
+_impl_np(name='expand_dims')(np.expand_dims)
 _impl_np(name='reduce_max')(np.max)
 _impl_np(name='reduce_mean')(np.mean)
 _impl_np(name='reduce_sum')(np.sum)

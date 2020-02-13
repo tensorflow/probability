@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -214,8 +215,9 @@ class Logistic(distribution.Distribution):
 
   def _stddev(self):
     scale = tf.convert_to_tensor(self.scale)
-    return tf.broadcast_to(scale * np.pi / np.sqrt(3),
-                           self._batch_shape_tensor(scale=scale))
+    return tf.broadcast_to(
+        scale * tf.constant(np.pi / np.sqrt(3), dtype=scale.dtype),
+        self._batch_shape_tensor(scale=scale))
 
   def _mode(self):
     return self._mean()
@@ -227,6 +229,9 @@ class Logistic(distribution.Distribution):
 
   def _quantile(self, x):
     return self.loc + self.scale * (tf.math.log(x) - tf.math.log1p(-x))
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if is_init:

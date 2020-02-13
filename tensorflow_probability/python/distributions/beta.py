@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -34,7 +35,7 @@ from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "Beta",
+    'Beta',
 ]
 
 
@@ -46,7 +47,7 @@ class Beta(distribution.Distribution):
   """Beta distribution.
 
   The Beta distribution is defined over the `(0, 1)` interval using parameters
-  `concentration1` (aka "alpha") and `concentration0` (aka "beta").
+  `concentration1` (aka 'alpha') and `concentration0` (aka 'beta').
 
   #### Mathematical Details
 
@@ -150,23 +151,23 @@ class Beta(distribution.Distribution):
                concentration0,
                validate_args=False,
                allow_nan_stats=True,
-               name="Beta"):
+               name='Beta'):
     """Initialize a batch of Beta distributions.
 
     Args:
       concentration1: Positive floating-point `Tensor` indicating mean
-        number of successes; aka "alpha". Implies `self.dtype` and
+        number of successes; aka 'alpha'. Implies `self.dtype` and
         `self.batch_shape`, i.e.,
         `concentration1.shape = [N1, N2, ..., Nm] = self.batch_shape`.
       concentration0: Positive floating-point `Tensor` indicating mean
-        number of failures; aka "beta". Otherwise has same semantics as
+        number of failures; aka 'beta'. Otherwise has same semantics as
         `concentration1`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -176,9 +177,9 @@ class Beta(distribution.Distribution):
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       dtype_hint=tf.float32)
       self._concentration1 = tensor_util.convert_nonref_to_tensor(
-          concentration1, dtype=dtype, name="concentration1")
+          concentration1, dtype=dtype, name='concentration1')
       self._concentration0 = tensor_util.convert_nonref_to_tensor(
-          concentration0, dtype=dtype, name="concentration0")
+          concentration0, dtype=dtype, name='concentration0')
       super(Beta, self).__init__(
           dtype=dtype,
           validate_args=validate_args,
@@ -208,13 +209,13 @@ class Beta(distribution.Distribution):
 
   @property
   @deprecation.deprecated(
-      "2019-10-01",
-      ("The `total_concentration` property is deprecated; instead use "
-       "`dist.concentration1 + dist.concentration0`."),
+      '2019-10-01',
+      ('The `total_concentration` property is deprecated; instead use '
+       '`dist.concentration1 + dist.concentration0`.'),
       warn_once=True)
   def total_concentration(self):
     """Sum of concentration parameters."""
-    with self._name_and_control_scope("total_concentration"):
+    with self._name_and_control_scope('total_concentration'):
       return self.concentration1 + self.concentration0
 
   def _batch_shape_tensor(self, concentration1=None, concentration0=None):
@@ -235,7 +236,7 @@ class Beta(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    seed = SeedStream(seed, "beta")
+    seed = SeedStream(seed, 'beta')
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
     shape = self._batch_shape_tensor(concentration1, concentration0)
@@ -265,18 +266,16 @@ class Beta(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_beta_sample_note)
   def _cdf(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      concentration1 = tf.convert_to_tensor(self.concentration1)
-      concentration0 = tf.convert_to_tensor(self.concentration0)
-      shape = self._batch_shape_tensor(concentration1, concentration0)
-      concentration1 = tf.broadcast_to(concentration1, shape)
-      concentration0 = tf.broadcast_to(concentration0, shape)
-      return tf.math.betainc(concentration1, concentration0, x)
+    concentration1 = tf.convert_to_tensor(self.concentration1)
+    concentration0 = tf.convert_to_tensor(self.concentration0)
+    shape = self._batch_shape_tensor(concentration1, concentration0)
+    concentration1 = tf.broadcast_to(concentration1, shape)
+    concentration0 = tf.broadcast_to(concentration0, shape)
+    return tf.math.betainc(concentration1, concentration0, x)
 
   def _log_unnormalized_prob(self, x, concentration1, concentration0):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      return (tf.math.xlogy(concentration1 - 1., x) +
-              (concentration0 - 1.) * tf.math.log1p(-x))
+    return (tf.math.xlogy(concentration1 - 1., x) +
+            tf.math.xlog1py(concentration0 - 1., -x))
 
   def _log_normalization(self, concentration1, concentration0):
     return (tf.math.lgamma(concentration1) + tf.math.lgamma(concentration0) -
@@ -315,24 +314,31 @@ class Beta(distribution.Distribution):
         assert_util.assert_less(
             tf.ones([], dtype=self.dtype),
             concentration1,
-            message="Mode undefined for concentration1 <= 1."),
+            message='Mode undefined for concentration1 <= 1.'),
         assert_util.assert_less(
             tf.ones([], dtype=self.dtype),
             concentration0,
-            message="Mode undefined for concentration0 <= 1.")
+            message='Mode undefined for concentration0 <= 1.')
     ]):
       return tf.where(
           (concentration1 > 1.) & (concentration0 > 1.),
           mode,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
-  def _maybe_assert_valid_sample(self, x):
+  def _default_event_space_bijector(self):
+    return sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""
+    assertions = []
     if not self.validate_args:
-      return []
-    return [
-        assert_util.assert_positive(x, message="Sample must be positive."),
-        assert_util.assert_less(x, 1., message="Sample must be less than `1`.")]
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, tf.ones([], x.dtype),
+        message='Sample must be less than or equal to `1`.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
@@ -342,7 +348,7 @@ class Beta(distribution.Distribution):
       if is_init != tensor_util.is_ref(concentration):
         assertions.append(assert_util.assert_positive(
             concentration,
-            message="Concentration parameter must be positive."))
+            message='Concentration parameter must be positive.'))
     return assertions
 
 
@@ -354,12 +360,12 @@ def _kl_beta_beta(d1, d2, name=None):
     d1: instance of a Beta distribution object.
     d2: instance of a Beta distribution object.
     name: (optional) Name to use for created operations.
-      default is "kl_beta_beta".
+      default is 'kl_beta_beta'.
 
   Returns:
     Batchwise KL(d1 || d2)
   """
-  with tf.name_scope(name or "kl_beta_beta"):
+  with tf.name_scope(name or 'kl_beta_beta'):
     d1_concentration1 = tf.convert_to_tensor(d1.concentration1)
     d1_concentration0 = tf.convert_to_tensor(d1.concentration0)
     d2_concentration1 = tf.convert_to_tensor(d2.concentration1)

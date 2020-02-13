@@ -23,6 +23,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -192,7 +193,8 @@ class Normal(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     log_unnormalized = -0.5 * tf.math.squared_difference(
         x / scale, self.loc / scale)
-    log_normalization = 0.5 * np.log(2. * np.pi) + tf.math.log(scale)
+    log_normalization = tf.constant(
+        0.5 * np.log(2. * np.pi), dtype=self.dtype) + tf.math.log(scale)
     return log_unnormalized - log_normalization
 
   def _log_cdf(self, x):
@@ -208,7 +210,8 @@ class Normal(distribution.Distribution):
     return special_math.ndtr(-self._z(x))
 
   def _entropy(self):
-    log_normalization = 0.5 * np.log(2. * np.pi) + tf.math.log(self.scale)
+    log_normalization = tf.constant(
+        0.5 * np.log(2. * np.pi), dtype=self.dtype) + tf.math.log(self.scale)
     entropy = 0.5 + log_normalization
     return entropy * tf.ones_like(self.loc)
 
@@ -216,7 +219,7 @@ class Normal(distribution.Distribution):
     return self.loc * tf.ones_like(self.scale)
 
   def _quantile(self, p):
-    return special_math.ndtri(p) * self.scale + self.loc
+    return tf.math.ndtri(p) * self.scale + self.loc
 
   def _stddev(self):
     return self.scale * tf.ones_like(self.loc)
@@ -227,6 +230,9 @@ class Normal(distribution.Distribution):
     """Standardize input `x` to a unit normal."""
     with tf.name_scope('standardize'):
       return (x - self.loc) / (self.scale if scale is None else scale)
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

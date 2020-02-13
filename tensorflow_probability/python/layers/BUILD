@@ -69,7 +69,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -99,7 +99,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -124,7 +124,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -135,7 +135,7 @@ py_library(
     deps = [
         # cloudpickle dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:scale_tril",
+        "//tensorflow_probability/python/bijectors:fill_scale_tril",
         "//tensorflow_probability/python/bijectors:transpose",
         "//tensorflow_probability/python/distributions:bernoulli",
         "//tensorflow_probability/python/distributions:categorical",
@@ -156,14 +156,14 @@ py_library(
 
 py_test(
     name = "distribution_layer_test",
-    size = "large",
+    size = "medium",
     srcs = ["distribution_layer_test.py"],
     shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -180,11 +180,12 @@ py_library(
 
 py_test(
     name = "initializers_test",
+    size = "small",
     srcs = ["initializers_test.py"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -201,13 +202,13 @@ py_library(
 
 py_test(
     name = "masked_autoregressive_test",
-    size = "medium",
+    size = "small",
     srcs = ["masked_autoregressive_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -239,11 +240,12 @@ py_library(
 
 py_test(
     name = "variable_input_test",
+    size = "small",
     srcs = ["variable_input_test.py"],
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -260,12 +262,13 @@ py_library(
 
 py_test(
     name = "weight_norm_test",
+    size = "small",
     srcs = ["weight_norm_test.py"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/layers:weight_norm",
     ],
 )

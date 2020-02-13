@@ -27,6 +27,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
@@ -69,7 +70,7 @@ def _get_shape(x, out_type=tf.int32):
   # is known statically. Otherwise return a Tensor representing the shape.
   if x.shape.is_fully_defined():
     return np.array(x.shape.as_list(), dtype=out_type.as_numpy_dtype)
-  return tf.shape(input=x, out_type=out_type)
+  return tf.shape(x, out_type=out_type)
 
 
 def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
@@ -109,7 +110,7 @@ def _sparse_or_dense_matmul_onehot(sparse_or_dense_matrix, col_index):
 def _one_hot_like(x, indices, on_value=None):
   output_dtype = x.dtype.base_dtype
   if tf.compat.dimension_value(x.shape[-1]) is None:
-    depth = tf.shape(input=x)[-1]
+    depth = tf.shape(x)[-1]
   else:
     depth = tf.compat.dimension_value(x.shape[-1])
   if on_value is not None:
@@ -224,18 +225,7 @@ def minimize_one_step(gradient_unregularized_loss,
        Research_, 13, 2012.
        http://www.jmlr.org/papers/volume13/yuan12a/yuan12a.pdf
   """
-  graph_deps = [
-      gradient_unregularized_loss,
-      hessian_unregularized_loss_outer,
-      hessian_unregularized_loss_middle,
-      x_start,
-      l1_regularizer,
-      l2_regularizer,
-      maximum_full_sweeps,
-      tolerance,
-      learning_rate,
-  ]
-  with tf1.name_scope(name, 'minimize_one_step', graph_deps):
+  with tf.name_scope(name or 'minimize_one_step'):
     x_shape = _get_shape(x_start)
     batch_shape = x_shape[:-1]
     dims = x_shape[-1]
@@ -247,7 +237,7 @@ def minimize_one_step(gradient_unregularized_loss,
       #
       # evaluated at x = x_start.
       inner_square = tf.reduce_sum(
-          input_tensor=_sparse_or_dense_matmul_onehot(
+          _sparse_or_dense_matmul_onehot(
               hessian_unregularized_loss_outer, coord)**2,
           axis=-1)
       unregularized_component = (
@@ -284,7 +274,7 @@ def minimize_one_step(gradient_unregularized_loss,
           x_update_diff_norm_sq < x_update_diff_norm_sq_convergence_threshold)
       converged = sweep_complete & small_delta
       allowed_more_iterations = iter_ < maximum_full_sweeps * dims
-      return allowed_more_iterations & tf.reduce_any(input_tensor=~converged)
+      return allowed_more_iterations & tf.reduce_any(~converged)
 
     def _loop_body(  # pylint: disable=missing-docstring
         iter_, x_update_diff_norm_sq, x_update, hess_matmul_x_update):
@@ -354,8 +344,9 @@ def minimize_one_step(gradient_unregularized_loss,
       # computed incrementally, where x_update_end and x_update_start are as
       # defined in the convergence criteria.  Accordingly, we reset
       # x_update_diff_norm_sq to zero at the beginning of each sweep.
-      x_update_diff_norm_sq = tf1.where(
-          tf.equal(coord, 0), tf.zeros_like(x_update_diff_norm_sq),
+      x_update_diff_norm_sq = tf.where(
+          tf.equal(coord, 0),
+          dtype_util.as_numpy_dtype(x_update_diff_norm_sq.dtype)(0.),
           x_update_diff_norm_sq)
 
       # Recall that x_update and hess_matmul_x_update has the rightmost
@@ -441,7 +432,7 @@ def minimize_one_step(gradient_unregularized_loss,
           # e.g. if the loss function is piecewise linear and one of the pieces
           # has slope 1.  But since LossSmoothComponent is strictly convex, (i)
           # should not systematically happen.
-          tf.reduce_all(input_tensor=tf.equal(delta, 0.)),
+          tf.reduce_all(tf.equal(delta, 0.)),
           lambda: inputs_to_update,
           lambda: _do_update(*inputs_to_update))
 
@@ -464,7 +455,7 @@ def minimize_one_step(gradient_unregularized_loss,
     perm = tf.roll(tf.range(n), shift=-1, axis=0)
     x_update = tf.transpose(a=x_update, perm=perm)
 
-    converged = tf.reduce_all(input_tensor=x_update_diff_norm_sq <
+    converged = tf.reduce_all(x_update_diff_norm_sq <
                               x_update_diff_norm_sq_convergence_threshold)
     return x_start + x_update, converged, iter_ / dims
 
@@ -551,17 +542,7 @@ def minimize(grad_and_hessian_loss_fn,
        Research_, 13, 2012.
        http://www.jmlr.org/papers/volume13/yuan12a/yuan12a.pdf
   """
-  graph_deps = [
-      x_start,
-      l1_regularizer,
-      l2_regularizer,
-      maximum_iterations,
-      maximum_full_sweeps_per_iteration,
-      tolerance,
-      learning_rate,
-  ],
-  with tf1.name_scope(name, 'minimize', graph_deps):
-
+  with tf.name_scope(name or 'minimize'):
     def _loop_cond(x_start, converged, iter_):
       del x_start
       return tf.logical_and(iter_ < maximum_iterations,

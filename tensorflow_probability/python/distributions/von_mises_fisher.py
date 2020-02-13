@@ -22,6 +22,10 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
+from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -231,17 +235,14 @@ class VonMisesFisher(distribution.Distribution):
     return tensorshape_util.with_rank(self.mean_direction.shape[-1:], rank=1)
 
   def _log_prob(self, x):
-    x = self._maybe_assert_valid_sample(x)
     concentration = tf.convert_to_tensor(self.concentration)
     return (self._log_unnormalized_prob(x, concentration=concentration) -
             self._log_normalization(concentration=concentration))
 
-  def _log_unnormalized_prob(self, samples,
-                             concentration=None):
+  def _log_unnormalized_prob(self, samples, concentration=None):
     if concentration is None:
       concentration = tf.convert_to_tensor(self.concentration)
 
-    samples = self._maybe_assert_valid_sample(samples)
     bcast_mean_dir = (self.mean_direction +
                       tf.zeros_like(concentration)[..., tf.newaxis])
     inner_product = tf.reduce_sum(samples * bcast_mean_dir, axis=-1)
@@ -271,22 +272,28 @@ class VonMisesFisher(distribution.Distribution):
   # TODO(bjp): Odd dimension analytic CDFs are provided in [1]
   # [1]: https://ieeexplore.ieee.org/document/7347705/
 
-  def _maybe_assert_valid_sample(self, samples):
+  def _sample_control_dependencies(self, samples):
     """Check counts for proper shape, values, then return tensor version."""
+    inner_sample_dim = samples.shape[-1]
+    event_size = self.event_shape[-1]
+    shape_msg = ('Samples must have innermost dimension matching that of '
+                 '`self.mean_direction`.')
+    if event_size is not None and inner_sample_dim is not None:
+      if event_size != inner_sample_dim:
+        raise ValueError(shape_msg)
+
+    assertions = []
     if not self.validate_args:
-      return samples
-    with tf.control_dependencies([
-        assert_util.assert_near(
-            1.,
-            tf.linalg.norm(samples, axis=-1),
-            message='samples must be unit length'),
-        assert_util.assert_equal(
-            tf.shape(samples)[-1:],
-            self.event_shape_tensor(),
-            message=('samples must have innermost dimension matching that of '
-                     '`self.mean_direction`')),
-    ]):
-      return tf.identity(samples)
+      return assertions
+    assertions.append(assert_util.assert_near(
+        1.,
+        tf.linalg.norm(samples, axis=-1),
+        message='Samples must be unit length.'))
+    assertions.append(assert_util.assert_equal(
+        tf.shape(samples)[-1:],
+        self.event_shape_tensor(),
+        message=shape_msg))
+    return assertions
 
   def _mode(self):
     """The mode of the von Mises-Fisher distribution is the mean direction."""
@@ -427,7 +434,7 @@ class VonMisesFisher(distribution.Distribution):
       def body_fn(w, should_continue):
         z = beta.sample(sample_shape=sample_batch_shape, seed=seed())
         # set_shape needed here because of b/139013403
-        z.set_shape(w.shape)
+        tensorshape_util.set_shape(z, w.shape)
         w = tf.where(should_continue,
                      (1. - (1. + b) * z) / (1. - (1. - b) * z),
                      w)
@@ -435,7 +442,7 @@ class VonMisesFisher(distribution.Distribution):
         unif = tf.random.uniform(
             sample_batch_shape, seed=seed(), dtype=self.dtype)
         # set_shape needed here because of b/139013403
-        unif.set_shape(w.shape)
+        tensorshape_util.set_shape(unif, w.shape)
         should_continue = should_continue & (
             concentration * w + dim * tf.math.log1p(-x * w) - c <
             # Use log1p(-unif) to prevent log(0) and ensure that log(1) is
@@ -454,12 +461,10 @@ class VonMisesFisher(distribution.Distribution):
       with tf.control_dependencies([
           assert_util.assert_less_equal(
               samples_dim0,
-              dtype_util.as_numpy_dtype(self.dtype)(1.01),
-              data=[tf.math.top_k(tf.reshape(samples_dim0, [-1]))[0]]),
+              dtype_util.as_numpy_dtype(self.dtype)(1.01)),
           assert_util.assert_greater_equal(
               samples_dim0,
-              dtype_util.as_numpy_dtype(self.dtype)(-1.01),
-              data=[-tf.math.top_k(tf.reshape(-samples_dim0, [-1]))[0]])
+              dtype_util.as_numpy_dtype(self.dtype)(-1.01)),
       ]):
         samples_dim0 = tf.identity(samples_dim0)
     samples_otherdims_shape = tf.concat([sample_batch_shape, [event_dim - 1]],
@@ -478,16 +483,12 @@ class VonMisesFisher(distribution.Distribution):
 
     # Runtime assert that samples are unit length.
     if not self._allow_nan_stats:
-      worst, idx = tf.math.top_k(
+      worst, _ = tf.math.top_k(
           tf.reshape(tf.abs(1 - tf.linalg.norm(samples, axis=-1)), [-1]))
       with tf.control_dependencies([
           assert_util.assert_near(
               dtype_util.as_numpy_dtype(self.dtype)(0),
               worst,
-              data=[
-                  worst, idx,
-                  tf.gather(tf.reshape(samples, [-1, event_dim]), idx)
-              ],
               atol=1e-4,
               summarize=100)
       ]):
@@ -507,6 +508,16 @@ class VonMisesFisher(distribution.Distribution):
       ]):
         return self._rotate(samples, mean_direction=mean_direction)
     return self._rotate(samples, mean_direction=mean_direction)
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return chain_bijector.Chain([
+        invert_bijector.Invert(
+            square_bijector.Square(validate_args=self.validate_args),
+            validate_args=self.validate_args),
+        softmax_centered_bijector.SoftmaxCentered(
+            validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

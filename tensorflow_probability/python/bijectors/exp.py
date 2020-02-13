@@ -20,11 +20,13 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import power_transform
 
 
 __all__ = [
-    "Exp",
+    'Exp',
+    'Log',
 ]
 
 
@@ -51,7 +53,7 @@ class Exp(power_transform.PowerTransform):
 
   def __init__(self,
                validate_args=False,
-               name="exp"):
+               name='exp'):
     """Instantiates the `Exp` bijector.
 
     Args:
@@ -61,7 +63,23 @@ class Exp(power_transform.PowerTransform):
     """
     # forward_min_event_ndims = 0.
     # No forward_min_event_ndims specified as this is done in PowerTransform.
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Exp, self).__init__(
           validate_args=validate_args,
+          parameters=parameters,
+          name=name)
+
+
+class Log(invert.Invert):
+  """Compute `Y = log(X)`. This is `Invert(Exp())`."""
+
+  def __init__(self, validate_args=False, name='log'):
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
+      bijector = Exp(validate_args=validate_args)
+      super(Log, self).__init__(
+          bijector=bijector,
+          validate_args=validate_args,
+          parameters=parameters,
           name=name)

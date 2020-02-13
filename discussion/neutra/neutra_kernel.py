@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
@@ -48,14 +48,14 @@ def make_iaf_stack(total_event_size,
     bijector: The created bijector.
   """
 
-  seed = tfd.SeedStream(seed, 'make_iaf_stack')
+  seed = tfp.util.SeedStream(seed, 'make_iaf_stack')
 
   def make_iaf():
     """Create an IAF."""
     initializer = tf.compat.v2.keras.initializers.VarianceScaling(
         2 * 0.01, seed=seed() % (2**31 - 1))
 
-    made = tfb.AutoregressiveLayer(
+    made = tfb.AutoregressiveNetwork(
         params=2,
         event_shape=[total_event_size],
         hidden_units=[total_event_size] * num_hidden_layers,
@@ -265,7 +265,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=num_step_size_adaptation_steps,
-        target_accept_prob=np.array(0.9, dtype.as_numpy_dtype()))
+        target_accept_prob=np.array(0.9, dtype.as_numpy_dtype))
     self._kernel = kernel
 
   @property
@@ -412,7 +412,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
 
     learning_rate = tf.compat.v2.optimizers.schedules.PiecewiseConstantDecay(
         list(self.num_train_steps *
-             np.array([0.2, 0.8]).astype(dtype.as_numpy_dtype())),
+             np.array([0.2, 0.8]).astype(dtype.as_numpy_dtype)),
         [lr, lr * 0.1, lr * 0.01])
 
     opt = tf.compat.v2.optimizers.Adam(learning_rate)

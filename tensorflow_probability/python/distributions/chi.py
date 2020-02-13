@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import chi2
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -119,6 +120,9 @@ class Chi(transformed_distribution.TransformedDistribution):
             0.5 * (df - np.log(2.) -
                    (df - 1.) * tf.math.digamma(0.5 * df)))
 
+  def _default_event_space_bijector(self):
+    return softplus_bijector.Softplus(validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -126,6 +130,14 @@ class Chi(transformed_distribution.TransformedDistribution):
     if is_init != tensor_util.is_ref(self._df):
       assertions.append(assert_util.assert_positive(
           self._df, message='Argument `df` must be positive.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
     return assertions
 
 

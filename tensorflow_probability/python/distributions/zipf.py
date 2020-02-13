@@ -160,15 +160,8 @@ class Zipf(distribution.Distribution):
     # However, if interpolate_nondiscrete is True, we return the natural
     # continuous relaxation for x >= 1 which agrees with the log probability at
     # positive integer points.
-    #
-    # If interpolate_nondiscrete is False and validate_args is True, we check
-    # that the sample point x is in the support. That is, x is equivalent to a
-    # positive integer.
     power = power if power is not None else tf.convert_to_tensor(self.power)
     x = tf.cast(x, power.dtype)
-    if self.validate_args and not self.interpolate_nondiscrete:
-      x = distribution_util.embed_check_integer_casting_closed(
-          x, target_dtype=self.dtype, assert_positive=True)
     log_normalization = tf.math.log(tf.math.zeta(power, 1.))
 
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 1.)
@@ -198,13 +191,17 @@ class Zipf(distribution.Distribution):
   @distribution_util.AppendDocstring(
       """Note: Zipf has an infinite mean when `power` <= 2.""")
   def _mean(self):
-    zeta_p = tf.math.zeta(self.power[..., tf.newaxis] - [0., 1.], 1.)
+    zeta_p = tf.math.zeta(
+        self.power[..., tf.newaxis] -
+        np.array([0., 1.], dtype_util.as_numpy_dtype(self.dtype)), 1.)
     return zeta_p[..., 1] / zeta_p[..., 0]
 
   @distribution_util.AppendDocstring(
       """Note: Zipf has infinite variance when `power` <= 3.""")
   def _variance(self):
-    zeta_p = tf.math.zeta(self.power[..., tf.newaxis] - [0., 1., 2.], 1.)
+    zeta_p = tf.math.zeta(
+        self.power[..., tf.newaxis] -
+        np.array([0., 1., 2.], dtype_util.as_numpy_dtype(self.dtype)), 1.)
     return ((zeta_p[..., 0] * zeta_p[..., 2]) - (zeta_p[..., 1]**2)) / (
         zeta_p[..., 0]**2)
 
@@ -229,7 +226,8 @@ class Zipf(distribution.Distribution):
     seed = SeedStream(seed, salt='zipf')
 
     minval_u = self._hat_integral(0.5, power=power) + 1.
-    maxval_u = self._hat_integral(tf.int64.max - 0.5, power=power)
+    maxval_u = self._hat_integral(
+        dtype_util.max(tf.int64) - 0.5, power=power)
 
     def loop_body(should_continue, k):
       """Resample the non-accepted points."""
@@ -317,12 +315,22 @@ class Zipf(distribution.Distribution):
     t = power - 1.
     return tf.math.expm1(-(tf.math.log(t) + tf.math.log(x)) / t)
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
     assertions = []
     if is_init != tensor_util.is_ref(self.power):
       assertions.append(assert_util.assert_greater(
-          self.power, np.ones([], self.power.dtype.as_numpy_dtype),
+          self.power, np.ones([], dtype_util.as_numpy_dtype(self.power.dtype)),
           message='`power` must be greater than 1.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args or self.interpolate_nondiscrete:
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
     return assertions

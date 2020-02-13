@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import weakref
-
 # Dependency imports
 import mock
 import numpy as np
@@ -28,12 +26,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BaseBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BaseBijectorTest(test_util.TestCase):
   """Tests properties of the Bijector base-class."""
 
   def testIsAbstract(self):
@@ -163,8 +160,8 @@ class ConstantJacobian(tfb.Bijector):
     return tf.constant(-2., x.dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorTestEventNdims(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorTestEventNdims(test_util.TestCase):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
@@ -196,8 +193,8 @@ class BijectorTestEventNdims(test_case.TestCase):
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorCachingTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorCachingTest(test_util.TestCase):
 
   def testCachingOfForwardResults(self):
     forward_only_bijector = ForwardOnlyBijector()
@@ -247,19 +244,18 @@ class BijectorCachingTest(test_case.TestCase):
 
   def testCachingGarbageCollection(self):
     bijector = ForwardOnlyBijector()
-    refs = []
-    niters = 3
-    for _ in range(niters):
-      y = bijector.forward(tf.zeros([10]))
-      refs.append(weakref.ref(y))
+    niters = 6
+    for i in range(niters):
+      x = tf.constant(i, dtype=tf.float32)
+      y = bijector.forward(x)  # pylint: disable=unused-variable
 
     # We tolerate leaking tensor references in graph mode only.
     expected_live = 1 if tf.executing_eagerly() else niters
-    self.assertEqual(expected_live, sum(ref() is not None for ref in refs))
+    self.assertEqual(expected_live, len(bijector._from_x))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorReduceEventDimsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorReduceEventDimsTest(test_util.TestCase):
   """Test reducing of event dims."""
 
   def testReduceEventNdimsForward(self):
@@ -331,7 +327,7 @@ class BijectorReduceEventDimsTest(test_case.TestCase):
     self.assertAllClose(-np.log(x_), ildj)
 
 
-class BijectorLDJCachingTest(test_case.TestCase):
+class BijectorLDJCachingTest(test_util.TestCase):
 
   def testShapeCachingIssue(self):
     if tf.executing_eagerly(): return
@@ -351,8 +347,8 @@ class BijectorLDJCachingTest(test_case.TestCase):
       sess.run(a, feed_dict={x1: x1_value})
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NumpyArrayCaching(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NumpyArrayCaching(test_util.TestCase):
 
   def test_caches(self):
     if mock is None:
@@ -387,8 +383,8 @@ class NumpyArrayCaching(test_case.TestCase):
         self.assertIs(xt_, xt)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TfModuleTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TfModuleTest(test_util.TestCase):
 
   def test_variable_tracking(self):
     x = tf.Variable(1.)
@@ -427,8 +423,8 @@ class _ConditionalBijector(tfb.Bijector):
 
 # Test that ensures kwargs from public methods are passed in to
 # private methods.
-@test_util.run_all_in_graph_and_eager_modes
-class ConditionalBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ConditionalBijectorTest(test_util.TestCase):
 
   def testConditionalBijector(self):
     b = _ConditionalBijector()

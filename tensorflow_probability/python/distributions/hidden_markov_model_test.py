@@ -14,6 +14,7 @@
 # ============================================================================
 """The HiddenMarkovModel distribution class."""
 
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -26,80 +27,20 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
-# pylint: disable=no-member
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class _HiddenMarkovModelTest(
-    tfp_test_util.VectorDistributionTestHelpers,
-    tfp_test_util.DiscreteScalarDistributionTestHelpers,
-    test_case.TestCase,
-    parameterized.TestCase):
+    test_util.VectorDistributionTestHelpers,
+    test_util.DiscreteScalarDistributionTestHelpers,
+    test_util.TestCase):
 
-  @staticmethod
-  def make_placeholders(constants):
-    return [
-        tf1.placeholder_with_default(constant, shape=None)
-        for constant in constants
-    ]
-
-  def test_non_agreeing_states(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
-    # This transition matrix corresponds to a 2-state Markov chain
-    # but the observation distribution is appropriate to a 3-state
-    # chain.
-    # For this test to pass it must raise an appropriate exception.
-    transition_matrix_data = tf.constant([[0.6, 0.4],
-                                          [0.3, 0.7]], dtype=self.dtype)
-    observation_locs_data = tf.constant([0.0, 1.0, 2.0], dtype=self.dtype)
-    observation_scale_data = tf.constant(0.5, dtype=self.dtype)
-
-    (initial_prob, transition_matrix,
-     observation_locs, observation_scale) = self.make_placeholders([
-         initial_prob_data, transition_matrix_data,
-         observation_locs_data, observation_scale_data])
-
-    [num_steps] = self.make_placeholders([4])
-    with self.assertRaisesWithPredicateMatch(Exception,
-                                             lambda e: "must agree" in str(e)):
-      model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                    tfd.Categorical(probs=transition_matrix),
-                                    tfd.Normal(observation_locs,
-                                               scale=observation_scale),
-                                    num_steps=num_steps,
-                                    validate_args=True)
-      self.evaluate(model.mean())
-
-  def test_non_scalar_transition_batch(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
-    # The HMM class expect a `Categorical` distribution for each state.
-    # This test provides only a single scalar distribution.
-    # For this test to pass it must raise an appropriate exception.
-    transition_matrix_data = tf.constant([0.6, 0.4], dtype=self.dtype)
-    observation_locs_data = tf.constant(0.0, dtype=self.dtype)
-    observation_scale_data = tf.constant(0.5, dtype=self.dtype)
-
-    (initial_prob, transition_matrix,
-     observation_locs, observation_scale) = self.make_placeholders([
-         initial_prob_data, transition_matrix_data,
-         observation_locs_data, observation_scale_data])
-
-    with self.assertRaisesWithPredicateMatch(
-        Exception,
-        lambda e: "scalar batches" in str(e)):
-      [num_steps] = self.make_placeholders([4])
-      model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                    tfd.Categorical(probs=transition_matrix),
-                                    tfd.Normal(observation_locs,
-                                               scale=observation_scale),
-                                    num_steps=num_steps,
-                                    validate_args=True)
-      self.evaluate(model.mean())
+  def make_placeholders(self, constants):
+    variables = [tf.Variable(c, shape=tf.TensorShape(None)) for c in constants]
+    self.evaluate([v.initializer for v in variables])
+    return variables
 
   def test_reproducibility(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -114,18 +55,51 @@ class _HiddenMarkovModelTest(
          observation_locs_data, observation_scale_data])
 
     [num_steps] = self.make_placeholders([30])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs, scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
 
-    seed = tfp_test_util.test_seed()
-    s1 = self.evaluate(model.sample(5, seed=seed))
+    seed = test_util.test_seed()
+    with tf.control_dependencies([tf.compat.v1.global_variables_initializer()]):
+      s = model.sample(5, seed=seed)
+    s1 = self.evaluate(s)
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
-    s2 = self.evaluate(model.sample(5, seed=seed))
+    with tf.control_dependencies([tf.compat.v1.global_variables_initializer()]):
+      s = model.sample(5, seed=seed)
+    s2 = self.evaluate(s)
     self.assertAllEqual(s1, s2)
+
+  def test_supports_dynamic_observation_size(self):
+    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    transition_matrix_data = tf.constant([[0.6, 0.4],
+                                          [0.3, 0.7]], dtype=self.dtype)
+    observation_locs_data = tf.constant([[0.0, 1.0],
+                                         [1.0, 0.0]], dtype=self.dtype)
+    observation_scale_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_locs, observation_scale) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_locs_data, observation_scale_data])
+
+    [num_steps] = self.make_placeholders([30])
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.MultivariateNormalDiag(loc=observation_locs,
+                                   scale_diag=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
+
+    self.evaluate(model.sample(5))
+    observation_data = tf.constant(30 * [[0.5, 0.5]], dtype=self.dtype)
+    self.evaluate(model.log_prob(observation_data))
+    self.evaluate(model.posterior_marginals(observation_data).probs_parameter())
+    self.evaluate(model.posterior_mode(observation_data))
 
   def test_consistency(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -140,18 +114,19 @@ class _HiddenMarkovModelTest(
          observation_locs_data, observation_scale_data])
 
     [num_steps] = self.make_placeholders([3])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=num_steps,
-                                  validate_args=True)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs,
+                   scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
 
     self.run_test_sample_consistent_log_prob(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=0.5,
-        rtol=0.05, seed=tfp_test_util.test_seed())
+        rtol=0.05, seed=test_util.test_seed())
 
   def test_broadcast_initial_probs(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -166,17 +141,19 @@ class _HiddenMarkovModelTest(
          observation_locs_data, observation_scale_data])
 
     [num_steps] = self.make_placeholders([3])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs,
+                   scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
 
     self.run_test_sample_consistent_log_prob(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=1.,
-        rtol=0.02, seed=tfp_test_util.test_seed())
+        rtol=0.02, seed=test_util.test_seed())
 
   def test_broadcast_transitions(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -194,17 +171,19 @@ class _HiddenMarkovModelTest(
          observation_locs_data, observation_scale_data])
 
     [num_steps] = self.make_placeholders([3])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs,
+                   scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
 
     self.run_test_sample_consistent_log_prob(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=1.,
-        rtol=2e-2, seed=tfp_test_util.test_seed())
+        rtol=2e-2, seed=test_util.test_seed())
 
   def test_broadcast_observations(self):
     initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
@@ -222,17 +201,19 @@ class _HiddenMarkovModelTest(
          observation_locs_data, observation_scale_data])
 
     [num_steps] = self.make_placeholders([3])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs,
+                   scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
 
     self.run_test_sample_consistent_log_prob(
         self.evaluate, model,
         num_samples=100000,
         center=0.5, radius=1.,
-        rtol=2e-2, seed=tfp_test_util.test_seed())
+        rtol=2e-2, seed=test_util.test_seed())
 
   def test_edge_case_sample_n_no_transitions(self):
     initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
@@ -247,13 +228,15 @@ class _HiddenMarkovModelTest(
          observation_probs_data])
 
     [num_steps] = self.make_placeholders([1])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     x = model._sample_n(1)
-    x_shape = self.evaluate(tf.shape(input=x))
+    x_shape = self.evaluate(tf.shape(x))
 
     self.assertAllEqual(x_shape, [1, 1])
 
@@ -274,10 +257,12 @@ class _HiddenMarkovModelTest(
          observation_probs_data])
 
     [num_steps] = self.make_placeholders([1])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     x = model.log_prob([0])
 
@@ -296,16 +281,42 @@ class _HiddenMarkovModelTest(
          observation_locs_data, observation_scale_data])
 
     [num_steps] = self.make_placeholders([1])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs,
+                   scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
 
     x = model.mean()
-    x_shape = self.evaluate(tf.shape(input=x))
+    x_shape = self.evaluate(tf.shape(x))
 
     self.assertAllEqual(x_shape, [1])
+
+  def test_num_states(self):
+    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    transition_matrix_data = tf.constant([[0.5, 0.5],
+                                          [0.5, 0.5]], dtype=self.dtype)
+    observation_probs_data = tf.constant([[0.5, 0.0, 0.5],
+                                          [0.0, 1.0, 0.0]], dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_probs) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_probs_data])
+
+    [num_steps] = self.make_placeholders([5])
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
+
+    x = model.num_states_tensor()
+
+    self.assertAllEqual(x, 2)
 
   def test_coin_tosses(self):
     initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
@@ -320,10 +331,12 @@ class _HiddenMarkovModelTest(
          observation_probs_data])
 
     [num_steps] = self.make_placeholders([5])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     x = model.log_prob([0, 0, 0, 0, 0])
 
@@ -344,10 +357,12 @@ class _HiddenMarkovModelTest(
     initial_prob = tf.broadcast_to(initial_prob, [3, 2, 2])
     transition_matrix = tf.broadcast_to(transition_matrix, [3, 2, 2, 2])
     [num_steps] = self.make_placeholders([5])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     examples = [tf.zeros(5, dtype=tf.int32), tf.ones(5, dtype=tf.int32)]
     examples = tf.broadcast_to(examples, [7, 3, 2, 5])
@@ -356,6 +371,32 @@ class _HiddenMarkovModelTest(
     expected_log_prob = tf.broadcast_to([np.log(.5**5)], [7, 3, 2])
     self.assertAllClose(computed_log_prob, expected_log_prob,
                         rtol=1e-4, atol=0.0)
+
+  def test_mean_shape(self):
+    initial_prob_data = tf.constant([0.8, 0.2], dtype=self.dtype)
+    transition_matrix_data = tf.constant([[0.7, 0.3],
+                                          [0.2, 0.8]], dtype=self.dtype)
+    observation_locs_data = tf.constant([[0.0, 0.0],
+                                         [10.0, 10.0]], dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_locs) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_locs_data])
+
+    [num_steps] = self.make_placeholders([7])
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.MultivariateNormalDiag(
+            loc=observation_locs),
+        num_steps=num_steps,
+        validate_args=True)
+
+    x = model.mean()
+    x_shape = self.evaluate(tf.shape(x))
+
+    self.assertAllEqual(x_shape, [7, 2])
 
   def test_batch_mean_shape(self):
     initial_prob_data = tf.constant([[0.8, 0.2],
@@ -372,14 +413,16 @@ class _HiddenMarkovModelTest(
          observation_locs_data])
 
     [num_steps] = self.make_placeholders([7])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.MultivariateNormalDiag(
-                                      loc=observation_locs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.MultivariateNormalDiag(
+            loc=observation_locs),
+        num_steps=num_steps,
+        validate_args=True)
 
     x = model.mean()
-    x_shape = self.evaluate(tf.shape(input=x))
+    x_shape = self.evaluate(tf.shape(x))
 
     self.assertAllEqual(x_shape, [3, 7, 2])
 
@@ -397,11 +440,12 @@ class _HiddenMarkovModelTest(
          observation_locs_data, observation_scale_data])
 
     [num_steps] = self.make_placeholders([5])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Normal(loc=observation_locs,
-                                             scale=observation_scale),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs, scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
 
     self.run_test_sample_consistent_mean_variance(self.evaluate, model,
                                                   num_samples=100000,
@@ -438,10 +482,12 @@ class _HiddenMarkovModelTest(
         dtype=self.dtype)
 
     [num_steps] = self.make_placeholders([7])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     observations = [0, 1, 1, 1, 1, 1, 2]
 
@@ -549,8 +595,7 @@ class _HiddenMarkovModelTest(
     model = tfd.HiddenMarkovModel(
         tfd.Categorical(probs=initial_prob),
         tfd.Categorical(probs=transition_matrix),
-        tfd.Normal(observation_locs,
-                   scale=observation_scale),
+        tfd.Normal(observation_locs, scale=observation_scale),
         num_steps=num_steps,
         validate_args=True)
 
@@ -647,7 +692,8 @@ class _HiddenMarkovModelTest(
         tfd.Categorical(probs=initial_prob),
         tfd.Categorical(probs=transition_matrix),
         tfd.Categorical(probs=observation_probs),
-        num_steps=num_steps)
+        num_steps=num_steps,
+        validate_args=True)
 
     inferred_states = model.posterior_mode(observations)
     expected_states = 2*[3*[[5*[0], 5*[1]]]]
@@ -684,14 +730,16 @@ class _HiddenMarkovModelTest(
     observations_permuted = tf.transpose(
         a=tf.gather(tf.transpose(a=permutations)[..., tf.newaxis],
                     observations,
-                    batch_dims=observations.shape.ndims-1)[..., 0])
+                    batch_dims=(
+                        tensorshape_util.rank(observations.shape) - 1))[..., 0])
 
     [num_steps] = self.make_placeholders([16])
     model = tfd.HiddenMarkovModel(
         tfd.Categorical(probs=initial_prob),
         tfd.Categorical(probs=transition_matrix),
         tfd.Categorical(probs=observation_probs_permuted),
-        num_steps=num_steps)
+        num_steps=num_steps,
+        validate_args=True)
 
     inferred_states = model.posterior_mode(observations_permuted)
     expected_states = [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0]
@@ -742,7 +790,8 @@ class _HiddenMarkovModelTest(
         tfd.Categorical(probs=initial_prob_permuted),
         tfd.Categorical(probs=transition_matrix_permuted),
         tfd.Categorical(probs=observation_probs_permuted),
-        num_steps=num_steps)
+        num_steps=num_steps,
+        validate_args=True)
 
     inferred_states = model.posterior_mode(observations)
     expected_states = [0, 1, 2, 0, 2, 1, 2, 0, 2, 0, 2, 0, 1, 2, 0, 1]
@@ -767,11 +816,12 @@ class _HiddenMarkovModelTest(
          observation_locs_data])
 
     [num_steps] = self.make_placeholders([3])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.MultivariateNormalDiag(
-                                      loc=observation_locs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.MultivariateNormalDiag(loc=observation_locs),
+        num_steps=num_steps,
+        validate_args=True)
 
     observations = tf.constant([[0.0, 0.0],
                                 [0.0, 0.0],
@@ -811,10 +861,12 @@ class _HiddenMarkovModelTest(
     observation_probs = tf.constant(observation_data, dtype=self.dtype)
 
     [num_steps] = self.make_placeholders([7])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     observations = tf.constant([0, 1, 2, 3, 2, 1, 0])
     mask = tf.constant([False, True, True, False, True, True, False])
@@ -846,10 +898,12 @@ class _HiddenMarkovModelTest(
     observation_probs = tf.constant(observation_data, dtype=self.dtype)
 
     [num_steps] = self.make_placeholders([7])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     observations = tf.constant([0, 1, 2, 3, 2, 1, 0])
     mask = tf.constant([False, True, True, True, True, True, False])
@@ -882,10 +936,12 @@ class _HiddenMarkovModelTest(
          observation_probs_data])
 
     [num_steps] = self.make_placeholders([1])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     inferred_state = model.posterior_mode(
         observations=[[[0]], [[1]]],
@@ -913,10 +969,12 @@ class _HiddenMarkovModelTest(
          observation_probs_data])
 
     [num_steps] = self.make_placeholders([1])
-    model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
-                                  tfd.Categorical(probs=transition_matrix),
-                                  tfd.Categorical(probs=observation_probs),
-                                  num_steps=num_steps)
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
 
     inferred_marginals = self.evaluate(
         model.posterior_marginals(
@@ -944,7 +1002,254 @@ class HiddenMarkovModelTestFloat32(_HiddenMarkovModelTest):
 class HiddenMarkovModelTestFloat64(_HiddenMarkovModelTest):
   dtype = tf.float64
 
+
 del _HiddenMarkovModelTest
 
-if __name__ == "__main__":
+
+class _HiddenMarkovModelAssertionTest(
+    test_util.VectorDistributionTestHelpers,
+    test_util.DiscreteScalarDistributionTestHelpers,
+    test_util.TestCase):
+
+  def test_integer_initial_state_assertion(self):
+    transition_matrix = np.array([[0.9, 0.1],
+                                  [0.1, 0.9]])
+    observation_probs = np.array([[1.0, 0.0],
+                                  [0.0, 1.0]])
+
+    num_steps = 2
+    message = 'is not over integers'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(
+          tfd.Normal(loc=0.0, scale=1.0),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Categorical(probs=observation_probs),
+          num_steps=num_steps,
+          validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_integer_transition_state_assertion(self):
+    initial_prob = np.array([0.9, 0.1])
+    observation_probs = np.array([[1.0, 0.0],
+                                  [0.0, 1.0]])
+
+    num_steps = 2
+    message = 'is not over integers'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                    tfd.Normal(loc=0.0, scale=1.0),
+                                    tfd.Categorical(probs=observation_probs),
+                                    num_steps=num_steps,
+                                    validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_scalar_num_steps_assertion(self):
+    initial_prob = np.array([0.9, 0.1])
+    transition_matrix = np.array([[0.9, 0.1],
+                                  [0.1, 0.9]])
+    observation_probs = np.array([[1.0, 0.0],
+                                  [0.0, 1.0]])
+
+    num_steps = np.array([2, 3])
+    message = '`num_steps` must be a scalar'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(tfd.Categorical(probs=initial_prob),
+                                    tfd.Categorical(probs=transition_matrix),
+                                    tfd.Categorical(probs=observation_probs),
+                                    num_steps=num_steps,
+                                    validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_variable_num_steps_assertion(self):
+    initial_prob = np.array([0.9, 0.1])
+    transition_matrix = np.array([[0.9, 0.1],
+                                  [0.1, 0.9]])
+    observation_probs = np.array([[1.0, 0.0],
+                                  [0.0, 1.0]])
+
+    num_steps = tf.Variable(np.array([2, 3]))
+    message = '`num_steps` must be a scalar'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(
+          tfd.Categorical(probs=initial_prob),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Categorical(probs=observation_probs),
+          num_steps=num_steps,
+          validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_num_steps_greater1_assertion(self):
+    initial_prob = np.array([0.9, 0.1])
+    transition_matrix = np.array([[0.9, 0.1],
+                                  [0.1, 0.9]])
+    observation_probs = np.array([[1.0, 0.0],
+                                  [0.0, 1.0]])
+
+    num_steps = 0
+    message = '`num_steps` must be at least 1'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(
+          tfd.Categorical(probs=initial_prob),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Categorical(probs=observation_probs),
+          num_steps=num_steps,
+          validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_initial_scalar_assertion(self):
+    initial_prob = np.array([0.9, 0.1])
+    transition_matrix = np.array([[0.9, 0.1],
+                                  [0.1, 0.9]])
+    observation_probs = np.array([[1.0, 0.0],
+                                  [0.0, 1.0]])
+
+    num_steps = 2
+    message = 'must have scalar'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(
+          tfd.Sample(tfd.Categorical(probs=initial_prob), sample_shape=2),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Categorical(probs=observation_probs),
+          num_steps=num_steps,
+          validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_batch_agreement_assertion(self):
+    initial_prob = np.array([[0.9, 0.1],
+                             [0.1, 0.9]])
+    transition_matrix = np.array([[1.0]])
+    observation_probs = np.array([[1.0, 0.0],
+                                  [0.0, 1.0]])
+
+    num_steps = 1
+    message = 'must agree on'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(
+          tfd.Categorical(probs=initial_prob),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Categorical(probs=observation_probs),
+          num_steps=num_steps,
+          validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_variable_batch_agreement_assertion(self):
+    initial_prob = np.array([[0.9, 0.1],
+                             [0.1, 0.9]])
+    transition_matrix_data = np.array([[1.0]])
+    observation_probs_data = np.array([[1.0, 0.0],
+                                       [0.0, 1.0]])
+    transition_matrix = tf.Variable(transition_matrix_data)
+    observation_probs = tf.Variable(observation_probs_data)
+    self.evaluate(transition_matrix.initializer)
+    self.evaluate(observation_probs.initializer)
+
+    num_steps = 1
+    message = 'must agree on'
+    with self.assertRaisesRegexp(Exception, message):
+      model = tfd.HiddenMarkovModel(
+          tfd.Categorical(probs=initial_prob),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Categorical(probs=observation_probs),
+          num_steps=num_steps,
+          validate_args=True)
+      _ = self.evaluate(model.sample())
+
+  def test_modified_variable_batch_agreement_assertion(self):
+    initial_prob = np.array([[0.9, 0.1],
+                             [0.1, 0.9]])
+    transition_matrix_data = np.array([[1.0, 0.0],
+                                       [0.0, 1.0]])
+    transition_matrix_data2 = np.array([[1.0]])
+    observation_probs_data = np.array([[1.0, 0.0],
+                                       [0.0, 1.0]])
+    transition_matrix = tf.Variable(transition_matrix_data,
+                                    shape=tf.TensorShape(None))
+    observation_probs = tf.Variable(observation_probs_data,
+                                    shape=tf.TensorShape(None))
+    self.evaluate(transition_matrix.initializer)
+    self.evaluate(observation_probs.initializer)
+
+    num_steps = 1
+    message = 'transition_distribution` and `observation_distribution` must'
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Categorical(probs=observation_probs),
+        num_steps=num_steps,
+        validate_args=True)
+    with self.assertRaisesRegexp(Exception, message):
+      with tf.control_dependencies([
+          transition_matrix.assign(transition_matrix_data2)]):
+        _ = self.evaluate(model.sample())
+
+  def test_non_scalar_transition_batch(self):
+    initial_prob = tf.constant([0.6, 0.4])
+    # The HMM class expect a `Categorical` distribution for each state.
+    # This test provides only a single scalar distribution.
+    # For this test to pass it must raise an appropriate exception.
+    transition_matrix = tf.constant([0.6, 0.4])
+    observation_locs = tf.constant(0.0)
+    observation_scale = tf.constant(0.5)
+
+    num_steps = 4
+
+    with self.assertRaisesRegexp(Exception, 'can\'t have scalar batches'):
+      model = tfd.HiddenMarkovModel(
+          tfd.Categorical(probs=initial_prob),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Normal(observation_locs, scale=observation_scale),
+          num_steps=num_steps,
+          validate_args=True)
+      self.evaluate(model.mean())
+
+  def test_variable_non_scalar_transition_batch(self):
+    initial_prob = tf.constant([0.6, 0.4])
+    # The HMM class expect a `Categorical` distribution for each state.
+    # This test provides only a single scalar distribution.
+    # For this test to pass it must raise an appropriate exception.
+    transition_matrix_data = tf.constant([0.6, 0.4])
+    transition_matrix = tf.Variable(transition_matrix_data)
+    self.evaluate(transition_matrix.initializer)
+    observation_locs = tf.constant([0.0, 1.0])
+    observation_scale = tf.constant([0.5, 0.5])
+
+    num_steps = 4
+
+    with self.assertRaisesRegexp(Exception, 'can\'t have scalar batches'):
+      model = tfd.HiddenMarkovModel(
+          tfd.Categorical(probs=initial_prob),
+          tfd.Categorical(probs=transition_matrix),
+          tfd.Normal(loc=observation_locs, scale=observation_scale),
+          num_steps=num_steps,
+          validate_args=True)
+      self.evaluate(model.mean())
+
+  def test_modified_variable_non_scalar_transition_batch(self):
+    initial_prob = tf.constant([0.6, 0.4])
+    transition_matrix_data = tf.constant([[0.6, 0.4], [0.5, 0.5]])
+    transition_matrix = tf.Variable(
+        transition_matrix_data,
+        shape=tf.TensorShape(None))
+    transition_matrix_data2 = tf.constant([0.6, 0.4])
+    self.evaluate(transition_matrix.initializer)
+    observation_locs = tf.constant([0.0, 1.0])
+    observation_scale = tf.constant([0.5, 0.5])
+
+    num_steps = 4
+
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(observation_locs, scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True)
+
+    with self.assertRaisesRegexp(
+        Exception,
+        'have scalar batches'):
+      with tf.control_dependencies([
+          transition_matrix.assign(transition_matrix_data2)]):
+        self.evaluate(model.mean())
+
+if __name__ == '__main__':
   tf.test.main()

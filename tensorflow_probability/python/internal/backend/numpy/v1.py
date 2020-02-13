@@ -19,155 +19,51 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
-# Dependency imports
-import numpy as np
-import six
 
+# Dependency imports
+
+import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import initializers
+from tensorflow_probability.python.internal.backend.numpy import linalg_impl
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
-from tensorflow_probability.python.internal.backend.numpy.ops import Tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
+from tensorflow_probability.python.internal.backend.numpy.random_generators import set_seed
+from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
 
 
 __all__ = [
-    'assert_equal',
-    'assert_greater',
-    'assert_greater_equal',
-    'assert_integer',
-    'assert_less',
-    'assert_less_equal',
-    'assert_near',
-    'assert_negative',
-    'assert_non_negative',
-    'assert_non_positive',
-    'assert_none_equal',
-    'assert_positive',
-    'assert_proper_iterable',
-    'assert_rank',
-    'assert_rank_at_least',
-    'assert_rank_in',
-    'assert_scalar',
+    'Module',
+    'Session',
+    'TensorArray',
     'colocate_with',
+    'control_flow_v2_enabled',
     'get_variable',
+    'get_variable_scope',
     'global_variables_initializer',
     'initializers',
     'logging',
+    'matrix_determinant',
+    'matrix_solve',
     'name_scope',
     'placeholder_with_default',
-    'Module',
-    'Session',
     'set_random_seed',
+    'variable_scope',
 ]
 
 
-def _assert_equal(x, y, data=None, summarize=None, message=None, name=None):
-  del summarize
-  del name
-  x = convert_to_tensor(x)
-  y = convert_to_tensor(y)
-  if not np.all(np.equal(x, y)):
-    raise ValueError('Expected x == y but got {} vs {} {} {}'.format(
-        x, y, message or '', data or ''))
-
-
-def _assert_greater(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_less(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_rank(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_scalar(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_greater_equal(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_integer(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_less_equal(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_near(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_negative(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_non_negative(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_non_positive(*_, **__):  # pylint: disable=unused-argument
-  pass
-
-
-def _assert_none_equal(x, y, summarize=None, message=None, name=None):
-  del summarize
-  del name
-  x = convert_to_tensor(x)
-  y = convert_to_tensor(y)
-  if np.any(np.equal(x, y)):
-    raise ValueError('Expected x != y but got {} vs {} {}'.format(
-        x, y, message or ''))
-
-
-def _assert_positive(x, data=None, summarize=None, message=None, name=None):
-  del data
-  del summarize
-  del name
-  x = convert_to_tensor(x)
-  if np.any(x <= 0):
-    raise ValueError('Condition x > 0 did not hold; got {} {}'.format(
-        x, message or ''))
-
-
-def _assert_proper_iterable(values):
-  unintentional_iterables = (Tensor, np.ndarray, bytes, six.text_type)
-  if isinstance(values, unintentional_iterables):
-    raise TypeError(
-        'Expected argument "values" to be a "proper" iterable.  Found: %s' %
-        type(values))
-
-  if not hasattr(values, '__iter__'):
-    raise TypeError(
-        'Expected argument "values" to be iterable.  Found: %s' % type(values))
-
-
-def _assert_rank_at_least(x, rank, message=None, name=None):
-  del name
-  if len(x.shape) < rank:
-    raise ValueError('Expected rank at least {} but got shape {} {}'.format(
-        rank, x.shape, message or ''))
-
-
-def _assert_rank_in(*_, **__):  # pylint: disable=unused-argument
-  pass
+JAX_MODE = False
 
 
 @contextlib.contextmanager
-def _colocate_with(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _dummy_scope(*_, **__):  # pylint: disable=unused-argument
+  yield
 
 
 def _get_variable(  # pylint: disable=unused-argument
@@ -186,7 +82,9 @@ def _get_variable(  # pylint: disable=unused-argument
 
 
 def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redefined-builtin,unused-argument
-  x = np.array(input)
+  x = convert_to_tensor(input)
+  if hasattr(shape, 'as_list'):
+    shape = shape.as_list()
   if shape is None or any(s is None for s in shape):
     return x
   return np.reshape(x, shape)
@@ -195,81 +93,24 @@ def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redef
 # --- Begin Public Functions --------------------------------------------------
 
 
-assert_equal = utils.copy_docstring(
-    tf1.assert_equal,
-    _assert_equal)
-
-assert_greater = utils.copy_docstring(
-    tf1.assert_greater,
-    _assert_greater)
-
-assert_less = utils.copy_docstring(
-    tf1.assert_less,
-    _assert_less)
-
-assert_rank = utils.copy_docstring(
-    tf1.assert_rank,
-    _assert_rank)
-
-assert_scalar = utils.copy_docstring(
-    tf1.assert_scalar,
-    _assert_scalar)
-
-assert_greater_equal = utils.copy_docstring(
-    tf1.assert_greater_equal,
-    _assert_greater_equal)
-
-assert_integer = utils.copy_docstring(
-    tf1.assert_integer,
-    _assert_integer)
-
-assert_less_equal = utils.copy_docstring(
-    tf1.assert_less_equal,
-    _assert_less_equal)
-
-assert_near = utils.copy_docstring(
-    tf1.assert_near,
-    _assert_near)
-
-assert_negative = utils.copy_docstring(
-    tf1.assert_negative,
-    _assert_negative)
-
-assert_non_negative = utils.copy_docstring(
-    tf1.assert_non_negative,
-    _assert_non_negative)
-
-assert_non_positive = utils.copy_docstring(
-    tf1.assert_non_positive,
-    _assert_non_positive)
-
-assert_none_equal = utils.copy_docstring(
-    tf1.assert_none_equal,
-    _assert_none_equal)
-
-assert_positive = utils.copy_docstring(
-    tf1.assert_positive,
-    _assert_positive)
-
-assert_proper_iterable = utils.copy_docstring(
-    tf1.assert_proper_iterable,
-    _assert_proper_iterable)
-
-assert_rank_at_least = utils.copy_docstring(
-    tf1.assert_rank_at_least,
-    _assert_rank_at_least)
-
-assert_rank_in = utils.copy_docstring(
-    tf1.assert_rank_in,
-    _assert_rank_in)
+matrix_determinant = linalg_impl.det
+matrix_solve = linalg_impl.solve
 
 colocate_with = utils.copy_docstring(
     tf1.colocate_with,
-    _colocate_with)
+    _dummy_scope)
+
+control_flow_v2_enabled = utils.copy_docstring(
+    tf1.control_flow_v2_enabled,
+    lambda: True)
 
 get_variable = utils.copy_docstring(
     tf1.get_variable,
     _get_variable)
+
+get_variable_scope = utils.copy_docstring(
+    tf1.get_variable_scope,
+    lambda: variable_scope(name_or_scope=None))
 
 placeholder_with_default = utils.copy_docstring(
     tf1.placeholder_with_default,
@@ -281,7 +122,7 @@ global_variables_initializer = utils.copy_docstring(
 
 set_random_seed = utils.copy_docstring(
     tf1.set_random_seed,
-    lambda seed: np.random.seed(seed % (2**32 - 1)))
+    set_seed)
 
 
 class Session(object):
@@ -294,5 +135,31 @@ class Session(object):
 
   def run(self, *args, **_):
     return args
+
+
+class variable_scope(object):  # pylint: disable=invalid-name
+  """A context manager for defining ops that creates variables (layers)."""
+
+  def __init__(
+      self, name_or_scope, default_name=None, values=None, initializer=None,  # pylint: disable=unused-argument
+      regularizer=None, caching_device=None, partitioner=None,  # pylint: disable=unused-argument
+      custom_getter=None, reuse=None, dtype=None, use_resource=None,  # pylint: disable=unused-argument
+      constraint=None, auxiliary_name_scope=True):  # pylint: disable=unused-argument
+    self._caching_device = None
+
+  @property
+  def caching_device(self):
+    return self._caching_device
+
+  @caching_device.setter
+  def caching_device(self, val):
+    self._caching_device = val
+
+  def __enter__(self, *_, **__):
+    return self
+
+  def __exit__(self, *_, **__):
+    pass
+
 
 del tf

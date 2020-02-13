@@ -22,22 +22,20 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class FiniteDiscreteTest(object):
 
   def _build_tensor(self, ndarray):
     # Enforce parameterized dtype and static/dynamic testing.
     ndarray = np.asarray(ndarray)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _get_shape(self, tensor):
-    return tensor.shape if self.use_static_shape else tf.shape(input=tensor)
+    return tensor.shape if self.use_static_shape else tf.shape(tensor)
 
 
 class FiniteDiscreteValidateArgsTest(FiniteDiscreteTest):
@@ -153,7 +151,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     probs = self._build_tensor([0.2, 0.8])
     dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
-    samples = self.evaluate(dist.sample(5000, seed=1234))
+    samples = self.evaluate(dist.sample(5000, seed=test_util.test_seed()))
     self.assertAllEqual((5000,), self._get_shape(samples))
     self.assertAllClose(np.mean(samples), dist.mean(), atol=0.1)
     self.assertAllClose(np.std(samples), dist.stddev(), atol=0.1)
@@ -163,7 +161,7 @@ class FiniteDiscreteScalarTest(FiniteDiscreteTest):
     probs = self._build_tensor([0.2, 0.8])
     dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
-    samples = self.evaluate(dist.sample(5000, seed=1234))
+    samples = self.evaluate(dist.sample(5000, seed=test_util.test_seed()))
     self.assertAllClose(np.mean(samples), dist.mean(), atol=0.1)
     self.assertAllClose(np.std(samples), dist.stddev(), atol=0.1)
 
@@ -313,7 +311,7 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
     probs = self._build_tensor([[0.2, 0.8], [0.8, 0.2]])
     dist = tfd.FiniteDiscrete(
         outcomes, probs=probs, validate_args=True)
-    samples = self.evaluate(dist.sample(5000, seed=1234))
+    samples = self.evaluate(dist.sample(5000, seed=test_util.test_seed()))
     self.assertAllEqual((5000, 2), self._get_shape(samples))
     self.assertAllClose(np.mean(samples, axis=0), dist.mean(), atol=0.1)
     self.assertAllClose(np.std(samples, axis=0), dist.stddev(), atol=0.1)
@@ -385,37 +383,37 @@ class FiniteDiscreteVectorTest(FiniteDiscreteTest):
 
 
 class FiniteDiscreteValidateArgsStaticShapeTest(FiniteDiscreteValidateArgsTest,
-                                                test_case.TestCase):
+                                                test_util.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteValidateArgsDynamicShapeTest(FiniteDiscreteValidateArgsTest,
-                                                 test_case.TestCase):
+                                                 test_util.TestCase):
   use_static_shape = False
 
 
 class FiniteDiscreteScalarStaticShapeTest(FiniteDiscreteScalarTest,
-                                          test_case.TestCase):
+                                          test_util.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteScalarDynamicShapeTest(FiniteDiscreteScalarTest,
-                                           test_case.TestCase):
+                                           test_util.TestCase):
   use_static_shape = False
 
 
 class FiniteDiscreteVectorStaticShapeTest(FiniteDiscreteVectorTest,
-                                          test_case.TestCase):
+                                          test_util.TestCase):
   use_static_shape = True
 
 
 class FiniteDiscreteVectorDynamicShapeTest(FiniteDiscreteVectorTest,
-                                           test_case.TestCase):
+                                           test_util.TestCase):
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class FiniteDiscreteFromVariableTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class FiniteDiscreteFromVariableTest(test_util.TestCase):
 
   def testAssertionLastDimensionOfOutcomesAndLogits(self):
     x = tf.Variable([0., -1., -2., -3.])

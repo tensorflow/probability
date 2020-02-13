@@ -26,6 +26,8 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -238,7 +240,8 @@ def find_bins(x,
           'First dimension of `edges` must have length > 1 to index 1 or '
           'more bin. Found: {}'.format(edges.shape))
 
-    flattening_x = edges.shape.ndims == 1 and x.shape.ndims > 1
+    flattening_x = (tensorshape_util.rank(edges.shape) == 1 and
+                    tensorshape_util.rank(x.shape) > 1)
 
     if flattening_x:
       x_orig_shape = tf.shape(x)
@@ -394,18 +397,24 @@ def histogram(x,
         dtype=dtype or in_dtype)
     n_edges = tf.compat.dimension_value(edges.shape[0])
     if n_edges is not None:
-      counts.set_shape(
+      tensorshape_util.set_shape(
+          counts,
           tf.TensorShape([n_edges - 1]).concatenate(counts.shape[1:]))
     return counts
 
 
+@deprecation.deprecated_args(
+    '2020-05-03',
+    '`keep_dims` is deprecated, use `keepdims` instead.',
+    'keep_dims')
 def percentile(x,
                q,
                axis=None,
                interpolation=None,
-               keep_dims=False,
+               keepdims=False,
                validate_args=False,
                preserve_gradients=True,
+               keep_dims=None,
                name=None):
   """Compute the `q`-th percentile(s) of `x`.
 
@@ -442,7 +451,7 @@ def percentile(x,
         * nearest: `i` or `j`, whichever is nearest.
         * midpoint: (i + j) / 2.
       `linear` and `midpoint` interpolation do not work with integer dtypes.
-    keep_dims:  Python `bool`. If `True`, the last dimension is kept with size 1
+    keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
@@ -450,6 +459,7 @@ def percentile(x,
       the percentile `q` is preserved in the case of linear interpolation.
       If `False`, the gradient will be (incorrectly) zero when `q` corresponds
       to a point in `x`.
+    keep_dims: deprecated, use keepdims instead.
     name:  A Python string name to give this `Op`.  Default is 'percentile'
 
   Returns:
@@ -494,6 +504,8 @@ def percentile(x,
   ```
 
   """
+  keepdims = keepdims if keep_dims is None else keep_dims
+  del keep_dims
   name = name or 'percentile'
   allowed_interpolations = {'linear', 'lower', 'higher', 'nearest', 'midpoint'}
 
@@ -501,8 +513,9 @@ def percentile(x,
     interpolation = 'nearest'
   else:
     if interpolation not in allowed_interpolations:
-      raise ValueError('Argument `interpolation` must be in %s.  Found %s' %
-                       (allowed_interpolations, interpolation))
+      raise ValueError(
+          'Argument `interpolation` must be in {}. Found {}.'.format(
+              allowed_interpolations, interpolation))
 
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
@@ -603,14 +616,14 @@ def percentile(x,
       gathered_y = tf.where(nan_batch_members, nan, gathered_y)
 
     # Expand dimensions if requested
-    if keep_dims:
+    if keepdims:
       if axis is None:
         ones_vec = tf.ones(
             shape=[_get_best_effort_ndims(x) + _get_best_effort_ndims(q)],
             dtype=tf.int32)
         gathered_y *= tf.ones(ones_vec, dtype=x.dtype)
       else:
-        gathered_y = _insert_back_keep_dims(gathered_y, axis)
+        gathered_y = _insert_back_keepdims(gathered_y, axis)
 
     # If q is a scalar, then result has the right shape.
     # If q is a vector, then result has trailing dim of shape q.shape, which
@@ -618,12 +631,17 @@ def percentile(x,
     return distribution_util.rotate_transpose(gathered_y, tf.rank(q))
 
 
+@deprecation.deprecated_args(
+    '2020-05-03',
+    '`keep_dims` is deprecated, use `keepdims` instead.',
+    'keep_dims')
 def quantiles(x,
               num_quantiles,
               axis=None,
               interpolation=None,
-              keep_dims=False,
+              keepdims=False,
               validate_args=False,
+              keep_dims=None,
               name=None):
   """Compute quantiles of `x` along `axis`.
 
@@ -661,16 +679,17 @@ def quantiles(x,
         * nearest: `i` or `j`, whichever is nearest.
         * midpoint: (i + j) / 2. `linear` and `midpoint` interpolation do not
           work with integer dtypes.
-    keep_dims:  Python `bool`. If `True`, the last dimension is kept with size 1
+    keepdims:  Python `bool`. If `True`, the last dimension is kept with size 1
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
+    keep_dims: deprecated, use keepdims instead.
     name:  A Python string name to give this `Op`.  Default is 'percentile'
 
   Returns:
     cut_points:  A `rank(x) + 1 - len(axis)` dimensional `Tensor` with same
     `dtype` as `x` and shape `[num_quantiles + 1, ...]` where the trailing shape
-    is that of `x` without the dimensions in `axis` (unless `keep_dims is True`)
+    is that of `x` without the dimensions in `axis` (unless `keepdims is True`)
 
   Raises:
     ValueError:  If argument 'interpolation' is not an allowed type.
@@ -698,6 +717,8 @@ def quantiles(x,
   ```
 
   """
+  keepdims = keepdims if keep_dims is None else keep_dims
+  del keep_dims
   with tf.name_scope(name or 'quantiles'):
     x = tf.convert_to_tensor(x, name='x')
     return percentile(
@@ -712,7 +733,7 @@ def quantiles(x,
             num=num_quantiles + 1),
         axis=axis,
         interpolation=interpolation,
-        keep_dims=keep_dims,
+        keepdims=keepdims,
         validate_args=validate_args,
         preserve_gradients=False)
 
@@ -745,36 +766,33 @@ def _get_static_ndims(x,
   Raises:
     ValueError:  If any of the expectations above are violated.
   """
-  ndims = x.shape.ndims
-  if ndims is None:
-    shape_const = tf.get_static_value(tf.shape(x))
-    if shape_const is not None:
-      ndims = shape_const.ndim
+  ndims = tensorshape_util.rank(x.shape)
 
   if ndims is None:
     if expect_static:
       raise ValueError(
-          'Expected argument `x` to have statically defined `ndims`.  Found: ' %
-          x)
+          'Expected argument `x` to have statically defined `ndims`. '
+          'Found: {}.'.format(x))
     return
 
   if expect_ndims is not None:
-    ndims_message = ('Expected argument `x` to have ndims %s.  Found tensor %s'
-                     % (expect_ndims, x))
+    ndims_message = (
+        'Expected argument `x` to have ndims {}. Found tensor {}.'.format(
+            expect_ndims, x))
     if ndims != expect_ndims:
       raise ValueError(ndims_message)
 
   if expect_ndims_at_least is not None:
     ndims_at_least_message = (
-        'Expected argument `x` to have ndims >= %d.  Found tensor %s' %
-        (expect_ndims_at_least, x))
+        'Expected argument `x` to have ndims >= {}. Found tensor {}.'.format(
+            expect_ndims_at_least, x))
     if ndims < expect_ndims_at_least:
       raise ValueError(ndims_at_least_message)
 
   if expect_ndims_no_more_than is not None:
     ndims_no_more_than_message = (
-        'Expected argument `x` to have ndims <= %d.  Found tensor %s' %
-        (expect_ndims_no_more_than, x))
+        'Expected argument `x` to have ndims <= {}. Found tensor {}.'.format(
+            expect_ndims_no_more_than, x))
     if ndims > expect_ndims_no_more_than:
       raise ValueError(ndims_no_more_than_message)
 
@@ -796,7 +814,7 @@ def _get_best_effort_ndims(x,
   return tf.rank(x)
 
 
-def _insert_back_keep_dims(x, axis):
+def _insert_back_keepdims(x, axis):
   """Insert the dims in `axis` back as singletons after being removed.
 
   Args:
@@ -829,8 +847,8 @@ def _make_static_axis_non_negative_list(axis, ndims):
   axis_const = tf.get_static_value(axis)
   if axis_const is None:
     raise ValueError(
-        'Expected argument `axis` to be statically available.  Found: %s' %
-        axis)
+        'Expected argument `axis` to be statically available. '
+        'Found: {}.'.format(axis))
 
   # Make at least 1-D.
   axis = axis_const + np.zeros([1], dtype=axis_const.dtype)
@@ -864,8 +882,8 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
   perm = other_dims + list(axis) if right_end else list(axis) + other_dims
   x_permed = tf.transpose(a=x, perm=perm)
 
-  if x.shape.is_fully_defined():
-    x_shape = x.shape.as_list()
+  if tensorshape_util.is_fully_defined(x.shape):
+    x_shape = tensorshape_util.as_list(x.shape)
     # other_shape = [a, c], end_shape = [b * d]
     other_shape = [x_shape[i] for i in other_dims]
     end_shape = [np.prod([x_shape[i] for i in axis])]
@@ -881,5 +899,5 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
 def _sort_tensor(tensor):
   """Use `top_k` to sort a `Tensor` along the last dimension."""
   sorted_, _ = tf.math.top_k(tensor, k=tf.shape(tensor)[-1])
-  sorted_.set_shape(tensor.shape)
+  tensorshape_util.set_shape(sorted_, tensor.shape)
   return sorted_

@@ -28,14 +28,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal import util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
-
-@test_util.run_all_in_graph_and_eager_modes
-class ChooseTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ChooseTest(test_util.TestCase):
 
   def test_works_for_nested_namedtuple(self):
     Results = collections.namedtuple('Results', ['field1', 'inner'])  # pylint: disable=invalid-name
@@ -94,7 +92,7 @@ class ChooseTest(test_case.TestCase):
     self.assertAllEqual(expected, chosen_)
 
 
-class IsNamedTupleLikeTest(test_case.TestCase):
+class IsNamedTupleLikeTest(test_util.TestCase):
 
   def test_true_for_namedtuple_without_fields(self):
     NoFields = collections.namedtuple('NoFields', [])  # pylint: disable=invalid-name
@@ -114,7 +112,7 @@ class IsNamedTupleLikeTest(test_case.TestCase):
     self.assertFalse(util.is_namedtuple_like(np.int32()))
 
 
-class GradientTest(test_case.TestCase):
+class GradientTest(test_util.TestCase):
 
   def testGradientComputesCorrectly(self):
     dtype = np.float32
@@ -159,13 +157,13 @@ class GradientTest(test_case.TestCase):
         util.maybe_call_fn_and_grads(fn, fn_args)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SmartForLoopTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SmartForLoopTest(test_util.TestCase):
 
   def test_python_for_loop(self):
     counter = None
     # Not @parameterized because the tf.constants would be executed outside the
-    # Eager mode that @test_util.run_all_in_graph_and_eager_modes creates, and
+    # Eager mode that @test_util.test_all_tf_execution_regimes creates, and
     # TF is unhappy about that.
     for n in [10, tf.constant(10, dtype=tf.int64),
               tf.constant(10, dtype=tf.int32)]:
@@ -181,7 +179,7 @@ class SmartForLoopTest(test_case.TestCase):
 
   def test_tf_while_loop(self):
     iters = 10
-    n = tf1.placeholder_with_default(input=np.int64(iters), shape=())
+    n = tf1.placeholder_with_default(np.int64(iters), shape=())
     counter = collections.Counter()
     def body(x):
       counter['body_calls'] += 1
@@ -194,8 +192,8 @@ class SmartForLoopTest(test_case.TestCase):
     self.assertAllClose([11], self.evaluate(result))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TraceScanTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TraceScanTest(test_util.TestCase):
 
   def testBasic(self):
 
@@ -228,7 +226,65 @@ def _test_setter_fn(simple_results, increment=1):
   return simple_results._replace(value=simple_results.value + increment)
 
 
-class MakeInnermostSetterTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class IndexRemappingGatherTest(test_util.TestCase):
+
+  def test_rank_1_same_as_gather(self):
+    params = [10, 11, 12, 13]
+    indices = [3, 2, 0]
+
+    expected = [13, 12, 10]
+    result = util.index_remapping_gather(params, indices)
+    self.assertAllEqual(np.asarray(indices).shape, result.shape)
+
+    self.assertAllEqual(expected, self.evaluate(result))
+
+  def test_rank_2_and_axis_0(self):
+    params = [[95, 46, 17],
+              [46, 29, 55]]
+    indices = [[0, 0, 1],
+               [1, 0, 1]]
+
+    expected = [[95, 46, 55],
+                [46, 46, 55]]
+    result = util.index_remapping_gather(params, indices)
+
+    self.assertAllEqual(np.asarray(params).shape, result.shape)
+
+    self.assertAllEqual(expected, self.evaluate(result))
+
+  def test_rank_3_and_axis_0(self):
+    axis = 0
+    params = np.random.randint(10, 100, size=(4, 5, 6))
+    indices = np.random.randint(0, params.shape[axis], size=(3, 5, 6))
+
+    result = util.index_remapping_gather(params, indices)
+    self.assertAllEqual(indices.shape[:axis + 1] + params.shape[axis + 1:],
+                        result.shape)
+    result_ = self.evaluate(result)
+
+    for i in range(indices.shape[0]):
+      for j in range(params.shape[1]):
+        for k in range(params.shape[2]):
+          self.assertEqual(params[indices[i, j, k], j, k], result_[i, j, k])
+
+  def test_params_rank3_indices_rank2_axis_0(self):
+    axis = 0
+    params = np.random.randint(10, 100, size=(4, 5, 2))
+    indices = np.random.randint(0, params.shape[axis], size=(6, 5))
+
+    result = util.index_remapping_gather(params, indices)
+    self.assertAllEqual(indices.shape[:axis + 1] + params.shape[axis + 1:],
+                        result.shape)
+    result_ = self.evaluate(result)
+
+    for i in range(indices.shape[0]):
+      for j in range(params.shape[1]):
+        for k in range(params.shape[2]):
+          self.assertEqual(params[indices[i, j], j, k], result_[i, j, k])
+
+
+class MakeInnermostSetterTest(test_util.TestCase):
 
   def testNoWrapper(self):
     results = SimpleResults(1)
@@ -262,7 +318,7 @@ class MakeInnermostSetterTest(test_case.TestCase):
     self.assertEqual(2, new_results.inner_results.inner_results.value)
 
 
-class MakeInnermostGetterTest(test_case.TestCase):
+class MakeInnermostGetterTest(test_util.TestCase):
 
   def testNoWrapper(self):
     results = SimpleResults(1)
@@ -323,8 +379,7 @@ class FakeInnerNoParameters(object):
   pass
 
 
-class EnableStoreParametersInResultsTest(test_case.TestCase,
-                                         parameterized.TestCase):
+class EnableStoreParametersInResultsTest(test_util.TestCase):
 
   @parameterized.parameters(FakeInnerOld(),
                             FakeInnerNew(),
@@ -375,7 +430,7 @@ tf.register_tensor_conversion_function(
     TensorConvertible, conversion_func=lambda *args: tf.constant(0))
 
 
-class SimpleTensorWarningTest(test_case.TestCase, parameterized.TestCase):
+class SimpleTensorWarningTest(test_util.TestCase):
 
   # We must defer creating the TF objects until the body of the test.
   # pylint: disable=unnecessary-lambda

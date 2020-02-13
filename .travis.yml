@@ -35,9 +35,8 @@ jobs:
       script: ./testing/run_lints.sh
 
 # The below implicitly run under a build stage called "Test". The full matrix
-# of python versions x SHARD will be expanded and run in parallel.
+# of python version(s) x SHARD will be expanded and run in parallel.
 python:
-  - "2.7"
   - "3.5"
 env:
   global:

@@ -21,6 +21,134 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import normal
 
+from tensorflow.python.ops.linalg import linear_operator_addition  # pylint: disable=g-direct-tensorflow-import
+
+
+def mvn_conjugate_linear_update(prior_scale,
+                                linear_transformation,
+                                likelihood_scale,
+                                observation,
+                                prior_mean=None,
+                                name=None):
+  """Computes a conjugate normal posterior for a Bayesian linear regression.
+
+  We assume the following model:
+
+  ```
+  latent ~ MVN(loc=prior_mean, scale=prior_scale)
+  observation ~ MVN(loc=linear_transformation.matvec(latent),
+                    scale=likelihood_scale)
+  ```
+
+  For Bayesian linear regression, the `latent` represents the weights, and the
+  provided `linear_transformation` is the design matrix.
+
+  This method computes the multivariate normal
+  posterior `p(latent | observation)`, using `LinearOperator`s to perform
+  perform computations efficiently when the matrices involved have special
+  structure.
+
+  Args:
+    prior_scale: Instance of `tf.linalg.LinearOperator` of shape
+      `[..., num_features, num_features]`, specifying a
+      scale matrix (any matrix `L` such that `LL' = Q` where `Q` is the
+      covariance) for the prior on regression weights. May optionally be a
+      float `Tensor`.
+    linear_transformation: Instance of `tf.linalg.LinearOperator` of shape
+      `[..., num_outputs, num_features])`, specifying a transformation of the
+      latent values. May optionally be a float `Tensor`.
+    likelihood_scale: Instance of `tf.linalg.LinearOperator` of shape
+      `[..., num_outputs, num_outputs]` specifying a scale matrix (any matrix
+      `L` such that `LL' = Q` where `Q` is the covariance) for the likelihood
+      of observed targets. May optionally be a float `Tensor`.
+    observation: Float `Tensor` of shape `[..., num_outputs]]), specifying the
+      observed values or regression targets.
+    prior_mean: Optional float `Tensor` of shape `[..., num_features]`,
+      specifying the prior mean. If `None`, the prior mean is assumed to be
+      zero and some computation is avoided.
+      Default value: `None`.
+    name: Option Python `str` name given to ops created by this function.
+      Default value: 'mvn_conjugate_linear_update'.
+  Returns:
+    posterior_mean: Float `Tensor` of shape `[..., num_features]`, giving the
+      mean of the multivariate normal posterior on the latent value.
+    posterior_prec: Instance of `tf.linalg.LinearOperator` of shape
+      shape `[..., num_features, num_features]`, giving the
+      posterior precision (inverse covariance) matrix.
+
+  #### Mathematical details
+
+  Let the prior precision be denoted by
+  `prior_prec = prior_scale.matmul(prior_scale, adjoint_arg=True).inverse()`
+  and the likelihood precision by `likelihood_prec = likelihood_scale.matmul(
+  likelihood_scale, adjoint_arg=True).inverse()`. Then the posterior
+  `p(latent | observation)` is multivariate normal with precision
+
+  ```python
+  posterior_prec = (
+    linear_transformation.matmul(
+      likelihood_prec.matmul(linear_transformation), adjoint=True) +
+     prior_prec)
+  ```
+
+  and mean
+
+  ```python
+  posterior_mean = posterior_prec.solvevec(
+    linear_transformation.matvec(
+      likelihood_prec.matvec(observation) +
+      prior_prec.matvec(prior_mean)))
+  ```
+
+  """
+  with tf.name_scope(name or 'mvn_conjugate_linear_update'):
+
+    def ensure_is_linop(x):
+      return x if hasattr(x, 'solve') else tf.linalg.LinearOperatorFullMatrix(x)
+    prior_scale = ensure_is_linop(prior_scale)
+    likelihood_scale = ensure_is_linop(likelihood_scale)
+    linear_transformation = ensure_is_linop(linear_transformation)
+
+    observation = tf.convert_to_tensor(observation, name='observation')
+    if prior_mean is not None:
+      prior_mean = tf.convert_to_tensor(prior_mean, name='prior_mean')
+
+    prior_prec_chol = prior_scale.inverse()
+    prior_prec = prior_prec_chol.matmul(prior_prec_chol, adjoint=True)
+
+    # Compute `evidence_prec = X.T @ Q^-1 @ X`, with
+    #  Q = likelihood covariance (`likelihood_scale @ likelihood_scale.T`)
+    #  X = linear transformation.
+    scaled_transform = likelihood_scale.solve(linear_transformation)
+    evidence_prec = scaled_transform.matmul(scaled_transform, adjoint=True)
+
+    try:  # Attempt to add prior + evidence efficiently by exploiting structure.
+      sum_terms = linear_operator_addition.add_operators(
+          [prior_prec, evidence_prec])  # Unregistered linops raise a TypeError.
+      if len(sum_terms) > 1:
+        raise TypeError('LinearOperator addition failed to reduce terms.')
+      posterior_prec = sum_terms[0]
+    except TypeError:  # We have to do things the hard way.
+      posterior_prec = tf.linalg.LinearOperatorFullMatrix(
+          prior_prec.to_dense() + evidence_prec.to_dense())
+
+    # Hint to LinearOperator that precision matrices are always PSD.
+    # pylint: disable=protected-access
+    posterior_prec._is_positive_definite = True
+    posterior_prec._is_self_adjoint = True
+    posterior_prec._is_square = True
+    # pylint: enable=protected-access
+
+    # The posterior mean is a weighted combination of the prior mean and the
+    # observed value, scaled by the posterior covariance.
+    prior_plus_observed_value = scaled_transform.matvec(
+        likelihood_scale.solvevec(observation), adjoint=True)
+    if prior_mean is not None:
+      prior_plus_observed_value += prior_prec.matvec(prior_mean)
+    posterior_mean = posterior_prec.solvevec(prior_plus_observed_value)
+
+    return posterior_mean, posterior_prec
+
 
 def normal_conjugates_known_scale_posterior(prior, scale, s, n):
   """Posterior Normal distribution with conjugate prior on the mean.
@@ -65,11 +193,11 @@ def normal_conjugates_known_scale_posterior(prior, scale, s, n):
       Normal object.
   """
   if not isinstance(prior, normal.Normal):
-    raise TypeError("Expected prior to be an instance of type Normal")
+    raise TypeError('Expected prior to be an instance of type Normal')
 
   if s.dtype != prior.dtype:
     raise TypeError(
-        "Observation sum s.dtype does not match prior dtype: %s vs. %s"
+        'Observation sum s.dtype does not match prior dtype: %s vs. %s'
         % (s.dtype, prior.dtype))
 
   n = tf.cast(n, prior.dtype)
@@ -131,11 +259,11 @@ def normal_conjugates_known_scale_predictive(prior, scale, s, n):
       Normal object.
   """
   if not isinstance(prior, normal.Normal):
-    raise TypeError("Expected prior to be an instance of type Normal")
+    raise TypeError('Expected prior to be an instance of type Normal')
 
   if s.dtype != prior.dtype:
     raise TypeError(
-        "Observation sum s.dtype does not match prior dtype: %s vs. %s"
+        'Observation sum s.dtype does not match prior dtype: %s vs. %s'
         % (s.dtype, prior.dtype))
 
   n = tf.cast(n, prior.dtype)

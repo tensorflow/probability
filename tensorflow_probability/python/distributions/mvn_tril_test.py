@@ -25,16 +25,14 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalTriLTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -42,15 +40,34 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
 
+  def testMVNNegativeOnDiagonal(self):
+    mu = self._rng.rand(4)
+    chol, sigma = self._random_chol(4, 4)
+    chol = chol * np.array([1., -1., -1., 1.], dtype=chol.dtype)
+    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+    x = self._rng.rand(4)
+    log_pdf = mvn.log_prob(x)
+    pdf = mvn.prob(x)
+
+    # scipy can't do batches, so just test one of them.
+    scipy_mvn = stats.multivariate_normal(mean=mu, cov=sigma)
+    expected_log_pdf = scipy_mvn.logpdf(x)
+    expected_pdf = scipy_mvn.pdf(x)
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+    self.assertAllClose(expected_pdf, self.evaluate(pdf))
+
+    entropy = mvn.entropy()
+    expected_entropy = scipy_mvn.entropy()
+    self.assertAllClose(expected_entropy, self.evaluate(entropy))
+
   def testLogPDFScalarBatch(self):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
-    chol[1, 1] = -chol[1, 1]
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     x = self._rng.rand(2)
 
@@ -69,7 +86,6 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testLogPDFXIsHigherRank(self):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
-    chol[0, 0] = -chol[0, 0]
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     x = self._rng.rand(3, 2)
 
@@ -89,8 +105,6 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testLogPDFXLowerDimension(self):
     mu = self._rng.rand(3, 2)
     chol, sigma = self._random_chol(3, 2, 2)
-    chol[0, 0, 0] = -chol[0, 0, 0]
-    chol[2, 1, 1] = -chol[2, 1, 1]
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     x = self._rng.rand(2)
 
@@ -111,7 +125,6 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testEntropy(self):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
-    chol[0, 0] = -chol[0, 0]
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     entropy = mvn.entropy()
 
@@ -123,8 +136,6 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testEntropyMultidimensional(self):
     mu = self._rng.rand(3, 5, 2)
     chol, sigma = self._random_chol(3, 5, 2, 2)
-    chol[1, 0, 0, 0] = -chol[1, 0, 0, 0]
-    chol[2, 3, 1, 1] = -chol[2, 3, 1, 1]
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     entropy = mvn.entropy()
 
@@ -137,13 +148,9 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testSample(self):
     mu = self._rng.rand(2)
     chol, sigma = self._random_chol(2, 2)
-    chol[0, 0] = -chol[0, 0]
-    sigma[0, 1] = -sigma[0, 1]
-    sigma[1, 0] = -sigma[1, 0]
-
     n = tf.constant(100000)
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    samples = mvn.sample(n, seed=tfp_test_util.test_seed())
+    samples = mvn.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, [int(100e3), 2])
     self.assertAllClose(sample_values.mean(axis=0), mu, atol=1e-2)
@@ -152,19 +159,17 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testSingularScaleRaises(self):
     mu = None
     chol = [[1., 0.], [0., 0.]]
-    mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
-    with self.assertRaisesOpError("Singular operator"):
-      self.evaluate(mvn.sample())
+    with self.assertRaisesOpError('Singular operator'):
+      mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
+      self.evaluate(mvn.sample(seed=test_util.test_seed()))
 
   def testSampleWithSampleShape(self):
     mu = self._rng.rand(3, 5, 2)
     chol, sigma = self._random_chol(3, 5, 2, 2)
-    chol[1, 0, 0, 0] = -chol[1, 0, 0, 0]
-    chol[2, 3, 1, 1] = -chol[2, 3, 1, 1]
 
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     samples_val = self.evaluate(mvn.sample(
-        (10, 11, 12), seed=tfp_test_util.test_seed()))
+        (10, 11, 12), seed=test_util.test_seed()))
 
     # Check sample shape
     self.assertEqual((10, 11, 12, 3, 5, 2), samples_val.shape)
@@ -184,12 +189,10 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testSampleMultiDimensional(self):
     mu = self._rng.rand(3, 5, 2)
     chol, sigma = self._random_chol(3, 5, 2, 2)
-    chol[1, 0, 0, 0] = -chol[1, 0, 0, 0]
-    chol[2, 3, 1, 1] = -chol[2, 3, 1, 1]
 
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     n = tf.constant(100000)
-    samples = mvn.sample(n, seed=tfp_test_util.test_seed())
+    samples = mvn.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertEqual(samples.shape, (100000, 3, 5, 2))
@@ -203,8 +206,6 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
   def testShapes(self):
     mu = self._rng.rand(3, 5, 2)
     chol, _ = self._random_chol(3, 5, 2, 2)
-    chol[1, 0, 0, 0] = -chol[1, 0, 0, 0]
-    chol[2, 3, 1, 1] = -chol[2, 3, 1, 1]
 
     mvn = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
 
@@ -323,13 +324,13 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
         validate_args=True)
 
     n = int(10e3)
-    samps = dist.sample(n, seed=tfp_test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
+    samps = dist.sample(n, seed=test_util.test_seed())
+    sample_mean = tf.reduce_mean(samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
 
     sample_kl_chol = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
     analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
 
     scale = dist.scale.to_dense()
@@ -359,29 +360,29 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
     sample_variance_ = np.diag(sample_covariance_)
     sample_stddev_ = np.sqrt(sample_variance_)
 
-    tf1.logging.vlog(2, "true_mean:\n{}  ".format(true_mean))
-    tf1.logging.vlog(2, "sample_mean:\n{}".format(sample_mean_))
-    tf1.logging.vlog(2, "analytical_mean:\n{}".format(analytical_mean_))
+    tf1.logging.vlog(2, 'true_mean:\n{}  '.format(true_mean))
+    tf1.logging.vlog(2, 'sample_mean:\n{}'.format(sample_mean_))
+    tf1.logging.vlog(2, 'analytical_mean:\n{}'.format(analytical_mean_))
 
-    tf1.logging.vlog(2, "true_covariance:\n{}".format(true_covariance))
-    tf1.logging.vlog(2, "sample_covariance:\n{}".format(sample_covariance_))
+    tf1.logging.vlog(2, 'true_covariance:\n{}'.format(true_covariance))
+    tf1.logging.vlog(2, 'sample_covariance:\n{}'.format(sample_covariance_))
     tf1.logging.vlog(
-        2, "analytical_covariance:\n{}".format(analytical_covariance_))
+        2, 'analytical_covariance:\n{}'.format(analytical_covariance_))
 
-    tf1.logging.vlog(2, "true_variance:\n{}".format(true_variance))
-    tf1.logging.vlog(2, "sample_variance:\n{}".format(sample_variance_))
-    tf1.logging.vlog(2, "analytical_variance:\n{}".format(analytical_variance_))
+    tf1.logging.vlog(2, 'true_variance:\n{}'.format(true_variance))
+    tf1.logging.vlog(2, 'sample_variance:\n{}'.format(sample_variance_))
+    tf1.logging.vlog(2, 'analytical_variance:\n{}'.format(analytical_variance_))
 
-    tf1.logging.vlog(2, "true_stddev:\n{}".format(true_stddev))
-    tf1.logging.vlog(2, "sample_stddev:\n{}".format(sample_stddev_))
-    tf1.logging.vlog(2, "analytical_stddev:\n{}".format(analytical_stddev_))
+    tf1.logging.vlog(2, 'true_stddev:\n{}'.format(true_stddev))
+    tf1.logging.vlog(2, 'sample_stddev:\n{}'.format(sample_stddev_))
+    tf1.logging.vlog(2, 'analytical_stddev:\n{}'.format(analytical_stddev_))
 
-    tf1.logging.vlog(2, "true_scale:\n{}".format(true_scale))
-    tf1.logging.vlog(2, "scale:\n{}".format(scale_))
+    tf1.logging.vlog(2, 'true_scale:\n{}'.format(true_scale))
+    tf1.logging.vlog(2, 'scale:\n{}'.format(scale_))
 
     tf1.logging.vlog(
         2,
-        "kl_chol:      analytical:{}  sample:{}".format(analytical_kl_chol_,
+        'kl_chol:      analytical:{}  sample:{}'.format(analytical_kl_chol_,
                                                         sample_kl_chol_))
 
     self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.03)
@@ -401,6 +402,40 @@ class MultivariateNormalTriLTest(test_case.TestCase, parameterized.TestCase):
 
     self.assertAllClose(
         sample_kl_chol_, analytical_kl_chol_, atol=0., rtol=0.02)
+
+  @test_util.jax_disable_variable_test
+  def testVariableLocation(self):
+    loc = tf.Variable([1., 1.])
+    scale = tf.eye(2)
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(loc.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, loc))
+
+  @test_util.jax_disable_variable_test
+  def testVariableScale(self):
+    loc = tf.constant([1., 1.])
+    scale = tf.Variable([[1., 0.], [0., 1.]])
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(scale.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale))
+
+  @test_util.jax_disable_variable_test
+  def testVariableScaleAssertions(self):
+    # We test that changing the scale to be non-invertible raises an exception
+    # when validate_args is True. This is really just testing the underlying
+    # LinearOperator instance, but we include it to demonstrate that it works as
+    # expected.
+    loc = tf.constant([1., 1.], dtype=np.float32)
+    scale = tf.Variable(np.eye(2, dtype=np.float32))
+    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
+    self.evaluate(scale.initializer)
+    with self.assertRaises(Exception):
+      with tf.control_dependencies([scale.assign([[1., 0.], [1., 0.]])]):
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
 
 def _compute_non_batch_kl(mu_a, sigma_a, mu_b, sigma_b):
@@ -426,9 +461,8 @@ class _MakeSlicer(object):
 make_slicer = _MakeSlicer()
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalTriLSlicingTest(test_case.TestCase,
-                                        parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalTriLSlicingTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
@@ -436,7 +470,7 @@ class MultivariateNormalTriLSlicingTest(test_case.TestCase,
 
   def _random_chol(self, *shape):
     mat = self._rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
     chol = tf.linalg.band_part(chol, -1, 0)
     sigma = tf.matmul(chol, chol, adjoint_b=True)
     return self.evaluate(chol), self.evaluate(sigma)
@@ -460,7 +494,6 @@ class MultivariateNormalTriLSlicingTest(test_case.TestCase,
     # chol has batch [7, 4, 1] and event [2,2]
     mu = self._rng.rand(4, 3, 1)
     chol, _ = self._random_chol(7, 4, 1, 2, 2)
-    chol[1, 1] = -chol[1, 1]
     dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0, 0]))
@@ -504,7 +537,6 @@ class MultivariateNormalTriLSlicingTest(test_case.TestCase,
     # rank (i.e. the native rank for loc is 1, but mu has rank 0).
     mu = self._rng.rand()
     chol, _ = self._random_chol(7, 4, 2, 2)
-    chol[1, 1] = -chol[1, 1]
     dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
     probs = self.evaluate(dist.prob([0, 0]))
@@ -519,7 +551,6 @@ class MultivariateNormalTriLSlicingTest(test_case.TestCase,
     mu = self._rng.rand(4, 3, 1)
     mu = tf.Variable(mu)
     chol, _ = self._random_chol(7, 4, 1, 2, 2)
-    chol[1, 1] = -chol[1, 1]
     chol = tf.Variable(chol)
     self.evaluate([mu.initializer, chol.initializer])
     dist = tfd.MultivariateNormalTriL(mu, chol, validate_args=True)
@@ -531,53 +562,23 @@ class MultivariateNormalTriLSlicingTest(test_case.TestCase,
       self.assertIsNotNone(dlpdmu)
       self.assertIsNotNone(dlpdchol)
       self.assertGreater(
-          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdmu))), 0)
+          self.evaluate(tf.reduce_sum(tf.abs(dlpdmu))), 0)
       self.assertGreater(
-          self.evaluate(tf.reduce_sum(input_tensor=tf.abs(dlpdchol))), 0)
+          self.evaluate(tf.reduce_sum(tf.abs(dlpdchol))), 0)
 
   def testDocstrSliceExample(self):
-    x = tf.random.normal([5, 3, 2, 2])
+    seed_stream = test_util.test_seed_stream('mvn_tril_docstr')
+    x = tf.random.normal([5, 3, 2, 2], seed=seed_stream())
     cov = tf.matmul(x, x, transpose_b=True)
     chol = tf.linalg.cholesky(cov)
-    loc = tf.random.normal([4, 1, 3, 1])
-    mvn = tfd.MultivariateNormalTriL(loc, chol)
+    loc = tf.random.normal([4, 1, 3, 1], seed=seed_stream())
+    mvn = tfd.MultivariateNormalTriL(loc, chol, validate_args=True)
     self.assertAllEqual((4, 5, 3), mvn.batch_shape)
     self.assertAllEqual((2,), mvn.event_shape)
     mvn2 = mvn[:, 3:, ..., ::-1, tf.newaxis]
     self.assertAllEqual((4, 2, 3, 1), mvn2.batch_shape)
     self.assertAllEqual((2,), mvn2.event_shape)
 
-  def testVariableLocation(self):
-    loc = tf.Variable([1., 1.])
-    scale = tf.eye(2)
-    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
-    self.evaluate(loc.initializer)
-    with tf.GradientTape() as tape:
-      lp = d.log_prob([0., 0.])
-    self.assertIsNotNone(tape.gradient(lp, loc))
 
-  def testVariableScale(self):
-    loc = tf.constant([1., 1.])
-    scale = tf.Variable([[1., 0.], [0., 1.]])
-    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
-    self.evaluate(scale.initializer)
-    with tf.GradientTape() as tape:
-      lp = d.log_prob([0., 0.])
-    self.assertIsNotNone(tape.gradient(lp, scale))
-
-  def testVariableScaleAssertions(self):
-    # We test that changing the scale to be non-invertible raises an exception
-    # when validate_args is True. This is really just testing the underlying
-    # LinearOperator instance, but we include it to demonstrate that it works as
-    # expected.
-    loc = tf.constant([1., 1.])
-    scale = tf.Variable(np.eye(2, dtype=np.float32))
-    d = tfd.MultivariateNormalTriL(loc, scale, validate_args=True)
-    self.evaluate(scale.initializer)
-    with self.assertRaises(Exception):
-      with tf.control_dependencies([scale.assign([[1., 0.], [1., 0.]])]):
-        self.evaluate(d.sample())
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

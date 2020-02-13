@@ -1082,7 +1082,7 @@ class _ConvFlipout(_ConvVariational):
     outputs = self._convolution_op(
         inputs, self.kernel_posterior.distribution.loc)
 
-    input_shape = tf.shape(input=inputs)
+    input_shape = tf.shape(inputs)
     batch_shape = tf.expand_dims(input_shape[0], 0)
     if self.data_format == 'channels_first':
       channels = input_shape[1]

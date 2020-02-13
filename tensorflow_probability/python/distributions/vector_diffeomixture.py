@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.ops.linalg import linear_operator_addition as linop_add_lib  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -266,7 +267,7 @@ class VectorDiffeomixture(distribution_lib.Distribution):
   sources of stochasticity. That is, as long as the parameters are used *after*
   the underlying source of stochasticity, the computed gradient is accurate.
 
-  Reparametrization means that we can use gradient-descent (via backprop) to
+  Reparameterization means that we can use gradient-descent (via backprop) to
   optimize Monte-Carlo objectives. Such objectives are a finite-sample
   approximation of an expectation and arise throughout scientific computing.
 
@@ -312,6 +313,11 @@ class VectorDiffeomixture(distribution_lib.Distribution):
        https://arxiv.org/abs/1801.03080
   """
 
+  @deprecation.deprecated(
+      "2020-03-01",
+      "`VectorDiffeomixture` is deprecated. If you prefer we not remove this "
+      "functionality, please contact tfprobability@tensorflow.org, or raise "
+      "an issue on https://github.com/tensorflow/probability/issues.")
   def __init__(self,
                mix_loc,
                temperature,
@@ -765,6 +771,10 @@ class VectorDiffeomixture(distribution_lib.Distribution):
         ],
         axis=0)
     return tf.reshape(p, shape=expand_shape)
+
+  # TODO(b/145620027) Finalize choice of bijector, if any.
+  # def _default_event_space_bijector(self):
+  #   return
 
 
 def maybe_check_quadrature_param(param, name, validate_args):

@@ -22,6 +22,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import scale as scale_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
@@ -33,6 +37,8 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.util.seed_stream import SeedStream
+
+__all__ = ['VonMises']
 
 
 class VonMises(distribution.Distribution):
@@ -264,6 +270,15 @@ class VonMises(distribution.Distribution):
     # Map the samples to [-pi, pi].
     samples = samples - 2. * np.pi * tf.round(samples / (2. * np.pi))
     return samples
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return chain_bijector.Chain([
+        shift_bijector.Shift(shift=-np.pi, validate_args=self.validate_args),
+        scale_bijector.Scale(
+            scale=2. * np.pi, validate_args=self.validate_args),
+        sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

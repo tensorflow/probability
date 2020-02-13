@@ -29,17 +29,20 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util
+from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+
+JAX_MODE = False
 
 
-class _CholeskyExtend(test_case.TestCase):
+class _CholeskyExtend(test_util.TestCase):
 
   def testCholeskyExtension(self):
     xs = np.random.random(7).astype(self.dtype)[:, tf.newaxis]
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
-    k = tfp.positive_semidefinite_kernels.MaternOneHalf()
+    k = tfp.math.psd_kernels.MaternOneHalf()
     mat = k.matrix(xs, xs)
     chol = tf.linalg.cholesky(mat)
 
@@ -61,7 +64,7 @@ class _CholeskyExtend(test_case.TestCase):
     prev_bs, new_bs = data.draw(tfp_hps.broadcasting_shapes(target_bs, 2))
     ones = tf.TensorShape([1] * len(target_bs))
     smallest_shared_shp = tuple(np.min(
-        [tf.broadcast_static_shape(ones, shp).as_list()
+        [tensorshape_util.as_list(tf.broadcast_static_shape(ones, shp))
          for shp in [prev_bs, new_bs]],
         axis=0))
 
@@ -72,18 +75,20 @@ class _CholeskyExtend(test_case.TestCase):
     np.random.seed(data.draw(hps.integers(min_value=0, max_value=2**32 - 1)))
     xs = np.random.uniform(size=smallest_shared_shp + (n,))
     data.draw(hps.just(xs))
-    xs = (xs + np.zeros(prev_bs.as_list() + [n]))[..., np.newaxis]
+    xs = (xs + np.zeros(tensorshape_util.as_list(prev_bs) +
+                        [n]))[..., np.newaxis]
     xs = xs.astype(self.dtype)
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
 
-    k = tfp.positive_semidefinite_kernels.MaternOneHalf()
+    k = tfp.math.psd_kernels.MaternOneHalf()
     mat = k.matrix(xs, xs) + jitter(n)
     chol = tf.linalg.cholesky(mat)
 
     ys = np.random.uniform(size=smallest_shared_shp + (m,))
     data.draw(hps.just(ys))
-    ys = (ys + np.zeros(new_bs.as_list() + [m]))[..., np.newaxis]
+    ys = (ys + np.zeros(tensorshape_util.as_list(new_bs)
+                        + [m]))[..., np.newaxis]
     ys = ys.astype(self.dtype)
     ys = tf1.placeholder_with_default(
         ys, shape=ys.shape if self.use_static_shape else None)
@@ -95,16 +100,16 @@ class _CholeskyExtend(test_case.TestCase):
 
     new_chol = tfp.math.cholesky_concat(
         chol, k.matrix(xsys, ys) + jitter(z)[:, n:])
-    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class CholeskyExtend32Static(_CholeskyExtend):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class CholeskyExtend64Dynamic(_CholeskyExtend):
   dtype = np.float64
   use_static_shape = False
@@ -112,7 +117,7 @@ class CholeskyExtend64Dynamic(_CholeskyExtend):
 del _CholeskyExtend
 
 
-class _PivotedCholesky(test_case.TestCase, parameterized.TestCase):
+class _PivotedCholesky(test_util.TestCase):
 
   def _random_batch_psd(self, dim):
     matrix = np.random.random([2, dim, dim])
@@ -161,7 +166,8 @@ class _PivotedCholesky(test_case.TestCase, parameterized.TestCase):
     self.assertIsNotNone(dmatrix)
     self.assertAllGreater(tf.linalg.norm(dmatrix, ord='fro', axis=[-1, -2]), 0.)
 
-  @test_util.enable_control_flow_v2
+  @test_util.tf_tape_safety_test
+  @tf_test_util.enable_control_flow_v2
   def testGradientTapeCFv2(self):
     dim = 11
     matrix = self._random_batch_psd(dim)
@@ -224,17 +230,31 @@ class _PivotedCholesky(test_case.TestCase, parameterized.TestCase):
           tfp.math.pivoted_cholesky(mat, max_rank=rank, diag_rtol=-1),
           atol=1e-4)
 
+  def testLinopKernel(self):
+    x = tf.random.uniform([10, 2], dtype=self.dtype, seed=test_util.test_seed())
+    masked_shape = x.shape if self.use_static_shape else [None] * len(x.shape)
+    x = tf1.placeholder_with_default(x, shape=masked_shape)
+    k = tfp.math.psd_kernels.ExponentiatedQuadratic()
+    expected = tfp.math.pivoted_cholesky(k.matrix(x, x), max_rank=3)
+    actual = tfp.math.pivoted_cholesky(
+        tfp.experimental.linalg.LinearOperatorPSDKernel(k, x), max_rank=3)
+    expected, actual = self.evaluate([expected, actual])
+    self.assertAllClose(expected, actual)
 
-@test_util.run_all_in_graph_and_eager_modes
-class PivotedCholesky32Static(_PivotedCholesky):
-  dtype = np.float32
-  use_static_shape = True
 
+if not JAX_MODE:
+  # TODO(b/147693911): Enable these tests once pivoted_cholesky
+  # no longer relies on dynamic slices
 
-@test_util.run_all_in_graph_and_eager_modes
-class PivotedCholesky64Dynamic(_PivotedCholesky):
-  dtype = np.float64
-  use_static_shape = False
+  @test_util.test_all_tf_execution_regimes
+  class PivotedCholesky32Static(_PivotedCholesky):
+    dtype = np.float32
+    use_static_shape = True
+
+  @test_util.test_all_tf_execution_regimes
+  class PivotedCholesky64Dynamic(_PivotedCholesky):
+    dtype = np.float64
+    use_static_shape = False
 
 
 del _PivotedCholesky
@@ -284,13 +304,13 @@ class _LUReconstruct(object):
     self.assertAllClose(x_, y_, atol=0., rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LUReconstructStatic(test_case.TestCase, _LUReconstruct):
+@test_util.test_all_tf_execution_regimes
+class LUReconstructStatic(test_util.TestCase, _LUReconstruct):
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LUReconstructDynamic(test_case.TestCase, _LUReconstruct):
+@test_util.test_all_tf_execution_regimes
+class LUReconstructDynamic(test_util.TestCase, _LUReconstruct):
   use_static_shape = False
 
 
@@ -332,13 +352,13 @@ class _LUMatrixInverse(object):
     self.assertAllClose(np.linalg.inv(x_), y_, atol=0., rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LUMatrixInverseStatic(test_case.TestCase, _LUMatrixInverse):
+@test_util.test_all_tf_execution_regimes
+class LUMatrixInverseStatic(test_util.TestCase, _LUMatrixInverse):
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LUMatrixInverseDynamic(test_case.TestCase, _LUMatrixInverse):
+@test_util.test_all_tf_execution_regimes
+class LUMatrixInverseDynamic(test_util.TestCase, _LUMatrixInverse):
   use_static_shape = False
 
 
@@ -397,17 +417,17 @@ class _LUSolve(object):
     self.assertAllClose(expected_, y_, atol=0., rtol=1e-3)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LUSolveStatic(test_case.TestCase, _LUSolve):
+@test_util.test_all_tf_execution_regimes
+class LUSolveStatic(test_util.TestCase, _LUSolve):
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LUSolveDynamic(test_case.TestCase, _LUSolve):
+@test_util.test_all_tf_execution_regimes
+class LUSolveDynamic(test_util.TestCase, _LUSolve):
   use_static_shape = False
 
 
-class _SparseOrDenseMatmul(object):
+class _SparseOrDenseMatmul(test_util.TestCase):
   dtype = np.float32
   use_static_shape = True
   use_sparse_tensor = False
@@ -505,32 +525,33 @@ class _SparseOrDenseMatmul(object):
 
     self.verify_sparse_dense_matvecmul(x_, y_)
 
+if not JAX_MODE:
+  # TODO(b/147683793): Enable tests when JAX backend supports SparseTensor.
 
-@test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulStatic(test_case.TestCase, _SparseOrDenseMatmul):
-  use_static_shape = True
+  @test_util.test_all_tf_execution_regimes
+  class SparseOrDenseMatmulStatic(_SparseOrDenseMatmul):
+    use_static_shape = True
 
+  @test_util.test_all_tf_execution_regimes
+  class SparseOrDenseMatmulDynamic(_SparseOrDenseMatmul):
+    use_static_shape = False
 
-@test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulDynamic(test_case.TestCase, _SparseOrDenseMatmul):
-  use_static_shape = False
+  @test_util.test_all_tf_execution_regimes
+  class SparseOrDenseMatmulStaticSparse(_SparseOrDenseMatmul):
+    use_static_shape = True
+    use_sparse_tensor = True
 
-
-@test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulStaticSparse(test_case.TestCase, _SparseOrDenseMatmul):
-  use_static_shape = True
-  use_sparse_tensor = True
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class SparseOrDenseMatmulDynamicSparse(test_case.TestCase,
-                                       _SparseOrDenseMatmul):
-  use_static_shape = False
-  use_sparse_tensor = True
+  @test_util.test_all_tf_execution_regimes
+  class SparseOrDenseMatmulDynamicSparse(_SparseOrDenseMatmul):
+    use_static_shape = False
+    use_sparse_tensor = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class FillTriangularTest(test_case.TestCase):
+del _SparseOrDenseMatmul
+
+
+@test_util.test_all_tf_execution_regimes
+class FillTriangularTest(test_util.TestCase):
 
   def _fill_triangular(self, x, upper=False):
     """Numpy implementation of `fill_triangular`."""
@@ -620,7 +641,7 @@ class FillTriangularTest(test_case.TestCase):
     self._run_test(np.random.randn(2, 3, int(7*8/2)), upper=True)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class FillTriangularInverseTest(FillTriangularTest):
 
   def _run_test(self, x_, use_deferred_shape=False, **kwargs):

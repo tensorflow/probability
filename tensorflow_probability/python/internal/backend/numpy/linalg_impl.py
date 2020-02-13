@@ -37,37 +37,36 @@ __all__ = [
     'det',
     'diag',
     'diag_part',
+    'einsum',
     'eye',
+    'inv',
     'lu',
     'matmul',
+    'matvec',
     'matrix_rank',
     'matrix_transpose',
     'norm',
     'pinv',
     'set_diag',
     'slogdet',
+    'solve',
+    'tensordot',
+    'trace',
     'triangular_solve',
     # 'cross',
     # 'eigh',
     # 'eigvalsh',
-    # 'einsum',
     # 'expm',
     # 'global_norm',
-    # 'inv',
-    # 'l2_normalize',
     # 'logdet',
     # 'logm',
     # 'lstsq',
-    # 'matvec',
-    # 'norm',
+    # 'l2_normalize'
     # 'qr',
-    # 'solve',
     # 'sqrtm',
     # 'svd',
     # 'tensor_diag',
     # 'tensor_diag_part',
-    # 'tensordot',
-    # 'trace',
     # 'tridiagonal_solve',
 ]
 
@@ -114,6 +113,11 @@ def _diag(diagonal, name=None):
   return _set_diag(
       np.zeros(diagonal.shape + (diagonal.shape[-1],), dtype=diagonal.dtype),
       diagonal)
+
+
+def _einsum(equation, *inputs, **kwargs):
+  del kwargs
+  return np.einsum(equation, *inputs)
 
 
 def _eye(num_rows, num_columns=None, batch_shape=None,
@@ -192,10 +196,82 @@ def _matmul(a, b,
   return np.matmul(a, b)
 
 
+def _matvec(a, b,
+            transpose_a=False, transpose_b=False,
+            adjoint_a=False, adjoint_b=False,
+            a_is_sparse=False, b_is_sparse=False,
+            name=None):  # pylint: disable=unused-argument
+  """Numpy matvec wrapper."""
+  return np.squeeze(_matmul(
+      a,
+      b[..., np.newaxis],
+      transpose_a=transpose_a,
+      transpose_b=transpose_b,
+      adjoint_a=adjoint_a,
+      adjoint_b=adjoint_b,
+      a_is_sparse=a_is_sparse,
+      b_is_sparse=b_is_sparse), axis=-1)
+
+
+def _norm(tensor, ord='euclidean', axis=None, keepdims=None,  # pylint: disable=redefined-builtin
+          name=None, keep_dims=None):
+  """Numpy norm wrapper."""
+  del name
+  del keep_dims
+  if axis is None:
+    tensor = np.reshape(tensor, [-1])
+    axis = -1
+  if isinstance(axis, (tuple, list)):
+    # JAX expects tuples or ints.
+    axis = tuple(axis)
+  return np.linalg.norm(
+      tensor,
+      ord=2 if ord == 'euclidean' else ord,
+      axis=axis, keepdims=bool(keepdims))
+
+
 def _set_diag(input, diagonal, name=None):  # pylint: disable=unused-argument,redefined-builtin
   return np.where(np.eye(diagonal.shape[-1], dtype=np.bool),
                   diagonal[..., np.newaxis, :],
                   input)
+
+
+def _solve(matrix, rhs, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
+  """Numpy solve does not broadcast, so we must do so explicitly."""
+  del name
+  if adjoint:
+    matrix = _matrix_transpose(matrix, conjugate=True)
+  if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
+    matrix = matrix + np.zeros(rhs.shape[:-2] + (1, 1), dtype=matrix.dtype)
+    rhs = rhs + np.zeros(matrix.shape[:-2] + (1, 1), dtype=rhs.dtype)
+    return np.linalg.solve(matrix, rhs)
+  try:
+    bcast = np.broadcast(matrix[..., :1], rhs)
+  except ValueError as e:
+    raise ValueError('Error with inputs shaped `matrix`={}, rhs={}:\n{}'.format(
+        matrix.shape, rhs.shape, str(e)))
+  dim = matrix.shape[-1]
+  matrix = np.broadcast_to(matrix, bcast.shape[:-1] + (dim,))
+  rhs = np.broadcast_to(rhs, bcast.shape)
+  nbatch = int(np.prod(matrix.shape[:-2]))
+  flat_mat = matrix.reshape(nbatch, dim, dim)
+  flat_rhs = rhs.reshape(nbatch, dim, rhs.shape[-1])
+  result = np.empty(flat_rhs.shape)
+  if np.size(result):
+    # ValueError: On entry to STRTRS parameter number 7 had an illegal value.
+    for i, (mat, rh) in enumerate(zip(flat_mat, flat_rhs)):
+      result[i] = np.linalg.solve(mat, rh)
+  return result.reshape(*rhs.shape)
+
+
+def _tensordot(a, b, axes, name=None):  # pylint: disable=redefined-outer-name
+  del name
+  return np.tensordot(a, b, axes=axes)
+
+
+def _trace(x, name=None):
+  del name
+  return np.trace(x, axis1=-1, axis2=-2)
 
 
 def _triangular_solve(matrix, rhs, lower=True, adjoint=False, name=None):  # pylint: disable=redefined-outer-name
@@ -256,9 +332,17 @@ diag_part = utils.copy_docstring(
     tf.linalg.diag_part,
     lambda input, name=None: np.diagonal(input, axis1=-2, axis2=-1))
 
+einsum = utils.copy_docstring(
+    tf.linalg.einsum,
+    _einsum)
+
 eye = utils.copy_docstring(
     tf.eye,
     _eye)
+
+inv = utils.copy_docstring(
+    tf.linalg.inv,
+    lambda input, name=None: np.linalg.inv(input))
 
 lu = utils.copy_docstring(
     tf.linalg.lu,
@@ -267,6 +351,10 @@ lu = utils.copy_docstring(
 matmul = utils.copy_docstring(
     tf.linalg.matmul,
     _matmul)
+
+matvec = utils.copy_docstring(
+    tf.linalg.matvec,
+    _matvec)
 
 # TODO(b/140157055): Remove the try/except.
 matrix_rank = lambda input, name=None: np.linalg.matrix_rank(input)
@@ -278,14 +366,7 @@ try:
 except AttributeError:
   pass
 
-norm = utils.copy_docstring(
-    tf.norm,
-    lambda tensor, ord='euclidean', axis=None, keepdims=None, name=None,  # pylint: disable=g-long-lambda
-           keep_dims=None: np.linalg.norm(
-               np.reshape(tensor, [-1]) if axis is None else tensor,
-               ord=2 if ord == 'euclidean' else ord,
-               axis=-1 if axis is None else axis, keepdims=bool(keepdims))
-)
+norm = utils.copy_docstring(tf.norm, _norm)
 
 # TODO(b/140157055): Remove the try/except.
 pinv = lambda input, name=None: np.linalg.pinv(input)
@@ -310,6 +391,16 @@ slogdet = utils.copy_docstring(
 matrix_transpose = utils.copy_docstring(
     tf.linalg.matrix_transpose,
     _matrix_transpose)
+
+solve = utils.copy_docstring(tf.linalg.solve, _solve)
+
+tensordot = utils.copy_docstring(
+    tf.linalg.tensordot,
+    _tensordot)
+
+trace = utils.copy_docstring(
+    tf.linalg.trace,
+    _trace)
 
 triangular_solve = utils.copy_docstring(
     tf.linalg.triangular_solve,
