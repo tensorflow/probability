@@ -80,6 +80,7 @@ from tensorflow_probability.python.distributions.mvn_tril import MultivariateNor
 from tensorflow_probability.python.distributions.negative_binomial import NegativeBinomial
 from tensorflow_probability.python.distributions.normal import Normal
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
+from tensorflow_probability.python.distributions.ordered_logistic import OrderedLogistic
 from tensorflow_probability.python.distributions.pareto import Pareto
 from tensorflow_probability.python.distributions.pert import PERT
 from tensorflow_probability.python.distributions.pixel_cnn import PixelCNN
@@ -132,7 +133,8 @@ augment_kl_xent_docs(_sys.modules[__name__])
 del augment_kl_xent_docs
 del _sys
 
-# pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member,g-bad-import-order
+# pylint: enable=unused-import,wildcard-import,g-importing-member,g-bad-import-order
+# pylint: enable=line-too-long
 
 __all__ = [
     'FULLY_REPARAMETERIZED',
@@ -218,6 +220,7 @@ __all__ = [
     'MixtureSameFamily',
     'ExpRelaxedOneHotCategorical',
     'OneHotCategorical',
+    'OrderedLogistic',
     'Pareto',
     'PERT',
     'PlackettLuce',

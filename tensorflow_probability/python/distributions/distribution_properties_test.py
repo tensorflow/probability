@@ -76,6 +76,7 @@ TF2_FRIENDLY_DISTS = (
     'Multinomial',
     'NegativeBinomial',
     'OneHotCategorical',
+    'OrderedLogistic',
     'Pareto',
     'PERT',
     'PlackettLuce',
@@ -161,6 +162,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'DirichletMultinomial',  # No converter for TensorListFromTensor
     'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'Multinomial',  # No converter for TensorListFromTensor
+    'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
     'VonMises',  # No converter for While
@@ -176,6 +178,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'NegativeBinomial',  # Numeric inconsistency: b/147743999
     'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
     'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.
+    'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
     'ProbitBernoulli',  # Seemingly runs, but gives `NaN`s sometimes.
     'TruncatedNormal',  # Numerical problem: b/145554459
@@ -1531,6 +1534,9 @@ CONSTRAINTS = {
         tf.sigmoid,
     'RelaxedBernoulli.probs':
         tf.sigmoid,
+    'cutpoints':
+        # Permit values that aren't too large
+        lambda x: tfb.Ordered().inverse(10 * tf.math.tanh(x)),
     'log_rate':
         lambda x: tf.maximum(x, -16.),
     'mixing_concentration':

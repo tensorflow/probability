@@ -458,6 +458,25 @@ def assert_symmetric(matrix):
       [assert_util.assert_near(matrix, matrix_t)], matrix)
 
 
+def assert_nondecreasing(x, summarize=None, message=None, name=None):
+  """Assert (batched) elements in `x` are non decreasing."""
+
+  with tf.name_scope(name or 'assert_non_decreasing'):
+    if message is None:
+      message = '`Tensor` contained decreasing values.'
+    x = tf.convert_to_tensor(x)
+    x_ = tf.get_static_value(x)
+    if x_ is not None:
+      if not np.all(x_[..., :-1] <= x_[..., 1:]):
+        raise ValueError(message)
+      return x
+    return assert_util.assert_less_equal(
+        x[..., :-1],
+        x[..., 1:],
+        summarize=summarize,
+        message=message)
+
+
 def assert_nonnegative_integer_form(
     x, name='assert_nonnegative_integer_form'):
   """Assert x is a non-negative tensor, and optionally of integers."""
