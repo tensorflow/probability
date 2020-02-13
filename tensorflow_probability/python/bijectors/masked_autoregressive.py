@@ -625,7 +625,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   for input dimension `i` depends only on inputs `x[batch_idx, j]` where
   `ord(j) < ord(i)`.  The autoregressive property allows us to use
   `output[batch_idx, i]` to parameterize conditional distributions:
-    `p(x[batch_idx, i] | x[batch_idx, ] for ord(j) < ord(i))`
+    `p(x[batch_idx, i] | x[batch_idx, j] for ord(j) < ord(i))`
   which give us a tractable distribution over input `x[batch_idx]`:
     `p(x[batch_idx]) = prod_i p(x[batch_idx, ord(i)] | x[batch_idx, ord(0:i)])`
 
