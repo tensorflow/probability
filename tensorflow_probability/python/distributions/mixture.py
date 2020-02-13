@@ -76,7 +76,7 @@ class Mixture(distribution.Distribution):
 
     A `Mixture` is defined by a `Categorical` (`cat`, representing the
     mixture probabilities) and a list of `Distribution` objects
-    all having matching dtype, batch shape, event shape, and continuity
+    all having matching dtype, batch shape, event shape, support, and continuity
     properties (the components).
 
     The `num_classes` of `cat` must be possible to infer at graph construction
