@@ -54,7 +54,7 @@ class ContinuousBernoulli(distribution.Distribution):
         dtype=tf.float32,
         validate_args=False,
         allow_nan_stats=True,
-        name="ContinuousBernoulli",
+        name="ContinuousBernoulli"
     ):
         """Construct Bernoulli distributions.
 
@@ -103,7 +103,7 @@ class ContinuousBernoulli(distribution.Distribution):
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats,
             parameters=parameters,
-            name=name,
+            name=name
         )
 
     @staticmethod
@@ -161,7 +161,7 @@ class ContinuousBernoulli(distribution.Distribution):
                 - tf.math.log1p(-cut_lams)
             )
             / (tf.math.log(cut_lams) - tf.math.log1p(-cut_lams)),
-            uniform,
+            uniform
         )
         return tf.cast(sample, self.dtype)
 
@@ -176,11 +176,7 @@ class ContinuousBernoulli(distribution.Distribution):
             + 4.0 / 3.0 * tf.math.pow(lams - 0.5, 2)
             + 104.0 / 45.0 * tf.math.pow(lams - 0.5, 4)
         )
-        return tf.where(
-            self._outside_unstable_region(),
-            log_norm,
-            taylor,
-        )
+        return tf.where(self._outside_unstable_region(), log_norm, taylor)
 
     def _log_prob(self, event):
         log_lams0, log_lams1 = self._outcome_log_lams()
@@ -193,7 +189,7 @@ class ContinuousBernoulli(distribution.Distribution):
         return tf.where(
             event < 0 | event > 1,
             -float("Inf") * tf.ones_like(tentative_log_pdf),
-            tentative_log_pdf,
+            tentative_log_pdf
         )
 
     def _cdf(self, x):
@@ -203,11 +199,7 @@ class ContinuousBernoulli(distribution.Distribution):
             + cut_lams
             - 1.0
         ) / (2.0 * cut_lams - 1.0)
-        unbounded_cdfs = tf.where(
-            self._outside_unstable_region(),
-            cdfs,
-            x,
-        )
+        unbounded_cdfs = tf.where(self._outside_unstable_region(), cdfs, x)
         return tf.where(
             x < 0.0,
             tf.zeros_like(x),
@@ -243,29 +235,22 @@ class ContinuousBernoulli(distribution.Distribution):
         taylor = (
             0.5 + (lams - 0.5) / 3.0 + 16.0 / 45.0 * tf.math.pow(lams - 0.5, 3)
         )
-        return tf.where(
-            self._outside_unstable_region(),
-            mus,
-            taylor,
-        )
+        return tf.where(self._outside_unstable_region(), mus, taylor)
 
     def _variance(self):
         lams = self._lams_parameter_no_checks()
         cut_lams = self._cut_lams()
         vars = cut_lams * (cut_lams - 1.0) / tf.math.pow(
             1.0 - 2.0 * cut_lams, 2
-        ) + 1.0 / tf.math.pow(tf.math.log1p(-cut_lams) - tf.math.log(cut_lams),
-                              2)
+        ) + 1.0 / tf.math.pow(
+            tf.math.log1p(-cut_lams) - tf.math.log(cut_lams), 2
+        )
         taylor = (
             1.0 / 12.0
             - tf.math.pow(lams - 0.5, 2) / 15.0
             - 128.0 / 945.0 * tf.math.pow(lams - 0.5, 4)
         )
-        return tf.where(
-            self._outside_unstable_region(),
-            vars,
-            taylor,
-        )
+        return tf.where(self._outside_unstable_region(), vars, taylor)
 
     def _quantile(self, p):
         cut_lams = self._cut_lams()
@@ -276,7 +261,7 @@ class ContinuousBernoulli(distribution.Distribution):
                 - tf.math.log1p(-cut_lams)
             )
             / (tf.math.log(cut_lams) - tf.math.log1p(-cut_lams)),
-            p,
+            p
         )
 
     def _mode(self):
@@ -323,7 +308,7 @@ class ContinuousBernoulli(distribution.Distribution):
             assert_util.assert_less(
                 x,
                 tf.ones([], dtype=x.dtype),
-                message="Sample must be less than `1`.",
+                message="Sample must be less than `1`."
             )
         )
         return assertions
@@ -356,8 +341,8 @@ def maybe_assert_continuous_bernoulli_param_correctness(
                 assert_util.assert_less(
                     lams,
                     one,
-                    message="lams has components greater than or equal to 1.",
-                ),
+                    message="lams has components greater than or equal to 1."
+                )
             ]
 
     return assertions
@@ -381,11 +366,11 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
     with tf.name_scope(name or "kl_continuous_bernoulli_continuous_bernoulli"):
         (
             a_log_lams0,
-            a_log_lams1,
+            a_log_lams1
         ) = a._outcome_log_lams()  # pylint:disable=protected-access
         (
             b_log_lams0,
-            b_log_lams1,
+            b_log_lams1
         ) = b._outcome_log_lams()  # pylint:disable=protected-access
         a_mean = a._mean()  # pylint:disable=protected-access
         a_log_norm = a._cont_bern_log_norm()  # pylint:disable=protected-access
