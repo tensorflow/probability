@@ -97,9 +97,9 @@ def minimize(loss_fn,
   ```python
   # `x` is the tf.Variable instance defined above.
   trace_fn = lambda loss, grads, variables: {'loss': loss, 'x': x}
-  trace = tfp.vi.minimize(loss_fn, num_steps=100,
-                          optimizer=tf.optimizers.Adam(0.1),
-                          trace_fn=trace_fn)
+  trace = tfp.math.minimize(loss_fn, num_steps=100,
+                            optimizer=tf.optimizers.Adam(0.1),
+                            trace_fn=trace_fn)
   print(trace['loss'].shape,   # => [100]
         trace['x'].shape)      # => [100]
   ```
