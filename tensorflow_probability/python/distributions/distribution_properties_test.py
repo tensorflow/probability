@@ -1238,8 +1238,8 @@ def _all_ok(thing, one_ok):
     answer = True
     for _, param in dist.parameters.items():
       answer &= _all_ok(param, one_ok)
-    if isinstance(thing, tfd.TransformedDistribution):
-      answer &= one_ok(thing.batch_shape)
+    if isinstance(thing, tfd.Distribution):
+      answer &= one_ok(thing.batch_shape + thing.event_shape)
     return answer
   elif tf.is_tensor(thing):
     return one_ok(thing.shape)
