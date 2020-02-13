@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -74,8 +75,9 @@ class Sigmoid(bijector.Bijector):
             'Either both or neither of `low` and `high` must be passed. '
             'Received `low={}`, `high={}`'.format(low, high))
 
-      self._low = tensor_util.convert_nonref_to_tensor(low)
-      self._high = tensor_util.convert_nonref_to_tensor(high)
+      dtype = dtype_util.common_dtype([low, high], dtype_hint=tf.float32)
+      self._low = tensor_util.convert_nonref_to_tensor(low, dtype=dtype)
+      self._high = tensor_util.convert_nonref_to_tensor(high, dtype=dtype)
       super(Sigmoid, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
