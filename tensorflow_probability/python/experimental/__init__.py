@@ -38,11 +38,13 @@ from tensorflow_probability.python.experimental import marginalize
 from tensorflow_probability.python.experimental import mcmc
 from tensorflow_probability.python.experimental import substrates
 from tensorflow_probability.python.experimental import vi
+from tensorflow_probability.python.experimental.composite_tensor import as_composite
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'auto_batching',
+    'as_composite',
     'edward2',
     'linalg',
     'marginalize',
