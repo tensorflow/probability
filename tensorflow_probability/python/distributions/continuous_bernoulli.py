@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -138,41 +138,38 @@ class ContinuousBernoulli(distribution.Distribution):
     def _event_shape(self):
         return tf.TensorShape([])
 
-    def _sample_n(self, n, seed=None):
+    def _outside_unstable_region(self):
         lams = self._lams_parameter_no_checks()
-        cut_lams = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
+        return lams < self._lims[0] | lams > self._lims[1]
+
+    def _cut_lams(self):
+        lams = self._lams_parameter_no_checks()
+        return tf.where(
+            self._outside_unstable_region(),
             lams,
-            self._lims[0] * tf.ones_like(lams),
+            self._lims[0] * tf.ones_like(lams)
         )
-        new_shape = tf.concat([[n], tf.shape(lams)], 0)
-        uniform = tf.random.uniform(new_shape, seed=seed, dtype=lams.dtype)
+
+    def _sample_n(self, n, seed=None):
+        cut_lams = self._cut_lams()
+        new_shape = tf.concat([[n], tf.shape(cut_lams)], 0)
+        uniform = tf.random.uniform(new_shape, seed=seed, dtype=cut_lams.dtype)
         sample = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
+            self._outside_unstable_region(),
             (
-                tf.math.log(uniform * (2.0 * cut_lams - 1.0) + 1.0 - cut_lams)
-                - tf.math.log(1.0 - cut_lams)
+                tf.math.log1p(-cut_lams + uniform * (2.0 * cut_lams - 1.0))
+                - tf.math.log1p(-cut_lams)
             )
-            / (tf.math.log(cut_lams) - tf.math.log(1.0 - cut_lams)),
+            / (tf.math.log(cut_lams) - tf.math.log1p(-cut_lams)),
             uniform,
         )
         return tf.cast(sample, self.dtype)
 
     def _cont_bern_log_norm(self):
         lams = self._lams_parameter_no_checks()
-        cut_lams = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
-            lams,
-            self._lims[0] * tf.ones_like(lams),
-        )
+        cut_lams = self._cut_lams()
         log_norm = tf.math.log(
-            tf.math.abs(2.0 * tf.math.atanh(1 - 2.0 * cut_lams))
+            tf.math.abs(tf.math.log1p(-cut_lams) - tf.math.log(cut_lams))
         ) - tf.math.log(tf.math.abs(1 - 2.0 * cut_lams))
         taylor = (
             tf.math.log(2.0)
@@ -180,9 +177,7 @@ class ContinuousBernoulli(distribution.Distribution):
             + 104.0 / 45.0 * tf.math.pow(lams - 0.5, 4)
         )
         return tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
+            self._outside_unstable_region(),
             log_norm,
             taylor,
         )
@@ -196,50 +191,28 @@ class ContinuousBernoulli(distribution.Distribution):
             + self._cont_bern_log_norm()
         )
         return tf.where(
-            tf.logical_or(event < 0, event > 1),
+            event < 0 | event > 1,
             -float("Inf") * tf.ones_like(tentative_log_pdf),
             tentative_log_pdf,
         )
 
-    def _log_cdf(self, x):
-        return tf.math.log(self._cdf(x))
-
     def _cdf(self, x):
-        lams = self._lams_parameter_no_checks()
-        cut_lams = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
-            lams,
-            self._lims[0] * tf.ones_like(lams),
-        )
+        cut_lams = self._cut_lams()
         cdfs = (
             tf.math.pow(cut_lams, x) * tf.math.pow(1.0 - cut_lams, 1.0 - x)
             + cut_lams
             - 1.0
         ) / (2.0 * cut_lams - 1.0)
         unbounded_cdfs = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
+            self._outside_unstable_region(),
             cdfs,
             x,
         )
-        indicators0 = tf.where(
-            tf.logical_or(tf.less(x, 0.0), tf.greater(x, 1.0)),
+        return tf.where(
+            x < 0.0,
             tf.zeros_like(x),
-            tf.ones_like(x),
+            tf.where(x > 1.0, tf.ones_like(x), unbounded_cdfs)
         )
-        indicators1 = tf.where(
-            tf.greater(x, 1.0), tf.ones_like(x), tf.zeros_like(x)
-        )
-        return unbounded_cdfs * indicators0 + indicators1
-
-    def _log_survival_function(self, x):
-        return tf.math.log(self._survival_function(x))
-
-    def _survival_function(self, x):
-        return 1.0 - self._cdf(x)
 
     def _outcome_log_lams(self):
         if self._logits is None:
@@ -263,75 +236,48 @@ class ContinuousBernoulli(distribution.Distribution):
 
     def _mean(self):
         lams = self._lams_parameter_no_checks()
-        cut_lams = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
-            lams,
-            self._lims[0] * tf.ones_like(lams),
-        )
+        cut_lams = self._cut_lams()
         mus = cut_lams / (2.0 * cut_lams - 1.0) + 1.0 / (
-            2.0 * tf.math.atanh(1.0 - 2.0 * cut_lams)
+            tf.math.log1p(-cut_lams) - tf.math.log(cut_lams)
         )
         taylor = (
             0.5 + (lams - 0.5) / 3.0 + 16.0 / 45.0 * tf.math.pow(lams - 0.5, 3)
         )
         return tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
+            self._outside_unstable_region(),
             mus,
             taylor,
         )
 
     def _variance(self):
         lams = self._lams_parameter_no_checks()
-        cut_lams = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
-            lams,
-            self._lims[0] * tf.ones_like(lams),
-        )
+        cut_lams = self._cut_lams()
         vars = cut_lams * (cut_lams - 1.0) / tf.math.pow(
             1.0 - 2.0 * cut_lams, 2
-        ) + 1.0 / tf.math.pow(2.0 * tf.math.atanh(1.0 - 2.0 * cut_lams), 2)
+        ) + 1.0 / tf.math.pow(tf.math.log1p(-cut_lams) - tf.math.log(cut_lams),
+                              2)
         taylor = (
             1.0 / 12.0
             - tf.math.pow(lams - 0.5, 2) / 15.0
             - 128.0 / 945.0 * tf.math.pow(lams - 0.5, 4)
         )
         return tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
+            self._outside_unstable_region(),
             vars,
             taylor,
         )
 
     def _quantile(self, p):
-        lams = self._lams_parameter_no_checks()
-        cut_lams = tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
-            lams,
-            self._lims[0] * tf.ones_like(lams),
-        )
+        cut_lams = self._cut_lams()
         return tf.where(
-            tf.logical_or(
-                tf.less(lams, self._lims[0]), tf.greater(lams, self._lims[1])
-            ),
+            self._outside_unstable_region(),
             (
-                tf.math.log(p * (2.0 * cut_lams - 1.0) + 1.0 - cut_lams)
-                - tf.math.log(1.0 - cut_lams)
+                tf.math.log1p(-cut_lams + p * (2.0 * cut_lams - 1.0))
+                - tf.math.log1p(-cut_lams)
             )
-            / (tf.math.log(cut_lams) - tf.math.log(1.0 - cut_lams)),
+            / (tf.math.log(cut_lams) - tf.math.log1p(-cut_lams)),
             p,
         )
-
-    def _stddev(self):
-        return tf.math.sqrt(self._variance())
 
     def _mode(self):
         """Returns `1` if `prob > 0.5` and `0` otherwise."""
