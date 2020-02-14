@@ -21,7 +21,7 @@ __Layer 1: Statistical Building Blocks__
 * Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions)):
   A large collection of probability
   distributions and related statistics with batch and
-  [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html)
+  [broadcasting](https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
   semantics. See the
   [Distributions Tutorial](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Distributions_Tutorial.ipynb).
 * Bijectors ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors)):
@@ -107,57 +107,53 @@ It also includes example scripts such as:
 
 ## Installation
 
+For additional details on installing TensorFlow, guidance installing
+prerequisites, and (optionally) setting up virtual environments, see the
+[TensorFlow installation guide](https://www.tensorflow.org/install).
+
 ### Stable Builds
 
-To install the latest version, run the following:
+To install the latest stable version, run the following:
 
 ```shell
 # Notes:
-# - We recommend that users move towards using TensorFlow 2.x as soon as
-#   possible. Until the TF2 stable package is released (due in Sep. 2019),
-#   the best way to use TFP with TF2 is to use nightly TFP and TF2 packages:
-#     - Nightly TFP: [tfp-nightly](http://pypi.python.org/pypi/tfp-nightly)
-#     - Nightly TF2: [tf-nightly-2.0-preview](http://pypi.python.org/pypi/tf-nightly-2.0-preview)
-#   Once the TF2 stable release comes out, TFP will issue its 0.8.0 release,
-#   which will be tested and stable against TF 2.0.0.
-# - You need the latest version of `pip` in order to get the latest version of
-#   `tf-nightly-2.0-preview`.
-# - For GPU TF, use `tf-nightly-2.0-preview-gpu`.
+
 # - The `--upgrade` flag ensures you'll get the latest version.
 # - The `--user` flag ensures the packages are installed to your user directory
 #   rather than the system directory.
-python -m pip install pip --upgrade --user
-python -m pip install tf-nightly-2.0-preview tfp-nightly --upgrade --user
-TFVERSION=$(python -c 'import tensorflow; print(tensorflow.__version__)')
-# If you have an older pip, you might get this older version of
-# tf-nightly-2.0-preview, so check to be sure.
-[[ $TFVERSION == '2.0.0-dev20190731' ]] &&
-  echo >&2 "Failed to install the most recent TF. Found: ${TFVERSION}."
+# - TensorFlow 2 packages require a pip >= 19.0
+python -m pip install --upgrade --user pip
+python -m pip install --upgrade --user tensorflow tensorflow_probability
 ```
 
-TensorFlow Probability depends on a recent stable release of
-[TensorFlow](https://www.tensorflow.org/install) (pip package `tensorflow`). See
-the [TFP release notes](https://github.com/tensorflow/probability/releases) for
+For CPU-only usage (and a smaller install), install with `tensorflow-cpu`.
+
+To use a pre-2.0 version of TensorFlow, run:
+
+```shell
+python -m pip install --upgrade --user "tensorflow<2" "tensorflow_probability<0.9"
+```
+
+Note: Since [TensorFlow](https://www.tensorflow.org/install) is *not* included
+as a dependency of the TensorFlow Probability package (in `setup.py`), you must
+explicitly install the TensorFlow package (`tensorflow` or `tensorflow-gpu`).
+This allows us to maintain one package instead of separate packages for CPU and
+GPU-enabled TensorFlow. See the
+[TFP release notes](https://github.com/tensorflow/probability/releases) for more
 details about dependencies between TensorFlow and TensorFlow Probability.
 
-Note: Since TensorFlow is *not* included as a dependency of the TensorFlow
-Probability package (in `setup.py`), you must explicitly install the TensorFlow
-package (`tensorflow` or `tensorflow-gpu`). This allows us to maintain one
-package instead of separate packages for CPU and GPU-enabled TensorFlow.
-
-To force a Python 3-specific install, replace `pip` with `pip3` in the above
-commands. For additional installation help, guidance installing prerequisites,
-and (optionally) setting up virtual environments, see the [TensorFlow
-installation guide](https://www.tensorflow.org/install).
 
 ### Nightly Builds
 
 There are also nightly builds of TensorFlow Probability under the pip package
-`tfp-nightly`, which depends on one of `tf-nightly`, `tf-nightly-gpu`,
-`tf-nightly-2.0-preview` or `tf-nightly-gpu-2.0-preview`. Nightly builds include
-newer features, but may be less stable than the versioned releases. Docs are
-periodically refreshed [here](
-https://github.com/tensorflow/probability/blob/master/tensorflow_probability/g3doc/api_docs/python/tfp.md).
+`tfp-nightly`, which depends on one of `tf-nightly` or `tf-nightly-cpu`.
+Nightly builds include newer features, but may be less stable than the
+versioned releases. Both stable and nightly docs are available
+[here](https://www.tensorflow.org/probability/api_docs/python/tfp?version=nightly).
+
+```shell
+python -m pip install --upgrade --user tf-nightly tfp-nightly
+```
 
 ### Installing from Source
 
@@ -206,7 +202,7 @@ uphold this code.
 
 ## References
 
-If you use TensorFlow Probability in a paper, please cite: 
+If you use TensorFlow Probability in a paper, please cite:
 
 + _TensorFlow Distributions._ Joshua V. Dillon, Ian Langmore, Dustin Tran,
 Eugene Brevdo, Srinivas Vasudevan, Dave Moore, Brian Patton, Alex Alemi, Matt
