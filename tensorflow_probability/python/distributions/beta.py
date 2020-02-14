@@ -156,12 +156,9 @@ class Beta(distribution.Distribution):
 
     Args:
       concentration1: Positive floating-point `Tensor` indicating mean
-        number of successes; aka 'alpha'. Implies `self.dtype` and
-        `self.batch_shape`, i.e.,
-        `concentration1.shape = [N1, N2, ..., Nm] = self.batch_shape`.
+        number of successes; aka 'alpha'.
       concentration0: Positive floating-point `Tensor` indicating mean
-        number of failures; aka 'beta'. Otherwise has same semantics as
-        `concentration1`.
+        number of failures; aka 'beta'.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
