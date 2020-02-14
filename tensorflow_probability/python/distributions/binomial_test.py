@@ -22,9 +22,12 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+import tensorflow_probability as tfp
+
 from tensorflow_probability.python.distributions.binomial import _log_concave_rejection_sampler
 from tensorflow_probability.python.internal import test_util
+
+tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -338,6 +341,14 @@ class BinomialTest(test_util.TestCase):
     self.assertAllClose(
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
+
+  def testNotReparameterized(self):
+    def f(n):
+      b = tfd.Binomial(n, 0.5)
+      return b.sample(5, seed=test_util.test_seed())
+
+    _, grad_n = tfp.math.value_and_gradient(f, 10.)
+    self.assertIsNone(grad_n)
 
 
 @test_util.test_all_tf_execution_regimes

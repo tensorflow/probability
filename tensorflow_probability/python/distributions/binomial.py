@@ -115,7 +115,7 @@ def _log_concave_rejection_sampler(
   """
   dtype = log_concave_distribution.dtype
 
-  mode = log_concave_distribution.mode()
+  mode = tf.stop_gradient(log_concave_distribution.mode())
   mode = tf.broadcast_to(
       mode,
       tf.concat((sample_shape, prefer_static.shape(mode)), axis=0))
@@ -168,8 +168,9 @@ def _log_concave_rejection_sampler(
     return tf.where(in_range_mask,
                     log_concave_distribution.prob(in_range_values), 0.)
 
-  return batched_rejection_sampler.batched_rejection_sampler(
-      proposal, target, seed, dtype=dtype)[0]  # Discard `num_iters`.
+  return tf.stop_gradient(
+      batched_rejection_sampler.batched_rejection_sampler(
+          proposal, target, seed, dtype=dtype)[0])  # Discard `num_iters`.
 
 
 class Binomial(distribution.Distribution):
