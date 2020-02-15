@@ -126,6 +126,7 @@ SPECIAL_DISTS = (
 # batch slicing.
 INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchReshape',
+    'OrderedLogistic',  # b/149597503
 )
 
 EXTRA_TENSOR_CONVERSION_DISTS = {
