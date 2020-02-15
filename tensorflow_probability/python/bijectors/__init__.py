@@ -38,6 +38,8 @@ from tensorflow_probability.python.bijectors.exp import Log
 from tensorflow_probability.python.bijectors.expm1 import Expm1
 from tensorflow_probability.python.bijectors.expm1 import Log1p
 from tensorflow_probability.python.bijectors.ffjord import FFJORD
+from tensorflow_probability.python.bijectors.fill_diagonal import FillDiagonal
+from tensorflow_probability.python.bijectors.fill_scale_diagonal import FillScaleDiagonal
 from tensorflow_probability.python.bijectors.fill_scale_tril import FillScaleTriL
 from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
@@ -104,6 +106,8 @@ __all__ = [
     "Exp",
     "Expm1",
     "FFJORD",
+    "FillDiagonal",
+    "FillScaleDiagonal",
     "FillScaleTriL",
     "FillTriangular",
     "GeneralizedPareto",
