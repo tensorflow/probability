@@ -148,6 +148,12 @@ def bijector_supports():
                           Support.SCALAR_POSITIVE),
       'Expm1':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_GT_NEG1),
+      'FillDiagonal':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.MATRIX_UNCONSTRAINED),
+      'FillScaleDiagonal':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'FillScaleTriL':
           BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
