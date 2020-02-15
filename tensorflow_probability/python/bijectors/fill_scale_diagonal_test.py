@@ -31,7 +31,7 @@ class FillScaleDiagonalBijectorTest(test_util.TestCase):
 
   def testComputesCorrectValues(self):
     shift = 1.61803398875
-    x = np.float32(np.array([-1, .5, 2]))
+    x = np.float32(np.array([-1, 2]))
     y = np.float32(np.array([[np.exp(-1) + shift, 0.],
                              [0., np.exp(2) + shift]]))
 

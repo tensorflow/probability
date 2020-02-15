@@ -33,7 +33,7 @@ class FillDiagonalBijectorTest(test_util.TestCase):
   """Tests the correctness of the FillDiagonal bijector."""
 
   def testBijector(self):
-    x = np.float32(np.array([1., 2., 3.]))
+    x = np.float32(np.array([1., 2.]))
     y = np.float32(np.array([[1., 0.],
                              [0., 2.]]))
 
