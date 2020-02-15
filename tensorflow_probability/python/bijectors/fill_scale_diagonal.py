@@ -1,6 +1,22 @@
+# Copyright 2018 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
 """FillScaleDiagonal bijector."""
 
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import chain
@@ -11,11 +27,13 @@ from tensorflow_probability.python.bijectors import transform_diagonal
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
-__all__ = ["FillScaleDiagonal"]
+__all__ = [
+  "FillScaleDiagonal",
+]
 
 
 class FillScaleDiagonal(chain.Chain):
-  """Transforms unconstrained vectors to Diag matrices with positive diagonal.
+    """Transforms unconstrained vectors to Diag matrices with positive diagonal.
   This is implemented as a simple `tfb.Chain` of `tfb.FillDiagonal`
   followed by `tfb.TransformDiagonal`, and provided mostly as a
   convenience. The default setup is somewhat opinionated, using a
@@ -54,12 +72,12 @@ class FillScaleDiagonal(chain.Chain):
        diag_shift=None)
   ```
   """
-  def __init__(self,
-               diag_bijector=None,
-               diag_shift=1e-5,
-               validate_args=False,
-               name="fill_scale_diagonal"):
-    """Instantiates the `FillScaleDiagonal` bijector.
+    def __init__(self,
+                 diag_bijector=None,
+                 diag_shift=1e-5,
+                 validate_args=False,
+                 name="fill_scale_diagonal"):
+        """Instantiates the `FillScaleDiagonal` bijector.
     Args:
       diag_bijector: `Bijector` instance, used to transform the output diagonal
         to be positive.
@@ -76,24 +94,24 @@ class FillScaleDiagonal(chain.Chain):
       name: Python `str` name given to ops managed by this object.
         Default value: `fill_scale_diagonal`.
     """
-    with tf.name_scope(name) as name:
-      if diag_bijector is None:
-        diag_bijector = softplus.Softplus(validate_args=validate_args)
+        with tf.name_scope(name) as name:
+            if diag_bijector is None:
+                diag_bijector = softplus.Softplus(validate_args=validate_args)
 
-      if diag_shift is not None:
-        dtype = dtype_util.common_dtype([diag_bijector, diag_shift],
-                                        tf.float32)
-        diag_shift = tensor_util.convert_nonref_to_tensor(
-            diag_shift, name="diag_shift", dtype=dtype)
-        diag_bijector = chain.Chain(
-            [shift.Shift(shift=diag_shift), diag_bijector])
+            if diag_shift is not None:
+                dtype = dtype_util.common_dtype([diag_bijector, diag_shift],
+                                                tf.float32)
+                diag_shift = tensor_util.convert_nonref_to_tensor(
+                    diag_shift, name="diag_shift", dtype=dtype)
+                diag_bijector = chain.Chain(
+                    [shift.Shift(shift=diag_shift), diag_bijector])
 
-      super(FillScaleDiagonal, self).__init__(
-          [
-              transform_diagonal.TransformDiagonal(
-                  diag_bijector=diag_bijector),
-              fill_diagonal.FillDiagonal()
-          ],
-          validate_args=validate_args,
-          name=name,
-      )
+            super(FillScaleDiagonal, self).__init__(
+                [
+                    transform_diagonal.TransformDiagonal(
+                        diag_bijector=diag_bijector),
+                    fill_diagonal.FillDiagonal()
+                ],
+                validate_args=validate_args,
+                name=name,
+            )

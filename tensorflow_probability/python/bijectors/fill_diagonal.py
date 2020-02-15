@@ -24,7 +24,9 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensorshape_util
 
-__all__ = ["FillDiagonal"]
+__all__ = [
+  "FillDiagonal",
+]
 
 
 class FillDiagonal(bijector.Bijector):
