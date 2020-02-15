@@ -74,7 +74,7 @@ class FillScaleDiagonal(chain.Chain):
         checked for correctness.
         Default value: `False` (i.e., arguments are not validated).
       name: Python `str` name given to ops managed by this object.
-        Default value: `fill_scale_tril`.
+        Default value: `fill_scale_diagonal`.
     """
     with tf.name_scope(name) as name:
       if diag_bijector is None:
