@@ -28,12 +28,12 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-  "FillScaleDiagonal",
+    "FillScaleDiagonal",
 ]
 
 
 class FillScaleDiagonal(chain.Chain):
-    """Transforms unconstrained vectors to Diag matrices with positive diagonal.
+  """Transforms unconstrained vectors to Diag matrices with positive diagonal.
   This is implemented as a simple `tfb.Chain` of `tfb.FillDiagonal`
   followed by `tfb.TransformDiagonal`, and provided mostly as a
   convenience. The default setup is somewhat opinionated, using a
@@ -72,12 +72,12 @@ class FillScaleDiagonal(chain.Chain):
        diag_shift=None)
   ```
   """
-    def __init__(self,
-                 diag_bijector=None,
-                 diag_shift=1e-5,
-                 validate_args=False,
-                 name="fill_scale_diagonal"):
-        """Instantiates the `FillScaleDiagonal` bijector.
+  def __init__(self,
+               diag_bijector=None,
+               diag_shift=1e-5,
+               validate_args=False,
+               name="fill_scale_diagonal"):
+    """Instantiates the `FillScaleDiagonal` bijector.
     Args:
       diag_bijector: `Bijector` instance, used to transform the output diagonal
         to be positive.
@@ -94,24 +94,24 @@ class FillScaleDiagonal(chain.Chain):
       name: Python `str` name given to ops managed by this object.
         Default value: `fill_scale_diagonal`.
     """
-        with tf.name_scope(name) as name:
-            if diag_bijector is None:
-                diag_bijector = softplus.Softplus(validate_args=validate_args)
+    with tf.name_scope(name) as name:
+      if diag_bijector is None:
+        diag_bijector = softplus.Softplus(validate_args=validate_args)
 
-            if diag_shift is not None:
-                dtype = dtype_util.common_dtype([diag_bijector, diag_shift],
-                                                tf.float32)
-                diag_shift = tensor_util.convert_nonref_to_tensor(
-                    diag_shift, name="diag_shift", dtype=dtype)
-                diag_bijector = chain.Chain(
-                    [shift.Shift(shift=diag_shift), diag_bijector])
+      if diag_shift is not None:
+        dtype = dtype_util.common_dtype([diag_bijector, diag_shift],
+                                        tf.float32)
+        diag_shift = tensor_util.convert_nonref_to_tensor(
+            diag_shift, name="diag_shift", dtype=dtype)
+        diag_bijector = chain.Chain(
+            [shift.Shift(shift=diag_shift), diag_bijector])
 
-            super(FillScaleDiagonal, self).__init__(
-                [
-                    transform_diagonal.TransformDiagonal(
-                        diag_bijector=diag_bijector),
-                    fill_diagonal.FillDiagonal()
-                ],
-                validate_args=validate_args,
-                name=name,
-            )
+      super(FillScaleDiagonal, self).__init__(
+          [
+              transform_diagonal.TransformDiagonal(
+                  diag_bijector=diag_bijector),
+              fill_diagonal.FillDiagonal()
+          ],
+          validate_args=validate_args,
+          name=name,
+      )
