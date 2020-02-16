@@ -992,6 +992,10 @@ class KalmanSmootherTest(test_util.TestCase):
         dtype=np.float32)  # shape = [1, 5, 2]
     mask = np.array([[[False, False, True, False, False]]])  # shape = [1, 1, 5]
 
+    single_posterior_sample = kf.posterior_sample(
+        obs[0, ...], [], seed=test_util.test_seed(), mask=mask[0, 0, :])
+    self.assertAllEqual(single_posterior_sample.shape, [5, 3])
+
     sample_shape = [8000, 2]
     posterior_samples = kf.posterior_sample(
         obs, sample_shape, seed=test_util.test_seed(), mask=mask)
