@@ -256,8 +256,7 @@ class OrderedLogistic(distribution.Distribution):
 
   def categorical_log_probs(self):
     """Log probabilities for the `K+1` ordered categories."""
-    log_survival = tf.math.log_sigmoid(
-        self.loc[..., tf.newaxis] - self._augmented_cutpoints())
+    log_survival = self._augmented_log_survival_function()
     return tfp_math.log_sub_exp(
         log_survival[..., :-1], log_survival[..., 1:])
 
