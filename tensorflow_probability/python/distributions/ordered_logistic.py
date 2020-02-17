@@ -36,6 +36,32 @@ from tensorflow_probability.python.internal import tensorshape_util
 # QuantizedDistribution.
 
 
+def _broadcast_cat_event_and_params(event, params, base_dtype):
+  """Broadcasts the event or distribution parameters."""
+  if dtype_util.is_integer(event.dtype):
+    pass
+  elif dtype_util.is_floating(event.dtype):
+    # When `validate_args=True` we've already ensured int/float casting
+    # is closed.
+    event = tf.cast(event, dtype=tf.int32)
+  else:
+    raise TypeError('`value` should have integer `dtype` or '
+                    '`self.dtype` ({})'.format(base_dtype))
+  shape_known_statically = (
+      tensorshape_util.rank(params.shape) is not None and
+      tensorshape_util.is_fully_defined(params.shape[:-1]) and
+      tensorshape_util.is_fully_defined(event.shape))
+  if not shape_known_statically or params.shape[:-1] != event.shape:
+    params = params * tf.ones_like(event[..., tf.newaxis],
+                                   dtype=params.dtype)
+    params_shape = tf.shape(params)[:-1]
+    event = event * tf.ones(params_shape, dtype=event.dtype)
+    if tensorshape_util.rank(params.shape) is not None:
+      tensorshape_util.set_shape(event, params.shape[:-1])
+
+  return event, params
+
+
 class OrderedLogistic(distribution.Distribution):
   """Ordered logistic distribution.
 
@@ -246,6 +272,10 @@ class OrderedLogistic(distribution.Distribution):
         tf.constant(np.inf, dtype=cutpoints.dtype))
     return tf.concat([-inf, cutpoints, inf], axis=-1)
 
+  def _augmented_log_survival_function(self):
+    return tf.math.log_sigmoid(
+        self.loc[..., tf.newaxis] - self._augmented_cutpoints())
+
   def _num_categories(self):
     return prefer_static.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
 
@@ -280,17 +310,48 @@ class OrderedLogistic(distribution.Distribution):
   def _log_prob(self, x):
     # TODO(b/149334734): Consider using QuantizedDistribution for the log_prob
     # computation for better precision.
-    log_survival_xm1 = self._log_survival_function(x - 1)
-    log_survival_x = self._log_survival_function(x)
-    return tfp_math.log_sub_exp(log_survival_xm1, log_survival_x)
+    num_categories = self._num_categories()
+    x, augmented_log_survival = _broadcast_cat_event_and_params(
+        event=x,
+        params=self._augmented_log_survival_function(),
+        base_dtype=dtype_util.base_dtype(self.dtype))
+    x_flat = tf.reshape(x, [-1, 1])
+    augmented_log_survival_flat = tf.reshape(
+        augmented_log_survival, [-1, num_categories + 1])
+    log_survival_flat_xm1 = tf.gather(
+        params=augmented_log_survival_flat,
+        indices=tf.clip_by_value(x_flat, 0, num_categories),
+        batch_dims=1)
+    log_survival_flat_x = tf.gather(
+        params=augmented_log_survival_flat,
+        indices=tf.clip_by_value(x_flat + 1, 0, num_categories),
+        batch_dims=1)
+    log_prob_flat = tfp_math.log_sub_exp(
+        log_survival_flat_xm1, log_survival_flat_x)
+    # deal with case where both survival probabilities are -inf which gives
+    # `log_prob_flat = nan` when it should be -inf
+    minus_inf = tf.constant(-np.inf, dtype=log_prob_flat.dtype)
+    log_prob_flat = tf.where(
+        x_flat > num_categories - 1, minus_inf, log_prob_flat)
+    return tf.reshape(log_prob_flat, shape=tf.shape(x))
 
   def _log_cdf(self, x):
     return tfp_math.log1mexp(self._log_survival_function(x))
 
   def _log_survival_function(self, x):
-    return tf.math.log_sigmoid(
-        self.loc -
-        tf.gather(self._augmented_cutpoints(), x + 1, axis=-1))
+    num_categories = self._num_categories()
+    x, augmented_log_survival = _broadcast_cat_event_and_params(
+        event=x,
+        params=self._augmented_log_survival_function(),
+        base_dtype=dtype_util.base_dtype(self.dtype))
+    x_flat = tf.reshape(x, [-1, 1])
+    augmented_log_survival_flat = tf.reshape(
+        augmented_log_survival, [-1, num_categories + 1])
+    log_survival_flat = tf.gather(
+        params=augmented_log_survival_flat,
+        indices=tf.clip_by_value(x_flat + 1, 0, num_categories),
+        batch_dims=1)
+    return tf.reshape(log_survival_flat, shape=tf.shape(x))
 
   def _entropy(self):
     log_probs = self.categorical_log_probs()

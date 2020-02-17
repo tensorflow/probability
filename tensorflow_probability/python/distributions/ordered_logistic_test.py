@@ -67,18 +67,32 @@ class OrderedLogisticTest(test_util.TestCase):
     self.assertAllEqual(dist.event_shape, [])
     self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
 
-    log_probs_shape = tf.shape(dist.categorical_log_probs())
-    self.assertAllEqual(self.evaluate(log_probs_shape), batch_shape + [3])
+    categorical_probs = dist.categorical_probs()
+    categorical_probs_shape = tf.shape(categorical_probs)
+    self.assertAllEqual(
+        self.evaluate(categorical_probs_shape), batch_shape + [3])
 
-    sample_shape = tf.shape(dist.sample(seed=test_util.test_seed()))
+    sample = dist.sample(seed=test_util.test_seed())
+    sample_shape = tf.shape(sample)
     self.assertAllEqual(self.evaluate(sample_shape), batch_shape)
 
-    sample_shape_n = tf.shape(
-        dist.sample([4, 5], seed=test_util.test_seed()))
-    self.assertAllEqual(self.evaluate(sample_shape_n), [4, 5] + batch_shape)
+    prob_sample_shape = tf.shape(dist.prob(sample))
+    survival_prob_sample_shape = tf.shape(dist.survival_function(sample))
+    self.assertAllEqual(self.evaluate(prob_sample_shape), batch_shape)
+    self.assertAllEqual(self.evaluate(survival_prob_sample_shape), batch_shape)
+
+    n = [4, 5]
+    sample_n = dist.sample(n, seed=test_util.test_seed())
+    sample_n_shape = tf.shape(sample_n)
+    self.assertAllEqual(self.evaluate(sample_n_shape), n + batch_shape)
+
+    prob_sample_n_shape = tf.shape(dist.prob(sample_n))
+    survival_prob_sample_n_shape = tf.shape(dist.survival_function(sample_n))
+    self.assertAllEqual(self.evaluate(prob_sample_n_shape), n + batch_shape)
+    self.assertAllEqual(
+        self.evaluate(survival_prob_sample_n_shape), n + batch_shape)
 
   def testProbs(self):
-
     # survival functions
     # P(Y > 0) = sigmoid(1) = 0.7310586
     # P(Y > 1) = sigmoid(0) = 0.5
@@ -90,6 +104,7 @@ class OrderedLogisticTest(test_util.TestCase):
     # P(Y = 2) = sigmoid(0) - sigmoid(-1) = 0.23105857
     # P(Y = 3) = sigmoid(-1) = 0.26894143
     expected_probs = [0.2689414, 0.2310586, 0.23105857, 0.26894143]
+    expected_survival_probs = 1. - np.cumsum(expected_probs)
     dist = tfd.OrderedLogistic(cutpoints=[-1., 0., 1.], loc=0.)
 
     categorical_probs = self.evaluate(dist.categorical_probs())
@@ -97,6 +112,17 @@ class OrderedLogisticTest(test_util.TestCase):
 
     probs = np.flip(self.evaluate(dist.prob([3, 2, 1, 0])))
     self.assertAllClose(expected_probs, probs, atol=1e-6)
+
+    survival_probs = self.evaluate(dist.survival_function([0, 1, 2, 3]))
+    self.assertAllClose(expected_survival_probs, survival_probs, atol=1e-6)
+
+    zero_probs = self.evaluate(dist.prob([-1, 4]))
+    self.assertAllClose([0., 0.], zero_probs, atol=1e-6)
+
+    out_of_bounds_survival_probs = self.evaluate(
+        dist.survival_function([-2, -1, 4, 5]))
+    self.assertAllClose(
+        [1., 1., 0., 0.], out_of_bounds_survival_probs, atol=1e-6)
 
   def testMode(self):
     # 2 cutpoints i.e. 3 possible outcomes. 3 "batched" distributions with the
