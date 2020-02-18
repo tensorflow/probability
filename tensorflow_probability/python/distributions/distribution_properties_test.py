@@ -64,6 +64,7 @@ TF2_FRIENDLY_DISTS = (
     'Gumbel',
     'HalfCauchy',
     'HalfNormal',
+    'HalfStudentT',
     'Horseshoe',
     'InverseGamma',
     'InverseGaussian',
@@ -202,6 +203,7 @@ VECTORIZED_LOGPROB_ATOL.update({
     'CholeskyLKJ': 1e-4,
     'LKJ': 1e-3,
     'StudentT': 5e-5,
+    'HalfStudentT': 2e-5,
     'TruncatedNormal': 1e-1,
 })
 

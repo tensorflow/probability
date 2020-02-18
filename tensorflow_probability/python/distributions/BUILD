@@ -65,6 +65,7 @@ multi_substrate_py_library(
         ":gumbel",
         ":half_cauchy",
         ":half_normal",
+        ":half_student_t",
         ":hidden_markov_model",
         ":horseshoe",
         ":independent",
@@ -1313,6 +1314,24 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "half_student_t",
+    srcs = ["half_student_t.py"],
+    deps = [
+        ":distribution",
+        ":student_t",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "student_t",
     srcs = ["student_t.py"],
     deps = [
@@ -2550,6 +2569,23 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "half_student_t_test",
+    size = "medium",
+    srcs = ["half_student_t_test.py"],
+    jax_size = "medium",
+    jax_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "student_t_test",
     srcs = ["student_t_test.py"],
     jax_size = "medium",
@@ -2750,7 +2786,7 @@ py_test(
     name = "distribution_properties_test",
     size = "large",
     srcs = ["distribution_properties_test.py"],
-    shard_count = 20,
+    shard_count = 40,
     tags = ["hypothesis"],
     deps = [
         # absl/logging dep,
@@ -2816,6 +2852,7 @@ exports_files(
         "gumbel.py",
         "half_cauchy.py",
         "half_normal.py",
+        "half_student_t.py",
         "hidden_markov_model.py",
         "horseshoe.py",
         "independent.py",

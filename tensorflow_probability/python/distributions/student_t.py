@@ -38,6 +38,113 @@ __all__ = [
 ]
 
 
+def sample_n(n, df, loc, scale, batch_shape, dtype, seed):
+  """Draw n samples from a Student T distribution.
+
+  Note that `scale` can be negative or zero.
+  The sampling method comes from the fact that if:
+    X ~ Normal(0, 1)
+    Z ~ Chi2(df)
+    Y = X / sqrt(Z / df)
+  then:
+    Y ~ StudentT(df)
+
+  Args:
+    n: int, number of samples
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    loc: Floating-point `Tensor`; the location(s) of the distribution(s).
+    scale: Floating-point `Tensor`; the scale(s) of the distribution(s). Must
+      contain only positive values.
+    batch_shape: Callable to compute batch shape
+    dtype: Return dtype.
+    seed: Optional seed for random draw.
+
+  Returns:
+    samples: a `Tensor` with prepended dimensions `n`.
+  """
+  shape = tf.concat([[n], batch_shape], 0)
+  seed = SeedStream(seed, 'student_t')
+
+  normal_sample = tf.random.normal(shape, dtype=dtype, seed=seed())
+  df = df * tf.ones(batch_shape, dtype=dtype)
+  gamma_sample = tf.random.gamma([n],
+                                 0.5 * df,
+                                 beta=0.5,
+                                 dtype=dtype,
+                                 seed=seed())
+  samples = normal_sample * tf.math.rsqrt(gamma_sample / df)
+  return samples * scale + loc
+
+
+def log_prob(x, df, loc, scale):
+  """Compute log probability of Student T distribution.
+
+  Note that scale can be negative.
+
+  Args:
+    x: Floating-point `Tensor`. Where to compute the log probabilities.
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    loc: Floating-point `Tensor`; the location(s) of the distribution(s).
+    scale: Floating-point `Tensor`; the scale(s) of the distribution(s).
+
+  Returns:
+    A `Tensor` with shape broadcast according to the arguments.
+  """
+  y = (x - loc) / scale
+  log_unnormalized_prob = -0.5 * (df + 1.) * tf.math.log1p(y**2. / df)
+  log_normalization = (
+      tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
+      0.5 * np.log(np.pi) + tf.math.lgamma(0.5 * df) -
+      tf.math.lgamma(0.5 * (df + 1.)))
+  return log_unnormalized_prob - log_normalization
+
+
+def cdf(x, df, loc, scale):
+  """Compute cumulative density function of Student T distribution.
+
+  Note that scale can be negative.
+
+  Args:
+    x: Floating-point `Tensor`. Where to compute the log probabilities.
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    loc: Floating-point `Tensor`; the location(s) of the distribution(s).
+    scale: Floating-point `Tensor`; the scale(s) of the distribution(s).
+
+  Returns:
+    A `Tensor` with shape broadcast according to the arguments.
+  """
+  y = (x - loc) / tf.abs(scale)
+  x_t = df / (y**2. + df)
+  neg_cdf = 0.5 * tf.math.betainc(
+      0.5 * tf.broadcast_to(df, prefer_static.shape(x_t)), 0.5, x_t)
+  return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
+
+
+def entropy(df, scale, batch_shape, dtype):
+  """Compute entropy of the StudentT distribution.
+
+  Args:
+    df: Floating-point `Tensor`. The degrees of freedom of the
+      distribution(s). `df` must contain only positive values.
+    scale: Floating-point `Tensor`; the scale(s) of the distribution(s). Must
+      contain only positive values.
+    batch_shape: Floating-point `Tensor` of the batch shape
+    dtype: Return dtype.
+
+  Returns:
+    A `Tensor` of the entropy for a Student's T with these parameters.
+  """
+  v = tf.ones(batch_shape, dtype=dtype)[..., tf.newaxis]
+  u = v * df[..., tf.newaxis]
+  beta_arg = tf.concat([u, v], -1) / 2.
+  return (tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
+          tf.math.lbeta(beta_arg) + 0.5 * (df + 1.) *
+          (tf.math.digamma(0.5 * (df + 1.)) - tf.math.digamma(0.5 * df)))
+
+
 class StudentT(distribution.Distribution):
   """Student's t-distribution.
 
@@ -234,57 +341,34 @@ class StudentT(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    # The sampling method comes from the fact that if:
-    #   X ~ Normal(0, 1)
-    #   Z ~ Chi2(df)
-    #   Y = X / sqrt(Z / df)
-    # then:
-    #   Y ~ StudentT(df).
     df = tf.convert_to_tensor(self.df)
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     batch_shape = self._batch_shape_tensor(df=df, loc=loc, scale=scale)
-    shape = tf.concat([[n], batch_shape], 0)
-    seed = SeedStream(seed, 'student_t')
-
-    normal_sample = tf.random.normal(shape, dtype=self.dtype, seed=seed())
-    df = df * tf.ones(batch_shape, dtype=self.dtype)
-    gamma_sample = tf.random.gamma(
-        [n], 0.5 * df, beta=0.5, dtype=self.dtype, seed=seed())
-    samples = normal_sample * tf.math.rsqrt(gamma_sample / df)
-    return samples * scale + loc  # Abs(scale) not wanted.
+    return sample_n(
+        n,
+        df=df,
+        loc=loc,
+        scale=scale,
+        batch_shape=batch_shape,
+        dtype=self.dtype,
+        seed=seed)
 
   def _log_prob(self, x):
     df = tf.convert_to_tensor(self.df)
-    scale = tf.convert_to_tensor(self.scale)
     loc = tf.convert_to_tensor(self.loc)
-    y = (x - loc) / scale  # Abs(scale) superfluous.
-    log_unnormalized_prob = -0.5 * (df + 1.) * tf.math.log1p(y**2. / df)
-    log_normalization = (tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df)
-                         + 0.5 * np.log(np.pi) + tf.math.lgamma(0.5 * df)
-                         - tf.math.lgamma(0.5 * (df + 1.)))
-    return log_unnormalized_prob - log_normalization
+    scale = tf.convert_to_tensor(self.scale)
+    return log_prob(x, df, loc, scale)
 
   def _cdf(self, x):
     df = tf.convert_to_tensor(self.df)
-    # Take Abs(scale) to make subsequent where work correctly.
-    y = (x - self.loc) / tf.abs(self.scale)
-    x_t = df / (y**2. + df)
-    neg_cdf = 0.5 * tf.math.betainc(
-        0.5 * tf.broadcast_to(df, prefer_static.shape(x_t)), 0.5, x_t)
-    return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
+    return cdf(x, df, self.loc, self.scale)
 
   def _entropy(self):
     df = tf.convert_to_tensor(self.df)
     scale = tf.convert_to_tensor(self.scale)
-    v = tf.ones(self._batch_shape_tensor(df=df, scale=scale),
-                dtype=self.dtype)[..., tf.newaxis]
-    u = v * df[..., tf.newaxis]
-    beta_arg = tf.concat([u, v], -1) / 2.
-    return (tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
-            tf.math.lbeta(beta_arg) + 0.5 * (df + 1.) *
-            (tf.math.digamma(0.5 *
-                             (df + 1.)) - tf.math.digamma(0.5 * df)))
+    batch_shape = self._batch_shape_tensor(df=df, scale=scale)
+    return entropy(df, scale, batch_shape, self.dtype)
 
   @distribution_util.AppendDocstring(
       """The mean of Student's T equals `loc` if `df > 1`, otherwise it is
