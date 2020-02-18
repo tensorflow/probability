@@ -44,6 +44,7 @@ from tensorflow_probability.python.internal import test_util
 TF2_FRIENDLY_DISTS = (
     'Bernoulli',
     'Beta',
+    'BetaBinomial',
     'Binomial',
     'Chi',
     'Chi2',
@@ -131,6 +132,8 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 )
 
 EXTRA_TENSOR_CONVERSION_DISTS = {
+    # binomial rejection sampler converts many times
+    'BetaBinomial': sys.maxsize,
     'Binomial': sys.maxsize,  # binomial rejection sampler converts many times
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
@@ -159,6 +162,7 @@ QUANTIZED_BASE_DISTS = (
 # blacklisted by the autovectorization tests. Since not all distributions are
 # in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
+    'BetaBinomial',  # No converter for While
     'Binomial',  # No converter for While
     'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'DirichletMultinomial',  # No converter for TensorListFromTensor
@@ -173,6 +177,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
+    'BetaBinomial',  # Numeric inconsistency: b/147743999
     'Binomial',  # Numeric inconsistency: b/147743999
     'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'DirichletMultinomial',  # Same as Multinomial.
