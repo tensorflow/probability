@@ -1078,11 +1078,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # than the distribution, we'll need to draw extra samples to match.
       result_sample_and_batch_shape = prefer_static.concat([
           distribution_util.expand_to_vector(sample_shape),
-          functools.reduce(prefer_static.broadcast_shape, [
-              prefer_static.shape(x)[:-2],
-              prefer_static.shape(mask)[:-1] if mask is not None else [],
-              batch_shape,
-          ])], axis=0)
+          tf.convert_to_tensor(
+              functools.reduce(prefer_static.broadcast_shape, [
+                  prefer_static.shape(x)[:-2],
+                  prefer_static.shape(mask)[:-1] if mask is not None else [],
+                  batch_shape]),
+              dtype_hint=tf.int32)
+          ], axis=0)
       sample_size = tf.cast(
           prefer_static.reduce_prod(result_sample_and_batch_shape) /
           prefer_static.reduce_prod(batch_shape), tf.int32)
