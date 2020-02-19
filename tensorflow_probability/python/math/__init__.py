@@ -51,6 +51,7 @@ from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
 from tensorflow_probability.python.math.root_search import secant_root
+from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
@@ -86,6 +87,7 @@ _allowed_symbols = [
     'random_rayleigh',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
+    'scan_associative',
     'secant_root',
     'smootherstep',
     'soft_sorting_matrix',
