@@ -1243,20 +1243,32 @@ class EventSpaceBijectorsTest(test_util.TestCase):
       self.evaluate(tf.identity(x))
 
 
-def _all_ok(thing, one_ok):
+def _all_shapes(thing):
   if isinstance(thing, (tfd.Distribution, tfb.Bijector)):
-    dist = thing
-    answer = True
-    for _, param in dist.parameters.items():
-      answer &= _all_ok(param, one_ok)
+    # pylint: disable=g-complex-comprehension
+    answer = [s for _, param in thing.parameters.items()
+              for s in _all_shapes(param)]
+    if isinstance(thing, tfd.TransformedDistribution):
+      answer = [thing.batch_shape + s for s in answer]
     if isinstance(thing, tfd.Distribution):
-      answer &= one_ok(thing.batch_shape + thing.event_shape)
+      answer += [thing.batch_shape + thing.event_shape]
+    if isinstance(thing, tfd.MixtureSameFamily):
+      num_components = thing.mixture_distribution.logits_parameter().shape[-1]
+      answer += [thing.batch_shape + [num_components] + thing.event_shape]
     return answer
   elif tf.is_tensor(thing):
-    return one_ok(thing.shape)
+    return [thing.shape]
   else:
     # Assume the thing is some Python constant like a string or a boolean
-    return True
+    return []
+
+
+def _all_ok(thing, one_ok):
+  hp.note('Testing packetization of {}.'.format(thing))
+  for s in _all_shapes(thing):
+    if not one_ok(s):
+      return False
+  return True
 
 
 def _all_packetized(thing):
