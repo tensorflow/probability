@@ -188,6 +188,8 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
     'ProbitBernoulli',  # Seemingly runs, but gives `NaN`s sometimes.
+    'StudentT',  # Numerical problem: b/149785284
+    'HalfStudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/145554459
     'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
@@ -207,8 +209,6 @@ VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
     'CholeskyLKJ': 1e-4,
     'LKJ': 1e-3,
-    'StudentT': 5e-5,
-    'HalfStudentT': 2e-5,
     'TruncatedNormal': 1e-1,
 })
 
