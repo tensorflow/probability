@@ -1398,7 +1398,9 @@ class DistributionSlicingTest(test_util.TestCase):
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
 
 
-@test_util.test_all_tf_execution_regimes
+# Testing eager_no_tf_function is meaningless here, because pfor internally
+# turns tf.function on regardless of the override.
+@test_util.test_graph_and_eager_modes
 class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
 
   def _test_vectorization(self, dist_name, dist):
