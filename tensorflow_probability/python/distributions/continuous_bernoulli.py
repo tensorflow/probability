@@ -31,43 +31,60 @@ from tensorflow_probability.python.internal import tensor_util
 class ContinuousBernoulli(distribution.Distribution):
     """Continuous Bernoulli distribution.
 
-    The continuous Bernoulli distribution with `lam` in (0, 1) parameter,
-    supported in [0, 1], the pdf is given by:
-    pdf(x|lam) = lam^x * (1 - lam)^(1 - x) * C(lam)
-    where C(lam) = 2 * atanh(1 - 2 * lam) / (1 - 2* lam) if lam != 0.5 and 2
-    otherwise
-    for more details, see:
-    The continuous Bernoulli: fixing a pervasive error in variational
-    autoencoders, Loaiza-Ganem and Cunningham,
-    NeurIPS 2019, https://arxiv.org/abs/1907.06845
-    NOTE: Unlike the Bernoulli, numerical instabilities can happen for lams
+    This distribution is parameterized by `probs`, a (batch of) parameters
+    taking values in (0,1). Note that, unlike in the Bernoulli case, 'probs'
+    does not correspond to a probability, but the same name is used due to the
+    similarity with the Bernoulli.
+
+    #### Mathematical Details
+
+    The continuous Bernoulli is a distribution over the interval [0,1],
+    parameterized by 'probs' in (0,1).
+
+    The probability density function (pdf) is,
+
+    ```none
+    pdf(x; lam) = lam**x (1-lam)**(1-x) C(lam)
+    C(lam) = 2atanh(1-2lam) / (1-2lam) if lam!=0 and 2 otherwise
+    ```
+
+    where:
+    * 'probs = lam'
+
+    For more details, see [(Loaiza-Ganem and Cunningham, 2019)][1].
+    NOTE: Unlike the Bernoulli, numerical instabilities can happen for probs
     very close to 0 or 1. Current implementation allows any value in (0,1),
     but this could be changed to (1e-6, 1-1e-6) to avoid these issues.
 
+    #### References
+    
+    [1] Loaiza-Ganem G and Cunningham JP. The continuous Bernoulli: fixing a
+        pervasive error in variational autoencoders. NeurIPS2019.
+        https://arxiv.org/abs/1907.06845
     """
 
     def __init__(
         self,
         logits=None,
-        lams=None,
+        probs=None,
         lims=[0.499, 0.501],
         dtype=tf.float32,
         validate_args=False,
         allow_nan_stats=True,
-        name="ContinuousBernoulli"
-    ):
+        name="ContinuousBernoulli"):
         """Construct Bernoulli distributions.
 
         Args:
           logits: An N-D `Tensor`. Each entry in the `Tensor` parameterizes
            an independent continuous Bernoulli distribution with parameter
-           sigmoid(logits). Only one of `logits` or `lams` should be passed
+           sigmoid(logits). Only one of `logits` or `probs` should be passed
            in. Note that this does not correspond to the log-odds as in the
            Bernoulli case.
-          lams: An N-D `Tensor` representing the parameter of a continuous
+          probs: An N-D `Tensor` representing the parameter of a continuous
            Bernoulli. Each entry in the `Tensor` parameterizes an independent
-           continuous Bernoulli distribution. Only one of `logits` or `lams`
-           should be passed in.
+           continuous Bernoulli distribution. Only one of `logits` or `probs`
+           should be passed in. Note that this also does not correspond to a
+           probability as in the Bernoulli case.
           lims: A list with two floats containing the lower and upper limits
            used to approximate the continuous Bernoulli around 0.5 for
            numerical stability purposes.
@@ -84,27 +101,24 @@ class ContinuousBernoulli(distribution.Distribution):
           name: Python `str` name prefixed to Ops created by this class.
 
         Raises:
-          ValueError: If p and logits are passed, or if neither are passed.
+          ValueError: If probs and logits are passed, or if neither are passed.
         """
         parameters = dict(locals())
-        if (lams is None) == (logits is None):
-            raise ValueError("Must pass lams or logits, but not both.")
+        if (probs is None) == (logits is None):
+            raise ValueError("Must pass `probs` or `logits`, but not both.")
         self._lims = lims
         with tf.name_scope(name) as name:
-            self._lams = tensor_util.convert_nonref_to_tensor(
-                lams, dtype_hint=tf.float32, name="lams"
-            )
+            self._probs = tensor_util.convert_nonref_to_tensor(
+                probs, dtype_hint=tf.float32, name="probs")
             self._logits = tensor_util.convert_nonref_to_tensor(
-                logits, dtype_hint=tf.float32, name="logits"
-            )
+                logits, dtype_hint=tf.float32, name="logits")
         super(ContinuousBernoulli, self).__init__(
             dtype=dtype,
             reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats,
             parameters=parameters,
-            name=name
-        )
+            name=name)
 
     @staticmethod
     def _param_shapes(sample_shape):
@@ -112,7 +126,7 @@ class ContinuousBernoulli(distribution.Distribution):
 
     @classmethod
     def _params_event_ndims(cls):
-        return dict(logits=0, lams=0)
+        return dict(logits=0, probs=0)
 
     @property
     def logits(self):
@@ -120,16 +134,16 @@ class ContinuousBernoulli(distribution.Distribution):
         return self._logits
 
     @property
-    def lams(self):
-        """Input argument `lams`."""
-        return self._lams
+    def probs(self):
+        """Input argument `probs`."""
+        return self._probs
 
     def _batch_shape_tensor(self):
-        x = self._lams if self._logits is None else self._logits
+        x = self._probs if self._logits is None else self._logits
         return tf.shape(x)
 
     def _batch_shape(self):
-        x = self._lams if self._logits is None else self._logits
+        x = self._probs if self._logits is None else self._logits
         return x.shape
 
     def _event_shape_tensor(self):
@@ -139,77 +153,65 @@ class ContinuousBernoulli(distribution.Distribution):
         return tf.TensorShape([])
 
     def _outside_unstable_region(self):
-        lams = self._lams_parameter_no_checks()
-        return lams < self._lims[0] | lams > self._lims[1]
+        probs = self._probs_parameter_no_checks()
+        return probs < self._lims[0] | probs > self._lims[1]
 
-    def _cut_lams(self):
-        lams = self._lams_parameter_no_checks()
+    def _cut_probs(self):
+        probs = self._probs_parameter_no_checks()
         return tf.where(
             self._outside_unstable_region(),
-            lams,
-            self._lims[0] * tf.ones_like(lams)
-        )
+            probs,
+            self._lims[0] * tf.ones_like(probs))
 
     def _sample_n(self, n, seed=None):
-        cut_lams = self._cut_lams()
-        new_shape = tf.concat([[n], tf.shape(cut_lams)], 0)
-        uniform = tf.random.uniform(new_shape, seed=seed, dtype=cut_lams.dtype)
+        cut_probs = self._cut_probs()
+        new_shape = tf.concat([[n], tf.shape(cut_probs)], axis=0)
+        uniform = tf.random.uniform(new_shape, seed=seed, dtype=cut_probs.dtype)
         sample = tf.where(
             self._outside_unstable_region(),
-            (
-                tf.math.log1p(-cut_lams + uniform * (2.0 * cut_lams - 1.0))
-                - tf.math.log1p(-cut_lams)
-            )
-            / (tf.math.log(cut_lams) - tf.math.log1p(-cut_lams)),
-            uniform
-        )
+            (tf.math.log1p(-cut_probs + uniform * (2.0 * cut_probs - 1.0))
+             - tf.math.log1p(-cut_probs))
+            / (tf.math.log(cut_probs) - tf.math.log1p(-cut_probs)),
+            uniform)
         return tf.cast(sample, self.dtype)
 
     def _cont_bern_log_norm(self):
-        lams = self._lams_parameter_no_checks()
-        cut_lams = self._cut_lams()
+        probs = self._probs_parameter_no_checks()
+        cut_probs = self._cut_probs()
         log_norm = tf.math.log(
-            tf.math.abs(tf.math.log1p(-cut_lams) - tf.math.log(cut_lams))
-        ) - tf.math.log(tf.math.abs(1 - 2.0 * cut_lams))
-        taylor = (
-            tf.math.log(2.0)
-            + 4.0 / 3.0 * tf.math.pow(lams - 0.5, 2)
-            + 104.0 / 45.0 * tf.math.pow(lams - 0.5, 4)
-        )
+            tf.math.abs(tf.math.log1p(-cut_probs) - tf.math.log(cut_probs))
+        ) - tf.math.log(tf.math.abs(1 - 2.0 * cut_probs))
+        x = tf.math.square(probs - 0.5)
+        taylor = tf.math.log(2.0) + (4.0 / 3.0 + 104.0 / 45.0 * x) * x
         return tf.where(self._outside_unstable_region(), log_norm, taylor)
 
     def _log_prob(self, event):
-        log_lams0, log_lams1 = self._outcome_log_lams()
-        event = tf.cast(event, log_lams0.dtype)
-        tentative_log_pdf = (
-            tf.math.multiply_no_nan(log_lams0, 1.0 - event)
-            + tf.math.multiply_no_nan(log_lams1, event)
-            + self._cont_bern_log_norm()
-        )
+        log_probs0, log_probs1 = self._outcome_log_probs()
+        event = tf.cast(event, log_probs0.dtype)
+        tentative_log_pdf = (tf.math.multiply_no_nan(log_probs0, 1.0 - event)
+                             + tf.math.multiply_no_nan(log_probs1, event)
+                             + self._cont_bern_log_norm())
         return tf.where(
             event < 0 | event > 1,
             -float("Inf") * tf.ones_like(tentative_log_pdf),
-            tentative_log_pdf
-        )
+            tentative_log_pdf)
 
     def _cdf(self, x):
-        cut_lams = self._cut_lams()
+        cut_probs = self._cut_probs()
         cdfs = (
-            tf.math.pow(cut_lams, x) * tf.math.pow(1.0 - cut_lams, 1.0 - x)
-            + cut_lams
-            - 1.0
-        ) / (2.0 * cut_lams - 1.0)
+            tf.math.pow(cut_probs, x) * tf.math.pow(1.0 - cut_probs, 1.0 - x)
+            + cut_probs - 1.0) / (2.0 * cut_probs - 1.0)
         unbounded_cdfs = tf.where(self._outside_unstable_region(), cdfs, x)
         return tf.where(
             x < 0.0,
             tf.zeros_like(x),
-            tf.where(x > 1.0, tf.ones_like(x), unbounded_cdfs)
-        )
+            tf.where(x > 1.0, tf.ones_like(x), unbounded_cdfs))
 
-    def _outcome_log_lams(self):
+    def _outcome_log_probs(self):
+        """returns log(1-probs) and log(probs)"""
         if self._logits is None:
-            lam = tf.convert_to_tensor(self._lams)
-            return tf.math.log1p(-lam), tf.math.log(lam)
+            probs = tf.convert_to_tensor(self._probs)
+            return tf.math.log1p(-probs), tf.math.log(probs)
         s = tf.convert_to_tensor(self._logits)
         # softplus(s) = -Log[1 - p]
         # -softplus(-s) = Log[p]
@@ -219,74 +221,61 @@ class ContinuousBernoulli(distribution.Distribution):
         return -tf.math.softplus(s), -tf.math.softplus(-s)
 
     def _entropy(self):
-        log_lams0, log_lams1 = self._outcome_log_lams()
-        return (
-            self._mean() * (log_lams0 - log_lams1)
-            - self._cont_bern_log_norm()
-            - log_lams0
-        )
+        log_probs0, log_probs1 = self._outcome_log_probs()
+        return (self._mean() * (log_probs0 - log_probs1)
+                - self._cont_bern_log_norm()- log_probs0)
 
     def _mean(self):
-        lams = self._lams_parameter_no_checks()
-        cut_lams = self._cut_lams()
-        mus = cut_lams / (2.0 * cut_lams - 1.0) + 1.0 / (
-            tf.math.log1p(-cut_lams) - tf.math.log(cut_lams)
-        )
-        taylor = (
-            0.5 + (lams - 0.5) / 3.0 + 16.0 / 45.0 * tf.math.pow(lams - 0.5, 3)
-        )
+        probs = self._probs_parameter_no_checks()
+        cut_probs = self._cut_probs()
+        mus = cut_probs / (2.0 * cut_probs - 1.0) + 1.0 / (
+            tf.math.log1p(-cut_probs) - tf.math.log(cut_probs))
+        x = probs - 0.5
+        taylor = 0.5 + (1.0 / 3.0 + 16.0 / 45.0 * tf.math.square(x)) * x
         return tf.where(self._outside_unstable_region(), mus, taylor)
 
     def _variance(self):
-        lams = self._lams_parameter_no_checks()
-        cut_lams = self._cut_lams()
-        vars = cut_lams * (cut_lams - 1.0) / tf.math.pow(
-            1.0 - 2.0 * cut_lams, 2
-        ) + 1.0 / tf.math.pow(
-            tf.math.log1p(-cut_lams) - tf.math.log(cut_lams), 2
-        )
-        taylor = (
-            1.0 / 12.0
-            - tf.math.pow(lams - 0.5, 2) / 15.0
-            - 128.0 / 945.0 * tf.math.pow(lams - 0.5, 4)
-        )
+        probs = self._probs_parameter_no_checks()
+        cut_probs = self._cut_probs()
+        vars = cut_probs * (cut_probs - 1.0) / tf.math.pow(
+            1.0 - 2.0 * cut_probs, 2) + 1.0 / tf.math.pow(
+            tf.math.log1p(-cut_probs) - tf.math.log(cut_probs), 2)
+        x = tf.math.square(probs - 0.5)
+        taylor = 1.0 / 12.0 - (1.0 / 15.0 - 128. / 945.0 * x) * x
         return tf.where(self._outside_unstable_region(), vars, taylor)
 
     def _quantile(self, p):
-        cut_lams = self._cut_lams()
+        cut_probs = self._cut_probs()
         return tf.where(
             self._outside_unstable_region(),
-            (
-                tf.math.log1p(-cut_lams + p * (2.0 * cut_lams - 1.0))
-                - tf.math.log1p(-cut_lams)
-            )
-            / (tf.math.log(cut_lams) - tf.math.log1p(-cut_lams)),
-            p
-        )
+            (tf.math.log1p(-cut_probs + p * (2.0 * cut_probs - 1.0))
+             - tf.math.log1p(-cut_probs))
+            / (tf.math.log(cut_probs) - tf.math.log1p(-cut_probs)),
+            p)
 
     def _mode(self):
         """Returns `1` if `prob > 0.5` and `0` otherwise."""
-        return tf.cast(self._lams_parameter_no_checks() > 0.5, self.dtype)
+        return tf.cast(self._probs_parameter_no_checks() > 0.5, self.dtype)
 
     def logits_parameter(self, name=None):
-        """Logits computed from non-`None` input arg (`lams` or `logits`)."""
+        """Logits computed from non-`None` input arg (`probs` or `logits`)."""
         with self._name_and_control_scope(name or "logits_parameter"):
             return self._logits_parameter_no_checks()
 
     def _logits_parameter_no_checks(self):
         if self._logits is None:
-            lams = tf.convert_to_tensor(self._lams)
-            return tf.math.log(lams) - tf.math.log1p(-lams)
+            probs = tf.convert_to_tensor(self._probs)
+            return tf.math.log(probs) - tf.math.log1p(-probs)
         return tf.identity(self._logits)
 
-    def lams_parameter(self, name=None):
-        """Lams computed from non-`None` input arg (`lams` or `logits`)."""
-        with self._name_and_control_scope(name or "lams_parameter"):
-            return self._lams_parameter_no_checks()
+    def probs_parameter(self, name=None):
+        """probs computed from non-`None` input arg (`probs` or `logits`)."""
+        with self._name_and_control_scope(name or "probs_parameter"):
+            return self._probs_parameter_no_checks()
 
-    def _lams_parameter_no_checks(self):
+    def _probs_parameter_no_checks(self):
         if self._logits is None:
-            return tf.identity(self._lams)
+            return tf.identity(self._probs)
         return tf.math.sigmoid(self._logits)
 
     def _default_event_space_bijector(self):
@@ -294,57 +283,48 @@ class ContinuousBernoulli(distribution.Distribution):
 
     def _parameter_control_dependencies(self, is_init):
         return maybe_assert_continuous_bernoulli_param_correctness(
-            is_init, self.validate_args, self._lams, self._logits
-        )
+            is_init, self.validate_args, self._probs, self._logits)
 
     def _sample_control_dependencies(self, x):
         assertions = []
         if not self.validate_args:
             return assertions
         assertions.append(
-            assert_util.assert_positive(x, message="Sample must be positive.")
-        )
+            assert_util.assert_positive(x, message="Sample must be positive."))
         assertions.append(
             assert_util.assert_less(
                 x,
                 tf.ones([], dtype=x.dtype),
-                message="Sample must be less than `1`."
-            )
-        )
+                message="Sample must be less than `1`."))
         return assertions
 
 
 def maybe_assert_continuous_bernoulli_param_correctness(
-    is_init, validate_args, lams, logits
-):
+    is_init, validate_args, probs, logits):
     """Return assertions for `Bernoulli`-type distributions."""
     if is_init:
-        x, name = (lams, "lams") if logits is None else (logits, "logits")
+        x, name = (probs, "probs") if logits is None else (logits, "logits")
         if not dtype_util.is_floating(x.dtype):
             raise TypeError(
-                "Argument `{}` must having floating type.".format(name)
-            )
+                "Argument `{}` must having floating type.".format(name))
 
     if not validate_args:
         return []
 
     assertions = []
 
-    if lams is not None:
-        if is_init != tensor_util.is_ref(lams):
-            lams = tf.convert_to_tensor(lams)
-            one = tf.constant(1.0, lams.dtype)
+    if probs is not None:
+        if is_init != tensor_util.is_ref(probs):
+            probs = tf.convert_to_tensor(probs)
+            one = tf.constant(1.0, probs.dtype)
             assertions += [
                 assert_util.assert_positive(
-                    lams, message="lams has components less than or equal to 0."
-                ),
+                    probs,
+                    message="probs has components less than or equal to 0."),
                 assert_util.assert_less(
-                    lams,
+                    probs,
                     one,
-                    message="lams has components greater than or equal to 1."
-                )
-            ]
-
+                    message="probs has components greater than or equal to 1.")]
     return assertions
 
 
@@ -365,21 +345,17 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
     """
     with tf.name_scope(name or "kl_continuous_bernoulli_continuous_bernoulli"):
         (
-            a_log_lams0,
-            a_log_lams1
-        ) = a._outcome_log_lams()  # pylint:disable=protected-access
+            a_log_probs0,
+            a_log_probs1
+        ) = a._outcome_log_probs()  # pylint:disable=protected-access
         (
-            b_log_lams0,
-            b_log_lams1
-        ) = b._outcome_log_lams()  # pylint:disable=protected-access
+            b_log_probs0,
+            b_log_probs1
+        ) = b._outcome_log_probs()  # pylint:disable=protected-access
         a_mean = a._mean()  # pylint:disable=protected-access
         a_log_norm = a._cont_bern_log_norm()  # pylint:disable=protected-access
         b_log_norm = b._cont_bern_log_norm()  # pylint:disable=protected-access
 
         return (
-            a_mean * (a_log_lams1 + b_log_lams0 - a_log_lams0 - b_log_lams1)
-            + a_log_norm
-            - b_log_norm
-            + a_log_lams0
-            - b_log_lams0
-        )
+            a_mean * (a_log_probs1 + b_log_probs0 - a_log_probs0 - b_log_probs1)
+            + a_log_norm - b_log_norm + a_log_probs0 - b_log_probs0)
