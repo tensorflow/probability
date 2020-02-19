@@ -51,7 +51,11 @@ class ContinuousBernoulli(distribution.Distribution):
     where:
     * 'probs = lam'
 
-    For more details, see [(Loaiza-Ganem and Cunningham, 2019)][1].
+    While C(lam) is a continuous function of lam (even at lam=0.5), computing
+    it at values close to 0.5 can result in numerical instabilities due to 0/0
+    errors. A Taylor approximation of C(lam) is thus used for values of lam
+    in a small interval [lims[0], lims[1]] around 0.5.For more details,
+    see [(Loaiza-Ganem and Cunningham, 2019)][1].
     NOTE: Unlike the Bernoulli, numerical instabilities can happen for probs
     very close to 0 or 1. Current implementation allows any value in (0,1),
     but this could be changed to (1e-6, 1-1e-6) to avoid these issues.
@@ -173,9 +177,20 @@ class ContinuousBernoulli(distribution.Distribution):
     def _cont_bern_log_norm(self):
         probs = self._probs_parameter_no_checks()
         cut_probs = self._cut_probs()
+        cut_probs_below_half = tf.where(
+            cut_probs < 0.5,
+            cut_probs,
+            tf.zeros_like(cut_probs))
+        cut_probs_above_half = tf.where(
+            cut_probs > 0.5,
+            cut_probs,
+            tf.ones_like(cut_probs))
         log_norm = tf.math.log(
             tf.math.abs(tf.math.log1p(-cut_probs) - tf.math.log(cut_probs))
-        ) - tf.math.log(tf.math.abs(1 - 2.0 * cut_probs))
+        ) - tf.where(
+            cut_probs < 0.5,
+            tf.math.log1p(-2.0 * cut_probs_below_half),
+            tf.math.log(2.0 * cut_probs_above_half - 1.0))
         x = tf.math.square(probs - 0.5)
         taylor = tf.math.log(2.0) + (4.0 / 3.0 + 104.0 / 45.0 * x) * x
         return tf.where(self._outside_unstable_region(), log_norm, taylor)
