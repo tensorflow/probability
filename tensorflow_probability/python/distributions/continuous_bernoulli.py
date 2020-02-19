@@ -167,12 +167,7 @@ class ContinuousBernoulli(distribution.Distribution):
         cut_probs = self._cut_probs()
         new_shape = tf.concat([[n], tf.shape(cut_probs)], axis=0)
         uniform = tf.random.uniform(new_shape, seed=seed, dtype=cut_probs.dtype)
-        sample = tf.where(
-            self._outside_unstable_region(),
-            (tf.math.log1p(-cut_probs + uniform * (2.0 * cut_probs - 1.0))
-             - tf.math.log1p(-cut_probs))
-            / (tf.math.log(cut_probs) - tf.math.log1p(-cut_probs)),
-            uniform)
+        sample = self._quantile(uniform)
         return tf.cast(sample, self.dtype)
 
     def _cont_bern_log_norm(self):
