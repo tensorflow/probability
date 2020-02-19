@@ -465,6 +465,43 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
                         (grads[0].shape, grads[1].shape))
     self.assertAllNotNone(grads)
 
+  @parameterized.named_parameters(
+      {'testcase_name': 'coroutine',
+       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
+      {'testcase_name': 'sequential',
+       'jd_class': tfd.JointDistributionSequentialAutoBatched},
+      {'testcase_name': 'named',
+       'jd_class': tfd.JointDistributionNamedAutoBatched})
+  def test_default_event_space_bijector(self, jd_class):
+
+    models = {}
+    def coroutine_model():
+      g = yield Root(tfd.Gamma(2, [2, 3.]))
+      df = yield Root(tfd.Exponential([1., 2.]))
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
+      yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[tfd.JointDistributionSequentialAutoBatched] = [
+        tfd.Gamma(2, [2, 3.]),
+        tfd.Exponential([1., 2.]),
+        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
+        lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+    ]
+
+    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+        ('g', tfd.Gamma(2, [2, 3.])),
+        ('df', tfd.Exponential([1., 2.])),
+        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
+        ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
+
+    joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
+    joint_bijector = joint._experimental_default_event_space_bijector()
+    x = self.evaluate(joint.sample(seed=test_util.test_seed()))
+    self.assertAllClose(
+        x,
+        self.evaluate(joint_bijector.forward(joint_bijector.inverse(x))))
+
 
 if __name__ == '__main__':
   tf.test.main()
