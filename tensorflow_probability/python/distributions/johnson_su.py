@@ -26,7 +26,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization

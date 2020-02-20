@@ -54,8 +54,8 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.JohnsonSU(gamma, delta, mu, sigma,
-                validate_args=True).sample(seed=test_util.test_seed()))))
+            tf.shape(tfd.JohnsonSU(gamma, delta, mu, sigma, validate_args=True)
+                     .sample(seed=test_util.test_seed()))))
 
   def _testParamStaticShapes(self, sample_shape, expected):
     param_shapes = tfd.JohnsonSU.param_static_shapes(sample_shape)
@@ -226,7 +226,7 @@ class JohnsonSUTest(test_util.TestCase):
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       return lambda g, d, m, s: getattr(  # pylint: disable=g-long-lambda
           tfd.JohnsonSU(gamma=g, delta=d, loc=m, scale=s, validate_args=True),
-            attr)(x)
+          attr)(x)
 
     for dtype in np.float32, np.float64:
       for attr in ['cdf', 'log_cdf', 'survival_function',
@@ -348,11 +348,12 @@ class JohnsonSUTest(test_util.TestCase):
     delta = tf.constant(2.0)
     mu = tf.constant(4.0)
     sigma = tf.constant(3.0)
-    _, [grad_gamma, grad_delta, grad_mu, grad_sigma] = tfp.math.value_and_gradient(
-        lambda g, d, m, s: tfd.JohnsonSU(gamma=g, delta=d, loc=m, scale=s,
-            validate_args=True).sample(  # pylint: disable=g-long-lambda
-            100, seed=test_util.test_seed()),
-        [gamma, delta, mu, sigma])
+    _, [grad_gamma, grad_delta, grad_mu, grad_sigma] = \
+        tfp.math.value_and_gradient(
+            lambda g, d, m, s: tfd.JohnsonSU(gamma=g, delta=d, loc=m, scale=s,
+                                             validate_args=True)
+            .sample(100, seed=test_util.test_seed()),
+            [gamma, delta, mu, sigma])
     grad_gamma, grad_delta, grad_mu, grad_sigma = self.evaluate(
         [grad_gamma, grad_delta, grad_mu, grad_sigma])
     self.assertIsNotNone(grad_gamma)
