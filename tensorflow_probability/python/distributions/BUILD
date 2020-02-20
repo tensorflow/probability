@@ -80,6 +80,7 @@ multi_substrate_py_library(
         ":joint_distribution_named",
         ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
+        ":johnson_su",
         ":kullback_leibler",
         ":kumaraswamy",
         ":lambertw_f",
@@ -815,6 +816,25 @@ multi_substrate_py_library(
         ":kullback_leibler",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "johnson_su",
+    srcs = ["johnson_su.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -2229,6 +2249,19 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "johnson_su_test",
+    srcs = ["johnson_su_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "kumaraswamy_test",
     srcs = ["kumaraswamy_test.py"],
     deps = [
@@ -3019,6 +3052,7 @@ exports_files(
         "joint_distribution_coroutine.py",
         "joint_distribution_named.py",
         "joint_distribution_sequential.py",
+        "johnson_su.py",
         "kullback_leibler.py",
         "kumaraswamy.py",
         "kumaraswamy_test.py",
