@@ -250,7 +250,7 @@ class JohnsonSU(distribution.Distribution):
     u = tf.random.uniform(shape, minval=0., maxval=1.,
                           dtype=self.dtype, seed=seed())
 
-    samples = tf.sinh((special_math.ndtri(u) - gamma) / delta)
+    samples = tf.sinh((tf.math.ndtri(u) - gamma) / delta)
 
     return samples * scale + loc  # Abs(scale) not wanted.
 
