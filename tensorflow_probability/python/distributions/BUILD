@@ -647,6 +647,23 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "hypothesis_testlib",
+    testonly = 1,
+    srcs = ["hypothesis_testlib.py"],
+    deps = [
+        # absl/logging dep,
+        # hypothesis dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "independent",
     srcs = ["independent.py"],
     deps = [
@@ -2825,14 +2842,13 @@ py_test(
     shard_count = 40,
     tags = ["hypothesis"],
     deps = [
-        # absl/logging dep,
+        ":hypothesis_testlib",
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/bijectors:hypothesis_testlib",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
