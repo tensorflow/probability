@@ -65,6 +65,7 @@ TF2_FRIENDLY_DISTS = (
     'Horseshoe',
     'InverseGamma',
     'InverseGaussian',
+    'JohnsonSU',
     'Kumaraswamy',
     'Laplace',
     'LKJ',
