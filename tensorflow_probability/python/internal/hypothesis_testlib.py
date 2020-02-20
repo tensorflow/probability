@@ -667,7 +667,7 @@ def no_tf_rank_errors():
   # have larger "event" shapes than the distribution itself.
   input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
   input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
-  cwise_op_names = r'Op:(AddV2|Sub|Mul|SquaredDifference|RealDiv)'
+  cwise_op_names = r'Op:(AddV2|Sub|Mul|SquaredDifference|RealDiv|BroadcastTo)'
   cwise_pat_1 = _rank_broadcasting_error_pattern(5, 6, cwise_op_names)
   cwise_pat_2 = _rank_broadcasting_error_pattern(6, 5, cwise_op_names)
   pat_1 = _rank_broadcasting_error_pattern(8, 9)
