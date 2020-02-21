@@ -111,7 +111,7 @@ class _IIDNormalTest(object):
                             atol=5*stderr_mean)
         self.assertAllClose(np.var(x_val, axis=0),
                             np.ones(result_shape) * marginal_variance,
-                            rtol=5*stderr_variance)
+                            atol=5*stderr_variance)
 
   def testIIDNormalLogprob(self):
 
