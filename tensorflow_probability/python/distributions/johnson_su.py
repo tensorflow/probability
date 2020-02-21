@@ -20,18 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 import functools
-import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
-from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.bijectors import inline as inline_bijector
+from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import scale as scale_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -39,7 +41,7 @@ __all__ = [
 ]
 
 
-class JohnsonSU(distribution.Distribution):
+class JohnsonSU(transformed_distribution.TransformedDistribution):
   """Johnson's SU-distribution.
 
   This distribution has parameters: shape parameters `gamma` and `delta`,
@@ -180,11 +182,49 @@ class JohnsonSU(distribution.Distribution):
           scale, name='scale', dtype=dtype)
       dtype_util.assert_same_float_dtype((self._gamma, self._delta,
                                           self._loc, self._scale))
+
+      norm_affine = invert_bijector.Invert(
+          shift_bijector.Shift(
+              shift=self._gamma,
+              validate_args=validate_args)(
+                  scale_bijector.Scale(
+                      scale=self._delta,
+                      validate_args=validate_args
+                  )
+              )
+      )
+
+      sinh = inline_bijector.Inline(
+          forward_fn=tf.sinh,
+          inverse_fn=tf.asinh,
+          forward_log_det_jacobian_fn=lambda x: tf.math.log(tf.math.cosh(x)),
+          inverse_log_det_jacobian_fn=lambda y: -0.5 * math.log1psquare(y),
+          forward_min_event_ndims=0,
+          is_increasing=lambda: True,
+          name='sinh'
+      )
+
+      affine = shift_bijector.Shift(
+          shift=self._loc,
+          validate_args=validate_args)(
+              scale_bijector.Scale(
+                  scale=self._scale,
+                  validate_args=validate_args
+              )
+          )
+
+      batch_shape = distribution_util.get_broadcast_shape(
+          self._gamma, self._delta, self._loc, self._scale)
+
       super(JohnsonSU, self).__init__(
-          dtype=dtype,
-          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          distribution=normal.Normal(
+              loc=tf.zeros([], dtype=dtype),
+              scale=tf.ones([], dtype=dtype),
+              validate_args=validate_args,
+              allow_nan_stats=allow_nan_stats),
+          bijector=affine(sinh(norm_affine)),
+          batch_shape=batch_shape,
           validate_args=validate_args,
-          allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
 
@@ -236,46 +276,6 @@ class JohnsonSU(distribution.Distribution):
 
   def _event_shape(self):
     return tf.TensorShape([])
-
-  def _sample_n(self, n, seed=None):
-    gamma = tf.convert_to_tensor(self.gamma)
-    delta = tf.convert_to_tensor(self.delta)
-    loc = tf.convert_to_tensor(self.loc)
-    scale = tf.convert_to_tensor(self.scale)
-    batch_shape = self._batch_shape_tensor(gamma=gamma, delta=delta,
-                                           loc=loc, scale=scale)
-    shape = tf.concat([[n], batch_shape], axis=0)
-    seed = SeedStream(seed, 'johnson_su')
-
-    u = tf.random.uniform(shape, minval=0., maxval=1.,
-                          dtype=self.dtype, seed=seed())
-
-    samples = tf.sinh((tf.math.ndtri(u) - gamma) / delta)
-
-    return samples * scale + loc  # Abs(scale) not wanted.
-
-  def _log_prob(self, x):
-    gamma = tf.convert_to_tensor(self.gamma)
-    delta = tf.convert_to_tensor(self.delta)
-    scale = tf.convert_to_tensor(self.scale)
-    loc = tf.convert_to_tensor(self.loc)
-
-    y = (x - loc) / scale  # Abs(scale) superfluous.
-
-    log_unnormalized = -0.5 * math.log1psquare(y) - \
-      0.5 * tf.square(gamma + delta * tf.math.asinh(y))
-    log_normalization = tf.math.log(scale/delta) + 0.5 * np.log(2. * np.pi)
-
-    return log_unnormalized - log_normalization
-
-  def _cdf(self, x):
-    gamma = tf.convert_to_tensor(self.gamma)
-    delta = tf.convert_to_tensor(self.delta)
-    scale = tf.convert_to_tensor(self.scale)
-    loc = tf.convert_to_tensor(self.loc)
-
-    y = (x - loc) / scale  # Abs(scale) superfluous.
-    return special_math.ndtr(gamma + delta * tf.math.asinh(y))
 
   def _mean(self):
     gamma = tf.convert_to_tensor(self.gamma)

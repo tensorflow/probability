@@ -32,7 +32,6 @@ from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
-
 @test_util.test_all_tf_execution_regimes
 class JohnsonSUTest(test_util.TestCase):
 
@@ -67,7 +66,7 @@ class JohnsonSUTest(test_util.TestCase):
     dist = tfd.JohnsonSU(1., 2., 0., 1.)
     self.assertEqual(tf.float32, dist.dtype)
     for method in ('log_prob', 'prob', 'log_cdf', 'cdf',
-                   'log_survival_function', 'survival_function'):
+                   'log_survival_function', 'survival_function', 'quantile'):
       self.assertEqual(tf.float32, getattr(dist, method)(1).dtype)
 
   def testParamShapes(self):
@@ -247,7 +246,7 @@ class JohnsonSUTest(test_util.TestCase):
     delta = self._rng.rand(batch_size) + 1.0
     mu = self._rng.randn(batch_size)
     sigma = self._rng.rand(batch_size) + 1.0
-    x = np.linspace(-10.0, 100.0, batch_size).astype(np.float64)
+    x = np.linspace(-10.0, 10.0, batch_size).astype(np.float64)
 
     johnson_su = tfd.JohnsonSU(gamma=gamma, delta=delta, loc=mu, scale=sigma,
                                validate_args=True)
@@ -279,6 +278,53 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllEqual((3,), johnson_su.mean().shape)
     expected_mean = sp_stats_d.mean()
     self.assertAllClose(expected_mean, self.evaluate(johnson_su.mean()))
+
+  def testJohnsonSUQuantile(self):
+    batch_size = 52
+    gamma = self._rng.randn(batch_size)
+    delta = self._rng.rand(batch_size) + 1.0
+    mu = self._rng.randn(batch_size)
+    sigma = self._rng.rand(batch_size) + 1.0
+    p = np.linspace(0., 1.0, batch_size - 2).astype(np.float64)
+    # Quantile performs piecewise rational approximation so adding some
+    # special input values to make sure we hit all the pieces.
+    p = np.hstack((p, np.exp(-33), 1. - np.exp(-33)))
+
+    johnson_su = tfd.JohnsonSU(gamma=gamma, delta=delta, loc=mu, scale=sigma,
+                               validate_args=True)
+    x = johnson_su.quantile(p)
+
+    self.assertAllEqual(
+        self.evaluate(johnson_su.batch_shape_tensor()), x.shape)
+    self.assertAllEqual(
+        self.evaluate(johnson_su.batch_shape_tensor()),
+        self.evaluate(x).shape)
+    self.assertAllEqual(johnson_su.batch_shape, x.shape)
+    self.assertAllEqual(johnson_su.batch_shape, self.evaluate(x).shape)
+
+    expected_x = sp_stats.johnsonsu(gamma, delta, mu, sigma).ppf(p)
+    self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
+
+  def _testQuantileFiniteGradientAtDifficultPoints(self, dtype):
+    gamma = tf.constant(dtype(0))
+    delta = tf.constant(dtype(1))
+    mu = tf.constant(dtype(0))
+    sigma = tf.constant(dtype(1))
+    p = tf.constant(dtype([np.exp(-32.), np.exp(-2.),
+                           1. - np.exp(-2.), 1. - np.exp(-8.)]))
+    value, grads = tfp.math.value_and_gradient(
+        lambda m, p_: tfd.JohnsonSU(gamma=gamma, delta=delta, loc=m,
+                                    scale=sigma, validate_args=True).
+        quantile(p_), [mu, p])
+    value, grads = self.evaluate([value, grads])
+    self.assertAllFinite(grads[0])
+    self.assertAllFinite(grads[1])
+
+  def testQuantileFiniteGradientAtDifficultPointsFloat32(self):
+    self._testQuantileFiniteGradientAtDifficultPoints(np.float32)
+
+  def testQuantileFiniteGradientAtDifficultPointsFloat64(self):
+    self._testQuantileFiniteGradientAtDifficultPoints(np.float64)
 
   def testJohnsonSUVariance(self):
     gamma = [1.]
@@ -465,9 +511,9 @@ class JohnsonSUTest(test_util.TestCase):
   def testIncompatibleArgShapesEager(self):
     if not tf.executing_eagerly(): return
     scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
-    with self.assertRaisesRegexp(
+    with self.assertRaisesWithLiteralMatch(
         ValueError,
-        r'Arguments must have compatible shapes'):
+        'Incompatible shapes for broadcasting: (2, 3) and (4, 1)'):
       tfd.JohnsonSU(gamma=1., delta=2., loc=tf.zeros([2, 3]), scale=scale,
                     validate_args=True)
 
