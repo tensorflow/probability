@@ -68,6 +68,7 @@ multi_substrate_py_library(
         ":invert",
         ":iterated_sigmoid_centered",
         ":kumaraswamy_cdf",
+        ":lambertw_transform",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
         ":normal_cdf",
@@ -460,6 +461,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "lambertw_transform",
+    srcs = ["lambertw_transform.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -1233,6 +1248,23 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_test(
+    name = "lambertw_transform_test",
+    size = "small",
+    srcs = ["lambertw_transform_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        ":lambertw_transform",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 py_test(
     name = "masked_autoregressive_test",
     size = "small",
@@ -1650,6 +1682,8 @@ exports_files(
         "kumaraswamy.py",
         "kumaraswamy_cdf.py",
         "kumaraswamy_cdf_test.py",
+        "lambertw_transform.py",
+        "lambertw_transform_test.py",
         "matrix_inverse_tril.py",
         "matrix_inverse_tril_test.py",
         "normal_cdf.py",

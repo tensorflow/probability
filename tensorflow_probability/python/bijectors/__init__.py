@@ -48,6 +48,7 @@ from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.bijectors.iterated_sigmoid_centered import IteratedSigmoidCentered
 from tensorflow_probability.python.bijectors.kumaraswamy_cdf import KumaraswamyCDF
+from tensorflow_probability.python.bijectors.lambertw_transform import LambertWTail
 from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveNetwork
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_autoregressive_default_template
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
@@ -113,6 +114,7 @@ __all__ = [
     "Invert",
     "IteratedSigmoidCentered",
     "KumaraswamyCDF",
+    "LambertWTail",
     "Log",
     "Log1p",
     "MaskedAutoregressiveFlow",
