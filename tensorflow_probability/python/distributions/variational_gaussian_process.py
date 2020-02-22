@@ -170,7 +170,7 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
   def variational_scale(self):
     return self._variational_scale
 
-@property
+  @property
   def jitter(self):
     return self._jitter
 
