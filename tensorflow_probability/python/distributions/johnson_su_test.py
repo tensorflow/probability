@@ -519,24 +519,5 @@ class JohnsonSUTest(test_util.TestCase):
                     validate_args=True)
 
 
-class JohnsonSUEagerGCTest(test_util.TestCase):
-
-  @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def testJohnsonSUMean(self):
-    gamma = [1.]
-    delta = [2.]
-    # Mu will be broadcast to [7, 7, 7].
-    mu = [7.]
-    sigma = [11., 12., 13.]
-
-    johnson_su = tfd.JohnsonSU(gamma=gamma, delta=delta, loc=mu, scale=sigma,
-                               validate_args=True)
-
-    self.assertAllEqual((3,), johnson_su.mean().shape)
-    # sp_stats doesn't work with array delta
-    expected_mean = sp_stats.johnsonsu.mean(gamma, delta[0], mu, sigma)
-    self.assertAllClose(expected_mean, self.evaluate(johnson_su.mean()))
-
-
 if __name__ == '__main__':
   tf.test.main()
