@@ -501,11 +501,11 @@ def base_distributions(draw,
       (or an arbitrary one if omitted).
   """
   if dist_name is None:
-    names = [k for k in INSTANTIABLE_BASE_DISTS.keys() if eligibility_filter(k)]
+    names = [k for k in INSTANTIABLE_BASE_DISTS if eligibility_filter(k)]
     dist_name = draw(hps.sampled_from(sorted(names)))
 
   if dist_name == 'Empirical':
-    variants = [k for k in INSTANTIABLE_BASE_DISTS.keys()
+    variants = [k for k in INSTANTIABLE_BASE_DISTS
                 if eligibility_filter(k) and 'Empirical' in k]
     dist_name = draw(hps.sampled_from(sorted(variants)))
 
@@ -534,7 +534,7 @@ def base_distributions(draw,
         isinstance(params_kwargs[k], (tfp_util.DeferredTensor, tf.Variable)) and
         params_kwargs[k] is not params_constrained[k]):
 
-      def constrained_value(v, val=params_constrained[k]):
+      def constrained_value(v, val=params_constrained[k]):  # pylint: disable=cell-var-from-loop
         # While the gradient to v will be 0, we only care about the c2t counts.
         return v * 0 + val
 

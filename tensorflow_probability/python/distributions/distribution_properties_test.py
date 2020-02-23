@@ -275,7 +275,7 @@ class DistributionParamsAreVarsTest(test_util.TestCase):
         grads = tape.gradient(kl, wrt_vars)
         for grad, var in zip(grads, wrt_vars):
           if grad is None and dist_name not in NO_KL_PARAM_GRADS:
-            raise AssertionError('Missing KL({} || {}) -> {} grad:\n'
+            raise AssertionError('Missing KL({} || {}) -> {} grad:\n'  # pylint: disable=duplicate-string-formatting-argument
                                  '{} vars: {}\n{} vars: {}'.format(
                                      d1, d2, var, d1, d1.variables, d2,
                                      d2.variables))
@@ -557,7 +557,7 @@ class DistributionSlicingTest(test_util.TestCase):
   def testDistributions(self, data):
     self._run_test(data)
 
-  def disabled_testFailureCase(self):
+  def disabled_testFailureCase(self):  # pylint: disable=invalid-name
     # TODO(b/140229057): This test should pass.
     dist = tfd.Chi(df=np.float32(27.744131))
     dist = tfd.TransformedDistribution(
