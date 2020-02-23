@@ -127,18 +127,30 @@ class RelaxedBernoulliTest(test_util.TestCase):
   def testBoundaryConditions(self):
     temperature = 1e-2
     dist = tfd.RelaxedBernoulli(temperature, probs=1.0, validate_args=True)
-    self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0.0)))
-    self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1.0))])
+    self.assertAllClose(-np.inf, self.evaluate(dist.log_prob(0.0)))
+    self.assertAllClose(np.inf, self.evaluate(dist.log_prob(1.0)))
 
-  # TODO(b/144948687): Reimplement `log_prob` so it doesn't return `nan` at the
-  # boundary. Ideally we'd do this test:
-  # def testPdfAtBoundary(self):
-  #   dist = tfd.RelaxedBernoulli(temperature=0.1, logits=[[3., 5.], [3., 2]],
-  #                               validate_args=True)
-  #   pdf_at_boundary = self.evaluate(dist.prob([0., 1.]))
-  #   log_pdf_at_boundary = self.evaluate(dist.log_prob([0., 1.]))
-  #   self.assertAllPositiveInf(pdf_at_boundary)
-  #   self.assertAllPositiveInf(log_pdf_at_boundary)
+    dist = tfd.RelaxedBernoulli(temperature, probs=0.0, validate_args=True)
+    self.assertAllClose(np.inf, self.evaluate(dist.log_prob(0.0)))
+    self.assertAllClose(-np.inf, self.evaluate(dist.log_prob(1.0)))
+
+  def testSamplesAtBoundaryNotNaN(self):
+    temperature = 1e-2
+    dist = tfd.RelaxedBernoulli(temperature, probs=1.0, validate_args=True)
+    self.assertFalse(np.any(np.isnan(self.evaluate(
+        dist.log_prob(dist.sample(10, seed=test_util.test_seed()))))))
+
+    dist = tfd.RelaxedBernoulli(temperature, probs=0.0, validate_args=True)
+    self.assertFalse(np.any(np.isnan(self.evaluate(
+        dist.log_prob(dist.sample(10, seed=test_util.test_seed()))))))
+
+  def testPdfAtBoundary(self):
+    dist = tfd.RelaxedBernoulli(temperature=0.1, logits=[[3., 5.], [3., 2]],
+                                validate_args=True)
+    pdf_at_boundary = self.evaluate(dist.prob([0., 1.]))
+    log_pdf_at_boundary = self.evaluate(dist.log_prob([0., 1.]))
+    self.assertAllPositiveInf(pdf_at_boundary)
+    self.assertAllPositiveInf(log_pdf_at_boundary)
 
   def testAssertValidSample(self):
     temperature = 1e-2

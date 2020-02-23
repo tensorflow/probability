@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -256,10 +257,39 @@ class RelaxedBernoulli(distribution.Distribution):
     return self._transformed_logistic().sample(n, seed=seed, **kwargs)
 
   def _log_prob(self, y, **kwargs):
-    return self._transformed_logistic().log_prob(y, **kwargs)
+    # The computation below is the same as
+    # `self._transformed_logistic().log_prob(y, **kwargs)`. However, when `y`
+    # approaches `0` or `1` it encounters numerical problems. Namely,
+    # the Jacobian correction in `TransformedDistribution` becomes large in
+    # absolute value, and catastrophically cancels against a similar term in the
+    # `log_prob`. Instead, we collapse this computation below, and do the
+    # cancellation symbolically.
+    # The below also handles the case where `logits` goes to
+    # `+-inf`, which also returns `NaN` when using `TransformedDistribution`
 
-  def _prob(self, y, **kwargs):
-    return self._transformed_logistic().prob(y, **kwargs)
+    logits_parameter = self._logits_parameter_no_checks()
+    logits_y = tf.math.log(y) - tf.math.log1p(-y)
+    t = tf.convert_to_tensor(self._temperature)
+    z = logits_parameter - t * logits_y
+    result = tf.where(
+        z > 0,
+        -logits_parameter + tf.math.xlogy(t - 1., y) - (
+            t + 1.) * tf.math.log1p(-y) - 2 * tf.math.softplus(-z),
+        logits_parameter - (t + 1.) * tf.math.log(y) + tf.math.xlog1py(
+            t - 1., -y) - 2 * tf.math.softplus(z)) + tf.math.log(t)
+    return tf.where(
+        # Handle the case where `logits_parameter` is infinite. This corresponds
+        # to a `Bernoulli` with all mass centered at `0` or `1`. The above
+        # computation returns `NaN` values when `y = 0` or `y = 1`, so we
+        # explicitly handle this here.
+        tf.math.is_inf(logits_parameter) & tf.math.is_inf(logits_y) &
+        ~tf.math.is_nan(logits_parameter) & ~tf.math.is_nan(logits_y),
+        tf.where(
+            tf.math.equal(
+                tf.math.sign(logits_parameter), tf.math.sign(logits_y)),
+            dtype_util.as_numpy_dtype(self.dtype)(np.inf),
+            dtype_util.as_numpy_dtype(self.dtype)(-np.inf)),
+        result)
 
   def _log_survival_function(self, y, **kwargs):
     return self._transformed_logistic().log_survival_function(y, **kwargs)
