@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math
@@ -32,7 +31,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -258,78 +256,33 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
     """Scaling factors of these Johnson's SU distribution(s)."""
     return self._scale
 
-  def _batch_shape_tensor(self, gamma=None, delta=None, loc=None, scale=None):
-    return functools.reduce(
-        prefer_static.broadcast_shape,
-        (prefer_static.shape(self.gamma if gamma is None else gamma),
-         prefer_static.shape(self.delta if delta is None else delta),
-         prefer_static.shape(self.loc if loc is None else loc),
-         prefer_static.shape(self.scale if scale is None else scale)))
-
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape,
-        (self.gamma.shape, self.delta.shape, self.loc.shape, self.scale.shape))
-
-  def _event_shape_tensor(self):
-    return tf.constant([], dtype=tf.int32)
-
-  def _event_shape(self):
-    return tf.TensorShape([])
-
   def _mean(self):
-    gamma = tf.convert_to_tensor(self.gamma)
-    delta = tf.convert_to_tensor(self.delta)
-    scale = tf.convert_to_tensor(self.scale)
-    loc = tf.convert_to_tensor(self.loc)
+    batch_shape_tensor = self.batch_shape_tensor()
+    gamma = tf.broadcast_to(self.gamma, batch_shape_tensor)
+    delta = tf.broadcast_to(self.delta, batch_shape_tensor)
+    scale = tf.broadcast_to(self.scale, batch_shape_tensor)
+    loc = tf.broadcast_to(self.loc, batch_shape_tensor)
 
-    gamma = gamma * tf.ones(self._batch_shape_tensor(gamma=gamma),
-                            dtype=self.dtype)
-    delta = delta * tf.ones(self._batch_shape_tensor(delta=delta),
-                            dtype=self.dtype)
-    scale = scale * tf.ones(self._batch_shape_tensor(scale=scale),
-                            dtype=self.dtype)
-    loc = loc * tf.ones(self._batch_shape_tensor(loc=loc), dtype=self.dtype)
-
-    mean = loc - scale * tf.math.exp(0.5 / tf.math.square(delta)) * \
+    return loc - scale * tf.math.exp(0.5 / tf.math.square(delta)) * \
       tf.math.sinh(gamma / delta)
-    return mean
 
   def _variance(self):
-    gamma = tf.convert_to_tensor(self.gamma)
-    delta = tf.convert_to_tensor(self.delta)
-    scale = tf.convert_to_tensor(self.scale)
-
-    gamma = gamma * tf.ones(self._batch_shape_tensor(gamma=gamma),
-                            dtype=self.dtype)
-    delta = delta * tf.ones(self._batch_shape_tensor(delta=delta),
-                            dtype=self.dtype)
-    scale = scale * tf.ones(self._batch_shape_tensor(scale=scale),
-                            dtype=self.dtype)
+    batch_shape_tensor = self.batch_shape_tensor()
+    gamma = tf.broadcast_to(self.gamma, batch_shape_tensor)
+    delta = tf.broadcast_to(self.delta, batch_shape_tensor)
+    scale = tf.broadcast_to(self.scale, batch_shape_tensor)
 
     return 0.5 * scale**2 * tf.math.expm1(1./delta**2) * \
         (tf.math.exp(1/delta**2) * tf.math.cosh(2. * gamma / delta) + 1.)
 
   def _parameter_control_dependencies(self, is_init):
-    if is_init:
-      try:
-        self._batch_shape()
-      except ValueError:
-        raise ValueError(
-            'Arguments must have compatible shapes; '
-            'gamma.shape={}, delta.shape={}, loc.shape={}, scale.shape={}.'
-            .format(self.gamma.shape, self.delta.shape, self.loc.shape,
-                    self.scale.shape))
-      # We don't bother checking the shapes in the dynamic case because
-      # all member functions access all arguments anyway.
+    assertions = super(JohnsonSU, self)._parameter_control_dependencies(is_init)
 
-    if not self.validate_args:
-      return []
-    assertions = []
     if is_init != tensor_util.is_ref(self.delta):
       assertions.append(assert_util.assert_positive(
           self.delta, message='Argument `delta` must be positive.'))
     if is_init != tensor_util.is_ref(self.scale):
       assertions.append(assert_util.assert_positive(
           self.scale, message='Argument `scale` must be positive.'))
+
     return assertions
