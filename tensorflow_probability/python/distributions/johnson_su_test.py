@@ -521,7 +521,7 @@ class JohnsonSUTest(test_util.TestCase):
 class JohnsonSUEagerGCTest(test_util.TestCase):
 
   @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
-  def testJohnsonSUMeanAndMode(self):
+  def testJohnsonSUMean(self):
     gamma = [1.]
     delta = [2.]
     # Mu will be broadcast to [7, 7, 7].

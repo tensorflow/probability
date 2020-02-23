@@ -181,15 +181,12 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
       dtype_util.assert_same_float_dtype((self._gamma, self._delta,
                                           self._loc, self._scale))
 
-      norm_affine = invert_bijector.Invert(
-          shift_bijector.Shift(
-              shift=self._gamma,
-              validate_args=validate_args)(
-                  scale_bijector.Scale(
-                      scale=self._delta,
-                      validate_args=validate_args
-                  )
-              )
+      norm_shift = invert_bijector.Invert(
+          shift_bijector.Shift(shift=self._gamma, validate_args=validate_args)
+      )
+
+      norm_scale = invert_bijector.Invert(
+          scale_bijector.Scale(scale=self._delta, validate_args=validate_args)
       )
 
       sinh = inline_bijector.Inline(
@@ -199,17 +196,17 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
           inverse_log_det_jacobian_fn=lambda y: -0.5 * math.log1psquare(y),
           forward_min_event_ndims=0,
           is_increasing=lambda: True,
+          validate_args=validate_args,
           name='sinh'
       )
 
-      affine = shift_bijector.Shift(
-          shift=self._loc,
-          validate_args=validate_args)(
-              scale_bijector.Scale(
-                  scale=self._scale,
-                  validate_args=validate_args
-              )
-          )
+      scale = scale_bijector.Scale(scale=self._scale,
+                                   validate_args=validate_args)
+
+      shift = shift_bijector.Shift(shift=self._loc,
+                                   validate_args=validate_args)
+
+      bijector = shift(scale(sinh(norm_scale(norm_shift))))
 
       batch_shape = distribution_util.get_broadcast_shape(
           self._gamma, self._delta, self._loc, self._scale)
@@ -220,7 +217,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
               scale=tf.ones([], dtype=dtype),
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats),
-          bijector=affine(sinh(norm_affine)),
+          bijector=bijector,
           batch_shape=batch_shape,
           validate_args=validate_args,
           parameters=parameters,
@@ -257,32 +254,34 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
     return self._scale
 
   def _mean(self):
-    batch_shape_tensor = self.batch_shape_tensor()
-    gamma = tf.broadcast_to(self.gamma, batch_shape_tensor)
-    delta = tf.broadcast_to(self.delta, batch_shape_tensor)
-    scale = tf.broadcast_to(self.scale, batch_shape_tensor)
-    loc = tf.broadcast_to(self.loc, batch_shape_tensor)
+    gamma, delta, scale, loc = [tf.convert_to_tensor(v)
+                                for v in (self.gamma, self.delta, self.scale,
+                                          self.loc)]
 
     return loc - scale * tf.math.exp(0.5 / tf.math.square(delta)) * \
       tf.math.sinh(gamma / delta)
 
   def _variance(self):
-    batch_shape_tensor = self.batch_shape_tensor()
-    gamma = tf.broadcast_to(self.gamma, batch_shape_tensor)
-    delta = tf.broadcast_to(self.delta, batch_shape_tensor)
-    scale = tf.broadcast_to(self.scale, batch_shape_tensor)
+    gamma, delta, scale = [tf.convert_to_tensor(v)
+                           for v in (self.gamma, self.delta, self.scale)]
 
-    return 0.5 * scale**2 * tf.math.expm1(1./delta**2) * \
-        (tf.math.exp(1/delta**2) * tf.math.cosh(2. * gamma / delta) + 1.)
+    inv_delta = 1./delta
+    inv_delta_2 = inv_delta**2
+
+    variance = 0.5 * scale**2 * tf.math.expm1(inv_delta_2) * \
+        (tf.math.exp(inv_delta_2) * tf.math.cosh(2. * gamma * inv_delta) + 1.)
+
+    return tf.broadcast_to(variance, self.batch_shape_tensor())
 
   def _parameter_control_dependencies(self, is_init):
     assertions = super(JohnsonSU, self)._parameter_control_dependencies(is_init)
 
-    if is_init != tensor_util.is_ref(self.delta):
-      assertions.append(assert_util.assert_positive(
-          self.delta, message='Argument `delta` must be positive.'))
-    if is_init != tensor_util.is_ref(self.scale):
-      assertions.append(assert_util.assert_positive(
-          self.scale, message='Argument `scale` must be positive.'))
+    if self.validate_args:
+      if is_init != tensor_util.is_ref(self.delta):
+        assertions.append(assert_util.assert_positive(
+            self.delta, message='Argument `delta` must be positive.'))
+      if is_init != tensor_util.is_ref(self.scale):
+        assertions.append(assert_util.assert_positive(
+            self.scale, message='Argument `scale` must be positive.'))
 
     return assertions
