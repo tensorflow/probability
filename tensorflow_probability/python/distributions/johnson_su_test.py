@@ -30,8 +30,6 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
-
 @test_util.test_all_tf_execution_regimes
 class JohnsonSUTest(test_util.TestCase):
 
