@@ -57,6 +57,7 @@ from tensorflow_probability.python.distributions.horseshoe import Horseshoe
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
+from tensorflow_probability.python.distributions.johnson_su import JohnsonSU
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionCoroutineAutoBatched
@@ -64,7 +65,6 @@ from tensorflow_probability.python.distributions.joint_distribution_named import
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionNamedAutoBatched
 from tensorflow_probability.python.distributions.joint_distribution_sequential import JointDistributionSequential
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionSequentialAutoBatched
-from tensorflow_probability.python.distributions.johnson_su import JohnsonSU
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
 from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
@@ -179,6 +179,7 @@ __all__ = [
     'Horseshoe',
     'Independent',
     'InverseGamma',
+    'JohnsonSU',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionCoroutineAutoBatched',
@@ -186,7 +187,6 @@ __all__ = [
     'JointDistributionNamedAutoBatched',
     'JointDistributionSequential',
     'JointDistributionSequentialAutoBatched',
-    'JohnsonSU',
     'Kumaraswamy',
     'LinearGaussianStateSpaceModel',
     'Laplace',
