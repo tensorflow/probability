@@ -44,6 +44,8 @@ class JohnsonSUTest(test_util.TestCase):
     gamma_shape, delta_shape, mu_shape, sigma_shape = \
       param_shapes['gamma'], param_shapes['delta'], \
       param_shapes['loc'], param_shapes['scale']
+    self.assertAllEqual(expected, self.evaluate(gamma_shape))
+    self.assertAllEqual(expected, self.evaluate(delta_shape))
     self.assertAllEqual(expected, self.evaluate(mu_shape))
     self.assertAllEqual(expected, self.evaluate(sigma_shape))
     gamma = tf.zeros(gamma_shape)
@@ -147,10 +149,11 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllEqual(johnson_su.batch_shape, pdf.shape)
     self.assertAllEqual(johnson_su.batch_shape, pdf_values.shape)
 
-    expected_log_pdf = sp_stats.johnsonsu(self.evaluate(gamma),
-                                          self.evaluate(delta),
-                                          self.evaluate(mu),
-                                          self.evaluate(sigma)).logpdf(x)
+    expected_log_pdf = sp_stats.johnsonsu.logpdf(x,
+                                                 self.evaluate(gamma),
+                                                 self.evaluate(delta),
+                                                 self.evaluate(mu),
+                                                 self.evaluate(sigma))
     self.assertAllClose(expected_log_pdf, log_pdf_values)
     self.assertAllClose(np.exp(expected_log_pdf), pdf_values)
 
@@ -172,7 +175,7 @@ class JohnsonSUTest(test_util.TestCase):
         self.evaluate(cdf).shape)
     self.assertAllEqual(johnson_su.batch_shape, cdf.shape)
     self.assertAllEqual(johnson_su.batch_shape, self.evaluate(cdf).shape)
-    expected_cdf = sp_stats.johnsonsu(gamma, delta, mu, sigma).cdf(x)
+    expected_cdf = sp_stats.johnsonsu.cdf(x, gamma, delta, mu, sigma)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0)
 
   def testJohnsonSUSurvivalFunction(self):
@@ -194,7 +197,7 @@ class JohnsonSUTest(test_util.TestCase):
         self.evaluate(sf).shape)
     self.assertAllEqual(johnson_su.batch_shape, sf.shape)
     self.assertAllEqual(johnson_su.batch_shape, self.evaluate(sf).shape)
-    expected_sf = sp_stats.johnsonsu(gamma, delta, mu, sigma).sf(x)
+    expected_sf = sp_stats.johnsonsu.sf(x, gamma, delta, mu, sigma)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0)
 
   def testJohnsonSULogCDF(self):
@@ -217,7 +220,7 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllEqual(johnson_su.batch_shape, cdf.shape)
     self.assertAllEqual(johnson_su.batch_shape, self.evaluate(cdf).shape)
 
-    expected_cdf = sp_stats.johnsonsu(gamma, delta, mu, sigma).logcdf(x)
+    expected_cdf = sp_stats.johnsonsu.logcdf(x, gamma, delta, mu, sigma)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-3)
 
   def testFiniteGradientAtDifficultPoints(self):
@@ -260,7 +263,7 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllEqual(johnson_su.batch_shape, sf.shape)
     self.assertAllEqual(johnson_su.batch_shape, self.evaluate(sf).shape)
 
-    expected_sf = sp_stats.johnsonsu(gamma, delta, mu, sigma).logsf(x)
+    expected_sf = sp_stats.johnsonsu.logsf(x, gamma, delta, mu, sigma)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0, rtol=1e-5)
 
   def testJohnsonSUMean(self):
@@ -272,11 +275,9 @@ class JohnsonSUTest(test_util.TestCase):
 
     johnson_su = tfd.JohnsonSU(gamma=gamma, delta=delta, loc=mu, scale=sigma,
                                validate_args=True)
-    # sp_stats doesn't work with array delta
-    sp_stats_d = sp_stats.johnsonsu(gamma, delta[0], mu, sigma)
-
     self.assertAllEqual((3,), johnson_su.mean().shape)
-    expected_mean = sp_stats_d.mean()
+    # sp_stats doesn't work with array delta
+    expected_mean = sp_stats.johnsonsu.mean(gamma, delta[0], mu, sigma)
     self.assertAllClose(expected_mean, self.evaluate(johnson_su.mean()))
 
   def testJohnsonSUQuantile(self):
@@ -302,7 +303,7 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllEqual(johnson_su.batch_shape, x.shape)
     self.assertAllEqual(johnson_su.batch_shape, self.evaluate(x).shape)
 
-    expected_x = sp_stats.johnsonsu(gamma, delta, mu, sigma).ppf(p)
+    expected_x = sp_stats.johnsonsu.ppf(p, gamma, delta, mu, sigma)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
 
   def _testQuantileFiniteGradientAtDifficultPoints(self, dtype):
@@ -359,8 +360,8 @@ class JohnsonSUTest(test_util.TestCase):
     delta = tf.constant(2.0)
     mu = tf.constant(3.0)
     sigma = tf.constant(math.sqrt(3.0))
-    mu_v = sp_stats.johnsonsu(1, 2, 3, math.sqrt(3.0)).mean()
-    sigma_v = sp_stats.johnsonsu(1, 2, 3, math.sqrt(3.0)).std()
+    mu_v = sp_stats.johnsonsu.mean(1, 2, 3, math.sqrt(3.0))
+    sigma_v = sp_stats.johnsonsu.std(1, 2, 3, math.sqrt(3.0))
     n = tf.constant(100000)
     johnson_su = tfd.JohnsonSU(gamma=gamma, delta=delta, loc=mu, scale=sigma,
                                validate_args=True)
@@ -415,12 +416,12 @@ class JohnsonSUTest(test_util.TestCase):
     sigma = tf.constant(
         [[math.sqrt(2.0), math.sqrt(3.0)]] * batch_size)
 
-    sp_stats_d = [
-        sp_stats.johnsonsu(1, 2, 3, math.sqrt(2.)),
-        sp_stats.johnsonsu(-1, 3, -3, math.sqrt(3.))
+    sp_stats_params = [
+        (1, 2, 3, math.sqrt(2.)),
+        (-1, 3, -3, math.sqrt(3.))
     ]
-    mu_v = [dist.mean() for dist in sp_stats_d]
-    sigma_v = [dist.std() for dist in sp_stats_d]
+    mu_v = [sp_stats.johnsonsu.mean(*params) for params in sp_stats_params]
+    sigma_v = [sp_stats.johnsonsu.std(*params) for params in sp_stats_params]
     n = tf.constant(100000)
     johnson_su = tfd.JohnsonSU(gamma=gamma, delta=delta, loc=mu, scale=sigma,
                                validate_args=True)
@@ -455,7 +456,7 @@ class JohnsonSUTest(test_util.TestCase):
                                  validate_args=True, name='D')
       self.evaluate(johnson_su.mean())
 
-  def testNegativeSigmaFails(self):
+  def testNegativeScaleFails(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       johnson_su = tfd.JohnsonSU(gamma=[1.], delta=[1.], loc=[1.], scale=[-5.],
                                  validate_args=True, name='S')
