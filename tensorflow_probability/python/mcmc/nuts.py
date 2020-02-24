@@ -117,10 +117,12 @@ TreeDoublingMetaState = collections.namedtuple(
         'is_accepted',
         'momentum_sum',     # Sum of momentum of the current tree for
                             # generalized U turn criteria
-        'energy_diff_sum',  # Sum of the energy differences (H' - H0) between
-                            # the states explored within the subtree and the
-                            # initial state. We use this to approximate the
-                            # Metropolis acceptance ratio
+        'energy_diff_sum',  # Sum over all states explored within the subtree of
+                            # Metropolis acceptance probabilities
+                            # exp(min(0, H' - H0)), where H0 is the negative
+                            # energy of the initial state and H' is the negative
+                            # energy of a state explored in the subtree.
+                            # TODO(b/150152798): Do sum in log-space.
         'leapfrog_count',   # How many leapfrogs each chain has taken
         'continue_tree',
         'not_divergence',
@@ -540,10 +542,6 @@ class NoUTurnSampler(TransitionKernel):
 
       last_candidate_state = initial_step_metastate.candidate_state
 
-      energy_diff_tree_sum = tf.where(
-          continue_tree_final,
-          energy_diff_tree_sum,
-          tf.zeros_like(energy_diff_tree_sum))
       energy_diff_sum = (
           energy_diff_tree_sum + initial_step_metastate.energy_diff_sum)
       if MULTINOMIAL_SAMPLE:
