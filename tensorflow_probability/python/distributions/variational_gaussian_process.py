@@ -118,7 +118,8 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
     parameters = dict(locals())
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype(
-          [inducing_index_points, variational_scale, jitter], dtype_hint=tf.float32)
+          [inducing_index_points, variational_scale, jitter], 
+          dtype_hint=tf.float32)
 
       self._base_kernel = base_kernel
       self._inducing_index_points = tensor_util.convert_nonref_to_tensor(
