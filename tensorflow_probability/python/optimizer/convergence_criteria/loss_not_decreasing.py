@@ -90,14 +90,17 @@ class LossNotDecreasing(convergence_criterion.ConvergenceCriterion):
         first `window_size` steps of the optimization. If both `atol`
         and `rtol` are specified, then convergence is assumed if *either* of
         the criteria is met.
-      window_size: int `Tensor` effective window size for the moving average.
-        The moving average is computed as
-        `average_decrease_in_loss[t] = ((window_size - 1) *
-        average_decrease_in_loss[t - 1] + decrease_in_loss[t]) / window_size`.
+      window_size: int `Tensor` effective window size for the moving average
+        decrease in loss. The moving average is computed as
+        `moving_average[t] = decrease_in_loss[t] + decay *
+        (moving_average[t-1] - decrease_in_loss[t])` where
+        `decay = 1. - 1. / window_size`.
+        Default value: `10`.
       min_num_steps: int `Tensor` minimum number of steps before convergence.
         The criterion will not return `has_converged=True` until
         `step >= min_num_steps`. This should generally be a larger value than
         `window_size`.
+        Default value: `20`.
       name: optional Python `str` name prefixed to ops created by this class.
     """
 
