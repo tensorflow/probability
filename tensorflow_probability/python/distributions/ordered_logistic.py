@@ -38,13 +38,11 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
   """Broadcasts the event or distribution parameters."""
-  if dtype_util.is_integer(event.dtype):
-    pass
-  elif dtype_util.is_floating(event.dtype):
+  if dtype_util.is_floating(event.dtype):
     # When `validate_args=True` we've already ensured int/float casting
     # is closed.
     event = tf.cast(event, dtype=tf.int32)
-  else:
+  elif not dtype_util.is_integer(event.dtype):
     raise TypeError('`value` should have integer `dtype` or '
                     '`self.dtype` ({})'.format(base_dtype))
   shape_known_statically = (
