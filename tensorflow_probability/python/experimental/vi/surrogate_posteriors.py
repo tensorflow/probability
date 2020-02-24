@@ -146,7 +146,7 @@ def build_factored_surrogate_posterior(
       build the corresponding factor in the surrogate posterior. It is expected
       that the distribution returned is supported on unconstrained real values.
       Default value: `functools.partial(
-        tfp.vi.experimental.build_trainable_location_scale_distribution,
+        tfp.experimental.vi.build_trainable_location_scale_distribution,
         distribution_fn=tfd.Normal)`, i.e., a trainable Normal distribution.
     seed: Python integer to seed the random number generator. This is used
       only when `initial_loc` is not specified.
@@ -183,7 +183,7 @@ def build_factored_surrogate_posterior(
   be positive.
 
   ```python
-  surrogate_posterior = tfp.vi.experimental.build_factored_surrogate_posterior(
+  surrogate_posterior = tfp.experimental.vi.build_factored_surrogate_posterior(
     event_shape=model.event_shape_tensor()[:-1],  # Omit the observed `y`.
     constraining_bijectors=[tfb.Softplus(),   # Rate is positive.
                             tfb.Softplus()])  # Concentration is positive.
@@ -222,7 +222,7 @@ def build_factored_surrogate_posterior(
   initial_unconstrained_loc = tf.nest.map_fn(
     lambda b, x: b.inverse(x) if b is not None else x,
     constraining_bijectors, initial_loc)
-  surrogate_posterior = tfp.vi.experimental.build_factored_surrogate_posterior(
+  surrogate_posterior = tfp.experimental.vi.build_factored_surrogate_posterior(
     event_shape=tf.nest.map_fn(tf.shape, initial_loc),
     constraining_bijectors=constraining_bijectors,
     initial_unconstrained_loc=initial_unconstrained_state,
