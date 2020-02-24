@@ -254,7 +254,8 @@ class OrderedLogistic(distribution.Distribution):
 
   def categorical_log_probs(self):
     """Log probabilities for the `K+1` ordered categories."""
-    log_survival = self._augmented_log_survival_function()
+    log_survival = tf.math.log_sigmoid(
+        self.loc[..., tf.newaxis] - self._augmented_cutpoints())
     return tfp_math.log_sub_exp(
         log_survival[..., :-1], log_survival[..., 1:])
 
@@ -268,10 +269,6 @@ class OrderedLogistic(distribution.Distribution):
         prefer_static.shape(cutpoints[..., :1]),
         tf.constant(np.inf, dtype=cutpoints.dtype))
     return tf.concat([-inf, cutpoints, inf], axis=-1)
-
-  def _augmented_log_survival_function(self):
-    return tf.math.log_sigmoid(
-        self.loc[..., tf.newaxis] - self._augmented_cutpoints())
 
   def _num_categories(self):
     return prefer_static.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
@@ -310,7 +307,8 @@ class OrderedLogistic(distribution.Distribution):
     num_categories = self._num_categories()
     x, augmented_log_survival = _broadcast_cat_event_and_params(
         event=x,
-        params=self._augmented_log_survival_function(),
+        params=tf.math.log_sigmoid(
+            self.loc[..., tf.newaxis] - self._augmented_cutpoints()),
         base_dtype=dtype_util.base_dtype(self.dtype))
     x_flat = tf.reshape(x, [-1, 1])
     augmented_log_survival_flat = tf.reshape(
@@ -339,7 +337,8 @@ class OrderedLogistic(distribution.Distribution):
     num_categories = self._num_categories()
     x, augmented_log_survival = _broadcast_cat_event_and_params(
         event=x,
-        params=self._augmented_log_survival_function(),
+        params=tf.math.log_sigmoid(
+            self.loc[..., tf.newaxis] - self._augmented_cutpoints()),
         base_dtype=dtype_util.base_dtype(self.dtype))
     x_flat = tf.reshape(x, [-1, 1])
     augmented_log_survival_flat = tf.reshape(
