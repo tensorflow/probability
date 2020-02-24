@@ -118,18 +118,19 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
     parameters = dict(locals())
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype(
-          [inducing_index_points, variational_scale], dtype_hint=tf.float32)
+          [inducing_index_points, variational_scale, jitter], dtype_hint=tf.float32)
 
       self._base_kernel = base_kernel
       self._inducing_index_points = tensor_util.convert_nonref_to_tensor(
           inducing_index_points, dtype=dtype, name='inducing_index_points')
       self._variational_scale = tensor_util.convert_nonref_to_tensor(
           variational_scale, dtype=dtype, name='variational_scale')
-      self._jitter = jitter
+      self._jitter = tensor_util.convert_nonref_to_tensor(
+          jitter, dtype=dtype, name='jitter')
 
       def _compute_chol_kzz(z):
         kzz = base_kernel.matrix(z, z)
-        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, self.jitter))
+        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, self._jitter))
         return result
 
       # Somewhat confusingly, but for the sake of brevity, we use `var` to refer
