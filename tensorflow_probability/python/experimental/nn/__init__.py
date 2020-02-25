@@ -17,21 +17,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from discussion.nn import util
-from discussion.nn.affine_layers import Affine
-from discussion.nn.affine_layers import AffineVariationalFlipout
-from discussion.nn.affine_layers import AffineVariationalReparameterization
-from discussion.nn.affine_layers import AffineVariationalReparameterizationLocal
-from discussion.nn.convolutional_layers import Convolution
-from discussion.nn.convolutional_layers import ConvolutionVariationalFlipout
-from discussion.nn.convolutional_layers import ConvolutionVariationalReparameterization
-from discussion.nn.convolutional_transpose_layers import ConvolutionTranspose
-from discussion.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalFlipout
-from discussion.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalReparameterization
-from discussion.nn.layers import Lambda
-from discussion.nn.layers import Layer
-from discussion.nn.layers import Sequential
-from discussion.nn.variational_base import VariationalLayer
+from tensorflow_probability.python.experimental.nn import util
+from tensorflow_probability.python.experimental.nn.affine_layers import Affine
+from tensorflow_probability.python.experimental.nn.affine_layers import AffineVariationalFlipout
+from tensorflow_probability.python.experimental.nn.affine_layers import AffineVariationalReparameterization
+from tensorflow_probability.python.experimental.nn.affine_layers import AffineVariationalReparameterizationLocal
+from tensorflow_probability.python.experimental.nn.convolutional_layers import Convolution
+from tensorflow_probability.python.experimental.nn.convolutional_layers import ConvolutionVariationalFlipout
+from tensorflow_probability.python.experimental.nn.convolutional_layers import ConvolutionVariationalReparameterization
+from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTranspose
+from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalFlipout
+from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalReparameterization
+from tensorflow_probability.python.experimental.nn.layers import Lambda
+from tensorflow_probability.python.experimental.nn.layers import Layer
+from tensorflow_probability.python.experimental.nn.layers import Sequential
+from tensorflow_probability.python.experimental.nn.variational_base import VariationalLayer
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 

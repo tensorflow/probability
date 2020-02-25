@@ -18,9 +18,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-from discussion.nn import util as nn_util_lib
+from tensorflow_probability.python.experimental.nn import util as nn_util_lib
 from tensorflow_probability.python.internal import name_util
 
 
@@ -29,8 +28,6 @@ __all__ = [
     'Layer',
     'Sequential',
 ]
-
-tfd = tfp.distributions
 
 
 class Layer(tf.Module):
