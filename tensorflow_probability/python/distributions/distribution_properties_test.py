@@ -152,6 +152,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
     'ProbitBernoulli',  # Seemingly runs, but gives `NaN`s sometimes.
+    'RelaxedBernoulli',  # Denormal flushing problem: b/150161911
     'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/145554459
