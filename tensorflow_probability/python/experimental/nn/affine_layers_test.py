@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for convolution_layers.py."""
+"""Tests for affine_layers.py."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from discussion import nn
+from tensorflow_probability.python.experimental import nn
 from tensorflow_probability.python.internal import test_util
 
 
@@ -34,7 +34,7 @@ tfd = tfp.distributions
 
 class BnnEndToEnd(object):
 
-  def run_bnn_test(self, make_conv):
+  def run_bnn_test(self, make_affine):
     # 1  Prepare Dataset
 
     train_size = 128
@@ -57,13 +57,17 @@ class BnnEndToEnd(object):
     scale = tfp.util.TransformedVariable(1., tfb.Softplus())
     n = tf.cast(train_size, tf.float32)
     bnn = nn.Sequential([
-        make_conv(evidence_shape[-1], 32, filter_shape=7, strides=2,
-                  penalty_weight=1. / n),
-        tf.nn.elu,
+        nn.ConvolutionVariationalReparameterization(
+            evidence_shape[-1], 32, filter_shape=7,
+            rank=2, strides=2, padding='same',
+            init_kernel_fn=tf.initializers.he_uniform(),
+            penalty_weight=1. / n),
         # nn.util.trace('conv1'),    # [b, 14, 14, 32]
+        tf.nn.elu,
+        # nn.util.trace('elu'),    # [b, 14, 14, 32]
         nn.util.flatten_rightmost(ndims=3),
         # nn.util.trace('flat1'),    # [b, 14 * 14 * 32]
-        nn.AffineVariationalReparameterization(
+        make_affine(
             14 * 14 * 32, np.prod(target_shape) - 1,
             penalty_weight=1. / n),
         # nn.util.trace('affine1'),  # [b, 9]
@@ -92,39 +96,50 @@ class BnnEndToEnd(object):
 
 
 @test_util.test_all_tf_execution_regimes
-class ConvolutionTest(test_util.TestCase):
+class AffineTest(test_util.TestCase):
 
   def test_works_correctly(self):
     pass
 
 
 @test_util.test_all_tf_execution_regimes
-class ConvolutionVariationalReparameterizationTest(
+class AffineVariationalReparameterizationTest(test_util.TestCase, BnnEndToEnd):
+
+  def test_works_correctly(self):
+    if not tf.executing_eagerly():
+      self.skipTest('Skipping graph mode test since we simulate user behavior.')
+    make_affine = functools.partial(
+        nn.AffineVariationalReparameterization,
+        init_kernel_fn=tf.initializers.he_uniform(),
+        init_bias_fn=tf.initializers.he_uniform())
+    self.run_bnn_test(make_affine)
+
+
+@test_util.test_all_tf_execution_regimes
+class AffineVariationalFlipoutTest(test_util.TestCase, BnnEndToEnd):
+
+  def test_works_correctly(self):
+    if not tf.executing_eagerly():
+      self.skipTest('Skipping graph mode test since we simulate user behavior.')
+    make_affine = functools.partial(
+        nn.AffineVariationalFlipout,
+        init_kernel_fn=tf.initializers.he_uniform(),
+        init_bias_fn=tf.initializers.he_uniform())
+    self.run_bnn_test(make_affine)
+
+
+@test_util.test_all_tf_execution_regimes
+class AffineVariationalReparameterizationLocalTest(
     test_util.TestCase, BnnEndToEnd):
 
   def test_works_correctly(self):
     if not tf.executing_eagerly():
       self.skipTest('Skipping graph mode test since we simulate user behavior.')
-    make_conv = functools.partial(
-        nn.ConvolutionVariationalReparameterization,
-        rank=2,
-        padding='same',
-        init_kernel_fn=tf.initializers.he_normal())
-    self.run_bnn_test(make_conv)
-
-
-@test_util.test_all_tf_execution_regimes
-class ConvolutionVariationalFlipoutTest(test_util.TestCase, BnnEndToEnd):
-
-  def test_works_correctly(self):
-    if not tf.executing_eagerly():
-      self.skipTest('Skipping graph mode test since we simulate user behavior.')
-    make_conv = functools.partial(
-        nn.ConvolutionVariationalFlipout,
-        rank=2,
-        padding='same',
-        init_kernel_fn=tf.initializers.he_normal())
-    self.run_bnn_test(make_conv)
+    make_affine = functools.partial(
+        nn.AffineVariationalReparameterizationLocal,
+        init_kernel_fn=tf.initializers.he_uniform(),
+        init_bias_fn=tf.initializers.he_uniform())
+    self.run_bnn_test(make_affine)
 
 
 if __name__ == '__main__':

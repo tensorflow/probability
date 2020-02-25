@@ -21,12 +21,12 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
-from discussion.nn import layers as layers_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
 from tensorflow_probability.python.distributions import mvn_diag as mvn_diag_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
+from tensorflow_probability.python.experimental.nn import layers as layers_lib
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
 from tensorflow_probability.python.math.random_ops import random_rademacher

@@ -37,7 +37,7 @@ py_library(
         ":convolutional_transpose_layers",
         ":layers",
         ":variational_base",
-        "//tensorflow_probability/opensource/discussion/nn/util",
+        "//tensorflow_probability/python/experimental/nn/util",
     ],
 )
 
@@ -49,9 +49,9 @@ py_library(
         ":layers",
         ":variational_base",
         # tensorflow dep,
-        "//tensorflow_probability/opensource/discussion/nn/util",
         "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/experimental/nn/util",
     ],
 )
 
@@ -60,7 +60,6 @@ py_test(
     size = "small",
     srcs = ["affine_layers_test.py"],
     deps = [
-        ":nn",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -76,8 +75,8 @@ py_library(
         ":layers",
         ":variational_base",
         # tensorflow dep,
-        "//tensorflow_probability/opensource/discussion/nn/util",
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/experimental/nn/util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
@@ -88,7 +87,6 @@ py_test(
     size = "small",
     srcs = ["convolutional_layers_test.py"],
     deps = [
-        ":nn",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -105,8 +103,8 @@ py_library(
         ":layers",
         ":variational_base",
         # tensorflow dep,
-        "//tensorflow_probability/opensource/discussion/nn/util",
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/experimental/nn/util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
@@ -116,7 +114,6 @@ py_test(
     size = "small",
     srcs = ["convolutional_transpose_layers_test.py"],
     deps = [
-        ":nn",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
@@ -129,8 +126,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/opensource/discussion/nn/util",
+        "//tensorflow_probability/python/experimental/nn/util",
         "//tensorflow_probability/python/internal:name_util",
     ],
 )
@@ -140,7 +136,6 @@ py_test(
     size = "small",
     srcs = ["layers_test.py"],
     deps = [
-        ":nn",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
