@@ -125,7 +125,7 @@ py_test(
     name = "bijector_properties_test",
     size = "medium",
     srcs = ["bijector_properties_test.py"],
-    shard_count = 10,
+    shard_count = 20,
     tags = ["hypothesis"],
     deps = [
         ":categorical_to_discrete",

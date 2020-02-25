@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+import functools
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
@@ -26,6 +28,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -139,6 +142,21 @@ TRANSFORM_DIAGONAL_WHITELIST = {
     'WeibullCDF',
 }
 
+AUTOVECTORIZATION_IS_BROKEN = [
+    'BatchNormalization',  # Might (necessarily) violate shape semantics?
+    'FillScaleTriL',  # No converter for ReverseV2
+    'FillTriangular',  # No converter for ReverseV2
+    'MatvecLU',  # GatherV2 with loop-varying args requires axis=0 (got -2)
+    'Permute',  # GatherV2 with loop-varying args requires axis=0 (got -1)
+    'ScaleMatvecLU',  # GatherV2 with loop-varying args requires axis=0 (got -2)
+    'ScaleTriL',  # No converter for ReverseV2
+]
+
+AUTOVECTORIZATION_RTOL = collections.defaultdict(lambda: 1e-5)
+AUTOVECTORIZATION_RTOL.update({
+    'Invert': 1e-2,  # Can contain poorly-conditioned bijectors.
+    'ScaleMatvecTriL': 1e-3})
+
 
 def is_invert(bijector):
   return isinstance(bijector, tfb.Invert)
@@ -189,7 +207,7 @@ class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
 
 @hps.composite
 def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
-              enable_vars=False):
+              enable_vars=False, allowed_bijectors=None, validate_args=True):
   """Strategy for drawing Bijectors.
 
   The emitted bijector may be a basic bijector or an `Invert` of a basic
@@ -210,38 +228,50 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
       initialization in slicing_test.  If `False`, the returned parameters are
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
+    allowed_bijectors: Optional list of `str` Bijector names to sample from.
+      Bijectors not in this list will not be returned or instantiated as
+      part of a meta-bijector (Chain, Invert, etc.). Defaults to
+      `TF2_FRIENDLY_BIJECTORS`.
+    validate_args: Python `bool`; whether to enable runtime checks.
 
   Returns:
     bijectors: A strategy for drawing bijectors with the specified `batch_shape`
       (or an arbitrary one if omitted).
   """
+  if allowed_bijectors is None:
+    allowed_bijectors = TF2_FRIENDLY_BIJECTORS
   if bijector_name is None:
-    bijector_name = draw(hps.sampled_from(TF2_FRIENDLY_BIJECTORS))
+    bijector_name = draw(hps.sampled_from(allowed_bijectors))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
   if bijector_name == 'Invert':
     underlying_name = draw(
-        hps.sampled_from(sorted(set(TF2_FRIENDLY_BIJECTORS) - {'Invert'})))
+        hps.sampled_from(sorted(set(allowed_bijectors) - {'Invert'})))
     underlying = draw(
         bijectors(
             bijector_name=underlying_name,
             batch_shape=batch_shape,
             event_dim=event_dim,
-            enable_vars=enable_vars))
+            enable_vars=enable_vars,
+            allowed_bijectors=allowed_bijectors,
+            validate_args=validate_args))
     bijector_params = {'bijector': underlying}
     msg = 'Forming Invert bijector with underlying bijector {}.'
     hp.note(msg.format(underlying))
   elif bijector_name == 'TransformDiagonal':
     underlying_name = draw(
-        hps.sampled_from(sorted(TRANSFORM_DIAGONAL_WHITELIST)))
+        hps.sampled_from(sorted(
+            set(allowed_bijectors) & set(TRANSFORM_DIAGONAL_WHITELIST))))
     underlying = draw(
         bijectors(
             bijector_name=underlying_name,
             batch_shape=(),
             event_dim=event_dim,
-            enable_vars=enable_vars))
+            enable_vars=enable_vars,
+            allowed_bijectors=allowed_bijectors,
+            validate_args=validate_args))
     bijector_params = {'diag_bijector': underlying}
     msg = 'Forming TransformDiagonal bijector with underlying bijector {}.'
     hp.note(msg.format(underlying))
@@ -297,7 +327,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   ctor = getattr(tfb, bijector_name)
   hp.note('Forming {} bijector with params {}.'.format(
       bijector_name, bijector_params))
-  return ctor(validate_args=True, **bijector_params)
+  return ctor(validate_args=validate_args, **bijector_params)
 
 
 def constrain_forward_shape(bijector, shape):
@@ -448,22 +478,19 @@ def _ldj_tensor_conversions_allowed(bijector, is_forward):
 @test_util.test_all_tf_execution_regimes
 class BijectorPropertiesTest(test_util.TestCase):
 
-  @parameterized.named_parameters(
-      {'testcase_name': bname, 'bijector_name': bname}
-      for bname in TF2_FRIENDLY_BIJECTORS)
-  @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings()
-  def testBijector(self, bijector_name, data):
-    tfp_hps.guitar_skip_if_matches('Tanh', bijector_name, 'b/144163991')
+  def _draw_bijector(self, bijector_name, data,
+                     batch_shape=None, allowed_bijectors=None,
+                     validate_args=True):
     event_dim = data.draw(hps.integers(min_value=2, max_value=6))
     bijector = data.draw(
         bijectors(bijector_name=bijector_name, event_dim=event_dim,
-                  enable_vars=True))
+                  enable_vars=True, batch_shape=batch_shape,
+                  allowed_bijectors=allowed_bijectors,
+                  validate_args=validate_args))
     self.evaluate(tf.group(*[v.initializer for v in bijector.variables]))
+    return bijector, event_dim
 
-    # Forward mapping: Check differentiation through forward mapping with
-    # respect to the input and parameter variables.  Also check that any
-    # variables are not referenced overmuch.
+  def _draw_domain_tensor(self, bijector, data, event_dim, sample_shape=()):
     # TODO(axch): Would be nice to get rid of all this shape inference logic and
     # just rely on a notion of batch and event shape for bijectors, so we can
     # pass those through `domain_tensors` and `codomain_tensors` and use
@@ -473,12 +500,36 @@ class BijectorPropertiesTest(test_util.TestCase):
     codomain_event_shape = constrain_inverse_shape(
         bijector, codomain_event_shape)
     shp = bijector.inverse_event_shape(codomain_event_shape)
-    shp = tensorshape_util.concatenate(
+    shp = functools.reduce(tensorshape_util.concatenate, [
+        sample_shape,
         data.draw(
             tfp_hps.broadcast_compatible_shape(
                 shp[:shp.ndims - bijector.forward_min_event_ndims])),
-        shp[shp.ndims - bijector.forward_min_event_ndims:])
+        shp[shp.ndims - bijector.forward_min_event_ndims:]])
     xs = tf.identity(data.draw(domain_tensors(bijector, shape=shp)), name='xs')
+
+    return xs
+
+  def _draw_codomain_tensor(self, bijector, data, event_dim, sample_shape=()):
+    return self._draw_domain_tensor(tfb.Invert(bijector),
+                                    data=data,
+                                    event_dim=event_dim,
+                                    sample_shape=sample_shape)
+
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in TF2_FRIENDLY_BIJECTORS)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testBijector(self, bijector_name, data):
+    tfp_hps.guitar_skip_if_matches('Tanh', bijector_name, 'b/144163991')
+
+    bijector, event_dim = self._draw_bijector(bijector_name, data)
+
+    # Forward mapping: Check differentiation through forward mapping with
+    # respect to the input and parameter variables.  Also check that any
+    # variables are not referenced overmuch.
+    xs = self._draw_domain_tensor(bijector, data, event_dim)
     wrt_vars = [xs] + [v for v in bijector.trainable_variables
                        if v.dtype.is_floating]
     with tf.GradientTape() as tape:
@@ -533,16 +584,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     # Inverse mapping: Check differentiation through inverse mapping with
     # respect to the codomain "input" and parameter variables.  Also check that
     # any variables are not referenced overmuch.
-    domain_event_shape = [event_dim] * bijector.forward_min_event_ndims
-    domain_event_shape = constrain_forward_shape(bijector, domain_event_shape)
-    shp = bijector.forward_event_shape(domain_event_shape)
-    shp = tensorshape_util.concatenate(
-        data.draw(
-            tfp_hps.broadcast_compatible_shape(
-                shp[:shp.ndims - bijector.inverse_min_event_ndims])),
-        shp[shp.ndims - bijector.inverse_min_event_ndims:])
-    ys = tf.identity(
-        data.draw(codomain_tensors(bijector, shape=shp)), name='ys')
+    ys = self._draw_codomain_tensor(bijector, data, event_dim)
     wrt_vars = [ys] + [v for v in bijector.trainable_variables
                        if v.dtype.is_floating]
     with tf.GradientTape() as tape:
@@ -572,6 +614,61 @@ class BijectorPropertiesTest(test_util.TestCase):
         ldj = bijector.inverse_log_det_jacobian(ys + 0, event_ndims=event_ndims)
     grads = tape.gradient(ldj, wrt_vars)
     assert_no_none_grad(bijector, 'inverse_log_det_jacobian', wrt_vars, grads)
+
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in (set(TF2_FRIENDLY_BIJECTORS) -
+                    set(AUTOVECTORIZATION_IS_BROKEN)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testAutoVectorization(self, bijector_name, data):
+
+    # TODO(b/150161911): reconcile numeric behavior of eager and graph mode.
+    if tf.executing_eagerly():
+      return
+
+    bijector, event_dim = self._draw_bijector(
+        bijector_name, data,
+        batch_shape=[],  # Avoid conflict with vmap sample dimension.
+        validate_args=False,  # Work around lack of `If` support in vmap.
+        allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
+                           set(AUTOVECTORIZATION_IS_BROKEN)))
+    rtol = AUTOVECTORIZATION_RTOL[bijector_name]
+
+    # Forward
+    n = 3
+    xs = self._draw_domain_tensor(bijector, data, event_dim, sample_shape=[n])
+    ys = bijector.forward(xs)
+    vectorized_ys = tf.vectorized_map(bijector.forward, xs)
+    self.assertAllClose(*self.evaluate((ys, vectorized_ys)), rtol=rtol)
+
+    # FLDJ
+    event_ndims = data.draw(
+        hps.integers(
+            min_value=bijector.forward_min_event_ndims,
+            max_value=prefer_static.rank_from_shape(xs.shape) - 1))
+    fldj_fn = functools.partial(bijector.forward_log_det_jacobian,
+                                event_ndims=event_ndims)
+    vectorized_fldj = tf.vectorized_map(fldj_fn, xs)
+    fldj = tf.broadcast_to(fldj_fn(xs), tf.shape(vectorized_fldj))
+    self.assertAllClose(*self.evaluate((fldj, vectorized_fldj)), rtol=rtol)
+
+    # Inverse
+    ys = self._draw_codomain_tensor(bijector, data, event_dim, sample_shape=[n])
+    xs = bijector.inverse(ys)
+    vectorized_xs = tf.vectorized_map(bijector.inverse, ys)
+    self.assertAllClose(*self.evaluate((xs, vectorized_xs)), rtol=rtol)
+
+    # ILDJ
+    event_ndims = data.draw(
+        hps.integers(
+            min_value=bijector.inverse_min_event_ndims,
+            max_value=prefer_static.rank_from_shape(ys.shape) - 1))
+    ildj_fn = functools.partial(bijector.inverse_log_det_jacobian,
+                                event_ndims=event_ndims)
+    vectorized_ildj = tf.vectorized_map(ildj_fn, ys)
+    ildj = tf.broadcast_to(ildj_fn(ys), tf.shape(vectorized_ildj))
+    self.assertAllClose(*self.evaluate((ildj, vectorized_ildj)), rtol=rtol)
 
 
 def ensure_nonzero(x):

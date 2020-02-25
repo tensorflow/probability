@@ -201,7 +201,7 @@ class CholeskyOuterProduct(bijector.Bijector):
     return tf.reshape(x, maybe_expanded_shape)
 
   def _assertions(self, t):
-    if self.validate_args:
+    if not self.validate_args:
       return []
     is_matrix = assert_util.assert_rank_at_least(t, 2)
     is_square = assert_util.assert_equal(tf.shape(t)[-2], tf.shape(t)[-1])
