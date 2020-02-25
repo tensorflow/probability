@@ -131,6 +131,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'DirichletMultinomial',  # No converter for TensorListFromTensor
     'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
+    'Gamma',  # No converter for While
     'Multinomial',  # No converter for TensorListFromTensor
     'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # No converter for TopKV2
@@ -146,6 +147,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'DirichletMultinomial',  # Same as Multinomial.
     'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
+    'Gamma',  # Denormal flushing problem: b/150161911
     'NegativeBinomial',  # Numeric inconsistency: b/147743999
     'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
     'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.

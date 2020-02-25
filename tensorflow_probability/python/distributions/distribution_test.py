@@ -295,7 +295,8 @@ class DistributionTest(test_util.TestCase):
         tfd.Beta,
         tfd.Chi2,
         tfd.Exponential,
-        tfd.Gamma,
+        # Uncomment when b/150222300 is fixed.
+        # tfd.Gamma,
         tfd.InverseGamma,
         tfd.Laplace,
         tfd.StudentT,
