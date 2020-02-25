@@ -22,7 +22,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.experimental import nn
+from discussion import nn
 from tensorflow_probability.python.internal import test_util
 
 
@@ -36,10 +36,10 @@ class AffineMeanFieldNormal(nn.Layer):
   def __init__(self, output_size, input_size, dtype=tf.float32, name=None):
     super(AffineMeanFieldNormal, self).__init__(name=name)
     self._kernel = tf.Variable(
-        tf.initializers.glorot_normal()([input_size, output_size], dtype),
+        tf.initializers.glorot_uniform()([input_size, output_size], dtype),
         name='kernel')
     self._bias = tf.Variable(
-        tf.initializers.glorot_normal()([output_size], dtype),
+        tf.initializers.glorot_uniform()([output_size], dtype),
         name='bias')
 
   @property

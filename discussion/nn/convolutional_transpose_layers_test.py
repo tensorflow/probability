@@ -23,7 +23,7 @@ import functools
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.experimental import nn
+from discussion import nn
 from tensorflow_probability.python.internal import test_util
 
 
@@ -122,13 +122,13 @@ class ConvolutionTransposeVariationalReparameterizationTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_normal())
     make_deconv = functools.partial(
         nn.ConvolutionTransposeVariationalReparameterization,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_normal())
     self.run_bnn_test(make_conv, make_deconv)
 
 
@@ -144,13 +144,13 @@ class ConvolutionTransposeVariationalFlipoutTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_normal())
     make_deconv = functools.partial(
         nn.ConvolutionTransposeVariationalFlipout,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_normal())
     self.run_bnn_test(make_conv, make_deconv)
 
 

@@ -17,20 +17,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python.experimental.nn.util.utils import display_imgs
-from tensorflow_probability.python.experimental.nn.util.utils import expand_dims
-from tensorflow_probability.python.experimental.nn.util.utils import flatten_rightmost
-from tensorflow_probability.python.experimental.nn.util.utils import make_fit_op
-from tensorflow_probability.python.experimental.nn.util.utils import make_kernel_bias
-from tensorflow_probability.python.experimental.nn.util.utils import make_kernel_bias_posterior_mvn_diag
-from tensorflow_probability.python.experimental.nn.util.utils import make_kernel_bias_prior_spike_and_slab
-from tensorflow_probability.python.experimental.nn.util.utils import negloglik
-from tensorflow_probability.python.experimental.nn.util.utils import tfcompile
-from tensorflow_probability.python.experimental.nn.util.utils import trace
-from tensorflow_probability.python.experimental.nn.util.utils import tune_dataset
-from tensorflow_probability.python.experimental.nn.util.utils import variables_load
-from tensorflow_probability.python.experimental.nn.util.utils import variables_save
-from tensorflow_probability.python.experimental.nn.util.utils import variables_summary
+from discussion.nn.util.utils import display_imgs
+from discussion.nn.util.utils import expand_dims
+from discussion.nn.util.utils import flatten_rightmost
+from discussion.nn.util.utils import make_fit_op
+from discussion.nn.util.utils import make_kernel_bias
+from discussion.nn.util.utils import make_kernel_bias_posterior_mvn_diag
+from discussion.nn.util.utils import make_kernel_bias_prior_spike_and_slab
+from discussion.nn.util.utils import negloglik
+from discussion.nn.util.utils import tfcompile
+from discussion.nn.util.utils import trace
+from discussion.nn.util.utils import tune_dataset
+from discussion.nn.util.utils import variables_load
+from discussion.nn.util.utils import variables_save
+from discussion.nn.util.utils import variables_summary
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 

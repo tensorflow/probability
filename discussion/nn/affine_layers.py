@@ -19,11 +19,11 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from discussion.nn import layers as layers_lib
+from discussion.nn import util as nn_util_lib
+from discussion.nn import variational_base as vi_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
-from tensorflow_probability.python.experimental.nn import layers as layers_lib
-from tensorflow_probability.python.experimental.nn import util as nn_util_lib
-from tensorflow_probability.python.experimental.nn import variational_base as vi_lib
 
 
 __all__ = [
@@ -48,8 +48,8 @@ class Affine(layers_lib.KernelBiasLayer):
       input_size,
       output_size,
       make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros
+      init_kernel_fn=None,
+      init_bias_fn=None,
       dtype=tf.float32,
       batch_shape=(),
       name=None):
@@ -59,11 +59,11 @@ class Affine(layers_lib.KernelBiasLayer):
       input_size: ...
       output_size: ...
       make_kernel_bias_fn: ...
-        Default value: `tfp.experimental.nn.util.make_kernel_bias`.
+        Default value: `nn.util.make_kernel_bias`.
       init_kernel_fn: ...
         Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
       init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
+        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
       dtype: ...
         Default value: `tf.float32`.
       batch_shape: ...
@@ -137,9 +137,9 @@ class AffineVariationalReparameterization(
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   import tensorflow_datasets as tfds
+  from discussion import nn
   tfb = tfp.bijectors
   tfd = tfp.distributions
-  tfn = tfp.experimental.nn
 
   # 1  Prepare Dataset
 
@@ -157,7 +157,7 @@ class AffineVariationalReparameterization(
     return image, label
   batch_size = 32
   train_size = datasets_info.splits['train'].num_examples
-  train_dataset = tfn.util.tune_dataset(
+  train_dataset = nn.util.tune_dataset(
       train_dataset,
       batch_shape=(batch_size,),
       shuffle_size=int(train_size / 7),
@@ -171,32 +171,35 @@ class AffineVariationalReparameterization(
   # 2  Specify Model
 
   BayesConv2D = functools.partial(
-      tfn.ConvolutionVariationalReparameterization,
+      nn.ConvolutionVariationalReparameterization,
       rank=2,
       padding='same',
       filter_shape=5,
-      init_kernel_fn=tf.initializers.he_uniform())  # Because we'll use `elu`.
+      init_kernel_fn=tf.initializers.he_normal())
 
-  BayesAffine = tfn.AffineVariationalReparameterization
+  BayesAffine = functools.partial(
+      nn.AffineVariationalReparameterization,
+      init_kernel_fn=tf.initializers.he_normal(),
+      init_bias_fn=tf.initializers.he_normal())
 
   scale = tfp.util.TransformedVariable(1., tfb.Softplus())
-  bnn = tfn.Sequential([
+  bnn = nn.Sequential([
       BayesConv2D(evidence_shape[-1], 32, filter_shape=7, strides=2),
       tf.nn.elu,
-      tfn.util.trace('conv1'),  # [b, 14, 14, 32]
+      nn.util.trace('conv1'),  # [b, 14, 14, 32]
 
-      tfn.util.flatten_rightmost(ndims=3),
-      tfn.util.trace('flat1'),  # [b, 14 * 14 * 32]
+      nn.util.flatten_rightmost(ndims=3),
+      nn.util.trace('flat1'),  # [b, 14 * 14 * 32]
 
       BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),
-      tfn.util.trace('affine1'),  # [b, 9]
+      nn.util.trace('affine1'),  # [b, 9]
 
-      tfn.Lambda(
+      nn.Lambda(
           eval_fn=lambda loc: tfb.SoftmaxCentered()(
               tfd.Independent(tfd.Normal(loc, scale),
                               reinterpreted_batch_ndims=1)),
           also_track=scale),
-      tfn.util.trace('head'),  # [b, 10]
+      nn.util.trace('head'),  # [b, 10]
   ], name='bayesian_neural_network')
 
   print(bnn.summary())
@@ -210,7 +213,7 @@ class AffineVariationalReparameterization(
     loss = nll + kl
     return loss, (nll, kl)
   opt = tf.optimizers.Adam()
-  fit_op = tfn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
+  fit_op = nn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
   for _ in range(200):
     loss, (nll, kl), g = fit_op()
   ```
@@ -236,8 +239,8 @@ class AffineVariationalReparameterization(
       # Weights
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros
+      init_kernel_fn=None,
+      init_bias_fn=None,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       # Penalty.
@@ -253,15 +256,13 @@ class AffineVariationalReparameterization(
       input_size: ...
       output_size: ...
       make_posterior_fn: ...
-        Default value:
-          `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
+        Default value: `nn.util.make_kernel_bias_posterior_mvn_diag`.
       make_prior_fn: ...
-        Default value:
-          `tfp.experimental.nn.util.make_kernel_bias_prior_spike_and_slab`.
+        Default value: `nn.util.make_kernel_bias_prior_spike_and_slab`.
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `tf.initializers.glorot_uniform()`.
       init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
+        Default value: `tf.initializers.glorot_uniform()`.
       posterior_value_fn: ...
         Default valye: `tfd.Distribution.sample`
       unpack_weights_fn:
@@ -334,9 +335,11 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
 
   ```python
   # Using the following substitution, see:
-  tfn = tfp.experimental.nn
-  help(tfn.AffineVariationalReparameterization)
-  BayesAffine = tfn.AffineVariationalFlipout
+  help(nn.AffineVariationalReparameterization)
+
+  BayesAffine = functools.partial(
+      nn.AffineVariationalFlipout,
+      init_kernel_fn=tf.initializers.he_normal())
   ```
 
   This example uses reparameterization gradients to minimize the
@@ -361,8 +364,8 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       # Weights
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros,
+      init_kernel_fn=None,
+      init_bias_fn=None,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       # Penalty.
@@ -378,15 +381,13 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       input_size: ...
       output_size: ...
       make_posterior_fn: ...
-        Default value:
-          `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
+        Default value: `nn.util.make_kernel_bias_posterior_mvn_diag`.
       make_prior_fn: ...
-        Default value:
-          `tfp.experimental.nn.util.make_kernel_bias_prior_spike_and_slab`.
+        Default value: `nn.util.make_kernel_bias_prior_spike_and_slab`.
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `tf.initializers.glorot_uniform()`.
       init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
+        Default value: `tf.initializers.glorot_uniform()`.
       posterior_value_fn: ...
         Default valye: `tfd.Distribution.sample`
       unpack_weights_fn:
@@ -465,9 +466,11 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
 
   ```python
   # Using the following substitution, see:
-  tfn = tfp.experimental.nn
-  help(tfn.AffineVariationalReparameterization)
-  BayesAffine =  tfn.AffineVariationalReparameterizationLocal
+  help(nn.AffineVariationalReparameterization)
+
+  BayesAffine = functools.partial(
+      nn.AffineVariationalReparameterizationLocal,
+      init_kernel_fn=tf.initializers.he_normal())
   ```
 
   This example uses reparameterization gradients to minimize the
@@ -494,8 +497,8 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       # Weights
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros
+      init_kernel_fn=None,
+      init_bias_fn=None,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       # Penalty.
@@ -511,15 +514,13 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       input_size: ...
       output_size: ...
       make_posterior_fn: ...
-        Default value:
-          `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
+        Default value: `nn.util.make_kernel_bias_posterior_mvn_diag`.
       make_prior_fn: ...
-        Default value:
-          `tfp.experimental.nn.util.make_kernel_bias_prior_spike_and_slab`.
+        Default value: `nn.util.make_kernel_bias_prior_spike_and_slab`.
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `tf.initializers.glorot_uniform()`.
       init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
+        Default value: `tf.initializers.glorot_uniform()`.
       posterior_value_fn: ...
         Default valye: `tfd.Distribution.sample`
       unpack_weights_fn:
