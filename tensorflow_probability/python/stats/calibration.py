@@ -28,13 +28,16 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.stats import quantiles as quantiles_lib
 
 
 __all__ = [
     'brier_decomposition',
     'brier_score',
     'expected_calibration_error',
+    'expected_calibration_error_quantiles',
 ]
 
 
@@ -345,3 +348,187 @@ def _make_flatten_unflatten_fns(batch_shape):
 def _reduce_log_l2_exp(loga, logb, axis=-1):
   return tf.math.reduce_logsumexp(2. * tfp_math.log_sub_exp(loga, logb),
                                   axis=axis)
+
+
+def expected_calibration_error_quantiles(
+    hit, pred_log_prob, num_buckets=20, axis=0,
+    name=None):
+  """Expected calibration error via `quantiles(exp(pred_log_prob),num_buckets)`.
+
+  Calibration is a measure of how well a model reports its own uncertainty. A
+  model is said to be "calibrated" if buckets of predicted probabilities have
+  the same within bucket average accurcy. The exected calibration error is the
+  average absolute difference between predicted probability and (bucket) average
+  accuracy. That is:
+
+  ```python
+  bucket weight = bucket_count / tf.reduce_sum(bucket_count, axis=0)
+  bucket_error = abs(bucket_accuracy - bucket_confidence)
+  ece = tf.reduce_sum(bucket_weight * bucket_error, axis=0)
+  ```
+
+  where `bucket_accuracy, bucket_confidence, bucket_count` are statistics
+  aggregated by `num_buckets`-quantiles of `tf.math.exp(pred_log_prob)`. Note:
+  `bucket_*` always have `num_buckets` size for the zero-th dimension.
+
+  Args:
+    hit: `bool` `Tensor` where `True` means the model prediction was correct
+      and `False` means the model prediction was incorrect. Shape must
+      broadcast with pred_log_prob.
+    pred_log_prob: `Tensor` representing the model's predicted log probability
+      for the given `hit`. Shape must broadcast with `hit`.
+    num_buckets: `int` representing the number of buckets over which to
+      aggregate hits. Buckets are quantiles of `exp(pred_log_prob)`.
+      Default value: `20`.
+    axis: Dimension over which to compute buckets and aggregate stats.
+      Default value: `0`.
+    name: Prefer `str` name used for ops created by this function.
+      Default value: `None` (i.e.,
+      `"expected_calibration_error_quantiles"`).
+
+  Returns:
+    ece: Expected calibration error; `tf.reduce_sum(abs(bucket_accuracy -
+      bucket_confidence) * bucket_count, axis=0) / tf.reduce_sum(bucket_count,
+      axis=0)`.
+    bucket_accuracy: `Tensor` representing the within bucket average hits, i.e.,
+      total bucket hits divided by bucket count. Has shape
+      `tf.concat([[num_buckets], tf.shape(tf.reduce_sum(pred_log_prob,
+      axis=axis))], axis=0)`.
+    bucket_confidence: `Tensor` representing the within bucket average
+      probability, i.e., total bucket predicted probability divided by bucket
+      count. Has shape `tf.concat([[num_buckets],
+      tf.shape(tf.reduce_sum(pred_log_prob, axis=axis))], axis=0)`.
+    bucket_count: `Tensor` representing the total number of obervations in each
+      bucket. Has shape `tf.concat([[num_buckets],
+      tf.shape(tf.reduce_sum(pred_log_prob, axis=axis))], axis=0)`.
+
+  #### Examples
+
+  ```python
+  # Example 1: Generic use.
+  label = tf.cast([0, 0, 1, 0, 1, 1], dtype=tf.bool)
+  log_pred = tf.math.log([0.1, 0.05, 0.5, 0.2, 0.99, 0.99])
+  (
+    ece,
+    acc,
+    conf,
+    cnt,
+    edges,
+    bucket,
+  ) = tfp.stats.expected_calibration_error_quantiles(
+      label, log_pred, num_buckets=3)
+  # ece  ==> tf.Tensor(0.145, shape=(), dtype=float32)
+  # acc  ==> tf.Tensor([0. 0. 1.], shape=(3,), dtype=float32)
+  # conf ==> tf.Tensor([0.075, 0.2, 0.826665], shape=(3,), dtype=float32)
+  # cnt  ==> tf.Tensor([2. 1. 3.], shape=(3,), dtype=float32)
+  ```
+
+  ```python
+  # Example 2: Categorgical classification.
+  # Assume we have evidence `x`, targets `y`, and model function `dnn`.
+  d = tfd.Categorical(logits=dnn(x))
+  def all_categories(d):
+    num_classes = tf.shape(d.logits_parameter())[-1]
+    batch_ndims = tf.size(d.batch_shape_tensor())
+    expand_shape = tf.pad(
+        [num_classes], paddings=[[0, batch_ndims]], constant_values=1)
+    return tf.reshape(tf.range(num_classes, dtype=d.dtype), expand_shape)
+  all_pred_log_prob = d.log_prob(all_categories(d))
+  yhat = tf.argmax(all_pred_log_prob, axis=0)
+  def rollaxis(x, shift):
+    return tf.transpose(x, tf.roll(tf.range(tf.rank(x)), shift=shift, axis=0))
+  pred_log_prob = tf.gather(rollaxis(all_pred_log_prob, shift=-1),
+                            yhat,
+                            batch_dims=len(d.batch_shape))
+  hit = tf.equal(y, yhat)
+  (
+    ece,
+    acc,
+    conf,
+    cnt,
+    edges,
+    bucket,
+  ) = tfp.stats.expected_calibration_error_quantiles(
+      hit, pred_log_prob, num_buckets=10)
+  ```
+
+  """
+  with tf.name_scope(name or 'expected_calibration_error_quantiles'):
+    pred_log_prob = tf.convert_to_tensor(
+        pred_log_prob, dtype_hint=tf.float32, name='pred_log_prob')
+    dtype = pred_log_prob.dtype
+    hit = tf.cast(hit, dtype, name='hit')
+    # Make sure to compute quantiles in "prob" space not "log(prob)".
+    bucket_pred_log_prob = tf.math.log(quantiles_lib.quantiles(
+        tf.math.exp(pred_log_prob),
+        num_quantiles=num_buckets,
+        axis=axis))
+    bucket = _find_bins(pred_log_prob, bucket_pred_log_prob, axis)
+    def _fn(i):
+      """`map_fn` body."""
+      keep = tf.equal(i, bucket)
+      total_hit = tf.math.reduce_sum(
+          tf.where(keep, hit, tf.constant(0., dtype)),
+          axis=axis)
+      total_count = tf.math.reduce_sum(
+          tf.cast(keep, dtype),
+          axis=axis)
+      log_total_pred_prob = tf.math.reduce_logsumexp(
+          tf.where(keep, pred_log_prob, tf.constant(-np.inf, dtype)),
+          axis=axis)
+      return total_hit, log_total_pred_prob, total_count
+    bucket_total_hit, bucket_log_total_pred_prob, bucket_count = tf.map_fn(
+        fn=_fn,
+        elems=tf.range(num_buckets, dtype=bucket.dtype),
+        dtype=(dtype,)*3)
+    n = tf.maximum(bucket_count, 1.)
+    bucket_accuracy = bucket_total_hit / n
+    bucket_confidence = tf.math.exp(bucket_log_total_pred_prob - tf.math.log(n))
+    bucket_error = abs(bucket_accuracy - bucket_confidence)
+    n = prefer_static.cast(prefer_static.shape(pred_log_prob)[axis], dtype)
+    ece = tf.math.reduce_sum(bucket_count * bucket_error, axis=0) / n
+    return (
+        ece,
+        bucket_accuracy,
+        bucket_confidence,
+        bucket_count,
+        bucket_pred_log_prob,
+        bucket,
+    )
+
+
+def _find_bins(x, edges, axis, dtype=tf.int64, name=None):
+  """Like `tfp.stats.find_bins` but correctly handles quantiles axis arg."""
+  with tf.name_scope(name or 'find_bins'):
+    # We can't do this:
+    #   return tf.cast(quantiles_lib.find_bins(x, edges=edges), dtype=tf.int64)
+    # because it doesn't seem to correctly handle axis!=-1. This is a bug in TFP
+    # and should be fixed. Furthermore, the following is probably more efficient
+    # than tfp.stats..find_bins anyway.
+    num_buckets = prefer_static.size0(edges) - 1
+    # First, we need to have `keepdims=True` semantics for edges.
+    axis = axis % prefer_static.rank(x)
+    edges = tf.expand_dims(edges, axis + 1)
+    # We now find the bucket which is is the "first larger", then subtract one
+    # to get the bucket which is the "last smaller". Care must be taken for the
+    # max element.
+    pred = x < edges
+    # The following is equivalent to:
+    #    tf.argmin(tf.cast(~pred, dtype), axis=0))
+    # yet gives the same implementation across TPU/GPU/CPU.
+    # As a bonus, we can also leverage the `sorted=True` behavior.
+    _, bucket_larger = tf.math.top_k(
+        tf.cast(
+            tf.transpose(pred, prefer_static.pad(
+                prefer_static.range(1, prefer_static.rank(pred)),
+                paddings=[[0, 1]])),
+            dtype),
+        k=1,
+        sorted=True)
+    bucket_larger = bucket_larger[..., 0]
+
+    bucket_larger = tf.where(
+        pred[-1],  # == ~tf.math.reduce_all(pred, axis=0)
+        tf.cast(bucket_larger, dtype),
+        tf.cast(num_buckets, dtype))
+    return bucket_larger - 1
