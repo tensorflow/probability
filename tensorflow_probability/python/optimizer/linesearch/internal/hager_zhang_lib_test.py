@@ -47,7 +47,7 @@ def _interval(val_left, val_right):
       right=val_right)
 
 
-def test_function_x_y(x, y):
+def _test_function_x_y(x, y):
   """Builds a function that passes through the given points.
 
   Args:
@@ -74,13 +74,13 @@ def test_function_x_y(x, y):
   return f
 
 
-def test_function_x_y_dy(x, y, dy, eps=0.01):
+def _test_function_x_y_dy(x, y, dy, eps=0.01):
   """Builds a polynomial with (approx) given values and derivatives."""
   x1 = x + eps
   y1 = y + eps * dy
   x2 = x - eps
   y2 = y - eps * dy
-  return test_function_x_y(
+  return _test_function_x_y(
       np.concatenate([x1, x2], axis=-1), np.concatenate([y1, y2], axis=-1))
 
 
@@ -98,9 +98,9 @@ class HagerZhangLibTest(test_util.TestCase):
                     [-0.8, -0.8, -1.0, 0.8]])
 
     # Create each individual and batched functions.
-    fun1 = test_function_x_y_dy(x, ys[0], dys[0])
-    fun2 = test_function_x_y_dy(x, ys[1], dys[1])
-    funs = test_function_x_y_dy(x, ys, dys)
+    fun1 = _test_function_x_y_dy(x, ys[0], dys[0])
+    fun2 = _test_function_x_y_dy(x, ys[1], dys[1])
+    funs = _test_function_x_y_dy(x, ys, dys)
 
     def eval_secant2(fun):
       val_0 = fun(0.0)
@@ -139,7 +139,7 @@ class HagerZhangLibTest(test_util.TestCase):
     x = np.array([0.0, 0.6, 1.0])
     y = np.array([1.0, 0.9, 1.2])
     dy = np.array([-0.8, -0.7, 0.6])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)
     val_b = fun(1.0)
@@ -175,7 +175,7 @@ class HagerZhangLibTest(test_util.TestCase):
                    [-0.8, -0.7, 0.6],
                    [-0.8, -0.7, 0.6],
                    [-0.8, -0.7, 0.6]])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Values at zero.
     val_b = fun(1.0)  # Values at initial step.
@@ -204,9 +204,9 @@ class HagerZhangLibTest(test_util.TestCase):
                     [-0.8, -0.7, 0.6]])
 
     # Create each individual and batched functions.
-    fun1 = test_function_x_y_dy(x, ys[0], dys[0])
-    fun2 = test_function_x_y_dy(x, ys[1], dys[1])
-    funs = test_function_x_y_dy(x, ys, dys)
+    fun1 = _test_function_x_y_dy(x, ys[0], dys[0])
+    fun2 = _test_function_x_y_dy(x, ys[1], dys[1])
+    funs = _test_function_x_y_dy(x, ys, dys)
 
     def eval_update(fun):
       val_a = fun(0.0)
@@ -233,7 +233,7 @@ class HagerZhangLibTest(test_util.TestCase):
     x = np.array([0.0, 1.0, 2.5, 5.0])
     y = np.array([1.0, 0.9, -2.0, 1.1])
     dy = np.array([-0.8, -0.7, 1.6, -0.8])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Value at zero.
     val_b = fun(1.0)  # Value at initial step.
@@ -267,7 +267,7 @@ class HagerZhangLibTest(test_util.TestCase):
                    [-0.8, -0.7, -0.5, 0.6],
                    [-0.8, -0.7, -0.3, -0.8],
                    [-0.8, -0.7, 1.6, -0.8]])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)
     val_b = fun(1.0)
@@ -292,7 +292,7 @@ class HagerZhangLibTest(test_util.TestCase):
     x = np.array([0.0, 0.5, 1.0])
     y = np.array([1.0, 0.6, 1.2])
     dy = np.array([-0.8, 0.6, -0.7])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Value at zero.
     val_b = fun(1.0)  # Value at initial step.
@@ -317,7 +317,7 @@ class HagerZhangLibTest(test_util.TestCase):
                    [-0.8, -0.4, -0.7],
                    [-0.8, 0.8, -0.7],
                    [-0.8, -0.4, -0.7]])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Values at zero.
     val_b = fun(1.0)  # Values at initial step.

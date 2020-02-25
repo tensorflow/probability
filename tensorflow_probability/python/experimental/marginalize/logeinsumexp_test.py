@@ -19,7 +19,8 @@ from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v1 as tf
-import tensorflow_probability.python.experimental.marginalize.logeinsumexp as logeinsumexp
+from tensorflow_probability.python.experimental.marginalize.logeinsumexp import _binary_einslogsumexp
+from tensorflow_probability.python.experimental.marginalize.logeinsumexp import logeinsumexp
 from tensorflow_probability.python.internal import test_util
 import tensorflow_probability.python.internal.hypothesis_testlib as testlib
 
@@ -117,7 +118,7 @@ class _EinLogSumExpTest(test_util.TestCase):
 
     a = _random_sparse_tensor([100])
     u = tf.reduce_logsumexp(tf.math.log(a))
-    v = logeinsumexp.logeinsumexp('i->', tf.math.log(a))
+    v = logeinsumexp('i->', tf.math.log(a))
 
     self.assertAllClose(u, v)
 
@@ -126,7 +127,7 @@ class _EinLogSumExpTest(test_util.TestCase):
 
     a = _random_sparse_tensor([100, 100])
     u = tf.reduce_logsumexp(tf.math.log(a), axis=-1)
-    v = logeinsumexp.logeinsumexp('ij->i', tf.math.log(a))
+    v = logeinsumexp('ij->i', tf.math.log(a))
 
     self.assertAllClose(u, v)
 
@@ -136,7 +137,7 @@ class _EinLogSumExpTest(test_util.TestCase):
     a = _random_sparse_tensor([100])
     b = _random_sparse_tensor([100])
     u = tf.reduce_logsumexp(tf.math.log(a) + tf.math.log(b))
-    v = logeinsumexp.logeinsumexp(
+    v = logeinsumexp(
         'i,i->', tf.math.log(a), tf.math.log(b))
 
     self.assertAllClose(u, v)
@@ -148,7 +149,7 @@ class _EinLogSumExpTest(test_util.TestCase):
 
     a = _random_sparse_tensor([100, 8, 8])
     u = tf.linalg.diag_part(a)
-    v = logeinsumexp.logeinsumexp('ijj->ij', a)
+    v = logeinsumexp('ijj->ij', a)
 
     self.assertAllClose(u, v)
 
@@ -159,7 +160,7 @@ class _EinLogSumExpTest(test_util.TestCase):
 
     a = _random_sparse_tensor([2, 2, 2, 2, 2, 2, 2, 2])
     u = tf.math.log(a[0, 0, 0, 0, 0, 0, 0, 0] + a[1, 1, 1, 1, 1, 1, 1, 1])
-    v = logeinsumexp.logeinsumexp('iiiiiiii->', tf.math.log(a))
+    v = logeinsumexp('iiiiiiii->', tf.math.log(a))
 
     self.assertAllClose(u, v)
 
@@ -174,7 +175,7 @@ class _EinLogSumExpTest(test_util.TestCase):
     b = _random_sparse_tensor([2, 2, 2, 2, 2, 2, 2], min_value=0.1)
     formula = 'abcdcfg,edfcbaa->bd'
     u = tf.math.log(tf.einsum(formula, a, b))
-    v = logeinsumexp.logeinsumexp(formula, tf.math.log(a), tf.math.log(b))
+    v = logeinsumexp(formula, tf.math.log(a), tf.math.log(b))
 
     self.assertAllClose(u, v)
 
@@ -182,8 +183,7 @@ class _EinLogSumExpTest(test_util.TestCase):
     """Batch matrix multiplication test."""
 
     a = np.array([[0.0, 0.0], [0.0, 0.0]])
-    v = tf.exp(logeinsumexp.logeinsumexp('ij,jk->ik',
-                                         tf.math.log(a), tf.math.log(a)))
+    v = tf.exp(logeinsumexp('ij,jk->ik', tf.math.log(a), tf.math.log(a)))
 
     self.assertAllClose(a, v)
 
@@ -195,7 +195,7 @@ class _EinLogSumExpTest(test_util.TestCase):
     a = _random_sparse_tensor([200, 2, 2])
     b = _random_sparse_tensor([200, 2, 2])
     u = tf.math.log(tf.matmul(a, b))
-    v = logeinsumexp._binary_einslogsumexp(
+    v = _binary_einslogsumexp(
         'hij,hjk->hik', tf.math.log(a), tf.math.log(b))
 
     self.assertAllClose(u, v)
@@ -207,7 +207,7 @@ class _EinLogSumExpTest(test_util.TestCase):
 
     t = _random_sparse_tensor(8 * [2])
     u = tf.transpose(t, perm=[2, 3, 4, 5, 6, 7, 0, 1])
-    v = logeinsumexp.logeinsumexp('abcdefgh->cdefghab', t)
+    v = logeinsumexp('abcdefgh->cdefghab', t)
 
     self.assertAllClose(u, v)
 
@@ -217,7 +217,7 @@ class _EinLogSumExpTest(test_util.TestCase):
   def test_counterexample(self):
     a = tf.convert_to_tensor(np.array([0., -1000.]), dtype=tf.float64)
     b = tf.convert_to_tensor(np.array([-1000., 0.]), dtype=tf.float64)
-    v = logeinsumexp.logeinsumexp('i,i->', a, b)
+    v = logeinsumexp('i,i->', a, b)
 
     self.assertAllClose(np.log(2.) - 1000., v)
 
@@ -245,7 +245,7 @@ class _EinLogSumExpTest(test_util.TestCase):
     rhs = 'Z' + letters[0] + letters[32]
     formula = '{}->{}'.format(lhs, rhs)
     log_as = 32 * [m]
-    v = logeinsumexp.logeinsumexp(formula, *log_as)
+    v = logeinsumexp(formula, *log_as)
 
     self.assertAllClose(u, v)
 
@@ -258,7 +258,7 @@ class _EinLogSumExpTest(test_util.TestCase):
     tensors = [tf.convert_to_tensor(a, dtype=tf.float64) for a in tensors]
     u = tf.math.log(tf.einsum(formula, *tensors))
     log_tensors = [tf.math.log(t) for t in tensors]
-    v = logeinsumexp.logeinsumexp(formula, *log_tensors)
+    v = logeinsumexp(formula, *log_tensors)
 
     self.assertAllClose(u, v)
 

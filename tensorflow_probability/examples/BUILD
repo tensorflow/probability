@@ -140,7 +140,6 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        # tensorflow/contrib :contrib_py dep,
     ],
 )
 
@@ -323,7 +322,6 @@ py_library(
         # absl/flags dep,
         # six dep,
         # tensorflow dep,
-        # tensorflow/contrib /lookup:lookup_py dep,
     ],
 )
 
