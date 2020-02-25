@@ -62,12 +62,12 @@ class NegativeBinomial(distribution.Distribution):
     """Construct NegativeBinomial distributions.
 
     Args:
-      total_count: Non-negative floating-point `Tensor` with shape
-        broadcastable to `[B1,..., Bb]` with `b >= 0` and the same dtype as
-        `probs` or `logits`. Defines this as a batch of `N1 x ... x Nm`
-        different Negative Binomial distributions. In practice, this represents
-        the number of negative Bernoulli trials to stop at (the `total_count`
-        of failures). Its components should be equal to integer values.
+      total_count: Positive floating-point `Tensor` with shape broadcastable to
+        `[B1,..., Bb]` with `b >= 0` and the same dtype as `probs` or
+        `logits`. Defines this as a batch of `N1 x ... x Nm` different Negative
+        Binomial distributions. In practice, this represents the number of
+        negative Bernoulli trials to stop at (the `total_count` of
+        failures). Its components should be equal to integer values.
       logits: Floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents logits for the probability of success for
@@ -253,9 +253,9 @@ def maybe_assert_negative_binomial_param_correctness(
   if is_init != tensor_util.is_ref(total_count):
     total_count = tf.convert_to_tensor(total_count)
     assertions.extend([
-        assert_util.assert_non_negative(
+        assert_util.assert_positive(
             total_count,
-            message='`total_count` has components less than 0.'),
+            message='`total_count` has components less than or equal to 0.'),
         distribution_util.assert_integer_form(
             total_count,
             message='`total_count` has fractional components.')
