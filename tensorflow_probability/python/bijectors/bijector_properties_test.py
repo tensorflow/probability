@@ -156,6 +156,9 @@ AUTOVECTORIZATION_RTOL = collections.defaultdict(lambda: 1e-5)
 AUTOVECTORIZATION_RTOL.update({
     'Invert': 1e-2,  # Can contain poorly-conditioned bijectors.
     'ScaleMatvecTriL': 1e-3})
+AUTOVECTORIZATION_ATOL = collections.defaultdict(lambda: 1e-5)
+AUTOVECTORIZATION_ATOL.update({
+    'ScaleMatvecTriL': 1e-1})  # TODO(b/150250388) loosen this.
 
 
 def is_invert(bijector):
@@ -633,6 +636,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         validate_args=False,  # Work around lack of `If` support in vmap.
         allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
                            set(AUTOVECTORIZATION_IS_BROKEN)))
+    atol = AUTOVECTORIZATION_ATOL[bijector_name]
     rtol = AUTOVECTORIZATION_RTOL[bijector_name]
 
     # Forward
@@ -640,7 +644,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     xs = self._draw_domain_tensor(bijector, data, event_dim, sample_shape=[n])
     ys = bijector.forward(xs)
     vectorized_ys = tf.vectorized_map(bijector.forward, xs)
-    self.assertAllClose(*self.evaluate((ys, vectorized_ys)), rtol=rtol)
+    self.assertAllClose(*self.evaluate((ys, vectorized_ys)),
+                        atol=atol, rtol=rtol)
 
     # FLDJ
     event_ndims = data.draw(
@@ -651,13 +656,15 @@ class BijectorPropertiesTest(test_util.TestCase):
                                 event_ndims=event_ndims)
     vectorized_fldj = tf.vectorized_map(fldj_fn, xs)
     fldj = tf.broadcast_to(fldj_fn(xs), tf.shape(vectorized_fldj))
-    self.assertAllClose(*self.evaluate((fldj, vectorized_fldj)), rtol=rtol)
+    self.assertAllClose(*self.evaluate((fldj, vectorized_fldj)),
+                        atol=atol, rtol=rtol)
 
     # Inverse
     ys = self._draw_codomain_tensor(bijector, data, event_dim, sample_shape=[n])
     xs = bijector.inverse(ys)
     vectorized_xs = tf.vectorized_map(bijector.inverse, ys)
-    self.assertAllClose(*self.evaluate((xs, vectorized_xs)), rtol=rtol)
+    self.assertAllClose(*self.evaluate((xs, vectorized_xs)),
+                        atol=atol, rtol=rtol)
 
     # ILDJ
     event_ndims = data.draw(
@@ -668,7 +675,8 @@ class BijectorPropertiesTest(test_util.TestCase):
                                 event_ndims=event_ndims)
     vectorized_ildj = tf.vectorized_map(ildj_fn, ys)
     ildj = tf.broadcast_to(ildj_fn(ys), tf.shape(vectorized_ildj))
-    self.assertAllClose(*self.evaluate((ildj, vectorized_ildj)), rtol=rtol)
+    self.assertAllClose(*self.evaluate((ildj, vectorized_ildj)),
+                        atol=atol, rtol=rtol)
 
 
 def ensure_nonzero(x):
