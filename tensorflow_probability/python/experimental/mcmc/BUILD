@@ -120,7 +120,7 @@ py_test(
     tags = [
         "notap",
         "nozapfhahn",
-        "requires-gpu-sm35",
+        "requires-gpu-nvidia",
     ],
     deps = [
         ":nuts_testlib",

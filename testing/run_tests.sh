@@ -99,7 +99,7 @@ install_python_packages() {
 call_with_log_folding install_bazel
 call_with_log_folding install_python_packages
 
-test_tags_to_skip="(gpu|requires-gpu-sm35|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
+test_tags_to_skip="(gpu|requires-gpu-nvidia|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
 
 # Given a test size (small, medium, large), a number of shards and a shard ID,
 # query and print a list of tests of the given size to run in the given shard.
