@@ -89,6 +89,20 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     else:
       return tf1.placeholder_with_default(x, shape=None)
 
+  def assertAllEqualNested(self, a, b, check_types=False):
+    """Assert that analogous entries in two nested structures are equivalent.
+
+    Args:
+      a: A nested structure.
+      b: A nested structure.
+      check_types: If `True`, types of sequences are checked as well, including
+        the keys of dictionaries. If `False`, for example a list and a tuple of
+        objects may be equivalent.
+    """
+    tf.nest.assert_same_structure(a, b, check_types=check_types)
+    for a_, b_ in zip(tf.nest.flatten(a), tf.nest.flatten(b)):
+      self.assertAllEqual(a_, b_)
+
   def assertAllFinite(self, a):
     """Assert that all entries in a `Tensor` are finite.
 
