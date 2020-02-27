@@ -83,6 +83,13 @@ class GammaTest(test_util.TestCase):
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(g.log_prob(-.1))
 
+  def testSampleWithPartiallyDefinedShapeEndingInOne(self):
+    param = tf.Variable(np.ones((8, 16, 16, 1)),
+                        shape=tf.TensorShape([None, 16, 16, 1]))
+    self.evaluate(param.initializer)
+    samples = self.evaluate(tfd.Gamma(param, param).sample())
+    self.assertEqual(samples.shape, (8, 16, 16, 1))
+
   def testGammaLogPDFMultidimensional(self):
     batch_size = 6
     alpha = tf.constant([[2.0, 4.0]] * batch_size)

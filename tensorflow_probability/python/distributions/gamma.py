@@ -224,7 +224,8 @@ class Gamma(distribution.Distribution):
     n = tf.convert_to_tensor(n, name='shape', dtype=tf.int32)
     alpha = tf.convert_to_tensor(self.concentration, name='alpha')
     beta = tf.convert_to_tensor(self.rate, name='beta')
-    broadcast_shape = tf.shape(alpha * beta)
+    broadcast_shape = prefer_static.broadcast_shape(
+        prefer_static.shape(alpha), prefer_static.shape(beta))
     result_shape = tf.concat([[n], broadcast_shape], axis=0)
 
     return random_gamma(result_shape, alpha, beta, seed=seed)
