@@ -112,25 +112,25 @@ class _HeavyTailOnly(bijector.Bijector):
   The effect of this transformation is that it adds heavy tails to input.
 
   Attributes:
-    tail: Tail parameter `delta` of the transformation(s).
+    tailweight: Tail parameter `delta` of the transformation(s).
   """
 
   def __init__(self,
-               tail,
+               tailweight,
                validate_args=False,
-               name="tail"):
+               name="heavytailonly"):
     """Construct heavy-tail Lambert W bijector.
 
     Args:
-      tail: Floating point tensor; the tail behaviors of the distribution(s).
-        Must contain only non-negative values.
+      tailweight: Floating point tensor; specifies the excess tail behaviors of
+        the distribution(s). Must contain only non-negative values.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    self._tail = tail
+    self._tailweight = tailweight
     super(_HeavyTailOnly, self).__init__(validate_args=validate_args,
                                          forward_min_event_ndims=0,
                                          name=name)
@@ -141,11 +141,11 @@ class _HeavyTailOnly(bijector.Bijector):
 
   def _forward(self, x):
     """Turns input vector x into its heavy-tail version using Lambert W."""
-    return _xexp_delta_squared(x, delta=self._tail)
+    return _xexp_delta_squared(x, delta=self._tailweight)
 
   def _inverse(self, y):
     """Reverses the _forward transformation."""
-    return _w_delta_squared(y, delta=self._tail)
+    return _w_delta_squared(y, delta=self._tailweight)
 
   def _inverse_log_det_jacobian(self, y):
     """Returns log of the Jacobian determinant of the inverse function."""
@@ -155,9 +155,9 @@ class _HeavyTailOnly(bijector.Bijector):
     # See also Eq (11) and (31) of
     # https://www.hindawi.com/journals/tswj/2015/909231/
     log_jacobian_term_nonzero = (
-        tf.math.log(tf.abs(_w_delta_squared(y, delta=self._tail))) -
+        tf.math.log(tf.abs(_w_delta_squared(y, delta=self._tailweight))) -
         tf.math.log(tf.abs(y)) -
-        tf.math.log(1. + tfp_math.lambertw(self._tail * y**2)))
+        tf.math.log(1. + tfp_math.lambertw(self._tailweight * y**2)))
     # If y = 0 the expression becomes log(0/0) - log(1 + 0), and the first term
     # equals log(1) = 0.  Hence, for y = 0 the whole expression equals 0.
     return tf.where(tf.equal(y, 0.0),
@@ -184,13 +184,14 @@ class LambertWTail(chain.Chain):
   Attributes:
     shift: shift to center (uncenter) the input data.
     scale: scale to normalize (de-normalize) the input data.
-    tail: Tail parameter `delta` of heavy-tail transformation; must be >= 0.
+    tailweight: Tail parameter `delta` of heavy-tail transformation; must be
+      >= 0.
   """
 
   def __init__(self,
                shift,
                scale,
-               tail,
+               tailweight,
                validate_args=False,
                name="lambertw_tail"):
     """Construct a location scale heavy-tail Lambert W bijector.
@@ -203,7 +204,7 @@ class LambertWTail(chain.Chain):
         input (output) random variable(s).
       scale: Floating point tensor; the scaling (unscaling) of the input
         (output) random variable(s). Must contain only positive values.
-      tail: Floating point tensor; the tail behaviors of the output random
+      tailweight: Floating point tensor; the tail behaviors of the output random
         variable(s).  Must contain only non-negative values.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -215,14 +216,15 @@ class LambertWTail(chain.Chain):
       TypeError: if `shift` and `scale` and `tail` have different `dtype`.
     """
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([tail, shift, scale], tf.float32)
-      self._tail = tensor_util.convert_nonref_to_tensor(
-          tail, name="tail", dtype=dtype)
+      dtype = dtype_util.common_dtype([tailweight, shift, scale], tf.float32)
+      self._tailweight = tensor_util.convert_nonref_to_tensor(
+          tailweight, name="tailweight", dtype=dtype)
       self._shift = tensor_util.convert_nonref_to_tensor(
           shift, name="shift", dtype=dtype)
       self._scale = tensor_util.convert_nonref_to_tensor(
           scale, name="scale", dtype=dtype)
-      dtype_util.assert_same_float_dtype((self._tail, self._shift, self._scale))
+      dtype_util.assert_same_float_dtype((self._tailweight, self._shift,
+                                          self._scale))
 
       self._shift_and_scale = chain.Chain([tfb_shift.Shift(self._shift),
                                            tfb_scale.Scale(self._scale)])
@@ -230,6 +232,6 @@ class LambertWTail(chain.Chain):
       # order.  Hence the ordering in the list must be (3,2,1), not (1,2,3).
       super(LambertWTail, self).__init__(
           bijectors=[self._shift_and_scale,
-                     _HeavyTailOnly(tail=self._tail),
+                     _HeavyTailOnly(tailweight=self._tailweight),
                      invert.Invert(self._shift_and_scale)],
           validate_args=validate_args)

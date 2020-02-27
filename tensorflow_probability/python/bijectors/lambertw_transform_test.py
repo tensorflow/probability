@@ -69,7 +69,7 @@ class HeavyTailOnlyBijectorTest(test_util.TestCase, parameterized.TestCase):
   def testTailBijectorIdentities(self, value, delta, expected):
     """Tests that the output of the delta transformation is correct."""
     ht = tfb.LambertWTail(shift=0., scale=1.,
-                          tail=tf.constant(delta, tf.float64))
+                          tailweight=tf.constant(delta, tf.float64))
     self.assertAllClose(ht(np.float64(value)), np.float64(expected))
 
   @parameterized.named_parameters(("0", 0.0, 0.1, 0.),
@@ -77,13 +77,13 @@ class HeavyTailOnlyBijectorTest(test_util.TestCase, parameterized.TestCase):
   def testTailBijectorInverseIdentities(self, value, delta, expected):
     """Tests that the output of the inverse delta transformation is correct."""
     ht = tfb.LambertWTail(shift=0., scale=1.,
-                          tail=tf.constant(delta, tf.float64))
+                          tailweight=tf.constant(delta, tf.float64))
     self.assertAllClose(ht.inverse(np.float64(value)), np.float64(expected))
 
   def testTailBijectorRandomInputZeroDelta(self):
     """Tests that the output of the inverse delta transformation is correct."""
     vals = np.linspace(-1, 1, num=11)
-    ht = tfb.LambertWTail(shift=0., scale=1., tail=0.0)
+    ht = tfb.LambertWTail(shift=0., scale=1., tailweight=0.0)
     self.assertAllClose(ht(vals), vals)
 
   @parameterized.named_parameters(("0.01", 0.01),
@@ -93,7 +93,7 @@ class HeavyTailOnlyBijectorTest(test_util.TestCase, parameterized.TestCase):
     """Tests that the output of the inverse delta transformation is correct."""
     vals = np.linspace(-1, 1, num=10)
     ht = tfb.LambertWTail(shift=0., scale=1.,
-                          tail=tf.constant(delta, tf.float64))
+                          tailweight=tf.constant(delta, tf.float64))
     with self.session():
       # Gaussianizing makes the values be further away from zero, i.e., their
       # ratio > 1 (for vals != 0).
@@ -112,7 +112,7 @@ class HeavyTailOnlyBijectorTest(test_util.TestCase, parameterized.TestCase):
   def testTailBijectorLogDetJacobian(self, value, delta, expected):
     """Tests that the output of the inverse delta transformation is correct."""
     ht = tfb.LambertWTail(shift=0., scale=1.,
-                          tail=tf.constant(delta, tf.float64))
+                          tailweight=tf.constant(delta, tf.float64))
     if isinstance(value, np.ndarray):
       value = value.astype(np.float64)
       expected = expected.astype(np.float64)
@@ -129,14 +129,14 @@ class LambertWGaussianizationTest(test_util.TestCase, parameterized.TestCase):
   def setUp(self):
     """This method will be run before each of the test methods in the class."""
     super(LambertWGaussianizationTest, self).setUp()
-    self.tail = 0.2
+    self.tailweight = 0.2
     self.loc = 2.0  # location parameter of Normal
     self.scale = 0.1  # scale parameter of Normal
 
   def testLambertWGaussianizationDeltaZero(self):
     """Tests that the output of ShiftScaleTail is correct when delta=0."""
     values = np.random.normal(loc=self.loc, scale=self.scale, size=10)
-    lsht = tfb.LambertWTail(shift=self.loc, scale=self.scale, tail=0.0)
+    lsht = tfb.LambertWTail(shift=self.loc, scale=self.scale, tailweight=0.0)
     self.assertAllClose(values, lsht(values))
     self.assertAllClose(values, lsht.inverse(values))
 
@@ -147,7 +147,7 @@ class LambertWGaussianizationTest(test_util.TestCase, parameterized.TestCase):
   def testLambertWGaussianizationDeltaNonZeroSpecificValues(self, delta):
     """Tests that the output of ShiftScaleTail is correct when delta!=0."""
     vals = np.linspace(-1, 1, 10) + self.loc
-    lsht = tfb.LambertWTail(shift=self.loc, scale=self.scale, tail=delta)
+    lsht = tfb.LambertWTail(shift=self.loc, scale=self.scale, tailweight=delta)
     with self.session():
       scaled_vals = (vals - self.loc) / self.scale
       ht_vals = _xexp_delta_squared_numpy(scaled_vals, delta=delta)
@@ -166,7 +166,8 @@ class LambertWGaussianizationTest(test_util.TestCase, parameterized.TestCase):
     """Tests that the inverse of the heavy tail transform is Normal."""
     vals = np.random.normal(loc=self.loc, scale=self.scale,
                             size=100).astype(np.float64)
-    lsht = tfb.LambertWTail(shift=self.loc, scale=self.scale, tail=self.tail)
+    lsht = tfb.LambertWTail(shift=self.loc, scale=self.scale,
+                            tailweight=self.tailweight)
     with self.session():
       heavy_tailed_vals = lsht(vals)
       _, p = stats.normaltest(self.evaluate(heavy_tailed_vals))
