@@ -214,6 +214,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'scale_tril':
         tfp_hps.lower_tril_positive_definite,
+    'tailweight':
+        tfp_hps.softplus_plus_eps(),
     'temperature':
         tfp_hps.softplus_plus_eps(),
     'total_count':

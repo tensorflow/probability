@@ -169,6 +169,7 @@ EVENT_SPACE_BIJECTOR_IS_BROKEN = [
                      # (Reciprocal(Softplus(x)) -> inf for small x)
 ]
 
+
 # Vectorization can rewrite computations in ways that (apparently) lead to
 # minor floating-point inconsistency.
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.

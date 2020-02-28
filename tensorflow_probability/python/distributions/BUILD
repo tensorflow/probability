@@ -80,6 +80,7 @@ multi_substrate_py_library(
         ":joint_distribution_sequential",
         ":kullback_leibler",
         ":kumaraswamy",
+        ":lambertw_f",
         ":laplace",
         ":linear_gaussian_ssm",
         ":lkj",
@@ -837,6 +838,19 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "lambertw_f",
+    srcs = ["lambertw_f.py"],
+    deps = [
+        ":normal",
+        ":transformed_distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -2189,6 +2203,27 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "lambertw_f_test",
+    srcs = ["lambertw_f_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":lambertw_f",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "linear_gaussian_ssm_test",
     size = "medium",
     srcs = ["linear_gaussian_ssm_test.py"],
@@ -2923,6 +2958,7 @@ exports_files(
         "kumaraswamy.py",
         "kumaraswamy_test.py",
         "laplace.py",
+        "lambertw_f.py",
         "linear_gaussian_ssm.py",
         "lkj.py",
         "logistic.py",

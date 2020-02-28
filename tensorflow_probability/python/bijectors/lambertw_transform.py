@@ -60,6 +60,7 @@ from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import scale as tfb_scale
 from tensorflow_probability.python.bijectors import shift as tfb_shift
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -79,6 +80,10 @@ def _xexp_delta_squared(u, delta):
   Returns:
     The transformed tensor with same shape and same dtype as `u`.
   """
+  delta = tf.convert_to_tensor(delta, dtype=u.dtype)
+  u = tf.broadcast_to(u,
+                      prefer_static.broadcast_shape(tf.shape(u),
+                                                    tf.shape(delta)))
   return u * tf.math.exp(0.5 * delta * u**2)
 
 
@@ -95,8 +100,10 @@ def _w_delta_squared(z, delta):
   Returns:
     The transformed Tensor with same shape and same dtype as `z`.
   """
-
   delta = tf.convert_to_tensor(delta, dtype=z.dtype)
+  z = tf.broadcast_to(z,
+                      prefer_static.broadcast_shape(tf.shape(z),
+                                                    tf.shape(delta)))
   wd = tf.sign(z) * tf.sqrt(tfp_math.lambertw(delta * z**2) / delta)
   return tf.where(tf.equal(delta, 0.0), z, wd)
 
@@ -118,7 +125,7 @@ class _HeavyTailOnly(bijector.Bijector):
   def __init__(self,
                tailweight,
                validate_args=False,
-               name="heavytailonly"):
+               name="HeavyTailOnly"):
     """Construct heavy-tail Lambert W bijector.
 
     Args:
@@ -130,10 +137,14 @@ class _HeavyTailOnly(bijector.Bijector):
         outputs.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    self._tailweight = tailweight
-    super(_HeavyTailOnly, self).__init__(validate_args=validate_args,
-                                         forward_min_event_ndims=0,
-                                         name=name)
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([tailweight], tf.float32)
+      self._tailweight = tensor_util.convert_nonref_to_tensor(
+          tailweight, name="tailweight", dtype=dtype)
+
+      super(_HeavyTailOnly, self).__init__(validate_args=validate_args,
+                                           forward_min_event_ndims=0,
+                                           name=name)
 
   def _is_increasing(self):
     """Heavy-tail Lambert W x F transformations are increasing."""
@@ -163,6 +174,9 @@ class _HeavyTailOnly(bijector.Bijector):
     return tf.where(tf.equal(y, 0.0),
                     tf.zeros_like(y),
                     log_jacobian_term_nonzero)
+
+# TODO(https://github.com/tensorflow/probability/issues/820):
+# fix batch_shape inconsistencies when running distribution_properties_test.
 
 
 class LambertWTail(chain.Chain):
