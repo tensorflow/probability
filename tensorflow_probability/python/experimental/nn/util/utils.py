@@ -231,6 +231,10 @@ def tfcompile(func=None,
   ```
 
   """
+  if not (tf_function or xla_best_effort or xla_compile_all):
+    # This specialization makes for smaller stack trace and easier debugging.
+    return lambda fn: fn if func is None else func
+
   # Note: xla_compile_all overrides both tf_function and xla_best_effort.
   tf_function = tf_function or xla_compile_all
   xla_best_effort = xla_best_effort and not xla_compile_all
@@ -296,16 +300,32 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
     with tf.GradientTape(watch_accessed_variables=False) as tape:
       tf.nest.map_structure(tape.watch, trainable_variables)
       loss, other = loss_fn(*args, **kwargs)
-    grads = tape.gradient(loss, trainable_variables)
-    optimizer.apply_gradients(list(zip(
-        tf.nest.flatten(grads),
-        tf.nest.flatten(trainable_variables))))
+    grads = tf.nest.pack_sequence_as(
+        trainable_variables,
+        tape.gradient(loss, tf.nest.flatten(trainable_variables)))
+    try:
+      seq_type = collections.abc.Sequence
+    except AttributeError:
+      seq_type = collections.Sequence
+    if isinstance(optimizer, seq_type):
+      for opt, g, v in zip(optimizer, grads, trainable_variables):
+        _apply_gradients(opt, g, v)
+    else:
+      _apply_gradients(optimizer, grads, trainable_variables)
     if grad_summary_fn is not None:
       return loss, other, grad_summary_fn(grads)
     return loss, other
   # Note: we can't do `return tf.xla.experimental.compile(fit)` since we can't
   # assume the function arguments are coercible to `tf.Tensor`s.
   return fit_op
+
+
+def _apply_gradients(opt, g, v):
+  gvs = tuple((g_, v_) for g_, v_ in zip(tf.nest.flatten(g),
+                                         tf.nest.flatten(v))
+              if g_ is not None)
+  if gvs:
+    opt.apply_gradients(gvs)
 
 
 def flatten_rightmost(ndims=3):

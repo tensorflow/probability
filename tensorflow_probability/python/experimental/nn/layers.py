@@ -33,8 +33,9 @@ __all__ = [
 class Layer(tf.Module):
   """A `callable` `tf.Module` characterized by `eval(input)`."""
 
-  def __init__(self, name=None):
+  def __init__(self, also_track=None, name=None):
     name = name_util.strip_invalid_chars(name or type(self).__name__)
+    self._also_track = also_track
     super(Layer, self).__init__(name=name)
     self._extra_loss = None
     self._extra_result = None
@@ -46,6 +47,10 @@ class Layer(tf.Module):
   @property
   def extra_result(self):
     return self._extra_result
+
+  @property
+  def also_track(self):
+    return self._also_track
 
   def eval(self, inputs, is_training=True, **kwargs):
     self._set_extra_loss(None)
@@ -90,8 +95,7 @@ class Sequential(Layer):
           'Argument `layers` must contain at least one element.')
     name = name or '_'.join([_try_get_name(x) for x in layers])
     self._layers = tuple(layers)
-    self._also_track = also_track
-    super(Sequential, self).__init__(name=name)
+    super(Sequential, self).__init__(also_track=also_track, name=name)
 
   @property
   def layers(self):
@@ -117,7 +121,7 @@ class Sequential(Layer):
 
   def __getitem__(self, i):
     return Sequential(
-        self.layers[i], also_track=self._also_track, name=self.name)
+        self.layers[i], also_track=self.also_track, name=self.name)
 
 
 class Lambda(Layer):
@@ -134,8 +138,7 @@ class Lambda(Layer):
     name = name or _try_get_name(eval_fn)
     self._eval_fn = eval_fn
     self._extra_loss_fn = extra_loss_fn
-    self._also_track = also_track
-    super(Lambda, self).__init__(name=name)
+    super(Lambda, self).__init__(also_track=also_track, name=name)
 
   def eval(self, inputs, is_training=True, **kwargs):
     kwargs.update({'is_training': is_training})
