@@ -31,21 +31,24 @@ tfd = tfp.distributions
 class _ScanAssociativeTest(test_util.TestCase):
 
   def test_cumulative_sum_size_zero(self):
-    elems = tf.range(0, dtype=np.int64)
+    elems = tf.range(0, dtype=tf.int64)
     self.assertAllEqual(
-        self.evaluate(tfp.math.scan_associative(operator.add, elems)),
+        self.evaluate(tfp.math.scan_associative(operator.add, elems,
+                                                max_num_levels=8)),
         self.evaluate(tf.cumsum(elems)))
 
   def test_cumulative_sum_size_one(self):
-    elems = self._maybe_static(tf.range(1, dtype=np.int64))
+    elems = self._maybe_static(tf.range(1, dtype=tf.int64))
     self.assertAllEqual(
-        self.evaluate(tfp.math.scan_associative(operator.add, elems)),
+        self.evaluate(tfp.math.scan_associative(operator.add, elems,
+                                                max_num_levels=8)),
         self.evaluate(tf.cumsum(elems)))
 
   def test_cumulative_sum_power_of_two(self):
-    elems = self._maybe_static(tf.range(0, 2**4, dtype=np.int64))
+    elems = self._maybe_static(tf.range(0, 2**4, dtype=tf.int64))
     self.assertAllEqual(
-        self.evaluate(tfp.math.scan_associative(operator.add, elems)),
+        self.evaluate(tfp.math.scan_associative(operator.add, elems,
+                                                max_num_levels=8)),
         self.evaluate(tf.cumsum(elems)))
 
   def test_cumulative_sum_maximally_odd(self):
@@ -53,9 +56,10 @@ class _ScanAssociativeTest(test_util.TestCase):
     # every reduction results in an odd size tensor.
     # This makes a good test for the logic to handle
     # odd sizes
-    elems = self._maybe_static(tf.range(0, 2**4 - 1, dtype=np.int64))
+    elems = self._maybe_static(tf.range(0, 2**4 - 1, dtype=tf.int64))
     self.assertAllEqual(
-        self.evaluate(tfp.math.scan_associative(operator.add, elems)),
+        self.evaluate(tfp.math.scan_associative(operator.add, elems,
+                                                max_num_levels=8)),
         self.evaluate(tf.cumsum(elems)))
 
   def test_counting_by_matmul_example(self):
@@ -65,7 +69,8 @@ class _ScanAssociativeTest(test_util.TestCase):
     lower_row = tf.stack([tf.zeros(num_elems, dtype=tf.int64),
                           tf.ones(num_elems, dtype=tf.int64)], axis=1)
     m = self._maybe_static(tf.stack([upper_row, lower_row], axis=1))
-    result = self.evaluate(tfp.math.scan_associative(tf.matmul, m))
+    result = self.evaluate(tfp.math.scan_associative(tf.matmul, m,
+                                                     max_num_levels=8))
     self.assertAllEqual(result[:, 0, 1], np.cumsum(np.arange(num_elems)))
 
   def test_supports_structured_elems_odd_base_case(self):
@@ -77,7 +82,8 @@ class _ScanAssociativeTest(test_util.TestCase):
       return pair(first=a.first + b.first,
                   second=a.second + b.second)
 
-    result = self.evaluate(tfp.math.scan_associative(fn, elems=data))
+    result = self.evaluate(tfp.math.scan_associative(fn, elems=data,
+                                                     max_num_levels=8))
     self.assertAllClose(result.first, [0., 1., 3.])
     self.assertAllClose(result.second, [0., 10., 30.])
 
@@ -104,7 +110,7 @@ class _ScanAssociativeTest(test_util.TestCase):
         mean=self._maybe_static(data),
         unscaled_variance=self._maybe_static(tf.zeros_like(data)))
     result = self.evaluate(
-        tfp.math.scan_associative(fn, elems=initial_stats))
+        tfp.math.scan_associative(fn, elems=initial_stats, max_num_levels=8))
     self.assertAllClose(mean_, result.mean[-1])
     self.assertAllClose(variance_,
                         result.unscaled_variance[-1] / result.count[-1])
@@ -122,7 +128,7 @@ class _ScanAssociativeTest(test_util.TestCase):
     result = self.evaluate(
         tfp.math.scan_associative(
             extended_add, (self._maybe_static(elems0),
-                           self._maybe_static(elems1))))
+                           self._maybe_static(elems1)), max_num_levels=8))
 
     self.assertAllClose(
         result[0],
@@ -137,11 +143,11 @@ class _ScanAssociativeTest(test_util.TestCase):
     x = self._maybe_static(tf.ones(n, dtype=tf.float64))
 
     def fn(x):
-      y = tfp.math.scan_associative(operator.add, x)
+      y = tfp.math.scan_associative(operator.add, x, max_num_levels=8)
       return tf.tensordot(y, y, 1)
     _, dz_dx = tfp.math.value_and_gradient(fn, x)
 
-    k = tf.range(n, dtype=np.float64)
+    k = tf.range(n, dtype=tf.float64)
     # Exact result (n + k + 1) * (n - k) computed in Mathematica.
     self.assertAllClose(dz_dx, (n + k + 1) * (n - k))
 
@@ -157,6 +163,31 @@ class _ScanAssociativeTest(test_util.TestCase):
       self.evaluate(tfp.math.scan_associative(
           extended_add,
           (self._maybe_static(elems0), self._maybe_static(elems1)),
+          max_num_levels=8,
+          validate_args=True))
+
+  def test_max_allowed_size(self):
+    elems = self.evaluate(tfd.Uniform(-1., 1.).sample([511]))
+
+    result = self.evaluate(tfp.math.scan_associative(
+        operator.add,
+        self._maybe_static(elems),
+        max_num_levels=8,
+        validate_args=True))
+    self.assertAllClose(
+        result,
+        self.evaluate(tf.cumsum(elems)),
+        atol=1e-4)
+
+  def test_min_disallowed_size(self):
+    elems = self.evaluate(tfd.Uniform(-1., 1.).sample([512]))
+
+    with self.assertRaisesRegexp(
+        Exception, 'Input `Tensor`s must have first axis dimension less than'):
+      self.evaluate(tfp.math.scan_associative(
+          operator.add,
+          self._maybe_static(elems),
+          max_num_levels=8,
           validate_args=True))
 
 
@@ -165,7 +196,7 @@ class ScanAssociativeTestStatic(_ScanAssociativeTest):
 
   # XLA requires static shapes.
   def test_cumulative_sum_with_xla(self):
-    elems = self._maybe_static(tf.range(0, 2**4 - 1, dtype=np.int64))
+    elems = self._maybe_static(tf.range(0, 2**4 - 1, dtype=tf.int64))
 
     xla_scan = tf.function(experimental_compile=True)(tfp.math.scan_associative)
     result = xla_scan(operator.add, elems)

@@ -36,11 +36,34 @@ def _interleave(a, b):
       lambda: _interleave_with_b(a))
 
 
-def _validate_elem_length(elems_flat):
+def _validate_elem_length(max_num_levels, elems_flat):
   """Checks that elems all have the same length, and returns that length."""
   assertions = []
 
   elem_length = prefer_static.shape(elems_flat[0])[0]
+
+  size_limit = 2**(max_num_levels + 1)
+  enough_levels = prefer_static.less(elem_length, size_limit)
+  enough_levels_ = tf.get_static_value(enough_levels)
+  if enough_levels_ is None:
+    assertions.append(
+        tf.debugging.assert_equal(
+            enough_levels, True,
+            message='Input `Tensor`s must have first axis dimension less than'
+            ' `2**(max_num_levels + 1)`'
+            ' (saw: {} which is not less than 2**{} == {})'.format(
+                elem_length,
+                max_num_levels,
+                size_limit)))
+  elif not enough_levels_:
+    raise ValueError(
+        'Input `Tensor`s must have first axis dimension less than'
+        ' `2**(max_num_levels + 1)`'
+        ' (saw: {} which is not less than 2**{} == {})'.format(
+            elem_length,
+            max_num_levels,
+            size_limit))
+
   is_consistent = prefer_static.reduce_all([
       prefer_static.equal(
           prefer_static.shape(elem)[0], elem_length)
@@ -60,7 +83,8 @@ def _validate_elem_length(elems_flat):
   return elem_length, assertions
 
 
-def scan_associative(fn, elems, validate_args=False, name=None):
+def scan_associative(fn, elems, max_num_levels=48,
+                     validate_args=False, name=None):
   """Perform a scan with an associative binary operation, in parallel.
 
   The associative scan operation computes the cumulative sum, or
@@ -111,6 +135,12 @@ def scan_associative(fn, elems, validate_args=False, name=None):
       of recursive steps required to perform the scan: if, in graph mode,
       this is not statically available, then ops will be created to
       handle any `elem_length` up to the maximum dimension of a `Tensor`.
+    max_num_levels: Python `int`. The size
+      of the first dimension of the tensors in `elems` must be less than
+      `2**(max_num_levels + 1)`. The default value is sufficiently large
+      for most needs. Lowering this value can reduce graph-building time when
+      `scan_associative` is used with inputs of unknown shape.
+      Default value: `48`.
     validate_args: Python `bool`. When `True`, runtime checks
       for invalid inputs are performed. This may carry a performance cost.
       Default value: `False`.
@@ -197,6 +227,9 @@ def scan_associative(fn, elems, validate_args=False, name=None):
   # inter     |    |          |     |          |       |
   # leave(..) |    |          |     |          |       |
   #           x0 x0+x1 x0+...+x2  x0+...+x3 x0+...+x4 x0+...+x5 ...
+
+  # TODO(b/150374456): if the sizes of all of the tensors can be determined
+  # statically then we don't need a `level` parameter.
   def _scan(level, elems):
     """Perform scan on `elems`."""
     elem_length = prefer_static.shape(elems[0])[0]
@@ -227,7 +260,7 @@ def scan_associative(fn, elems, validate_args=False, name=None):
         handle_base_case_elem_length_two,
         handle_base_case_elem_length_three)
 
-    if level == 0:
+    if level <= 0:
       return base_value()
 
     def recursive_case():
@@ -256,13 +289,11 @@ def scan_associative(fn, elems, validate_args=False, name=None):
     return prefer_static.cond(at_base_case, base_value, recursive_case)
 
   with tf.name_scope(name if name else 'scan_associative'):
-    elem_length, assertions = _validate_elem_length(elems_flat)
-    max_num_levels = 64  # If input length is not static, we build a graph
-                         # that supports tensors of length up to 2**64.
+    elem_length, assertions = _validate_elem_length(max_num_levels, elems_flat)
 
   with tf.control_dependencies(assertions if validate_args else []):
     return prefer_static.cond(
         elem_length < 2,
         lambda: elems,
-        lambda: (tf.nest.pack_sequence_as(elems,  # pylint: disable=g-long-lambda
-                                          _scan(max_num_levels, elems_flat))))
+        lambda: (tf.nest.pack_sequence_as(  # pylint: disable=g-long-lambda
+            elems, _scan(max_num_levels - 1, elems_flat))))
