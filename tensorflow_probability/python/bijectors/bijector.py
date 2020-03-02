@@ -1365,6 +1365,52 @@ class Bijector(tf.Module):
     """
     return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
+  def _forward_dtype(self, dtype):
+    # TODO(emilyaf): Raise an error if not implemented for bijectors with
+    # multipart forward or inverse event shapes.
+    return dtype
+
+  def _inverse_dtype(self, dtype):
+    # TODO(emilyaf): Raise an error if not implemented for bijectors with
+    # multipart forward or inverse event shapes.
+    return dtype
+
+  def forward_dtype(self,
+                    dtype,
+                    name='forward_dtype',
+                    **kwargs):
+    """Returns the dtype of the output of the forward transformation.
+
+    Args:
+      dtype: `tf.dtype`, or nested structure of `tf.dtype`s, of the input to
+        `forward`.
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      `tf.dtype` or nested structure of `tf.dtype`s of the output of `forward`.
+    """
+    with self._name_and_control_scope(name):
+      return self._forward_dtype(dtype, **kwargs)
+
+  def inverse_dtype(self,
+                    dtype,
+                    name='inverse_dtype',
+                    **kwargs):
+    """Returns the dtype of the output of the inverse transformation.
+
+    Args:
+      dtype: `tf.dtype`, or nested structure of `tf.dtype`s, of the input to
+        `inverse`.
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      `tf.dtype` or nested structure of `tf.dtype`s of the output of `inverse`.
+    """
+    with self._name_and_control_scope(name):
+      return self._inverse_dtype(dtype, **kwargs)
+
   @contextlib.contextmanager
   def _name_and_control_scope(self, name=None):
     """Helper function to standardize op scope."""

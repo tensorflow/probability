@@ -111,3 +111,10 @@ class Invert(bijector_lib.Bijector):
 
   def forward_log_det_jacobian(self, x, event_ndims, **kwargs):
     return self.bijector.inverse_log_det_jacobian(x, event_ndims, **kwargs)
+
+  def forward_dtype(self, dtype, **kwargs):
+    return self.bijector.inverse_dtype(dtype, **kwargs)
+
+  def inverse_dtype(self, dtype, **kwargs):
+    return self.bijector.forward_dtype(dtype, **kwargs)
+

@@ -281,6 +281,11 @@ class Chain(bijector.Bijector):
       y = b.inverse(y, **kwargs.get(b.name, {}))
     return ildj
 
+  def _inverse_dtype(self, dtype, **kwargs):
+    for b in self.bijectors:
+      dtype = b.inverse_dtype(dtype, **kwargs.get(b.name, {}))
+    return dtype
+
   def _forward(self, x, **kwargs):
     for b in reversed(self.bijectors):
       x = b.forward(x, **kwargs.get(b.name, {}))
@@ -323,3 +328,8 @@ class Chain(bijector.Bijector):
       x = b.forward(x, **kwargs.get(b.name, {}))
 
     return fldj
+
+  def _forward_dtype(self, dtype, **kwargs):
+    for b in reversed(self.bijectors):
+      dtype = b.forward_dtype(dtype, **kwargs.get(b.name, {}))
+    return dtype

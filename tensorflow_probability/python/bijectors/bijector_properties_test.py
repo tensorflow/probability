@@ -618,6 +618,11 @@ class BijectorPropertiesTest(test_util.TestCase):
     grads = tape.gradient(ldj, wrt_vars)
     assert_no_none_grad(bijector, 'inverse_log_det_jacobian', wrt_vars, grads)
 
+    # Check that the outputs of forward_dtype and inverse_dtype match the dtypes
+    # of the outputs of forward and inverse.
+    self.assertAllEqualNested(ys.dtype, bijector.forward_dtype(xs.dtype))
+    self.assertAllEqualNested(xs.dtype, bijector.inverse_dtype(ys.dtype))
+
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}
       for bname in (set(TF2_FRIENDLY_BIJECTORS) -
