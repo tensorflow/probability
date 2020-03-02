@@ -66,6 +66,8 @@ class TrainableLocationScale(test_util.TestCase):
                         atol=1e-4)  # Much larger than initial_scale.
     self.assertAllEqual(dist.event_shape.as_list(), event_shape)
     self.assertAllEqual(dist.batch_shape.as_list(), batch_shape)
+    for v in dist.trainable_variables:
+      self.assertAllEqual(v.shape.as_list(), batch_shape + event_shape)
 
     # Test that gradients are available wrt the variational parameters.
     self.assertNotEmpty(dist.trainable_variables)

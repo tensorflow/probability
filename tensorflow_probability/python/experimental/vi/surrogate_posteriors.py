@@ -61,8 +61,8 @@ def build_trainable_location_scale_distribution(initial_loc,
   with tf.name_scope(name or 'build_trainable_location_scale_distribution'):
     dtype = dtype_util.common_dtype([initial_loc, initial_scale],
                                     dtype_hint=tf.float32)
-    initial_loc = tf.convert_to_tensor(initial_loc, dtype=dtype)
-    initial_scale = tf.convert_to_tensor(initial_scale, dtype=dtype)
+    initial_loc = initial_loc * tf.ones(tf.shape(initial_scale), dtype=dtype)
+    initial_scale = initial_scale * tf.ones_like(initial_loc)
 
     loc = tf.Variable(initial_value=initial_loc, name='loc')
     scale = tfp_util.TransformedVariable(
