@@ -890,7 +890,7 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
     full_shape = (
         other_shape + end_shape if right_end else end_shape + other_shape)
   else:
-    other_shape = tf.gather(tf.shape(x), other_dims)
+    other_shape = tf.gather(tf.shape(x), tf.constant(other_dims, tf.int64))
     full_shape = tf.concat(
         [other_shape, [-1]] if right_end else [[-1], other_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)

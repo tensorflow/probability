@@ -47,6 +47,7 @@ __all__ = [
     'display_imgs',
     'expand_dims',
     'flatten_rightmost',
+    'halflife_decay',
     'make_fit_op',
     'make_kernel_bias',
     'make_kernel_bias_posterior_mvn_diag',
@@ -89,7 +90,7 @@ def display_imgs(x, title=None, fignum=None):
   axs.imshow(x.squeeze(), interpolation='none', cmap='gray')
   axs.axis('off')
   if title is not None:
-    axs.set_title(title)
+    axs.set_title(str(title))
   fig.tight_layout()
   plt.show()
   plt.ion()
@@ -533,8 +534,10 @@ def make_kernel_bias_posterior_mvn_diag(
   make_loc = lambda shape, init, name: tf.Variable(  # pylint: disable=g-long-lambda
       init(shape, dtype=dtype),
       name=name + '_loc')
+  # Setting the initial scale to a relatively small value causes the `loc` to
+  # quickly move toward a lower loss value.
   make_scale = lambda shape, name: TransformedVariable(  # pylint: disable=g-long-lambda
-      tf.ones(shape, dtype=dtype),
+      tf.fill(shape, value=tf.constant(0.01, dtype=dtype)),
       Chain([Shift(1e-5), Softplus()]),
       name=name + '_scale')
   return JointDistributionSequential([
@@ -621,3 +624,16 @@ def make_kernel_bias(
       tf.Variable(kernel_initializer(kernel_shape, dtype), name=kernel_name),
       tf.Variable(bias_initializer(bias_shape, dtype), name=bias_name),
   )
+
+
+def halflife_decay(time_step, half_life, initial, final=0., dtype=tf.float32,
+                   name=None):
+  """Interpolates `initial` to `final` using halflife (exponential) decay."""
+  with tf.name_scope(name or 'halflife_decay'):
+    dtype = dtype_util.common_dtype([initial, final, half_life],
+                                    dtype_hint=tf.float32)
+    initial = tf.convert_to_tensor(initial, dtype=dtype, name='initial')
+    final = tf.convert_to_tensor(final, dtype=dtype, name='final')
+    half_life = tf.convert_to_tensor(half_life, dtype=dtype, name='half_life')
+    time_step = tf.cast(time_step, dtype=dtype, name='time_step')
+    return final + (initial - final) * 0.5**(time_step / half_life)

@@ -351,7 +351,7 @@ def _reduce_log_l2_exp(loga, logb, axis=-1):
 
 
 def expected_calibration_error_quantiles(
-    hit, pred_log_prob, num_buckets=20, axis=0,
+    hit, pred_log_prob, num_buckets=20, axis=0, log_space_buckets=False,
     name=None):
   """Expected calibration error via `quantiles(exp(pred_log_prob),num_buckets)`.
 
@@ -382,6 +382,10 @@ def expected_calibration_error_quantiles(
       Default value: `20`.
     axis: Dimension over which to compute buckets and aggregate stats.
       Default value: `0`.
+    log_space_buckets: When `False` bucket edges are computed from
+      `tf.math.exp(pred_log_prob)`; when `True` bucket edges are computed from
+      `pred_log_prob`.
+      Default value: `False`.
     name: Prefer `str` name used for ops created by this function.
       Default value: `None` (i.e.,
       `"expected_calibration_error_quantiles"`).
@@ -401,6 +405,10 @@ def expected_calibration_error_quantiles(
     bucket_count: `Tensor` representing the total number of obervations in each
       bucket. Has shape `tf.concat([[num_buckets],
       tf.shape(tf.reduce_sum(pred_log_prob, axis=axis))], axis=0)`.
+    bucket_pred_log_prob: `Tensor` representing `pred_log_prob` bucket edges.
+      Always in log space, regardless of the value of `log_space_buckets`.
+    bucket: `int` `Tensor` representing the bucket within which `pred_log_prob`
+      lies.
 
   #### Examples
 
@@ -459,10 +467,16 @@ def expected_calibration_error_quantiles(
     dtype = pred_log_prob.dtype
     hit = tf.cast(hit, dtype, name='hit')
     # Make sure to compute quantiles in "prob" space not "log(prob)".
-    bucket_pred_log_prob = tf.math.log(quantiles_lib.quantiles(
-        tf.math.exp(pred_log_prob),
-        num_quantiles=num_buckets,
-        axis=axis))
+    if log_space_buckets:
+      bucket_pred_log_prob = quantiles_lib.quantiles(
+          pred_log_prob,
+          num_quantiles=num_buckets,
+          axis=axis)
+    else:
+      bucket_pred_log_prob = tf.math.log(quantiles_lib.quantiles(
+          tf.math.exp(pred_log_prob),
+          num_quantiles=num_buckets,
+          axis=axis))
     bucket = _find_bins(pred_log_prob, bucket_pred_log_prob, axis)
     def _fn(i):
       """`map_fn` body."""
