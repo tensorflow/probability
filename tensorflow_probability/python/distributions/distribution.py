@@ -21,6 +21,7 @@ from __future__ import print_function
 import abc
 import collections
 import contextlib
+import functools
 import inspect
 import types
 import decorator
@@ -187,6 +188,52 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
 def _remove_dict_keys_with_value(dict_, val):
   """Removes `dict` keys which have have `self` as value."""
   return {k: v for k, v in dict_.items() if v is not val}
+
+
+def _set_sample_static_shape_for_tensor(x,
+                                        event_shape,
+                                        batch_shape,
+                                        sample_shape):
+  """Helper to `_set_sample_static_shape`; sets shape info for a `Tensor`."""
+  sample_shape = tf.TensorShape(tf.get_static_value(sample_shape))
+
+  ndims = tensorshape_util.rank(x.shape)
+  sample_ndims = tensorshape_util.rank(sample_shape)
+  batch_ndims = tensorshape_util.rank(batch_shape)
+  event_ndims = tensorshape_util.rank(event_shape)
+
+  # Infer rank(x).
+  if (ndims is None and
+      sample_ndims is not None and
+      batch_ndims is not None and
+      event_ndims is not None):
+    ndims = sample_ndims + batch_ndims + event_ndims
+    tensorshape_util.set_shape(x, [None] * ndims)
+
+  # Infer sample shape.
+  if ndims is not None and sample_ndims is not None:
+    shape = tensorshape_util.concatenate(sample_shape,
+                                         [None] * (ndims - sample_ndims))
+    tensorshape_util.set_shape(x, shape)
+
+  # Infer event shape.
+  if ndims is not None and event_ndims is not None:
+    shape = tf.TensorShape(
+        [None]*(ndims - event_ndims)).concatenate(event_shape)
+    tensorshape_util.set_shape(x, shape)
+
+  # Infer batch shape.
+  if batch_ndims is not None:
+    if ndims is not None:
+      if sample_ndims is None and event_ndims is not None:
+        sample_ndims = ndims - batch_ndims - event_ndims
+      elif event_ndims is None and sample_ndims is not None:
+        event_ndims = ndims - batch_ndims - sample_ndims
+    if sample_ndims is not None and event_ndims is not None:
+      shape = tf.TensorShape([None]*sample_ndims).concatenate(
+          batch_shape).concatenate([None]*event_ndims)
+      tensorshape_util.set_shape(x, shape)
+  return x
 
 
 class _DistributionMeta(abc.ABCMeta):
@@ -733,12 +780,27 @@ class Distribution(_BaseDistribution):
       batch_shape: `Tensor`.
     """
     with self._name_and_control_scope(name):
-      if tensorshape_util.is_fully_defined(self.batch_shape):
-        v = tensorshape_util.as_list(self.batch_shape)
+      # Joint distributions may have a structured `batch shape_tensor` or a
+      # single `batch_shape_tensor` that applies to all components. (Simple
+      # distributions always have a single `batch_shape_tensor`.) If the
+      # distribution's `batch_shape` is an instance of `tf.TensorShape`, we
+      # infer that `batch_shape_tensor` is not structured.
+      shallow_structure = (None if isinstance(self.batch_shape, tf.TensorShape)
+                           else self.dtype)
+      if all([tensorshape_util.is_fully_defined(s)
+              for s in nest.flatten_up_to(
+                  shallow_structure, self.batch_shape, check_types=False)]):
+        batch_shape = nest.map_structure_up_to(
+            shallow_structure,
+            tensorshape_util.as_list,
+            self.batch_shape, check_types=False)
       else:
-        v = self._batch_shape_tensor()
-      return tf.identity(tf.convert_to_tensor(v, dtype_hint=tf.int32),
-                         name='batch_shape')
+        batch_shape = self._batch_shape_tensor()
+      return nest.map_structure_up_to(
+          shallow_structure,
+          lambda s: tf.identity(  # pylint: disable=g-long-lambda
+              tf.convert_to_tensor(s, dtype=tf.int32), name='batch_shape'),
+          batch_shape, check_types=False)
 
   def _batch_shape(self):
     return None
@@ -755,7 +817,16 @@ class Distribution(_BaseDistribution):
     Returns:
       batch_shape: `TensorShape`, possibly unknown.
     """
-    return tf.TensorShape(self._batch_shape())
+    batch_shape = self._batch_shape()
+    # See comment in `batch_shape_tensor()` on structured batch shapes. If
+    # `_batch_shape()` is a `tf.TensorShape` instance or a flat list/tuple that
+    # does not contain `tf.TensorShape`s, we infer that it is not structured.
+    if (isinstance(batch_shape, tf.TensorShape)
+        or all(len(path) == 1 and not isinstance(s, tf.TensorShape)
+               for path, s in nest.flatten_with_tuple_paths(batch_shape))):
+      return tf.TensorShape(batch_shape)
+    return nest.map_structure_up_to(
+        self.dtype, tf.TensorShape, batch_shape, check_types=False)
 
   def _event_shape_tensor(self):
     raise NotImplementedError(
@@ -771,12 +842,19 @@ class Distribution(_BaseDistribution):
       event_shape: `Tensor`.
     """
     with self._name_and_control_scope(name):
-      if tensorshape_util.is_fully_defined(self.event_shape):
-        v = tensorshape_util.as_list(self.event_shape)
+      if all([tensorshape_util.is_fully_defined(s)
+              for s in nest.flatten(self.event_shape)]):
+        event_shape = nest.map_structure_up_to(
+            self.dtype,
+            tensorshape_util.as_list,
+            self.event_shape, check_types=False)
       else:
-        v = self._event_shape_tensor()
-      return tf.identity(tf.convert_to_tensor(v, dtype_hint=tf.int32),
-                         name='event_shape')
+        event_shape = self._event_shape_tensor()
+      return nest.map_structure_up_to(
+          self.dtype,
+          lambda s: tf.identity(  # pylint: disable=g-long-lambda
+              tf.convert_to_tensor(s, dtype=tf.int32), name='event_shape'),
+          event_shape, check_types=False)
 
   def _event_shape(self):
     return None
@@ -790,7 +868,8 @@ class Distribution(_BaseDistribution):
     Returns:
       event_shape: `TensorShape`, possibly unknown.
     """
-    return tf.TensorShape(self._event_shape())
+    return nest.map_structure_up_to(
+        self.dtype, tf.TensorShape, self._event_shape(), check_types=False)
 
   def is_scalar_event(self, name='is_scalar_event'):
     """Indicates that `event_shape == []`.
@@ -1388,47 +1467,16 @@ class Distribution(_BaseDistribution):
 
   def _set_sample_static_shape(self, x, sample_shape):
     """Helper to `sample`; sets static shape info."""
-    # Set shape hints.
-    sample_shape = tf.TensorShape(tf.get_static_value(sample_shape))
+    batch_shape = self.batch_shape
+    if (tf.nest.is_nested(self.dtype)
+        and not tf.nest.is_nested(batch_shape)):
+      batch_shape = tf.nest.map_structure(
+          lambda _: batch_shape, self.dtype)
 
-    ndims = tensorshape_util.rank(x.shape)
-    sample_ndims = tensorshape_util.rank(sample_shape)
-    batch_ndims = tensorshape_util.rank(self.batch_shape)
-    event_ndims = tensorshape_util.rank(self.event_shape)
-
-    # Infer rank(x).
-    if (ndims is None and
-        sample_ndims is not None and
-        batch_ndims is not None and
-        event_ndims is not None):
-      ndims = sample_ndims + batch_ndims + event_ndims
-      tensorshape_util.set_shape(x, [None] * ndims)
-
-    # Infer sample shape.
-    if ndims is not None and sample_ndims is not None:
-      shape = tensorshape_util.concatenate(sample_shape,
-                                           [None] * (ndims - sample_ndims))
-      tensorshape_util.set_shape(x, shape)
-
-    # Infer event shape.
-    if ndims is not None and event_ndims is not None:
-      shape = tf.TensorShape(
-          [None]*(ndims - event_ndims)).concatenate(self.event_shape)
-      tensorshape_util.set_shape(x, shape)
-
-    # Infer batch shape.
-    if batch_ndims is not None:
-      if ndims is not None:
-        if sample_ndims is None and event_ndims is not None:
-          sample_ndims = ndims - batch_ndims - event_ndims
-        elif event_ndims is None and sample_ndims is not None:
-          event_ndims = ndims - batch_ndims - sample_ndims
-      if sample_ndims is not None and event_ndims is not None:
-        shape = tf.TensorShape([None]*sample_ndims).concatenate(
-            self.batch_shape).concatenate([None]*event_ndims)
-        tensorshape_util.set_shape(x, shape)
-
-    return x
+    return tf.nest.map_structure(
+        functools.partial(
+            _set_sample_static_shape_for_tensor, sample_shape=sample_shape),
+        x, self.event_shape, batch_shape)
 
   def _is_scalar_helper(self, static_shape, dynamic_shape_fn):
     """Implementation for `is_scalar_batch` and `is_scalar_event`."""

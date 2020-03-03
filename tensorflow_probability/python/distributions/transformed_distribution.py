@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -200,25 +201,49 @@ class TransformedDistribution(distribution_lib.Distribution):
         copy/slice re-instantiation operations.
       name: Python `str` name prefixed to Ops created by this class. Default:
         `bijector.name + distribution.name`.
+
+    Raises:
+      ValueError: If `distribution` is a joint distribution and a `batch_shape`
+        override is passed.
+      ValueError: If `distribution` is a joint distribution and an `event_shape`
+        override is passed.
     """
     parameters = dict(locals()) if parameters is None else parameters
     name = name or (('' if bijector is None else bijector.name) +
                     (distribution.name or ''))
     with tf.name_scope(name) as name:
+      self._distribution = distribution
+      self._bijector = bijector
       self._kwargs_split_fn = (_default_kwargs_split_fn
                                if kwargs_split_fn is None
                                else kwargs_split_fn)
+
       # For convenience we define some handy constants.
       self._zero = tf.constant(0, dtype=tf.int32, name='zero')
       self._empty = tf.constant([], dtype=tf.int32, name='empty')
 
-      batch_shape = self._empty if batch_shape is None else batch_shape
-      self._override_batch_shape = tensor_util.convert_nonref_to_tensor(
-          batch_shape, dtype=tf.int32, name='override_batch_shape')
+      # We don't just want to check isinstance(JointDistribution) because
+      # TransformedDistributions with multipart bijectors are effectively
+      # joint but don't inherit from JD. The 'duck-type' test is that
+      # JDs have a structured dtype.
+      self._base_is_joint = tf.nest.is_nested(self.distribution.dtype)
+      if self._base_is_joint:
+        if batch_shape:
+          raise ValueError('Overriding the batch shape of a joint distribution'
+                           ' ({}) is not currently supported.'.format(
+                               self.distribution))
+        if event_shape:
+          raise ValueError('Overriding the event shape of a joint distribution'
+                           ' ({}) is not currently supported.'.format(
+                               self.distribution))
 
-      event_shape = self._empty if event_shape is None else event_shape
+      override_batch_shape = self._empty if batch_shape is None else batch_shape
+      self._override_batch_shape = tensor_util.convert_nonref_to_tensor(
+          override_batch_shape, dtype=tf.int32, name='override_batch_shape')
+
+      override_event_shape = self._empty if event_shape is None else event_shape
       self._override_event_shape = tensor_util.convert_nonref_to_tensor(
-          event_shape, dtype=tf.int32, name='override_event_shape')
+          override_event_shape, dtype=tf.int32, name='override_event_shape')
 
       # `_is_maybe_{batch, event}_override` is False if we know statically that
       # the batch/event shape is not being overridden; otherwise it is True.
@@ -227,11 +252,9 @@ class TransformedDistribution(distribution_lib.Distribution):
       self._is_maybe_batch_override = tensorshape_util.dims(
           self._override_batch_shape.shape) != [0]
 
-      dtype = dtype_util.common_dtype([distribution, bijector],
-                                      dtype_hint=tf.float32)
+      dtype = self.bijector.forward_dtype(self.distribution.dtype)
+      self._is_joint = tf.nest.is_nested(dtype)
 
-      self._distribution = distribution
-      self._bijector = bijector
       super(TransformedDistribution, self).__init__(
           dtype=dtype,
           reparameterization_type=self._distribution.reparameterization_type,
@@ -277,11 +300,15 @@ class TransformedDistribution(distribution_lib.Distribution):
     base_event_shape_tensor = (self.distribution.event_shape_tensor()
                                if base_event_shape_tensor is None
                                else base_event_shape_tensor)
-    return self.bijector.forward_event_shape_tensor(
-        distribution_util.pick_vector(
-            self._has_nonzero_rank(override_event_shape),
-            override_event_shape,
-            base_event_shape_tensor))
+
+    # If the base distribution is not joint, use the base event shape override,
+    # if any.
+    if not self._base_is_joint:
+      base_event_shape_tensor = distribution_util.pick_vector(
+          self._has_nonzero_rank(override_event_shape),
+          override_event_shape,
+          base_event_shape_tensor)
+    return self.bijector.forward_event_shape_tensor(base_event_shape_tensor)
 
   def _event_shape(self):
     # If there's a chance that the event_shape has been overridden, we return
@@ -308,6 +335,29 @@ class TransformedDistribution(distribution_lib.Distribution):
     base_batch_shape_tensor = (self.distribution.batch_shape_tensor()
                                if base_batch_shape_tensor is None
                                else base_batch_shape_tensor)
+
+    # The `batch_shape_tensor` of the transformed distribution is the same as
+    # that of the base distribution in all cases except when the following are
+    # both true:
+    #   - the base distribution is joint with structured `batch_shape_tensor`
+    #   - the transformed distribution is not joint.
+    # In this case, the components of the base distribution's
+    # `batch_shape_tensor` are broadcast to obtain the `batch_shape_tensor` of
+    # the transformed distribution. Non-broadcasting components are not
+    # supported. (Note that joint distributions may either have a single
+    # `batch_shape_tensor` for all components, or a component-wise
+    # `batch_shape_tensor` with the same nested structure as the distribution's
+    # dtype.)
+    if tf.nest.is_nested(base_batch_shape_tensor):
+      if self._is_joint:
+        return base_batch_shape_tensor
+
+      base_batch_shape_tensor = functools.reduce(
+          prefer_static.broadcast_shape,
+          tf.nest.flatten(base_batch_shape_tensor))
+
+    # If the batch shape has been overridden, return the override batch shape
+    # instead.
     return distribution_util.pick_vector(
         self._has_nonzero_rank(override_batch_shape),
         override_batch_shape,
@@ -327,8 +377,16 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self._is_maybe_batch_override:
       return tensorshape_util.constant_value_as_shape(
           self._override_batch_shape)
-    else:
-      return self.distribution.batch_shape
+
+    # As with `batch_shape_tensor`, if the base distribution is joint with
+    # structured batch shape and the transformed distribution is not joint,
+    # the batch shape components of the base distribution are broadcast to
+    # obtain the batch shape of the transformed distribution.
+    batch_shape = self.distribution.batch_shape
+    if tf.nest.is_nested(batch_shape) and not self._is_joint:
+      batch_shape = functools.reduce(
+          tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
+    return batch_shape
 
   def _has_nonzero_rank(self, override_shape):
     return prefer_static.logical_not(
@@ -409,9 +467,11 @@ class TransformedDistribution(distribution_lib.Distribution):
 
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
-      batch_event_shape = tf.shape(x)[1:]
-      final_shape = tf.concat([sample_shape, batch_event_shape], 0)
-      x = tf.reshape(x, final_shape)
+      def reshape_sample_shape(t):
+        batch_event_shape = tf.shape(t)[1:]
+        final_shape = tf.concat([sample_shape, batch_event_shape], 0)
+        return tf.reshape(t, final_shape)
+      x = tf.nest.map_structure(reshape_sample_shape, x)
 
       # Finally, we apply the bijector's forward transformation. For caching to
       # work, it is imperative that this is the last modification to the
@@ -430,7 +490,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     # For caching to work, it is imperative that the bijector is the first to
     # modify the input.
     x = self.bijector.inverse(y, **bijector_kwargs)
-    event_ndims = self._maybe_get_static_event_ndims(override_event_shape)
+    event_ndims = tf.nest.map_structure(
+        prefer_static.rank_from_shape,
+        self._event_shape_tensor(override_event_shape=override_event_shape),
+        self.event_shape)
 
     ildj = self.bijector.inverse_log_det_jacobian(
         y, event_ndims=event_ndims, **bijector_kwargs)
@@ -474,7 +537,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
     x = self.bijector.inverse(y, **bijector_kwargs)
-    event_ndims = self._maybe_get_static_event_ndims(override_event_shape)
+    event_ndims = tf.nest.map_structure(
+        prefer_static.rank_from_shape,
+        self._event_shape_tensor(override_event_shape=override_event_shape),
+        self.event_shape
+        )
     ildj = self.bijector.inverse_log_det_jacobian(
         y, event_ndims=event_ndims, **bijector_kwargs)
     if self.bijector._is_injective:  # pylint: disable=protected-access
@@ -668,19 +735,17 @@ class TransformedDistribution(distribution_lib.Distribution):
           prefer_static.ones_like(base_batch_shape_tensor)
       ], 0)
       entropy = tf.tile(entropy, multiples)
-    dummy = prefer_static.zeros(
-        shape=tf.concat(
-            [self._batch_shape_tensor(
-                override_batch_shape, base_batch_shape_tensor),
-             self._event_shape_tensor(
-                 override_event_shape, base_event_shape_tensor)],
-            0),
-        dtype=self.dtype)
-    event_ndims = (
-        tensorshape_util.rank(self.event_shape)  # pylint: disable=g-long-ternary
-        if tensorshape_util.rank(self.event_shape) is not None else tf.size(
-            self._event_shape_tensor(
-                override_event_shape, base_event_shape_tensor)))
+
+    # Create a dummy event of zeros to pass to
+    # `bijector.inverse_log_det_jacobian` to extract the constant Jacobian.
+    event_shape_tensor = self._event_shape_tensor(
+        override_event_shape, base_event_shape_tensor)
+    event_ndims = tf.nest.map_structure(
+        prefer_static.rank_from_shape,
+        event_shape_tensor, self.event_shape)
+    dummy = tf.nest.map_structure(
+        prefer_static.zeros, event_shape_tensor, self.dtype)
+
     ildj = self.bijector.inverse_log_det_jacobian(
         dummy, event_ndims=event_ndims, **bijector_kwargs)
 
@@ -704,21 +769,6 @@ class TransformedDistribution(distribution_lib.Distribution):
     perm = prefer_static.concat([
         prefer_static.range(n, ndims), prefer_static.range(0, n)], axis=0)
     return tf.transpose(a=x, perm=perm)
-
-  def _maybe_get_static_event_ndims(self, override_event_shape):
-
-    if tensorshape_util.rank(self.event_shape) is not None:
-      return tensorshape_util.rank(self.event_shape)
-
-    event_ndims = tf.size(
-        self._event_shape_tensor(
-            override_event_shape, self.distribution.event_shape_tensor()))
-    event_ndims_ = distribution_util.maybe_get_static_value(event_ndims)
-
-    if event_ndims_ is not None:
-      return event_ndims_
-
-    return event_ndims
 
   def _maybe_validate_shape_override(
       self, override_shape, base_is_scalar_fn, static_base_shape, is_init):
@@ -765,7 +815,8 @@ class TransformedDistribution(distribution_lib.Distribution):
         assertions.append(
             assert_util.assert_equal(override_rank, 1, message=msg))
 
-    static_base_rank = tensorshape_util.rank(static_base_shape)
+    static_base_rank = tf.nest.map_structure(
+        tensorshape_util.rank, static_base_shape)
 
     # Determine if the override shape is `[]` (static_override_dims == [0]),
     # in which case the base distribution may be nonscalar.
