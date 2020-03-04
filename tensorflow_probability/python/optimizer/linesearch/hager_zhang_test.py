@@ -174,6 +174,8 @@ class HagerZhangTest(test_util.TestCase):
         fdf, initial_step_size=1.0))
     self.assertTrue(results.converged)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX traces value_and_gradient_fn so eval count cannot be tracked.')
   def test_eval_count(self):
     """Tests that the evaluation count is reported correctly."""
     if tf.executing_eagerly():

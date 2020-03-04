@@ -113,7 +113,7 @@ __all__ = [
     'multiply_no_nan',
     'ndtri',
     'negative',
-    # 'nextafter',
+    'nextafter',
     'not_equal',
     'polygamma',
     'polyval',
@@ -676,9 +676,9 @@ negative = utils.copy_docstring(
     tf.math.negative,
     lambda x, name=None: np.negative(x))
 
-# nextafter = utils.copy_docstring(
-#     tf.math.nextafter,
-#     lambda x1, x2, name=None: np.nextafter)
+nextafter = utils.copy_docstring(
+    tf.math.nextafter,
+    lambda x1, x2, name=None: np.nextafter(x1, x2))
 
 not_equal = utils.copy_docstring(
     tf.math.not_equal,

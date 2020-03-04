@@ -55,11 +55,17 @@ DISABLED_BY_PKG = {
     'mcmc':
         ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
          'slice_sampler_kernel'),
+    'optimizer': ('bfgs', 'bfgs_utils', 'differential_evolution', 'lbfgs',
+                  'nelder_mead', 'proximal_hessian_sparse', 'sgld',
+                  'variational_sgd', 'convergence_criteria'),
 }
-LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'stats', 'util')
+LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'optimizer', 'stats',
+        'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
              'dtype_util', 'hypothesis_testlib', 'prefer_static',
              'special_math', 'tensor_util', 'test_combinations', 'test_util')
+OPTIMIZERS = ('linesearch',)
+LINESEARCH = ('internal',)
 
 PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
 
@@ -112,6 +118,35 @@ def main(argv):
       'tensorflow_probability.python.internal import {}'.format(internal):
       'tensorflow_probability.python.internal._numpy import {}'.format(internal)
       for internal in INTERNALS
+  })
+  replacements.update({
+      'tensorflow_probability.python.optimizer._numpy import {}'.format(  # pylint: disable=g-complex-comprehension
+          optimizer):
+      'tensorflow_probability.python.optimizer.{} import _numpy as {}'.format(
+          optimizer, optimizer)
+      for optimizer in OPTIMIZERS
+  })
+  replacements.update({
+      'tensorflow_probability.python.optimizer._numpy.{}'.format(  # pylint: disable=g-complex-comprehension
+          optimizer):
+      'tensorflow_probability.python.optimizer.{}._numpy'.format(
+          optimizer)
+      for optimizer in OPTIMIZERS
+  })
+  replacements.update({
+      'tensorflow_probability.python.optimizer._numpy.linesearch '  # pylint: disable=g-complex-comprehension
+      'import {}'.format(linesearch):
+      'tensorflow_probability.python.optimizer.linesearch.{} '
+      'import _numpy as {}'.format(
+          linesearch, linesearch)
+      for linesearch in LINESEARCH
+  })
+  replacements.update({
+      'tensorflow_probability.python.optimizer.linesearch._numpy.{}'.format(  # pylint: disable=g-complex-comprehension
+          linesearch):
+      'tensorflow_probability.python.optimizer.linesearch.{}._numpy'.format(
+          linesearch)
+      for linesearch in LINESEARCH
   })
   # pylint: disable=g-complex-comprehension
   replacements.update({

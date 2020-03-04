@@ -47,5 +47,6 @@ from tensorflow_probability.python.math import _jax as math
 from tensorflow_probability.python.mcmc import _jax as mcmc
 from tensorflow_probability.python.stats import _jax as stats
 from tensorflow_probability.python.util import _jax as util
+from tensorflow_probability.python.optimizer import _jax as optimizer
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax

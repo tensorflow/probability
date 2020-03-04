@@ -271,8 +271,17 @@ executing_eagerly = utils.copy_docstring(
     tf.executing_eagerly,
     lambda: True)
 
+
+def _get_static_value_jax(tensor, partial=False):
+  del partial
+  import jax  # pylint: disable=g-import-not-at-top
+  if isinstance(tensor, jax.core.Tracer):
+    return None
+  return tensor
+
 get_static_value = utils.copy_docstring(
     tf.get_static_value,
+    _get_static_value_jax if JAX_MODE else
     lambda tensor, partial=False: tensor)
 
 group = utils.copy_docstring(
