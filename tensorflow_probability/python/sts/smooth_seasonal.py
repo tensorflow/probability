@@ -56,11 +56,11 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
   ```python
   effect[t] = (effect[t-1] * cos(frequencies[j]) +
-               auxiliary[t-] * sin(frequencies[j]) +
+               auxiliary[t-1] * sin(frequencies[j]) +
                Normal(0., drift_scale))
 
   auxiliary[t] = (-effect[t-1] * sin(frequencies[j]) +
-                  auxiliary[t-] * cos(frequencies[j]) +
+                  auxiliary[t-1] * cos(frequencies[j]) +
                   Normal(0., drift_scale))
   ```
 
@@ -334,11 +334,11 @@ class SmoothSeasonal(StructuralTimeSeries):
 
   ```python
   effect[t] = (effect[t-1] * cos(frequencies[j]) +
-               auxiliary[t-] * sin(frequencies[j]) +
+               auxiliary[t-1] * sin(frequencies[j]) +
                Normal(0., drift_scale))
 
   auxiliary[t] = (-effect[t-1] * sin(frequencies[j]) +
-                  auxiliary[t-] * cos(frequencies[j]) +
+                  auxiliary[t-1] * cos(frequencies[j]) +
                   Normal(0., drift_scale))
   ```
 
