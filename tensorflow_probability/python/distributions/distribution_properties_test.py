@@ -142,22 +142,12 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
-    'BetaBinomial',  # Numeric inconsistency: b/147743999
-    'Binomial',  # Numeric inconsistency: b/147743999
     'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
-    'DirichletMultinomial',  # Same as Multinomial.
     'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
-    'Gamma',  # Denormal flushing problem: b/150161911
-    'NegativeBinomial',  # Numeric inconsistency: b/147743999
-    'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
-    'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.
     'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
-    'ProbitBernoulli',  # Seemingly runs, but gives `NaN`s sometimes.
-    'RelaxedBernoulli',  # Denormal flushing problem: b/150161911
     'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
-    'TruncatedNormal',  # Numerical problem: b/145554459
     'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
                 # ill-conditioned for reasons unrelated to pfor.
@@ -177,7 +167,6 @@ VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
     'CholeskyLKJ': 1e-4,
     'LKJ': 1e-3,
-    'TruncatedNormal': 1e-1,
 })
 
 
@@ -586,9 +575,9 @@ class DistributionSlicingTest(test_util.TestCase):
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
 
 
-# Testing eager_no_tf_function is meaningless here, because pfor internally
-# turns tf.function on regardless of the override.
-@test_util.test_graph_and_eager_modes
+# TODO(b/150161911): reconcile graph- and eager-mode handling of denormal floats
+# so that we can re-enable eager mode tests.
+@test_util.test_graph_mode_only
 class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
 
   def _test_vectorization(self, dist_name, dist):
