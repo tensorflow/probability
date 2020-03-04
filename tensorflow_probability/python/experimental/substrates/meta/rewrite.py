@@ -62,10 +62,11 @@ DISABLED_BY_PKG = {
 LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'optimizer', 'stats',
         'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
-             'dtype_util', 'hypothesis_testlib', 'prefer_static',
+             'dtype_util', 'hypothesis_testlib', 'prefer_static', 'samplers',
              'special_math', 'tensor_util', 'test_combinations', 'test_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
+SAMPLERS = ('categorical', 'gamma', 'normal', 'poisson', 'uniform', 'shuffle')
 
 PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
 
@@ -157,6 +158,11 @@ def main(argv):
   })
   # pylint: enable=g-complex-comprehension
 
+  # TODO(bjp): Delete this block after TFP uses stateless samplers.
+  replacements.update({
+      'tf.random.{}'.format(sampler): 'tf.random.stateless_{}'.format(sampler)
+      for sampler in SAMPLERS
+  })
   replacements.update({
       'self._maybe_assert_dtype': '# self._maybe_assert_dtype',
       'SKIP_DTYPE_CHECKS = False': 'SKIP_DTYPE_CHECKS = True',

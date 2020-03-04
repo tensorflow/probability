@@ -39,6 +39,7 @@ from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direc
 
 
 __all__ = [
+    'substrate_disable_stateful_random_test',
     'numpy_disable_gradient_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
@@ -412,6 +413,17 @@ def jax_disable_variable_test(test_fn):
   return new_test
 
 
+def substrate_disable_stateful_random_test(test_fn):
+  """Disable a test of stateful randomness."""
+
+  def new_test(self, *args, **kwargs):
+    if not hasattr(tf.random, 'uniform'):
+      self.skipTest('Test uses stateful random sampling')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
 def numpy_disable_test_missing_functionality(issue_link):
   """Disable a test for unimplemented numpy functionality."""
 
@@ -459,7 +471,7 @@ def tf_tape_safety_test(test_fn):
   return new_test
 
 
-def test_seed(hardcoded_seed=None, set_eager_seed=True):
+def test_seed(hardcoded_seed=None, set_eager_seed=True, use_case='stateful'):
   """Returns a command-line-controllable PRNG seed for unit tests.
 
   If your test will pass a seed to more than one operation, consider using
@@ -493,6 +505,8 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     set_eager_seed: Python bool.  If true (default), invoke `tf.random.set_seed`
       in Eager mode to get more reproducibility.  Should become unnecessary
       once b/68017812 is resolved.
+    use_case: 'stateful' or 'stateless'. 'stateless' means we return a seed
+      pair.
 
   Returns:
     seed: 17, unless otherwise specified by arguments or command line flags.
@@ -512,19 +526,14 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     answer = hardcoded_seed
   else:
     answer = 17
-  return (_wrap_seed_jax if JAX_MODE else _wrap_seed)(answer, set_eager_seed)
-
-
-def _wrap_seed(seed, set_eager_seed):
+  if use_case == 'stateless' or JAX_MODE:
+    answer = tf.constant([0, answer % (2**32 - 1)], dtype=tf.uint32)
+    if not JAX_MODE:
+      answer = tf.bitcast(answer, tf.int32)
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
-  if tf.executing_eagerly() and set_eager_seed:
-    tf.random.set_seed(seed)
-  return seed
-
-
-def _wrap_seed_jax(seed, _):
-  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
-  return jaxrand.PRNGKey(seed % (2**32 - 1))
+  elif tf.executing_eagerly() and set_eager_seed:
+    tf.random.set_seed(answer)
+  return answer
 
 
 def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):

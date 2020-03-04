@@ -70,7 +70,8 @@ class TestCase(dict):
     super(TestCase, self).__init__(
         testcase_name='_' + name.replace('.', '_'),
         tensorflow_function=_getattr(tf, name),
-        numpy_function=_getattr(numpy_backend, name),
+        numpy_function=_getattr(numpy_backend,
+                                name.replace('random.', 'random.stateless_')),
         strategy_list=strategy_list,
         **kwargs)
 

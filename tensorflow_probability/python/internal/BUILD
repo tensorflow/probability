@@ -227,6 +227,28 @@ py_library(
 )
 
 multi_substrate_py_library(
+    name = "samplers",
+    srcs = ["samplers.py"],
+    deps = [
+        ":dtype_util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "samplers_test",
+    size = "small",
+    srcs = ["samplers_test.py"],
+    deps = [
+        ":samplers",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "special_math",
     srcs = ["special_math.py"],
     deps = [

@@ -33,6 +33,7 @@ import wrapt
 from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
+    'bitcast',
     'broadcast_dynamic_shape',
     'broadcast_static_shape',
     'broadcast_to',
@@ -206,6 +207,10 @@ class GradientTape(object):
                      parallel_iterations=None, experimental_use_pfor=True):  # pylint: disable=unused-argument
     return source
 
+bitcast = utils.copy_docstring(
+    tf.bitcast,
+    lambda input, type, name=None: convert_to_tensor(  # pylint: disable=g-long-lambda
+        input, dtype_hint=type).view(type))
 
 broadcast_dynamic_shape = utils.copy_docstring(
     tf.broadcast_static_shape, _broadcast_dynamic_shape)
