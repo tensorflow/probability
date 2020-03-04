@@ -44,13 +44,13 @@ class RandomTest(test_util.TestCase):
     self.assertNotAllEqual(seed1, seed2)
 
   def test_sanitize_tensor_or_tensorlike(self):
-    seed = test_util.test_seed(use_case='stateless')
+    seed = test_util.test_seed(sampler_type='stateless')
     seed1 = samplers.sanitize_seed(seed=self.evaluate(seed))
     seed2 = samplers.sanitize_seed(seed)
     self.assertAllEqual(seed1, seed2)
 
   def test_split(self):
-    seed = test_util.test_seed(use_case='stateless')
+    seed = test_util.test_seed(sampler_type='stateless')
     seed1, seed2 = samplers.split_seed(seed)
     seed3, seed4 = samplers.split_seed(seed)
     self.assertNotAllEqual(seed, seed1)
@@ -60,7 +60,7 @@ class RandomTest(test_util.TestCase):
                         self.evaluate([seed3, seed4]))
 
   def test_salted_split(self):
-    seed = test_util.test_seed(use_case='stateless')
+    seed = test_util.test_seed(sampler_type='stateless')
     seed1, seed2 = samplers.split_seed(seed, salt='normal')
     seed3, seed4 = samplers.split_seed(seed, salt='lognormal')
     self.assertNotAllEqual(seed, seed1)

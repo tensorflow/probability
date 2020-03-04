@@ -471,7 +471,9 @@ def tf_tape_safety_test(test_fn):
   return new_test
 
 
-def test_seed(hardcoded_seed=None, set_eager_seed=True, use_case='stateful'):
+def test_seed(hardcoded_seed=None,
+              set_eager_seed=True,
+              sampler_type='stateful'):
   """Returns a command-line-controllable PRNG seed for unit tests.
 
   If your test will pass a seed to more than one operation, consider using
@@ -505,7 +507,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True, use_case='stateful'):
     set_eager_seed: Python bool.  If true (default), invoke `tf.random.set_seed`
       in Eager mode to get more reproducibility.  Should become unnecessary
       once b/68017812 is resolved.
-    use_case: 'stateful' or 'stateless'. 'stateless' means we return a seed
+    sampler_type: 'stateful' or 'stateless'. 'stateless' means we return a seed
       pair.
 
   Returns:
@@ -526,7 +528,7 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True, use_case='stateful'):
     answer = hardcoded_seed
   else:
     answer = 17
-  if use_case == 'stateless' or JAX_MODE:
+  if sampler_type == 'stateless' or JAX_MODE:
     answer = tf.constant([0, answer % (2**32 - 1)], dtype=tf.uint32)
     if not JAX_MODE:
       answer = tf.bitcast(answer, tf.int32)
