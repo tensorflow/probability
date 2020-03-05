@@ -145,7 +145,6 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
-    'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
     'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/150811273
