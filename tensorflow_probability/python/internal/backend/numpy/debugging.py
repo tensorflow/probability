@@ -51,7 +51,23 @@ __all__ = [
     'check_numerics',
 ]
 
+JAX_MODE = False
 
+
+def skip_assert_for_tracers(f):
+  """Function decorator that returns None if JAX tracers are detected."""
+  if not JAX_MODE:
+    return f
+  from jax import core as jax_core  # pylint: disable=g-import-not-at-top
+  def wrapped(*args, **kwargs):
+    if any(isinstance(arg, jax_core.Tracer) for arg
+           in args + tuple(kwargs.values())):
+      return None
+    return f(*args, **kwargs)
+  return wrapped
+
+
+@skip_assert_for_tracers
 def _assert_binary(
     x, y, comparator, sym, summarize=None, message=None, name=None):
   del summarize
@@ -63,6 +79,7 @@ def _assert_binary(
         sym, message or ''))
 
 
+@skip_assert_for_tracers
 def _assert_equal(x, y, summarize=None, message=None, name=None):
   del summarize
   del name
@@ -99,6 +116,7 @@ def _assert_less_equal(
       message=message, name=name)
 
 
+@skip_assert_for_tracers
 def _assert_compare_to_zero(
     x, comparator, sym, summarize=None, message=None, name=None):
   del summarize
@@ -143,10 +161,12 @@ def _assert_integer(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
+@skip_assert_for_tracers
 def _assert_near(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
+@skip_assert_for_tracers
 def _assert_none_equal(x, y, summarize=None, message=None, name=None):
   del summarize
   del name
