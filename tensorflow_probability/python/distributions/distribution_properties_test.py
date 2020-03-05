@@ -148,6 +148,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
     'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
+    'TruncatedNormal',  # Numerical problem: b/150811273
     'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
                 # ill-conditioned for reasons unrelated to pfor.
