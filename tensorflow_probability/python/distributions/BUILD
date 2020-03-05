@@ -21,6 +21,7 @@ load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "py3_test",  # @unused
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -2894,6 +2895,31 @@ py_test(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py3_test(
+    name = "jax_transformation_test",
+    size = "large",
+    srcs = ["jax_transformation_test.py"],
+    python_version = "PY3",
+    shard_count = 40,
+    srcs_version = "PY3",
+    tags = [
+        "hypothesis",
+        "notap",
+    ],
+    deps = [
+        ":hypothesis_testlib.jax",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # jax dep,
+        # numpy dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib.jax",
+        "//tensorflow_probability/python/internal:tensor_util.jax",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util.jax",
     ],
 )
 
