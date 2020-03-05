@@ -139,8 +139,6 @@ class NestUtilTest(test_util.TestCase):
 
   @parameterized.parameters(
       # Input              DType
-      # DType mismatch.
-      (1.,                  tf.int32),
       # Structure mismatch.
       ([1],                 [None, None]),
       ([1],                 (None,)),

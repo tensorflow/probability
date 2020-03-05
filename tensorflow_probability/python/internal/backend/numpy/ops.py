@@ -156,6 +156,8 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
     return value.astype(dtype_hint)
 
   np_value = np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
+  if np.issubdtype(np_value.dtype, np.object_):
+    raise ValueError('Numpy `object`s cannot be converted to `Tensor`s.')
   # We have no hints. By default JAX (in x64 mode) and Numpy default to
   # {int64,float64} which does not match with TF's default.
   if dtype is None and dtype_hint is None:

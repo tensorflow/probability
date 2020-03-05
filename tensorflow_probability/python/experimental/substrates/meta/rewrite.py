@@ -62,8 +62,9 @@ DISABLED_BY_PKG = {
 LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'optimizer', 'stats',
         'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
-             'dtype_util', 'hypothesis_testlib', 'prefer_static', 'samplers',
-             'special_math', 'tensor_util', 'test_combinations', 'test_util')
+             'dtype_util', 'hypothesis_testlib', 'nest_util', 'prefer_static',
+             'samplers', 'special_math', 'tensor_util', 'test_combinations',
+             'test_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'gamma', 'normal', 'poisson', 'uniform', 'shuffle')

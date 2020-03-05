@@ -173,7 +173,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "nest_util",
     srcs = ["nest_util.py"],
     srcs_version = "PY2AND3",
@@ -182,7 +182,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "nest_util_test",
     size = "small",
     srcs = ["nest_util_test.py"],
