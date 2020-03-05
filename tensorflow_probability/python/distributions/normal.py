@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 
@@ -185,7 +186,7 @@ class Normal(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     shape = tf.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)],
                       axis=0)
-    sampled = tf.random.normal(
+    sampled = samplers.normal(
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
     return sampled * scale + loc
 

@@ -20,10 +20,13 @@ from __future__ import print_function
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
+
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import _augment_sample_shape
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import backward_smoothing_update
@@ -37,6 +40,7 @@ from tensorflow_probability.python.distributions.linear_gaussian_ssm import kalm
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -85,7 +89,6 @@ class _IIDNormalTest(object):
     latent_size = 3
     observation_size = 2
     num_samples = 10000
-    strm = test_util.test_seed_stream()
 
     for transition_variance_val in [.3, 100.]:
       for observation_variance_val in [.6, 40.]:
@@ -97,7 +100,7 @@ class _IIDNormalTest(object):
             transition_variance=transition_variance_val,
             observation_variance=observation_variance_val)
 
-        x = iid_latents.sample(num_samples, seed=strm())
+        x = iid_latents.sample(num_samples, seed=test_util.test_seed())
 
         x_val = self.evaluate(x)
         result_shape = [num_timesteps, observation_size]
@@ -451,21 +454,21 @@ class BatchTest(test_util.TestCase):
 
     return tfd.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=tf.random.normal(transition_matrix_batch_shape +
-                                           [latent_size, latent_size]),
+        transition_matrix=samplers.normal(transition_matrix_batch_shape +
+                                          [latent_size, latent_size]),
         transition_noise=tfd.MultivariateNormalDiag(
             scale_diag=tf.math.softplus(
-                tf.random.normal(transition_noise_batch_shape +
-                                 [latent_size]))),
-        observation_matrix=tf.random.normal(observation_matrix_batch_shape +
-                                            [observation_size, latent_size]),
+                samplers.normal(transition_noise_batch_shape +
+                                [latent_size]))),
+        observation_matrix=samplers.normal(observation_matrix_batch_shape +
+                                           [observation_size, latent_size]),
         observation_noise=tfd.MultivariateNormalDiag(
             scale_diag=tf.math.softplus(
-                tf.random.normal(observation_noise_batch_shape +
-                                 [observation_size]))),
+                samplers.normal(observation_noise_batch_shape +
+                                [observation_size]))),
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=tf.math.softplus(
-                tf.random.normal(prior_batch_shape + [latent_size]))),
+                samplers.normal(prior_batch_shape + [latent_size]))),
         validate_args=True)
 
   def _sanity_check_shapes(self, model,
@@ -502,7 +505,7 @@ class BatchTest(test_util.TestCase):
 
     # Try an argument with no batch shape to ensure we broadcast
     # correctly.
-    unbatched_y = tf.random.normal(event_shape)
+    unbatched_y = samplers.normal(event_shape)
     lp = model.log_prob(unbatched_y)
     self.assertEqual(tensorshape_util.as_list(lp.shape), batch_shape)
 
@@ -981,7 +984,10 @@ class KalmanSmootherTest(test_util.TestCase):
                           [-0.01090359, 0.10666106, -0.34516996],
                           [0.07458252, -0.34516996, 1.33941529]]])
 
-  def testPosteriorSample(self):
+  @parameterized.named_parameters((
+      dict(testcase_name='_{}'.format(sampler_type), sampler_type=sampler_type)
+      for sampler_type in ('stateless', 'stateful')))
+  def testPosteriorSample(self, sampler_type):
     kf = self.build_kf()
     obs = np.array(
         [[[1.36560337, 0.28252135],
@@ -993,12 +999,14 @@ class KalmanSmootherTest(test_util.TestCase):
     mask = np.array([[[False, False, True, False, False]]])  # shape = [1, 1, 5]
 
     single_posterior_sample = kf.posterior_sample(
-        obs[0, ...], [], seed=test_util.test_seed(), mask=mask[0, 0, :])
+        obs[0, ...], [], seed=test_util.test_seed(sampler_type=sampler_type),
+        mask=mask[0, 0, :])
     self.assertAllEqual(single_posterior_sample.shape, [5, 3])
 
     sample_shape = [8000, 2]
     posterior_samples = kf.posterior_sample(
-        obs, sample_shape, seed=test_util.test_seed(), mask=mask)
+        obs, sample_shape, seed=test_util.test_seed(sampler_type=sampler_type),
+        mask=mask)
     self.assertAllEqual(posterior_samples.shape,
                         sample_shape + [1, 1, 5, 3])
     posterior_mean, posterior_covs = kf.posterior_marginals(obs, mask=mask)
@@ -1447,7 +1455,7 @@ class AugmentSampleShapeTestStatic(test_util.TestCase, _AugmentSampleShapeTest):
   def build_inputs(self, full_batch_shape, partial_batch_shape):
 
     full_batch_shape = np.asarray(full_batch_shape, dtype=np.int32)
-    dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
+    dist = tfd.Normal(samplers.normal(partial_batch_shape), 1.)
 
     return full_batch_shape, dist
 
@@ -1471,7 +1479,7 @@ class AugmentSampleShapeTestDynamic(test_util.TestCase,
 
     partial_batch_shape = tf1.placeholder_with_default(
         np.asarray(partial_batch_shape, dtype=np.int32), shape=None)
-    dist = tfd.Normal(tf.random.normal(partial_batch_shape), 1.)
+    dist = tfd.Normal(samplers.normal(partial_batch_shape), 1.)
 
     return full_batch_shape, dist
 

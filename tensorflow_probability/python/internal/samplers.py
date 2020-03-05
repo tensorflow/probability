@@ -139,6 +139,11 @@ def normal(
     name=None):
   """As `tf.random.normal`, but handling stateful/stateless `seed`s."""
   with tf.name_scope(name or 'normal'):
+    # TODO(b/147874898): Remove workaround for seed-sensitive tests.
+    if seed is None or isinstance(seed, six.integer_types):
+      return tf.random.normal(
+          shape=shape, seed=seed, mean=mean, stddev=stddev, dtype=dtype)
+
     seed = sanitize_seed(seed)
     return tf.random.stateless_normal(
         shape=shape, seed=seed, mean=mean, stddev=stddev, dtype=dtype)

@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import independent as independe
 from tensorflow_probability.python.distributions import joint_distribution_named as joint_distribution_named_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 
@@ -58,7 +59,7 @@ def sample_uniform_initial_state(parameter,
   """
   unconstrained_prior_sample = parameter.bijector.inverse(
       parameter.prior.sample(init_sample_shape, seed=seed))
-  uniform_initializer = 4 * tf.random.uniform(
+  uniform_initializer = 4 * samplers.uniform(
       tf.shape(unconstrained_prior_sample),
       dtype=unconstrained_prior_sample.dtype,
       seed=seed) - 2
