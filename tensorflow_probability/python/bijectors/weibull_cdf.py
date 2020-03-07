@@ -32,7 +32,7 @@ __all__ = [
 
 
 class WeibullCDF(bijector.Bijector):
-  """Compute `Y = g(X) = 1 - exp((-X / scale) ** concentration), X >= 0`.
+  """Compute `Y = g(X) = 1 - exp( -( X / scale) ** concentration), X >= 0`.
 
   This bijector maps inputs from `[0, inf]` to `[0, 1]`. The inverse of the
   bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
@@ -59,10 +59,10 @@ class WeibullCDF(bijector.Bijector):
     Args:
       scale: Positive Float-type `Tensor` that is the same dtype and is
         broadcastable with `concentration`.
-        This is `l` in `Y = g(X) = 1 - exp((-x / l) ** k)`.
+        This is `l` in `Y = g(X) = 1 - exp( -( x / l) ** k)`.
       concentration: Positive Float-type `Tensor` that is the same dtype and is
         broadcastable with `scale`.
-        This is `k` in `Y = g(X) = 1 - exp((-x / l) ** k)`.
+        This is `k` in `Y = g(X) = 1 - exp( -( x / l) ** k)`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
@@ -83,12 +83,12 @@ class WeibullCDF(bijector.Bijector):
 
   @property
   def scale(self):
-    """The `l` in `Y = g(X) = 1 - exp((-x / l) ** k)`."""
+    """The `l` in `Y = g(X) = 1 - exp( -( x / l) ** k)`."""
     return self._scale
 
   @property
   def concentration(self):
-    """The `k` in `Y = g(X) = 1 - exp((-x / l) ** k)`."""
+    """The `k` in `Y = g(X) = 1 - exp( -( x / l) ** k)`."""
     return self._concentration
 
   @classmethod
