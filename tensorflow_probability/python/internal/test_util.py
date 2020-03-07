@@ -21,6 +21,7 @@ from __future__ import print_function
 import contextlib
 import os
 import sys
+import unittest
 
 from absl import app
 from absl import flags
@@ -498,16 +499,22 @@ def substrate_disable_stateful_random_test(test_fn):
 def numpy_disable_test_missing_functionality(issue_link):
   """Disable a test for unimplemented numpy functionality."""
 
-  def f(test_fn):
+  def f(test_fn_or_class):
     """Decorator."""
     if JAX_MODE:
-      return test_fn
+      return test_fn_or_class
+    if tf.Variable != ops.NumpyVariable:
+      return test_fn_or_class
+
+    reason = 'Test disabled for Numpy missing functionality: {}'.format(
+        issue_link)
+
+    if isinstance(test_fn_or_class, type):
+      return unittest.skip(reason)(test_fn_or_class)
 
     def new_test(self, *args, **kwargs):
-      if tf.Variable == ops.NumpyVariable:
-        msg = 'Test disabled for numpy missing functionality: {}'
-        self.skipTest(msg.format(issue_link))
-      return test_fn(self, *args, **kwargs)
+      self.skipTest(reason)
+      return test_fn_or_class(self, *args, **kwargs)
 
     return new_test
 
@@ -517,14 +524,19 @@ def numpy_disable_test_missing_functionality(issue_link):
 def jax_disable_test_missing_functionality(issue_link):
   """Disable a test for unimplemented JAX functionality."""
 
-  def f(test_fn):
+  def f(test_fn_or_class):
     if not JAX_MODE:
-      return test_fn
+      return test_fn_or_class
+
+    reason = 'Test disabled for JAX missing functionality: {}'.format(
+        issue_link)
+
+    if isinstance(test_fn_or_class, type):
+      return unittest.skip(reason)(test_fn_or_class)
 
     def new_test(self, *args, **kwargs):
-      self.skipTest(
-          'Test disabled for JAX missing functionality: {}'.format(issue_link))
-      return test_fn(self, *args, **kwargs)
+      self.skipTest(reason)
+      return test_fn_or_class(self, *args, **kwargs)
 
     return new_test
 

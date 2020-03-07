@@ -84,6 +84,7 @@ py_library(
     srcs = ["control_flow.py"],
     deps = [
         ":_utils",
+        ":ops",
         # numpy dep,
         # tensorflow dep,
     ],

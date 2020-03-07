@@ -47,7 +47,7 @@ TF_REPLACEMENTS = {
 
 DISABLED_BY_PKG = {
     'bijectors':
-        ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp'),
+        ('scale_matvec_lu', 'real_nvp'),
     'distributions':
         ('internal.moving_stats',),
     'math':

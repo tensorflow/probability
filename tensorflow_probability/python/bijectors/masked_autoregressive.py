@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -349,7 +350,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
     # call the template once to ensure creation
     if not tf.executing_eagerly():
       _ = self._bijector_fn(y0, **kwargs).forward(y0)
-    def _loop_body(index, y0):
+    def _loop_body(y0):
       """While-loop body for autoregression calculation."""
       # Set caching device to avoid re-getting the tf.Variable for every while
       # loop iteration.
@@ -358,16 +359,12 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
           vs.set_caching_device(lambda op: op.device)
         bijector = self._bijector_fn(y0, **kwargs)
       y = bijector.forward(x)
-      return index + 1, y
-    # If the event size is available at graph construction time, we can inform
-    # the graph compiler of the maximum number of steps. If not,
-    # static_event_size will be None, and the maximum_iterations argument will
-    # have no effect.
-    _, y = tf.while_loop(
-        cond=lambda index, _: index < event_size,
+      return (y,)
+    (y,) = tf.while_loop(
+        cond=lambda _: True,
         body=_loop_body,
-        loop_vars=(0, y0),
-        maximum_iterations=static_event_size)
+        loop_vars=(y0,),
+        maximum_iterations=event_size)
     return y
 
   def _inverse(self, y, **kwargs):
@@ -407,7 +404,7 @@ def _gen_mask(num_blocks,
               dtype=tf.float32):
   """Generate the mask for building an autoregressive dense layer."""
   # TODO(b/67594795): Better support of dynamic shape.
-  mask = np.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
+  mask = onp.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
   slices = _gen_slices(num_blocks, n_in, n_out, mask_type=mask_type)
   for [row_slice, col_slice] in slices:
     mask[row_slice, col_slice] = 1
@@ -1000,7 +997,7 @@ def _create_input_order(input_size, input_order='left-to-right'):
       return np.arange(start=input_size, stop=0, step=-1)
     elif input_order == 'random':
       ret = np.arange(start=1, stop=input_size + 1)
-      np.random.shuffle(ret)
+      onp.random.shuffle(ret)
       return ret
   elif np.all(np.sort(input_order) == np.arange(1, input_size + 1)):
     return np.array(input_order)
@@ -1045,9 +1042,9 @@ def _create_degrees(input_size,
       if hidden_degrees == 'random':
         # samples from: [low, high)
         degrees.append(
-            np.random.randint(low=min(np.min(degrees[-1]), input_size - 1),
-                              high=input_size,
-                              size=units))
+            onp.random.randint(low=min(np.min(degrees[-1]), input_size - 1),
+                               high=input_size,
+                               size=units))
       elif hidden_degrees == 'equal':
         min_degree = min(np.min(degrees[-1]), input_size - 1)
         degrees.append(np.maximum(
