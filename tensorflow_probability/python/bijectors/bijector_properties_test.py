@@ -144,12 +144,6 @@ TRANSFORM_DIAGONAL_WHITELIST = {
 
 AUTOVECTORIZATION_IS_BROKEN = [
     'BatchNormalization',  # Might (necessarily) violate shape semantics?
-    'FillScaleTriL',  # No converter for ReverseV2
-    'FillTriangular',  # No converter for ReverseV2
-    'MatvecLU',  # GatherV2 with loop-varying args requires axis=0 (got -2)
-    'Permute',  # GatherV2 with loop-varying args requires axis=0 (got -1)
-    'ScaleMatvecLU',  # GatherV2 with loop-varying args requires axis=0 (got -2)
-    'ScaleTriL',  # No converter for ReverseV2
 ]
 
 AUTOVECTORIZATION_RTOL = collections.defaultdict(lambda: 1e-5)

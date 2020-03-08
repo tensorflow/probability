@@ -33,6 +33,7 @@ import wrapt
 from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
+    'bitcast',
     'broadcast_dynamic_shape',
     'broadcast_static_shape',
     'broadcast_to',
@@ -155,6 +156,8 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
     return value.astype(dtype_hint)
 
   np_value = np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
+  if np.issubdtype(np_value.dtype, np.object_):
+    raise ValueError('Numpy `object`s cannot be converted to `Tensor`s.')
   # We have no hints. By default JAX (in x64 mode) and Numpy default to
   # {int64,float64} which does not match with TF's default.
   if dtype is None and dtype_hint is None:
@@ -206,6 +209,10 @@ class GradientTape(object):
                      parallel_iterations=None, experimental_use_pfor=True):  # pylint: disable=unused-argument
     return source
 
+bitcast = utils.copy_docstring(
+    tf.bitcast,
+    lambda input, type, name=None: convert_to_tensor(  # pylint: disable=g-long-lambda
+        input, dtype_hint=type).view(type))
 
 broadcast_dynamic_shape = utils.copy_docstring(
     tf.broadcast_static_shape, _broadcast_dynamic_shape)
@@ -271,8 +278,17 @@ executing_eagerly = utils.copy_docstring(
     tf.executing_eagerly,
     lambda: True)
 
+
+def _get_static_value_jax(tensor, partial=False):
+  del partial
+  import jax  # pylint: disable=g-import-not-at-top
+  if isinstance(tensor, jax.core.Tracer):
+    return None
+  return tensor
+
 get_static_value = utils.copy_docstring(
     tf.get_static_value,
+    _get_static_value_jax if JAX_MODE else
     lambda tensor, partial=False: tensor)
 
 group = utils.copy_docstring(

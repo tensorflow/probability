@@ -114,6 +114,7 @@ def _gather(  # pylint: disable=unused-argument
         take
     )
     return take(params, indices)
+  params = ops.convert_to_tensor(params)
   res = np.array([
       np.take(params[i], indices[i], axis=axis - batch_dims)
       for i in np.ndindex(*params.shape[:batch_dims])

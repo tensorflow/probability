@@ -37,7 +37,6 @@ multi_substrate_py_library(
     name = "bijectors",
     srcs = ["__init__.py"],
     substrates_omit_deps = [
-        ":masked_autoregressive",
         ":real_nvp",
         ":scale_matvec_lu",
     ],
@@ -478,7 +477,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "masked_autoregressive",
     srcs = ["masked_autoregressive.py"],
     deps = [
@@ -1265,7 +1264,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "masked_autoregressive_test",
     size = "small",
     timeout = "moderate",
@@ -1279,6 +1278,7 @@ py_test(
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 

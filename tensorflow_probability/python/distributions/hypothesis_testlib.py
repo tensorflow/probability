@@ -26,6 +26,7 @@ from absl import logging
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
+import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v2 as tf
 
@@ -36,6 +37,8 @@ from tensorflow_probability.python.bijectors import hypothesis_testlib as biject
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 
+
+JAX_MODE = False
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
 # argument 'batch_shape' in function call"), so disable this lint for the file.
@@ -452,7 +455,7 @@ def broadcasting_params(draw,
 
 def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
   for param, target_param_val in six.iteritems(target_shaped_dict):
-    np.testing.assert_array_equal(
+    onp.testing.assert_array_equal(
         tensorshape_util.as_list(target_param_val.shape),
         tensorshape_util.as_list(possibly_bcast_dict[param].shape))
 
@@ -521,7 +524,9 @@ def base_distributions(draw,
   # ignoring the value.  We similarly reinstate raw tf.Variables, so they
   # appear in the distribution's `variables` list and can be initialized.
   for k in params_constrained:
-    if (k in params_kwargs and
+    # In JAX_MODE, tfp_util.DeferredTensor is a function, not a class, so we
+    # disable this check entirely.
+    if (not JAX_MODE and k in params_kwargs and
         isinstance(params_kwargs[k], (tfp_util.DeferredTensor, tf.Variable)) and
         params_kwargs[k] is not params_constrained[k]):
 
@@ -606,7 +611,7 @@ def batch_reshapes(
   # underlying_batch_shape = draw(tfp_hps.shapes(min_ndims=1))
   # hp.assume(
   #   batch_shape.num_elements() == underlying_batch_shape.num_elements())
-  underlying_batch_shape = [tf.TensorShape(batch_shape).num_elements()]
+  underlying_batch_shape = [tensorshape_util.num_elements(batch_shape)]
 
   underlying = draw(
       distributions(

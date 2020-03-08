@@ -26,12 +26,28 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 tfk = tf.keras
 tfkl = tf.keras.layers
+
+
+def _funnel_bijector_fn(x):
+  """Funnel transform."""
+  batch_shape = tf.shape(x)[:-1]
+  ndims = 4
+  scale = tf.concat(
+      [
+          tf.ones(tf.concat([batch_shape, [1]], axis=0)),
+          tf.exp(x[..., :1] / 2) *
+          tf.ones(tf.concat([batch_shape, [ndims - 1]], axis=0)),
+      ],
+      axis=-1,
+  )
+  return tfb.Scale(scale)
 
 
 def _masked_autoregressive_2d_template(base_template, event_shape):
@@ -115,8 +131,8 @@ class GenMaskTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
-                                   test_util.TestCase):
+class _MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
+                                    test_util.TestCase):
 
   event_shape = [4]
 
@@ -196,6 +212,20 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=1e-4)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=1e-6)
 
+  @test_util.numpy_disable_gradient_test
+  def testGradients(self):
+    maf = tfb.MaskedAutoregressiveFlow(
+        validate_args=True, **self._autoregressive_flow_kwargs)
+
+    def _transform(x):
+      y = maf.forward(x)
+      return maf.inverse(tf.identity(y))
+
+    self.evaluate(tf1.global_variables_initializer())
+    _, gradient = tfp_math.value_and_gradient(_transform,
+                                              tf.zeros(self.event_shape))
+    self.assertIsNotNone(gradient)
+
   def testMutuallyConsistent(self):
     maf = tfb.MaskedAutoregressiveFlow(
         validate_args=True, **self._autoregressive_flow_kwargs)
@@ -264,8 +294,17 @@ class MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
       maf.forward([1., 2.])
 
 
+@test_util.numpy_disable_test_missing_functionality("tf.make_template")
+@test_util.jax_disable_test_missing_functionality("tf.make_template")
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
+class MaskedAutoregressiveFlowTest(_MaskedAutoregressiveFlowTest):
+  pass
+
+
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFlowShiftOnlyTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -278,8 +317,10 @@ class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressiveFlowShiftOnlyLayerTest(MaskedAutoregressiveFlowTest):
+class MaskedAutoregressiveFlowShiftOnlyLayerTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -292,8 +333,10 @@ class MaskedAutoregressiveFlowShiftOnlyLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.numpy_disable_test_missing_functionality("tf.make_template")
+@test_util.jax_disable_test_missing_functionality("tf.make_template")
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
+class MaskedAutoregressiveFlowUnrollLoopTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -308,8 +351,11 @@ class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressiveFlowUnrollLoopLayerTest(MaskedAutoregressiveFlowTest):
+class MaskedAutoregressiveFlowUnrollLoopLayerTest(_MaskedAutoregressiveFlowTest
+                                                 ):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -324,8 +370,10 @@ class MaskedAutoregressiveFlowUnrollLoopLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
+class MaskedAutoregressive2DTest(_MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 
   @property
@@ -343,8 +391,10 @@ class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressiveGatedTest(MaskedAutoregressiveFlowTest):
+class MaskedAutoregressiveGatedTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -357,8 +407,10 @@ class MaskedAutoregressiveGatedTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
 @test_util.test_all_tf_execution_regimes
-class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
+class MaskedAutoregressive2DLayerTest(_MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 
   @property
@@ -376,6 +428,21 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFunnelTest(_MaskedAutoregressiveFlowTest):
+
+  @property
+  def _autoregressive_flow_kwargs(self):
+    return {
+        "bijector_fn":
+            _funnel_bijector_fn,
+        "is_constant_jacobian":
+            False,
+    }
+
+
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
 @test_util.test_all_tf_execution_regimes
 class AutoregressiveNetworkTest(test_util.TestCase):
 
@@ -599,6 +666,8 @@ class AutoregressiveNetworkTest(test_util.TestCase):
                         distribution.sample(7).shape)
     self.assertAllEqual((n,), distribution.log_prob(reshaped_images).shape)
 
+
+del _MaskedAutoregressiveFlowTest
 
 if __name__ == "__main__":
   tf.test.main()

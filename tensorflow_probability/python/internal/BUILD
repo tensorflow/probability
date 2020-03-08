@@ -173,7 +173,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "nest_util",
     srcs = ["nest_util.py"],
     srcs_version = "PY2AND3",
@@ -182,7 +182,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "nest_util_test",
     size = "small",
     srcs = ["nest_util_test.py"],
@@ -224,6 +224,28 @@ multi_substrate_py_test(
 py_library(
     name = "reparameterization",
     srcs = ["reparameterization.py"],
+)
+
+multi_substrate_py_library(
+    name = "samplers",
+    srcs = ["samplers.py"],
+    deps = [
+        ":dtype_util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "samplers_test",
+    size = "small",
+    srcs = ["samplers_test.py"],
+    deps = [
+        ":samplers",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
 )
 
 multi_substrate_py_library(

@@ -28,22 +28,19 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_math import soft
 
 
 __all__ = [
-    'categorical',
-    'gamma',
-    'normal',
-    'poisson',
-    'uniform',
+    'stateless_categorical',
+    'stateless_gamma',
+    'stateless_normal',
+    'stateless_poisson',
+    'stateless_shuffle',
+    'stateless_uniform',
     'set_seed',
-    'shuffle',
     # 'all_candidate_sampler',
     # 'experimental',
     # 'fixed_unigram_candidate_sampler',
     # 'learned_unigram_candidate_sampler',
     # 'log_uniform_candidate_sampler',
-    # 'stateless_categorical',
-    # 'stateless_normal',
     # 'stateless_truncated_normal',
-    # 'stateless_uniform',
     # 'truncated_normal',
     # 'uniform_candidate_sampler',
 ]
@@ -82,7 +79,7 @@ def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pyli
 
 
 def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
-  """Jax implementation of `tf.random.categorical`."""
+  """Jax implementation of `tf.random.stateless_categorical`."""
   dtype = utils.numpy_dtype(dtype or np.int64)
   if not hasattr(logits, 'shape') or not hasattr(logits, 'dtype'):
     logits = np.array(logits, np.float32)
@@ -106,6 +103,8 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
 def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):  # pylint: disable=unused-argument
   """JAX-based reparameterized gamma sampler."""
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
+  alpha = np.array(alpha, dtype=dtype)
+  beta = None if beta is None else np.array(beta, dtype=dtype)
   shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, beta])
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
@@ -191,6 +190,7 @@ def _poisson_jax(shape, lam, dtype=tf.float32, seed=None,
                  name=None, max_iters=None):  # pylint: disable=unused-argument
   """Jax Poisson random sampler."""
   # TODO(b/146674643): use transformed rejection sampling with lam > 10.
+  lam = np.array(lam)
   return _poisson_jax_impl(lam, seed, shape, dtype, name, max_iters)
 
 
@@ -210,8 +210,16 @@ def _shuffle_jax(value, seed=None, name=None):  # pylint: disable=unused-argumen
 
 def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
+  """Numpy uniform random sampler."""
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  if np.issubdtype(dtype, np.integer):
+    if maxval is None:
+      if minval is None:
+        return rng.random_integers(
+            np.iinfo(dtype).min, np.iinfo(dtype).max, size=shape).astype(dtype)
+      raise ValueError('Must provide maxval for integer sampling')
+    return rng.randint(low=minval, high=maxval, size=shape, dtype=dtype)
   maxval = 1 if maxval is None else maxval
   shape = _bcast_shape(shape, [minval, maxval])
   return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
@@ -247,28 +255,27 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
 # --- Begin Public Functions --------------------------------------------------
 
 
-categorical = utils.copy_docstring(
-    tf.random.categorical,
+stateless_categorical = utils.copy_docstring(
+    tf.random.stateless_categorical,
     _categorical_jax if JAX_MODE else _categorical)
 
-gamma = utils.copy_docstring(
-    tf.random.gamma,
+stateless_gamma = utils.copy_docstring(
+    tf.random.stateless_gamma,
     _gamma_jax if JAX_MODE else _gamma)
 
-normal = utils.copy_docstring(
-    tf.random.normal,
+stateless_normal = utils.copy_docstring(
+    tf.random.stateless_normal,
     _normal_jax if JAX_MODE else _normal)
 
-poisson = utils.copy_docstring(
-    tf.random.poisson,
+stateless_poisson = utils.copy_docstring(
+    tf.random.stateless_poisson,
     _poisson_jax if JAX_MODE else _poisson)
 
-shuffle = utils.copy_docstring(
-    tf.random.shuffle,
-    _shuffle_jax if JAX_MODE else _shuffle)
+# TODO(bjp): Delete this method in favor of using `tfp_random.shuffle`.
+stateless_shuffle = (_shuffle_jax if JAX_MODE else _shuffle)
 
-uniform = utils.copy_docstring(
-    tf.random.uniform,
+stateless_uniform = utils.copy_docstring(
+    tf.random.stateless_uniform,
     _uniform_jax if JAX_MODE else _uniform)
 
 set_seed = utils.copy_docstring(

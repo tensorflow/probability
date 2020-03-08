@@ -21,6 +21,7 @@ from __future__ import print_function
 import contextlib
 import os
 import sys
+import unittest
 
 from absl import app
 from absl import flags
@@ -36,9 +37,11 @@ from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
+    'substrate_disable_stateful_random_test',
     'numpy_disable_gradient_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
@@ -89,6 +92,73 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     else:
       return tf1.placeholder_with_default(x, shape=None)
 
+  def assertAllAssertsNested(self, assert_fn, *structure, **kwargs):
+    """Run `assert_fn` on `structure` and report which elements errored.
+
+    This function will run `assert_fn` on each element of `structure` as
+    `assert_fn(structure[0], structure[1], ...)`, collecting any exceptions
+    raised in the process. Afterward, it will report which elements of
+    `structure` triggered an assertion, as well as the assertions themselves.
+
+    Args:
+      assert_fn: A callable that accepts as many arguments as there are
+        structures.
+      *structure: A list of nested structures.
+      **kwargs: Valid keyword args are:
+
+        * `shallow`: If not None, uses this as the shared tree prefix of
+          `structure` for the purpose of being able to use `structure` which
+          only share that tree prefix (e.g. `[1, 2]` and `[[1], 2]` share the
+          `[., .]` tree prefix).
+        * `msg`: Used as the message when a failure happened. Default:
+          `"AllAssertsNested failed"`.
+        * `check_types`: If `True`, types of sequences are checked as well,
+          including the keys of dictionaries. If `False`, for example a list and
+          a tuple of objects may be equivalent. Default: `False`.
+
+    Raises:
+      AssertionError: If the structures are mismatched, or at `assert_fn` raised
+        an exception at least once.
+    """
+    shallow = kwargs.pop('shallow', None)
+    if shallow is None:
+      shallow = structure[0]
+    msg = kwargs.pop('msg', 'AllAssertsNested failed')
+
+    def _one_part(*structure):
+      try:
+        assert_fn(*structure)
+      except Exception as part_e:  # pylint: disable=broad-except
+        return part_e
+
+    try:
+      maybe_exceptions = nest.map_structure_up_to(shallow, _one_part,
+                                                  *structure, **kwargs)
+      overall_exception = None
+      exceptions_with_paths = [
+          (p, e)
+          for p, e in nest.flatten_with_joined_string_paths(maybe_exceptions)
+          if e is not None
+      ]
+    except Exception as e:  # pylint: disable=broad-except
+      overall_exception = e
+      exceptions_with_paths = []
+
+    final_msg = '{}:\n\n'.format(msg)
+    if overall_exception:
+      final_msg += str(overall_exception)
+      raise AssertionError(final_msg)
+    elif exceptions_with_paths:
+      for i, one_structure in enumerate(structure):
+        final_msg += 'Structure {}:\n{}\n\n'.format(i, one_structure)
+      final_msg += 'Exceptions:\n\n'
+      for p, exception in exceptions_with_paths:
+        final_msg += 'Path: {}\nException: {}\n{}\n\n'.format(
+            p,
+            type(exception).__name__, exception)
+      # Drop the final two newlines.
+      raise AssertionError(final_msg[:-2])
+
   def assertAllEqualNested(self, a, b, check_types=False):
     """Assert that analogous entries in two nested structures are equivalent.
 
@@ -99,9 +169,12 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         the keys of dictionaries. If `False`, for example a list and a tuple of
         objects may be equivalent.
     """
-    tf.nest.assert_same_structure(a, b, check_types=check_types)
-    for a_, b_ in zip(tf.nest.flatten(a), tf.nest.flatten(b)):
-      self.assertAllEqual(a_, b_)
+    self.assertAllAssertsNested(
+        self.assertAllEqual,
+        a,
+        b,
+        check_types=check_types,
+        msg='AllEqualNested failed')
 
   def assertAllFinite(self, a):
     """Assert that all entries in a `Tensor` are finite.
@@ -412,19 +485,36 @@ def jax_disable_variable_test(test_fn):
   return new_test
 
 
+def substrate_disable_stateful_random_test(test_fn):
+  """Disable a test of stateful randomness."""
+
+  def new_test(self, *args, **kwargs):
+    if not hasattr(tf.random, 'uniform'):
+      self.skipTest('Test uses stateful random sampling')
+    return test_fn(self, *args, **kwargs)
+
+  return new_test
+
+
 def numpy_disable_test_missing_functionality(issue_link):
   """Disable a test for unimplemented numpy functionality."""
 
-  def f(test_fn):
+  def f(test_fn_or_class):
     """Decorator."""
     if JAX_MODE:
-      return test_fn
+      return test_fn_or_class
+    if tf.Variable != ops.NumpyVariable:
+      return test_fn_or_class
+
+    reason = 'Test disabled for Numpy missing functionality: {}'.format(
+        issue_link)
+
+    if isinstance(test_fn_or_class, type):
+      return unittest.skip(reason)(test_fn_or_class)
 
     def new_test(self, *args, **kwargs):
-      if tf.Variable == ops.NumpyVariable:
-        msg = 'Test disabled for numpy missing functionality: {}'
-        self.skipTest(msg.format(issue_link))
-      return test_fn(self, *args, **kwargs)
+      self.skipTest(reason)
+      return test_fn_or_class(self, *args, **kwargs)
 
     return new_test
 
@@ -434,14 +524,19 @@ def numpy_disable_test_missing_functionality(issue_link):
 def jax_disable_test_missing_functionality(issue_link):
   """Disable a test for unimplemented JAX functionality."""
 
-  def f(test_fn):
+  def f(test_fn_or_class):
     if not JAX_MODE:
-      return test_fn
+      return test_fn_or_class
+
+    reason = 'Test disabled for JAX missing functionality: {}'.format(
+        issue_link)
+
+    if isinstance(test_fn_or_class, type):
+      return unittest.skip(reason)(test_fn_or_class)
 
     def new_test(self, *args, **kwargs):
-      self.skipTest(
-          'Test disabled for JAX missing functionality: {}'.format(issue_link))
-      return test_fn(self, *args, **kwargs)
+      self.skipTest(reason)
+      return test_fn_or_class(self, *args, **kwargs)
 
     return new_test
 
@@ -459,7 +554,9 @@ def tf_tape_safety_test(test_fn):
   return new_test
 
 
-def test_seed(hardcoded_seed=None, set_eager_seed=True):
+def test_seed(hardcoded_seed=None,
+              set_eager_seed=True,
+              sampler_type='stateful'):
   """Returns a command-line-controllable PRNG seed for unit tests.
 
   If your test will pass a seed to more than one operation, consider using
@@ -493,6 +590,8 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     set_eager_seed: Python bool.  If true (default), invoke `tf.random.set_seed`
       in Eager mode to get more reproducibility.  Should become unnecessary
       once b/68017812 is resolved.
+    sampler_type: 'stateful' or 'stateless'. 'stateless' means we return a seed
+      pair.
 
   Returns:
     seed: 17, unless otherwise specified by arguments or command line flags.
@@ -512,19 +611,14 @@ def test_seed(hardcoded_seed=None, set_eager_seed=True):
     answer = hardcoded_seed
   else:
     answer = 17
-  return (_wrap_seed_jax if JAX_MODE else _wrap_seed)(answer, set_eager_seed)
-
-
-def _wrap_seed(seed, set_eager_seed):
+  if sampler_type == 'stateless' or JAX_MODE:
+    answer = tf.constant([0, answer % (2**32 - 1)], dtype=tf.uint32)
+    if not JAX_MODE:
+      answer = tf.bitcast(answer, tf.int32)
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
-  if tf.executing_eagerly() and set_eager_seed:
-    tf.random.set_seed(seed)
-  return seed
-
-
-def _wrap_seed_jax(seed, _):
-  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
-  return jaxrand.PRNGKey(seed % (2**32 - 1))
+  elif tf.executing_eagerly() and set_eager_seed:
+    tf.random.set_seed(answer)
+  return answer
 
 
 def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):

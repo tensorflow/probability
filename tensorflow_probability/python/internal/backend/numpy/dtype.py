@@ -33,6 +33,7 @@ __all__ = [
     'complex128',
     'complex64',
     'double',
+    'DType',
     'float16',
     'float32',
     'float64',
@@ -57,6 +58,8 @@ __all__ = [
 
 
 JAX_MODE = False
+
+DType = np.dtype  # pylint: disable=invalid-name
 
 
 def _complex(real, imag, name=None):  # pylint: disable=unused-argument

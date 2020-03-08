@@ -40,6 +40,8 @@ except ImportError:
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
+JAX_MODE = False
+
 
 def _prefer_static(original_fn, static_fn):
   """Wraps original_fn, preferring to call static_fn when inputs are static."""
@@ -95,7 +97,7 @@ def _get_static_value(pred):
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
     # pylint: disable=protected-access
-    if pred_value is None:
+    if not JAX_MODE and pred_value is None:
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access

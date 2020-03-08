@@ -34,6 +34,7 @@ import collections
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
 
@@ -44,8 +45,7 @@ __all__ = [
 
 def _machine_eps(dtype):
   """Returns the machine epsilon for the supplied dtype."""
-  if isinstance(dtype, tf.DType):
-    dtype = dtype.as_numpy_dtype
+  dtype = dtype_util.as_numpy_dtype(tf.as_dtype(dtype))
   return np.finfo(dtype).eps
 
 

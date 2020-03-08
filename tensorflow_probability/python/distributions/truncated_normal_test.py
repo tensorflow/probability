@@ -369,22 +369,6 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       err = self.compute_max_gradient_error(lambda x: f(x, scale), [loc])
       self.assertLess(err, 0.005)
 
-  @parameterized.parameters(tf.float32, tf.float64)
-  def testReproduceVmap(self, dtype):
-    if dtype == tf.float32:
-      raise unittest.SkipTest('b/145554459')
-    loc = tf.constant(-200., dtype=dtype)
-    scale = tf.constant(2.188274e+01, dtype=dtype)
-    high = tf.constant(113.33857, dtype=dtype)
-    low = tf.constant(102.94414, dtype=dtype)
-    # Not validating args b/c the assertions confuse pfor.
-    dist = tfd.TruncatedNormal(loc, scale, low, high, validate_args=False)
-    sample = tf.constant([102.950745, 103.87256, 107.78299], dtype=dtype)
-    batch_lp = dist.log_prob(sample)
-    pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
-    batch_lp_, pfor_lp_ = self.evaluate((batch_lp, pfor_lp))
-    self.assertAllClose(batch_lp_, pfor_lp_, atol=1e-6)
-
   def testSupportBijectorOutsideRange(self):
     low = np.array([1., 2., 3., -5.]).astype(np.float32)
     loc = np.array([4., 4., 4., -2.]).astype(np.float32)
@@ -396,6 +380,52 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     bijector_inverse_x = dist._experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
+
+
+# TODO(b/150161911): reconcile graph- and eager-mode handling of denormal floats
+# so that we can re-enable eager mode tests.
+@test_util.test_graph_mode_only
+class TruncatedNormalTestGraphMode(_TruncatedNormalTestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': '_float32', 'dtype': tf.float32},
+      {'testcase_name': '_float64', 'dtype': tf.float64})
+  def testReproduceVmap1(self, dtype):
+    # Regression test for b/145554459
+    loc = tf.constant(-200., dtype=dtype)
+    scale = tf.constant(2.188274e+01, dtype=dtype)
+    high = tf.constant(113.33857, dtype=dtype)
+    low = tf.constant(102.94414, dtype=dtype)
+    # Not validating args b/c the assertions confuse pfor.
+    dist = tfd.TruncatedNormal(loc, scale, low, high, validate_args=False)
+    sample = tf.constant([102.950745, 103.87256, 107.78299], dtype=dtype)
+    batch_lp = dist.log_prob(sample)
+    pfor_lp = tf.vectorized_map(dist.log_prob, sample)
+    batch_lp_, pfor_lp_ = self.evaluate((batch_lp, pfor_lp))
+    self.assertAllClose(batch_lp_, pfor_lp_, atol=1e-6)
+
+  @parameterized.named_parameters(
+      {'testcase_name': '_float32', 'dtype': tf.float32},
+      {'testcase_name': '_float64', 'dtype': tf.float64})
+  def testReproduceVmap2(self, dtype):
+    # Regression test for b/150811273
+    if dtype == np.float32:
+      raise unittest.SkipTest('b/150811273')
+    seed = test_util.test_seed()
+    loc = tf.constant(-12.500191, dtype=dtype)
+    scale = tf.constant(1e-06, dtype=dtype)
+    high = tf.constant(-12.502851, dtype=dtype)
+    low = tf.constant(-187.50009, dtype=dtype)
+    # Not validating args b/c the assertions confuse pfor.
+    dist = tfd.TruncatedNormal(loc, scale, low, high, validate_args=False)
+    # At the default seed, the sample comes out as [-12.502851 -12.502851
+    # -12.502851], but that's also weird.  At a scale of 1e-6, the samples
+    # should cluster more tightly around the location, which is -12.500191.
+    sample = self.evaluate(dist.sample(3, seed=seed))
+    batch_lp = dist.log_prob(sample)
+    pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
+    batch_lp_, pfor_lp_ = self.evaluate((batch_lp, pfor_lp))
+    self.assertAllClose(batch_lp_, pfor_lp_, atol=1e-6)
 
 
 @test_util.test_all_tf_execution_regimes

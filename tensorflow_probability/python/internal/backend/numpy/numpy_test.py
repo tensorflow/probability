@@ -33,6 +33,7 @@ import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+import tensorflow_probability.python.experimental.substrates.numpy as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
@@ -70,7 +71,8 @@ class TestCase(dict):
     super(TestCase, self).__init__(
         testcase_name='_' + name.replace('.', '_'),
         tensorflow_function=_getattr(tf, name),
-        numpy_function=_getattr(numpy_backend, name),
+        numpy_function=_getattr(numpy_backend,
+                                name.replace('random.', 'random.stateless_')),
         strategy_list=strategy_list,
         **kwargs)
 
@@ -378,7 +380,7 @@ def gather_params(draw):
 @hps.composite
 def gather_nd_params(draw):
   if JAX_MODE:
-  # Restricting batch_dims to be positive for now
+    # Restricting batch_dims to be positive for now
     batch_dims = draw(hps.integers(min_value=0, max_value=4))
   else:
     batch_dims = 0
@@ -967,6 +969,24 @@ class NumpyTest(test_util.TestCase):
 
     for dim in tensor_shape:
       self.assertNotIsInstance(dim, tf1.Dimension)
+
+  @test_util.numpy_disable_gradient_test
+  def test_while_loop_gradients(self):
+
+    def _fn(x):
+
+      def _cond_fn(i, _):
+        return i < 3.
+
+      def _body_fn(i, val):
+        return i + 1, val + 1.
+
+      return numpy_backend.while_loop(
+          cond=_cond_fn, body=_body_fn, loop_vars=(0, x),
+          maximum_iterations=5)[1]
+
+    _, grad = tfp.math.value_and_gradient(_fn, 0.)
+    self.assertIsNotNone(grad)
 
   def evaluate(self, tensors):
     if tf.executing_eagerly():

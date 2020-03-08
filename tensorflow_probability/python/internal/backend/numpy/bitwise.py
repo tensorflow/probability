@@ -30,6 +30,10 @@ __all__ = [
 ]
 
 
+bitwise_xor = utils.copy_docstring(
+    tf.bitwise.bitwise_xor,
+    lambda x, y, name=None: np.bitwise_xor(x, y))  # pylint: disable=unused-argument
+
 left_shift = utils.copy_docstring(
     tf.bitwise.left_shift,
     lambda x, y, name=None: np.left_shift(x, y))  # pylint: disable=unused-argument
