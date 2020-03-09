@@ -128,9 +128,7 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'BetaBinomial',  # No converter for While
     'Binomial',  # No converter for While
-    'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'DirichletMultinomial',  # No converter for TensorListFromTensor
-    'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'Gamma',  # No converter for While
     'Multinomial',  # No converter for TensorListFromTensor
     'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
@@ -142,8 +140,6 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
-    'Categorical',  # No converter for SparseSoftmaxCrossEntropyWithLogits
-    'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
