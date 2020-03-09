@@ -108,7 +108,6 @@ NO_KL_PARAM_GRADS = ('Deterministic',)
 # batch slicing.
 INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchReshape',
-    'OrderedLogistic',  # b/149597503
 )
 
 EXTRA_TENSOR_CONVERSION_DISTS = {
@@ -131,7 +130,6 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'DirichletMultinomial',  # No converter for TensorListFromTensor
     'Gamma',  # No converter for While
     'Multinomial',  # No converter for TensorListFromTensor
-    'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
     'VonMises',  # No converter for While
@@ -140,7 +138,6 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
-    'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/150811273
