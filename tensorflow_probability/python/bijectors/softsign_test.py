@@ -40,14 +40,14 @@ class SoftsignBijectorTest(test_util.TestCase):
 
   def testBijectorBounds(self):
     bijector = tfb.Softsign(validate_args=True)
-    with self.assertRaisesOpError("greater than -1"):
+    with self.assertRaisesOpError(">= -1"):
       self.evaluate(bijector.inverse(-3.))
-    with self.assertRaisesOpError("greater than -1"):
+    with self.assertRaisesOpError(">= -1"):
       self.evaluate(bijector.inverse_log_det_jacobian(-3., event_ndims=0))
 
-    with self.assertRaisesOpError("less than 1"):
+    with self.assertRaisesOpError("<= 1"):
       self.evaluate(bijector.inverse(3.))
-    with self.assertRaisesOpError("less than 1"):
+    with self.assertRaisesOpError("<= 1"):
       self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
 
   def testBijectorForwardInverse(self):
