@@ -163,7 +163,6 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'DirichletMultinomial',  # No converter for TensorListFromTensor
     'FiniteDiscrete',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'Multinomial',  # No converter for TensorListFromTensor
-    'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
     'VonMises',  # No converter for While
@@ -179,7 +178,6 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'NegativeBinomial',  # Numeric inconsistency: b/147743999
     'Multinomial',  # Seemingly runs, but gives `NaN`s sometimes.
     'OneHotCategorical',  # Seemingly runs, but gives `NaN`s sometimes.
-    'OrderedLogistic',  # No converter for SparseSoftmaxCrossEntropyWithLogits
     'PlackettLuce',  # Shape error because pfor gather ignores `batch_dims`.
     'ProbitBernoulli',  # Seemingly runs, but gives `NaN`s sometimes.
     'TruncatedNormal',  # Numerical problem: b/145554459
