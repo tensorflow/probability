@@ -55,12 +55,12 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   `auxiliary`. The two latent states for component `j` drift over time via:
 
   ```python
-  effect[t] = (effect[t-1] * cos(frequencies[j]) +
-               auxiliary[t-] * sin(frequencies[j]) +
+  effect[t] = (effect[t - 1] * cos(frequencies[j]) +
+               auxiliary[t - 1] * sin(frequencies[j]) +
                Normal(0., drift_scale))
 
-  auxiliary[t] = (-effect[t-1] * sin(frequencies[j]) +
-                  auxiliary[t-] * cos(frequencies[j]) +
+  auxiliary[t] = (-effect[t - 1] * sin(frequencies[j]) +
+                  auxiliary[t - 1] * cos(frequencies[j]) +
                   Normal(0., drift_scale))
   ```
 
@@ -333,12 +333,12 @@ class SmoothSeasonal(StructuralTimeSeries):
   associated with frequency `j` drift over time via:
 
   ```python
-  effect[t] = (effect[t-1] * cos(frequencies[j]) +
-               auxiliary[t-] * sin(frequencies[j]) +
+  effect[t] = (effect[t - 1] * cos(frequencies[j]) +
+               auxiliary[t - 1] * sin(frequencies[j]) +
                Normal(0., drift_scale))
 
-  auxiliary[t] = (-effect[t-1] * sin(frequencies[j]) +
-                  auxiliary[t-] * cos(frequencies[j]) +
+  auxiliary[t] = (-effect[t - 1] * sin(frequencies[j]) +
+                  auxiliary[t - 1] * cos(frequencies[j]) +
                   Normal(0., drift_scale))
   ```
 
