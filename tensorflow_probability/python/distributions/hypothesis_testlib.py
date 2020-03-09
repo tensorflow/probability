@@ -178,6 +178,8 @@ CONSTRAINTS = {
         tf.math.softmax,
     'Zipf.power':
         tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
+    'ContinuousBernoulli.probs':
+        tf.sigmoid,
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
         # Capping at 15. so that probability is less than 1, and entropy is
         # defined. b/147394924

@@ -47,6 +47,7 @@ TF2_FRIENDLY_DISTS = (
     'CholeskyLKJ',
     'Categorical',
     'Cauchy',
+    'ContinuousBernoulli',
     'Deterministic',
     'Dirichlet',
     'DirichletMultinomial',

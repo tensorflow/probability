@@ -50,6 +50,7 @@ multi_substrate_py_library(
         ":chi",
         ":chi2",
         ":cholesky_lkj",
+        ":continuous_bernoulli",
         ":deterministic",
         ":dirichlet",
         ":dirichlet_multinomial",
@@ -334,6 +335,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "continuous_bernoulli",
+    srcs = ["continuous_bernoulli.py"],
+    deps = [
+        ":distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1805,6 +1820,21 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "continuous_bernoulli_test",
+    srcs = ["continuous_bernoulli_test.py"],
+    jax_size = "medium",
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "deterministic_test",
     srcs = ["deterministic_test.py"],
     numpy_tags = ["notap"],
@@ -2955,6 +2985,7 @@ exports_files(
         "chi.py",
         "chi2.py",
         "cholesky_lkj.py",
+        "continuous_bernoulli.py",
         "deterministic.py",
         "dirichlet.py",
         "dirichlet_multinomial.py",
