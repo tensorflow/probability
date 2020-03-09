@@ -149,10 +149,12 @@ AUTOVECTORIZATION_IS_BROKEN = [
 AUTOVECTORIZATION_RTOL = collections.defaultdict(lambda: 1e-5)
 AUTOVECTORIZATION_RTOL.update({
     'Invert': 1e-2,  # Can contain poorly-conditioned bijectors.
-    'ScaleMatvecTriL': 1e-3})
+    'ScaleMatvecLU': 1e-3,  # TODO(b/151041130) tighten this.
+    'ScaleMatvecTriL': 1e-3})  # TODO(b/150250388) tighten this.
 AUTOVECTORIZATION_ATOL = collections.defaultdict(lambda: 1e-5)
 AUTOVECTORIZATION_ATOL.update({
-    'ScaleMatvecTriL': 1e-1})  # TODO(b/150250388) loosen this.
+    'ScaleMatvecLU': 1e-3,  # TODO(b/151041130) tighten this.
+    'ScaleMatvecTriL': 1e-1})  # TODO(b/150250388) tighten this.
 
 
 def is_invert(bijector):
