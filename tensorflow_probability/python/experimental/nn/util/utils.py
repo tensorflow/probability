@@ -331,7 +331,7 @@ def _apply_gradients(opt, g, v):
 
 def flatten_rightmost(ndims=3):
   """Flatten rightmost dims."""
-  def flatten_rightmost_layer(x):
+  def flatten_rightmost_(x):
     """Implementation of `flatten_rightmost`."""
     leftmost_ndims = prefer_static.rank(x) - ndims
     new_shape = prefer_static.pad(
@@ -344,13 +344,13 @@ def flatten_rightmost(ndims=3):
       d = np.prod(d) if d.is_fully_defined() else None
       y.set_shape(x.shape[:leftmost_ndims].concatenate(d))
     return y
-  return flatten_rightmost_layer
+  return flatten_rightmost_
 
 
 def trace(name=None):
   """Returns a function which prints info related to input."""
   name = '' if name is None else 'name:{:10}  '.format(name)
-  def _trace(x):
+  def trace_(x):
     """Prints something."""
     if hasattr(x, 'dtype') and hasattr(x, 'shape'):
       print('--- TRACE:  {}shape:{:16}  dtype:{:10}'.format(
@@ -361,12 +361,12 @@ def trace(name=None):
       print('--- TRACE:  {}value:{}'.format(name, x))
     sys.stdout.flush()
     return x
-  return _trace
+  return trace_
 
 
 def expand_dims(axis, name=None):
   """Like `tf.expand_dims` but accepts a vector of axes to expand."""
-  def expand_dims_layer(x):
+  def expand_dims_(x):
     """Implementation of `expand_dims`."""
     with tf.name_scope(name or 'expand_dims'):
       x = tf.convert_to_tensor(x, name='x')
@@ -389,7 +389,7 @@ def expand_dims(axis, name=None):
                                 constant_values=1)
       shape = prefer_static.gather(shape, idx)
       return tf.reshape(x, shape)
-  return expand_dims_layer
+  return expand_dims_
 
 
 def variables_save(filename, variables):
@@ -449,117 +449,14 @@ def variables_summary(variables, name=None):
 # make_kernel_bias* functions must all have the same call signature.
 
 
-def make_kernel_bias_prior_spike_and_slab(
-    kernel_shape,
-    bias_shape,
-    dtype=tf.float32,
-    kernel_initializer=None,  # pylint: disable=unused-argument
-    bias_initializer=None,  # pylint: disable=unused-argument
-    kernel_name='prior_kernel',
-    bias_name='prior_bias'):
-  """Create prior for Variational layers with kernel and bias.
-
-  Note: Distribution scale is inversely related to regularization strength.
-  Consider a "Normal" prior; bigger scale corresponds to less L2 regularization.
-  I.e.,
-  ```python
-  scale    = (2. * l2weight)**-0.5
-  l2weight = scale**-2. / 2.
-  ```
-  have a similar regularizing effect.
-
-  The std. deviation of each of the component distributions returned by this
-  function is approximately `1415` (or approximately `l2weight = 25e-6`). In
-  other words this prior is extremely "weak".
-
-  Args:
-    kernel_shape: ...
-    bias_shape: ...
-    dtype: ...
-      Default value: `tf.float32`.
-    kernel_initializer: Ignored.
-      Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
-    bias_initializer: Ignored.
-      Default value: `None` (i.e., `tf.zeros`).
-    kernel_name: ...
-      Default value: `"prior_kernel"`.
-    bias_name: ...
-      Default value: `"prior_bias"`.
-
-  Returns:
-    kernel_and_bias_distribution: ...
-  """
-  w = MixtureSameFamily(
-      mixture_distribution=Categorical(probs=[0.5, 0.5]),
-      components_distribution=Normal(
-          loc=0.,
-          scale=tf.constant([1., 2000.], dtype=dtype)))
-  return JointDistributionSequential([
-      Sample(w, kernel_shape, name=kernel_name),
-      Sample(w, bias_shape, name=bias_name),
-  ])
-
-
-def make_kernel_bias_posterior_mvn_diag(
-    kernel_shape,
-    bias_shape,
-    dtype=tf.float32,
-    kernel_initializer=None,
-    bias_initializer=None,
-    kernel_name='posterior_kernel',
-    bias_name='posterior_bias'):
-  """Create learnable posterior for Variational layers with kernel and bias.
-
-  Args:
-    kernel_shape: ...
-    bias_shape: ...
-    dtype: ...
-      Default value: `tf.float32`.
-    kernel_initializer: ...
-      Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
-    bias_initializer: ...
-      Default value: `None` (i.e., `tf.zeros`).
-    kernel_name: ...
-      Default value: `"posterior_kernel"`.
-    bias_name: ...
-      Default value: `"posterior_bias"`.
-
-  Returns:
-    kernel_and_bias_distribution: ...
-  """
-  if kernel_initializer is None:
-    kernel_initializer = tf.initializers.glorot_uniform()
-  if bias_initializer is None:
-    bias_initializer = tf.zeros
-  make_loc = lambda shape, init, name: tf.Variable(  # pylint: disable=g-long-lambda
-      init(shape, dtype=dtype),
-      name=name + '_loc')
-  # Setting the initial scale to a relatively small value causes the `loc` to
-  # quickly move toward a lower loss value.
-  make_scale = lambda shape, name: TransformedVariable(  # pylint: disable=g-long-lambda
-      tf.fill(shape, value=tf.constant(0.01, dtype=dtype)),
-      Chain([Shift(1e-5), Softplus()]),
-      name=name + '_scale')
-  return JointDistributionSequential([
-      Independent(
-          Normal(loc=make_loc(kernel_shape, kernel_initializer, kernel_name),
-                 scale=make_scale(kernel_shape, kernel_name)),
-          reinterpreted_batch_ndims=prefer_static.size(kernel_shape),
-          name=kernel_name),
-      Independent(
-          Normal(loc=make_loc(bias_shape, bias_initializer, bias_name),
-                 scale=make_scale(bias_shape, bias_name)),
-          reinterpreted_batch_ndims=prefer_static.size(bias_shape),
-          name=bias_name),
-  ])
-
-
 def make_kernel_bias(
     kernel_shape,
     bias_shape,
-    dtype=tf.float32,
     kernel_initializer=None,
     bias_initializer=None,
+    kernel_batch_ndims=0,  # pylint: disable=unused-argument
+    bias_batch_ndims=0,  # pylint: disable=unused-argument
+    dtype=tf.float32,
     kernel_name='kernel',
     bias_name='bias'):
   # pylint: disable=line-too-long
@@ -568,12 +465,16 @@ def make_kernel_bias(
   Args:
     kernel_shape: ...
     bias_shape: ...
-    dtype: ...
-      Default value: `tf.float32`.
     kernel_initializer: ...
       Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
     bias_initializer: ...
       Default value: `None` (i.e., `tf.zeros`).
+    kernel_batch_ndims: ...
+      Default value: `0`.
+    bias_batch_ndims: ...
+      Default value: `0`.
+    dtype: ...
+      Default value: `tf.float32`.
     kernel_name: ...
       Default value: `"kernel"`.
     bias_name: ...
@@ -624,6 +525,123 @@ def make_kernel_bias(
       tf.Variable(kernel_initializer(kernel_shape, dtype), name=kernel_name),
       tf.Variable(bias_initializer(bias_shape, dtype), name=bias_name),
   )
+
+
+def make_kernel_bias_prior_spike_and_slab(
+    kernel_shape,
+    bias_shape,
+    kernel_initializer=None,  # pylint: disable=unused-argument
+    bias_initializer=None,  # pylint: disable=unused-argument
+    kernel_batch_ndims=0,  # pylint: disable=unused-argument
+    bias_batch_ndims=0,  # pylint: disable=unused-argument
+    dtype=tf.float32,
+    kernel_name='prior_kernel',
+    bias_name='prior_bias'):
+  """Create prior for Variational layers with kernel and bias.
+
+  Note: Distribution scale is inversely related to regularization strength.
+  Consider a "Normal" prior; bigger scale corresponds to less L2 regularization.
+  I.e.,
+  ```python
+  scale    = (2. * l2weight)**-0.5
+  l2weight = scale**-2. / 2.
+  ```
+  have a similar regularizing effect.
+
+  The std. deviation of each of the component distributions returned by this
+  function is approximately `1415` (or approximately `l2weight = 25e-6`). In
+  other words this prior is extremely "weak".
+
+  Args:
+    kernel_shape: ...
+    bias_shape: ...
+    kernel_initializer: Ignored.
+      Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+    bias_initializer: Ignored.
+      Default value: `None` (i.e., `tf.zeros`).
+    kernel_batch_ndims: ...
+      Default value: `0`.
+    bias_batch_ndims: ...
+      Default value: `0`.
+    dtype: ...
+      Default value: `tf.float32`.
+    kernel_name: ...
+      Default value: `"prior_kernel"`.
+    bias_name: ...
+      Default value: `"prior_bias"`.
+
+  Returns:
+    kernel_and_bias_distribution: ...
+  """
+  w = MixtureSameFamily(
+      mixture_distribution=Categorical(probs=[0.5, 0.5]),
+      components_distribution=Normal(
+          loc=0.,
+          scale=tf.constant([1., 2000.], dtype=dtype)))
+  return JointDistributionSequential([
+      Sample(w, kernel_shape, name=kernel_name),
+      Sample(w, bias_shape, name=bias_name),
+  ])
+
+
+def make_kernel_bias_posterior_mvn_diag(
+    kernel_shape,
+    bias_shape,
+    kernel_initializer=None,
+    bias_initializer=None,
+    kernel_batch_ndims=0,  # pylint: disable=unused-argument
+    bias_batch_ndims=0,  # pylint: disable=unused-argument
+    dtype=tf.float32,
+    kernel_name='posterior_kernel',
+    bias_name='posterior_bias'):
+  """Create learnable posterior for Variational layers with kernel and bias.
+
+  Args:
+    kernel_shape: ...
+    bias_shape: ...
+    kernel_initializer: ...
+      Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+    bias_initializer: ...
+      Default value: `None` (i.e., `tf.zeros`).
+    kernel_batch_ndims: ...
+      Default value: `0`.
+    bias_batch_ndims: ...
+      Default value: `0`.
+    dtype: ...
+      Default value: `tf.float32`.
+    kernel_name: ...
+      Default value: `"posterior_kernel"`.
+    bias_name: ...
+      Default value: `"posterior_bias"`.
+
+  Returns:
+    kernel_and_bias_distribution: ...
+  """
+  if kernel_initializer is None:
+    kernel_initializer = tf.initializers.glorot_uniform()
+  if bias_initializer is None:
+    bias_initializer = tf.zeros
+  make_loc = lambda shape, init, name: tf.Variable(  # pylint: disable=g-long-lambda
+      init(shape, dtype=dtype),
+      name=name + '_loc')
+  # Setting the initial scale to a relatively small value causes the `loc` to
+  # quickly move toward a lower loss value.
+  make_scale = lambda shape, name: TransformedVariable(  # pylint: disable=g-long-lambda
+      tf.fill(shape, value=tf.constant(1e-3, dtype=dtype)),
+      Chain([Shift(1e-5), Softplus()]),
+      name=name + '_scale')
+  return JointDistributionSequential([
+      Independent(
+          Normal(loc=make_loc(kernel_shape, kernel_initializer, kernel_name),
+                 scale=make_scale(kernel_shape, kernel_name)),
+          reinterpreted_batch_ndims=prefer_static.size(kernel_shape),
+          name=kernel_name),
+      Independent(
+          Normal(loc=make_loc(bias_shape, bias_initializer, bias_name),
+                 scale=make_scale(bias_shape, bias_name)),
+          reinterpreted_batch_ndims=prefer_static.size(bias_shape),
+          name=bias_name),
+  ])
 
 
 def halflife_decay(time_step, half_life, initial, final=0., dtype=tf.float32,

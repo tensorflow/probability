@@ -17,6 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.nn import util as nn_util_lib
@@ -35,10 +37,11 @@ class Layer(tf.Module):
 
   def __init__(self, also_track=None, name=None):
     name = name_util.strip_invalid_chars(name or type(self).__name__)
-    self._also_track = also_track
+    self._also_track = [] if also_track is None else [also_track]
     super(Layer, self).__init__(name=name)
     self._extra_loss = None
     self._extra_result = None
+    self._trace = False
 
   @property
   def extra_loss(self):
@@ -50,7 +53,7 @@ class Layer(tf.Module):
 
   @property
   def also_track(self):
-    return self._also_track
+    return list(self._also_track)
 
   def eval(self, inputs, is_training=True, **kwargs):
     self._set_extra_loss(None)
@@ -97,6 +100,10 @@ class Sequential(Layer):
     self._layers = tuple(layers)
     super(Sequential, self).__init__(also_track=also_track, name=name)
 
+  def set_trace(self, trace):
+    self._trace = bool(trace)
+    return self
+
   @property
   def layers(self):
     return self._layers
@@ -105,9 +112,13 @@ class Sequential(Layer):
     kwargs.update({'is_training': is_training})
     all_extras = []
     x = inputs
-    for layer in self.layers:
+    if self._trace:
+      _trace(self, x, -1)
+    for i, layer in enumerate(self.layers):
       _try_set_extra_results(layer, loss=None, result=None)
       x = _try_call(layer, [x], kwargs)
+      if self._trace:
+        _trace(layer, x, i)
       extra_loss, extra_result = _try_get_extra_results(layer)
       all_extras.append((extra_loss, extra_result))
       _try_set_extra_results(layer, loss=extra_loss, result=extra_result)
@@ -120,8 +131,9 @@ class Sequential(Layer):
     return x
 
   def __getitem__(self, i):
-    return Sequential(
-        self.layers[i], also_track=self.also_track, name=self.name)
+    r = Sequential(self.layers[i], name=self.name)
+    r._also_track = self._also_track  # pylint: disable=protected-access
+    return r
 
 
 class Lambda(Layer):
@@ -160,10 +172,12 @@ class KernelBiasLayer(Layer):
                kernel,
                bias,
                apply_kernel_fn,
+               activation_fn=None,
                dtype=tf.float32,
                name=None):
     self._kernel = kernel
     self._bias = bias
+    self._activation_fn = activation_fn
     self._apply_kernel_fn = apply_kernel_fn
     self._dtype = dtype
     super(KernelBiasLayer, self).__init__(name=name)
@@ -180,6 +194,10 @@ class KernelBiasLayer(Layer):
   def bias(self):
     return self._bias
 
+  @property
+  def activation_fn(self):
+    return self._activation_fn
+
   def eval(self, x, is_training=True):
     x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
     y = x
@@ -187,6 +205,8 @@ class KernelBiasLayer(Layer):
       y = self._apply_kernel_fn(y, self.kernel)
     if self.bias is not None:
       y = y + self.bias
+    if self.activation_fn is not None:
+      y = self.activation_fn(y)  # pylint: disable=not-callable
     return y
 
 
@@ -227,5 +247,16 @@ def _try_call(fn, args, kwargs):
 
 
 def _try_get_name(fn, name_fallback='unknown'):
-  return str(getattr(fn, 'name', None) or
-             getattr(fn, '__name__', name_fallback))
+  return str(getattr(fn, '__name__', None) or
+             getattr(fn, 'name', None) or
+             getattr(type(fn), '__name__', name_fallback))
+
+
+def _trace(layer, x, i):
+  name = _try_get_name(layer)
+  z = tf.nest.map_structure(lambda x_: '{:14} {:<24} {:>10}'.format(  # pylint: disable=g-long-lambda
+      _try_get_name(x_),
+      str(list(getattr(x_, 'shape', '?'))),
+      _try_get_name(getattr(x_, 'dtype', x_), '?')), x)
+  print('--- TRACE{:02}:  {:<24} {}'.format(i, name, z))
+  sys.stdout.flush()

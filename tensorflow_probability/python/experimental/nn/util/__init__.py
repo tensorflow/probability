@@ -20,6 +20,7 @@ from __future__ import print_function
 from tensorflow_probability.python.experimental.nn.util.utils import display_imgs
 from tensorflow_probability.python.experimental.nn.util.utils import expand_dims
 from tensorflow_probability.python.experimental.nn.util.utils import flatten_rightmost
+from tensorflow_probability.python.experimental.nn.util.utils import halflife_decay
 from tensorflow_probability.python.experimental.nn.util.utils import make_fit_op
 from tensorflow_probability.python.experimental.nn.util.utils import make_kernel_bias
 from tensorflow_probability.python.experimental.nn.util.utils import make_kernel_bias_posterior_mvn_diag
@@ -38,6 +39,7 @@ _allowed_symbols = [
     'display_imgs',
     'expand_dims',
     'flatten_rightmost',
+    'halflife_decay',
     'make_fit_op',
     'make_kernel_bias',
     'make_kernel_bias_posterior_mvn_diag',

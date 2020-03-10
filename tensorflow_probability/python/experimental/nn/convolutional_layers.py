@@ -17,6 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
@@ -93,12 +95,13 @@ class Convolution(layers_lib.KernelBiasLayer):
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
-      make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
       init_kernel_fn=None,  # tf.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
-      # Misc
+      make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
       dtype=tf.float32,
       batch_shape=(),
+      # Misc
+      activation_fn=None,
       name=None):
     """Constructs layer.
 
@@ -144,30 +147,39 @@ class Convolution(layers_lib.KernelBiasLayer):
         value != 1.
         In Keras, this argument is called `dilation_rate`.
         Default value: `1`.
-      make_kernel_bias_fn: ...
-        Default value: `tfp.experimental.nn.util.make_kernel_bias`.
       init_kernel_fn: ...
         Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
+      make_kernel_bias_fn: ...
+        Default value: `tfp.experimental.nn.util.make_kernel_bias`.
       dtype: ...
         Default value: `tf.float32`.
       batch_shape: ...
         Default value: `()`.
+      activation_fn: ...
+        Default value: `None`.
       name: ...
         Default value: `None` (i.e., `'Convolution'`).
     """
     filter_shape = prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
-    if not batch_shape:
+    batch_shape = (np.array([], dtype=np.int32) if batch_shape is None
+                   else prefer_static.reshape(batch_shape, shape=[-1]))
+    batch_ndims = prefer_static.size(batch_shape)
+    if tf.get_static_value(batch_ndims) == 0:
+      # In this branch, we statically know there are no batch dims.
       kernel_shape = filter_shape + (input_size, output_size)
-      bias_shape = (output_size,)
+      bias_shape = [output_size]
       apply_kernel_fn = _make_convolution_fn(
           rank, strides, padding, dilations)
     else:
-      batch_shape = tuple(batch_shape)
-      kernel_shape = batch_shape + filter_shape + (input_size, output_size)
-      bias_shape = batch_shape + (output_size,)
+      # In this branch, there are either static/dynamic batch dims or
+      # dynamically no batch dims.
+      kernel_shape = prefer_static.concat([
+          batch_shape, filter_shape, [input_size, output_size]], axis=0)
+      bias_shape = prefer_static.concat(
+          [batch_shape, [output_size]], axis=0)
       apply_kernel_fn = lambda x, k: convolution_batch(  # pylint: disable=g-long-lambda
           x, k,
           rank=rank,
@@ -176,13 +188,17 @@ class Convolution(layers_lib.KernelBiasLayer):
           data_format='NHWBC',
           dilations=dilations)
     kernel, bias = make_kernel_bias_fn(
-        kernel_shape, bias_shape, dtype, init_kernel_fn, init_bias_fn)
+        kernel_shape, bias_shape,
+        init_kernel_fn, init_bias_fn,
+        batch_ndims, batch_ndims,
+        dtype)
     self._make_kernel_bias_fn = make_kernel_bias_fn  # For tracking.
     super(Convolution, self).__init__(
         kernel=kernel,
         bias=bias,
         apply_kernel_fn=apply_kernel_fn,
         dtype=dtype,
+        activation_fn=activation_fn,
         name=name)
 
 
@@ -270,7 +286,8 @@ class ConvolutionVariationalReparameterization(
       rank=2,
       padding='same',
       filter_shape=5,
-      init_kernel_fn=tf.initializers.he_uniform(),  # Because we'll use `elu`.
+      # Use `he_uniform` because we'll use the `relu` family.
+      init_kernel_fn=tf.initializers.he_uniform(),
       penalty_weight=1. / n)
 
   BayesAffine = functools.partial(
@@ -279,22 +296,15 @@ class ConvolutionVariationalReparameterization(
 
   scale = tfp.util.TransformedVariable(1., tfb.Softplus())
   bnn = tfn.Sequential([
-      BayesConv2D(evidence_shape[-1], 32, filter_shape=7, strides=2),
-      tf.nn.elu,
-      tfn.util.trace('conv1'),  # [b, 14, 14, 32]
-
-      tfn.util.flatten_rightmost(ndims=3),
-      tfn.util.trace('flat1'),  # [b, 14 * 14 * 32]
-
-      BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),
-      tfn.util.trace('affine1'),  # [b, 9]
-
+      BayesConv2D(evidence_shape[-1], 32, filter_shape=7, strides=2,
+                  activation_fn=tf.nn.leaky_relu),           # [b, 14, 14, 32]
+      tfn.util.flatten_rightmost(ndims=3),                   # [b, 14 * 14 * 32]
+      BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),  # [b, 9]
       tfn.Lambda(
           eval_fn=lambda loc: tfb.SoftmaxCentered()(
               tfd.Independent(tfd.Normal(loc, scale),
                               reinterpreted_batch_ndims=1)),
-          also_track=scale),
-      tfn.util.trace('head'),  # [b, 10]
+          also_track=scale),                                 # [b, 10]
   ], name='bayesian_neural_network')
 
   print(bnn.summary())
@@ -339,18 +349,19 @@ class ConvolutionVariationalReparameterization(
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
-      make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
-      make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
       init_kernel_fn=None,  # tf.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
+      make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
+      make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
+      dtype=tf.float32,
       # Penalty.
       penalty_weight=None,
       posterior_penalty_fn=kl_divergence_monte_carlo,
       # Misc
+      activation_fn=None,
       seed=None,
-      dtype=tf.float32,
       name=None):
     """Constructs layer.
 
@@ -396,28 +407,30 @@ class ConvolutionVariationalReparameterization(
         value != 1.
         In Keras, this argument is called `dilation_rate`.
         Default value: `1`.
+      init_kernel_fn: ...
+        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+      init_bias_fn: ...
+        Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
       make_prior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_prior_spike_and_slab`.
-      init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
-      init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
       posterior_value_fn: ...
         Default valye: `tfd.Distribution.sample`
       unpack_weights_fn:
         Default value: `unpack_kernel_and_bias`
+      dtype: ...
+        Default value: `tf.float32`.
       penalty_weight: ...
         Default value: `None` (i.e., weight is `1`).
       posterior_penalty_fn: ...
         Default value: `kl_divergence_monte_carlo`.
+      activation_fn: ...
+        Default value: `None`.
       seed: ...
         Default value: `None` (i.e., no seed).
-      dtype: ...
-        Default value: `tf.float32`.
       name: ...
         Default value: `None` (i.e.,
         `'ConvolutionVariationalReparameterization'`).
@@ -427,24 +440,31 @@ class ConvolutionVariationalReparameterization(
     kernel_shape = filter_shape + (input_size, output_size)
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
     self._make_prior_fn = make_prior_fn  # For variable tracking.
+    batch_ndims = 0
     super(ConvolutionVariationalReparameterization, self).__init__(
         posterior=make_posterior_fn(
-            kernel_shape, [output_size], dtype, init_kernel_fn, init_bias_fn),
+            kernel_shape, [output_size],
+            init_kernel_fn, init_bias_fn,
+            batch_ndims, batch_ndims,
+            dtype),
         prior=make_prior_fn(
-            kernel_shape, [output_size], dtype, init_kernel_fn, init_bias_fn),
+            kernel_shape, [output_size],
+            init_kernel_fn, init_bias_fn,
+            batch_ndims, batch_ndims,
+            dtype),
         apply_kernel_fn=_make_convolution_fn(
             rank, strides, padding, dilations),
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
+        dtype=dtype,
         penalty_weight=penalty_weight,
         posterior_penalty_fn=posterior_penalty_fn,
+        activation_fn=activation_fn,
         seed=seed,
-        dtype=dtype,
         name=name)
 
 
-class ConvolutionVariationalFlipout(
-    vi_lib.VariationalFlipoutKernelBiasLayer):
+class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
   """Convolution layer class with Flipout estimator.
 
   This layer implements the Bayesian variational inference analogue to
@@ -521,18 +541,19 @@ class ConvolutionVariationalFlipout(
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
+      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
+      dtype=tf.float32,
       # Penalty.
       penalty_weight=None,
       posterior_penalty_fn=kl_divergence_monte_carlo,
       # Misc
+      activation_fn=None,
       seed=None,
-      dtype=tf.float32,
       name=None):
     """Constructs layer.
 
@@ -578,49 +599,60 @@ class ConvolutionVariationalFlipout(
         value != 1.
         In Keras, this argument is called `dilation_rate`.
         Default value: `1`.
+      init_kernel_fn: ...
+        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+      init_bias_fn: ...
+        Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
       make_prior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_prior_spike_and_slab`.
-      init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
-      init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
       posterior_value_fn: ...
         Default valye: `tfd.Distribution.sample`
       unpack_weights_fn:
         Default value: `unpack_kernel_and_bias`
+      dtype: ...
+        Default value: `tf.float32`.
       penalty_weight: ...
         Default value: `None` (i.e., weight is `1`).
       posterior_penalty_fn: ...
         Default value: `kl_divergence_monte_carlo`.
+      activation_fn: ...
+        Default value: `None`.
       seed: ...
         Default value: `None` (i.e., no seed).
-      dtype: ...
-        Default value: `tf.float32`.
       name: ...
-        Default value: `None` (i.e., `'ConvolutionVariationalFlipout'`).
+        Default value: `None` (i.e.,
+        `'ConvolutionVariationalFlipout'`).
     """
     filter_shape = prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
     kernel_shape = filter_shape + (input_size, output_size)
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
     self._make_prior_fn = make_prior_fn  # For variable tracking.
+    batch_ndims = 0
     super(ConvolutionVariationalFlipout, self).__init__(
         posterior=make_posterior_fn(
-            kernel_shape, [output_size], dtype, init_kernel_fn, init_bias_fn),
+            kernel_shape, [output_size],
+            init_kernel_fn, init_bias_fn,
+            batch_ndims, batch_ndims,
+            dtype),
         prior=make_prior_fn(
-            kernel_shape, [output_size], dtype, init_kernel_fn, init_bias_fn),
+            kernel_shape, [output_size],
+            init_kernel_fn, init_bias_fn,
+            batch_ndims, batch_ndims,
+            dtype),
         apply_kernel_fn=_make_convolution_fn(
             rank, strides, padding, dilations),
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
+        dtype=dtype,
         penalty_weight=penalty_weight,
         posterior_penalty_fn=posterior_penalty_fn,
+        activation_fn=activation_fn,
         seed=seed,
-        dtype=dtype,
         name=name)
 
 

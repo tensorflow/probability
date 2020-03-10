@@ -58,21 +58,16 @@ class BnnEndToEnd(object):
     n = tf.cast(train_size, tf.float32)
     bnn = nn.Sequential([
         make_conv(evidence_shape[-1], 32, filter_shape=7, strides=2,
-                  penalty_weight=1. / n),
-        tf.nn.elu,
-        # nn.util.trace('conv1'),    # [b, 14, 14, 32]
-        nn.util.flatten_rightmost(ndims=3),
-        # nn.util.trace('flat1'),    # [b, 14 * 14 * 32]
+                  penalty_weight=1. / n),      # [b, 14, 14, 32]
+        nn.util.flatten_rightmost(ndims=3),    # [b, 14 * 14 * 32]
         nn.AffineVariationalReparameterization(
             14 * 14 * 32, np.prod(target_shape) - 1,
-            penalty_weight=1. / n),
-        # nn.util.trace('affine1'),  # [b, 9]
+            penalty_weight=1. / n),            # [b, 9]
         nn.Lambda(
             eval_fn=lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
                 tfd.Independent(tfd.Normal(loc, scale),
                                 reinterpreted_batch_ndims=1)),
-            also_track=scale),
-        # nn.util.trace('head'),     # [b, 10]
+            also_track=scale),                 # [b, 10]
     ], name='bayesian_autoencoder')
 
     self.evaluate([v.initializer for v in bnn.trainable_variables])
@@ -109,7 +104,8 @@ class ConvolutionVariationalReparameterizationTest(
         nn.ConvolutionVariationalReparameterization,
         rank=2,
         padding='same',
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_uniform(),
+        activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv)
 
 
@@ -123,7 +119,8 @@ class ConvolutionVariationalFlipoutTest(test_util.TestCase, BnnEndToEnd):
         nn.ConvolutionVariationalFlipout,
         rank=2,
         padding='same',
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_uniform(),
+        activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv)
 
 

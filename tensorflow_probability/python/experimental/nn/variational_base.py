@@ -81,6 +81,7 @@ class VariationalLayer(layers_lib.Layer):
       self,
       posterior,
       prior,
+      activation_fn=None,
       penalty_weight=None,
       posterior_penalty_fn=kl_divergence_monte_carlo,
       posterior_value_fn=tfd.Distribution.sample,
@@ -95,6 +96,7 @@ class VariationalLayer(layers_lib.Layer):
     Args:
       posterior: ...
       prior: ...
+      activation_fn: ...
       penalty_weight: ...
       posterior_penalty_fn: ...
       posterior_value_fn: ...
@@ -106,6 +108,7 @@ class VariationalLayer(layers_lib.Layer):
     super(VariationalLayer, self).__init__(name=name)
     self._posterior = posterior
     self._prior = prior
+    self._activation_fn = activation_fn
     self._penalty_weight = penalty_weight
     self._posterior_penalty_fn = posterior_penalty_fn
     self._posterior_value_fn = posterior_value_fn
@@ -125,6 +128,10 @@ class VariationalLayer(layers_lib.Layer):
   @property
   def prior(self):
     return self._prior
+
+  @property
+  def activation_fn(self):
+    return self._activation_fn
 
   @property
   def penalty_weight(self):
@@ -164,6 +171,7 @@ class VariationalReparameterizationKernelBiasLayer(VariationalLayer):
       posterior,
       prior,
       apply_kernel_fn,
+      activation_fn=None,
       penalty_weight=None,
       posterior_penalty_fn=kl_divergence_monte_carlo,
       posterior_value_fn=tfd.Distribution.sample,
@@ -174,6 +182,7 @@ class VariationalReparameterizationKernelBiasLayer(VariationalLayer):
     super(VariationalReparameterizationKernelBiasLayer, self).__init__(
         posterior,
         prior,
+        activation_fn=activation_fn,
         penalty_weight=penalty_weight,
         posterior_penalty_fn=posterior_penalty_fn,
         posterior_value_fn=posterior_value_fn,
@@ -194,6 +203,8 @@ class VariationalReparameterizationKernelBiasLayer(VariationalLayer):
       y = self._apply_kernel_fn(y, kernel)
     if bias is not None:
       y = y + bias
+    if self.activation_fn is not None:
+      y = self.activation_fn(y)  # pylint: disable=not-callable
     return y
 
 
@@ -205,6 +216,7 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
       posterior,
       prior,
       apply_kernel_fn,
+      activation_fn=None,
       penalty_weight=None,
       posterior_penalty_fn=kl_divergence_monte_carlo,
       posterior_value_fn=tfd.Distribution.sample,
@@ -215,6 +227,7 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
     super(VariationalFlipoutKernelBiasLayer, self).__init__(
         posterior,
         prior,
+        activation_fn=activation_fn,
         penalty_weight=penalty_weight,
         posterior_penalty_fn=posterior_penalty_fn,
         posterior_value_fn=posterior_value_fn,
@@ -255,6 +268,9 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
 
     if bias is not None:
       y = y + bias
+
+    if self.activation_fn is not None:
+      y = self.activation_fn(y)  # pylint: disable=not-callable
 
     return y
 

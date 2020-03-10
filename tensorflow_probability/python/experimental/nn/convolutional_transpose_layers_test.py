@@ -57,36 +57,19 @@ class BnnEndToEnd(object):
     scale = tfp.util.TransformedVariable(1., tfb.Softplus())
 
     bnn = nn.Sequential([
-        make_conv(input_channels, 32, filter_shape=5, strides=2),
-        tf.nn.elu,
-        # nn.util.trace('conv1'),    # [b, 14, 14, 32]
-
-        nn.util.flatten_rightmost(ndims=3),
-        # nn.util.trace('flat1'),    # [b, 14 * 14 * 32]
-
+        make_conv(input_channels, 32, filter_shape=5,
+                  strides=2),                                # [b, 14, 14, 32]
+        nn.util.flatten_rightmost(ndims=3),                  # [b, 14 * 14 * 32]
         nn.AffineVariationalReparameterization(
-            14 * 14 * 32, bottleneck_size),
-        # nn.util.trace('affine1'),  # [b, 2]
-
-        lambda x: x[..., tf.newaxis, tf.newaxis, :],
-        # nn.util.trace('expand'),   # [b, 1, 1, 2]
-
-        make_deconv(2, 64, filter_shape=7, strides=1, padding='valid'),
-        tf.nn.elu,
-        # nn.util.trace('deconv1'),  # [b, 7, 7, 64]
-
-        make_deconv(64, 32, filter_shape=4, strides=4),
-        tf.nn.elu,
-        # nn.util.trace('deconv2'),  # [2, 28, 28, 32]
-
-        make_conv(32, 1, filter_shape=2, strides=1),
-        # No activation.
-        # nn.util.trace('deconv3'),  # [2, 28, 28, 1]
-
+            14 * 14 * 32, bottleneck_size),                  # [b, 2]
+        lambda x: x[..., tf.newaxis, tf.newaxis, :],         # [b, 1, 1, 2]
+        make_deconv(2, 64, filter_shape=7, strides=1,
+                    padding='valid'),                        # [b, 7, 7, 64]
+        make_deconv(64, 32, filter_shape=4, strides=4),      # [2, 28, 28, 32]
+        make_conv(32, 1, filter_shape=2, strides=1),         # [2, 28, 28, 1]
         nn.Lambda(eval_fn=lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
             tfb.Sigmoid()(tfd.Normal(loc, scale)),
-            reinterpreted_batch_ndims=3), also_track=scale),
-        # nn.util.trace('head'),     # [b, 28, 28, 1]
+            reinterpreted_batch_ndims=3), also_track=scale),  # [b, 28, 28, 1]
     ], name='bayesian_autoencoder')
 
     # 3  Train.
@@ -122,13 +105,15 @@ class ConvolutionTransposeVariationalReparameterizationTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_uniform(),
+        activation_fn=tf.nn.elu)
     make_deconv = functools.partial(
         nn.ConvolutionTransposeVariationalReparameterization,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_uniform(),
+        activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv, make_deconv)
 
 
@@ -144,13 +129,15 @@ class ConvolutionTransposeVariationalFlipoutTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_uniform(),
+        activation_fn=tf.nn.elu)
     make_deconv = functools.partial(
         nn.ConvolutionTransposeVariationalFlipout,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tf.initializers.he_uniform())
+        init_kernel_fn=tf.initializers.he_uniform(),
+        activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv, make_deconv)
 
 
