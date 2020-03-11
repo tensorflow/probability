@@ -38,6 +38,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
                             surrogate_posterior,
                             optimizer,
                             num_steps,
+                            convergence_criterion=None,
                             trace_fn=_trace_loss,
                             variational_loss_fn=_reparameterized_elbo,
                             sample_size=1,
@@ -86,16 +87,24 @@ def fit_surrogate_posterior(target_log_prob_fn,
       `tf.train.Optimizer`, TF2-style `tf.optimizers.Optimizer`, or any Python
       object that implements `optimizer.apply_gradients(grads_and_vars)`.
     num_steps: Python `int` number of steps to run the optimizer.
-    trace_fn: Python callable with signature `state = trace_fn(
-      loss, grads, variables)`, where `state` may be a `Tensor` or nested
-      structure of `Tensor`s. The state values are accumulated (by `tf.scan`)
-      and returned. The default `trace_fn` simply returns the loss, but in
-      general can depend on the gradients and variables (if
-      `trainable_variables` is not `None` then `variables==trainable_variables`;
-      otherwise it is the list of all variables accessed during execution of
-      `loss_fn()`), as well as any other quantities captured in the closure of
-      `trace_fn`, for example, statistics of a variational distribution.
-      Default value: `lambda loss, grads, variables: loss`.
+    convergence_criterion: Optional instance of
+      `tfp.optimizer.convergence_criteria.ConvergenceCriterion`
+      representing a criterion for detecting convergence. If `None`,
+      the optimization will run for `num_steps` steps, otherwise, it will run
+      for at *most* `num_steps` steps, as determined by the provided criterion.
+      Default value: `None`.
+    trace_fn: Python callable with signature `traced_values = trace_fn(
+      traceable_quantities)`, where the argument is an instance of
+      `tfp.math.MinimizeTraceableQuantities` and the returned `traced_values`
+      may be a `Tensor` or nested structure of `Tensor`s. The traced values are
+      stacked across steps and returned.
+      The default `trace_fn` simply returns the loss. In general, trace
+      functions may also examine the gradients, values of parameters,
+      the state propagated by the specified `convergence_criterion`, if any (if
+      no convergence criterion is specified, this will be `None`),
+      as well as any other quantities captured in the closure of `trace_fn`,
+      for example, statistics of a variational distribution.
+      Default value: `lambda traceable_quantities: traceable_quantities.loss`.
     variational_loss_fn: Python `callable` with signature
       `loss = variational_loss_fn(target_log_prob_fn, surrogate_posterior,
        sample_size, seed)` defining a variational loss function. The default is
@@ -286,6 +295,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   return tfp_math.minimize(complete_variational_loss_fn,
                            num_steps=num_steps,
                            optimizer=optimizer,
+                           convergence_criterion=convergence_criterion,
                            trace_fn=trace_fn,
                            trainable_variables=trainable_variables,
                            name=name)
