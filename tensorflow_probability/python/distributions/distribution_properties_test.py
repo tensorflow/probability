@@ -533,7 +533,7 @@ class DistributionSlicingTest(test_util.TestCase):
     hp.note('Non-packetization check {}'.format(all_non_packetized))
     hp.assume(all_packetized or all_non_packetized)
 
-    self.assertAllClose(lp[slices], sliced_lp, rtol=1e-5)
+    self.assertAllClose(lp[slices], sliced_lp, atol=1e-5, rtol=1e-5)
 
   def _run_test(self, data):
     def ok(name):
