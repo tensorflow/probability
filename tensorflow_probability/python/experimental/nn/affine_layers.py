@@ -51,7 +51,7 @@ class Affine(layers_lib.KernelBiasLayer):
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
       dtype=tf.float32,
@@ -65,7 +65,8 @@ class Affine(layers_lib.KernelBiasLayer):
       input_size: ...
       output_size: ...
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_kernel_bias_fn: ...
@@ -250,7 +251,7 @@ class AffineVariationalReparameterization(
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
@@ -270,7 +271,8 @@ class AffineVariationalReparameterization(
       input_size: ...
       output_size: ...
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...
@@ -385,7 +387,7 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
@@ -405,7 +407,8 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       input_size: ...
       output_size: ...
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...
@@ -528,7 +531,7 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
@@ -548,7 +551,8 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       input_size: ...
       output_size: ...
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...

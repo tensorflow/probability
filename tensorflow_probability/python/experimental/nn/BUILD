@@ -37,6 +37,7 @@ py_library(
         ":convolutional_transpose_layers",
         ":layers",
         ":variational_base",
+        "//tensorflow_probability/python/experimental/nn/initializers",
         "//tensorflow_probability/python/experimental/nn/util",
     ],
 )

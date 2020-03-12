@@ -1,4 +1,4 @@
-# Copyright 2019 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,36 +23,21 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "util",
+    name = "initializers",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":utils",
+        ":initializers_lib",
     ],
 )
 
 py_library(
-    name = "utils",
-    srcs = ["utils.py"],
+    name = "initializers_lib",
+    srcs = ["initializers.py"],
     srcs_version = "PY2AND3",
     deps = [
-        # matplotlib dep,
-        # numpy dep,
-        # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:chain",
-        "//tensorflow_probability/python/bijectors:shift",
-        "//tensorflow_probability/python/bijectors:softplus",
-        "//tensorflow_probability/python/distributions:categorical",
-        "//tensorflow_probability/python/distributions:independent",
-        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
-        "//tensorflow_probability/python/distributions:mixture_same_family",
-        "//tensorflow_probability/python/distributions:normal",
-        "//tensorflow_probability/python/distributions:sample",
-        "//tensorflow_probability/python/experimental/nn/initializers:initializers_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )

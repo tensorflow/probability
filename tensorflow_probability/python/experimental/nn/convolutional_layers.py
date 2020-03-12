@@ -95,7 +95,7 @@ class Convolution(layers_lib.KernelBiasLayer):
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
       dtype=tf.float32,
@@ -148,7 +148,8 @@ class Convolution(layers_lib.KernelBiasLayer):
         In Keras, this argument is called `dilation_rate`.
         Default value: `1`.
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_kernel_bias_fn: ...
@@ -349,7 +350,7 @@ class ConvolutionVariationalReparameterization(
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
@@ -408,7 +409,8 @@ class ConvolutionVariationalReparameterization(
         In Keras, this argument is called `dilation_rate`.
         Default value: `1`.
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...
@@ -541,7 +543,7 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
@@ -600,7 +602,8 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
         In Keras, this argument is called `dilation_rate`.
         Default value: `1`.
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...

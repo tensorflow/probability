@@ -94,7 +94,7 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
       dilations=1,          # keras::Conv::dilation_rate
       output_padding=None,  # keras::ConvTranspose::output_padding
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
       dtype=tf.float32,
@@ -154,7 +154,8 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
         In Keras, this argument has the same name and semantics.
         Default value: `None` (i.e., inferred).
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_kernel_bias_fn: ...
@@ -344,7 +345,7 @@ class ConvolutionTransposeVariationalReparameterization(
       dilations=1,          # keras::Conv::dilation_rate
       output_padding=None,  # keras::ConvTranspose::output_padding
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
@@ -411,7 +412,8 @@ class ConvolutionTransposeVariationalReparameterization(
         In Keras, this argument has the same name and semantics.
         Default value: `None` (i.e., inferred).
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...
@@ -557,7 +559,7 @@ class ConvolutionTransposeVariationalFlipout(
       dilations=1,          # keras::Conv::dilation_rate
       output_padding=None,  # keras::ConvTranspose::output_padding
       # Weights
-      init_kernel_fn=None,  # tf.initializers.glorot_uniform()
+      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
       init_bias_fn=None,    # tf.zeros
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
@@ -624,7 +626,8 @@ class ConvolutionTransposeVariationalFlipout(
         In Keras, this argument has the same name and semantics.
         Default value: `None` (i.e., inferred).
       init_kernel_fn: ...
-        Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
+        Default value: `None` (i.e.,
+        `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
         Default value: `None` (i.e., `tf.zeros`).
       make_posterior_fn: ...

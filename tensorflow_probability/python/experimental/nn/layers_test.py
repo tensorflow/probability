@@ -22,24 +22,24 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.experimental import nn
 from tensorflow_probability.python.internal import test_util
 
 
-tfd = tfp.distributions
 tfb = tfp.bijectors
+tfd = tfp.distributions
+tfn = tfp.experimental.nn
 
 
-class AffineMeanFieldNormal(nn.Layer):
+class AffineMeanFieldNormal(tfn.Layer):
   """This interesting layer produces an MVNDiag via affine transformation."""
 
   def __init__(self, output_size, input_size, dtype=tf.float32, name=None):
     super(AffineMeanFieldNormal, self).__init__(name=name)
     self._kernel = tf.Variable(
-        tf.initializers.glorot_normal()([input_size, output_size], dtype),
+        tfn.initializers.glorot_normal()([input_size, output_size], dtype),
         name='kernel')
     self._bias = tf.Variable(
-        tf.initializers.glorot_normal()([output_size], dtype),
+        tfn.initializers.glorot_normal()([output_size], dtype),
         name='bias')
 
   @property
@@ -82,7 +82,7 @@ class SequentialTest(test_util.TestCase):
   def test_works_correctly(self):
     input_size = 3
     output_size = 5
-    model = nn.Sequential([
+    model = tfn.Sequential([
         lambda x: tf.reshape(x, [-1, input_size]),
         AffineMeanFieldNormal(output_size=5, input_size=input_size),
         AffineMeanFieldNormal(output_size=output_size, input_size=5),
@@ -115,7 +115,7 @@ class SequentialTest(test_util.TestCase):
                         rtol=1e-3, atol=1e-3)
 
   def test_summary(self):
-    model = nn.Sequential([
+    model = tfn.Sequential([
         lambda x: tf.reshape(x, [-1, 3]),
         AffineMeanFieldNormal(output_size=5, input_size=3),
         AffineMeanFieldNormal(output_size=2, input_size=5),
@@ -130,7 +130,7 @@ class LambdaTest(test_util.TestCase):
   def test_basic(self):
     shift = tf.Variable(1.)
     scale = tfp.util.TransformedVariable(1., tfb.Exp())
-    f = nn.Lambda(
+    f = tfn.Lambda(
         eval_fn=lambda x: tfd.Normal(loc=x + shift, scale=scale),
         extra_loss_fn=lambda x: tf.norm(x.loc),
         # `scale` will be tracked through the distribution but not `shift`.
