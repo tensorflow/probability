@@ -168,7 +168,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
   """
 
-  @deprecation.deprecated(
+  @deprecation.deprecated_args(
       '2020-06-01', '`batch_shape` and `event_shape` args are deprecated. '
       'Please use `tfd.Sample`, `tfd.Independent`, and broadcasted parameters '
       'of the base distribution instead. For example, replace '
@@ -177,7 +177,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       '`tfd.TransformedDistrbution(tfd.Sample(tfd.Normal(tf.zeros([2, 3]), 1.),'
       'sample_shape=[4]), tfb.Exp())` or '
       '`tfd.TransformedDistribution(tfd.Independent(tfd.Normal('
-      'tf.zeros([2, 3, 4]), 1.), reinterpreted_batch_ndims=1), tfb.Exp())`.')
+      'tf.zeros([2, 3, 4]), 1.), reinterpreted_batch_ndims=1), tfb.Exp())`.',
+      'batch_shape', 'event_shape')
   def __init__(self,
                distribution,
                bijector,
