@@ -25,6 +25,7 @@ from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
+from tensorflow_probability.python.math.generic import log_cosh
 from tensorflow_probability.python.math.generic import log_sub_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
@@ -76,6 +77,7 @@ _allowed_symbols = [
     'log1psquare',
     'log_add_exp',
     'log_combinations',
+    'log_cosh',
     'log_sub_exp',
     'lu_matrix_inverse',
     'lu_reconstruct',
