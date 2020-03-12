@@ -244,7 +244,7 @@ class BinomialTest(test_util.TestCase):
 
   def testUnivariateLogConcaveDistributionRejectionSamplerGeometric(self):
     seed = test_util.test_seed()
-    n = int(1e5)
+    n = int(5e5)
 
     probs = np.float32([0.7, 0.8, 0.3, 0.2])
     geometric = tfd.Geometric(probs=probs)
@@ -342,6 +342,8 @@ class BinomialTest(test_util.TestCase):
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'No gradient for while loops in JAX backend.')
   def testNotReparameterized(self):
     def f(n):
       b = tfd.Binomial(n, 0.5)

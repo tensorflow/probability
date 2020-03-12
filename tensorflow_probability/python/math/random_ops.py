@@ -23,6 +23,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import samplers
 
 __all__ = [
     'random_rademacher',
@@ -53,7 +54,7 @@ def random_rademacher(shape, dtype=tf.float32, seed=None, name=None):
     # convention on GPU is that int32 are in host memory and int64 are in device
     # memory.
     generation_dtype = tf.int64 if tf.as_dtype(dtype) != tf.int32 else tf.int32
-    random_bernoulli = tf.random.uniform(
+    random_bernoulli = samplers.uniform(
         shape, minval=0, maxval=2, dtype=generation_dtype, seed=seed)
     return tf.cast(2 * random_bernoulli - 1, dtype)
 
@@ -93,7 +94,7 @@ def random_rayleigh(shape, scale=None, dtype=tf.float32, seed=None, name=None):
       scale = tf.convert_to_tensor(scale, dtype=dtype, name='scale')
       shape = tf.broadcast_dynamic_shape(shape, tf.shape(scale))
     x = tf.sqrt(-2. * tf.math.log(
-        tf.random.uniform(shape, minval=0, maxval=1, dtype=dtype, seed=seed)))
+        samplers.uniform(shape, minval=0, maxval=1, dtype=dtype, seed=seed)))
     if scale is None:
       return x
     return x * scale

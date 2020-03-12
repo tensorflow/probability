@@ -228,10 +228,10 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:random_ops",
-        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -460,6 +460,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -497,8 +498,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -1724,7 +1725,6 @@ multi_substrate_py_test(
     name = "binomial_test",
     size = "medium",
     srcs = ["binomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,

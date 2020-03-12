@@ -22,7 +22,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.internal import samplers
 
 __all__ = [
     'batched_las_vegas_algorithm',
@@ -54,7 +54,7 @@ def batched_las_vegas_algorithm(
       and returns two values. (1) A structure of Tensors containing the results
       of the computation, all with a shape broadcastable with (2) a boolean mask
       representing whether each batch point succeeded.
-    seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+    seed: Python integer or `Tensor`, for seeding PRNG.
     name: A name to prepend to created ops.
       Default value: `'batched_las_vegas_algorithm'`.
 
@@ -69,30 +69,30 @@ def batched_las_vegas_algorithm(
        testing. Universite de Montreal, D.M.S. No. 79-10.
   """
   with tf.name_scope(name or 'batched_las_vegas_algorithm'):
-    seed_stream = SeedStream(seed, 'batched_las_vegas_algorithm')
-    values, good_values_mask = batched_las_vegas_trial_fn(seed_stream())
+    init_seed, loop_seed = samplers.split_seed(
+        seed, salt='batched_las_vegas_algorithm')
+    values, good_values_mask = batched_las_vegas_trial_fn(init_seed)
     num_iters = tf.constant(1)
 
-    def cond(unused_values, good_values_mask, unused_num_iters):
+    def cond(unused_values, good_values_mask, unused_num_iters, unused_seed):
       return tf.math.logical_not(tf.reduce_all(good_values_mask))
 
-    def body(values, good_values_mask, num_iters):
+    def body(values, good_values_mask, num_iters, seed):
       """Batched Las Vegas Algorithm body."""
 
-      new_values, new_good_values_mask = batched_las_vegas_trial_fn(
-          seed_stream())
+      trial_seed, new_seed = samplers.split_seed(seed)
+      new_values, new_good_values_mask = batched_las_vegas_trial_fn(trial_seed)
 
       values = tf.nest.map_structure(
           lambda new, old: tf.where(new_good_values_mask, new, old),
-          *(new_values, values))
+          new_values, values)
 
       good_values_mask = tf.logical_or(good_values_mask, new_good_values_mask)
 
-      return values, good_values_mask, num_iters+1
+      return values, good_values_mask, num_iters + 1, new_seed
 
-    (values, _, num_iters) = tf.while_loop(
-        cond, body, (values, good_values_mask, num_iters),
-        parallel_iterations=1 if seed is not None else 10)
+    (values, _, num_iters, _) = tf.while_loop(
+        cond, body, (values, good_values_mask, num_iters, loop_seed))
     return values, num_iters
 
 
@@ -118,7 +118,7 @@ def batched_rejection_sampler(
       set of proposed samples and the value of the proposal at the samples.
     target_fn: A callable that takes a tensor of samples and returns the value
       of the target at the samples.
-    seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+    seed: Python integer or `Tensor`, for seeding PRNG.
     dtype: The TensorFlow dtype used internally by `proposal_fn` and
       `target_fn`.  Default value: `tf.float32`.
     name: A name to prepend to created ops.
@@ -130,12 +130,14 @@ def batched_rejection_sampler(
   """
   with tf.name_scope(name or 'batched_rejection_sampler'):
     def randomized_computation(seed):
-      seed_stream = SeedStream(seed, 'batched_rejection_sampler')
-      proposed_samples, proposed_values = proposal_fn(seed_stream())
+      """Internal randomized computation."""
+      proposal_seed, mask_seed = samplers.split_seed(
+          seed, salt='batched_rejection_sampler')
+      proposed_samples, proposed_values = proposal_fn(proposal_seed)
       good_samples_mask = tf.less_equal(
-          proposed_values * tf.random.uniform(
+          proposed_values * samplers.uniform(
               prefer_static.shape(proposed_samples),
-              seed=seed_stream(),
+              seed=mask_seed,
               dtype=dtype),
           target_fn(proposed_samples))
       return proposed_samples, good_samples_mask

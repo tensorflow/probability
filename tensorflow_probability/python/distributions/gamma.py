@@ -31,8 +31,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'Gamma',
@@ -366,7 +366,8 @@ def random_gamma(
   [2] Michael Figurnov, Shakir Mohamed, and Andriy Mnih. Implicit
       Reparameterization Gradients. Neural Information Processing Systems, 2018.
   """
-  seed_stream = SeedStream(seed, 'random_gamma')
+  generate_and_test_samples_seed, alpha_fix_seed = samplers.split_seed(
+      seed, salt='random_gamma')
   output_dtype = dtype_util.common_dtype([alpha, beta], dtype_hint=tf.float32)
 
   @tf.custom_gradient
@@ -389,14 +390,13 @@ def random_gamma(
 
     def generate_and_test_samples(seed):
       """Generate and test samples."""
-      seed_stream = SeedStream(seed, 'generate_and_test_samples')
+      v_seed, u_seed = samplers.split_seed(seed)
 
       def generate_positive_v():
         """Generate positive v."""
         def _inner(seed):
-          seed_stream = SeedStream(seed, '_inner')
-          x = tf.random.normal(
-              sample_shape, dtype=internal_dtype, seed=seed_stream())
+          x = samplers.normal(
+              sample_shape, dtype=internal_dtype, seed=seed)
           # This implicitly broadcasts alpha up to sample shape.
           v = 1 + c * x
           return (x, v), v > 0.
@@ -407,13 +407,13 @@ def random_gamma(
         # implementation; it is unclear whether it would be faster. We include
         # the inner loop so this implementation is more easily comparable to
         # Ref. [1] and other implementations.
-        return brs.batched_las_vegas_algorithm(_inner, seed)[0]
+        return brs.batched_las_vegas_algorithm(_inner, v_seed)[0]
 
       (x, v) = generate_positive_v()
       x2 = x * x
       v3 = v * v * v
-      u = tf.random.uniform(
-          sample_shape, dtype=internal_dtype, seed=seed_stream())
+      u = samplers.uniform(
+          sample_shape, dtype=internal_dtype, seed=u_seed)
 
       # In [1], the suggestion is to first check u < 1 - 0.331 * x2 * x2, and to
       # run the check below only if it fails, in order to avoid the relatively
@@ -427,7 +427,7 @@ def random_gamma(
       return v3, good_sample_mask
 
     samples = brs.batched_las_vegas_algorithm(
-        generate_and_test_samples, seed=seed_stream())[0]
+        generate_and_test_samples, seed=generate_and_test_samples_seed)[0]
 
     samples = samples * d
 
@@ -436,8 +436,8 @@ def random_gamma(
     alpha_lt_one_fix = tf.where(
         safe_alpha < 1.,
         tf.math.pow(
-            tf.random.uniform(
-                sample_shape, dtype=internal_dtype, seed=seed_stream()),
+            samplers.uniform(
+                sample_shape, dtype=internal_dtype, seed=alpha_fix_seed),
             one / safe_alpha),
         one)
     samples = samples * alpha_lt_one_fix

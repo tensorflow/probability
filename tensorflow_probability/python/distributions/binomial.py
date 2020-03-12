@@ -29,10 +29,10 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.random_ops import random_rademacher
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 _binomial_sample_note = """
@@ -100,7 +100,7 @@ def _log_concave_rejection_sampler(
       as unbounded below.
     distribution_maximum: Tensor of type `distribution.dtype`. The maximum value
       taken by the distribution. See `distribution_minimum` for details.
-    seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+    seed: Python integer or `Tensor` instance, for seeding PRNG.
 
   Returns:
     samples: a `Tensor` with prepended dimensions `sample_shape`.
@@ -135,25 +135,30 @@ def _log_concave_rejection_sampler(
 
   def proposal(seed):
     """Proposal for log-concave rejection sampler."""
-    seed_stream = SeedStream(seed, 'log_concave_rejection_sampler_proposal')
+    (top_lobe_fractions_seed,
+     exponential_samples_seed,
+     top_selector_seed,
+     random_rademacher_seed) = samplers.split_seed(
+         seed, n=4, salt='log_concave_rejection_sampler_proposal')
 
-    top_lobe_fractions = tf.random.uniform(
-        mode_shape, seed=seed_stream(), dtype=dtype)  # V in ref [1].
+    top_lobe_fractions = samplers.uniform(
+        mode_shape, seed=top_lobe_fractions_seed, dtype=dtype)  # V in ref [1].
     top_offsets = top_lobe_fractions * top_width / mode_height
 
     exponential_samples = exponential_distribution.sample(
-        mode_shape, seed=seed_stream())  # E in ref [1].
+        mode_shape, seed=exponential_samples_seed)  # E in ref [1].
     exponential_height = (exponential_distribution.prob(exponential_samples) *
                           mode_height)
     exponential_offsets = (top_width + exponential_samples) / mode_height
 
-    top_selector = tf.random.uniform(
-        mode_shape, seed=seed_stream(), dtype=dtype)  # U in ref [1].
+    top_selector = samplers.uniform(
+        mode_shape, seed=top_selector_seed, dtype=dtype)  # U in ref [1].
     on_top_mask = tf.less_equal(top_selector, top_fraction)
 
     unsigned_offsets = tf.where(on_top_mask, top_offsets, exponential_offsets)
     offsets = tf.round(
-        random_rademacher(mode_shape, seed=seed_stream(), dtype=dtype) *
+        random_rademacher(
+            mode_shape, seed=random_rademacher_seed, dtype=dtype) *
         unsigned_offsets)
 
     potential_samples = mode + offsets
