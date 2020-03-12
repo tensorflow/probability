@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'TransformedDistribution',
@@ -167,6 +168,16 @@ class TransformedDistribution(distribution_lib.Distribution):
 
   """
 
+  @deprecation.deprecated(
+      '2020-06-01', '`batch_shape` and `event_shape` args are deprecated. '
+      'Please use `tfd.Sample`, `tfd.Independent`, and broadcasted parameters '
+      'of the base distribution instead. For example, replace '
+      '`tfd.TransformedDistribution(tfd.Normal(0., 1.), tfb.Exp(), '
+      'batch_shape=[2, 3], event_shape=[4])` with '
+      '`tfd.TransformedDistrbution(tfd.Sample(tfd.Normal(tf.zeros([2, 3]), 1.),'
+      'sample_shape=[4]), tfb.Exp())` or '
+      '`tfd.TransformedDistribution(tfd.Independent(tfd.Normal('
+      'tf.zeros([2, 3, 4]), 1.), reinterpreted_batch_ndims=1), tfb.Exp())`.')
   def __init__(self,
                distribution,
                bijector,
