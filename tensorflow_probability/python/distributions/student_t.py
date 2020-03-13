@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
@@ -92,8 +93,9 @@ def log_prob(x, df, loc, scale):
   Returns:
     A `Tensor` with shape broadcast according to the arguments.
   """
-  y = (x - loc) / scale
-  log_unnormalized_prob = -0.5 * (df + 1.) * tf.math.log1p(y**2. / df)
+  # Writing `y` this way reduces XLA mem copies.
+  y = (x - loc) * (tf.math.rsqrt(df) / scale)
+  log_unnormalized_prob = -0.5 * (df + 1.) * log1psquare(y)
   log_normalization = (
       tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
       0.5 * np.log(np.pi) + tf.math.lgamma(0.5 * df) -
