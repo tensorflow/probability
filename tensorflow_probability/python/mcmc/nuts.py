@@ -674,8 +674,7 @@ class NoUTurnSampler(TransitionKernel):
                       initial_state,
                       continue_tree,
                       not_divergence,
-                      momentum_state_memory,
-                      name=None):
+                      momentum_state_memory):
     with tf.name_scope('build_sub_tree'):
       batch_shape = prefer_static.shape(current_step_meta_info.init_energy)
       # We never want to select the inital state
