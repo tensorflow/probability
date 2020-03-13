@@ -548,9 +548,8 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
 
     distribution = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
-        bijector=tfb.MaskedAutoregressiveFlow(made),
-        event_shape=[2])
+        distribution=tfd.Sample(tfd.Normal(0., 1.), [2]),
+        bijector=tfb.MaskedAutoregressiveFlow(made))
 
     # Construct and fit model.
     x_ = tfkl.Input(shape=(2,), dtype=tf.float32)

@@ -184,9 +184,8 @@ class BatchNormTest(test_util.TestCase,
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
     dist = distributions.TransformedDistribution(
-        distribution=distributions.Normal(loc=0., scale=1.),
+        distribution=distributions.Sample(distributions.Normal(0., 1.), [dims]),
         bijector=batch_norm,
-        event_shape=[dims],
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
@@ -207,9 +206,8 @@ class BatchNormTest(test_util.TestCase,
     batch_norm = tfb.Invert(
         tfb.BatchNormalization(batchnorm_layer=layer, training=training))
     dist = distributions.TransformedDistribution(
-        distribution=distributions.Normal(loc=0., scale=1.),
+        distribution=distributions.Sample(distributions.Normal(0., 1.), [dims]),
         bijector=batch_norm,
-        event_shape=[dims],
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
@@ -225,9 +223,8 @@ class BatchNormTest(test_util.TestCase,
     layer = None
 
     dist = distributions.TransformedDistribution(
-        distribution=distributions.Normal(loc=0., scale=1.),
+        distribution=distributions.Sample(distributions.Normal(0., 1.), [1]),
         bijector=tfb.BatchNormalization(batchnorm_layer=layer),
-        event_shape=[1],
         validate_args=True)
 
     x_ = tf.keras.Input(shape=(1,))

@@ -238,9 +238,8 @@ class RealNVPTestKwargs(
     nvp = tfb.RealNVP(
         num_masked=3, validate_args=True, **self._real_nvp_kwargs)
     dist = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
+        distribution=tfd.Sample(tfd.Normal(0., 1.), [dims]),
         bijector=nvp,
-        event_shape=[dims],
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
@@ -257,9 +256,8 @@ class RealNVPTestKwargs(
         tfb.RealNVP(
             num_masked=3, validate_args=True, **self._real_nvp_kwargs))
     dist = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
+        distribution=tfd.Sample(tfd.Normal(0., 1.), [dims]),
         bijector=nvp,
-        event_shape=[dims],
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,

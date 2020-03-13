@@ -751,6 +751,8 @@ def transformed_distributions(draw,
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
   underlying_batch_shape = batch_shape
+  # TODO(b/151180729): Remove `batch_shape_arg` when `TransformedDistribution`
+  # shape overrides are deprecated.
   batch_shape_arg = None
   if draw(hps.booleans()):
     # Use batch_shape overrides.
@@ -768,8 +770,6 @@ def transformed_distributions(draw,
   hp.note('Forming TransformedDistribution with '
           'underlying distribution {}; parameters {}'.format(
               to_transform, params_used(to_transform)))
-  # TODO(bjp): Add test coverage for `event_shape` argument of
-  # `TransformedDistribution`.
   result_dist = tfd.TransformedDistribution(
       bijector=bijector,
       distribution=to_transform,

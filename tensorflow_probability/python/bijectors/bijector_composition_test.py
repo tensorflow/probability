@@ -78,7 +78,7 @@ class BijectorCompositionTest(test_util.TestCase):
         atol=0, rtol=1e-3)
 
   def testHandlesKwargs(self):
-    x = tfb.Exp()(tfd.Normal(0, 1), event_shape=[4])
+    x = tfb.Exp()(tfd.Sample(tfd.Normal(0., 1.), sample_shape=[4]))
     y = tfd.Independent(tfd.LogNormal(tf.zeros(4), 1), 1)
     z = tf.constant([[1., 2, 3, 4],
                      [0.5, 1.5, 2., 2.5]])

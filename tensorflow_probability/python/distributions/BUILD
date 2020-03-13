@@ -1031,6 +1031,7 @@ multi_substrate_py_library(
     deps = [
         ":kullback_leibler",
         ":normal",
+        ":sample",
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
@@ -1556,6 +1557,7 @@ multi_substrate_py_library(
     srcs = ["vector_exponential_linear_operator.py"],
     deps = [
         ":exponential",
+        ":sample",
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:affine_linear_operator",
