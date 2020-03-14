@@ -25,7 +25,7 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import affine_scalar
+from tensorflow_probability.python.bijectors import shift, scale
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -312,7 +312,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
             shift, log_scale = tf.unstack(params, num=2, axis=-1)
           else:
             shift, log_scale = params
-          return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+          return shift.Shift(shift=shift)(scale.Scale(scale=log_scale))
 
         bijector_fn = _bijector_fn
 
