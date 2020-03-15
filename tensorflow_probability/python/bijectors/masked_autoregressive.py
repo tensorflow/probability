@@ -376,12 +376,20 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
     return y
 
   def _inverse(self, y, **kwargs):
+    if self._conditional:
+      y1, y2 = tf.split(y, [self._event_size, self._conditional_size], axis=-1)
+    else:
+      y1 = y
     bijector = self._bijector_fn(y, **kwargs)
-    return bijector.inverse(y)
+    return bijector.inverse(y1)
 
   def _inverse_log_det_jacobian(self, y, **kwargs):
+    if self._conditional:
+      y1, y2 = tf.split(y, [self._event_size, self._conditional_size], axis=-1)
+    else:
+      y1 = y
     return self._bijector_fn(y, **kwargs).inverse_log_det_jacobian(
-        y, event_ndims=self._event_ndims)
+        y1, event_ndims=self._event_ndims)
 
 class AutoregressiveNetwork(tf.keras.layers.Layer):
   r"""Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
@@ -581,11 +589,11 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
                event_shape=None,
                conditional=False,
                conditional_shape=None,
-               all_layers=True,
+               conditional_input_all_layers=True,
                hidden_units=None,
                input_order='left-to-right',
                hidden_degrees='equal',
-               activation=None,
+               activation=tf.keras.activations.linear,
                use_bias=True,
                kernel_initializer='glorot_uniform',
                bias_initializer='zeros',
@@ -607,12 +615,12 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         integer.  If not specified, the event shape is inferred when this layer
         is first called or built.
       conditional: Python boolean describing whether to add conditional inputs.
-      all_layers: Python boolean whether to add conditional input to all layers
-        or just the first one.
       conditional_shape: Python `list`-like of positive integers (or a single
         int), specifying the shape of the conditional input to this layer. If
         not specified, the conditional shape is inferred when this layer
         is first called or built.
+      conditional_input_all_layers: Python boolean whether to add conditional
+        input to all layers or just the first one.
       hidden_units: Python `list`-like of non-negative integers, specifying
         the number of units in each hidden layer.
       input_order: Order of degrees to the input units: 'random',
@@ -652,7 +660,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     self._conditional = conditional
     self._conditional_shape = (_list(conditional_shape) if conditional_shape
                                is not None else None)
-    self._all_layers = all_layers
+    self._all_layers = conditional_input_all_layers
     self._hidden_units = hidden_units if hidden_units is not None else []
     self._input_order_param = input_order
     self._hidden_degrees = hidden_degrees
