@@ -42,10 +42,7 @@ from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.bijectors.iterated_sigmoid_centered import IteratedSigmoidCentered
 from tensorflow_probability.python.bijectors.kumaraswamy import Kumaraswamy
-from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveLayer
 from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveNetwork
-from tensorflow_probability.python.bijectors.masked_autoregressive import masked_autoregressive_default_template
-from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
 from tensorflow_probability.python.bijectors.matveclu import MatvecLU

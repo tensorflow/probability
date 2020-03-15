@@ -29,68 +29,62 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
+
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
-
 __all__ = [
-    'AutoregressiveLayer',
     'AutoregressiveNetwork',
     'MaskedAutoregressiveFlow',
-    'masked_autoregressive_default_template',
-    'masked_dense',
 ]
-
 
 class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   """Affine MaskedAutoregressiveFlow bijector.
 
   The affine autoregressive flow [(Papamakarios et al., 2016)][3] provides a
   relatively simple framework for user-specified (deep) architectures to learn a
-  distribution over continuous events. Regarding terminology,
+  distribution over continuous events.  Regarding terminology,
 
     'Autoregressive models decompose the joint density as a product of
-    conditionals, and model each conditional in turn. Normalizing flows
+    conditionals, and model each conditional in turn.  Normalizing flows
     transform a base density (e.g. a standard Gaussian) into the target density
     by an invertible transformation with tractable Jacobian.'
     [(Papamakarios et al., 2016)][3]
 
   In other words, the 'autoregressive property' is equivalent to the
   decomposition, `p(x) = prod{ p(x[perm[i]] | x[perm[0:i]]) : i=0, ..., d }`
-  where `perm` is some permutation of `{0, ..., d}`. In the simple case where
+  where `perm` is some permutation of `{0, ..., d}`.  In the simple case where
   the permutation is identity this reduces to:
-  `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`. The provided
-  `shift_and_log_scale_fn`, `masked_autoregressive_default_template`, achieves
-  this property by zeroing out weights in its `masked_dense` layers.
+  `p(x) = prod{ p(x[i] | x[0:i]) : i=0, ..., d }`.
 
   In TensorFlow Probability, 'normalizing flows' are implemented as
-  `tfp.bijectors.Bijector`s. The `forward` 'autoregression' is implemented
+  `tfp.bijectors.Bijector`s.  The `forward` 'autoregression' is implemented
   using a `tf.while_loop` and a deep neural network (DNN) with masked weights
   such that the autoregressive property is automatically met in the `inverse`.
 
   A `TransformedDistribution` using `MaskedAutoregressiveFlow(...)` uses the
   (expensive) forward-mode calculation to draw samples and the (cheap)
-  reverse-mode calculation to compute log-probabilities. Conversely, a
+  reverse-mode calculation to compute log-probabilities.  Conversely, a
   `TransformedDistribution` using `Invert(MaskedAutoregressiveFlow(...))` uses
   the (expensive) forward-mode calculation to compute log-probabilities and the
   (cheap) reverse-mode calculation to compute samples.  See 'Example Use'
   [below] for more details.
 
   Given a `shift_and_log_scale_fn`, the forward and inverse transformations are
-  (a sequence of) affine transformations. A 'valid' `shift_and_log_scale_fn`
+  (a sequence of) affine transformations.  A 'valid' `shift_and_log_scale_fn`
   must compute each `shift` (aka `loc` or 'mu' in [Germain et al. (2015)][1])
   and `log(scale)` (aka 'alpha' in [Germain et al. (2015)][1]) such that each
   are broadcastable with the arguments to `forward` and `inverse`, i.e., such
   that the calculations in `forward`, `inverse` [below] are possible.
 
-  For convenience, `masked_autoregressive_default_template` is offered as a
-  possible `shift_and_log_scale_fn` function. It implements the MADE
-  architecture [(Germain et al., 2015)][1]. MADE is a feed-forward network that
-  computes a `shift` and `log(scale)` using `masked_dense` layers in a deep
+  For convenience, `tfp.bijectors.AutoregressiveNetwork` is offered as a
+  possible `shift_and_log_scale_fn` function.  It implements the MADE
+  architecture [(Germain et al., 2015)][1].  MADE is a feed-forward network that
+  computes a `shift` and `log(scale)` using masked dense layers in a deep
   neural network. Weights are masked to ensure the autoregressive property. It
   is possible that this architecture is suboptimal for your task. To build
   alternative networks, either change the arguments to
-  `masked_autoregressive_default_template`, use the `masked_dense` function to
-  roll-out your own, or use some other architecture, e.g., using `tf.layers`.
+  `tfp.bijectors.AutoregressiveNetwork` or use some other architecture, e.g.,
+  using `tf.keras.layers`.
 
   Warning: no attempt is made to validate that the `shift_and_log_scale_fn`
   enforces the 'autoregressive property'.
@@ -116,18 +110,18 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
     return (y - shift) / tf.exp(log_scale)
   ```
 
-  Notice that the `inverse` does not need a for-loop. This is because in the
+  Notice that the `inverse` does not need a for-loop.  This is because in the
   forward pass each calculation of `shift` and `log_scale` is based on the `y`
-  calculated so far (not `x`). In the `inverse`, the `y` is fully known, thus is
-  equivalent to the scaling used in `forward` after `event_size` passes, i.e.,
-  the 'last' `y` used to compute `shift`, `log_scale`. (Roughly speaking, this
-  also proves the transform is bijective.)
+  calculated so far (not `x`).  In the `inverse`, the `y` is fully known, thus
+  is equivalent to the scaling used in `forward` after `event_size` passes,
+  i.e., the 'last' `y` used to compute `shift`, `log_scale`.  (Roughly speaking,
+  this also proves the transform is bijective.)
 
   The `bijector_fn` argument allows specifying a more general coupling relation,
-  such as the LSTM-inspired activation from [4], or Neural Spline Flow [5]. It
+  such as the LSTM-inspired activation from [4], or Neural Spline Flow [5].  It
   must logically operate on each element of the input individually, and still
-  obey the 'autoregressive property' described above. The forward transformation
-  is
+  obey the 'autoregressive property' described above.  The forward
+  transformation is
 
   ```python
   def forward(x):
@@ -156,12 +150,12 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   dims = 5
 
   # A common choice for a normalizing flow is to use a Gaussian for the base
-  # distribution. (However, any continuous distribution would work.) E.g.,
+  # distribution.  (However, any continuous distribution would work.) E.g.,
   maf = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
       bijector=tfb.MaskedAutoregressiveFlow(
-          shift_and_log_scale_fn=tfb.masked_autoregressive_default_template(
-              hidden_layers=[512, 512])),
+          shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
+              params=2, hidden_units=[512, 512])),
       event_shape=[dims])
 
   x = maf.sample()  # Expensive; uses `tf.while_loop`, no Bijector caching.
@@ -173,8 +167,8 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   iaf = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
       bijector=tfb.Invert(tfb.MaskedAutoregressiveFlow(
-          shift_and_log_scale_fn=tfb.masked_autoregressive_default_template(
-              hidden_layers=[512, 512]))),
+          shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
+              params=2, hidden_units=[512, 512]))),
       event_shape=[dims])
 
   x = iaf.sample()  # Cheap; no `tf.while_loop` despite no Bijector caching.
@@ -182,18 +176,48 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   iaf.log_prob(0.)  # Expensive; uses `tf.while_loop`, no Bijector caching.
 
   # In many (if not most) cases the default `shift_and_log_scale_fn` will be a
-  # poor choice. Here's an example of using a 'shift only' version and with a
+  # poor choice.  Here's an example of using a 'shift only' version and with a
   # different number/depth of hidden layers.
-  shift_only = True
+  made = tfb.AutoregressiveNetwork(params=1, hidden_units=[32])
   maf_no_scale_hidden2 = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
       bijector=tfb.MaskedAutoregressiveFlow(
-          tfb.masked_autoregressive_default_template(
-              hidden_layers=[32],
-              shift_only=shift_only),
-          is_constant_jacobian=shift_only),
+          lambda y: (made(y)[..., 0], None),
+          is_constant_jacobian=True),
       event_shape=[dims])
+  maf_no_scale_hidden2._made = made  # Ensure maf_no_scale_hidden2.trainable
+  # NOTE: The last line ensures that maf_no_scale_hidden2.trainable_variables
+  # will include all variables from `made`.
   ```
+
+  #### Variable Tracking
+
+  NOTE: Like all subclasses of `tfb.Bijector`, `tfb.MaskedAutoregressiveFlow`
+  subclasses `tf.Module` for variable tracking.
+
+  A `tfb.MaskedAutoregressiveFlow` instance saves a reference to the values
+  passed as `shift_and_log_scale_fn` and `bijector_fn` to its constructor.
+  Thus, for most values passed as `shift_and_log_scale_fn` or `bijector_fn`,
+  variables referenced by those values will be found and tracked by the
+  `tfb.MaskedAutoregressiveFlow` instance.  Please see the `tf.Module`
+  documentation for further details.
+
+  However, if the value passed to `shift_and_log_scale_fn` or `bijector_fn` is a
+  Python function, then `tfb.MaskedAutoregressiveFlow` cannot automatically
+  track variables used inside `shift_and_log_scale_fn` or `bijector_fn`.  To get
+  `tfb.MaskedAutoregressiveFlow` to track such variables, either:
+
+   1. Replace the Python function with a `tf.Module`, `tf.keras.Layer`,
+      or other callable object through which `tf.Module` can find variables.
+
+   2. Or, add a reference to the variables to the `tfb.MaskedAutoregressiveFlow`
+      instance by setting an attribute -- for example:
+      ````
+      made1 = tfb.AutoregressiveNetwork(params=1, hidden_units=[10, 10])
+      made2 = tfb.AutoregressiveNetwork(params=1, hidden_units=[10, 10])
+      maf = tfb.MaskedAutoregressiveFlow(lambda y: (made1(y), made2(y) + 1.))
+      maf._made_variables = made1.variables + made2.variables
+      ````
 
   #### References
 
@@ -230,20 +254,21 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
 
     Args:
       shift_and_log_scale_fn: Python `callable` which computes `shift` and
-        `log_scale` from both the forward domain (`x`) and the inverse domain
-        (`y`). Calculation must respect the 'autoregressive property' (see class
-        docstring). Suggested default
-        `masked_autoregressive_default_template(hidden_layers=...)`.
-        Typically the function contains `tf.Variables` and is wrapped using
-        `tf.make_template`. Returning `None` for either (both) `shift`,
-        `log_scale` is equivalent to (but more efficient than) returning zero.
+        `log_scale` from the inverse domain (`y`). Calculation must respect the
+        'autoregressive property' (see class docstring). Suggested default
+        `tfb.AutoregressiveNetwork(params=2, hidden_layers=...)`.
+        Typically the function contains `tf.Variables`. Returning `None` for
+        either (both) `shift`, `log_scale` is equivalent to (but more efficient
+        than) returning zero. If `shift_and_log_scale_fn` returns a single
+        `Tensor`, the returned value will be unstacked to get the `shift` and
+        `log_scale`: `tf.unstack(shift_and_log_scale_fn(y), num=2, axis=-1)`.
       bijector_fn: Python `callable` which returns a `tfb.Bijector` which
         transforms event tensor with the signature
         `(input, **condition_kwargs) -> bijector`. The bijector must operate on
         scalar events and must not alter the rank of its input. The
-        `bijector_fn` will be called with `Tensors` from both the forward domain
-        (`x`) and the inverse domain (`y`). Calculation must respect the
-        'autoregressive property' (see class docstring).
+        `bijector_fn` will be called with `Tensors` from the inverse domain
+        (`y`). Calculation must respect the 'autoregressive property' (see
+        class docstring).
       is_constant_jacobian: Python `bool`. Default: `False`. When `True` the
         implementation assumes `log_scale` does not depend on the forward domain
         (`x`) or inverse domain (`y`) values. (No validation is made;
@@ -257,7 +282,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
         to `False`.
       event_ndims: Python `integer`, the intrinsic dimensionality of this
         bijector. 1 corresponds to a simple vector autoregressive bijector as
-        implemented by the `masked_autoregressive_default_template`, 2 might be
+        implemented by the `tfp.bijectors.AutoregressiveNetwork`, 2 might be
         useful for a 2D convolutional `shift_and_log_scale_fn` and so on.
       name: Python `str`, name given to ops managed by this object.
 
@@ -272,9 +297,19 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
       raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
                        '`bijector_fn` should be specified.')
     if shift_and_log_scale_fn:
+      self._event_size = shift_and_log_scale_fn._event_size
+      self._total_size = self._event_size
+      self._conditional = shift_and_log_scale_fn._conditional
+      if self._conditional:
+          self._conditional_size = shift_and_log_scale_fn._conditional_size
+          self._total_size += self._conditional_size
+      shift_and_log_scale_fn.build([self._total_size])
       def _bijector_fn(x, **condition_kwargs):
-        shift, log_scale = shift_and_log_scale_fn(x,
-                                                  **condition_kwargs)
+        params = shift_and_log_scale_fn(x, **condition_kwargs)
+        if tf.is_tensor(params):
+          shift, log_scale = tf.unstack(params, num=2, axis=-1)
+        else:
+          shift, log_scale = params
         return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
 
       bijector_fn = _bijector_fn
@@ -291,36 +326,43 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
         name=name)
 
   def _forward(self, x, **kwargs):
+    if self._conditional:
+      x0, x1 = tf.split(x, [self._event_size, self._conditional_size], axis=-1)
+    else:
+      x0 = x
     static_event_size = tensorshape_util.num_elements(
         tensorshape_util.with_rank_at_least(
-            x.shape, self._event_ndims)[-self._event_ndims:])
-
+            x0.shape, self._event_ndims)[-self._event_ndims:])
     if self._unroll_loop:
       if not static_event_size:
         raise ValueError(
-            'The final {} dimensions of `x` must be known at graph '
-            'construction time if `unroll_loop=True`. `x.shape: {!r}`'.format(
-                self._event_ndims, x.shape))
+              'The final {} dimensions of `x` must be known at graph '
+              'construction time if `unroll_loop=True`. `x.shape: '
+              '{!r}`'.format(self._event_ndims, x.shape))
       y = tf.zeros_like(x, name='y0')
 
       for _ in range(static_event_size):
-        y = self._bijector_fn(y, **kwargs).forward(x)
+        y = self._bijector_fn(y, **kwargs).forward(x0)
+        if self._conditional:
+          y = tf.concat([y, x1], axis=-1)
       return y
 
-    event_size = tf.reduce_prod(tf.shape(x)[-self._event_ndims:])
+    event_size = tf.reduce_prod(tf.shape(x0)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name='y0')
     # call the template once to ensure creation
     if not tf.executing_eagerly():
-      _ = self._bijector_fn(y0).forward(y0)
+      _ = self._bijector_fn(y0, **kwargs).forward(x0)
     def _loop_body(index, y0):
       """While-loop body for autoregression calculation."""
       # Set caching device to avoid re-getting the tf.Variable for every while
-      # loop iteration.
+      # loop iteration.)
       with tf1.variable_scope(tf1.get_variable_scope()) as vs:
         if vs.caching_device is None and not tf.executing_eagerly():
           vs.set_caching_device(lambda op: op.device)
         bijector = self._bijector_fn(y0, **kwargs)
-      y = bijector.forward(x)
+        y = bijector.forward(x0)
+      if self._conditional:
+          y = tf.concat([y, x1], axis=-1)
       return index + 1, y
     # If the event size is available at graph construction time, we can inform
     # the graph compiler of the maximum number of steps. If not,
@@ -340,234 +382,6 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   def _inverse_log_det_jacobian(self, y, **kwargs):
     return self._bijector_fn(y, **kwargs).inverse_log_det_jacobian(
         y, event_ndims=self._event_ndims)
-
-
-MASK_INCLUSIVE = 'inclusive'
-MASK_EXCLUSIVE = 'exclusive'
-
-
-def _gen_slices(num_blocks, n_in, n_out, mask_type=MASK_EXCLUSIVE):
-  """Generate the slices for building an autoregressive mask."""
-  # TODO(b/67594795): Better support of dynamic shape.
-  slices = []
-  col = 0
-  d_in = n_in // num_blocks
-  d_out = n_out // num_blocks
-  row = d_out if mask_type == MASK_EXCLUSIVE else 0
-  for _ in range(num_blocks):
-    row_slice = slice(row, None)
-    col_slice = slice(col, col + d_in)
-    slices.append([row_slice, col_slice])
-    col += d_in
-    row += d_out
-  return slices
-
-
-def _gen_mask(num_blocks,
-              n_in,
-              n_out,
-              mask_type=MASK_EXCLUSIVE,
-              dtype=tf.float32):
-  """Generate the mask for building an autoregressive dense layer."""
-  # TODO(b/67594795): Better support of dynamic shape.
-  mask = np.zeros([n_out, n_in], dtype=dtype.as_numpy_dtype())
-  slices = _gen_slices(num_blocks, n_in, n_out, mask_type=mask_type)
-  for [row_slice, col_slice] in slices:
-    mask[row_slice, col_slice] = 1
-  return mask
-
-
-def masked_dense(inputs,
-                 units,
-                 num_blocks=None,
-                 exclusive=False,
-                 kernel_initializer=None,
-                 reuse=None,
-                 name=None,
-                 *args,  # pylint: disable=keyword-arg-before-vararg
-                 **kwargs):
-  """A autoregressively masked dense layer. Analogous to `tf.layers.dense`.
-
-  See [Germain et al. (2015)][1] for detailed explanation.
-
-  Arguments:
-    inputs: Tensor input.
-    units: Python `int` scalar representing the dimensionality of the output
-      space.
-    num_blocks: Python `int` scalar representing the number of blocks for the
-      MADE masks.
-    exclusive: Python `bool` scalar representing whether to zero the diagonal of
-      the mask, used for the first layer of a MADE.
-    kernel_initializer: Initializer function for the weight matrix.
-      If `None` (default), weights are initialized using the
-      `tf.glorot_random_initializer`.
-    reuse: Python `bool` scalar representing whether to reuse the weights of a
-      previous layer by the same name.
-    name: Python `str` used to describe ops managed by this function.
-    *args: `tf.layers.dense` arguments.
-    **kwargs: `tf.layers.dense` keyword arguments.
-
-  Returns:
-    Output tensor.
-
-  Raises:
-    NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-      graph execution.
-
-  #### References
-
-  [1]: Mathieu Germain, Karol Gregor, Iain Murray, and Hugo Larochelle. MADE:
-       Masked Autoencoder for Distribution Estimation. In _International
-       Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
-  """
-  # TODO(b/67594795): Better support of dynamic shape.
-  input_depth = tf.compat.dimension_value(
-      tensorshape_util.with_rank_at_least(inputs.shape, 1)[-1])
-  if input_depth is None:
-    raise NotImplementedError(
-        'Rightmost dimension must be known prior to graph execution.')
-
-  mask = _gen_mask(num_blocks, input_depth, units,
-                   MASK_EXCLUSIVE if exclusive else MASK_INCLUSIVE).T
-
-  if kernel_initializer is None:
-    kernel_initializer = tf1.glorot_normal_initializer()
-
-  def masked_initializer(shape, dtype=None, partition_info=None):
-    return mask * kernel_initializer(shape, dtype, partition_info)
-
-  with tf.name_scope(name or 'masked_dense'):
-    layer = tf1.layers.Dense(
-        units,
-        kernel_initializer=masked_initializer,
-        kernel_constraint=lambda x: mask * x,
-        name=name,
-        dtype=dtype_util.base_dtype(inputs.dtype),
-        _scope=name,
-        _reuse=reuse,
-        *args,  # pylint: disable=keyword-arg-before-vararg
-        **kwargs)
-    return layer.apply(inputs)
-
-
-def masked_autoregressive_default_template(hidden_layers,
-                                           shift_only=False,
-                                           activation=tf.nn.relu,
-                                           log_scale_min_clip=-5.,
-                                           log_scale_max_clip=3.,
-                                           log_scale_clip_gradient=False,
-                                           name=None,
-                                           *args,  # pylint: disable=keyword-arg-before-vararg
-                                           **kwargs):
-  """Build the Masked Autoregressive Density Estimator (Germain et al., 2015).
-
-  This will be wrapped in a make_template to ensure the variables are only
-  created once. It takes the input and returns the `loc` ('mu' in [Germain et
-  al. (2015)][1]) and `log_scale` ('alpha' in [Germain et al. (2015)][1]) from
-  the MADE network.
-
-  Warning: This function uses `masked_dense` to create randomly initialized
-  `tf.Variables`. It is presumed that these will be fit, just as you would any
-  other neural architecture which uses `tf.layers.dense`.
-
-  #### About Hidden Layers
-
-  Each element of `hidden_layers` should be greater than the `input_depth`
-  (i.e., `input_depth = tf.shape(input)[-1]` where `input` is the input to the
-  neural network). This is necessary to ensure the autoregressivity property.
-
-  #### About Clipping
-
-  This function also optionally clips the `log_scale` (but possibly not its
-  gradient). This is useful because if `log_scale` is too small/large it might
-  underflow/overflow making it impossible for the `MaskedAutoregressiveFlow`
-  bijector to implement a bijection. Additionally, the `log_scale_clip_gradient`
-  `bool` indicates whether the gradient should also be clipped. The default does
-  not clip the gradient; this is useful because it still provides gradient
-  information (for fitting) yet solves the numerical stability problem. I.e.,
-  `log_scale_clip_gradient = False` means
-  `grad[exp(clip(x))] = grad[x] exp(clip(x))` rather than the usual
-  `grad[clip(x)] exp(clip(x))`.
-
-  Args:
-    hidden_layers: Python `list`-like of non-negative integer, scalars
-      indicating the number of units in each hidden layer. Default: `[512, 512].
-    shift_only: Python `bool` indicating if only the `shift` term shall be
-      computed. Default: `False`.
-    activation: Activation function (callable). Explicitly setting to `None`
-      implies a linear activation.
-    log_scale_min_clip: `float`-like scalar `Tensor`, or a `Tensor` with the
-      same shape as `log_scale`. The minimum value to clip by. Default: -5.
-    log_scale_max_clip: `float`-like scalar `Tensor`, or a `Tensor` with the
-      same shape as `log_scale`. The maximum value to clip by. Default: 3.
-    log_scale_clip_gradient: Python `bool` indicating that the gradient of
-      `tf.clip_by_value` should be preserved. Default: `False`.
-    name: A name for ops managed by this function. Default:
-      'masked_autoregressive_default_template'.
-    *args: `tf.layers.dense` arguments.
-    **kwargs: `tf.layers.dense` keyword arguments.
-
-  Returns:
-    shift: `Float`-like `Tensor` of shift terms (the 'mu' in
-      [Germain et al.  (2015)][1]).
-    log_scale: `Float`-like `Tensor` of log(scale) terms (the 'alpha' in
-      [Germain et al. (2015)][1]).
-
-  Raises:
-    NotImplementedError: if rightmost dimension of `inputs` is unknown prior to
-      graph execution.
-
-  #### References
-
-  [1]: Mathieu Germain, Karol Gregor, Iain Murray, and Hugo Larochelle. MADE:
-       Masked Autoencoder for Distribution Estimation. In _International
-       Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
-  """
-  name = name or 'masked_autoregressive_default_template'
-  with tf.name_scope(name):
-
-    def _fn(x):
-      """MADE parameterized via `masked_autoregressive_default_template`."""
-      # TODO(b/67594795): Better support of dynamic shape.
-      input_depth = tf.compat.dimension_value(
-          tensorshape_util.with_rank_at_least(x.shape, 1)[-1])
-      if input_depth is None:
-        raise NotImplementedError(
-            'Rightmost dimension must be known prior to graph execution.')
-      input_shape = (
-          np.int32(tensorshape_util.as_list(x.shape))
-          if tensorshape_util.is_fully_defined(x.shape) else tf.shape(x))
-      if tensorshape_util.rank(x.shape) == 1:
-        x = x[tf.newaxis, ...]
-      for i, units in enumerate(hidden_layers):
-        x = masked_dense(
-            inputs=x,
-            units=units,
-            num_blocks=input_depth,
-            exclusive=True if i == 0 else False,
-            activation=activation,
-            *args,  # pylint: disable=keyword-arg-before-vararg
-            **kwargs)
-      x = masked_dense(
-          inputs=x,
-          units=(1 if shift_only else 2) * input_depth,
-          num_blocks=input_depth,
-          activation=None,
-          *args,  # pylint: disable=keyword-arg-before-vararg
-          **kwargs)
-      if shift_only:
-        x = tf.reshape(x, shape=input_shape)
-        return x, None
-      x = tf.reshape(x, shape=tf.concat([input_shape, [2]], axis=0))
-      shift, log_scale = tf.unstack(x, num=2, axis=-1)
-      which_clip = (
-          tf.clip_by_value
-          if log_scale_clip_gradient else clip_by_value_preserve_gradient)
-      log_scale = which_clip(log_scale, log_scale_min_clip, log_scale_max_clip)
-      return shift, log_scale
-
-    return tf1.make_template(name, _fn)
-
 
 class AutoregressiveNetwork(tf.keras.layers.Layer):
   r"""Masked Autoencoder for Distribution Estimation [Germain et al. (2015)][1].
@@ -602,8 +416,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
   distribution = tfd.TransformedDistribution(
       distribution=tfd.Normal(loc=0., scale=1.),
-      bijector=tfb.MaskedAutoregressiveFlow(
-          lambda x: tf.unstack(made(x), num=2, axis=-1)),
+      bijector=tfb.MaskedAutoregressiveFlow(made),
       event_shape=[2])
 
   # Construct and fit model.
@@ -662,8 +475,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
                                        hidden_units=[20, 20], activation='relu')
       distribution = tfd.TransformedDistribution(
           distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=tfb.MaskedAutoregressiveFlow(
-              lambda x: tf.unstack(made(x), num=2, axis=-1)),
+          bijector=tfb.MaskedAutoregressiveFlow(made),
           event_shape=event_shape)
 
       # Construct and fit model.
@@ -767,6 +579,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   def __init__(self,
                params,
                event_shape=None,
+               conditional=False,
+               conditional_shape=None,
+               all_layers=True,
                hidden_units=None,
                input_order='left-to-right',
                hidden_degrees='equal',
@@ -790,6 +605,13 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         event_shape of the distribution parameterized by this layer.  Currently
         only rank-1 shapes are supported.  That is, event_shape must be a single
         integer.  If not specified, the event shape is inferred when this layer
+        is first called or built.
+      conditional: Python boolean describing whether to add conditional inputs.
+      all_layers: Python boolean whether to add conditional input to all layers
+        or just the first one.
+      conditional_shape: Python `list`-like of positive integers (or a single
+        int), specifying the shape of the conditional input to this layer. If
+        not specified, the conditional shape is inferred when this layer
         is first called or built.
       hidden_units: Python `list`-like of non-negative integers, specifying
         the number of units in each hidden layer.
@@ -827,6 +649,10 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
     self._params = params
     self._event_shape = _list(event_shape) if event_shape is not None else None
+    self._conditional = conditional
+    self._conditional_shape = (_list(conditional_shape) if conditional_shape
+                               is not None else None)
+    self._all_layers = all_layers
     self._hidden_units = hidden_units if hidden_units is not None else []
     self._input_order_param = input_order
     self._hidden_degrees = hidden_degrees
@@ -849,6 +675,16 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         raise ValueError('Parameter `event_shape` must describe a rank-1 shape.'
                          ' `event_shape: {!r}`'.format(event_shape))
 
+    if self._conditional:
+      if self._conditional_shape is not None:
+        self._conditional_size = self._conditional_shape[-1]
+        self._conditional_ndims = len(self._conditional_shape)
+
+        if self._conditional_ndims != 1:
+          raise ValueError('Parameter `conditional_shape` must describe a'
+                            ' rank-1 shape. `conditional_shape: {!r}`'.format(
+                            conditional_shape))
+
     # To be built in `build`.
     self._input_order = None
     self._masks = None
@@ -856,17 +692,30 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
   def build(self, input_shape):
     """See tfkl.Layer.build."""
-    if self._event_shape is None:
-      # `event_shape` wasn't specied at __init__, so infer from `input_shape`.
-      self._event_shape = [tf.compat.dimension_value(input_shape[-1])]
-      self._event_size = self._event_shape[-1]
-      self._event_ndims = len(self._event_shape)
-      # Should we throw if input_shape has rank > 2?
-
-    if input_shape[-1] != self._event_shape[-1]:
-      raise ValueError('Invalid final dimension of `input_shape`. '
-                       'Expected `{!r}`, but got `{!r}`'.format(
-                           self._event_shape[-1], input_shape[-1]))
+    if self._conditional:
+        if self._event_shape is None:
+          raise ValueError('`event_shape` must be provided when using'
+                           ' conditional autoregressive network')
+        if self._conditional_shape is None:
+          raise ValueError('`conditional_shape` must be provided when using'
+                           ' conditional autoregressive network')
+        if (input_shape[-1] !=
+            self._event_shape[-1] + self._conditional_shape[-1]):
+          raise ValueError('Invalid final dimension of `input_shape`. '
+                           'Expected `{!r}`, but got `{!r}`'.format(
+            self._event_shape[-1] + self._conditional_shape[-1],
+            input_shape[-1]))
+    else:
+      if self._event_shape is None:
+        # `event_shape` wasn't specied at __init__, so infer from `input_shape`.
+        self._event_shape = [tf.compat.dimension_value(input_shape[-1])]
+        self._event_size = self._event_shape[-1]
+        self._event_ndims = len(self._event_shape)
+        # Should we throw if input_shape has rank > 2?
+      if input_shape[-1] != self._event_shape[-1]:
+        raise ValueError('Invalid final dimension of `input_shape`. '
+                         'Expected `{!r}`, but got `{!r}`'.format(
+                             self._event_shape[-1], input_shape[-1]))
 
     # Construct the masks.
     self._input_order = _create_input_order(
@@ -890,30 +739,54 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         np.tile(self._masks[-1][..., tf.newaxis], [1, 1, self._params]),
         [self._masks[-1].shape[0], self._event_size * self._params])
 
-    self._network = tf.keras.Sequential([
-        tf.keras.layers.InputLayer((self._event_size,), dtype=self.dtype)
-    ])
-
+    layers = [tf.keras.layers.Input((self._event_size,), dtype=self.dtype)]
+    input_layer = layers[0]
+    if self._conditional:
+        conditional_input = tf.keras.layers.Input((self._conditional_size,),
+                                                  dtype=self.dtype)
+        input_layer = [input_layer, conditional_input]
     # Input-to-hidden, hidden-to-hidden, and hidden-to-output layers:
     #  [..., self._event_size] -> [..., self._hidden_units[0]].
     #  [..., self._hidden_units[k-1]] -> [..., self._hidden_units[k]].
     #  [..., self._hidden_units[-1]] -> [..., event_size * self._params].
     layer_output_sizes = self._hidden_units + [self._event_size * self._params]
     for k in range(len(self._masks)):
-      self._network.add(tf.keras.layers.Dense(
+      this_autoregressive = tf.keras.layers.Dense(
+        layer_output_sizes[k],
+        activation=None,
+        use_bias=self._use_bias,
+        kernel_initializer=_make_masked_initializer(
+          self._masks[k], self._kernel_initializer),
+        bias_initializer=self._bias_initializer,
+        kernel_regularizer=self._kernel_regularizer,
+        bias_regularizer=self._bias_regularizer,
+        kernel_constraint=_make_masked_constraint(
+          self._masks[k], self._kernel_constraint),
+        bias_constraint=self._bias_constraint,
+        dtype=self.dtype)(layers[-1])
+      if self._conditional and (self._all_layers or (k == 0)):
+        this_conditional = tf.keras.layers.Dense(
           layer_output_sizes[k],
-          activation=self._activation if k + 1 < len(self._masks) else None,
-          use_bias=self._use_bias,
-          kernel_initializer=_make_masked_initializer(
-              self._masks[k], self._kernel_initializer),
-          bias_initializer=self._bias_initializer,
+          activation=None,
+          use_bias=False,
+          kernel_initializer=self._kernel_initializer,
+          bias_initializer=None,
           kernel_regularizer=self._kernel_regularizer,
-          bias_regularizer=self._bias_regularizer,
-          kernel_constraint=_make_masked_constraint(
-              self._masks[k], self._kernel_constraint),
-          bias_constraint=self._bias_constraint,
-          dtype=self.dtype))
-
+          bias_regularizer=None,
+          kernel_constraint=self._kernel_constraint,
+          bias_constraint=None,
+          dtype=self.dtype)(conditional_input)
+        layers.append(tf.keras.layers.Add()([
+          this_autoregressive,
+          this_conditional]))
+      else:
+        layers.append(this_autoregressive)
+      if k + 1 < len(self._masks):
+        layers.append(self._activation(layers[-1]))
+    self._network = tf.keras.models.Model(
+      inputs=input_layer,
+      outputs=layers[-1])
+    print(self._network.summary())
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
 
@@ -921,10 +794,15 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     """See tfkl.Layer.call."""
     with tf.name_scope(self.name or 'AutoregressiveNetwork_call'):
       x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
-      input_shape = tf.shape(x)
-      # TODO(b/67594795): Better support for dynamic shapes.
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
+      if self._conditional:
+          x = tf.split(x,
+                       [self._event_size, self._conditional_size],
+                       axis=1)
+          input_shape = x[0].shape
+      else:
+          input_shape = x.shape
       return tf.reshape(self._network(x),
                         tf.concat([input_shape, [self._params]], axis=0))
 
@@ -939,18 +817,6 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   @property
   def params(self):
     return self._params
-
-
-class AutoregressiveLayer(AutoregressiveNetwork):
-  """Masked Autoencoder for Distribution Estimation [Germain et al. (2015)]."""
-
-  @deprecation.deprecated(
-      '2019-08-01',
-      '`AutoregressiveLayer` has been renamed `AutoregressiveNetwork`.',
-      warn_once=True)
-  def __new__(cls, *args, **kwargs):  # pylint: disable=unused-argument
-    return super(AutoregressiveLayer, cls).__new__(cls)
-
 
 def _list(xs):
   """Convert the given argument to a list."""
