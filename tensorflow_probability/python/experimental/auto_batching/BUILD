@@ -216,18 +216,6 @@ py_library(
 )
 
 py_library(
-    name = "tfp_xla_test_case",
-    testonly = 1,
-    srcs = ["tfp_xla_test_case.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        ":xla",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
     name = "xla",
     srcs = ["xla.py"],
     srcs_version = "PY2AND3",
