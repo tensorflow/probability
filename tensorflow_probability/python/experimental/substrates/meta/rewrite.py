@@ -67,7 +67,7 @@ INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
              'test_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
-SAMPLERS = ('categorical', 'gamma', 'normal', 'poisson', 'uniform', 'shuffle')
+SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')
 
 PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
 

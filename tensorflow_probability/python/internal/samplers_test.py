@@ -95,21 +95,23 @@ class RandomTest(test_util.TestCase):
     s1 = sampler(seed=(1, 2), **kwargs)
     s2 = sampler(seed=(1, 2), **kwargs)
     self.assertAllEqual(s1, s2)
+    self.verify_tf_behavior_match(sampler, kwargs, tf_kwargs)
 
-    # Avoid testing these scenarios for numpy, jax, where we don't support
+  @test_util.substrate_disable_stateful_random_test
+  def verify_tf_behavior_match(self, sampler, kwargs, tf_kwargs):
+    # We don't test these scenarios for numpy, jax, where we don't support
     # stateful sampling.
-    if hasattr(tf.random, sampler.__name__):
-      s1 = sampler(seed=123, **kwargs)
-      s2 = sampler(seed=123, **kwargs)
-      tf_sampler = getattr(tf.random, sampler.__name__)
-      tf_s1 = tf_sampler(seed=123, **kwargs)
-      tf_s2 = tf_sampler(seed=123, **kwargs)
-      if tf.executing_eagerly():
-        self.assertNotAllEqual(s1, s2)
-        self.assertNotAllEqual(tf_s1, tf_s2)
-      else:
-        self.assertAllEqual(s1, s2)
-        self.assertAllEqual(tf_s1, tf_s2)
+    s1 = sampler(seed=123, **kwargs)
+    s2 = sampler(seed=123, **kwargs)
+    tf_sampler = getattr(tf.random, sampler.__name__)
+    tf_s1 = tf_sampler(seed=123, **tf_kwargs)
+    tf_s2 = tf_sampler(seed=123, **tf_kwargs)
+    if tf.executing_eagerly():
+      self.assertNotAllEqual(s1, s2)
+      self.assertNotAllEqual(tf_s1, tf_s2)
+    else:
+      self.assertAllEqual(s1, s2)
+      self.assertAllEqual(tf_s1, tf_s2)
 
 
 if __name__ == '__main__':

@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_math import soft
 
 __all__ = [
     'stateless_categorical',
+    'gamma',
     'stateless_gamma',
     'stateless_normal',
     'stateless_poisson',
@@ -96,7 +97,7 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   scale = 1. if beta is None else (1. / beta)
-  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, scale])
+  shape = _ensure_tuple(shape)
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
 
 
@@ -105,7 +106,7 @@ def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   alpha = np.array(alpha, dtype=dtype)
   beta = None if beta is None else np.array(beta, dtype=dtype)
-  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, beta])
+  shape = _ensure_tuple(shape)
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
@@ -263,6 +264,21 @@ stateless_gamma = utils.copy_docstring(
     tf.random.stateless_gamma,
     _gamma_jax if JAX_MODE else _gamma)
 
+
+# TODO(b/147874898): Delete this method.
+def gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):
+  """Handles the difference in shape parameter interpretation."""
+  # While we still have usages of tf.random.gamma and tf.random.stateless_gamma,
+  # we must handle the different interpretation of the shape argument
+  # between the two. `tf.random.gamma` interprets shape as a prefix.
+  # `tf.random.stateless_gamma` interprets shape as the full output shape,
+  # including as suffix the broadcast of alpha and beta shapes.
+  scale = 1 if beta is None else beta
+  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, scale])
+  return stateless_gamma(shape=shape, alpha=alpha, beta=beta, dtype=dtype,
+                         seed=seed, name=name)
+
+
 stateless_normal = utils.copy_docstring(
     tf.random.stateless_normal,
     _normal_jax if JAX_MODE else _normal)
@@ -271,7 +287,7 @@ stateless_poisson = utils.copy_docstring(
     tf.random.stateless_poisson,
     _poisson_jax if JAX_MODE else _poisson)
 
-# TODO(bjp): Delete this method in favor of using `tfp_random.shuffle`.
+# TODO(b/147874898): Delete this method in favor of using `samplers.shuffle`.
 stateless_shuffle = (_shuffle_jax if JAX_MODE else _shuffle)
 
 stateless_uniform = utils.copy_docstring(

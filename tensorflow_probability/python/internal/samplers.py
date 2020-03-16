@@ -126,8 +126,14 @@ def gamma(
   """As `tf.random.gamma`, but handling stateful/stateless `seed`s."""
   with tf.name_scope(name or 'gamma'):
     seed = sanitize_seed(seed)
+    alpha = tf.convert_to_tensor(alpha, dtype=dtype)
+    beta = None if beta is None else tf.convert_to_tensor(beta, dtype=dtype)
+    params_shape = tf.shape(alpha)
+    if beta is not None:
+      params_shape = tf.broadcast_dynamic_shape(params_shape, tf.shape(beta))
+    samples_shape = tf.concat([shape, params_shape], axis=0)
     return tf.random.stateless_gamma(
-        shape=shape, seed=seed, alpha=alpha, beta=beta, dtype=dtype)
+        shape=samples_shape, seed=seed, alpha=alpha, beta=beta, dtype=dtype)
 
 
 def normal(
