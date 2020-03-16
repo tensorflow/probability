@@ -42,6 +42,7 @@ del _ensure_jax_install  # Cleanup symbol to avoid polluting namespace.
 
 from tensorflow_probability.python.bijectors import _jax as bijectors
 from tensorflow_probability.python.distributions import _jax as distributions
+from tensorflow_probability.python.experimental import _jax as experimental
 from tensorflow_probability.python.internal import _jax as internal
 from tensorflow_probability.python.math import _jax as math
 from tensorflow_probability.python.mcmc import _jax as mcmc

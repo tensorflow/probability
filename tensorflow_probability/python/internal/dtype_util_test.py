@@ -24,6 +24,7 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
@@ -66,8 +67,8 @@ class DtypeUtilTest(test_util.TestCase):
     # Only test Edward2 if it's able to be imported (not possible in jax/numpy
     # modes).
     try:
-      from tensorflow_probability.python.experimental import edward2 as ed  # pylint: disable=g-import-not-at-top
-    except ImportError:
+      ed = tfp.experimental.edward2
+    except AttributeError:
       self.skipTest('No edward2 module present in jax/numpy modes.')
     # As in tensorflow_probability github issue #221
     x = ed.Dirichlet(np.ones(3, dtype='float64'))

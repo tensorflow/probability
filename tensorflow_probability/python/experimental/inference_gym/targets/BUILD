@@ -1,4 +1,4 @@
-# Copyright 2019 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# TFP with a numpy backend.
+# Description:
+#   A package for target densities.
 
-licenses(["notice"])  # Apache 2.0
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_test",
+    "multi_substrate_py_library",
+)
 
 package(
     default_visibility = [
@@ -22,19 +27,33 @@ package(
     ],
 )
 
+licenses(["notice"])  # Apache 2.0
+
 exports_files(["LICENSE"])
 
-py_library(
-    name = "numpy",
+multi_substrate_py_library(
+    name = "targets",
     srcs = ["__init__.py"],
     deps = [
-        "//tensorflow_probability/python/experimental/substrates/numpy/bijectors",
-        "//tensorflow_probability/python/experimental/substrates/numpy/distributions",
-        "//tensorflow_probability/python/experimental/substrates/numpy/experimental",
-        "//tensorflow_probability/python/experimental/substrates/numpy/internal",
-        "//tensorflow_probability/python/experimental/substrates/numpy/stats",
-        "//tensorflow_probability/python/experimental/substrates/numpy/util",
-        "//tensorflow_probability/python/internal/backend",
-        "//tensorflow_probability/python/mcmc:mcmc.numpy",
+        ":bayesian_model",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "bayesian_model",
+    srcs = ["bayesian_model.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "bayesian_model_test",
+    srcs = ["bayesian_model_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

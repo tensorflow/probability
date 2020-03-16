@@ -30,6 +30,7 @@ py_library(
     deps = [
         "//tensorflow_probability/python/experimental/substrates/jax/bijectors",
         "//tensorflow_probability/python/experimental/substrates/jax/distributions",
+        "//tensorflow_probability/python/experimental/substrates/jax/experimental",
         "//tensorflow_probability/python/experimental/substrates/jax/internal",
         "//tensorflow_probability/python/experimental/substrates/jax/stats",
         "//tensorflow_probability/python/experimental/substrates/jax/util",

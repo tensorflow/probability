@@ -58,9 +58,12 @@ DISABLED_BY_PKG = {
     'optimizer': ('bfgs', 'bfgs_utils', 'differential_evolution', 'lbfgs',
                   'nelder_mead', 'proximal_hessian_sparse', 'sgld',
                   'variational_sgd', 'convergence_criteria'),
+    'experimental':
+        ('auto_batching', 'composite_tensor', 'edward2', 'linalg',
+         'marginalize', 'mcmc', 'nn', 'substrates', 'vi'),
 }
-LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'optimizer', 'stats',
-        'util')
+LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
+        'optimizer', 'stats', 'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
              'dtype_util', 'hypothesis_testlib', 'nest_util', 'prefer_static',
              'samplers', 'special_math', 'tensor_util', 'test_combinations',
@@ -102,7 +105,12 @@ def main(argv):
       for lib in LIBS
   })
   replacements.update({
+      '._numpy import inference_gym':
+          '.inference_gym import _numpy as inference_gym',
       '._numpy import psd_kernels': '.psd_kernels import _numpy as psd_kernels',
+      '._numpy.inference_gym import targets':
+          '.inference_gym.targets import _numpy as targets',
+      '._numpy.inference_gym.targets': '.inference_gym.targets._numpy',
       'math._numpy.psd_kernels': 'math.psd_kernels._numpy',
       'util.seed_stream': 'util._numpy.seed_stream',
   })

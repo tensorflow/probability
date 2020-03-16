@@ -33,6 +33,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.experimental import auto_batching
 from tensorflow_probability.python.experimental import edward2
+from tensorflow_probability.python.experimental import inference_gym
 from tensorflow_probability.python.experimental import linalg
 from tensorflow_probability.python.experimental import marginalize
 from tensorflow_probability.python.experimental import mcmc
@@ -47,6 +48,7 @@ _allowed_symbols = [
     'auto_batching',
     'as_composite',
     'edward2',
+    'inference_gym',
     'linalg',
     'marginalize',
     'mcmc',
