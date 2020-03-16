@@ -17,6 +17,7 @@
 
 load(
     "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_test",
     "multi_substrate_py_library",
 )
 
@@ -35,6 +36,17 @@ multi_substrate_py_library(
     testonly = True,
     srcs = ["test_util.py"],
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "test_util_test",
+    srcs = ["test_util_test.py"],
+    deps = [
+        ":test_util",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
