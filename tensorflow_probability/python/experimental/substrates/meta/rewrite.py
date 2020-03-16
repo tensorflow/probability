@@ -111,6 +111,9 @@ def main(argv):
       '._numpy.inference_gym import targets':
           '.inference_gym.targets import _numpy as targets',
       '._numpy.inference_gym.targets': '.inference_gym.targets._numpy',
+      '._numpy.inference_gym import internal':
+          '.inference_gym.internal import _numpy as internal',
+      '._numpy.inference_gym.internal': '.inference_gym.internal._numpy',
       'math._numpy.psd_kernels': 'math.psd_kernels._numpy',
       'util.seed_stream': 'util._numpy.seed_stream',
   })

@@ -13,11 +13,10 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   A package for target densities.
+#   Internal utilities for the inference gym.
 
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
 )
 
@@ -32,51 +31,12 @@ licenses(["notice"])  # Apache 2.0
 exports_files(["LICENSE"])
 
 multi_substrate_py_library(
-    name = "targets",
-    srcs = ["__init__.py"],
+    name = "test_util",
+    testonly = True,
+    srcs = ["test_util.py"],
     deps = [
-        ":bayesian_model",
-        ":logistic_regression",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "bayesian_model",
-    srcs = ["bayesian_model.py"],
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
-multi_substrate_py_test(
-    name = "bayesian_model_test",
-    srcs = ["bayesian_model_test.py"],
-    deps = [
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "logistic_regression",
-    srcs = ["logistic_regression.py"],
-    deps = [
-        ":bayesian_model",
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
-        "//tensorflow_probability/python/distributions",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "logistic_regression_test",
-    srcs = ["logistic_regression_test.py"],
-    deps = [
-        ":logistic_regression",
-        # absl/testing:parameterized dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
     ],
 )

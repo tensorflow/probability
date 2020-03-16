@@ -18,7 +18,9 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental.inference_gym.targets.bayesian_model import BayesianModel
+from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import LogisticRegression
 
 __all__ = [
     'BayesianModel',
+    'LogisticRegression',
 ]

@@ -158,6 +158,9 @@ class BayesianModel(object):
     self._dtype = dtype
     self._name = name
     self._pretty_name = pretty_name
+    if not isinstance(sample_transformations, collections.OrderedDict):
+      sample_transformations = collections.OrderedDict(
+          sorted(sample_transformations.items()))
     self._sample_transformations = sample_transformations
 
   # PyLint is confused, this is a new-style class.
