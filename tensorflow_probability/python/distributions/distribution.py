@@ -821,11 +821,32 @@ class Distribution(_BaseDistribution):
       if JAX_MODE and seed is None:
         raise ValueError('Must provide JAX PRNGKey as `dist.sample(seed=.)`')
       sample_shape = tf.cast(sample_shape, tf.int32, name='sample_shape')
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = tf.convert_to_tensor(
+            kwargs["conditional"], dtype=self.dtype, name="conditional")
+          conditional_shape = tf.convert_to_tensor(
+            kwargs["conditional"].shape[0], dtype=tf.int32,
+            name="conditional_shape")
+          kwargs["conditional"] = tf.repeat(
+            kwargs["conditional"], sample_shape, axis=0)
+          n_samples, n = self._expand_sample_shape_to_vector(sample_shape,
+                                                             "n_samples")
+          n_conditional, c = self._expand_sample_shape_to_vector(
+            conditional_shape, "n_conditional")
+          sample_shape = tf.multiply(n, c)
       sample_shape, n = self._expand_sample_shape_to_vector(
-          sample_shape, 'sample_shape')
+        sample_shape, 'sample_shape')
       samples = self._sample_n(n, seed, **kwargs)
       batch_event_shape = tf.shape(samples)[1:]
-      final_shape = tf.concat([sample_shape, batch_event_shape], 0)
+      if "conditional" in kwargs.keys():
+        final_shape = tf.concat([n_samples, n_conditional,
+                                 batch_event_shape], 0)
+        sample_shape = tf.concat([n_samples, n_conditional], 0)
+      else:
+          final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       samples = tf.reshape(samples, final_shape)
       samples = self._set_sample_static_shape(samples, sample_shape)
       return samples
@@ -852,6 +873,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = _convert_to_tensor(
+            kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
       if hasattr(self, '_log_prob'):
         return self._log_prob(value, **kwargs)
       if hasattr(self, '_prob'):
@@ -878,6 +905,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = _convert_to_tensor(
+            kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
       if hasattr(self, '_prob'):
         return self._prob(value, **kwargs)
       if hasattr(self, '_log_prob'):
@@ -904,6 +937,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = _convert_to_tensor(
+            kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
       if hasattr(self, '_log_cdf'):
         return self._log_cdf(value, **kwargs)
       if hasattr(self, '_cdf'):
@@ -940,6 +979,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = _convert_to_tensor(
+            kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
       if hasattr(self, '_cdf'):
         return self._cdf(value, **kwargs)
       if hasattr(self, '_log_cdf'):
@@ -977,6 +1022,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = _convert_to_tensor(
+            kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
       try:
         return self._log_survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
@@ -1020,6 +1071,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = _convert_to_tensor(
+            kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
       try:
         return self._survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
@@ -1076,6 +1133,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       value = _convert_to_tensor(
           value, name='value', dtype_hint=self.dtype)
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = _convert_to_tensor(
+            kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
       return self._quantile(value, **kwargs)
 
   def quantile(self, value, name='quantile', **kwargs):

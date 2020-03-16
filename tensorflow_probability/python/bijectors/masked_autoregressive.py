@@ -273,6 +273,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
                        '`bijector_fn` should be specified.')
     if shift_and_log_scale_fn:
       shift_and_log_scale_fn.build([shift_and_log_scale_fn._event_size])
+      self.model = shift_and_log_scale_fn._network
       def _bijector_fn(x, **condition_kwargs):
         params = shift_and_log_scale_fn(x, **condition_kwargs)
         if tf.is_tensor(params):
@@ -298,7 +299,6 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
     static_event_size = tensorshape_util.num_elements(
         tensorshape_util.with_rank_at_least(
             x.shape, self._event_ndims)[-self._event_ndims:])
-
     if self._unroll_loop:
       if not static_event_size:
         raise ValueError(
@@ -310,12 +310,11 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
       for _ in range(static_event_size):
         y = self._bijector_fn(y, **kwargs).forward(x)
       return y
-
     event_size = tf.reduce_prod(tf.shape(x)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name='y0')
     # call the template once to ensure creation
     if not tf.executing_eagerly():
-      _ = self._bijector_fn(y0).forward(y0)
+      _ = self._bijector_fn(y0, **kwargs).forward(y0)
     def _loop_body(index, y0):
       """While-loop body for autoregression calculation."""
       # Set caching device to avoid re-getting the tf.Variable for every while
@@ -951,11 +950,12 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
       if self._conditional:
-        if "conditional_input" not in kwargs.keys():
-          raise ValueError('`conditional_input` must be passed to'
-                           ' bijector_kwargs.')
+        if "conditional" not in kwargs.keys():
+          raise ValueError('`conditional` must be passed as a named arguement')
+        elif kwargs["conditional"] is None:
+          raise ValueError('the value of `conditional` cannot be `None`')
         else:
-          conditional = kwargs["conditional_input"]
+          conditional = kwargs["conditional"]
         if tensorshape_util.rank(conditional.shape) == 1:
           conditional = conditional[tf.newaxis, ...]
         x = [x, conditional]

@@ -178,7 +178,7 @@ class Normal(distribution.Distribution):
   def _event_shape(self):
     return tf.TensorShape([])
 
-  def _sample_n(self, n, seed=None):
+  def _sample_n(self, n, seed=None, **kwargs):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     shape = tf.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)],
@@ -187,23 +187,23 @@ class Normal(distribution.Distribution):
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
     return sampled * scale + loc
 
-  def _log_prob(self, x):
+  def _log_prob(self, x, **kwargs):
     scale = tf.convert_to_tensor(self.scale)
     log_unnormalized = -0.5 * tf.math.squared_difference(
         x / scale, self.loc / scale)
     log_normalization = 0.5 * np.log(2. * np.pi) + tf.math.log(scale)
     return log_unnormalized - log_normalization
 
-  def _log_cdf(self, x):
+  def _log_cdf(self, x, **kwargs):
     return special_math.log_ndtr(self._z(x))
 
-  def _cdf(self, x):
+  def _cdf(self, x, **kwargs):
     return special_math.ndtr(self._z(x))
 
-  def _log_survival_function(self, x):
+  def _log_survival_function(self, x, **kwargs):
     return special_math.log_ndtr(-self._z(x))
 
-  def _survival_function(self, x):
+  def _survival_function(self, x, **kwargs):
     return special_math.ndtr(-self._z(x))
 
   def _entropy(self):

@@ -54,8 +54,12 @@ def _is_scalar_from_shape_tensor(shape):
 
 def _default_kwargs_split_fn(kwargs):
   """Default `kwargs` `dict` getter."""
-  return (kwargs.get("distribution_kwargs", {}),
-          kwargs.get("bijector_kwargs", {}))
+  other = {key: kwargs[key] for key in kwargs
+    if ((key != "distribution_kwargs") or (key != "bijector_kwargs"))}
+  distribution_kwargs = kwargs.get("distribution_kwargs", {})
+  bijector_kwargs = kwargs.get("bijector_kwargs", {})
+  return (distribution_kwargs,
+          {**bijector_kwargs, **other})
 
 
 class TransformedDistribution(distribution_lib.Distribution):
@@ -260,6 +264,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     self._distribution = distribution
     self._bijector = bijector
+    
     super(TransformedDistribution, self).__init__(
         dtype=self._distribution.dtype,
         reparameterization_type=self._distribution.reparameterization_type,
@@ -362,6 +367,22 @@ class TransformedDistribution(distribution_lib.Distribution):
     with self._name_and_control_scope(name):
       sample_shape = tf.convert_to_tensor(
           sample_shape, dtype=tf.int32, name="sample_shape")
+      if "conditional" in kwargs.keys():
+        if kwargs["conditional"] is None:
+          kwargs.pop("conditional")
+        else:
+          kwargs["conditional"] = tf.convert_to_tensor(
+            kwargs["conditional"], dtype=self.dtype, name="conditional")
+          conditional_shape = tf.convert_to_tensor(
+            kwargs["conditional"].shape[0], dtype=tf.int32,
+            name="conditional_shape")
+          kwargs["conditional"] = tf.repeat(
+            kwargs["conditional"], sample_shape, axis=0)
+          n_samples, n = self._expand_sample_shape_to_vector(sample_shape,
+                                                             "n_samples")
+          n_conditional, c = self._expand_sample_shape_to_vector(
+            conditional_shape, "n_conditional")
+          sample_shape = tf.multiply(n, c)
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, "sample_shape")
 
@@ -371,24 +392,27 @@ class TransformedDistribution(distribution_lib.Distribution):
       # event that we need to reinterpret the samples as part of the
       # event_shape.
       x = self._sample_n(n, seed, **distribution_kwargs)
-
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
       batch_event_shape = tf.shape(x)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       x = tf.reshape(x, final_shape)
-
       # Finally, we apply the bijector's forward transformation. For caching to
       # work, it is imperative that this is the last modification to the
       # returned result.
       y = self.bijector.forward(x, **bijector_kwargs)
+      if "conditional" in kwargs.keys():
+        y = tf.reshape(y,
+                       tf.concat([n_samples,
+                                  n_conditional,
+                                  batch_event_shape], 0))
+        sample_shape = tf.concat([n_samples, n_conditional], 0)
       y = self._set_sample_static_shape(y, sample_shape)
 
       return y
 
   def _log_prob(self, y, **kwargs):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
-
     # For caching to work, it is imperative that the bijector is the first to
     # modify the input.
     x = self.bijector.inverse(y, **bijector_kwargs)
