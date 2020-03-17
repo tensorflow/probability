@@ -50,8 +50,10 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     transformation of a Logistic distribution.
 
     Args:
-      alpha: Floating-point `Tensor`; the scale of the log-Logistic distribution(s).
-      scale: Floating-point `Tensor`; the shape of the log- Logistic distribution(s).
+      alpha: Floating-point `Tensor`;
+        the scale of the log-Logistic distribution(s).
+      scale: Floating-point `Tensor`;
+        the shape of the log- Logistic distribution(s).
       validate_args: Python `bool`, default `False`. Whether to validate input
         with asserts. If `validate_args` is `False`, and the inputs are
         invalid, correct behavior is not guaranteed.
@@ -69,7 +71,8 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
       self._beta = tensor_util.convert_nonref_to_tensor(
           beta, name='beta', dtype=dtype)
       super(LogLogistic, self).__init__(
-          distribution=logistic.Logistic(loc=tf.math.log(self.alpha), scale=1./self.beta),
+          distribution=logistic.Logistic(loc=tf.math.log(self.alpha),
+                                         scale=1./self.beta),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
           parameters=parameters,
@@ -135,7 +138,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
           self._alpha, message='Argument `alpha` must be positive.'))
     if is_init != tensor_util.is_ref(self._beta):
       assertions.append(assert_util.assert_positive(
-        self._beta, message='Argument `beta` must be positive.'))
+          self._beta, message='Argument `beta` must be positive.'))
     return assertions
 
   def _default_event_space_bijector(self):

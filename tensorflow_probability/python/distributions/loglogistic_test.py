@@ -45,7 +45,8 @@ class LogLogiticTest(test_util.TestCase):
     variance = alpha ** 2 * (1. / np.sinc(2 * b) - 1. / np.sinc(b) ** 2)
     variance[:2] = np.nan
     self.assertAllClose(self.evaluate(dist.variance()), variance)
-    self.assertAllClose(self.evaluate(dist.stddev()), np.sqrt(self.evaluate(dist.variance())))
+    self.assertAllClose(self.evaluate(dist.stddev()),
+                        np.sqrt(self.evaluate(dist.variance())))
 
     mode = alpha * ((beta - 1.) / (beta + 1.)) ** (1. / beta)
     mode[0] = np.nan
@@ -72,7 +73,8 @@ class LogLogiticTest(test_util.TestCase):
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     log_pdf = dist.log_prob(x)
-    analytical_log_pdf = np.log(((beta/alpha) * (x/alpha) ** (beta - 1)) / (1 + (x/alpha) ** beta) ** 2)
+    analytical_log_pdf = np.log(((beta/alpha) * (x/alpha) ** (beta - 1)
+                                 ) / (1 + (x/alpha) ** beta) ** 2)
 
     self.assertAllClose(self.evaluate(log_pdf), analytical_log_pdf)
 
