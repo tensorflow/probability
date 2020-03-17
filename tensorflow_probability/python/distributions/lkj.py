@@ -490,17 +490,21 @@ class LKJ(distribution.Distribution):
       assertions.append(assert_util.assert_less_equal(
           dtype_util.as_numpy_dtype(x.dtype)(-1),
           x,
-          message='Correlations must be >= -1.'))
+          message='Correlations must be >= -1.',
+          summarize=30))
       assertions.append(assert_util.assert_less_equal(
           x,
           dtype_util.as_numpy_dtype(x.dtype)(1),
-          message='Correlations must be <= 1.'))
+          message='Correlations must be <= 1.',
+          summarize=30))
       assertions.append(assert_util.assert_near(
           tf.linalg.diag_part(x),
           dtype_util.as_numpy_dtype(x.dtype)(1),
-          message='Self-correlations must be = 1.'))
+          message='Self-correlations must be = 1.',
+          summarize=30))
       assertions.append(assert_util.assert_near(
           x,
           tf.linalg.matrix_transpose(x),
-          message='Correlation matrices must be symmetric.'))
+          message='Correlation matrices must be symmetric.',
+          summarize=30))
     return assertions
