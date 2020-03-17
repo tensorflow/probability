@@ -35,18 +35,7 @@ REQUIRED_PACKAGES = [
     'gast >= 0.2, < 0.3'  # For autobatching
 ]
 
-if '--release' in sys.argv:
-  release = True
-  sys.argv.remove('--release')
-else:
-  # Build a nightly package by default.
-  release = False
-
-if release:
-  project_name = 'tensorflow-probability'
-else:
-  project_name = 'tfp-nightly'
-
+project_name = 'tensorflow-probability'
 
 class BinaryDistribution(Distribution):
   """This class is needed in order to create OS specific wheels."""
