@@ -8,8 +8,6 @@ setup(
     version="conditionalmaf",
     description='Probabilistic modeling and statistical '
                 'inference in TensorFlow',
-    long_description=long_description,
-    long_description_content_type='text/markdown',
     author='Google LLC',
     author_email='no-reply@google.com',
     url='http://github.com/tomcharnock/probability',
