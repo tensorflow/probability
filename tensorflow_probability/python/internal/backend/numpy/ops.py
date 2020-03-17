@@ -284,6 +284,8 @@ def _get_static_value_jax(tensor, partial=False):
   import jax  # pylint: disable=g-import-not-at-top
   if isinstance(tensor, jax.core.Tracer):
     return None
+  if isinstance(tensor, np.ndarray):
+    return onp.array(tensor)
   return tensor
 
 get_static_value = utils.copy_docstring(

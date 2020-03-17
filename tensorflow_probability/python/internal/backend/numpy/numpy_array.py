@@ -192,6 +192,14 @@ def _pad(  # pylint: disable=unused-argument
       constant_values=constant_values)
 
 
+def _range(start, limit=None, delta=1, dtype=None, name='range'):  # pylint: disable=unused-argument
+  dtype = utils.numpy_dtype(dtype or utils.common_dtype([start], np.int32))
+  start = ops.convert_to_tensor(start, dtype=dtype)
+  limit = None if limit is None else ops.convert_to_tensor(limit, dtype=dtype)
+  delta = ops.convert_to_tensor(delta, dtype=dtype)
+  return np.arange(start, limit, delta).astype(dtype)
+
+
 def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument
   if np.array(axis).ndim == 0:
     return np.flip(tensor, axis)
@@ -318,9 +326,7 @@ pad = utils.copy_docstring(
 
 range = utils.copy_docstring(  # pylint: disable=redefined-builtin
     tf.range,
-    lambda start, limit=None, delta=1, dtype=None, name='range': np.arange(  # pylint: disable=g-long-lambda
-        start, limit, delta).astype(utils.numpy_dtype(
-            dtype or utils.common_dtype([start], np.int32))))
+    _range)
 
 rank = utils.copy_docstring(
     tf.rank,

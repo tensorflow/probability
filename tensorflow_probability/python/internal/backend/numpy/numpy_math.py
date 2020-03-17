@@ -283,6 +283,7 @@ def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
 
 def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
   """Computes `log(sum(exp(input_tensor))) along the specified axis."""
+  input_tensor = _convert_to_tensor(input_tensor)
   try:
     return scipy_special.logsumexp(
         input_tensor, axis=_astuple(axis), keepdims=keepdims)
@@ -842,7 +843,7 @@ sqrt = utils.copy_docstring(
 
 square = utils.copy_docstring(
     tf.math.square,
-    lambda x, name=None: np.square(x))
+    lambda x, name=None: np.square(_convert_to_tensor(x)))
 
 squared_difference = utils.copy_docstring(
     tf.math.squared_difference,
