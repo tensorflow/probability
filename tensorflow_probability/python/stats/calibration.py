@@ -109,7 +109,7 @@ def brier_decomposition(labels, logits, name=None):
                                         dtype=logits.dtype)
       confusion_matrix = tf.map_fn(
           fn_to_map, [flatten(pred_class), flatten(labels)],
-          dtype=logits.dtype)
+          fn_output_signature=logits.dtype)
       confusion_matrix = unflatten(confusion_matrix)
     else:
       confusion_matrix = tf.math.confusion_matrix(pred_class, labels,
@@ -141,7 +141,7 @@ def brier_decomposition(labels, logits, name=None):
       # TODO(b/139094519): Avoid using tf.map_fn here.
       prob_true = tf.map_fn(lambda args: tf.gather(args[0], args[1]),
                             [flatten(dist_mean), flatten(pred_class)],
-                            dtype=dist_mean.dtype)
+                            fn_output_signature=dist_mean.dtype)
       prob_true = unflatten(prob_true)
     else:
       prob_true = tf.gather(dist_mean, pred_class, axis=0)
@@ -494,7 +494,7 @@ def expected_calibration_error_quantiles(
     bucket_total_hit, bucket_log_total_pred_prob, bucket_count = tf.map_fn(
         fn=_fn,
         elems=tf.range(num_buckets, dtype=bucket.dtype),
-        dtype=(dtype,)*3)
+        fn_output_signature=(dtype,)*3)
     n = tf.maximum(bucket_count, 1.)
     bucket_accuracy = bucket_total_hit / n
     bucket_confidence = tf.math.exp(bucket_log_total_pred_prob - tf.math.log(n))

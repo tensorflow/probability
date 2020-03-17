@@ -387,13 +387,13 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
       # b/139210489
       x = tf.map_fn(
           _sample_one_batch_member, [flat_logits, flat_num_trials],
-          dtype=dtype,  # [B1B2...Bm, num_samples, num_classes]
+          fn_output_signature=dtype,  # [B1B2...Bm, num_samples, num_classes]
           parallel_iterations=1)
     else:
       # Invoke default parallel_iterations behavior
       x = tf.map_fn(
           _sample_one_batch_member, [flat_logits, flat_num_trials],
-          dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
+          fn_output_signature=dtype)  # [B1B2...Bm, num_samples, num_classes]
 
     # reshape the results to proper shape
     x = tf.transpose(a=x, perm=[1, 0, 2])

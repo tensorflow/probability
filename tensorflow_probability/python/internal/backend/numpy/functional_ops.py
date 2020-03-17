@@ -43,7 +43,8 @@ def _map_fn(  # pylint: disable=unused-argument
     back_prop=True,
     swap_memory=False,
     infer_shape=True,
-    name=None):
+    name=None,
+    fn_output_signature=None):
   """Numpy implementation of tf.map_fn."""
   if JAX_MODE:
     from jax import tree_util  # pylint: disable=g-import-not-at-top

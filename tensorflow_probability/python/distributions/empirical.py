@@ -266,7 +266,9 @@ class Empirical(distribution.Distribution):
           axis=0)
       flattened_samples = tf.reshape(samples, [-1, num_samples, event_size])
 
-    indices = tf.map_fn(_get_mode, flattened_samples, dtype=tf.int64)
+    indices = tf.map_fn(_get_mode,
+                        flattened_samples,
+                        fn_output_signature=tf.int64)
     full_indices = tf.stack(
         [tf.range(tf.shape(indices)[0]),
          tf.cast(indices, tf.int32)], axis=1)
