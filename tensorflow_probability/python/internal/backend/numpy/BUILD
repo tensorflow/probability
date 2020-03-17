@@ -64,7 +64,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -72,10 +71,8 @@ py_library(
     name = "compat",
     srcs = ["compat.py"],
     deps = [
-        ":_utils",
         ":v1",
         ":v2",
-        # tensorflow dep,
     ],
 )
 
@@ -86,7 +83,6 @@ py_library(
         ":_utils",
         ":ops",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -97,7 +93,6 @@ py_library(
         ":_utils",
         ":v1",
         ":v2",
-        # tensorflow dep,
     ],
 )
 
@@ -107,7 +102,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -115,7 +109,6 @@ py_library(
     name = "errors",
     srcs = ["errors.py"],
     deps = [
-        # tensorflow dep,
     ],
 )
 
@@ -125,7 +118,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -135,7 +127,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -146,7 +137,6 @@ py_library(
         ":_utils",
         ":keras_layers",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -156,7 +146,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -171,7 +160,6 @@ py_library(
         ":linear_operator",
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -181,7 +169,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -194,7 +181,6 @@ py_library(
         ":numpy_math",
         ":ops",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -205,7 +191,6 @@ py_library(
         ":_utils",
         ":ops",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -215,7 +200,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -226,7 +210,6 @@ py_library(
         ":_utils",
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -236,7 +219,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -257,7 +239,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -291,7 +272,6 @@ py_library(
         ":numpy_math",
         ":ops",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -304,7 +284,6 @@ py_library(
         ":numpy_math",
         ":ops",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -314,7 +293,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -323,7 +301,6 @@ py_library(
     srcs = ["sparse_lib.py"],
     deps = [
         ":_utils",
-        # tensorflow dep,
     ],
 )
 
@@ -380,7 +357,7 @@ py_library(
     name = "_utils",
     srcs = ["_utils.py"],
     deps = [
-        # decorator dep,
+        # wrapt dep,
     ],
 )
 
@@ -431,7 +408,6 @@ py_library(
         ":_utils",
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
     ],
 )
 

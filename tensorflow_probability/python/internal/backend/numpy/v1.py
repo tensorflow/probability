@@ -20,11 +20,7 @@ from __future__ import print_function
 
 import contextlib
 
-# Dependency imports
-
 import numpy as np
-import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import initializers
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl
@@ -97,31 +93,31 @@ matrix_determinant = linalg_impl.det
 matrix_solve = linalg_impl.solve
 
 colocate_with = utils.copy_docstring(
-    tf1.colocate_with,
+    'tf1.colocate_with',
     _dummy_scope)
 
 control_flow_v2_enabled = utils.copy_docstring(
-    tf1.control_flow_v2_enabled,
+    'tf1.control_flow_v2_enabled',
     lambda: True)
 
 get_variable = utils.copy_docstring(
-    tf1.get_variable,
+    'tf1.get_variable',
     _get_variable)
 
 get_variable_scope = utils.copy_docstring(
-    tf1.get_variable_scope,
+    'tf1.get_variable_scope',
     lambda: variable_scope(name_or_scope=None))
 
 placeholder_with_default = utils.copy_docstring(
-    tf1.placeholder_with_default,
+    'tf1.placeholder_with_default',
     _placeholder_with_default)
 
 global_variables_initializer = utils.copy_docstring(
-    tf1.global_variables_initializer,
+    'tf1.global_variables_initializer',
     lambda: None)
 
 set_random_seed = utils.copy_docstring(
-    tf1.set_random_seed,
+    'tf1.set_random_seed',
     set_seed)
 
 
@@ -160,6 +156,3 @@ class variable_scope(object):  # pylint: disable=invalid-name
 
   def __exit__(self, *_, **__):
     pass
-
-
-del tf

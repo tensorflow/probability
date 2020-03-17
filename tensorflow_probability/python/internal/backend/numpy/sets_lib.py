@@ -21,8 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
@@ -46,5 +44,5 @@ def _difference(a, b, aminusb=True, validate_indices=True):
 
 # TODO(b/136555907): Add unit test.
 difference = utils.copy_docstring(
-    tf.sets.difference,
+    'tf.sets.difference',
     _difference)

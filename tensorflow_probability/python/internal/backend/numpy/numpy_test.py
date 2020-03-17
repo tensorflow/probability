@@ -296,8 +296,8 @@ def uniform_params(draw):
 def gamma_params():
   def dict_to_params(d):
     return (d['shape'],  # sample shape
-            d['params'][0].astype(d['dtype'].as_numpy_dtype),  # alpha
-            (d['params'][1].astype(d['dtype'].as_numpy_dtype)  # beta (or None)
+            d['params'][0].astype(d['dtype']),  # alpha
+            (d['params'][1].astype(d['dtype'])  # beta (or None)
              if d['include_beta'] else None),
             d['dtype'])  # dtype
   return hps.fixed_dictionaries(
@@ -307,7 +307,7 @@ def gamma_params():
            params=n_same_shape(n=2, elements=positive_floats()),
            # pylint: enable=no-value-for-parameter
            include_beta=hps.booleans(),
-           dtype=hps.sampled_from([tf.float32, tf.float64]))
+           dtype=hps.sampled_from([np.float32, np.float64]))
       ).map(dict_to_params)  # dtype
 
 
@@ -534,7 +534,7 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=2),
                             dtype=np.float32,
                             elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-4, rtol=1e-4),
+             atol=2e-4, rtol=2e-4),
     TestCase('signal.rfft3d',
              [single_arrays(shape=fft_shapes(fft_dim=3),
                             dtype=np.float32,
@@ -559,11 +559,11 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=1),
                             dtype=np.complex64,
                             elements=complex_numbers(max_magnitude=1e3))],
-             atol=2e-4, rtol=2e-4),
+             atol=3e-4, rtol=3e-4),
     TestCase('signal.irfft2d',
              [single_arrays(shape=fft_shapes(fft_dim=2),
                             dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
+                            elements=complex_numbers(max_magnitude=5e2))],
              atol=2e-4, rtol=2e-4),
     TestCase('signal.irfft3d',
              [single_arrays(shape=fft_shapes(fft_dim=3),

@@ -18,10 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
-
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import softmax as _softmax
@@ -92,7 +89,7 @@ def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # 
   return np.argmax(np.expand_dims(logits, -1) + z, axis=-2).astype(dtype)
 
 
-def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
+def _gamma(shape, alpha, beta=None, dtype=np.float32, seed=None,
            name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
@@ -101,7 +98,7 @@ def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
 
 
-def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):  # pylint: disable=unused-argument
+def _gamma_jax(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):  # pylint: disable=unused-argument
   """JAX-based reparameterized gamma sampler."""
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   alpha = np.array(alpha, dtype=dtype)
@@ -117,7 +114,7 @@ def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):
   return samps if beta is None else samps / beta
 
 
-def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
+def _normal(shape, mean=0.0, stddev=1.0, dtype=np.float32, seed=None,
             name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
@@ -125,7 +122,7 @@ def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
   return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
 
 
-def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
+def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=np.float32, seed=None,
                 name=None):  # pylint: disable=unused-argument
   dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
   shape = _bcast_shape(shape, [mean, stddev])
@@ -135,7 +132,7 @@ def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
   return jaxrand.normal(key=seed, shape=shape, dtype=dtype) * stddev + mean
 
 
-def _poisson(shape, lam, dtype=tf.float32, seed=None,
+def _poisson(shape, lam, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([lam], dtype_hint=dtype)
@@ -187,7 +184,7 @@ if JAX_MODE:
     return (k - 1).astype(dtype)
 
 
-def _poisson_jax(shape, lam, dtype=tf.float32, seed=None,
+def _poisson_jax(shape, lam, dtype=np.float32, seed=None,
                  name=None, max_iters=None):  # pylint: disable=unused-argument
   """Jax Poisson random sampler."""
   # TODO(b/146674643): use transformed rejection sampling with lam > 10.
@@ -209,7 +206,7 @@ def _shuffle_jax(value, seed=None, name=None):  # pylint: disable=unused-argumen
   return jaxrand.shuffle(seed, value, axis=0)
 
 
-def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
+def _uniform(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   """Numpy uniform random sampler."""
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
@@ -226,7 +223,7 @@ def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
   return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
 
 
-def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
+def _uniform_jax(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
                  name=None):  # pylint: disable=unused-argument
   """Jax uniform random sampler."""
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
@@ -255,18 +252,19 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
 
 # --- Begin Public Functions --------------------------------------------------
 
-
+# TODO(b/147874898): rewrite samplers to use stateless signature. In the
+# meantime, we copy docstrings from stateful random samplers.
 stateless_categorical = utils.copy_docstring(
-    tf.random.stateless_categorical,
+    'tf.random.categorical',
     _categorical_jax if JAX_MODE else _categorical)
 
 stateless_gamma = utils.copy_docstring(
-    tf.random.stateless_gamma,
+    'tf.random.gamma',
     _gamma_jax if JAX_MODE else _gamma)
 
 
 # TODO(b/147874898): Delete this method.
-def gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):
+def gamma(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
   """Handles the difference in shape parameter interpretation."""
   # While we still have usages of tf.random.gamma and tf.random.stateless_gamma,
   # we must handle the different interpretation of the shape argument
@@ -280,21 +278,21 @@ def gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):
 
 
 stateless_normal = utils.copy_docstring(
-    tf.random.stateless_normal,
+    'tf.random.normal',
     _normal_jax if JAX_MODE else _normal)
 
 stateless_poisson = utils.copy_docstring(
-    tf.random.stateless_poisson,
+    'tf.random.poisson',
     _poisson_jax if JAX_MODE else _poisson)
 
 # TODO(b/147874898): Delete this method in favor of using `samplers.shuffle`.
 stateless_shuffle = (_shuffle_jax if JAX_MODE else _shuffle)
 
 stateless_uniform = utils.copy_docstring(
-    tf.random.stateless_uniform,
+    'tf.random.uniform',
     _uniform_jax if JAX_MODE else _uniform)
 
 set_seed = utils.copy_docstring(
-    tf.random.set_seed,
+    'tf.random.set_seed',
     (lambda seed: None if JAX_MODE  # pylint: disable=g-long-lambda
      else lambda seed: np.random.seed(seed % (2**32 - 1))))

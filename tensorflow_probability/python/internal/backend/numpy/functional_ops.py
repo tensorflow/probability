@@ -18,10 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
-
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
@@ -91,10 +88,10 @@ def _scan(  # pylint: disable=unused-argument
 
 
 map_fn = utils.copy_docstring(
-    tf.map_fn,
+    'tf.map_fn',
     _map_fn)
 
 scan = utils.copy_docstring(
-    tf.scan,
+    'tf.scan',
     _scan)
 

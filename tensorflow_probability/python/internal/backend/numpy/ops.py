@@ -25,6 +25,7 @@ import numpy as np
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six
 
+# TODO(b/151669121): Remove remaining TF imports
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -181,7 +182,7 @@ def _dimension_value(dimension):
 # --- Begin Public Functions --------------------------------------------------
 
 dimension_value = utils.copy_docstring(
-    tf.compat.dimension_value,
+    'tf.compat.dimension_value',
     _dimension_value)
 
 
@@ -210,43 +211,43 @@ class GradientTape(object):
     return source
 
 bitcast = utils.copy_docstring(
-    tf.bitcast,
+    'tf.bitcast',
     lambda input, type, name=None: convert_to_tensor(  # pylint: disable=g-long-lambda
         input, dtype_hint=type).view(type))
 
 broadcast_dynamic_shape = utils.copy_docstring(
-    tf.broadcast_static_shape, _broadcast_dynamic_shape)
+    'tf.broadcast_static_shape', _broadcast_dynamic_shape)
 
 broadcast_static_shape = utils.copy_docstring(
-    tf.broadcast_static_shape, _broadcast_static_shape)
+    'tf.broadcast_static_shape', _broadcast_static_shape)
 
 broadcast_static_shape_as_tensorshape = utils.copy_docstring(
-    tf.broadcast_static_shape,
+    'tf.broadcast_static_shape',
     functools.partial(_base_broadcast_static_shape, as_tensorshape=True))
 
 broadcast_to = utils.copy_docstring(
-    tf.broadcast_to,
+    'tf.broadcast_to',
     lambda input, shape, name=None: np.broadcast_to(input, shape))
 
 cast = utils.copy_docstring(
-    tf.cast,
+    'tf.cast',
     lambda x, dtype, name=None: np.array(x, dtype=utils.numpy_dtype(dtype)))
 
 clip_by_value = utils.copy_docstring(
-    tf.clip_by_value,
+    'tf.clip_by_value',
     lambda t, clip_value_min, clip_value_max, name=None:  # pylint: disable=g-long-lambda
     np.clip(t, clip_value_min, clip_value_max))
 
 constant = utils.copy_docstring(
-    tf.constant,
+    'tf.constant',
     _constant)
 
 control_dependencies = utils.copy_docstring(
-    tf.control_dependencies,
+    'tf.control_dependencies',
     _control_dependencies)
 
 convert_to_tensor = utils.copy_docstring(
-    tf.convert_to_tensor,
+    'tf.convert_to_tensor',
     _convert_to_tensor)
 
 
@@ -272,10 +273,10 @@ def _custom_gradient(f):
   return wrapped
 
 custom_gradient = utils.copy_docstring(
-    tf.custom_gradient, _custom_gradient)
+    'tf.custom_gradient', _custom_gradient)
 
 executing_eagerly = utils.copy_docstring(
-    tf.executing_eagerly,
+    'tf.executing_eagerly',
     lambda: True)
 
 
@@ -289,20 +290,20 @@ def _get_static_value_jax(tensor, partial=False):
   return tensor
 
 get_static_value = utils.copy_docstring(
-    tf.get_static_value,
+    'tf.get_static_value',
     _get_static_value_jax if JAX_MODE else
     lambda tensor, partial=False: tensor)
 
 group = utils.copy_docstring(
-    tf.group,
+    'tf.group',
     lambda *inputs, **kwargs: None)
 
 identity = utils.copy_docstring(
-    tf.identity,
+    'tf.identity',
     lambda input, name=None: np.array(input))
 
 is_tensor = utils.copy_docstring(
-    tf.is_tensor,
+    'tf.is_tensor',
     lambda x: isinstance(x, Tensor))
 
 
@@ -352,11 +353,11 @@ newaxis = np.newaxis
 if JAX_MODE:
   from jax import lax  # pylint: disable=g-import-not-at-top
   stop_gradient = utils.copy_docstring(
-      tf.stop_gradient,
+      'tf.stop_gradient',
       lambda input, name=None: lax.stop_gradient(input))
 else:
   stop_gradient = utils.copy_docstring(
-      tf.stop_gradient,
+      'tf.stop_gradient',
       lambda input, name=None: np.array(input))
 
 TensorShape = tf.TensorShape

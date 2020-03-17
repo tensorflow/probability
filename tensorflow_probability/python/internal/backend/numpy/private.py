@@ -18,13 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
-
-from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import random_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -73,7 +69,7 @@ def _parameterized_truncated_normal(shape, means=0., stddevs=1.,
   raise NotImplementedError
 
 parameterized_truncated_normal = utils.copy_docstring(
-    random_ops.parameterized_truncated_normal,
+    'random_ops.parameterized_truncated_normal',
     _parameterized_truncated_normal)
 
 
@@ -81,5 +77,5 @@ def _prevent_gradient(input, message='', name=None):  # pylint: disable=unused-a
   raise NotImplementedError
 
 prevent_gradient = utils.copy_docstring(
-    array_ops.prevent_gradient,
+    'array_ops.prevent_gradient',
     _prevent_gradient)
