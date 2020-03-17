@@ -55,7 +55,7 @@ setup(
     long_description_content_type='text/markdown',
     author='Google LLC',
     author_email='no-reply@google.com',
-    url='http://github.com/tensorflow/probability',
+    url='http://github.com/tomcharnock/probability',
     license='Apache 2.0',
     packages=find_packages(),
     install_requires=REQUIRED_PACKAGES,
