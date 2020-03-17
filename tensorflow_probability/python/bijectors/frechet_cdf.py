@@ -32,7 +32,8 @@ __all__ = [
 
 
 class FrechetCDF(bijector.Bijector):
-  """Compute `Y = g(X) = exp(-((X - loc) / scale) ** - alpha)`, the Frechet CDF.
+  """Compute `Y = g(X) = exp(-((X - loc) / scale) ** - concentration)`,
+  the Frechet CDF.
 
   This bijector maps inputs from `[loc, inf]` to `[0, 1]`. The inverse of the
   bijector applied to a uniform random variable `X ~ U(0, 1)` gives back a
@@ -40,17 +41,17 @@ class FrechetCDF(bijector.Bijector):
   [Frechet distribution](https://en.wikipedia.org/wiki/Frechet_distribution):
 
   ```none
-  Y ~ FrechetCDF(loc, scale, alpha)
-  pdf(y; loc, scale, alpha) = (alpha / scale)
-  * exp(- ((x - loc)/scale) ** -alpha)
-  * ((y - loc) / scale) ** - (1 + alpha)
+  Y ~ FrechetCDF(loc, scale, concentration)
+  pdf(y; loc, scale, concentration) = (concentration / scale)
+  * exp(- ((x - loc)/scale) ** -concentration)
+  * ((y - loc) / scale) ** - (1 + concentration)
   ```
   """
 
   def __init__(self,
                loc=0.,
                scale=1.,
-               alpha=1.,
+               concentration=1.,
                validate_args=False,
                dtype=tf.float64,
                name='frechet_cdf'):
@@ -59,13 +60,16 @@ class FrechetCDF(bijector.Bijector):
     Args:
       loc: Float-like `Tensor` that is the same dtype and is
         broadcastable with `scale`.
-        This is `loc` in `Y = g(X) = exp(-((X - loc) / scale) ** - alpha)`.
+        This is `loc` in
+        `Y = g(X) = exp(-((X - loc) / scale) ** - concentration)`.
       scale: Positive Float-like `Tensor` that is the same dtype and is
         broadcastable with `loc`.
-        This is `scale` in `Y = g(X) = exp(-((X - loc) / scale) ** - alpha)`.
-      alpha: Positive Float-like `Tensor` that is the same dtype and is
+        This is `scale` in
+        `Y = g(X) = exp(-((X - loc) / scale) ** - concentration)`.
+      concentration: Positive Float-like `Tensor` that is the same dtype and is
         broadcastable with `loc`.
-        This is `alpha` in `Y = g(X) = exp(-((X - loc) / scale) ** - alpha)`.
+        This is `concentration` in
+        `Y = g(X) = exp(-((X - loc) / scale) ** - concentration)`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
@@ -77,8 +81,8 @@ class FrechetCDF(bijector.Bijector):
           loc, dtype=dtype, name='loc')
       self._scale = tensor_util.convert_nonref_to_tensor(
           scale, dtype=dtype, name='scale')
-      self._alpha = tensor_util.convert_nonref_to_tensor(
-          alpha, dtype=dtype, name='alpha')
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, dtype=dtype, name='concentration')
       super(FrechetCDF, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=0,
@@ -88,18 +92,18 @@ class FrechetCDF(bijector.Bijector):
 
   @property
   def loc(self):
-    """The `loc` in `Y = g(X) = exp(-((X - loc) / scale) ** - alpha)`."""
+    """The `loc` in `Y = exp(-((X - loc) / scale) ** - concentration)`."""
     return self._loc
 
   @property
   def scale(self):
-    """This is `scale` in `Y = g(X) = exp(-((X - loc) / scale) ** - alpha)`."""
+    """This is `scale` in `Y = exp(-((X - loc) / scale) ** - concentration)`."""
     return self._scale
 
   @property
-  def alpha(self):
-    """This is `alpha` in `Y = g(X) = exp(-((X - loc) / scale) ** - alpha)`."""
-    return self._alpha
+  def concentration(self):
+    """This is `concentration` in `Y = exp(-((X - loc) / scale) ** - concentration)`."""
+    return self._concentration
 
   @classmethod
   def _is_increasing(cls):
@@ -108,24 +112,28 @@ class FrechetCDF(bijector.Bijector):
   def _forward(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       z = (x - self.loc) / self.scale
-      return tf.exp(-z ** (- self.alpha))
+      return tf.exp(-z ** (- self.concentration))
 
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return self.loc + self.scale * tf.exp(- tf.math.log(-tf.math.log(y)
-                                                          ) / self.alpha)
+      return self.loc + self.scale * tf.exp(
+        - tf.math.log(-tf.math.log(y)) / self.concentration)
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return tf.math.log(self.scale) - tf.math.log(self.alpha) - tf.math.log(y)\
-          - (1. + 1. / self.alpha) * tf.math.log(-tf.math.log(y))
+      return tf.math.log(self.scale) \
+             - tf.math.log(self.concentration) \
+             - tf.math.log(y) \
+             - (1. + 1. / self.concentration) * tf.math.log(-tf.math.log(y))
 
   def _forward_log_det_jacobian(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       scale = tf.convert_to_tensor(self.scale)
       z = (x - self.loc) / scale
-      return tf.math.log(self.alpha) - tf.math.log(scale) - (1. + self.alpha)\
-             * tf.math.log(z) - z ** (- self.alpha)
+      return tf.math.log(self.concentration)\
+             - tf.math.log(scale)\
+             - (1. + self.concentration) * tf.math.log(z) \
+             - z ** (- self.concentration)
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
@@ -154,8 +162,8 @@ class FrechetCDF(bijector.Bijector):
       assertions.append(assert_util.assert_positive(
           self.scale,
           message='Argument `scale` must be positive.'))
-    if is_init != tensor_util.is_ref(self.alpha):
+    if is_init != tensor_util.is_ref(self.concentration):
         assertions.append(assert_util.assert_positive(
-            self.alpha,
-            message='Argument `alpha` must be positive.'))
+            self.concentration,
+            message='Argument `concentration` must be positive.'))
     return assertions
