@@ -33,31 +33,34 @@ class LogLogiticTest(test_util.TestCase):
     self._rng = np.random.RandomState(123)
 
   def testLogLogisticStats(self):
-    alpha = np.float32([3., 1.5, 0.75])
-    beta = np.float32([0.4, 1.1, 2.1])
-    dist = tfd.LogLogistic(alpha=alpha, beta=beta, validate_args=True)
+    scale = np.float32([3., 1.5, 0.75])
+    concentration = np.float32([0.4, 1.1, 2.1])
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
 
-    b = 1. / beta
-    mean = alpha / np.sinc(b)
+    b = 1. / concentration
+    mean = scale / np.sinc(b)
     mean[0] = np.nan
     self.assertAllClose(self.evaluate(dist.mean()), mean)
 
-    variance = alpha ** 2 * (1. / np.sinc(2 * b) - 1. / np.sinc(b) ** 2)
+    variance = scale ** 2 * (1. / np.sinc(2 * b) - 1. / np.sinc(b) ** 2)
     variance[:2] = np.nan
     self.assertAllClose(self.evaluate(dist.variance()), variance)
     self.assertAllClose(self.evaluate(dist.stddev()),
                         np.sqrt(self.evaluate(dist.variance())))
 
-    mode = alpha * ((beta - 1.) / (beta + 1.)) ** (1. / beta)
+    mode = scale * ((concentration - 1.) / (concentration + 1.)
+                    ) ** (1. / concentration)
     mode[0] = np.nan
     self.assertAllClose(self.evaluate(dist.mode()), mode)
 
-    entropy = np.log2(np.e ** 2 * alpha / beta)
+    entropy = np.log2(np.e ** 2 * scale / concentration)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy)
 
   def testLogLogisticSample(self):
-    alpha, beta = 1.5, 3.
-    dist = tfd.LogLogistic(alpha=alpha, beta=beta, validate_args=True)
+    scale, concentration = 1.5, 3.
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
     samples = self.evaluate(dist.sample(6000, seed=test_util.test_seed()))
     self.assertAllClose(np.mean(samples),
                         self.evaluate(dist.mean()),
@@ -67,34 +70,38 @@ class LogLogiticTest(test_util.TestCase):
                         atol=0.5)
 
   def testLogLogisticPDF(self):
-    alpha, beta = 1.5, 0.4
-    dist = tfd.LogLogistic(alpha=alpha, beta=beta, validate_args=True)
+    scale, concentration = 1.5, 0.4
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     log_pdf = dist.log_prob(x)
-    analytical_log_pdf = np.log(((beta/alpha) * (x/alpha) ** (beta - 1)
-                                 ) / (1 + (x/alpha) ** beta) ** 2)
+    analytical_log_pdf = np.log(
+      ((concentration/scale) * (x/scale) ** (concentration - 1)
+       ) / (1 + (x/scale) ** concentration) ** 2)
 
     self.assertAllClose(self.evaluate(log_pdf), analytical_log_pdf)
 
   def testLogLogisticCDF(self):
-    alpha, beta = 1.5, 0.4
-    dist = tfd.LogLogistic(alpha=alpha, beta=beta, validate_args=True)
+    scale, concentration = 1.5, 0.4
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     cdf = dist.cdf(x)
-    analytical_cdf = 1. / (1 + (x / alpha) ** (- beta))
+    analytical_cdf = 1. / (1 + (x / scale) ** (- concentration))
     self.assertAllClose(self.evaluate(cdf), analytical_cdf)
 
   def testAssertValidSample(self):
-    dist = tfd.LogLogistic(alpha=[1., 1., 4.], beta=2., validate_args=True)
+    dist = tfd.LogLogistic(scale=[1., 1., 4.], concentration=2.,
+                           validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(dist.cdf([3., -0.2, 1.]))
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfd.LogLogistic(alpha=1., beta=2., validate_args=True)
+    dist = tfd.LogLogistic(scale=1., concentration=2., validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to 0'):
       dist._experimental_default_event_space_bijector().inverse(
           [-4.2, -1e-6, -1.3])

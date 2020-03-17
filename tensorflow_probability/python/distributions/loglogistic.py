@@ -37,22 +37,22 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
   """The log-logistic distribution."""
 
   def __init__(self,
-               alpha,
-               beta,
+               scale,
+               concentration,
                validate_args=False,
                allow_nan_stats=True,
                name='LogLogistic'):
     """Construct a log-logistic distribution.
 
     The LogLogistic distribution models positive-valued random variables
-    whose logarithm is logisticly distributed with mean `log(alpha)` and
-    scale `1/beta`. It is constructed as the exponential
+    whose logarithm is logisticly distributed with mean `log(scale)` and
+    scale `1/concentration`. It is constructed as the exponential
     transformation of a Logistic distribution.
 
     Args:
-      alpha: Floating-point `Tensor`;
-        the scale of the log-Logistic distribution(s).
       scale: Floating-point `Tensor`;
+        the scale of the log-Logistic distribution(s).
+      concentration: Floating-point `Tensor`;
         the shape of the log- Logistic distribution(s).
       validate_args: Python `bool`, default `False`. Whether to validate input
         with asserts. If `validate_args` is `False`, and the inputs are
@@ -65,14 +65,15 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([alpha, beta], dtype_hint=tf.float32)
-      self._alpha = tensor_util.convert_nonref_to_tensor(
-          alpha, name='alpha', dtype=dtype)
-      self._beta = tensor_util.convert_nonref_to_tensor(
-          beta, name='beta', dtype=dtype)
+      dtype = dtype_util.common_dtype([scale, concentration],
+                                      dtype_hint=tf.float32)
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale, name='scale', dtype=dtype)
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+          concentration, name='concentration', dtype=dtype)
       super(LogLogistic, self).__init__(
-          distribution=logistic.Logistic(loc=tf.math.log(self.alpha),
-                                         scale=1./self.beta),
+          distribution=logistic.Logistic(loc=tf.math.log(self.scale),
+                                         scale=1./self.concentration),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
           parameters=parameters,
@@ -80,7 +81,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
   @classmethod
   def _params_event_ndims(cls):
-    return dict(alpha=0, beta=0)
+    return dict(scale=0, concentration=0)
 
   @property
   def loc(self):
@@ -89,35 +90,31 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
   @property
   def scale(self):
-    """Distribution parameter for the pre-transformed scale."""
-    return self.distribution.scale
+    """Distribution parameter."""
+    return self._scale
 
   @property
-  def alpha(self):
+  def concentration(self):
     """Distribution parameter."""
-    return self._alpha
-
-  @property
-  def beta(self):
-    """Distribution parameter."""
-    return self._beta
+    return self._concentration
 
   def _mean(self):
-    b = 1. / self.beta
-    mean = self.alpha / sinc(b)
-    return tf.where(tf.greater(self.beta, 1.), mean, np.nan)
+    b = 1. / self.concentration
+    mean = self.scale / sinc(b)
+    return tf.where(tf.greater(self.concentration, 1.), mean, np.nan)
 
   def _variance(self):
-    b = 1. / self.beta
-    variance = self.alpha ** 2 * (1. / sinc(2*b) - 1. / sinc(b)**2)
-    return tf.where(tf.greater(self.beta, 2.), variance, np.nan)
+    b = 1. / self.concentration
+    variance = self.scale ** 2 * (1. / sinc(2*b) - 1. / sinc(b)**2)
+    return tf.where(tf.greater(self.concentration, 2.), variance, np.nan)
 
   def _mode(self):
-    mode = self.alpha * ((self.beta - 1.)/(self.beta + 1.))**(1./self.beta)
-    return tf.where(tf.greater(self.beta, 1.), mode, np.nan)
+    mode = self.scale * ((self.concentration - 1.)/(self.concentration + 1.)
+                         )**(1./self.concentration)
+    return tf.where(tf.greater(self.concentration, 1.), mode, np.nan)
 
   def _entropy(self):
-    return (tf.math.log(self.alpha / self.beta) + 2.) / tf.math.log(2.)
+    return (tf.math.log(self.scale / self.concentration) + 2.) / tf.math.log(2.)
 
   def _sample_control_dependencies(self, x):
     assertions = []
@@ -129,16 +126,17 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
   def _parameter_control_dependencies(self, is_init):
     if is_init:
-      dtype_util.assert_same_float_dtype([self.alpha, self.beta])
+      dtype_util.assert_same_float_dtype([self.scale, self.concentration])
     if not self.validate_args:
       return []
     assertions = []
-    if is_init != tensor_util.is_ref(self._alpha):
+    if is_init != tensor_util.is_ref(self._scale):
       assertions.append(assert_util.assert_positive(
-          self._alpha, message='Argument `alpha` must be positive.'))
-    if is_init != tensor_util.is_ref(self._beta):
+          self._scale, message='Argument `scale` must be positive.'))
+    if is_init != tensor_util.is_ref(self._concentration):
       assertions.append(assert_util.assert_positive(
-          self._beta, message='Argument `beta` must be positive.'))
+          self._concentration,
+          message='Argument `concentration` must be positive.'))
     return assertions
 
   def _default_event_space_bijector(self):
