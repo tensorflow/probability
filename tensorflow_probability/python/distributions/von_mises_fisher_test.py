@@ -295,8 +295,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     self._verifyPdfWithNumpy(vmf, atol=2e-4)
 
   def testInternalShapeInference(self):
-    # Regression test for the effect of b/139013403 on vMF sampling
-    # The bug only triggers if TF2_BEHAVIOR=1.
+    # Regression test for the effect of b/139013403 on vMF sampling.
     sample_shape = tf.constant([2])
     # There needs to be a 1 dimension in the batch shape to trigger the bug
     mean_dir = tf.math.l2_normalize([1., 2, 3, 4], axis=-1)
