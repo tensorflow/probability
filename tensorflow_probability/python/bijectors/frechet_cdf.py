@@ -41,8 +41,9 @@ class FrechetCDF(bijector.Bijector):
 
   ```none
   Y ~ FrechetCDF(loc, scale, alpha)
-  pdf(y; loc, scale, alpha) = (alpha / scale) * exp(- ((x - loc)/scale) ** -alpha) *
-    ((y - loc) / scale) ** - (1 + alpha)
+  pdf(y; loc, scale, alpha) = (alpha / scale)
+  * exp(- ((x - loc)/scale) ** -alpha)
+  * ((y - loc) / scale) ** - (1 + alpha)
   ```
   """
 
@@ -111,24 +112,28 @@ class FrechetCDF(bijector.Bijector):
 
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return self.loc + self.scale * tf.exp(- tf.math.log(-tf.math.log(y)) / self.alpha)
+      return self.loc + self.scale * tf.exp(- tf.math.log(-tf.math.log(y)
+                                                          ) / self.alpha)
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return tf.math.log(self.scale) - tf.math.log(self.alpha) - tf.math.log(y) \
+      return tf.math.log(self.scale) - tf.math.log(self.alpha) - tf.math.log(y)\
           - (1. + 1. / self.alpha) * tf.math.log(-tf.math.log(y))
 
   def _forward_log_det_jacobian(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       scale = tf.convert_to_tensor(self.scale)
       z = (x - self.loc) / scale
-      return tf.math.log(self.alpha) - tf.math.log(scale) - (1. + self.alpha) * tf.math.log(z) - z ** (- self.alpha)
+      return tf.math.log(self.alpha) - tf.math.log(scale) - (1. + self.alpha)\
+             * tf.math.log(z) - z ** (- self.alpha)
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
       return []
-    return [assert_util.assert_non_negative(
-          x - self.loc, message='Forward transformation input must be at least loc.')]
+    is_positive = assert_util.assert_non_negative(
+        x - self.loc,
+        message='Inverse transformation input must be greater than loc.')
+    return [is_positive]
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:

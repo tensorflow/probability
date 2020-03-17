@@ -36,7 +36,8 @@ class FrechetCDFTest(test_util.TestCase):
     loc = np.array(0.3, dtype=np.float64)
     scale = np.array(5., dtype=np.float64)
     alpha = np.array(2., dtype=np.float64)
-    bijector = tfb.FrechetCDF(loc=loc, scale=scale, alpha=alpha, validate_args=True)
+    bijector = tfb.FrechetCDF(loc=loc, scale=scale, alpha=alpha,
+                              validate_args=True)
     self.assertStartsWith(bijector.name, "frechet")
     # Frechet distribution
     frechet_dist = stats.invweibull(c=alpha, loc=loc, scale=scale)
@@ -44,7 +45,8 @@ class FrechetCDFTest(test_util.TestCase):
     y = frechet_dist.cdf(x).astype(np.float64)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     x = np.array([[[0.49], [0.8], [2.], [4.2], [12.]]], dtype=np.float64)
-    y = frechet_dist.cdf(x).astype(np.float64)  # the below tests fail if x < 0.49
+    y = frechet_dist.cdf(x).astype(np.float64)
+    # the below tests fail if x < 0.49
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
     self.assertAllClose(
         np.squeeze(frechet_dist.logpdf(x), axis=-1),
