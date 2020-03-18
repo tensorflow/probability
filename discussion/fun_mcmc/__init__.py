@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from discussion.fun_mcmc import prefab
 from discussion.fun_mcmc import util_tfp
 from discussion.fun_mcmc.backend import get_backend
 from discussion.fun_mcmc.backend import JAX
@@ -131,6 +132,7 @@ __all__ = [
     'potential_scale_reduction_step',
     'PotentialFn',
     'PotentialScaleReductionState',
+    'prefab',
     'random_walk_metropolis',
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',

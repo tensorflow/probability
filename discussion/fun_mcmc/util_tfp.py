@@ -21,8 +21,6 @@ from __future__ import print_function
 
 import functools
 
-import tensorflow.compat.v2 as tf
-
 from discussion.fun_mcmc import backend
 from discussion.fun_mcmc import fun_mcmc_lib
 from typing import Any, Optional, Tuple
@@ -30,8 +28,6 @@ from typing import Any, Optional, Tuple
 tf = backend.tf
 tfp = backend.tfp
 util = backend.util
-
-tfb = tfp.bijectors
 
 
 def bijector_to_transform_fn(
@@ -90,7 +86,7 @@ def bijector_to_transform_fn(
 
     return value, ((), ldj)
 
-  inverse_bijector = util.map_tree(tfb.Invert, bijector)
+  inverse_bijector = util.map_tree(tfp.bijectors.Invert, bijector)
 
   forward_transform_fn = functools.partial(transform_fn, bijector)
   inverse_transform_fn = functools.partial(transform_fn, inverse_bijector)
