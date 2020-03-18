@@ -667,12 +667,8 @@ def no_tf_rank_errors():
   # have larger "event" shapes than the distribution itself.
   input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
   input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
-  cwise_op_names = (r'Op:(AddV2|Sub|Mul|SquaredDifference|RealDiv|BroadcastTo|'
-                    r'LessEqual|MulNoNan)')
-  cwise_pat_1 = _rank_broadcasting_error_pattern(5, 6, cwise_op_names)
-  cwise_pat_2 = _rank_broadcasting_error_pattern(6, 5, cwise_op_names)
-  pat_1 = _rank_broadcasting_error_pattern(8, 9)
-  pat_2 = _rank_broadcasting_error_pattern(9, 8)
+  pat_1 = _rank_broadcasting_error_pattern(1, 6)
+  pat_2 = _rank_broadcasting_error_pattern(6, 1)
   try:
     yield
   except tf.errors.UnimplementedError as e:
@@ -681,11 +677,7 @@ def no_tf_rank_errors():
     # See also b/148230377.
     msg = str(e)
     if re.search(pat_1, msg) or re.search(pat_2, msg):
-      # We asked some op (SelectV2?) to broadcast Tensors one of whose ranks
-      # >= 9.
-      hp.assume(False)
-    elif re.search(cwise_pat_1, msg) or re.search(cwise_pat_2, msg):
-      # We asked some cwise op to broadcast Tensors one of whose ranks >= 6.
+      # We asked some op to broadcast Tensors one of whose ranks >= 6.
       hp.assume(False)
     elif re.search(input_dims_pat, msg):
       # We asked some TF op (StridedSlice?) to operate on a Tensor of rank >= 8.
