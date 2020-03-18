@@ -111,7 +111,7 @@ __all__ = [
     'simple_dual_averages_step',
     'SimpleDualAveragesExtra',
     'SimpleDualAveragesState',
-    'spliting_integrator_step',
+    'splitting_integrator_step',
     'State',
     'trace',
     'transform_log_prob_fn',
@@ -677,7 +677,7 @@ IntegratorStep = Callable[[IntegratorStepState], Tuple[IntegratorStepState,
                                                        IntegratorStepExtras]]
 
 
-def spliting_integrator_step(
+def splitting_integrator_step(
     integrator_step_state: IntegratorStepState,
     step_size: FloatTensor,
     target_log_prob_fn: PotentialFn,
@@ -776,7 +776,7 @@ def leapfrog_step(
     integrator_step_extras: IntegratorStepExtras.
   """
   coefficients = [0.5, 1., 0.5]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -813,7 +813,7 @@ def ruth4_step(
   c = 2**(1. / 3)
   coefficients = (1. / (2 - c)) * np.array([0.5, 1., 0.5 - 0.5 * c, -c])
   coefficients = list(coefficients) + list(reversed(coefficients))[1:]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -856,7 +856,7 @@ def blanes_3_stage_step(
   b1 = 0.29619504261
   coefficients = [a1, b1, 0.5 - a1, 1. - 2. * b1]
   coefficients = coefficients + list(reversed(coefficients))[1:]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -896,7 +896,7 @@ def blanes_4_stage_step(
   b1 = 0.191667800
   coefficients = [a1, b1, a2, 0.5 - b1, 1. - 2. * (a1 + a2)]
   coefficients = coefficients + list(reversed(coefficients))[1:]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -950,7 +950,7 @@ def mclachlan_optimal_4th_order_step(
   coefficients = [b1, a1, b2, a2, b3, a3, b4, a4]
 
   def _step(direction):
-    return spliting_integrator_step(
+    return splitting_integrator_step(
         integrator_step_state,
         step_size,
         target_log_prob_fn,
