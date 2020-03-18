@@ -117,7 +117,7 @@ class FrechetCDF(bijector.Bijector):
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
       return self.loc + self.scale * tf.exp(
-        - tf.math.log(-tf.math.log(y)) / self.concentration)
+          - tf.math.log(-tf.math.log(y)) / self.concentration)
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
@@ -163,7 +163,7 @@ class FrechetCDF(bijector.Bijector):
           self.scale,
           message='Argument `scale` must be positive.'))
     if is_init != tensor_util.is_ref(self.concentration):
-        assertions.append(assert_util.assert_positive(
-            self.concentration,
-            message='Argument `concentration` must be positive.'))
+      assertions.append(assert_util.assert_positive(
+          self.concentration,
+          message='Argument `concentration` must be positive.'))
     return assertions
