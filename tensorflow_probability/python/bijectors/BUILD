@@ -58,6 +58,8 @@ multi_substrate_py_library(
         ":exp",
         ":expm1",
         ":ffjord",
+        ":fill_diagonal",
+        ":fill_scale_diagonal",
         ":fill_scale_tril",
         ":fill_triangular",
         ":generalized_pareto",
@@ -397,6 +399,19 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "fill_diagonal",
+    srcs = ["fill_diagonal.py"],
+    deps = [
+        ":bijector",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "generalized_pareto",
     srcs = ["generalized_pareto.py"],
     deps = [
@@ -626,6 +641,21 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "fill_scale_diagonal",
+    srcs = ["fill_scale_diagonal.py"],
+    deps = [
+        ":affine_scalar",
+        ":chain",
+        ":fill_diagonal",
+        ":softplus",
+        ":transform_diagonal",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1450,6 +1480,30 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "fill_diagonal_test",
+    size = "small",
+    srcs = ["fill_diagonal_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "fill_scale_diagonal_test",
+    size = "small",
+    srcs = ["fill_scale_diagonal_test.py"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "sigmoid_test",
     size = "small",
     srcs = ["sigmoid_test.py"],
@@ -1661,6 +1715,10 @@ exports_files(
         "exp_test.py",
         "expm1.py",
         "expm1_test.py",
+        "fill_diagonal.py",
+        "fill_diagonal_test.py",
+        "fill_scale_diagonal.py",
+        "fill_scale_diagonal_test.py",
         "fill_scale_tril.py",
         "fill_scale_tril_test.py",
         "fill_triangular.py",
