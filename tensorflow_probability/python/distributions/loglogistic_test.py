@@ -78,8 +78,8 @@ class LogLogiticTest(test_util.TestCase):
 
     log_pdf = dist.log_prob(x)
     analytical_log_pdf = np.log(
-      ((concentration/scale) * (x/scale) ** (concentration - 1)
-       ) / (1 + (x/scale) ** concentration) ** 2)
+        ((concentration/scale) * (x/scale) ** (concentration - 1)
+         ) / (1 + (x/scale) ** concentration) ** 2)
 
     self.assertAllClose(self.evaluate(log_pdf), analytical_log_pdf)
 
