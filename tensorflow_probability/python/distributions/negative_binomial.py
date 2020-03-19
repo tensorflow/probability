@@ -26,8 +26,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -153,15 +153,16 @@ class NegativeBinomial(distribution.Distribution):
     # lam ~ Gamma(concentration=total_count, rate=(1-probs)/probs)
     # then X ~ Poisson(lam) is Negative Binomially distributed.
     logits = self._logits_parameter_no_checks()
-    stream = SeedStream(seed, salt='NegativeBinomial')
-    rate = tf.random.gamma(
+    gamma_seed, poisson_seed = samplers.split_seed(
+        seed, salt='NegativeBinomial')
+    rate = samplers.gamma(
         shape=[n],
         alpha=self.total_count,
         beta=tf.math.exp(-logits),
         dtype=self.dtype,
-        seed=stream())
-    return tf.random.poisson(
-        lam=rate, shape=[], dtype=self.dtype, seed=stream())
+        seed=gamma_seed)
+    return samplers.poisson(
+        shape=[], lam=rate, dtype=self.dtype, seed=poisson_seed)
 
   def _cdf(self, x):
     logits = self._logits_parameter_no_checks()
