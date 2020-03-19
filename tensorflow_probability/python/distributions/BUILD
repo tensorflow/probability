@@ -2263,6 +2263,7 @@ multi_substrate_py_test(
     name = "linear_gaussian_ssm_test",
     size = "medium",
     srcs = ["linear_gaussian_ssm_test.py"],
+    jax_size = "large",
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
