@@ -46,6 +46,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Expm1',
     'FillScaleTriL',
     'FillTriangular',
+    'FrechetCDF',
     'GumbelCDF',
     'Identity',
     'Inline',
@@ -402,6 +403,8 @@ def domain_tensors(draw, bijector, shape=None):
   support = bijector_hps.bijector_supports()[bijector_name].forward
   if isinstance(bijector, tfb.PowerTransform):
     constraint_fn = bijector_hps.power_transform_constraint(bijector.power)
+  elif isinstance(bijector, tfb.FrechetCDF):
+      constraint_fn = bijector_hps.frechet_constraint(bijector.power)
   else:
     constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
