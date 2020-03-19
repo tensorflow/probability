@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -125,7 +126,7 @@ class Chi2(distribution.Distribution):
       """Note: See `tf.random_gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return tf.random.gamma(
+    return samplers.gamma(
         shape=[n],
         alpha=0.5 * self.df,
         beta=tf.convert_to_tensor(0.5, dtype=self.dtype),
