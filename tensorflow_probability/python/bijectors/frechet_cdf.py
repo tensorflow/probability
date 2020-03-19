@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -111,29 +111,29 @@ class FrechetCDF(bijector.Bijector):
 
   def _forward(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
-      z = (x - self.loc) / self.scale
-      return tf.exp(-z ** (- self.concentration))
+      z = tf.convert_to_tensor((x - self.loc) / self.scale, dtype=self.dtype)
+      return tf.math.exp(-z ** (- self.concentration))
 
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return self.loc + self.scale * tf.exp(
+      return self.loc + self.scale * tf.math.exp(
           - tf.math.log(-tf.math.log(y)) / self.concentration)
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return tf.math.log(self.scale) \
-             - tf.math.log(self.concentration) \
-             - tf.math.log(y) \
-             - (1. + 1. / self.concentration) * tf.math.log(-tf.math.log(y))
+      return (tf.math.log(self.scale)
+              - tf.math.log(self.concentration)
+              - tf.math.log(y)
+              - (1. + 1. / self.concentration) * tf.math.log(-tf.math.log(y)))
 
   def _forward_log_det_jacobian(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
-      scale = tf.convert_to_tensor(self.scale)
-      z = (x - self.loc) / scale
-      return tf.math.log(self.concentration)\
-             - tf.math.log(scale)\
-             - (1. + self.concentration) * tf.math.log(z) \
-             - z ** (- self.concentration)
+      scale = tf.convert_to_tensor(self.scale, dtype=self.dtype)
+      z = tf.convert_to_tensor((x - self.loc) / scale, dtype=self.dtype)
+      return (tf.math.log(self.concentration)
+              - tf.math.log(scale)
+              - (1. + self.concentration) * tf.math.log(z)
+              - z ** (- self.concentration))
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
