@@ -1279,7 +1279,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
