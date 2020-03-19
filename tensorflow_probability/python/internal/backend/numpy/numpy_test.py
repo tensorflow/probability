@@ -37,7 +37,9 @@ import tensorflow_probability.python.experimental.substrates.numpy as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal.backend import numpy as numpy_backend
+from tensorflow_probability.python.internal.backend import numpy as nptf
+from tensorflow_probability.python.internal.backend.numpy import functional_ops as np_pfor
+from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
 
 
 ALLOW_NAN = False
@@ -72,7 +74,7 @@ class TestCase(dict):
         testcase_name='_' + name.replace('.', '_'),
         tensorflow_function=_getattr(tf, name),
         numpy_function=_getattr(
-            numpy_backend,
+            nptf,
             name.replace('random.', 'random.stateless_'
                         ).replace('random.stateless_gamma', 'random.gamma')),
         strategy_list=strategy_list,
@@ -916,7 +918,7 @@ def _maybe_convert_to_tensors(args):
 class NumpyTest(test_util.TestCase):
 
   def _base_test_convert_to_tensor(self, nmpy):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     self.assertEqual(
         nmpy.complex64,
         convert_to_tensor(nmpy.complex64(1 + 2j), dtype_hint=tf.int32).dtype)
@@ -946,20 +948,20 @@ class NumpyTest(test_util.TestCase):
     self._base_test_convert_to_tensor(onp)
 
   def test_convert_to_tensor_scalar_default(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     self.assertEqual(np.complex128, convert_to_tensor(1. + 2j).dtype)
     self.assertEqual(np.float32, convert_to_tensor(1.).dtype)
     self.assertEqual(np.int32, convert_to_tensor(1).dtype)
 
   def test_convert_to_tensor_dimension(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     shape = tf1.Dimension(1)
 
     tensor_shape = convert_to_tensor(shape)
     self.assertNotIsInstance(tensor_shape, tf1.Dimension)
 
   def test_convert_to_tensor_tensorshape(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     shape = tf.TensorShape((1, 2))
 
     tensor_shape = convert_to_tensor(shape)
@@ -983,12 +985,80 @@ class NumpyTest(test_util.TestCase):
       def _body_fn(i, val):
         return i + 1, val + 1.
 
-      return numpy_backend.while_loop(
+      return nptf.while_loop(
           cond=_cond_fn, body=_body_fn, loop_vars=(0, x),
           maximum_iterations=5)[1]
 
     _, grad = tfp.math.value_and_gradient(_fn, 0.)
     self.assertIsNotNone(grad)
+
+  def test_scan_no_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(lambda x, y: x + y, elems)),
+        nptf.scan(lambda x, y: x + y, elems))
+
+  def test_scan_with_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(lambda x, y: x + y, elems, initializer=7)),
+        nptf.scan(lambda x, y: x + y, elems, initializer=7))
+
+  def test_scan_with_struct(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y, x[1] - y), elems, initializer=(7, 3))),
+        nptf.scan(lambda x, y: (x[0] + y, x[1] - y), elems, initializer=(7, 3)))
+
+  def test_scan_with_struct_elems(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = (np.int32([7, 8]), np.int32([9, 1]))
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init)),
+        nptf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init))
+
+  def test_scan_with_struct_elems_reverse(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = (np.int32([7, 8]), np.int32([9, 1]))
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init,
+            reverse=True)),
+        nptf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init,
+            reverse=True))
+
+  def test_pfor(self):
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(lambda x: tf.ones([]), 7)),
+        np_pfor.pfor(lambda x: nptf.ones([]), 7))
+
+  def test_pfor_with_closure(self):
+    val = np.arange(7.)[:, np.newaxis]
+    tf_val = tf.constant(val)
+    def tf_fn(x):
+      return tf.gather(tf_val, x)**2
+    def np_fn(x):
+      return nptf.gather(val, x)**2
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        np_pfor.pfor(np_fn, 7))
+
+  def test_pfor_with_closure_multi_out(self):
+    val = np.arange(7.)[:, np.newaxis]
+    tf_val = tf.constant(val)
+    def tf_fn(x):
+      return tf.gather(tf_val, x)**2, tf.gather(tf_val, x)
+    def np_fn(x):
+      return nptf.gather(val, x)**2, nptf.gather(val, x)
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        np_pfor.pfor(np_fn, 7))
 
   def evaluate(self, tensors):
     if tf.executing_eagerly():

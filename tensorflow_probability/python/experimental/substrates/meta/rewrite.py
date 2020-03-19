@@ -42,7 +42,10 @@ TF_REPLACEMENTS = {
         'import tensorflow_probability as tfp; '
         'tfp = tfp.experimental.substrates.numpy',
     'from tensorflow.python.ops.linalg':
-        'from tensorflow_probability.python.internal.backend.numpy'
+        'from tensorflow_probability.python.internal.backend.numpy',
+    'from tensorflow.python.ops import parallel_for':
+        'from tensorflow_probability.python.internal.backend.numpy '
+        'import functional_ops as parallel_for',
 }
 
 DISABLED_BY_PKG = {
