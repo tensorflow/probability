@@ -193,11 +193,11 @@ class GeometricTest(test_util.TestCase):
       self.assertAllClose(
           sample_values[:, i].mean(),
           stats.geom.mean(probs_v[i], loc=-1),
-          rtol=.02)
+          rtol=.04)
       self.assertAllClose(
           sample_values[:, i].var(),
           stats.geom.var(probs_v[i], loc=-1),
-          rtol=.02)
+          rtol=.04)
 
   def testGeometricSampleMultiDimensional(self):
     batch_size = 2
@@ -217,19 +217,19 @@ class GeometricTest(test_util.TestCase):
       self.assertAllClose(
           sample_values[:, 0, i].mean(),
           stats.geom.mean(probs_v[i], loc=-1),
-          rtol=.02)
+          rtol=.04)
       self.assertAllClose(
           sample_values[:, 0, i].var(),
           stats.geom.var(probs_v[i], loc=-1),
-          rtol=.02)
+          rtol=.04)
       self.assertAllClose(
           sample_values[:, 1, i].mean(),
           stats.geom.mean(probs_v[i], loc=-1),
-          rtol=.02)
+          rtol=.04)
       self.assertAllClose(
           sample_values[:, 1, i].var(),
           stats.geom.var(probs_v[i], loc=-1),
-          rtol=.02)
+          rtol=.04)
 
   def testGeometricAtBoundary(self):
     geom = tfd.Geometric(probs=1., validate_args=True)
