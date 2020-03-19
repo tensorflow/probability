@@ -82,30 +82,28 @@ class RandomTest(test_util.TestCase):
            kwargs=dict(shape=[2])),
       dict(testcase_name='_poisson',
            sampler=samplers.poisson,
-           kwargs=dict(shape=[2, 3], lam=[1.5, 5.5, 8.5]),
-           tf_kwargs=dict(shape=[2], lam=[1.5, 5.5, 8.5])),
+           kwargs=dict(shape=[2, 3], lam=[1.5, 5.5, 8.5])),
       dict(testcase_name='_shuffle',
            sampler=samplers.shuffle,
            kwargs=dict(value=list(range(10)))),
       dict(testcase_name='_uniform',
            sampler=samplers.uniform,
            kwargs=dict(shape=[2])))
-  def test_sampler(self, sampler, kwargs, tf_kwargs=None):
-    tf_kwargs = kwargs if tf_kwargs is None else kwargs
+  def test_sampler(self, sampler, kwargs):
     s1 = sampler(seed=(1, 2), **kwargs)
     s2 = sampler(seed=(1, 2), **kwargs)
     self.assertAllEqual(s1, s2)
-    self.verify_tf_behavior_match(sampler, kwargs, tf_kwargs)
+    self.verify_tf_behavior_match(sampler, kwargs)
 
   @test_util.substrate_disable_stateful_random_test
-  def verify_tf_behavior_match(self, sampler, kwargs, tf_kwargs):
+  def verify_tf_behavior_match(self, sampler, kwargs):
     # We don't test these scenarios for numpy, jax, where we don't support
     # stateful sampling.
     s1 = sampler(seed=123, **kwargs)
     s2 = sampler(seed=123, **kwargs)
     tf_sampler = getattr(tf.random, sampler.__name__)
-    tf_s1 = tf_sampler(seed=123, **tf_kwargs)
-    tf_s2 = tf_sampler(seed=123, **tf_kwargs)
+    tf_s1 = tf_sampler(seed=123, **kwargs)
+    tf_s2 = tf_sampler(seed=123, **kwargs)
     if tf.executing_eagerly():
       self.assertNotAllEqual(s1, s2)
       self.assertNotAllEqual(tf_s1, tf_s2)

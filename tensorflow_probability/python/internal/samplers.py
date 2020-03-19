@@ -164,8 +164,9 @@ def poisson(
   """As `tf.random.poisson`, but handling stateful/stateless `seed`s."""
   with tf.name_scope(name or 'poisson'):
     seed = sanitize_seed(seed)
+    sample_shape = tf.concat([shape, tf.shape(lam)], axis=0)
     return tf.random.stateless_poisson(
-        shape=shape, seed=seed, lam=lam, dtype=dtype)
+        shape=sample_shape, seed=seed, lam=lam, dtype=dtype)
 
 
 def shuffle(
