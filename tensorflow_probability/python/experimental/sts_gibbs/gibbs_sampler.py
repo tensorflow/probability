@@ -74,6 +74,7 @@ from tensorflow_probability.python import sts
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
 from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts.internal import util as sts_util
@@ -223,6 +224,7 @@ def fit_with_gibbs_sampling(model,
 
 def one_step_predictive(model,
                         posterior_samples,
+                        num_forecast_steps=0,
                         original_mean=0.,
                         original_scale=1.,
                         thin_every=10):
@@ -230,7 +232,8 @@ def one_step_predictive(model,
 
   Unlike the generic `tfp.sts.one_step_predictive`, this method uses the
   latent levels from Gibbs sampling to efficiently construct a predictive
-  distribution that mixes over posterior samples.
+  distribution that mixes over posterior samples. The predictive distribution
+  may also include additional forecast steps.
 
   This method returns the predictive distributions for each timestep given
   previous timesteps and sampled model parameters, `p(observed_time_series[t] |
@@ -246,6 +249,9 @@ def one_step_predictive(model,
       form constructed by `build_model_for_gibbs_sampling`.
     posterior_samples: A `GibbsSamplerState` instance in which each element is a
       `Tensor` with initial dimension of size `num_samples`.
+    num_forecast_steps: Python `int` number of additional forecast steps to
+      append.
+      Default value: `0`.
     original_mean: Optional scalar float `Tensor`, added to the predictive
       distribution to undo the effect of input normalization.
       Default value: `0.`
@@ -258,28 +264,52 @@ def one_step_predictive(model,
       Default value: `10`.
   Returns:
     predictive_dist: A `tfd.MixtureSameFamily` instance of event shape
-      `[num_timesteps]` representing the predictive distribution of each
-      timestep given previous timesteps.
+      `[num_timesteps + num_forecast_steps]` representing the predictive
+      distribution of each timestep given previous timesteps.
   """
-  original_mean = tf.convert_to_tensor(original_mean)
-  original_scale = tf.convert_to_tensor(original_scale)
+  dtype = dtype_util.common_dtype([
+      posterior_samples.level_scale.dtype,
+      posterior_samples.observation_noise_scale.dtype,
+      posterior_samples.level.dtype,
+      original_mean,
+      original_scale], dtype_hint=tf.float32)
+  num_observed_steps = prefer_static.shape(posterior_samples.level)[-1]
+
+  original_mean = tf.convert_to_tensor(original_mean, dtype=dtype)
+  original_scale = tf.convert_to_tensor(original_scale, dtype=dtype)
   thinned_samples = tf.nest.map_structure(lambda x: x[::thin_every],
                                           posterior_samples)
 
   # The local level model expects that the level at step t+1 is equal
   # to the level at step t (plus transition noise of scale 'level_scale', which
   # we account for below).
-  level_onestep_pred = tf.concat([thinned_samples.level[:, :1],
-                                  thinned_samples.level[:, :-1]], axis=1)
+  if num_forecast_steps > 0:
+    num_batch_dims = prefer_static.rank_from_shape(
+        prefer_static.shape(thinned_samples.level)) - 2
+    forecast_level = tf.tile(thinned_samples.level[..., -1:],
+                             tf.concat([tf.ones([num_batch_dims + 1],
+                                                dtype=tf.int32),
+                                        [num_forecast_steps]], axis=0))
+  level_pred = tf.concat([thinned_samples.level[..., :1],  # t == 0
+                          thinned_samples.level[..., :-1]  # 1 <= t < T
+                         ] + ([forecast_level] if num_forecast_steps > 0
+                              else []),
+                         axis=-1)
 
-  design_matrix = _get_design_matrix(model)
-  regression_effect = design_matrix.matvec(thinned_samples.weights)
+  design_matrix = _get_design_matrix(
+      model).to_dense()[:num_observed_steps + num_forecast_steps]
+  regression_effect = tf.linalg.matvec(design_matrix, thinned_samples.weights)
 
-  y_mean = ((level_onestep_pred + regression_effect) *
+  y_mean = ((level_pred + regression_effect) *
             original_scale[..., tf.newaxis] + original_mean[..., tf.newaxis])
+
+  num_steps_from_last_observation = tf.concat([
+      tf.ones([num_observed_steps], dtype=dtype),
+      tf.range(1, num_forecast_steps + 1, dtype=dtype)], axis=0)
   y_scale = (original_scale * tf.sqrt(
-      thinned_samples.observation_noise_scale**2 +
-      thinned_samples.level_scale**2))[..., tf.newaxis]
+      thinned_samples.observation_noise_scale[..., tf.newaxis]**2 +
+      thinned_samples.level_scale[..., tf.newaxis]**2 *
+      num_steps_from_last_observation))
 
   num_posterior_draws = prefer_static.shape(y_mean)[0]
   return tfd.MixtureSameFamily(
@@ -490,7 +520,8 @@ def _build_sampler_loop_body(model,
                                     tf.zeros_like(observed_time_series),
                                     observed_time_series)
 
-  design_matrix = _get_design_matrix(model).to_dense()
+  num_observed_steps = prefer_static.shape(observed_time_series)[-1]
+  design_matrix = _get_design_matrix(model).to_dense()[:num_observed_steps]
 
   # Compile the functions that sample from Gibbs conditional posteriors.
   # In principle, we should XLA-compile the entire loop body or even the entire

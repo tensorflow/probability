@@ -88,6 +88,36 @@ class GibbsSamplerTests(test_util.TestCase):
             scale=tf.cast(0.01 * 0.01, dtype)))
     return model, time_series, is_missing
 
+  def test_forecasts_are_sane(self):
+    seed = test_util.test_seed()
+    num_observed_steps = 5
+    num_forecast_steps = 3
+    model, observed_time_series, is_missing = self._build_test_model(
+        num_timesteps=num_observed_steps + num_forecast_steps,
+        batch_shape=[3])
+
+    samples = gibbs_sampler.fit_with_gibbs_sampling(
+        model, tfp.sts.MaskedTimeSeries(
+            observed_time_series[..., :num_observed_steps, tf.newaxis],
+            is_missing[..., :num_observed_steps]),
+        num_results=5, num_warmup_steps=10,
+        seed=seed, compile_steps_with_xla=False)
+    predictive_dist = gibbs_sampler.one_step_predictive(
+        model, samples, num_forecast_steps=num_forecast_steps,
+        thin_every=1)
+    predictive_mean, predictive_stddev = self.evaluate((
+        predictive_dist.mean(), predictive_dist.stddev()))
+
+    self.assertAllEqual(predictive_mean.shape,
+                        [3, num_observed_steps + num_forecast_steps])
+    self.assertAllEqual(predictive_stddev.shape,
+                        [3, num_observed_steps + num_forecast_steps])
+
+    # Uncertainty should increase over the forecast period.
+    self.assertTrue(
+        np.all(predictive_stddev[..., num_observed_steps + 1:] >
+               predictive_stddev[..., num_observed_steps:-1]))
+
   @parameterized.named_parameters(
       {'testcase_name': 'float32_xla', 'dtype': tf.float32, 'use_xla': True},
       {'testcase_name': 'float16', 'dtype': tf.float16, 'use_xla': False})
