@@ -102,7 +102,7 @@ class FrechetCDF(bijector.Bijector):
 
   @property
   def concentration(self):
-    """This is `concentration` in `Y = exp(-((X - loc) / scale) ** - concentration)`."""
+    """This is `concentration` in `Y=exp(-((X-loc)/scale)**-concentration)`."""
     return self._concentration
 
   @classmethod

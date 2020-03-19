@@ -157,7 +157,7 @@ def bijector_supports():
       'FrechetCDF':
           # The domain is dependent on the `loc` parameter of FrechetCDF,
           # hence is handled in the test harness.
-          BijectorSupport(Support.OTHER,  Support.SCALAR_IN_0_1),
+          BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
       'GumbelCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
