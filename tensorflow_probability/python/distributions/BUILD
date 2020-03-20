@@ -2092,7 +2092,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["horseshoe_test.py"],
     jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
