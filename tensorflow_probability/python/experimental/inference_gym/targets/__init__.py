@@ -17,11 +17,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.inference_gym.targets.banana import Banana
 from tensorflow_probability.python.experimental.inference_gym.targets.bayesian_model import BayesianModel
 from tensorflow_probability.python.experimental.inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import LogisticRegression
 
 __all__ = [
+    'Banana',
     'BayesianModel',
     'LogisticRegression',
     'IllConditionedGaussian',

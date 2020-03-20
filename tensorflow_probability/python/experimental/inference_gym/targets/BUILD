@@ -35,9 +35,33 @@ multi_substrate_py_library(
     name = "targets",
     srcs = ["__init__.py"],
     deps = [
+        ":banana",
         ":bayesian_model",
         ":ill_conditioned_gaussian",
         ":logistic_regression",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "banana",
+    srcs = ["banana.py"],
+    deps = [
+        ":bayesian_model",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "banana_test",
+    srcs = ["banana_test.py"],
+    deps = [
+        ":banana",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
