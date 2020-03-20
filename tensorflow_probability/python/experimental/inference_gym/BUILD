@@ -35,6 +35,7 @@ multi_substrate_py_library(
     name = "inference_gym",
     srcs = ["__init__.py"],
     deps = [
+        "//tensorflow_probability/python/experimental/inference_gym/internal",
         "//tensorflow_probability/python/experimental/inference_gym/targets",
     ],
 )
