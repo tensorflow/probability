@@ -36,11 +36,12 @@ def _tfds():
   except ImportError:
     # Print more informative error message, then reraise.
     print("\n\nFailed to import TensorFlow Datasets. This is needed by the "
-          "Inference Gym targets conditioned on real data. Please note that "
-          "TensorFlow Datasets is an 'extra' dependency, not installed by "
-          "default. To install it, install TensorFlow Probability as "
-          "`pip install tensorflow_probability[tfds]` or `pip install "
-          "tfp_nightly[tfds]`.\n\n")
+          "Inference Gym targets conditioned on real data. "
+          "TensorFlow Probability does not have it as a dependency by default, "
+          "so you need to arrange for it to be installed yourself. If you're "
+          "installing TensorFlow Probability pip package, this can be done by "
+          "installing it as `pip install tensorflow_probability[tfds]` "
+          "or `pip install tfp_nightly[tfds]`.\n\n")
     raise
   return tfds
 

@@ -127,6 +127,7 @@ multi_substrate_py_test(
         ":logistic_regression",
         # absl/testing:parameterized dep,
         # tensorflow dep,
+        # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
     ],
 )
@@ -150,6 +151,7 @@ multi_substrate_py_test(
         ":sparse_logistic_regression",
         # absl/testing:parameterized dep,
         # tensorflow dep,
+        # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
     ],
 )
