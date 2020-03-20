@@ -225,6 +225,47 @@ py_library(
 )
 
 py_test(
+    name = "virtual_machine_test_cpu",
+    size = "medium",
+    srcs = ["virtual_machine_test.py"],
+    args = ["--test_device=cpu"],
+    main = "virtual_machine_test.py",
+    shard_count = 10,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        "//tensorflow_probability/python/experimental/auto_batching:numpy_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:test_programs",
+        "//tensorflow_probability/python/experimental/auto_batching:tf_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:virtual_machine",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_test(
+    name = "virtual_machine_test_gpu",
+    size = "medium",
+    srcs = ["virtual_machine_test.py"],
+    args = ["--test_device=gpu"],
+    main = "virtual_machine_test.py",
+    shard_count = 10,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        "//tensorflow_probability/python/experimental/auto_batching:numpy_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:test_programs",
+        "//tensorflow_probability/python/experimental/auto_batching:tf_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:virtual_machine",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_test(
     name = "instructions_test",
     size = "small",
     srcs = ["instructions_test.py"],

@@ -127,3 +127,44 @@ py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
+
+py_test(
+    name = "nuts_xla_test_cpu",
+    size = "large",
+    srcs = ["nuts_xla_test.py"],
+    args = ["--test_device=cpu"],
+    main = "nuts_xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_test(
+    name = "nuts_xla_test_gpu",
+    size = "large",
+    srcs = ["nuts_xla_test.py"],
+    args = ["--test_device=gpu"],
+    main = "nuts_xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
