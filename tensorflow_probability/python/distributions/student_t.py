@@ -29,9 +29,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.numeric import log1psquare
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -64,16 +64,16 @@ def sample_n(n, df, loc, scale, batch_shape, dtype, seed):
   Returns:
     samples: a `Tensor` with prepended dimensions `n`.
   """
+  normal_seed, gamma_seed = samplers.split_seed(seed, salt='student_t')
   shape = tf.concat([[n], batch_shape], 0)
-  seed = SeedStream(seed, 'student_t')
 
-  normal_sample = tf.random.normal(shape, dtype=dtype, seed=seed())
+  normal_sample = samplers.normal(shape, dtype=dtype, seed=normal_seed)
   df = df * tf.ones(batch_shape, dtype=dtype)
-  gamma_sample = tf.random.gamma([n],
-                                 0.5 * df,
-                                 beta=0.5,
-                                 dtype=dtype,
-                                 seed=seed())
+  gamma_sample = samplers.gamma([n],
+                                0.5 * df,
+                                beta=0.5,
+                                dtype=dtype,
+                                seed=gamma_seed)
   samples = normal_sample * tf.math.rsqrt(gamma_sample / df)
   return samples * scale + loc
 

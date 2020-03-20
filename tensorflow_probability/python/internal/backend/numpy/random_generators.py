@@ -111,7 +111,9 @@ def _gamma_jax(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
   # https://github.com/google/jax/issues/2130 is fixed.
   samps = jaxrand.gamma(
       key=seed, a=alpha, shape=shape, dtype=np.float64).astype(dtype)
-  return samps if beta is None else samps / beta
+  # Match the 0->tiny behavior of tf.random.gamma.
+  return np.maximum(np.finfo(dtype).tiny,
+                    samps if beta is None else samps / beta)
 
 
 def _normal(shape, mean=0.0, stddev=1.0, dtype=np.float32, seed=None,
