@@ -39,6 +39,7 @@ multi_substrate_py_library(
         ":bayesian_model",
         ":ill_conditioned_gaussian",
         ":logistic_regression",
+        ":sparse_logistic_regression",
     ],
 )
 
@@ -124,6 +125,29 @@ multi_substrate_py_test(
     srcs = ["logistic_regression_test.py"],
     deps = [
         ":logistic_regression",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sparse_logistic_regression",
+    srcs = ["sparse_logistic_regression.py"],
+    deps = [
+        ":bayesian_model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "sparse_logistic_regression_test",
+    srcs = ["sparse_logistic_regression_test.py"],
+    deps = [
+        ":sparse_logistic_regression",
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",

@@ -22,11 +22,15 @@ from tensorflow_probability.python.experimental.inference_gym.targets.bayesian_m
 from tensorflow_probability.python.experimental.inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import GermanCreditNumericLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import LogisticRegression
+from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
+from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
 
 __all__ = [
     'Banana',
     'BayesianModel',
     'GermanCreditNumericLogisticRegression',
+    'GermanCreditNumericSparseLogisticRegression',
     'IllConditionedGaussian',
     'LogisticRegression',
+    'SparseLogisticRegression',
 ]
