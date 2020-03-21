@@ -77,19 +77,15 @@ def sanitize_seed(seed, salt=None):
 
 def split_seed(seed, n=2, salt=None, name=None):
   """Splits a seed deterministically into derived seeds."""
-  if not (isinstance(n, int) or tf.is_tensor(n)):  # avoid confusion with salt.
-    raise TypeError(
-        '`n` must be a python `int` or an int Tensor, got {}'.format(repr(n)))
+  if not isinstance(n, int):  # avoid confusion with salt.
+    raise TypeError('`n` must be a python `int`, got {}'.format(repr(n)))
   with tf.name_scope(name or 'split'):
     seed = sanitize_seed(seed, salt=salt)
     if JAX_MODE:
       from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
       return jaxrand.split(seed, n)
-    seeds = tf.random.stateless_uniform(
-        [n, 2], seed=seed, minval=None, maxval=None, dtype=SEED_DTYPE)
-    if isinstance(n, six.integer_types):
-      seeds = tf.unstack(seeds)
-    return seeds
+    return tf.unstack(tf.random.stateless_uniform(
+        [n, 2], seed=seed, minval=None, maxval=None, dtype=SEED_DTYPE))
 
 
 def binomial(
