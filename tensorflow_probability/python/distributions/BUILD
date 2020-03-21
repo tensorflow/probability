@@ -2591,6 +2591,7 @@ multi_substrate_py_test(
     name = "poisson_test",
     srcs = ["poisson_test.py"],
     jax_size = "medium",
+    shard_count = 2,
     deps = [
         # numpy dep,
         # scipy dep,
