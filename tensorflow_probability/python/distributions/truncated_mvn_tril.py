@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.distributions import blockwise
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
@@ -191,9 +192,9 @@ class TruncatedMultivariateNormalTriL(distribution_lib.Distribution):
       loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
       scale_tril = tensor_util.convert_nonref_to_tensor(
         scale_tril, name='scale_tril', dtype=dtype)
-      high = tensor_util.convert_nonref_to_tensor(high, name='high',
+      self.high = tensor_util.convert_nonref_to_tensor(high, name='high',
         dtype=dtype)
-      low = tensor_util.convert_nonref_to_tensor(low, name='low',
+      self.low = tensor_util.convert_nonref_to_tensor(low, name='low',
         dtype=dtype)
       scale = tf.linalg.LinearOperatorLowerTriangular(
         scale_tril,
@@ -203,7 +204,7 @@ class TruncatedMultivariateNormalTriL(distribution_lib.Distribution):
       self.mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=loc, scale=scale, validate_args=validate_args,
         allow_nan_stats=allow_nan_stats, name=name)
-      self.u = uniform.Uniform(low=low, high=high)
+      self.u = blockwise.Blockwise([uniform.Uniform(low=low[i], high=high[i]) for i in range(self.low.shape[0])])
       super(TruncatedMultivariateNormalTriL, self).__init__(
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
@@ -213,15 +214,15 @@ class TruncatedMultivariateNormalTriL(distribution_lib.Distribution):
       self._parameters = parameters
 
   def _log_prob(self, x, **kwargs):
-    return self.mvn.log_prob(x, **kwargs) * self.u.log_prob(x, **kwargs)
+    return tf.math.log(self._log_prob(x, **kwargs))
 
   def _prob(self, x, **kwargs):
-    return self.mvn.prob(x, **kwargs) * self.u.prob(x, **kwargs)
+    return tf.multiply(self.mvn.prob(x, **kwargs), self.u.prob(x, **kwargs))
 
   def _sample_n(self, n, seed=None, **kwargs):
     samples = self.mvn.sample(n, seed=seed, **kwargs)
-    too_low = samples < self.u.low
-    too_high = samples > self.u.high
+    too_low = samples < self.low
+    too_high = samples > self.high
     rejected = tf.reduce_any(tf.logical_or(too_low, too_high), -1)
     while tf.reduce_any(rejected):
       new_n = tf.reduce_sum(
@@ -230,8 +231,8 @@ class TruncatedMultivariateNormalTriL(distribution_lib.Distribution):
           dtype=tf.int32))
       new_samples = self.mvn.sample(new_n, seed=seed, **kwargs)
       samples = tf.tensor_scatter_nd_update(samples, tf.where(rejected), new_samples)
-      too_low = samples < self.u.low
-      too_high = samples > self.u.high
+      too_low = samples < self.low
+      too_high = samples > self.high
       rejected = tf.reduce_any(tf.logical_or(too_low, too_high), -1)
     return samples
 
