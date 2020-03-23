@@ -23,7 +23,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.inference_gym.internal import test_util
 from tensorflow_probability.python.experimental.inference_gym.targets import banana
-from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 class BananaTest(test_util.InferenceGymTestCase):
@@ -37,21 +36,6 @@ class BananaTest(test_util.InferenceGymTestCase):
     model = banana.Banana(ndims=3)
     self.validate_log_prob_and_transforms(
         model, sample_transformation_shapes=dict(identity=[3]))
-
-  @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
-  def testHMC(self):
-    """Checks approximate samples from the model against the ground truth."""
-    model = banana.Banana(ndims=3)
-
-    self.validate_ground_truth_using_hmc(
-        model,
-        num_chains=4,
-        num_steps=4000,
-        num_leapfrog_steps=50,
-        step_size=1.,
-        target_accept_prob=0.95,
-    )
 
   def testMC(self):
     """Checks true samples from the model against the ground truth."""
