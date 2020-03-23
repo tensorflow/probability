@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.nn.util.im2row import im2row
 from tensorflow_probability.python.experimental.nn.util.utils import display_imgs
 from tensorflow_probability.python.experimental.nn.util.utils import expand_dims
 from tensorflow_probability.python.experimental.nn.util.utils import flatten_rightmost
@@ -40,6 +41,7 @@ _allowed_symbols = [
     'expand_dims',
     'flatten_rightmost',
     'halflife_decay',
+    'im2row',
     'make_fit_op',
     'make_kernel_bias',
     'make_kernel_bias_posterior_mvn_diag',
