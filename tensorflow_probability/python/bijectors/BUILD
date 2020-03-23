@@ -1461,7 +1461,6 @@ multi_substrate_py_test(
     name = "sinh_arcsinh_test",
     size = "small",
     srcs = ["sinh_arcsinh_test.py"],
-    jax_tags = ["notap"],
     tags = ["no_windows"],  # TODO: needs investigation on Windows.
     deps = [
         ":bijector_test_util",
