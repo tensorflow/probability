@@ -1011,7 +1011,6 @@ multi_substrate_py_test(
     name = "categorical_to_discrete_test",
     size = "small",
     srcs = ["categorical_to_discrete_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":categorical_to_discrete",
@@ -1170,8 +1169,6 @@ multi_substrate_py_test(
     name = "generalized_pareto_test",
     size = "small",
     srcs = ["generalized_pareto_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1252,8 +1249,6 @@ multi_substrate_py_test(
     name = "lambertw_transform_test",
     size = "small",
     srcs = ["lambertw_transform_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",

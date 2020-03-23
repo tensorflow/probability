@@ -1781,7 +1781,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "chi_test",
     srcs = ["chi_test.py"],
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1794,7 +1793,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "chi2_test",
     srcs = ["chi2_test.py"],
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1840,7 +1838,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "deterministic_test",
     srcs = ["deterministic_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1934,7 +1931,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "finite_discrete_test",
     srcs = ["finite_discrete_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2122,7 +2118,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["inverse_gamma_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
     shard_count = 5,
     deps = [
         # numpy dep,
@@ -2189,7 +2184,6 @@ multi_substrate_py_test(
     name = "joint_distribution_named_test",
     srcs = ["joint_distribution_named_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -2506,7 +2500,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "onehot_categorical_test",
     srcs = ["onehot_categorical_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2519,8 +2512,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "ordered_logistic_test",
     srcs = ["ordered_logistic_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2533,8 +2524,6 @@ multi_substrate_py_test(
     name = "pareto_test",
     size = "medium",
     srcs = ["pareto_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     shard_count = 3,
     deps = [
         # numpy dep,
@@ -2548,7 +2537,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "pert_test",
     srcs = ["pert_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2700,7 +2688,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["half_student_t_test.py"],
     jax_size = "medium",
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2761,7 +2748,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["triangular_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
         # numpy dep,
@@ -2792,8 +2778,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "uniform_test",
     srcs = ["uniform_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2821,8 +2805,6 @@ multi_substrate_py_test(
     name = "vector_diffeomixture_test",
     size = "medium",
     srcs = ["vector_diffeomixture_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2881,8 +2863,6 @@ multi_substrate_py_test(
     name = "wishart_test",
     srcs = ["wishart_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
