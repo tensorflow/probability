@@ -2375,7 +2375,6 @@ multi_substrate_py_test(
     name = "multivariate_student_t_test",
     size = "medium",
     srcs = ["multivariate_student_t_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 3,
     deps = [

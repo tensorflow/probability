@@ -836,7 +836,6 @@ multi_substrate_py_test(
     name = "bijector_test",
     size = "small",
     srcs = ["bijector_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijectors",
