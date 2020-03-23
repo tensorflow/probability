@@ -252,7 +252,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     self.assertAllClose(np.ones(5),
                         self.evaluate(d.prob(np.zeros((5, 1)))))
 
-  @parameterized.parameters(tf.float16, tf.float32, tf.float64)
+  @parameterized.parameters(tf.float32, tf.float64)
   def testDTypes(self, dtype):
     # check that sampling and log_prob work for a range of dtypes
     logits = tf.random.uniform(
