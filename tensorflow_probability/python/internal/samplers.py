@@ -135,6 +135,7 @@ def gamma(
     params_shape = tf.shape(alpha)
     if beta is not None:
       params_shape = tf.broadcast_dynamic_shape(params_shape, tf.shape(beta))
+    shape = tf.convert_to_tensor(shape, dtype=params_shape.dtype)
     samples_shape = tf.concat([shape, params_shape], axis=0)
     return tf.random.stateless_gamma(
         shape=samples_shape, seed=seed, alpha=alpha, beta=beta, dtype=dtype)

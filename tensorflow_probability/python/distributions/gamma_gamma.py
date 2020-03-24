@@ -29,8 +29,8 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -182,20 +182,20 @@ class GammaGamma(distribution.Distribution):
     concentration = tf.convert_to_tensor(self.concentration)
     mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
     mixing_rate = tf.convert_to_tensor(self.mixing_rate)
-    seed = SeedStream(seed, 'gamma_gamma')
-    rate = tf.random.gamma(
+    seed_rate, seed_samples = samplers.split_seed(seed, salt='gamma_gamma')
+    rate = samplers.gamma(
         shape=[n],
         # Be sure to draw enough rates for the fully-broadcasted gamma-gamma.
         alpha=mixing_concentration + tf.zeros_like(concentration),
         beta=mixing_rate,
         dtype=self.dtype,
-        seed=seed())
-    return tf.random.gamma(
+        seed=seed_rate)
+    return samplers.gamma(
         shape=[],
         alpha=concentration,
         beta=rate,
         dtype=self.dtype,
-        seed=seed())
+        seed=seed_samples)
 
   def _log_prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)
