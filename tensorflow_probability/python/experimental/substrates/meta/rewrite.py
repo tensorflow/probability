@@ -185,6 +185,8 @@ def main(argv):
           '# @test_util.test_all_tf_execution_regimes',
       '@test_util.test_graph_and_eager_modes':
           '# @test_util.test_graph_and_eager_modes',
+      '@test_util.test_graph_mode_only':
+          '# @test_util.test_graph_mode_only',
       'TestCombinationsTest(test_util.TestCase)':
           'TestCombinationsDoNotTest(object)',
       '@six.add_metaclass(TensorMetaClass)':

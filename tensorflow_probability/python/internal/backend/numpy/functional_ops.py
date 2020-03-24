@@ -28,6 +28,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'map_fn',
     'pfor',
+    'vectorized_map',
     'scan',
 ]
 
@@ -61,6 +62,16 @@ def _map_fn(  # pylint: disable=unused-argument
   # In the NumPy backend, we do not yet support map_fn over lists, tuples, or
   # other structures.
   raise NotImplementedError
+
+
+def _vectorized_map(fn, elems):
+  """Numpy implementation of tf.vectorized_map."""
+  if JAX_MODE:
+    from jax import vmap  # pylint: disable=g-import-not-at-top
+    return vmap(fn)(elems)
+
+  # In the NumPy backend, we don't actually vectorize.
+  return _map_fn(fn, elems)
 
 
 def _scan(  # pylint: disable=unused-argument
@@ -119,6 +130,10 @@ def _scan(  # pylint: disable=unused-argument
 map_fn = utils.copy_docstring(
     'tf.map_fn',
     _map_fn)
+
+vectorized_map = utils.copy_docstring(
+    'tf.vectorized_map',
+    _vectorized_map)
 
 
 def pfor(fn, n):
