@@ -1488,6 +1488,7 @@ multi_substrate_py_test(
     name = "softfloor_test",
     size = "small",
     srcs = ["softfloor_test.py"],
+    jax_size = "medium",
     deps = [
         ":bijector_test_util",
         ":bijectors",
