@@ -2510,6 +2510,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "ordered_logistic_test",
     srcs = ["ordered_logistic_test.py"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # tensorflow dep,
