@@ -49,7 +49,7 @@ class ConstantTest(test_util.TestCase):
       self.assertAllClose(
           np.ones(x.shape[:-feature_ndims]),
           self.evaluate(k.apply(x, y)))
-  
+
   def testShapesAreCorrect(self):
     k = tfp.math.psd_kernels.Constant(coef=1.0)
 
@@ -72,7 +72,7 @@ class ConstantTest(test_util.TestCase):
             tf.stack([x]*2),  # shape [2, 4, 3]
             tf.stack([y]*2)   # shape [2, 5, 3]
         ).shape)
-  
+
   def testValidateArgs(self):
     with self.assertRaisesOpError('must be positive'):
       k = tfp.math.psd_kernels.Constant(-1., validate_args=True)
