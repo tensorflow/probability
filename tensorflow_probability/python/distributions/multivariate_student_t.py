@@ -31,8 +31,8 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'MultivariateStudentTLinearOperator',
@@ -239,16 +239,16 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     # Like with the univariate Student's t, sampling can be implemented as a
     # ratio of samples from a multivariate gaussian with the appropriate
     # covariance matrix and a sample from the chi-squared distribution.
-    seed = SeedStream(seed, salt='multivariate t')
+    normal_seed, chi2_seed = samplers.split_seed(seed, salt='multivariate t')
 
     loc = tf.broadcast_to(self.loc, self._sample_shape())
     mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=tf.zeros_like(loc), scale=self.scale)
-    normal_samp = mvn.sample(n, seed=seed())
+    normal_samp = mvn.sample(n, seed=normal_seed)
 
     df = tf.broadcast_to(self.df, self.batch_shape_tensor())
     chi2 = chi2_lib.Chi2(df=df)
-    chi2_samp = chi2.sample(n, seed=seed())
+    chi2_samp = chi2.sample(n, seed=chi2_seed)
 
     return (self._loc +
             normal_samp * tf.math.rsqrt(chi2_samp / self._df)[..., tf.newaxis])

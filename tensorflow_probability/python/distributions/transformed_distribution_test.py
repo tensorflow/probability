@@ -711,6 +711,8 @@ class ScalarToMultiTest(test_util.TestCase):
                     5, seed=test_util.test_seed(),
                     bijector_kwargs={'z': z}))), z)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX only has static shapes.')
   def testVectorDynamicShapeOverrideWithMutation(self):
     batch_shape = tf.Variable([4], shape=tf.TensorShape(None), dtype=tf.int32)
     d = tfd.TransformedDistribution(
@@ -738,6 +740,8 @@ class ScalarToMultiTest(test_util.TestCase):
       with self.assertRaisesOpError('must have non-negative elements'):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX only has static shapes.')
   def testNonScalarDynamicShapeOverrideWithMutation(self):
     loc = tf.Variable(3., shape=tf.TensorShape(None))
     base_dist = tfd.Normal(loc=loc, scale=1.)

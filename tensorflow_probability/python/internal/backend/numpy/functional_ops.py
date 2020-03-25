@@ -21,10 +21,14 @@ from __future__ import print_function
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+# TODO(b/151669121): Remove dependency on TF
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'map_fn',
+    'pfor',
+    'vectorized_map',
     'scan',
 ]
 
@@ -60,6 +64,16 @@ def _map_fn(  # pylint: disable=unused-argument
   raise NotImplementedError
 
 
+def _vectorized_map(fn, elems):
+  """Numpy implementation of tf.vectorized_map."""
+  if JAX_MODE:
+    from jax import vmap  # pylint: disable=g-import-not-at-top
+    return vmap(fn)(elems)
+
+  # In the NumPy backend, we don't actually vectorize.
+  return _map_fn(fn, elems)
+
+
 def _scan(  # pylint: disable=unused-argument
     fn,
     elems,
@@ -71,17 +85,43 @@ def _scan(  # pylint: disable=unused-argument
     reverse=False,
     name=None):
   """Scan implementation."""
-  out = []
-  if initializer is None:
-    arg = elems[0]
-    elems = elems[1:]
-  else:
-    arg = initializer
 
-  for x in elems:
-    arg = fn(arg, x)
-    out.append(arg)
-  return np.array(out)
+  if reverse:
+    elems = nest.map_structure(lambda x: x[::-1], elems)
+
+  if initializer is None:
+    if nest.is_nested(elems):
+      raise NotImplementedError
+    initializer = elems[0]
+    elems = elems[1:]
+    prepend = [[initializer]]
+  else:
+    prepend = None
+
+  def func(arg, x):
+    return nest.flatten(fn(nest.pack_sequence_as(initializer, arg),
+                           nest.pack_sequence_as(elems, x)))
+
+  arg = nest.flatten(initializer)
+  if JAX_MODE:
+    from jax import lax  # pylint: disable=g-import-not-at-top
+    def scan_body(arg, x):
+      arg = func(arg, x)
+      return arg, arg
+    _, out = lax.scan(scan_body, arg, nest.flatten(elems))
+  else:
+    out = [[] for _ in range(len(arg))]
+    for x in zip(*nest.flatten(elems)):
+      arg = func(arg, x)
+      for i, z in enumerate(arg):
+        out[i].append(z)
+
+  if prepend is not None:
+    out = [pre + list(o) for (pre, o) in zip(prepend, out)]
+
+  ordering = (lambda x: x[::-1]) if reverse else (lambda x: x)
+  return nest.pack_sequence_as(
+      initializer, [ordering(np.array(o)) for o in out])
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -90,6 +130,21 @@ def _scan(  # pylint: disable=unused-argument
 map_fn = utils.copy_docstring(
     'tf.map_fn',
     _map_fn)
+
+vectorized_map = utils.copy_docstring(
+    'tf.vectorized_map',
+    _vectorized_map)
+
+
+def pfor(fn, n):
+  if JAX_MODE:
+    import jax  # pylint: disable=g-import-not-at-top
+    return jax.vmap(fn)(np.arange(n))
+  outs = [fn(i) for i in range(n)]
+  flat_outs = [nest.flatten(o) for o in outs]
+  return nest.pack_sequence_as(
+      outs[0], [np.array(o) for o in zip(*flat_outs)])
+
 
 scan = utils.copy_docstring(
     'tf.scan',

@@ -261,7 +261,9 @@ def _custom_gradient(f):
     value, vjp = f(*args, **kwargs)
     def vjp_(cts_out):
       cts_in = vjp(cts_out)
-      if not isinstance(cts_in, tuple):
+      if isinstance(cts_in, list):
+        cts_in = tuple(cts_in)
+      elif not isinstance(cts_in, tuple):
         cts_in = (cts_in,)
       return cts_in
     return value, vjp_

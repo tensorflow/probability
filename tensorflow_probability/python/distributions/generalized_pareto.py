@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -215,7 +216,7 @@ class GeneralizedPareto(distribution.Distribution):
              loc=loc, scale=scale, concentration=concentration)],
         axis=0)
     logu = tf.math.log1p(
-        -tf.random.uniform(sample_shp, dtype=self.dtype, seed=seed))
+        -samplers.uniform(sample_shp, dtype=self.dtype, seed=seed))
     eq_zero = tf.equal(concentration, 0)
     safe_conc = tf.where(eq_zero, tf.constant(1, dtype=self.dtype),
                          concentration)

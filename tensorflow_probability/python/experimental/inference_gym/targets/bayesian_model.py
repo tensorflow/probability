@@ -22,6 +22,7 @@ from __future__ import print_function
 import collections
 
 import tensorflow.compat.v2 as tf
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'BayesianModel',
@@ -279,7 +280,8 @@ class BayesianModel(object):
     Returns:
       event_shape: `TensorShape`, possibly unknown.
     """
-    return tf.TensorShape(self._event_shape)
+    return nest.map_structure_up_to(self.dtype, tf.TensorShape,
+                                    self._event_shape)
 
   @property
   def dtype(self):

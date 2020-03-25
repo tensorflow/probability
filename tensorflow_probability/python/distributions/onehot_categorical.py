@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -180,7 +181,7 @@ class OneHotCategorical(distribution.Distribution):
       logits_2d = logits
     else:
       logits_2d = tf.reshape(logits, [-1, event_size])
-    samples = tf.random.categorical(logits_2d, n, seed=seed)
+    samples = samplers.categorical(logits_2d, n, seed=seed)
     samples = tf.transpose(a=samples)
     samples = tf.one_hot(samples, event_size, dtype=self.dtype)
     ret = tf.reshape(samples, sample_shape)

@@ -115,8 +115,12 @@ class SinhArcsinhTest(test_util.TestCase):
   def testBijectorEndpoints(self, dtype):
     bijector = tfb.SinhArcsinh(
         skewness=dtype(0.), tailweight=dtype(1.), validate_args=True)
+    # Use bounds that are very large to check that the transformation remains
+    # bijective. We stray away from the largest/smallest value to avoid issues
+    # at the boundary since XLA sinh will return `inf` for the largest value.
     bounds = np.array(
-        [np.finfo(dtype).min, np.finfo(dtype).max], dtype=dtype)
+        [np.nextafter(np.finfo(dtype).min, 0.) / 10.,
+         np.nextafter(np.finfo(dtype).max, 0.) / 10.], dtype=dtype)
     # Note that the above bijector is the identity bijector. Hence, the
     # log_det_jacobian will be 0. Because of this we use atol.
     bijector_test_util.assert_bijective_and_finite(
@@ -128,9 +132,13 @@ class SinhArcsinhTest(test_util.TestCase):
     skewness = np.array([1.2, 5.], dtype=dtype)
     tailweight = np.array([2., 10.], dtype=dtype)
     # The inverse will be defined up to where sinh is valid, which is
-    # arcsinh(np.finfo(dtype).max).
+    # for values close to arcsinh(np.finfo(dtype).max).
+    # We stray away from the largest value to avoid issues
+    # at the boundary since XLA sinh will return `inf` for the largest value.
+    max_val = np.nextafter(np.finfo(dtype).max, 0.) / 10.
+
     log_boundary = np.log(
-        np.sinh(np.arcsinh(np.finfo(dtype).max) / tailweight - skewness))
+        np.sinh(np.arcsinh(max_val) / tailweight - skewness))
     x = np.array([
         np.logspace(-2, log_boundary[0], base=np.e, num=1000),
         np.logspace(-2, log_boundary[1], base=np.e, num=1000)

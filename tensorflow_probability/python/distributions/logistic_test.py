@@ -152,7 +152,7 @@ class LogisticTest(test_util.TestCase):
           stats.kstest(
               samples_[:, i],
               stats.logistic(loc=loc_[i], scale=scale_).cdf)[0],
-          0.01)
+          0.013)
 
   def testLogisticQuantile(self):
     loc = [3.0, 4.0, 2.0]

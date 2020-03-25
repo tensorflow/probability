@@ -111,7 +111,9 @@ def _gamma_jax(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
   # https://github.com/google/jax/issues/2130 is fixed.
   samps = jaxrand.gamma(
       key=seed, a=alpha, shape=shape, dtype=np.float64).astype(dtype)
-  return samps if beta is None else samps / beta
+  # Match the 0->tiny behavior of tf.random.gamma.
+  return np.maximum(np.finfo(dtype).tiny,
+                    samps if beta is None else samps / beta)
 
 
 def _normal(shape, mean=0.0, stddev=1.0, dtype=np.float32, seed=None,
@@ -136,7 +138,7 @@ def _poisson(shape, lam, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([lam], dtype_hint=dtype)
-  shape = _ensure_tuple(shape) + np.shape(lam)
+  shape = _ensure_tuple(shape)
   return rng.poisson(lam=lam, size=shape).astype(dtype)
 
 
@@ -162,7 +164,7 @@ if JAX_MODE:
     # lam > 10. A reference implementation can be found here:
     # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc#L159-L239
 
-    shape = _ensure_tuple(shape) + np.shape(lam)
+    shape = _ensure_tuple(shape)
     max_iters = (max_iters
                  if max_iters is not None
                  else np.iinfo(np.int32).max)

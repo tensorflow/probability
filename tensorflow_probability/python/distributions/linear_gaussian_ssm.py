@@ -1061,6 +1061,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         the posterior over latent states given the observed value `x`.
     """
     x = tf.convert_to_tensor(x, name='x')
+    sample_shape = tf.convert_to_tensor(sample_shape, dtype_hint=tf.int32)
     if mask is not None:
       mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
 
@@ -1148,7 +1149,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # Scan over all timesteps following the initial step.
       (latent_means, observation_means) = tf.scan(
           mean_step,
-          elems=tf.range(self.initial_step+1, self._final_step()),
+          elems=tf.range(self.initial_step + 1, self._final_step()),
           initializer=(initial_latent_mean, initial_observation_mean))
 
       # Squish the initial step back on top of the other (scanned) timesteps
@@ -1409,7 +1410,7 @@ def build_backward_pass_step(get_transition_matrix_for_timestep):
 
     return BackwardPassState(backward_mean=posterior_mean,
                              backward_cov=posterior_cov,
-                             timestep=state.timestep-1)
+                             timestep=state.timestep - 1)
 
   return backward_pass_step
 
@@ -1685,7 +1686,7 @@ def linear_gaussian_update(
   #      = (S^{-1} * tmp_obs_cov) '
   #      = (S \ tmp_obs_cov)'
   if observation_size_is_static_and_scalar:
-    gain_transpose = tmp_obs_cov/predicted_obs_cov
+    gain_transpose = tmp_obs_cov / predicted_obs_cov
   else:
     predicted_obs_cov_chol = tf.linalg.cholesky(predicted_obs_cov)
     gain_transpose = tf.linalg.cholesky_solve(predicted_obs_cov_chol,

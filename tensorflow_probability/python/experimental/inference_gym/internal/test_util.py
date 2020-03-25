@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 
+from absl import flags
 from absl import logging
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -27,11 +28,26 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 
+flags.DEFINE_bool('use_tfds', False, 'Whether to run tests that use TFDS.')
+
+FLAGS = flags.FLAGS
+
 __all__ = [
     'InferenceGymTestCase',
     'run_hmc_on_model',
     'MCMCResults',
+    'uses_tfds',
 ]
+
+
+def uses_tfds(test_fn):
+  def _new_test_fn(self, *args, **kwargs):
+    if FLAGS.use_tfds:
+      test_fn(self, *args, **kwargs)
+    else:
+      self.skipTest('Uses TensorFlow Datasets. Enable using --use_tfds')
+
+  return _new_test_fn
 
 
 class MCMCResults(

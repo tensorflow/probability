@@ -100,6 +100,10 @@ control_flow_v2_enabled = utils.copy_docstring(
     'tf1.control_flow_v2_enabled',
     lambda: True)
 
+enable_control_flow_v2 = utils.copy_docstring(
+    'tf1.enable_control_flow_v2',
+    lambda: None)
+
 get_variable = utils.copy_docstring(
     'tf1.get_variable',
     _get_variable)

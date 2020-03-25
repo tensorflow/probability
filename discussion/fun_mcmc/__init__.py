@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from discussion.fun_mcmc import prefab
 from discussion.fun_mcmc import util_tfp
 from discussion.fun_mcmc.backend import get_backend
 from discussion.fun_mcmc.backend import JAX
@@ -84,7 +85,7 @@ from discussion.fun_mcmc.fun_mcmc_lib import simple_dual_averages_init
 from discussion.fun_mcmc.fun_mcmc_lib import simple_dual_averages_step
 from discussion.fun_mcmc.fun_mcmc_lib import SimpleDualAveragesExtra
 from discussion.fun_mcmc.fun_mcmc_lib import SimpleDualAveragesState
-from discussion.fun_mcmc.fun_mcmc_lib import spliting_integrator_step
+from discussion.fun_mcmc.fun_mcmc_lib import splitting_integrator_step
 from discussion.fun_mcmc.fun_mcmc_lib import State
 from discussion.fun_mcmc.fun_mcmc_lib import trace
 from discussion.fun_mcmc.fun_mcmc_lib import transform_log_prob_fn
@@ -131,6 +132,7 @@ __all__ = [
     'potential_scale_reduction_step',
     'PotentialFn',
     'PotentialScaleReductionState',
+    'prefab',
     'random_walk_metropolis',
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
@@ -155,7 +157,7 @@ __all__ = [
     'simple_dual_averages_step',
     'SimpleDualAveragesExtra',
     'SimpleDualAveragesState',
-    'spliting_integrator_step',
+    'splitting_integrator_step',
     'State',
     'TENSORFLOW',
     'trace',

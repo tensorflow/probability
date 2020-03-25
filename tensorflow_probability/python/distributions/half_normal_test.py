@@ -160,7 +160,7 @@ class HalfNormalTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
   def testFiniteGradients(self, dtype):
-    scale = tf.Variable(dtype(3.0))
+    scale = tf.constant(dtype(3.0))
     x = np.array([0.01, 0.1, 1., 5., 10.]).astype(dtype)
     def half_normal_function(name, x):
       def half_normal(scale):
@@ -169,7 +169,6 @@ class HalfNormalTest(test_util.TestCase):
 
       return half_normal
 
-    self.evaluate(scale.initializer)
     for func_name in [
         'cdf', 'log_cdf', 'survival_function',
         'log_prob', 'prob', 'log_survival_function',

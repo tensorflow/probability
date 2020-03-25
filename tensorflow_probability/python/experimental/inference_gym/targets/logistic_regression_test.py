@@ -64,6 +64,26 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
             per_example_test_nll=[num_test_points],
         ))
 
+  def testPartiallySpecifiedTestSet(self):
+    """Check that partially specified test set raises an error."""
+    num_features = 5
+    num_test_points = 5
+    dataset = _test_dataset(num_features, num_test_points)
+    del dataset['test_features']
+    with self.assertRaisesRegex(ValueError, 'both specified'):
+      logistic_regression.LogisticRegression(**dataset)
+
+  @test_util.uses_tfds
+  def testGermanCredit(self):
+    """Checks that you get finite values given unconstrained samples.
+
+    We check `unnormalized_log_prob` as well as the values of the sample
+    transformations.
+    """
+    model = logistic_regression.GermanCreditNumericLogisticRegression()
+    self.validate_log_prob_and_transforms(
+        model, sample_transformation_shapes=dict(identity=[25],))
+
 
 if __name__ == '__main__':
   tf.test.main()

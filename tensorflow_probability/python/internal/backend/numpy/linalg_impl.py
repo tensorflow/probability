@@ -23,6 +23,7 @@ import collections
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import ops
 
 scipy_linalg = utils.try_import('scipy.linalg')
 
@@ -109,6 +110,7 @@ def _cholesky_solve(chol, rhs, name=None):  # pylint: disable=unused-argument
 def _diag(diagonal, name=None, k=0, num_rows=-1, num_cols=-1, padding_value=0.,
           align='RIGHT_LEFT'):
   del name
+  diagonal = ops.convert_to_tensor(diagonal)
   if (k != 0 or num_rows != -1 or num_cols != -1 or padding_value != 0. or
       align != 'RIGHT_LEFT'):
     raise NotImplementedError((k, num_rows, num_cols, padding_value, align))

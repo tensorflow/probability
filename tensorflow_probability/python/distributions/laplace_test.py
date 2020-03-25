@@ -24,6 +24,7 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
@@ -132,8 +133,8 @@ class LaplaceTest(test_util.TestCase):
     qs = self.evaluate(
         tf.concat(
             [[0., 1],
-             tf.random.uniform([10], minval=.1, maxval=.9,
-                               seed=test_util.test_seed())],
+             samplers.uniform([10], minval=.1, maxval=.9,
+                              seed=test_util.test_seed())],
             axis=0))
     d = tfd.Laplace(loc=1., scale=1.3, validate_args=True)
     vals = d.quantile(qs)

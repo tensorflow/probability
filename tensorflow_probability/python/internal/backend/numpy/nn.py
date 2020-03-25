@@ -119,7 +119,7 @@ moments = utils.copy_docstring(
 
 relu = utils.copy_docstring(
     'tf.nn.relu',
-    lambda features, name=None: np.max(features, 0))
+    lambda features, name=None: np.maximum(features, 0))
 
 
 sigmoid_cross_entropy_with_logits = utils.copy_docstring(

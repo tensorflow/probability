@@ -24,9 +24,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
+from tensorflow_probability.python.experimental.inference_gym.internal import data
 from tensorflow_probability.python.experimental.inference_gym.targets import bayesian_model
 
 __all__ = [
+    'GermanCreditNumericLogisticRegression',
     'LogisticRegression',
 ]
 
@@ -60,6 +62,10 @@ class LogisticRegression(bayesian_model.BayesianModel):
         are not computed.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
+
+    Raises:
+      ValueError: If `test_features` and `test_labels` are either not both
+        `None` or not both specified.
     """
     with tf.name_scope(name):
       train_features = _add_bias(train_features)
@@ -85,6 +91,11 @@ class LogisticRegression(bayesian_model.BayesianModel):
                   pretty_name='Identity',
               )
       }
+      if (test_features is not None) != (test_labels is not None):
+        raise ValueError('`test_features` and `test_labels` must either both '
+                         'be `None` or both specified. Got: test_features={}, '
+                         'test_labels={}'.format(test_features, test_labels))
+
       if test_features is not None and test_labels is not None:
         test_features = _add_bias(test_features)
         test_labels = tf.convert_to_tensor(test_labels)
@@ -132,3 +143,24 @@ class LogisticRegression(bayesian_model.BayesianModel):
 
   def _unnormalized_log_prob(self, value):
     return self.joint_distribution().log_prob([value, self.evidence()])
+
+
+class GermanCreditNumericLogisticRegression(LogisticRegression):
+  """Bayesian logistic regression with a Gaussian prior.
+
+  This model uses the German Credit (numeric) data set [1].
+
+  #### References
+
+  1. https://archive.ics.uci.edu/ml/datasets/statlog+(german+credit+data)
+  """
+
+  def __init__(self):
+    dataset = data.german_credit_numeric()
+    del dataset['test_features']
+    del dataset['test_labels']
+    super(GermanCreditNumericLogisticRegression, self).__init__(
+        name='german_credit_logistic_regression',
+        pretty_name='German Credit Numeric Logistic Regression',
+        **dataset
+    )

@@ -26,6 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -439,7 +440,7 @@ make_slicer = _MakeSlicer()
 class BernoulliSlicingTest(test_util.TestCase):
 
   def testScalarSlice(self):
-    logits = self.evaluate(tf.random.normal([], seed=test_util.test_seed()))
+    logits = self.evaluate(samplers.normal([], seed=test_util.test_seed()))
     dist = tfd.Bernoulli(logits=logits, validate_args=True)
     self.assertAllEqual([], dist.batch_shape)
     self.assertAllEqual([1], dist[tf.newaxis].batch_shape)
@@ -447,7 +448,7 @@ class BernoulliSlicingTest(test_util.TestCase):
     self.assertAllEqual([1, 1], dist[tf.newaxis, ..., tf.newaxis].batch_shape)
 
   def testSlice(self):
-    logits = self.evaluate(tf.random.normal(
+    logits = self.evaluate(samplers.normal(
         [20, 3, 1, 5], seed=test_util.test_seed()))
     dist = tfd.Bernoulli(logits=logits, validate_args=True)
     batch_shape = tensorshape_util.as_list(dist.batch_shape)
@@ -497,7 +498,7 @@ class BernoulliSlicingTest(test_util.TestCase):
       check(make_slicer[..., 2, :])  # ...,1,5 -> 2 is oob.
 
   def testSliceSequencePreservesOrigVarGradLinkage(self):
-    logits = tf.Variable(tf.random.normal(
+    logits = tf.Variable(samplers.normal(
         [20, 3, 1, 5], seed=test_util.test_seed()))
     self.evaluate(logits.initializer)
     dist = tfd.Bernoulli(logits=logits, validate_args=True)
@@ -512,7 +513,7 @@ class BernoulliSlicingTest(test_util.TestCase):
 
   def testSliceThenCopyPreservesOrigVarGradLinkage(self):
     logits = tf.Variable(
-        tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()))
+        samplers.normal([20, 3, 1, 5], seed=test_util.test_seed()))
     self.evaluate(logits.initializer)
     dist = tfd.Bernoulli(logits=logits, validate_args=True)
     dist = dist[:5]
@@ -535,7 +536,8 @@ class BernoulliSlicingTest(test_util.TestCase):
 
   def testCopyUnknownRank(self):
     logits = tf1.placeholder_with_default(
-        tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()), shape=None)
+        samplers.normal([20, 3, 1, 5], seed=test_util.test_seed()),
+        shape=None)
     dist = tfd.Bernoulli(logits=logits, name='b1', validate_args=True)
     self.assertIn('b1', dist.name)
     dist = dist.copy(name='b2')
@@ -543,7 +545,7 @@ class BernoulliSlicingTest(test_util.TestCase):
 
   def testSliceCopyOverrideNameSliceAgainCopyOverrideLogitsSliceAgain(self):
     seed_stream = test_util.test_seed_stream('slice_bernoulli')
-    logits = tf.random.normal([20, 3, 2, 5], seed=seed_stream())
+    logits = samplers.normal([20, 3, 2, 5], seed=seed_stream())
     dist = tfd.Bernoulli(logits=logits, name='b1', validate_args=True)
     self.assertIn('b1', dist.name)
     dist = dist[:10].copy(name='b2')
@@ -552,7 +554,7 @@ class BernoulliSlicingTest(test_util.TestCase):
     dist = dist.copy(name='b3')[..., 1]
     self.assertAllEqual((10, 3, 2), dist.batch_shape)
     self.assertIn('b3', dist.name)
-    dist = dist.copy(logits=tf.random.normal([2], seed=seed_stream()))
+    dist = dist.copy(logits=samplers.normal([2], seed=seed_stream()))
     self.assertAllEqual((2,), dist.batch_shape)
     self.assertIn('b3', dist.name)
 

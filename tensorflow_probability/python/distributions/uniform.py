@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -164,7 +165,7 @@ class Uniform(distribution.Distribution):
     high = tf.convert_to_tensor(self.high)
     shape = tf.concat([[n], self._batch_shape_tensor(
         low=low, high=high)], 0)
-    samples = tf.random.uniform(shape=shape, dtype=self.dtype, seed=seed)
+    samples = samplers.uniform(shape=shape, dtype=self.dtype, seed=seed)
     return low + self._range(low=low, high=high) * samples
 
   def _prob(self, x):

@@ -628,12 +628,13 @@ if JAX_MODE:
   # which breaks docstring wrapping
 
   def _promote_dtypes(x, y):
-    # Need to explicitly promote types
-    # because of custom_transforms
+    # Need to explicitly promote types because of custom_transforms.
+    # We also broadcast x and y to have the same shape, so we don't have to
+    # deal with broadcasting when writing the custom gradients for min/max.
     out_dtype = np.result_type(x, y)
     x = np.array(x, out_dtype)
     y = np.array(y, out_dtype)
-    return x, y
+    return np.broadcast_arrays(x, y)
 
   _minimum = lambda x, y, name=None: _minimum_(*_promote_dtypes(x, y))
   _maximum = lambda x, y, name=None: _maximum_(*_promote_dtypes(x, y))

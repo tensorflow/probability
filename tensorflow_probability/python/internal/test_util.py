@@ -57,6 +57,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
+
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
@@ -272,6 +275,8 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       err: the maximum error between all components of the numeric and
       autodiff'ed gradients.
     """
+    if JAX_MODE:
+      return _compute_max_gradient_error_jax(f, args, delta)
     def _compute_error():
       return gradient_checker_v2.max_error(
           *gradient_checker_v2.compute_gradient(f, x=args, delta=delta))
@@ -281,6 +286,30 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       # Make sure there's a global default session in graph mode.
       with self.test_session():
         return _compute_error()
+
+if JAX_MODE:
+  from jax import jacrev  # pylint: disable=g-import-not-at-top
+  from jax import vmap  # pylint: disable=g-import-not-at-top
+
+  def _compute_max_gradient_error_jax(f, xs, scale=1e-3):
+    f_jac = jacrev(f, argnums=range(len(xs)))
+    theoretical_jacobian = f_jac(*xs)
+    numerical_jacobian = [_compute_numerical_jacobian_jax(f, xs, i, scale)
+                          for i in range(len(xs))]
+    return np.max(np.array(
+        [np.max(np.abs(a - b))
+         for (a, b) in zip(theoretical_jacobian, numerical_jacobian)]))
+
+  def _compute_numerical_jacobian_jax(f, xs, i, scale=1e-3):
+    dtype_i = xs[i].dtype
+    shape_i = xs[i].shape
+    size_i = np.product(shape_i, dtype=np.int32)
+    def grad_i(d):
+      return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
+              - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
+    ret = vmap(grad_i, out_axes=-1)(
+        np.eye(size_i, dtype=dtype_i).reshape((size_i,) + shape_i))
+    return np.reshape(ret, ret.shape[:-1] + shape_i)
 
 
 @contextlib.contextmanager
@@ -453,9 +482,6 @@ def test_graph_mode_only(test_class_or_method=None):
   if test_class_or_method:
     return decorator(test_class_or_method)
   return decorator
-
-
-JAX_MODE = False
 
 
 def numpy_disable_gradient_test(test_fn):

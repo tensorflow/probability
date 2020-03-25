@@ -32,6 +32,36 @@ licenses(["notice"])  # Apache 2.0
 exports_files(["LICENSE"])
 
 multi_substrate_py_library(
+    name = "internal",
+    srcs = ["__init__.py"],
+    deps = [
+        ":data",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "data",
+    srcs = ["data.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "data_test",
+    srcs = ["data_test.py"],
+    deps = [
+        ":data",
+        ":test_util",
+        # numpy dep,
+        # tensorflow dep,
+        # tensorflow_datasets dep,  # buildcleaner: keep
+        # tensorflow_datasets/testing dep,
+    ],
+)
+
+multi_substrate_py_library(
     name = "test_util",
     testonly = True,
     srcs = ["test_util.py"],

@@ -909,25 +909,16 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
     # Construct the masks.
     self._input_order = _create_input_order(
-        self._event_size, self._input_order_param)
-    self._masks = _create_masks(_create_degrees(
-        input_size=self._event_size,
+        self._event_size,
+        self._input_order_param,
+    )
+    self._masks = _make_dense_autoregressive_masks(
+        params=self._params,
+        event_size=self._event_size,
         hidden_units=self._hidden_units,
         input_order=self._input_order,
-        hidden_degrees=self._hidden_degrees))
-
-    # In the final layer, we will produce `self._params` outputs for each of the
-    # `self._event_size` inputs to `AutoregressiveNetwork`.  But `masks[-1]` has
-    # shape `[self._hidden_units[-1], self._event_size]`.  Thus, we need to
-    # expand the mask to `[hidden_units[-1], event_size * self._params]` such
-    # that all units for the same input are masked identically.  In particular,
-    # we tile the mask so the j-th element of `tf.unstack(output, axis=-1)` is a
-    # tensor of the j-th parameter/unit for each input.
-    #
-    # NOTE: Other orderings of the output could be faster -- should benchmark.
-    self._masks[-1] = np.reshape(
-        np.tile(self._masks[-1][..., tf.newaxis], [1, 1, self._params]),
-        [self._masks[-1].shape[0], self._event_size * self._params])
+        hidden_degrees=self._hidden_degrees,
+    )
 
     self._network = tf.keras.Sequential([
         tf.keras.layers.InputLayer((self._event_size,), dtype=self.dtype)
@@ -980,6 +971,110 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     return self._params
 
 
+def _make_dense_autoregressive_masks(
+    params,
+    event_size,
+    hidden_units,
+    input_order='left-to-right',
+    hidden_degrees='equal',
+    seed=None,
+):
+  """Creates masks for use in dense MADE [Germain et al. (2015)][1] networks.
+
+  See the documentation for `AutoregressiveNetwork` for the theory and
+  application of MADE networks. This function lets you construct your own dense
+  MADE networks by applying the returned masks to each dense layer. E.g. a
+  consider an autoregressive network that takes `event_size`-dimensional vectors
+  and produces `params`-parameters per input, with `num_hidden` hidden layers,
+  with `hidden_size` hidden units each.
+
+  ```python
+  def random_made(x):
+    masks = tfb._make_dense_autoregressive_masks(
+        params=params,
+        event_size=event_size,
+        hidden_units=[hidden_size] * num_hidden)
+    output_sizes = [hidden_size] * num_hidden
+    input_size = event_size
+    for (mask, output_size) in zip(masks, output_sizes):
+      mask = tf.cast(mask, tf.float32)
+      x = tf.matmul(x, tf.random.normal([input_size, output_size]) * mask)
+      x = tf.nn.relu(x)
+      input_size = output_size
+    x = tf.matmul(
+        x,
+        tf.random.normal([input_size, params * event_size]) * masks[-1])
+    x = tf.reshape(x, [-1, event_size, params])
+    return x
+
+  y = random_made(tf.zeros([1, event_size]))
+  assert [1, event_size, params] == y.shape
+  ```
+
+  Each mask is a Numpy boolean array. All masks have the shape `[input_size,
+  output_size]`. For example, if we `hidden_units` is a list of two integers,
+  the mask shapes will be: `[event_size, hidden_units[0]], [hidden_units[0],
+  hidden_units[1]], [hidden_units[1], params * event_size]`.
+
+  You can extend this example with trainable parameters and constraints if
+  necessary.
+
+  Args:
+    params: Python integer specifying the number of parameters to output
+      per input.
+    event_size: Python integer specifying the shape of the input to this layer.
+    hidden_units: Python `list`-like of non-negative integers, specifying
+      the number of units in each hidden layer.
+    input_order: Order of degrees to the input units: 'random', 'left-to-right',
+      'right-to-left', or an array of an explicit order. For example,
+      'left-to-right' builds an autoregressive model
+      p(x) = p(x1) p(x2 | x1) ... p(xD | x<D).
+    hidden_degrees: Method for assigning degrees to the hidden units:
+      'equal', 'random'. If 'equal', hidden units in each layer are allocated
+      equally (up to a remainder term) to each degree. Default: 'equal'.
+    seed: If not `None`, seed to use for 'random' `input_order` and
+      `hidden_degrees`.
+
+  Returns:
+    masks: A list of masks that should be applied the dense matrices of
+      individual densely connected layers in the MADE network. Each mask is a
+      Numpy boolean array.
+
+  #### References
+
+  [1]: Mathieu Germain, Karol Gregor, Iain Murray, and Hugo Larochelle. MADE:
+       Masked Autoencoder for Distribution Estimation. In _International
+       Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
+  """
+  if seed is None:
+    input_order_seed = None
+    degrees_seed = None
+  else:
+    input_order_seed, degrees_seed = onp.random.RandomState(seed).randint(
+        2**31, size=2)
+  input_order = _create_input_order(
+      event_size, input_order, seed=input_order_seed)
+  masks = _create_masks(_create_degrees(
+      input_size=event_size,
+      hidden_units=hidden_units,
+      input_order=input_order,
+      hidden_degrees=hidden_degrees,
+      seed=degrees_seed))
+  # In the final layer, we will produce `params` outputs for each of the
+  # `event_size` inputs.  But `masks[-1]` has shape `[hidden_units[-1],
+  # event_size]`.  Thus, we need to expand the mask to `[hidden_units[-1],
+  # event_size * params]` such that all units for the same input are masked
+  # identically.  In particular, we tile the mask so the j-th element of
+  # `tf.unstack(output, axis=-1)` is a tensor of the j-th parameter/unit for
+  # each input.
+  #
+  # NOTE: Other orderings of the output could be faster -- should benchmark.
+  masks[-1] = np.reshape(
+      np.tile(masks[-1][..., tf.newaxis], [1, 1, params]),
+      [masks[-1].shape[0], event_size * params])
+  return masks
+
+
 def _list(xs):
   """Convert the given argument to a list."""
   try:
@@ -988,7 +1083,7 @@ def _list(xs):
     return [xs]
 
 
-def _create_input_order(input_size, input_order='left-to-right'):
+def _create_input_order(input_size, input_order='left-to-right', seed=None):
   """Returns a degree vectors for the input."""
   if isinstance(input_order, six.string_types):
     if input_order == 'left-to-right':
@@ -996,10 +1091,14 @@ def _create_input_order(input_size, input_order='left-to-right'):
     elif input_order == 'right-to-left':
       return np.arange(start=input_size, stop=0, step=-1)
     elif input_order == 'random':
-      ret = np.arange(start=1, stop=input_size + 1)
-      onp.random.shuffle(ret)
+      ret = onp.arange(start=1, stop=input_size + 1)
+      if seed is None:
+        rng = onp.random
+      else:
+        rng = onp.random.RandomState(seed)
+      rng.shuffle(ret)
       return ret
-  elif np.all(np.sort(input_order) == np.arange(1, input_size + 1)):
+  elif np.all(np.sort(np.array(input_order)) == np.arange(1, input_size + 1)):
     return np.array(input_order)
 
   raise ValueError('Invalid input order: "{}".'.format(input_order))
@@ -1008,7 +1107,8 @@ def _create_input_order(input_size, input_order='left-to-right'):
 def _create_degrees(input_size,
                     hidden_units=None,
                     input_order='left-to-right',
-                    hidden_degrees='equal'):
+                    hidden_degrees='equal',
+                    seed=None):
   """Returns a list of degree vectors, one for each input and hidden layer.
 
   A unit with degree d can only receive input from units with degree < d. Output
@@ -1026,6 +1126,7 @@ def _create_degrees(input_size,
     hidden_degrees: Method for assigning degrees to the hidden units:
       'equal', 'random'.  If 'equal', hidden units in each layer are allocated
       equally (up to a remainder term) to each degree.  Default: 'equal'.
+    seed: If not `None`, use as a seed for the 'random' hidden_degrees.
 
   Raises:
     ValueError: invalid input order.
@@ -1040,11 +1141,15 @@ def _create_degrees(input_size,
   for units in hidden_units:
     if isinstance(hidden_degrees, six.string_types):
       if hidden_degrees == 'random':
+        if seed is None:
+          rng = onp.random
+        else:
+          rng = onp.random.RandomState(seed)
         # samples from: [low, high)
         degrees.append(
-            onp.random.randint(low=min(np.min(degrees[-1]), input_size - 1),
-                               high=input_size,
-                               size=units))
+            rng.randint(low=min(np.min(degrees[-1]), input_size - 1),
+                        high=input_size,
+                        size=units))
       elif hidden_degrees == 'equal':
         min_degree = min(np.min(degrees[-1]), input_size - 1)
         degrees.append(np.maximum(

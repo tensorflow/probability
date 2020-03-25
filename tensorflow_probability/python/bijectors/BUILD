@@ -836,7 +836,6 @@ multi_substrate_py_test(
     name = "bijector_test",
     size = "small",
     srcs = ["bijector_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijectors",
@@ -1011,7 +1010,6 @@ multi_substrate_py_test(
     name = "categorical_to_discrete_test",
     size = "small",
     srcs = ["categorical_to_discrete_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":categorical_to_discrete",
@@ -1170,8 +1168,6 @@ multi_substrate_py_test(
     name = "generalized_pareto_test",
     size = "small",
     srcs = ["generalized_pareto_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1252,8 +1248,6 @@ multi_substrate_py_test(
     name = "lambertw_transform_test",
     size = "small",
     srcs = ["lambertw_transform_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1279,7 +1273,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -1467,7 +1461,6 @@ multi_substrate_py_test(
     name = "sinh_arcsinh_test",
     size = "small",
     srcs = ["sinh_arcsinh_test.py"],
-    jax_tags = ["notap"],
     tags = ["no_windows"],  # TODO: needs investigation on Windows.
     deps = [
         ":bijector_test_util",
@@ -1495,6 +1488,7 @@ multi_substrate_py_test(
     name = "softfloor_test",
     size = "small",
     srcs = ["softfloor_test.py"],
+    jax_size = "medium",
     deps = [
         ":bijector_test_util",
         ":bijectors",

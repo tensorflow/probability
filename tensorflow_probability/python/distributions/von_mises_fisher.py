@@ -383,7 +383,6 @@ class VonMisesFisher(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     dim0_seed, otherdims_seed = samplers.split_seed(seed,
                                                     salt='von_mises_fisher')
-    print(dim0_seed, otherdims_seed)
     # The sampling strategy relies on the fact that vMF variates are symmetric
     # about the mean direction. Accordingly, if we have a sampling strategy for
     # the away-from-mean angle, then we can uniformly sample the remaining

@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -176,7 +177,7 @@ class Cauchy(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     batch_shape = self._batch_shape_tensor(loc=loc, scale=scale)
     shape = tf.concat([[n], batch_shape], 0)
-    probs = tf.random.uniform(
+    probs = samplers.uniform(
         shape=shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     return self._quantile(probs, loc=loc, scale=scale)
 

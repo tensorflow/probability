@@ -386,12 +386,14 @@ class NumpyArrayCaching(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class TfModuleTest(test_util.TestCase):
 
+  @test_util.jax_disable_variable_test
   def test_variable_tracking(self):
     x = tf.Variable(1.)
     b = ForwardOnlyBijector(scale=x, validate_args=True)
     self.assertIsInstance(b, tf.Module)
     self.assertEqual((x,), b.trainable_variables)
 
+  @test_util.jax_disable_variable_test
   def test_gradient(self):
     x = tf.Variable(1.)
     b = InverseOnlyBijector(scale=x, validate_args=True)

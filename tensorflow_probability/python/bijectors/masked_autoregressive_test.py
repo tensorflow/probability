@@ -27,7 +27,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
+from tensorflow_probability.python.bijectors import masked_autoregressive
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -115,7 +115,8 @@ class GenMaskTest(test_util.TestCase):
          [1, 0, 0, 0],
          [1, 1, 0, 0],
          [1, 1, 0, 0]])
-    mask = _gen_mask(num_blocks=3, n_in=4, n_out=6, mask_type="exclusive")
+    mask = masked_autoregressive._gen_mask(
+        num_blocks=3, n_in=4, n_out=6, mask_type="exclusive")
     self.assertAllEqual(expected_mask, mask)
 
   def test346Inclusive(self):
@@ -126,8 +127,159 @@ class GenMaskTest(test_util.TestCase):
          [1, 1, 0, 0],
          [1, 1, 1, 0],
          [1, 1, 1, 0]])
-    mask = _gen_mask(num_blocks=3, n_in=4, n_out=6, mask_type="inclusive")
+    mask = masked_autoregressive._gen_mask(
+        num_blocks=3, n_in=4, n_out=6, mask_type="inclusive")
     self.assertAllEqual(expected_mask, mask)
+
+
+class MakeDenseAutoregressiveMasksTest(test_util.TestCase):
+
+  def testRandomMade(self):
+    hidden_size = 8
+    num_hidden = 3
+    params = 2
+    event_size = 4
+
+    def random_made(x):
+      masks = masked_autoregressive._make_dense_autoregressive_masks(
+          params=params,
+          event_size=event_size,
+          hidden_units=[hidden_size] * num_hidden)
+      output_sizes = [hidden_size] * num_hidden
+      input_size = event_size
+      for (mask, output_size) in zip(masks, output_sizes):
+        mask = tf.cast(mask, tf.float32)
+        x = tf.matmul(
+            x,
+            np.random.randn(input_size, output_size).astype(np.float32) * mask)
+        x = tf.nn.relu(x)
+        input_size = output_size
+      x = tf.matmul(
+          x,
+          np.random.randn(input_size, params * event_size).astype(np.float32) *
+          masks[-1])
+      x = tf.reshape(x, [-1, event_size, params])
+      return x
+
+    y = random_made(tf.zeros([1, event_size]))
+    self.assertEqual([1, event_size, params], y.shape)
+
+  def testLeftToRight(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order="left-to-right",
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 0, 0],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+    ], masks[2])
+
+  def testRandom(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order="random",
+        hidden_degrees="random",
+        seed=1)
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 0, 1, 1],
+        [0, 0, 0, 0],
+        [1, 1, 1, 1],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 0, 1, 1],
+        [1, 1, 1, 1],
+        [1, 0, 1, 1],
+        [1, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 0, 0],
+        [1, 1, 1, 1, 0, 0],
+        [0, 0, 1, 1, 0, 0],
+        [0, 0, 1, 1, 0, 0],
+    ], masks[2])
+
+  def testRightToLeft(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order=list(reversed(range(1, 4))),
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [0, 0, 0, 0],
+        [0, 0, 1, 1],
+        [1, 1, 1, 1],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 0, 0, 0, 0],
+        [1, 1, 0, 0, 0, 0],
+    ], masks[2])
+
+  def testUneven(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[5, 3],
+        input_order="left-to-right",
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 1, 1, 1, 1],
+        [0, 0, 0, 1, 1],
+        [0, 0, 0, 0, 0],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+    ], masks[2])
 
 
 @test_util.test_all_tf_execution_regimes

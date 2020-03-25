@@ -91,7 +91,7 @@ py_library(
 
 py_test(
     name = "dense_variational_test",
-    size = "small",
+    size = "medium",
     srcs = ["dense_variational_test.py"],
     deps = [
         # numpy dep,

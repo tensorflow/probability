@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -177,7 +178,7 @@ class Logistic(distribution.Distribution):
     # mantissa has an implicit leading 1. Normal, positive numbers x, y have the
     # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
     # number (i.e., np.nextafter) can cause us to sample 0.
-    uniform = tf.random.uniform(
+    uniform = samplers.uniform(
         shape=shape,
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
