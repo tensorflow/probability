@@ -31,6 +31,7 @@ from tensorflow_probability.python.math.psd_kernels.polynomial import Polynomial
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 from tensorflow_probability.python.math.psd_kernels.rational_quadratic import RationalQuadratic
 from tensorflow_probability.python.math.psd_kernels.schur_complement import SchurComplement
+from tensorflow_probability.python.math.psd_kernels.constant import Constant
 
 
 from tensorflow.python.util.all_util import remove_undocumented
@@ -49,6 +50,7 @@ _allowed_symbols = [
     'PositiveSemidefiniteKernel',
     'RationalQuadratic',
     'SchurComplement',
+    'Constant',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
