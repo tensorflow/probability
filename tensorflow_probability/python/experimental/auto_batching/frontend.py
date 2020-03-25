@@ -42,7 +42,6 @@ from tensorflow.python.autograph.converters import break_statements
 from tensorflow.python.autograph.converters import continue_statements
 from tensorflow.python.autograph.converters import return_statements
 from tensorflow.python.autograph.core import converter
-from tensorflow.python.autograph.core import naming
 from tensorflow.python.autograph.pyct import anno
 from tensorflow.python.autograph.pyct import inspect_utils
 from tensorflow.python.autograph.pyct import parser
@@ -52,7 +51,13 @@ from tensorflow.python.autograph.pyct import transformer
 from tensorflow.python.autograph.pyct.common_transformers import anf
 
 
-# For backward compatibility: compiler will be renamed to loader in TF 2.2+.
+# For backward compatibility:
+# - `compiler` will be renamed to `loader` in TF 2.2+.
+# - `naming` will be moved to `core` in TF 2.2+.
+try:
+  from tensorflow.python.autograph.pyct import naming  # pylint:disable=g-import-not-at-top
+except ImportError:
+  from tensorflow.python.autograph.core import naming  # pylint:disable=g-import-not-at-top
 try:
   from tensorflow.python.autograph.pyct import loader  # pylint:disable=g-import-not-at-top
 except ImportError:
