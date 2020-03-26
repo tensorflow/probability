@@ -475,8 +475,8 @@ def _von_mises_cdf_normal(x, concentration, dtype):
   def cdf_func(concentration):
     """A helper function that is passed to value_and_gradient."""
     # z is an "almost Normally distributed" random variable.
-    z = ((np.sqrt(2. / np.pi) / tf.math.bessel_i0e(concentration)) *
-         tf.sin(.5 * x))
+    z = (tf.constant(np.sqrt(2. / np.pi), dtype=dtype)
+         / tf.math.bessel_i0e(concentration)) * tf.sin(.5 * x)
 
     # This is the correction described in [1] which reduces the error
     # of the Normal approximation.

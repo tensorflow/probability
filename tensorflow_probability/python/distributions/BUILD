@@ -2846,7 +2846,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["von_mises_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
