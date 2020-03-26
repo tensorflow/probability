@@ -60,6 +60,7 @@ multi_substrate_py_library(
         ":ffjord",
         ":fill_scale_tril",
         ":fill_triangular",
+        ":frechet_cdf",
         ":generalized_pareto",
         ":gumbel_cdf",
         ":identity",
@@ -393,6 +394,18 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:linalg",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "frechet_cdf",
+    srcs = ["frechet_cdf.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1160,6 +1173,20 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "frechet_cdf_test",
+    size = "small",
+    srcs = ["frechet_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

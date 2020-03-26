@@ -46,6 +46,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Expm1',
     'FillScaleTriL',
     'FillTriangular',
+    'FrechetCDF',
     'GumbelCDF',
     'Identity',
     'Inline',
@@ -84,6 +85,7 @@ TF2_FRIENDLY_BIJECTORS = (
 
 BIJECTOR_PARAMS_NDIMS = {
     'AffineScalar': dict(shift=0, scale=0, log_scale=0),
+    'FrechetCDF': dict(loc=0, scale=0, concentration=0),
     'GumbelCDF': dict(loc=0, scale=0),
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
@@ -111,6 +113,7 @@ INVERT_LDJ = {FLDJ: ILDJ, ILDJ: FLDJ}
 NO_LDJ_GRADS_EXPECTED = {
     'AffineScalar': dict(shift={FLDJ, ILDJ}),
     'BatchNormalization': dict(beta={FLDJ, ILDJ}),
+    'FrechetCDF': dict(loc={ILDJ}),
     'GumbelCDF': dict(loc={ILDJ}),
     'Shift': dict(shift={FLDJ, ILDJ}),
 }
@@ -402,6 +405,8 @@ def domain_tensors(draw, bijector, shape=None):
   support = bijector_hps.bijector_supports()[bijector_name].forward
   if isinstance(bijector, tfb.PowerTransform):
     constraint_fn = bijector_hps.power_transform_constraint(bijector.power)
+  elif isinstance(bijector, tfb.FrechetCDF):
+    constraint_fn = bijector_hps.frechet_constraint(bijector.loc)
   else:
     constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
