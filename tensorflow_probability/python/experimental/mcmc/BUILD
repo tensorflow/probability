@@ -37,6 +37,7 @@ py_library(
     deps = [
         ":elliptical_slice_sampler",
         ":nuts_autobatching",
+        ":sample_sequential_monte_carlo",
         # tensorflow dep,
     ],
 )
@@ -164,6 +165,34 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "sample_sequential_monte_carlo",
+    srcs = ["sample_sequential_monte_carlo.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+py_test(
+    name = "sample_sequential_monte_carlo_test",
+    size = "medium",
+    timeout = "long",
+    srcs = ["sample_sequential_monte_carlo_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
