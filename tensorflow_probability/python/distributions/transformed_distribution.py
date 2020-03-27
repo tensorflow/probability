@@ -416,6 +416,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the left of the batch dims and we'll need to cyclically permute left the
     # new dims (in `_maybe_rotate_dims`). If these conditions do not hold, this
     # function returns `False` and no rotation is needed.
+    if self._base_is_joint:
+      # `prefer_static` can't handle nested structures like
+      # `base_is_scalar_batch` and shape overrides are not supported if the base
+      # distribution is joint.
+      return False
     return prefer_static.reduce_all([
         self._has_nonzero_rank(override_event_shape),
         prefer_static.logical_not(
