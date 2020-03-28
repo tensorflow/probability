@@ -319,6 +319,18 @@ class BinomialTest(test_util.TestCase):
          total_count * probs))
     self.assertAllEqual(samples, expected_samples)
 
+  def testSampleWithZeroCountsAndNanSuccessProbability(self):
+    # With zero counts, should sample 0 successes even if success probability is
+    # nan; and should not interfere with the rest of the batch.
+    total_count = tf.constant([23., 0.], dtype=tf.float32)
+    probs = tf.constant([1., np.nan], dtype=tf.float32)
+    dist = tfd.Binomial(
+        total_count=total_count, probs=probs, validate_args=False)
+    samples, expected_samples = self.evaluate(
+        (dist.sample(seed=test_util.test_seed()),
+         total_count))
+    self.assertAllEqual(samples, expected_samples)
+
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
     d = tfd.Binomial(total_count=1, logits=x, validate_args=True)

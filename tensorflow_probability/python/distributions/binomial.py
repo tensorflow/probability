@@ -393,8 +393,12 @@ class Binomial(distribution.Distribution):
 
   def _probs_parameter_no_checks(self):
     if self._logits is None:
-      return tf.identity(self._probs)
-    return tf.math.sigmoid(self._logits)
+      probs = tf.identity(self._probs)
+    else:
+      probs = tf.math.sigmoid(self._logits)
+    # Suppress potentially nasty probs like `nan` b/c they don't matter where
+    # total_count == 0.
+    return tf.where(self.total_count > 0, probs, 0)
 
   def _default_event_space_bijector(self):
     return
