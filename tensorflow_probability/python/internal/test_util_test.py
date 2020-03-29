@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 from absl import flags
 from absl.testing import flagsaver
@@ -178,6 +180,53 @@ class _TestCaseTest(object):
         AssertionError,
         r'Expected no entry to be `None` but found `None` in positions \[2\]'):
       self.assertAllNotNone(has_nones)
+
+  def test_assert_nested_all_ok(self):
+    self.assertAllAssertsNested(self.assertEqual, [4, {'a': 3}], [4, {'a': 3}])
+
+  def test_assert_nested_mismatched_structure(self):
+    expected_msg = (
+        "test:\n\nThe two structures don't have the same sequence type. " +
+        "Input structure has type <(class|type) 'list'>, while shallow "
+        "structure has type <(class|type) 'dict'>.")
+
+    with self.assertRaisesRegexp(AssertionError, expected_msg):
+      self.assertAllAssertsNested(self.assertEqual, {'a': 3}, [3], msg='test')
+
+  def test_assert_nested_mismatched_elements(self):
+    expected_msg = (r"""test:
+
+Structure 0:
+A\(a=3, b=4\)
+
+Structure 1:
+A\(a=3, b=5\)
+
+Exceptions:
+
+Path: b
+Exception: AssertionError
+4 != 5""")
+
+    namedtuple = collections.namedtuple('A', 'a, b')
+
+    with self.assertRaisesRegexp(AssertionError, expected_msg):
+      self.assertAllAssertsNested(
+          self.assertEqual,
+          namedtuple(a=3, b=4),
+          namedtuple(a=3, b=5),
+          msg='test')
+
+  def test_assert_nested_shallow(self):
+    with self.assertRaises(AssertionError):
+      self.assertAllAssertsNested(lambda *args: True, [1, 2], 5)
+    self.assertAllAssertsNested(lambda *args: True, [1, 2], 5, shallow=1)
+
+  def test_assert_nested_check_types(self):
+    with self.assertRaises(AssertionError):
+      self.assertAllAssertsNested(lambda *args: True, [1, 2], (1, 2))
+    self.assertAllAssertsNested(
+        lambda *args: True, [1, 2], (1, 2), check_types=False)
 
 
 @test_util.test_all_tf_execution_regimes

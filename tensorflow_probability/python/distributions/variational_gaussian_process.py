@@ -90,6 +90,7 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
                base_kernel,
                inducing_index_points,
                variational_scale,
+               jitter=1e-6,
                name='VariationalKernel'):
     """Construct a _VariationalKernel instance.
 
@@ -108,23 +109,29 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
         number of examples in `inducing_index_points`. Batch dimensions must be
         broadcast-compatible with the batch shape of `base_kernel` and
         `inducing_index_points`.
+      jitter: `float` scalar `Tensor` added to the diagonal of the covariance
+        matrix to ensure positive definiteness of the covariance matrix.
+        Default value: `1e-6`.
       name: Python `str` name prefixed to `Op`A created by this class.
         Default value: `"VariationalKernel"`
     """
     parameters = dict(locals())
     with tf.name_scope(name):
-      dtype = dtype_util.common_dtype(
-          [inducing_index_points, variational_scale], dtype_hint=tf.float32)
+      dtype = dtype_util.common_dtype([
+          inducing_index_points, variational_scale, jitter
+      ], dtype_hint=tf.float32)
 
       self._base_kernel = base_kernel
       self._inducing_index_points = tensor_util.convert_nonref_to_tensor(
           inducing_index_points, dtype=dtype, name='inducing_index_points')
       self._variational_scale = tensor_util.convert_nonref_to_tensor(
           variational_scale, dtype=dtype, name='variational_scale')
+      jitter = tensor_util.convert_nonref_to_tensor(
+          jitter, dtype=dtype, name='jitter')
 
       def _compute_chol_kzz(z):
         kzz = base_kernel.matrix(z, z)
-        result = tf.linalg.cholesky(kzz)
+        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, jitter))
         return result
 
       # Somewhat confusingly, but for the sake of brevity, we use `var` to refer
@@ -880,7 +887,8 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
       variational_kernel = _VariationalKernel(
           kernel,
           inducing_index_points,
-          variational_inducing_observations_scale)
+          variational_inducing_observations_scale,
+          jitter=jitter)
 
       posterior_predictive_mean_fn = _make_posterior_predictive_mean_fn(
           kernel=kernel,

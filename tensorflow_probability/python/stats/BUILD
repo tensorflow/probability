@@ -186,9 +186,11 @@ multi_substrate_py_library(
     srcs = ["calibration.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":quantiles",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math",
     ],
@@ -196,9 +198,9 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "calibration_test",
-    size = "small",
+    size = "large",
     srcs = ["calibration_test.py"],
-    jax_size = "medium",
+    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # absl/logging dep,

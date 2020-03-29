@@ -209,11 +209,6 @@ class CompositeTensorTest(tfp_test_util.TestCase):
                                  r'Unable.*sigmoidNormal.*file an issue'):
       tfp.experimental.as_composite(tfb.Sigmoid()(tfd.Normal(0, 1)))
 
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 r'Unable.*IndependentNormal.*file an issue'):
-      tfp.experimental.as_composite(
-          tfd.Independent(tfd.Normal(0, tf.ones([10])), 1))
-
     outcomes = tf.Variable([1., 2., 4.])
     self.evaluate(outcomes.initializer)
     # FiniteDiscrete does not include `outcomes` in the _params_event_ndims, so
@@ -229,6 +224,18 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     d2 = tfp.experimental.as_composite(d1)
     self.assertIsNot(d, d1)
     self.assertIs(d1, d2)
+
+  def test_basics_mixture_same_family(self):
+    gm = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(probs=[0.3, 0.7]),
+        components_distribution=tfd.Normal(
+            loc=[-1., 1],
+            scale=[0.1, 0.5]))
+    dist = tfp.experimental.as_composite(gm)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    self.evaluate(unflat.log_prob(.5))
 
 
 if __name__ == '__main__':

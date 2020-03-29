@@ -71,6 +71,9 @@ class SinhArcsinhTest(test_util.TestCase):
     scale = rng.rand(b) + 0.5
     loc = rng.randn(b)
     lap = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
+    # TODO(b/151180729): When shape overrides of `TransformedDistribution` are
+    # deprecated, change `distribution` below to
+    # `tfd.Laplace(np.float64(np.zeros(b)), np.float64(1))`.
     saslap = tfd.SinhArcsinh(
         loc=loc,
         scale=scale,

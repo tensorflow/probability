@@ -18,11 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
-import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
@@ -113,67 +108,67 @@ def _warning(*_, **__):  # pylint: disable=unused-argument
 # --- Begin Public Functions --------------------------------------------------
 
 TaskLevelStatusMessage = utils.copy_docstring(  # pylint: disable=invalid-name
-    tf1.logging.TaskLevelStatusMessage,
+    'tf1.logging.TaskLevelStatusMessage',
     _TaskLevelStatusMessage)
 
 debug = utils.copy_docstring(
-    tf1.logging.debug,
+    'tf1.logging.debug',
     _debug)
 
 error = utils.copy_docstring(
-    tf1.logging.error,
+    'tf1.logging.error',
     _error)
 
 fatal = utils.copy_docstring(
-    tf1.logging.fatal,
+    'tf1.logging.fatal',
     _fatal)
 
 flush = utils.copy_docstring(
-    tf1.logging.flush,
+    'tf1.logging.flush',
     _flush)
 
 get_verbosity = utils.copy_docstring(
-    tf1.logging.get_verbosity,
+    'tf1.logging.get_verbosity',
     _get_verbosity)
 
 info = utils.copy_docstring(
-    tf1.logging.info,
+    'tf1.logging.info',
     _info)
 
 log = utils.copy_docstring(
-    tf1.logging.log,
+    'tf1.logging.log',
     _log)
 
 log_every_n = utils.copy_docstring(
-    tf1.logging.log_every_n,
+    'tf1.logging.log_every_n',
     _log_every_n)
 
 log_first_n = utils.copy_docstring(
-    tf1.logging.log_first_n,
+    'tf1.logging.log_first_n',
     _log_first_n)
 
 log_if = utils.copy_docstring(
-    tf1.logging.log_if,
+    'tf1.logging.log_if',
     _log_if)
 
 set_verbosity = utils.copy_docstring(
-    tf1.logging.set_verbosity,
+    'tf1.logging.set_verbosity',
     _set_verbosity)
 
 vlog = utils.copy_docstring(
-    tf1.logging.vlog,
+    'tf1.logging.vlog',
     _vlog)
 
 warn = utils.copy_docstring(
-    tf1.logging.warn,
+    'tf1.logging.warn',
     _warn)
 
 warning = utils.copy_docstring(
-    tf1.logging.warning,
+    'tf1.logging.warning',
     _warning)
 
-DEBUG = tf1.logging.DEBUG
-ERROR = tf1.logging.ERROR
-FATAL = tf1.logging.FATAL
-INFO = tf1.logging.INFO
-WARN = tf1.logging.WARN
+DEBUG = 'DEBUG'
+ERROR = 'ERROR'
+FATAL = 'FATAL'
+INFO = 'INFO'
+WARN = 'WARN'

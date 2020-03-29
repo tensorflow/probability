@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
@@ -43,5 +41,5 @@ def _to_dense(sp_input, default_value=0, validate_indices=True, name=None):  # p
 
 # TODO(b/136555907): Add unit test.
 to_dense = utils.copy_docstring(
-    tf.sparse.to_dense,
+    'tf.sparse.to_dense',
     _to_dense)

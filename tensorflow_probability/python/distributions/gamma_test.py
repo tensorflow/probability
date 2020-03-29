@@ -18,7 +18,9 @@ from __future__ import print_function
 
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
+from scipy import misc as sp_misc
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
@@ -80,6 +82,13 @@ class GammaTest(test_util.TestCase):
     g = tfd.Gamma(concentration=2., rate=3., validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(g.log_prob(-.1))
+
+  def testSampleWithPartiallyDefinedShapeEndingInOne(self):
+    param = tf.Variable(np.ones((8, 16, 16, 1)),
+                        shape=tf.TensorShape([None, 16, 16, 1]))
+    self.evaluate(param.initializer)
+    samples = self.evaluate(tfd.Gamma(param, param).sample())
+    self.assertEqual(samples.shape, (8, 16, 16, 1))
 
   def testGammaLogPDFMultidimensional(self):
     batch_size = 6
@@ -241,6 +250,32 @@ class GammaTest(test_util.TestCase):
         sp_stats.gamma.var(alpha_v, scale=1 / beta_v),
         atol=.15)
 
+  def testGammaSampleReturnsNansForNonPositiveParameters(self):
+    gamma = tfd.Gamma([1., 2.], 1., validate_args=False)
+    samples = self.evaluate(gamma.sample())
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllFinite(samples)
+
+    gamma = tfd.Gamma([0., 2.], 1., validate_args=False)
+    samples = self.evaluate(gamma.sample())
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllEqual([np.isnan(s) for s in samples], [True, False])
+
+    gamma = tfd.Gamma([1., -1.], 1., validate_args=False)
+    samples = self.evaluate(gamma.sample())
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllEqual([np.isnan(s) for s in samples], [False, True])
+
+    gamma = tfd.Gamma([1., 2.], 0., validate_args=False)
+    samples = self.evaluate(gamma.sample())
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllNan(samples)
+
+    gamma = tfd.Gamma([1., 2.], -1., validate_args=False)
+    samples = self.evaluate(gamma.sample())
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllNan(samples)
+
   @test_util.numpy_disable_gradient_test
   def testGammaFullyReparameterized(self):
     alpha = tf.constant(4.0)
@@ -251,15 +286,46 @@ class GammaTest(test_util.TestCase):
     self.assertIsNotNone(grad_alpha)
     self.assertIsNotNone(grad_beta)
 
+  @test_util.numpy_disable_gradient_test
+  def testCompareGradientToTfRandomGammaGradient(self):
+    n_alpha = 4
+    alpha_v = tf.constant(np.array([np.arange(1, n_alpha+1, dtype=np.float32)]))
+    n_beta = 2
+    beta_v = tf.constant(np.array([np.arange(1, n_beta+1, dtype=np.float32)]).T)
+    num_samples = 100000
+
+    def tfp_gamma(a, b):
+      return tfd.Gamma(concentration=a, rate=b, validate_args=True).sample(
+          num_samples, seed=test_util.test_seed())
+
+    _, [grad_alpha, grad_beta] = self.evaluate(
+        tfp.math.value_and_gradient(tfp_gamma, [alpha_v, beta_v]))
+
+    def tf_gamma(a, b):
+      return tf.random.gamma([num_samples], a, b, seed=test_util.test_seed())
+
+    _, [grad_alpha_tf, grad_beta_tf] = self.evaluate(
+        tfp.math.value_and_gradient(tf_gamma, [alpha_v, beta_v]))
+
+    self.assertEqual(grad_alpha.shape, grad_alpha_tf.shape)
+    self.assertEqual(grad_beta.shape, grad_beta_tf.shape)
+    self.assertAllClose(grad_alpha, grad_alpha_tf, rtol=1e-2)
+    self.assertAllClose(grad_beta, grad_beta_tf, rtol=1e-2)
+
   def testGammaSampleMultiDimensional(self):
-    alpha_v = np.array([np.arange(1, 101, dtype=np.float32)])  # 1 x 100
-    beta_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
+    n_alpha = 50
+    alpha_v = np.array([np.arange(1, n_alpha+1, dtype=np.float32)])  # 1 x 50
+    n_beta = 10
+    beta_v = np.array([np.arange(1, n_beta+1, dtype=np.float32)]).T  # 10 x 1
     gamma = tfd.Gamma(concentration=alpha_v, rate=beta_v, validate_args=True)
+
     n = 10000
+
     samples = gamma.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
-    self.assertEqual(samples.shape, (n, 10, 100))
-    self.assertEqual(sample_values.shape, (n, 10, 100))
+
+    self.assertEqual(samples.shape, (n, n_beta, n_alpha))
+    self.assertEqual(sample_values.shape, (n, n_beta, n_alpha))
     zeros = np.zeros_like(alpha_v + beta_v)  # 10 x 100
     alpha_bc = alpha_v + zeros
     beta_bc = beta_v + zeros
@@ -387,6 +453,7 @@ class GammaTest(test_util.TestCase):
     concentration = tf.Variable([1., 2., 3.])
     self.evaluate(concentration.initializer)
     d = tfd.Gamma(concentration=concentration, rate=[5.], validate_args=True)
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       with tf.control_dependencies([concentration.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
@@ -412,7 +479,7 @@ class GammaTest(test_util.TestCase):
     rate = tf.Variable([1., 2., 3.])
     self.evaluate(rate.initializer)
     d = tfd.Gamma(concentration=[3.], rate=rate, validate_args=True)
-    self.evaluate(d.mean())
+    self.evaluate(d.sample(seed=test_util.test_seed()))
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
@@ -424,6 +491,86 @@ class GammaTest(test_util.TestCase):
     bijector_inverse_x = dist._experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_float32', dtype=tf.float32),
+      dict(testcase_name='_float64', dtype=tf.float64))
+  def testCompareToExplicitDerivative(self, dtype):
+    """Compare to the explicit reparameterization derivative.
+
+    Defining x to be the output from a gamma sampler with beta=1, and defining y
+    to be the actual gamma sample (defined by y = x / beta), we have:
+
+    dx / dalpha = d igammainv(alpha, x) / dalpha,
+    where u = igamma(alpha, x).
+
+    Therefore, we have:
+
+    dy / dalpha = (1 / beta) * d igammainv(alpha, y * beta) / dalpha,
+    where u = igamma(alpha, y * beta)
+
+    We also have dy / dbeta = -(x / beta^2) = -y / beta.
+
+    Args:
+      dtype: TensorFlow dtype to perform the computations in.
+    """
+    if not tf.executing_eagerly():
+      return
+
+    alpha_n = 4
+    alpha = tf.reshape(tf.range(alpha_n, dtype=dtype), (alpha_n, 1)) + 1.
+    beta_n = 3
+    beta = tf.range(beta_n, dtype=dtype) + 1.
+    num_samples = 2
+
+    with tf.GradientTape(persistent=True) as g:
+      g.watch(alpha)
+      g.watch(beta)
+      samples = tfd.Gamma(alpha, beta).sample(
+          num_samples, seed=test_util.test_seed())
+
+    alpha_jacobian_all, beta_jacobian_all = self.evaluate(
+        g.jacobian(samples, [alpha, beta], experimental_use_pfor=False))
+
+    samples = self.evaluate(samples)
+
+    self.assertEqual(samples.shape, (num_samples, alpha_n, beta_n))
+    self.assertEqual(alpha_jacobian_all.shape, samples.shape + (alpha_n, 1))
+    self.assertEqual(beta_jacobian_all.shape, samples.shape + (beta_n,))
+
+    alpha_all, beta_all = self.evaluate([alpha, beta])
+    alpha_all = np.squeeze(alpha_all)
+    self.assertEqual(alpha_all.shape, (alpha_n,))
+
+    for sample_i in range(num_samples):
+      for alpha_i, alpha in enumerate(alpha_all):
+        for beta_i, beta in enumerate(beta_all):
+          sample = samples[sample_i, alpha_i, beta_i]
+
+          for alpha_input_i in range(alpha_n):
+            alpha_jacobian = alpha_jacobian_all[
+                sample_i, alpha_i, beta_i, alpha_input_i, 0]
+            if alpha_i != alpha_input_i:
+              self.assertEqual(alpha_jacobian, 0.)
+            else:
+              def expected_grad(sample, alpha, beta):
+                u = sp_special.gammainc(alpha, sample*beta)
+                delta = 1e-3
+                return sp_misc.derivative(
+                    lambda alpha_prime: sp_special.gammaincinv(alpha_prime, u),
+                    alpha, dx=delta * alpha) / beta
+
+              self.assertAllClose(alpha_jacobian,
+                                  expected_grad(sample, alpha, beta))
+
+          for beta_input_i in range(beta_n):
+            beta_jacobian = beta_jacobian_all[
+                sample_i, alpha_i, beta_i, beta_input_i]
+            if beta_i != beta_input_i:
+              self.assertEqual(beta_jacobian, 0.)
+            else:
+              self.assertAllClose(beta_jacobian, -sample / beta)
+
 
 if __name__ == '__main__':
   tf.test.main()

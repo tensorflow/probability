@@ -37,6 +37,7 @@ py_library(
     deps = [
         ":elliptical_slice_sampler",
         ":nuts_autobatching",
+        ":sample_sequential_monte_carlo",
         # tensorflow dep,
     ],
 )
@@ -120,10 +121,79 @@ py_test(
     tags = [
         "notap",
         "nozapfhahn",
-        "requires-gpu-sm35",
+        "requires-gpu-nvidia",
     ],
     deps = [
         ":nuts_testlib",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "nuts_xla_test_cpu",
+    size = "large",
+    srcs = ["nuts_xla_test.py"],
+    args = ["--test_device=cpu"],
+    main = "nuts_xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_test(
+    name = "nuts_xla_test_gpu",
+    size = "large",
+    srcs = ["nuts_xla_test.py"],
+    args = ["--test_device=gpu"],
+    main = "nuts_xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "sample_sequential_monte_carlo",
+    srcs = ["sample_sequential_monte_carlo.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+py_test(
+    name = "sample_sequential_monte_carlo_test",
+    size = "medium",
+    timeout = "long",
+    srcs = ["sample_sequential_monte_carlo_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )

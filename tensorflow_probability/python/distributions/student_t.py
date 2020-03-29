@@ -29,8 +29,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.math.numeric import log1psquare
 
 
 __all__ = [
@@ -63,16 +64,16 @@ def sample_n(n, df, loc, scale, batch_shape, dtype, seed):
   Returns:
     samples: a `Tensor` with prepended dimensions `n`.
   """
+  normal_seed, gamma_seed = samplers.split_seed(seed, salt='student_t')
   shape = tf.concat([[n], batch_shape], 0)
-  seed = SeedStream(seed, 'student_t')
 
-  normal_sample = tf.random.normal(shape, dtype=dtype, seed=seed())
+  normal_sample = samplers.normal(shape, dtype=dtype, seed=normal_seed)
   df = df * tf.ones(batch_shape, dtype=dtype)
-  gamma_sample = tf.random.gamma([n],
-                                 0.5 * df,
-                                 beta=0.5,
-                                 dtype=dtype,
-                                 seed=seed())
+  gamma_sample = samplers.gamma([n],
+                                0.5 * df,
+                                beta=0.5,
+                                dtype=dtype,
+                                seed=gamma_seed)
   samples = normal_sample * tf.math.rsqrt(gamma_sample / df)
   return samples * scale + loc
 
@@ -92,8 +93,9 @@ def log_prob(x, df, loc, scale):
   Returns:
     A `Tensor` with shape broadcast according to the arguments.
   """
-  y = (x - loc) / scale
-  log_unnormalized_prob = -0.5 * (df + 1.) * tf.math.log1p(y**2. / df)
+  # Writing `y` this way reduces XLA mem copies.
+  y = (x - loc) * (tf.math.rsqrt(df) / scale)
+  log_unnormalized_prob = -0.5 * (df + 1.) * log1psquare(y)
   log_normalization = (
       tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
       0.5 * np.log(np.pi) + tf.math.lgamma(0.5 * df) -

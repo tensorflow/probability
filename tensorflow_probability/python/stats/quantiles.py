@@ -123,7 +123,8 @@ def count_integers(arr,
             maxlength=maxlength,
             dtype=dtype)
 
-      flat_counts = tf.map_fn(one_bincount, elems=flat_arr, dtype=dtype)
+      flat_counts = tf.map_fn(one_bincount, elems=flat_arr,
+                              fn_output_signature=dtype)
     else:
       weights = tf.convert_to_tensor(weights, name='weights')
       _get_static_ndims(weights, expect_static=True, expect_ndims=arr_ndims)
@@ -140,7 +141,8 @@ def count_integers(arr,
             dtype=dtype)
 
       flat_counts = tf.map_fn(
-          one_bincount, elems=[flat_arr, flat_weights], dtype=weights.dtype)
+          one_bincount, elems=[flat_arr, flat_weights],
+          fn_output_signature=weights.dtype)
 
     # flat_counts.shape = [prod(~axis), K], because map_fn stacked on axis 0.
     # bincount needs to have the K bins in axis 0, so transpose...
@@ -890,7 +892,7 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
     full_shape = (
         other_shape + end_shape if right_end else end_shape + other_shape)
   else:
-    other_shape = tf.gather(tf.shape(x), other_dims)
+    other_shape = tf.gather(tf.shape(x), tf.constant(other_dims, tf.int64))
     full_shape = tf.concat(
         [other_shape, [-1]] if right_end else [[-1], other_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)

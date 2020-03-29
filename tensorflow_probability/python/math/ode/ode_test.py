@@ -23,8 +23,9 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
+
 _RTOL = 1e-8
 _ATOL = 1e-12
 
@@ -85,7 +86,7 @@ class NonStiffTest(test_util.TestCase):
     states_exact = np.ones([times.size, initial_state.size]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear(self, solver):
+  def test_linear_ode(self, solver):
     jacobian_diag_part = np.float64([-0.5, -1.])
     ode_fn = lambda time, state: jacobian_diag_part * state
     initial_time = 0.
@@ -103,7 +104,7 @@ class NonStiffTest(test_util.TestCase):
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear_jacobian_fn_unspecified(self, solver):
+  def test_linear_ode_jacobian_fn_unspecified(self, solver):
     jacobian_diag_part = np.float64([-0.5, -1.])
     ode_fn = lambda time, state: jacobian_diag_part * state
     initial_time = 0.
@@ -119,7 +120,7 @@ class NonStiffTest(test_util.TestCase):
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear_complex(self, solver):
+  def test_linear_ode_complex(self, solver):
     jacobian_diag_part = np.complex128([1j - 0.1, 1j])
     ode_fn = lambda time, state: jacobian_diag_part * state
     initial_time = 0.
@@ -137,7 +138,7 @@ class NonStiffTest(test_util.TestCase):
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear_dense(self, solver):
+  def test_linear_ode_dense(self, solver):
     np.random.seed(0)
     initial_time = 0.
     num_odes = 20
@@ -253,7 +254,7 @@ class NonStiffTest(test_util.TestCase):
     self.assertAllClose(states[1][0], states_exact_b)
     self.assertAllClose(states[1][1], states_exact_c)
 
-  def test_linear_dense_tuple(self, solver):
+  def test_linear_ode_dense_tuple(self, solver):
     np.random.seed(0)
     initial_time = 0.
     num_odes = 20
@@ -374,6 +375,33 @@ class GradientTest(test_util.TestCase):
     grad_exact = 1. / (1. - initial_state_value * final_time)**2
     self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
 
+  def test_linear_ode(self, solver):
+    if not tf2.enabled():
+      self.skipTest('b/152464477')
+    jacobian_diag_part = tf.constant([-0.5, -1.], dtype=tf.float64)
+    ode_fn = lambda time, state, jacobian_diag_part: jacobian_diag_part * state
+    initial_time = 0.
+    initial_state = np.float64([1., 2.])
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+    with tf.GradientTape() as tape:
+      tape.watch(jacobian_diag_part)
+      results = solver_instance.solve(
+          ode_fn,
+          initial_time,
+          initial_state,
+          solution_times=tfp.math.ode.ChosenBySolver(1.),
+          constants={'jacobian_diag_part': jacobian_diag_part})
+    grad = tape.gradient(results.states, jacobian_diag_part)
+    times, grad = self.evaluate([results.times, grad])
+
+    with tf.GradientTape() as tape:
+      tape.watch(jacobian_diag_part)
+      states_exact = tf.exp(jacobian_diag_part[tf.newaxis, :] *
+                            times[:, tf.newaxis]) * initial_state
+    exact_grad = tape.gradient(states_exact, jacobian_diag_part)
+    exact_grad = self.evaluate(exact_grad)
+    self.assertAllClose(exact_grad, grad, atol=1e-5)
+
 
 # Running pfor repeatedly to rebuild the Jacobian graph is too slow in Eager
 # mode.
@@ -383,7 +411,7 @@ class GradientTest(test_util.TestCase):
     ('dormand_prince', tfp.math.ode.DormandPrince)])
 class GradientTestPforJacobian(test_util.TestCase):
 
-  def test_linear_dense(self, solver):
+  def test_linear_ode_dense(self, solver):
     initial_time = 0.
     jacobian = -np.float64([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
     num_odes = jacobian.shape[0]

@@ -17,11 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
 import numpy as np
 import six
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
@@ -51,7 +48,23 @@ __all__ = [
     'check_numerics',
 ]
 
+JAX_MODE = False
 
+
+def skip_assert_for_tracers(f):
+  """Function decorator that returns None if JAX tracers are detected."""
+  if not JAX_MODE:
+    return f
+  from jax import core as jax_core  # pylint: disable=g-import-not-at-top
+  def wrapped(*args, **kwargs):
+    if any(isinstance(arg, jax_core.Tracer) for arg
+           in args + tuple(kwargs.values())):
+      return None
+    return f(*args, **kwargs)
+  return wrapped
+
+
+@skip_assert_for_tracers
 def _assert_binary(
     x, y, comparator, sym, summarize=None, message=None, name=None):
   del summarize
@@ -63,6 +76,7 @@ def _assert_binary(
         sym, message or ''))
 
 
+@skip_assert_for_tracers
 def _assert_equal(x, y, summarize=None, message=None, name=None):
   del summarize
   del name
@@ -99,6 +113,7 @@ def _assert_less_equal(
       message=message, name=name)
 
 
+@skip_assert_for_tracers
 def _assert_compare_to_zero(
     x, comparator, sym, summarize=None, message=None, name=None):
   del summarize
@@ -143,10 +158,12 @@ def _assert_integer(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
+@skip_assert_for_tracers
 def _assert_near(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
+@skip_assert_for_tracers
 def _assert_none_equal(x, y, summarize=None, message=None, name=None):
   del summarize
   del name
@@ -184,81 +201,81 @@ def _assert_rank_in(*_, **__):  # pylint: disable=unused-argument
 
 
 Assert = utils.copy_docstring(  # pylint: disable=invalid-name
-    tf.debugging.Assert,
+    'tf.debugging.Assert',
     lambda condition, data, summarize=None, name=None: None)
 
 assert_equal = utils.copy_docstring(
-    tf.debugging.assert_equal,
+    'tf.debugging.assert_equal',
     _assert_equal)
 
 assert_greater = utils.copy_docstring(
-    tf.debugging.assert_greater,
+    'tf.debugging.assert_greater',
     _assert_greater)
 
 assert_less = utils.copy_docstring(
-    tf.debugging.assert_less,
+    'tf.debugging.assert_less',
     _assert_less)
 
 assert_rank = utils.copy_docstring(
-    tf.debugging.assert_rank,
+    'tf.debugging.assert_rank',
     _assert_rank)
 
 assert_scalar = utils.copy_docstring(
-    tf.debugging.assert_scalar,
+    'tf.debugging.assert_scalar',
     _assert_scalar)
 
 assert_greater_equal = utils.copy_docstring(
-    tf.debugging.assert_greater_equal,
+    'tf.debugging.assert_greater_equal',
     _assert_greater_equal)
 
 assert_integer = utils.copy_docstring(
-    tf.debugging.assert_integer,
+    'tf.debugging.assert_integer',
     _assert_integer)
 
 assert_less_equal = utils.copy_docstring(
-    tf.debugging.assert_less_equal,
+    'tf.debugging.assert_less_equal',
     _assert_less_equal)
 
 assert_near = utils.copy_docstring(
-    tf.debugging.assert_near,
+    'tf.debugging.assert_near',
     _assert_near)
 
 assert_negative = utils.copy_docstring(
-    tf.debugging.assert_negative,
+    'tf.debugging.assert_negative',
     _assert_negative)
 
 assert_non_negative = utils.copy_docstring(
-    tf.debugging.assert_non_negative,
+    'tf.debugging.assert_non_negative',
     _assert_non_negative)
 
 assert_non_positive = utils.copy_docstring(
-    tf.debugging.assert_non_positive,
+    'tf.debugging.assert_non_positive',
     _assert_non_positive)
 
 assert_none_equal = utils.copy_docstring(
-    tf.debugging.assert_none_equal,
+    'tf.debugging.assert_none_equal',
     _assert_none_equal)
 
 assert_positive = utils.copy_docstring(
-    tf.debugging.assert_positive,
+    'tf.debugging.assert_positive',
     _assert_positive)
 
 assert_proper_iterable = utils.copy_docstring(
-    tf.debugging.assert_proper_iterable,
+    'tf.debugging.assert_proper_iterable',
     _assert_proper_iterable)
 
 assert_rank_at_least = utils.copy_docstring(
-    tf.debugging.assert_rank_at_least,
+    'tf.debugging.assert_rank_at_least',
     _assert_rank_at_least)
 
 assert_rank_in = utils.copy_docstring(
-    tf.debugging.assert_rank_in,
+    'tf.debugging.assert_rank_in',
     _assert_rank_in)
 
 check_numerics = utils.copy_docstring(
-    tf.debugging.check_numerics,
+    'tf.debugging.check_numerics',
     lambda x, *_, **__: x)
 
 is_numeric_tensor = utils.copy_docstring(
-    tf.debugging.is_numeric_tensor,
+    'tf.debugging.is_numeric_tensor',
     lambda x: is_tensor(x) and np.issubdtype(x.dtype, np.number))

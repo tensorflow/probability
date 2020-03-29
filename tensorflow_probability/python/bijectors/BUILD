@@ -37,7 +37,6 @@ multi_substrate_py_library(
     name = "bijectors",
     srcs = ["__init__.py"],
     substrates_omit_deps = [
-        ":masked_autoregressive",
         ":real_nvp",
         ":scale_matvec_lu",
     ],
@@ -61,6 +60,7 @@ multi_substrate_py_library(
         ":ffjord",
         ":fill_scale_tril",
         ":fill_triangular",
+        ":frechet_cdf",
         ":generalized_pareto",
         ":gumbel_cdf",
         ":identity",
@@ -68,6 +68,7 @@ multi_substrate_py_library(
         ":invert",
         ":iterated_sigmoid_centered",
         ":kumaraswamy_cdf",
+        ":lambertw_transform",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
         ":normal_cdf",
@@ -124,7 +125,7 @@ py_test(
     name = "bijector_properties_test",
     size = "medium",
     srcs = ["bijector_properties_test.py"],
-    shard_count = 10,
+    shard_count = 20,
     tags = ["hypothesis"],
     deps = [
         ":categorical_to_discrete",
@@ -397,6 +398,18 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "frechet_cdf",
+    srcs = ["frechet_cdf.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "generalized_pareto",
     srcs = ["generalized_pareto.py"],
     deps = [
@@ -463,7 +476,21 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
+    name = "lambertw_transform",
+    srcs = ["lambertw_transform.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
+    ],
+)
+
+multi_substrate_py_library(
     name = "masked_autoregressive",
     srcs = ["masked_autoregressive.py"],
     deps = [
@@ -652,6 +679,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 
@@ -821,7 +849,6 @@ multi_substrate_py_test(
     name = "bijector_test",
     size = "small",
     srcs = ["bijector_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijectors",
@@ -996,7 +1023,6 @@ multi_substrate_py_test(
     name = "categorical_to_discrete_test",
     size = "small",
     srcs = ["categorical_to_discrete_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":categorical_to_discrete",
@@ -1152,11 +1178,23 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "frechet_cdf_test",
+    size = "small",
+    srcs = ["frechet_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "generalized_pareto_test",
     size = "small",
     srcs = ["generalized_pareto_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1233,7 +1271,22 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
+    name = "lambertw_transform_test",
+    size = "small",
+    srcs = ["lambertw_transform_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        ":lambertw_transform",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "masked_autoregressive_test",
     size = "small",
     timeout = "moderate",
@@ -1247,6 +1300,7 @@ py_test(
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -1434,7 +1488,6 @@ multi_substrate_py_test(
     name = "sinh_arcsinh_test",
     size = "small",
     srcs = ["sinh_arcsinh_test.py"],
-    jax_tags = ["notap"],
     tags = ["no_windows"],  # TODO: needs investigation on Windows.
     deps = [
         ":bijector_test_util",
@@ -1462,6 +1515,7 @@ multi_substrate_py_test(
     name = "softfloor_test",
     size = "small",
     srcs = ["softfloor_test.py"],
+    jax_size = "medium",
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1650,6 +1704,8 @@ exports_files(
         "kumaraswamy.py",
         "kumaraswamy_cdf.py",
         "kumaraswamy_cdf_test.py",
+        "lambertw_transform.py",
+        "lambertw_transform_test.py",
         "matrix_inverse_tril.py",
         "matrix_inverse_tril_test.py",
         "normal_cdf.py",

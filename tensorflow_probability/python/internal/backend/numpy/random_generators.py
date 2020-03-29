@@ -18,32 +18,27 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
-
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import softmax as _softmax
 
 
 __all__ = [
-    'categorical',
+    'stateless_categorical',
     'gamma',
-    'normal',
-    'poisson',
-    'uniform',
+    'stateless_gamma',
+    'stateless_normal',
+    'stateless_poisson',
+    'stateless_shuffle',
+    'stateless_uniform',
     'set_seed',
-    'shuffle',
     # 'all_candidate_sampler',
     # 'experimental',
     # 'fixed_unigram_candidate_sampler',
     # 'learned_unigram_candidate_sampler',
     # 'log_uniform_candidate_sampler',
-    # 'stateless_categorical',
-    # 'stateless_normal',
     # 'stateless_truncated_normal',
-    # 'stateless_uniform',
     # 'truncated_normal',
     # 'uniform_candidate_sampler',
 ]
@@ -82,7 +77,7 @@ def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pyli
 
 
 def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
-  """Jax implementation of `tf.random.categorical`."""
+  """Jax implementation of `tf.random.stateless_categorical`."""
   dtype = utils.numpy_dtype(dtype or np.int64)
   if not hasattr(logits, 'shape') or not hasattr(logits, 'dtype'):
     logits = np.array(logits, np.float32)
@@ -94,19 +89,21 @@ def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # 
   return np.argmax(np.expand_dims(logits, -1) + z, axis=-2).astype(dtype)
 
 
-def _gamma(shape, alpha, beta=None, dtype=tf.float32, seed=None,
+def _gamma(shape, alpha, beta=None, dtype=np.float32, seed=None,
            name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   scale = 1. if beta is None else (1. / beta)
-  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, scale])
+  shape = _ensure_tuple(shape)
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
 
 
-def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):  # pylint: disable=unused-argument
+def _gamma_jax(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):  # pylint: disable=unused-argument
   """JAX-based reparameterized gamma sampler."""
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
-  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, beta])
+  alpha = np.array(alpha, dtype=dtype)
+  beta = None if beta is None else np.array(beta, dtype=dtype)
+  shape = _ensure_tuple(shape)
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
@@ -114,10 +111,12 @@ def _gamma_jax(shape, alpha, beta=None, dtype=tf.float32, seed=None, name=None):
   # https://github.com/google/jax/issues/2130 is fixed.
   samps = jaxrand.gamma(
       key=seed, a=alpha, shape=shape, dtype=np.float64).astype(dtype)
-  return samps if beta is None else samps / beta
+  # Match the 0->tiny behavior of tf.random.gamma.
+  return np.maximum(np.finfo(dtype).tiny,
+                    samps if beta is None else samps / beta)
 
 
-def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
+def _normal(shape, mean=0.0, stddev=1.0, dtype=np.float32, seed=None,
             name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
@@ -125,7 +124,7 @@ def _normal(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
   return rng.normal(loc=mean, scale=stddev, size=shape).astype(dtype)
 
 
-def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
+def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=np.float32, seed=None,
                 name=None):  # pylint: disable=unused-argument
   dtype = utils.common_dtype([mean, stddev], dtype_hint=dtype)
   shape = _bcast_shape(shape, [mean, stddev])
@@ -135,11 +134,11 @@ def _normal_jax(shape, mean=0.0, stddev=1.0, dtype=tf.float32, seed=None,
   return jaxrand.normal(key=seed, shape=shape, dtype=dtype) * stddev + mean
 
 
-def _poisson(shape, lam, dtype=tf.float32, seed=None,
+def _poisson(shape, lam, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([lam], dtype_hint=dtype)
-  shape = _ensure_tuple(shape) + np.shape(lam)
+  shape = _ensure_tuple(shape)
   return rng.poisson(lam=lam, size=shape).astype(dtype)
 
 
@@ -165,7 +164,7 @@ if JAX_MODE:
     # lam > 10. A reference implementation can be found here:
     # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc#L159-L239
 
-    shape = _ensure_tuple(shape) + np.shape(lam)
+    shape = _ensure_tuple(shape)
     max_iters = (max_iters
                  if max_iters is not None
                  else np.iinfo(np.int32).max)
@@ -187,10 +186,11 @@ if JAX_MODE:
     return (k - 1).astype(dtype)
 
 
-def _poisson_jax(shape, lam, dtype=tf.float32, seed=None,
+def _poisson_jax(shape, lam, dtype=np.float32, seed=None,
                  name=None, max_iters=None):  # pylint: disable=unused-argument
   """Jax Poisson random sampler."""
   # TODO(b/146674643): use transformed rejection sampling with lam > 10.
+  lam = np.array(lam)
   return _poisson_jax_impl(lam, seed, shape, dtype, name, max_iters)
 
 
@@ -208,16 +208,24 @@ def _shuffle_jax(value, seed=None, name=None):  # pylint: disable=unused-argumen
   return jaxrand.shuffle(seed, value, axis=0)
 
 
-def _uniform(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
+def _uniform(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
+  """Numpy uniform random sampler."""
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  if np.issubdtype(dtype, np.integer):
+    if maxval is None:
+      if minval is None:
+        return rng.random_integers(
+            np.iinfo(dtype).min, np.iinfo(dtype).max, size=shape).astype(dtype)
+      raise ValueError('Must provide maxval for integer sampling')
+    return rng.randint(low=minval, high=maxval, size=shape, dtype=dtype)
   maxval = 1 if maxval is None else maxval
   shape = _bcast_shape(shape, [minval, maxval])
   return rng.uniform(low=minval, high=maxval, size=shape).astype(dtype)
 
 
-def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
+def _uniform_jax(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
                  name=None):  # pylint: disable=unused-argument
   """Jax uniform random sampler."""
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
@@ -246,32 +254,47 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=tf.float32, seed=None,
 
 # --- Begin Public Functions --------------------------------------------------
 
-
-categorical = utils.copy_docstring(
-    tf.random.categorical,
+# TODO(b/147874898): rewrite samplers to use stateless signature. In the
+# meantime, we copy docstrings from stateful random samplers.
+stateless_categorical = utils.copy_docstring(
+    'tf.random.categorical',
     _categorical_jax if JAX_MODE else _categorical)
 
-gamma = utils.copy_docstring(
-    tf.random.gamma,
+stateless_gamma = utils.copy_docstring(
+    'tf.random.gamma',
     _gamma_jax if JAX_MODE else _gamma)
 
-normal = utils.copy_docstring(
-    tf.random.normal,
+
+# TODO(b/147874898): Delete this method.
+def gamma(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
+  """Handles the difference in shape parameter interpretation."""
+  # While we still have usages of tf.random.gamma and tf.random.stateless_gamma,
+  # we must handle the different interpretation of the shape argument
+  # between the two. `tf.random.gamma` interprets shape as a prefix.
+  # `tf.random.stateless_gamma` interprets shape as the full output shape,
+  # including as suffix the broadcast of alpha and beta shapes.
+  scale = 1 if beta is None else beta
+  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, scale])
+  return stateless_gamma(shape=shape, alpha=alpha, beta=beta, dtype=dtype,
+                         seed=seed, name=name)
+
+
+stateless_normal = utils.copy_docstring(
+    'tf.random.normal',
     _normal_jax if JAX_MODE else _normal)
 
-poisson = utils.copy_docstring(
-    tf.random.poisson,
+stateless_poisson = utils.copy_docstring(
+    'tf.random.poisson',
     _poisson_jax if JAX_MODE else _poisson)
 
-shuffle = utils.copy_docstring(
-    tf.random.shuffle,
-    _shuffle_jax if JAX_MODE else _shuffle)
+# TODO(b/147874898): Delete this method in favor of using `samplers.shuffle`.
+stateless_shuffle = (_shuffle_jax if JAX_MODE else _shuffle)
 
-uniform = utils.copy_docstring(
-    tf.random.uniform,
+stateless_uniform = utils.copy_docstring(
+    'tf.random.uniform',
     _uniform_jax if JAX_MODE else _uniform)
 
 set_seed = utils.copy_docstring(
-    tf.random.set_seed,
+    'tf.random.set_seed',
     (lambda seed: None if JAX_MODE  # pylint: disable=g-long-lambda
      else lambda seed: np.random.seed(seed % (2**32 - 1))))

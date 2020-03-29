@@ -24,7 +24,6 @@ import functools
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import util
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
@@ -35,6 +34,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -671,8 +671,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     """Draw a joint sample from the prior over latents and observations."""
 
     with self._name_and_control_scope('sample_n_joint'):
-      stream = util.SeedStream(
-          seed, salt='LinearGaussianStateSpaceModel_sample_n_joint')
+      initial_state_seed, initial_obs_seed, loop_seed = samplers.split_seed(
+          seed, n=3, salt='LinearGaussianStateSpaceModel_sample_n_joint')
 
       sample_and_batch_shape = distribution_util.prefer_static_value(
           tf.concat([[n], self.batch_shape_tensor()],
@@ -688,7 +688,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
               self.initial_state_prior,
               sample_and_batch_shape,
               self.validate_args),
-          seed=stream())
+          seed=initial_state_seed)
 
       # Add a dummy dimension so that matmul() does matrix-vector
       # multiplication.
@@ -707,7 +707,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                                      initial_observation_noise,
                                      sample_and_batch_shape,
                                      self.validate_args),
-                                 seed=stream())[..., tf.newaxis])
+                                 seed=initial_obs_seed)[..., tf.newaxis])
 
       sample_step = build_kalman_sample_step(
           self.get_transition_matrix_for_timestep,
@@ -715,15 +715,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           self.get_observation_matrix_for_timestep,
           self.get_observation_noise_for_timestep,
           full_sample_and_batch_shape=sample_and_batch_shape,
-          stream=stream,
           validate_args=self.validate_args)
 
       # Scan over all timesteps to sample latents and observations.
-      (latents, observations) = tf.scan(
+      (latents, observations, _) = tf.scan(
           sample_step,
           elems=tf.range(self.initial_step+1, self._final_step()),
-          initializer=(initial_latent, initial_observation),
-          parallel_iterations=1 if seed is not None else 10)
+          initializer=(initial_latent, initial_observation, loop_seed))
 
       # Combine the initial sampled timestep with the remaining timesteps.
       latents = _safe_concat([initial_latent[tf.newaxis, ...],
@@ -1063,6 +1061,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         the posterior over latent states given the observed value `x`.
     """
     x = tf.convert_to_tensor(x, name='x')
+    sample_shape = tf.convert_to_tensor(sample_shape, dtype_hint=tf.int32)
     if mask is not None:
       mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
 
@@ -1078,11 +1077,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # than the distribution, we'll need to draw extra samples to match.
       result_sample_and_batch_shape = prefer_static.concat([
           distribution_util.expand_to_vector(sample_shape),
-          functools.reduce(prefer_static.broadcast_shape, [
-              prefer_static.shape(x)[:-2],
-              prefer_static.shape(mask)[:-1] if mask is not None else [],
-              batch_shape,
-          ])], axis=0)
+          tf.convert_to_tensor(
+              functools.reduce(prefer_static.broadcast_shape, [
+                  prefer_static.shape(x)[:-2],
+                  prefer_static.shape(mask)[:-1] if mask is not None else [],
+                  batch_shape]),
+              dtype_hint=tf.int32)
+          ], axis=0)
       sample_size = tf.cast(
           prefer_static.reduce_prod(result_sample_and_batch_shape) /
           prefer_static.reduce_prod(batch_shape), tf.int32)
@@ -1148,7 +1149,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # Scan over all timesteps following the initial step.
       (latent_means, observation_means) = tf.scan(
           mean_step,
-          elems=tf.range(self.initial_step+1, self._final_step()),
+          elems=tf.range(self.initial_step + 1, self._final_step()),
           initializer=(initial_latent_mean, initial_observation_mean))
 
       # Squish the initial step back on top of the other (scanned) timesteps
@@ -1409,7 +1410,7 @@ def build_backward_pass_step(get_transition_matrix_for_timestep):
 
     return BackwardPassState(backward_mean=posterior_mean,
                              backward_cov=posterior_cov,
-                             timestep=state.timestep-1)
+                             timestep=state.timestep - 1)
 
   return backward_pass_step
 
@@ -1685,7 +1686,7 @@ def linear_gaussian_update(
   #      = (S^{-1} * tmp_obs_cov) '
   #      = (S \ tmp_obs_cov)'
   if observation_size_is_static_and_scalar:
-    gain_transpose = tmp_obs_cov/predicted_obs_cov
+    gain_transpose = tmp_obs_cov / predicted_obs_cov
   else:
     predicted_obs_cov_chol = tf.linalg.cholesky(predicted_obs_cov)
     gain_transpose = tf.linalg.cholesky_solve(predicted_obs_cov_chol,
@@ -1840,7 +1841,6 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
                              get_observation_matrix_for_timestep,
                              get_observation_noise_for_timestep,
                              full_sample_and_batch_shape,
-                             stream,
                              validate_args=False):
   """Build a callable for one step of Kalman sampling recursion.
 
@@ -1861,8 +1861,6 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
       `[observation_size]`.
     full_sample_and_batch_shape: Desired sample and batch shape of the
       returned samples, concatenated in a single `Tensor`.
-    stream: `tfp.util.SeedStream` instance used to generate a
-      sequence of random seeds.
     validate_args: if True, perform error checking at runtime.
 
   Returns:
@@ -1872,7 +1870,10 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
 
   def sample_step(sampled_prev, t):
     """Sample values for a single timestep."""
-    latent_prev, _ = sampled_prev
+    latent_prev, _, seed = sampled_prev
+    (transition_noise_seed,
+     observation_noise_seed,
+     next_seed) = samplers.split_seed(seed, n=3)
 
     transition_matrix = get_transition_matrix_for_timestep(t - 1)
     transition_noise = get_transition_noise_for_timestep(t - 1)
@@ -1883,7 +1884,7 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
             transition_noise,
             full_sample_and_batch_shape,
             validate_args),
-        seed=stream())[..., tf.newaxis]
+        seed=transition_noise_seed)[..., tf.newaxis]
 
     observation_matrix = get_observation_matrix_for_timestep(t)
     observation_noise = get_observation_noise_for_timestep(t)
@@ -1894,9 +1895,9 @@ def build_kalman_sample_step(get_transition_matrix_for_timestep,
             observation_noise,
             full_sample_and_batch_shape,
             validate_args),
-        seed=stream())[..., tf.newaxis]
+        seed=observation_noise_seed)[..., tf.newaxis]
 
-    return (latent_sampled, observation_sampled)
+    return (latent_sampled, observation_sampled, next_seed)
 
   return sample_step
 

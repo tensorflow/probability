@@ -26,6 +26,8 @@ NO_REWRITE_NEEDED = [
     "math:sparse",
     "math/ode",
     "optimizer/convergence_criteria",
+    "optimizer:sgld",
+    "optimizer:variational_sgld",
     "platform_google",
 ]
 

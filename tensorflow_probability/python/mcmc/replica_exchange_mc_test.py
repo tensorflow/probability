@@ -32,6 +32,17 @@ from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 
 
+def init_tfp_randomwalkmetropolis(
+    target_log_prob_fn,
+    seed,
+    step_size,
+    store_parameters_in_results=False, num_leapfrog_steps=None):  # pylint: disable=unused-argument
+  return tfp.mcmc.RandomWalkMetropolis(
+      target_log_prob_fn,
+      new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=step_size),
+      seed=seed)
+
+
 def effective_sample_size(x, **kwargs):
   """tfp.mcmc.effective_sample_size, with a maximum appropriate for HMC."""
   # Since ESS is an estimate, it can go wrong...  E.g. we can have negatively
@@ -147,12 +158,31 @@ class REMCTest(test_util.TestCase):
     tf.random.set_seed(123)
     super(REMCTest, self).setUp()
 
-  def _checkNormalREMCSampling(self,
-                               inverse_temperatures,
-                               num_results=1000,
-                               prob_swap=1.0,
-                               dtype=np.float32):
+  @parameterized.named_parameters([
+      dict(  # pylint: disable=g-complex-comprehension
+          testcase_name=testcase_name + kernel_name,
+          tfp_transition_kernel=tfp_transition_kernel,
+          inverse_temperatures=inverse_temperatures,
+          store_parameters_in_results=store_param)
+      for kernel_name, tfp_transition_kernel, store_param in [
+          ('HMC', tfp.mcmc.HamiltonianMonteCarlo, True),
+          ('RWMH', init_tfp_randomwalkmetropolis, False),
+      ]
+      for testcase_name, inverse_temperatures in [
+          ('OddNumReplicas', [1.0, 0.8, 0.6]),
+          ('EvenNumReplicas', [1.0, 0.8, 0.7, 0.6]),
+          ('HighTemperatureOnly', [0.5]),
+          ('LowTemperatureOnly', [2.0]),
+      ]
+  ])
+  def testNormal(self,
+                 tfp_transition_kernel,
+                 inverse_temperatures,
+                 store_parameters_in_results,
+                 prob_swap=1.0,
+                 dtype=np.float32):
     """Sampling from standard normal with REMC."""
+    num_results = 500 if tf.executing_eagerly() else 2000
 
     target = tfd.Normal(dtype(0.), dtype(1.))
     inverse_temperatures = dtype(inverse_temperatures)
@@ -162,11 +192,11 @@ class REMCTest(test_util.TestCase):
     num_leapfrog_steps = 3
 
     def make_kernel_fn(target_log_prob_fn, seed):
-      return tfp.mcmc.HamiltonianMonteCarlo(
+      return tfp_transition_kernel(
           target_log_prob_fn=target_log_prob_fn,
           seed=seed,
           step_size=step_size,
-          store_parameters_in_results=True,
+          store_parameters_in_results=store_parameters_in_results,
           num_leapfrog_steps=num_leapfrog_steps)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
@@ -268,46 +298,21 @@ class REMCTest(test_util.TestCase):
         np.repeat([inverse_temperatures], axis=0, repeats=num_results),
         kr_.inverse_temperatures)
 
-    # Check that store_parameters_in_results=True worked.
-    self.assertAllEqual(
-        np.repeat(
-            [step_size], axis=0, repeats=num_results),
-        kr_.post_swap_replica_results.accepted_results.step_size)
+    if store_parameters_in_results:
+      # Check that store_parameters_in_results=True worked for HMC.
+      self.assertAllEqual(
+          np.repeat([step_size], axis=0, repeats=num_results),
+          kr_.post_swap_replica_results.accepted_results.step_size)
 
-    self.assertAllEqual(
-        np.repeat(
-            [num_leapfrog_steps], axis=0, repeats=num_results),
-        kr_.post_swap_replica_results.accepted_results.num_leapfrog_steps)
+      self.assertAllEqual(
+          np.repeat([num_leapfrog_steps], axis=0, repeats=num_results),
+          kr_.post_swap_replica_results.accepted_results.num_leapfrog_steps)
 
-  def testNormalOddNumReplicas(self):
-    """Sampling from the Standard Normal Distribution."""
-    self._checkNormalREMCSampling(
-        inverse_temperatures=[1., 0.8, 0.6],
-        num_results=500 if tf.executing_eagerly() else 2000,
-    )
-
-  def testNormalEvenNumReplicas(self):
-    """Sampling from the Standard Normal Distribution."""
-    self._checkNormalREMCSampling(
-        inverse_temperatures=[1., 0.8, 0.7, 0.6],
-        num_results=500 if tf.executing_eagerly() else 2000,
-    )
-
-  def testNormalHighTemperatureOnly(self):
-    """Sampling from a tempered Normal Distribution."""
-    self._checkNormalREMCSampling(
-        inverse_temperatures=[0.5],
-        num_results=500 if tf.executing_eagerly() else 2000,
-    )
-
-  def testNormalLowTemperatureOnly(self):
-    """Sampling from a tempered Normal Distribution."""
-    self._checkNormalREMCSampling(
-        inverse_temperatures=[2.0],
-        num_results=500 if tf.executing_eagerly() else 2000,
-    )
-
-  def testRWM2DMixNormal(self):
+  @parameterized.named_parameters([
+      ('HMC', tfp.mcmc.HamiltonianMonteCarlo),
+      ('RWMH', init_tfp_randomwalkmetropolis),
+  ])
+  def testRWM2DMixNormal(self, tfp_transition_kernel):
     """Sampling from a 2-D Mixture Normal Distribution."""
     dtype = np.float32
 
@@ -329,7 +334,7 @@ class REMCTest(test_util.TestCase):
     # to right pad the step_size by one dim (for the event).
     step_size = 0.2 / tf.math.sqrt(inverse_temperatures[:, tf.newaxis])
     def make_kernel_fn(target_log_prob_fn, seed):
-      return tfp.mcmc.HamiltonianMonteCarlo(
+      return tfp_transition_kernel(
           target_log_prob_fn=target_log_prob_fn,
           seed=seed,
           step_size=step_size,
@@ -475,9 +480,48 @@ class REMCTest(test_util.TestCase):
     self.assertAllClose(
         true_cov, sample_cov_, atol=5 * max_scale**2 / np.sqrt(np.min(ess_)))
 
-  def _checkMVNWithOneBatchDim(self, inverse_temperatures, step_size):
+  @parameterized.named_parameters([
+      dict(  # pylint: disable=g-complex-comprehension
+          testcase_name=testcase_name + kernel_name,
+          tfp_transition_kernel=tfp_transition_kernel,
+          inverse_temperatures=inverse_temperatures,
+          step_size_fn=step_size_fn,
+          ess_scaling=ess_scaling)
+      for kernel_name, tfp_transition_kernel, ess_scaling in [
+          ('HMC', tfp.mcmc.HamiltonianMonteCarlo, .1),
+          ('RWMH', init_tfp_randomwalkmetropolis, .02),
+      ]
+      for testcase_name, inverse_temperatures, step_size_fn in [
+          ('1DTemperatureScalarStep', np.float32([1.0, 0.5, 0.25]),
+           lambda x: 0.5),
+          ('1DTemperature1DStep', np.float32([1.0, 0.5, 0.25]),
+           lambda x: 0.5 / np.sqrt(x).reshape(3, 1, 1)),
+          (
+              '1DTemperature2DStep',
+              np.float32([1.0, 0.5, 0.25]),
+              lambda x: np.stack(  # pylint: disable=g-long-lambda
+                  [0.5 / np.sqrt(x), 0.5 / np.sqrt(x)],
+                  axis=-1).reshape(3, 2, 1)),
+          (
+              '2DTemperature1DStep',
+              np.float32(
+                  np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1)),
+              lambda x: 0.5 / np.sqrt(  # pylint: disable=g-long-lambda
+                  x.mean(axis=-1).reshape(3, 1, 1))),
+          ('2DTemperature2DStep',
+           np.float32(np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1)),
+           lambda x: 0.5 / np.sqrt(x).reshape(3, 2, 1))
+      ]
+  ])
+  def test1EventDim2BatchDim3Replica(self,
+                                     tfp_transition_kernel,
+                                     inverse_temperatures,
+                                     step_size_fn,
+                                     ess_scaling):
     """Sampling from two batch diagonal multivariate normal."""
-    step_size += np.exp(np.pi) / 100  # Prevent resonances.
+    step_size = step_size_fn(inverse_temperatures) + np.exp(
+        np.pi) / 100  # Prevent resonances.
+
     # Small scale and well-separated modes mean we need replica swap to
     # work or else tests fail.
     loc = np.array(
@@ -492,7 +536,7 @@ class REMCTest(test_util.TestCase):
         loc=loc, scale_identity_multiplier=scale_identity_multiplier)
 
     def make_kernel_fn(target_log_prob_fn, seed):
-      return tfp.mcmc.HamiltonianMonteCarlo(
+      return tfp_transition_kernel(
           target_log_prob_fn=target_log_prob_fn,
           seed=seed,
           step_size=step_size,
@@ -552,7 +596,7 @@ class REMCTest(test_util.TestCase):
 
     self.assertAllEqual(states_, replica_states_[:, 0])
 
-    def _check_stats(replica_idx, batch_idx):
+    def _check_stats(replica_idx, batch_idx, ess_scaling):
       err_msg = 'Failure in replica {}, batch {}'.format(replica_idx, batch_idx)
       assert inverse_temperatures.ndim in [1, 2]
       if inverse_temperatures.ndim == 1:
@@ -564,7 +608,7 @@ class REMCTest(test_util.TestCase):
           scale_identity_multiplier[batch_idx] * np.sqrt(temperature))
 
       ess = np.min(ess_[replica_idx, batch_idx])  # Conservative estimate.
-      self.assertGreater(ess, num_results / 10, msg='Bad sampling!')
+      self.assertGreater(ess, num_results * ess_scaling, msg='Bad sampling!')
 
       self.assertAllClose(
           replica_mean_[replica_idx, batch_idx],
@@ -581,47 +625,7 @@ class REMCTest(test_util.TestCase):
 
     for replica_idx in range(num_replica):
       for batch_idx in range(loc.shape[0]):
-        _check_stats(replica_idx, batch_idx)
-
-  def test1EventDim2BatchDim3Replica1DTemperatureScalarStep(self):
-    inverse_temperatures = np.float32([1.0, 0.5, 0.25])
-    step_size = 0.5
-    self._checkMVNWithOneBatchDim(inverse_temperatures, step_size)
-
-  def test1EventDim2BatchDim3Replica1DTemperature1DStep(self):
-    inverse_temperatures = np.float32([1.0, 0.5, 0.25])
-
-    # We need to pad the step_size so it broadcasts against MCMC samples.
-    step_size = 0.5 / np.sqrt(inverse_temperatures).reshape(3, 1, 1)
-    self._checkMVNWithOneBatchDim(inverse_temperatures, step_size)
-
-  def test1EventDim2BatchDim3Replica1DTemperature2DStep(self):
-    inverse_temperatures = np.float32([1.0, 0.5, 0.25])
-
-    # We need to pad the step_size so it broadcasts against MCMC samples.
-    step_size = np.stack([
-        0.5 / np.sqrt(inverse_temperatures),
-        0.5 / np.sqrt(inverse_temperatures),
-    ], axis=-1).reshape(3, 2, 1)
-    self._checkMVNWithOneBatchDim(inverse_temperatures, step_size)
-
-  def test1EventDim2BatchDim3Replica2DTemperature1DStep(self):
-    # Shape [3, 2].
-    inverse_temperatures = np.float32(
-        np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1))
-
-    # We need to pad the step_size so it broadcasts against MCMC samples.
-    step_size = 0.5 / np.sqrt(inverse_temperatures).reshape(3, 2, 1)
-    self._checkMVNWithOneBatchDim(inverse_temperatures, step_size)
-
-  def test1EventDim2BatchDim3Replica2DTemperature2DStep(self):
-    # Shape [3, 2].
-    inverse_temperatures = np.float32(
-        np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1))
-
-    # We need to pad the step_size so it broadcasts against MCMC samples.
-    step_size = 0.5 / np.sqrt(inverse_temperatures).reshape(3, 2, 1)
-    self._checkMVNWithOneBatchDim(inverse_temperatures, step_size)
+        _check_stats(replica_idx, batch_idx, ess_scaling)
 
   def testMultipleCorrelatedStatesWithOneBatchDim(self):
     dtype = np.float32

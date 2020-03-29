@@ -70,6 +70,9 @@ class Softsign(bijector.Bijector):
 
   def _inverse(self, y):
     with tf.control_dependencies(self._assertions(y)):
+      # y = +-1 exactly is still ok: the denominator will be 0, so the result
+      # will be +-inf according to the sign of y, which is the best answer we
+      # can give.
       return y / (1. - tf.math.abs(y))
 
   def _forward_log_det_jacobian(self, x):
@@ -83,12 +86,12 @@ class Softsign(bijector.Bijector):
     if not self.validate_args:
       return []
     return [
-        assert_util.assert_greater(
+        assert_util.assert_greater_equal(
             t,
             dtype_util.as_numpy_dtype(t.dtype)(-1),
-            message="Inverse transformation input must be greater than -1."),
-        assert_util.assert_less(
+            message="Inverse transformation input must be >= -1."),
+        assert_util.assert_less_equal(
             t,
             dtype_util.as_numpy_dtype(t.dtype)(1),
-            message="Inverse transformation input must be less than 1.")
+            message="Inverse transformation input must be <= 1.")
     ]

@@ -138,6 +138,45 @@ py_test(
     ],
 )
 
+py_test(
+    name = "xla_test_cpu",
+    srcs = ["xla_test.py"],
+    args = ["--test_device=cpu"],
+    main = "xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_test(
+    name = "xla_test_gpu",
+    srcs = ["xla_test.py"],
+    args = ["--test_device=gpu"],
+    main = "xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
 py_library(
     name = "util",
     srcs = ["util.py"],

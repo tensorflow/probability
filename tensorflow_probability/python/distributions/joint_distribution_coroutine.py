@@ -163,7 +163,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     parameters = dict(locals())
     with tf.name_scope(name or 'JointDistributionCoroutine') as name:
       self._sample_dtype = sample_dtype
-      self._model = model
+      self._model_coroutine = model
       self._single_sample_distributions = {}
       super(JointDistributionCoroutine, self).__init__(
           dtype=sample_dtype,
@@ -172,6 +172,10 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           allow_nan_stats=False,
           parameters=parameters,
           name=name)
+
+  @property
+  def model(self):
+    return self._model_coroutine
 
   def _assert_compatible_shape(self, index, sample_shape, samples):
     requested_shape, _ = self._expand_sample_shape_to_vector(
@@ -229,7 +233,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     ds = []
     values_out = []
     seed = SeedStream(seed, salt='JointDistributionCoroutine')
-    gen = self._model()
+    gen = self._model_coroutine()
     index = 0
     d = next(gen)
     if not isinstance(d, self.Root):

@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -357,9 +358,9 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
 
     # Computes each logits and num_trials situation by map_fn.
 
-    # Using just one batch tf.random.categorical call doesn't work because that
+    # Using just one batch samplers.categorical call doesn't work because that
     # requires num_trials to be the same across all members of the batch of
-    # logits.  This restriction makes sense for tf.random.categorical because
+    # logits.  This restriction makes sense for samplers.categorical because
     # for it, num_trials is part of the returned shape.  However, the
     # multinomial sampler does not need that restriction, because it sums out
     # exactly that dimension.
@@ -372,28 +373,21 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
     # with a batch categorical followed by batch unsorted_segment_sum, once both
     # of those work and are memory-efficient enough.
     def _sample_one_batch_member(args):
-      logits, num_cat_samples = args[0], args[1]  # [K], []
+      logits, num_cat_samples, item_seed = args  # [K], []
       # x has shape [1, num_cat_samples = num_samples * num_trials]
-      x = tf.random.categorical(
-          logits[tf.newaxis, ...], num_cat_samples, seed=seed)
+      x = samplers.categorical(
+          logits[tf.newaxis, ...], num_cat_samples, seed=item_seed)
       x = tf.reshape(x, shape=[num_samples, -1])  # [num_samples, num_trials]
       x = tf.one_hot(
           x, depth=num_classes)  # [num_samples, num_trials, num_classes]
       x = tf.reduce_sum(x, axis=-2)  # [num_samples, num_classes]
       return tf.cast(x, dtype=dtype)
 
-    if seed is not None:
-      # Force parallel_iterations to 1 to ensure reproducibility
-      # b/139210489
-      x = tf.map_fn(
-          _sample_one_batch_member, [flat_logits, flat_num_trials],
-          dtype=dtype,  # [B1B2...Bm, num_samples, num_classes]
-          parallel_iterations=1)
-    else:
-      # Invoke default parallel_iterations behavior
-      x = tf.map_fn(
-          _sample_one_batch_member, [flat_logits, flat_num_trials],
-          dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
+    flat_seeds = samplers.split_seed(seed, n=tf.shape(flat_logits)[0],
+                                     salt='multinomial_draw_sample')
+    x = tf.map_fn(
+        _sample_one_batch_member, [flat_logits, flat_num_trials, flat_seeds],
+        fn_output_signature=dtype)  # [B1B2...Bm, num_samples, num_classes]
 
     # reshape the results to proper shape
     x = tf.transpose(a=x, perm=[1, 0, 2])

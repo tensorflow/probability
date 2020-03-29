@@ -23,9 +23,8 @@ import collections
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import floor
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import truediv
 from tensorflow_probability.python.internal.backend.numpy.ops import clip_by_value
@@ -65,7 +64,7 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
   return np.argsort(values, axis, kind='stable' if stable else 'quicksort')
 
 
-def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=tf.int32,
+def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=np.int32,
                                 name=None):
   """Numpy implementation of `tf.histogram_fixed_width_bins`."""
   del name
@@ -129,11 +128,11 @@ _UniqueOutput = collections.namedtuple('UniqueOutput', ['y', 'idx'])
 
 
 # TODO(b/140685491): Add unit-test.
-def _unique(x, out_idx=tf.int32, name=None):  # pylint: disable=unused-argument
+def _unique(x, out_idx=np.int32, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.unique`."""
   x = np.array(x)
   if len(x.shape) != 1:
-    raise tf.errors.InvalidArgumentError('unique expects a 1D vector.')
+    raise errors.InvalidArgumentError('unique expects a 1D vector.')
   y, idx = np.unique(x,
                      return_index=True,
                      return_inverse=False,
@@ -146,29 +145,29 @@ def _unique(x, out_idx=tf.int32, name=None):  # pylint: disable=unused-argument
 # --- Begin Public Functions --------------------------------------------------
 
 argsort = utils.copy_docstring(
-    tf.argsort,
+    'tf.argsort',
     _argsort)
 
 histogram_fixed_width_bins = utils.copy_docstring(
-    tf.histogram_fixed_width_bins,
+    'tf.histogram_fixed_width_bins',
     _histogram_fixed_width_bins)
 
 sort = utils.copy_docstring(
-    tf.sort,
+    'tf.sort',
     _sort)
 
 tensor_scatter_nd_add = utils.copy_docstring(
-    tf.tensor_scatter_nd_add,
+    'tf.tensor_scatter_nd_add',
     _tensor_scatter_nd_add)
 
 tensor_scatter_nd_sub = utils.copy_docstring(
-    tf.tensor_scatter_nd_sub,
+    'tf.tensor_scatter_nd_sub',
     _tensor_scatter_nd_sub)
 
 tensor_scatter_nd_update = utils.copy_docstring(
-    tf.tensor_scatter_nd_update,
+    'tf.tensor_scatter_nd_update',
     _tensor_scatter_nd_update)
 
 unique = utils.copy_docstring(
-    tf.unique,
+    'tf.unique',
     _unique)

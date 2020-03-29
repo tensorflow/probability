@@ -53,22 +53,20 @@ multi_substrate_py_library(
     name = "batched_rejection_sampler",
     srcs = ["batched_rejection_sampler.py"],
     deps = [
+        ":samplers",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
 multi_substrate_py_test(
     name = "batched_rejection_sampler_test",
-    size = "small",
+    size = "medium",
     srcs = ["batched_rejection_sampler_test.py"],
-    # TODO(b/148640931): Current version produces identical random values across
-    # separate loop iterations in numpy / JAX, leading to infinite loops.
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":batched_rejection_sampler",
+        ":samplers",
         ":test_util",
         # numpy dep,
         # scipy dep,
@@ -173,7 +171,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "nest_util",
     srcs = ["nest_util.py"],
     srcs_version = "PY2AND3",
@@ -182,7 +180,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "nest_util_test",
     size = "small",
     srcs = ["nest_util_test.py"],
@@ -224,6 +222,28 @@ multi_substrate_py_test(
 py_library(
     name = "reparameterization",
     srcs = ["reparameterization.py"],
+)
+
+multi_substrate_py_library(
+    name = "samplers",
+    srcs = ["samplers.py"],
+    deps = [
+        ":dtype_util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "samplers_test",
+    size = "small",
+    srcs = ["samplers_test.py"],
+    deps = [
+        ":samplers",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
 )
 
 multi_substrate_py_library(
@@ -407,6 +427,7 @@ py_test(
 exports_files(
     [
         "assert_util.py",
+        "batched_rejection_sampler.py",
         "distribution_util.py",
         "dtype_util.py",
         "dtype_util_test.py",

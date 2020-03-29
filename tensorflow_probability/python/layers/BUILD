@@ -56,7 +56,6 @@ py_library(
         "//tensorflow_probability/python/distributions:kullback_leibler",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
-        "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -86,14 +85,13 @@ py_library(
         "//tensorflow_probability/python/distributions:kullback_leibler",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
-        "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
 py_test(
     name = "dense_variational_test",
-    size = "small",
+    size = "medium",
     srcs = ["dense_variational_test.py"],
     deps = [
         # numpy dep,

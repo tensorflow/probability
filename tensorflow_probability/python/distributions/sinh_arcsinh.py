@@ -28,9 +28,10 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "SinhArcsinh",
+    'SinhArcsinh',
 ]
 
 
@@ -97,6 +98,11 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   ```
   """
 
+  @deprecation.deprecated(
+      '2020-06-01', 'Previously, `distribution` was required to have scalar '
+      'batch. Because batch shape overrides to `TransformedDistribution` are '
+      'deprecated, `distribution` now must have a batch shape to which the '
+      'shapes of `loc`, `scale`, `skewness`, and `tailweight` all broadcast.')
   def __init__(self,
                loc,
                scale,
@@ -105,7 +111,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
                distribution=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="SinhArcsinh"):
+               name='SinhArcsinh'):
     """Construct SinhArcsinh distribution on `(-inf, inf)`.
 
     Arguments `(loc, scale, skewness, tailweight)` must have broadcastable shape
@@ -141,16 +147,16 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       dtype = dtype_util.common_dtype([loc, scale, skewness, tailweight],
                                       tf.float32)
       self._loc = tensor_util.convert_nonref_to_tensor(
-          loc, name="loc", dtype=dtype)
+          loc, name='loc', dtype=dtype)
       self._scale = tensor_util.convert_nonref_to_tensor(
-          scale, name="scale", dtype=dtype)
+          scale, name='scale', dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
       has_default_skewness = skewness is None
       skewness = 0. if has_default_skewness else skewness
       self._tailweight = tensor_util.convert_nonref_to_tensor(
-          tailweight, name="tailweight", dtype=dtype)
+          tailweight, name='tailweight', dtype=dtype)
       self._skewness = tensor_util.convert_nonref_to_tensor(
-          skewness, name="skewness", dtype=dtype)
+          skewness, name='skewness', dtype=dtype)
 
       batch_shape = distribution_util.get_broadcast_shape(
           self._loc, self._scale, self._tailweight, self._skewness)
@@ -161,6 +167,9 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       #   C := 2 / F_0(2)
       #   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
       if distribution is None:
+        # TODO(b/151180729): When `batch_shape` arg to `TransformedDistribution`
+        # is deprecated, broadcast `loc` or `scale` parameter to `batch_shape`
+        # and remove `else` condition.
         distribution = normal.Normal(
             loc=tf.zeros([], dtype=dtype),
             scale=tf.ones([], dtype=dtype),

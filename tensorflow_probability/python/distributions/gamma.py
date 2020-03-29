@@ -26,10 +26,12 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -202,12 +204,31 @@ class Gamma(distribution.Distribution):
       """Note: See `tf.random_gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return tf.random.gamma(
-        shape=[n],
-        alpha=self.concentration,
-        beta=self.rate,
-        dtype=self.dtype,
-        seed=seed)
+    """Gamma sampler.
+
+    Rather than use `tf.random.gamma` (which is as of February 2020 implemented
+    in C++ for CPU only), we implement our own gamma sampler in Python, using
+    `batched_las_vegas_algorithm` as a substrate. This has the advantage that
+    our sampler is XLA compilable.
+
+    If sampling becomes a bottleneck on CPU, one way to gain speed would be to
+    consider switching back to the C++ sampler.
+
+    Args:
+      n: Number of samples to draw.
+      seed: (optional) The random seed.
+
+    Returns:
+      n samples from the gamma distribution.
+    """
+    n = tf.convert_to_tensor(n, name='shape', dtype=tf.int32)
+    alpha = tf.convert_to_tensor(self.concentration, name='alpha')
+    beta = tf.convert_to_tensor(self.rate, name='beta')
+    broadcast_shape = prefer_static.broadcast_shape(
+        prefer_static.shape(alpha), prefer_static.shape(beta))
+    result_shape = tf.concat([[n], broadcast_shape], axis=0)
+
+    return random_gamma(result_shape, alpha, beta, seed=seed)
 
   def _log_prob(self, x, concentration=None, rate=None):
     concentration = tf.convert_to_tensor(
@@ -313,3 +334,145 @@ def _kl_gamma_gamma(g0, g1, name=None):
             g1_concentration * tf.math.log(g0_rate) -
             g1_concentration * tf.math.log(g1_rate) + g0_concentration *
             (g1_rate / g0_rate - 1.))
+
+
+def random_gamma(
+    sample_shape, alpha, beta, internal_dtype=tf.float64, seed=None):
+  """Samples from the gamma distribution.
+
+  The sampling algorithm is rejection sampling [1], and pathwise gradients with
+  respect to alpha are computed via implicit differentiation [2].
+
+  Args:
+    sample_shape: The output sample shape. Must broadcast with both
+      `alpha` and `beta`.
+    alpha: Floating point tensor, the alpha params of the
+      distribution(s). Must contain only positive values. Must broadcast with
+      `beta`.
+    beta: Floating point tensor, the inverse scale params of the
+      distribution(s). Must contain only positive values. Must broadcast with
+      `alpha`.
+    internal_dtype: dtype to use for internal computations.
+    seed: (optional) The random seed.
+
+  Returns:
+    Differentiable samples from the gamma distribution.
+
+  #### References
+
+  [1] George Marsaglia and Wai Wan Tsang. A simple method for generating Gamma
+      variables. ACM Transactions on Mathematical Software, 2000.
+
+  [2] Michael Figurnov, Shakir Mohamed, and Andriy Mnih. Implicit
+      Reparameterization Gradients. Neural Information Processing Systems, 2018.
+  """
+  generate_and_test_samples_seed, alpha_fix_seed = samplers.split_seed(
+      seed, salt='random_gamma')
+  output_dtype = dtype_util.common_dtype([alpha, beta], dtype_hint=tf.float32)
+
+  @tf.custom_gradient
+  def rejection_sample(alpha):
+    """Gamma rejection sampler."""
+    # Note that alpha here already has a shape that is broadcast with beta.
+    cast_alpha = tf.cast(alpha, internal_dtype)
+
+    good_params_mask = (alpha > 0.)
+    # When replacing NaN values, use 100. for alpha, since that leads to a
+    # high-likelihood of the rejection sampler accepting on the first pass.
+    safe_alpha = tf.where(good_params_mask, cast_alpha, 100.)
+
+    modified_safe_alpha = tf.where(
+        safe_alpha < 1., safe_alpha + 1., safe_alpha)
+
+    one_third = tf.constant(1. / 3, dtype=internal_dtype)
+    d = modified_safe_alpha - one_third
+    c = one_third / tf.sqrt(d)
+
+    def generate_and_test_samples(seed):
+      """Generate and test samples."""
+      v_seed, u_seed = samplers.split_seed(seed)
+
+      def generate_positive_v():
+        """Generate positive v."""
+        def _inner(seed):
+          x = samplers.normal(
+              sample_shape, dtype=internal_dtype, seed=seed)
+          # This implicitly broadcasts alpha up to sample shape.
+          v = 1 + c * x
+          return (x, v), v > 0.
+
+        # Note: It should be possible to remove this 'inner' call to
+        # `batched_las_vegas_algorithm` and merge the v > 0 check into the
+        # overall check for a good sample. This would lead to a slightly simpler
+        # implementation; it is unclear whether it would be faster. We include
+        # the inner loop so this implementation is more easily comparable to
+        # Ref. [1] and other implementations.
+        return brs.batched_las_vegas_algorithm(_inner, v_seed)[0]
+
+      (x, v) = generate_positive_v()
+      x2 = x * x
+      v3 = v * v * v
+      u = samplers.uniform(
+          sample_shape, dtype=internal_dtype, seed=u_seed)
+
+      # In [1], the suggestion is to first check u < 1 - 0.331 * x2 * x2, and to
+      # run the check below only if it fails, in order to avoid the relatively
+      # expensive logarithm calls. Our algorithm operates in batch mode: we will
+      # have to compute or not compute the logarithms for the entire batch, and
+      # as the batch gets larger, the odds we compute it grow. Therefore we
+      # don't bother with the "cheap" check.
+      good_sample_mask = (
+          tf.math.log(u) < x2 / 2. + d * (1 - v3 + tf.math.log(v3)))
+
+      return v3, good_sample_mask
+
+    samples = brs.batched_las_vegas_algorithm(
+        generate_and_test_samples, seed=generate_and_test_samples_seed)[0]
+
+    samples = samples * d
+
+    one = tf.constant(1., dtype=internal_dtype)
+
+    alpha_lt_one_fix = tf.where(
+        safe_alpha < 1.,
+        tf.math.pow(
+            samplers.uniform(
+                sample_shape, dtype=internal_dtype, seed=alpha_fix_seed),
+            one / safe_alpha),
+        one)
+    samples = samples * alpha_lt_one_fix
+    samples = tf.where(good_params_mask, samples, np.nan)
+
+    output_type_samples = tf.cast(samples, output_dtype)
+
+    # We use `tf.where` instead of `tf.maximum` because we need to allow for
+    # `samples` to be `nan`, but `tf.maximum(nan, x) == x`.
+    output_type_samples = tf.where(
+        output_type_samples == 0,
+        np.finfo(dtype_util.as_numpy_dtype(output_type_samples.dtype)).tiny,
+        output_type_samples)
+
+    def grad(dy):
+      """The gradient of the normalized (beta=1) gamma samples w.r.t alpha."""
+      # Recall that cast_alpha has shape broadcast with beta, and samples and dy
+      # have shape sample_shape (which further expands the alpha-beta broadcast
+      # shape on the left).
+      cast_dy = tf.cast(dy, internal_dtype)
+      partial_alpha = tf.raw_ops.RandomGammaGrad(
+          alpha=cast_alpha, sample=samples)
+      grad = tf.cast(
+          tf.math.reduce_sum(
+              cast_dy * partial_alpha,
+              axis=tf.range(tf.rank(partial_alpha) - tf.rank(alpha))),
+          output_dtype)
+      return grad
+
+    return output_type_samples, grad  # rejection_sample
+
+  broadcast_alpha_shape = prefer_static.broadcast_shape(
+      prefer_static.shape(alpha), prefer_static.shape(beta))
+  broadcast_alpha = tf.broadcast_to(alpha, broadcast_alpha_shape)
+  alpha_samples = rejection_sample(broadcast_alpha)
+
+  corrected_beta = tf.where(beta > 0., beta, np.nan)
+  return alpha_samples / corrected_beta

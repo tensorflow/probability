@@ -26,6 +26,7 @@ from absl import logging
 import numpy as np  # May be rewritten for JAX.
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 
+# TODO(b/151669121): Remove dependency of test_case on TF
 import tensorflow.compat.v2 as tf
 
 __all__ = [

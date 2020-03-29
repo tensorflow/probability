@@ -25,6 +25,7 @@ from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
+from tensorflow_probability.python.math.generic import log_cosh
 from tensorflow_probability.python.math.generic import log_sub_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
@@ -46,11 +47,13 @@ from tensorflow_probability.python.math.linalg import pivoted_cholesky
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 from tensorflow_probability.python.math.minimize import minimize
+from tensorflow_probability.python.math.minimize import MinimizeTraceableQuantities
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.math.random_ops import random_rayleigh
 from tensorflow_probability.python.math.root_search import secant_root
+from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
@@ -74,11 +77,13 @@ _allowed_symbols = [
     'log1psquare',
     'log_add_exp',
     'log_combinations',
+    'log_cosh',
     'log_sub_exp',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_solve',
     'minimize',
+    'MinimizeTraceableQuantities',
     'ode',
     'pivoted_cholesky',
     'psd_kernels',
@@ -86,6 +91,7 @@ _allowed_symbols = [
     'random_rayleigh',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
+    'scan_associative',
     'secant_root',
     'smootherstep',
     'soft_sorting_matrix',

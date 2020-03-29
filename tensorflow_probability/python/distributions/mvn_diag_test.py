@@ -88,15 +88,15 @@ class MultivariateNormalDiagTest(test_util.TestCase):
         scipy_mvn.entropy(), self.evaluate(dist.entropy()), atol=1e-4)
 
   def testSample(self):
-    mu = [-1., 1]
-    diag = [1., -2]
+    mu = [-.5, .5]
+    diag = [.7, -1.2]
     dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
     samps = self.evaluate(
-        dist.sample(int(1e3), seed=test_util.test_seed(hardcoded_seed=0)))
+        dist.sample(int(5e3), seed=test_util.test_seed()))
     cov_mat = self.evaluate(tf.linalg.diag(diag))**2
 
-    self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.05)
-    self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.05, rtol=0.05)
+    self.assertAllClose(mu, samps.mean(axis=0), atol=0., rtol=0.1)
+    self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.1, rtol=0.05)
 
   def testSingularScaleRaises(self):
     mu = [-1., 1]
@@ -107,10 +107,10 @@ class MultivariateNormalDiagTest(test_util.TestCase):
 
   def testSampleWithBroadcastScale(self):
     # mu corresponds to a 2-batch of 3-variate normals
-    mu = np.zeros([2, 3])
+    mu = np.ones([2, 3]) / 10
 
     # diag corresponds to no batches of 3-variate normals
-    diag = np.ones([3])
+    diag = np.ones([3]) / 2
 
     dist = tfd.MultivariateNormalDiag(mu, diag, validate_args=True)
 
@@ -237,12 +237,6 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     dims = 3
     x = np.zeros([num_draws, dims], dtype=np.float32)
     x_pl = tf1.placeholder_with_default(x, shape=[None, dims], name='x')
-    mu_var = tf1.get_variable(
-        name='mu',
-        shape=[dims],
-        dtype=tf.float32,
-        initializer=tf1.initializers.constant(1.))
-    self.evaluate([tf1.global_variables_initializer()])
 
     def neg_log_likelihood(mu):
       mvn = tfd.MultivariateNormalDiag(
@@ -258,6 +252,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       # handle negative indexes.)
       return -tf.reduce_sum(tf.math.log(mvn.prob(x_pl)))
 
+    mu_var = tf.fill([dims], value=np.float32(1))
     _, grad_neg_log_likelihood = tfp.math.value_and_gradient(
         neg_log_likelihood, mu_var)
 
@@ -355,6 +350,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, scale_identity_multiplier))
 
+  @test_util.jax_disable_variable_test
   def testVariableScaleDiagAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception
     # when validate_args is True. This is really just testing the underlying
@@ -369,6 +365,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       with tf.control_dependencies([scale_diag.assign([1., 0.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.jax_disable_variable_test
   def testVariableScaleIdentityMultiplierAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception
     # when validate_args is True. This is really just testing the underlying

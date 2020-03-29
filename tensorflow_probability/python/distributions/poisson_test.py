@@ -283,7 +283,8 @@ class PoissonTest(test_util.TestCase):
     self.assertEqual(sample_values.shape, (n,))
     self.assertAllClose(
         sample_values.mean(), stats.poisson.mean(lam_v), rtol=.01)
-    self.assertAllClose(sample_values.var(), stats.poisson.var(lam_v), rtol=.01)
+    self.assertAllClose(sample_values.var(), stats.poisson.var(lam_v),
+                        rtol=.013)
 
   def testAssertValidSample(self):
     lam_v = np.array([1.0, 3.0, 2.5], dtype=np.float32)

@@ -147,6 +147,28 @@ def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
 @test_util.test_graph_and_eager_modes
 class NutsTest(test_util.TestCase):
 
+  def testLogAcceptRatio(self):
+    """Ensure that `log_accept_ratio` is close to 0 if step size is small."""
+    seed = test_util.test_seed()
+    @tf.function(autograph=False)
+    def sample_from_banana():
+      def banana_model():
+        x0 = yield tfd.JointDistributionCoroutine.Root(tfd.Normal(0., 10.))
+        _ = yield tfd.Normal(0.03 * (tf.square(x0) - 100.), 1.)
+      banana = tfd.JointDistributionCoroutine(banana_model)
+      kernel = tfp.mcmc.NoUTurnSampler(banana.log_prob,
+                                       step_size=0.35,
+                                       seed=seed,
+                                       parallel_iterations=1)
+      trace_fn = lambda _, pkr: pkr.log_accept_ratio
+      return tfp.mcmc.sample_chain(50,
+                                   [0., 0.],
+                                   kernel=kernel,
+                                   trace_fn=trace_fn,
+                                   parallel_iterations=1)[1]
+    log_accept_ratio_trace = self.evaluate(sample_from_banana())
+    self.assertAllGreater(log_accept_ratio_trace, -0.2)
+
   def testReproducibility(self):
     seed = test_util.test_seed()
     s1 = self.evaluate(run_nuts_chain(2, 5, 10, seed=seed)[0])

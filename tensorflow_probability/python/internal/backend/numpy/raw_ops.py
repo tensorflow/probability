@@ -21,8 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
@@ -53,5 +51,5 @@ def _matrix_diag_part_v2(input, k, padding_value, name=None):  # pylint: disable
 
 
 MatrixDiagPartV2 = utils.copy_docstring(  # pylint: disable=invalid-name
-    tf.raw_ops.MatrixDiagPartV2,
+    'tf.raw_ops.MatrixDiagPartV2',
     _matrix_diag_part_v2)

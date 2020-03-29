@@ -33,6 +33,10 @@ def main(argv):
   contents = contents.replace(
       'from tensorflow_probability.python.internal.backend import numpy',
       'from tensorflow_probability.python.internal.backend import jax')
+  contents = contents.replace(
+      ('import tensorflow_probability.python.experimental.substrates.numpy' +
+       ' as tfp'),
+      'import tensorflow_probability.python.experimental.substrates.jax as tfp')
   contents = contents.replace('scipy.linalg', 'jax.scipy.linalg')
   contents = contents.replace('scipy.special', 'jax.scipy.special')
   contents = contents.replace(

@@ -120,7 +120,7 @@ class MultivariateNormalDiag(
   # Initialize a 2-batch of 3-variate Gaussians.
   mvn = tfd.MultivariateNormalDiag(
       loc=[[1., 2, 3],
-           [11, 22, 33]]           # shape: [2, 3]
+           [11, 22, 33]],           # shape: [2, 3]
       scale_diag=[[1., 2, 3],
                   [0.5, 1, 1.5]])  # shape: [2, 3]
 

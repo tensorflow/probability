@@ -17,7 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 from absl.testing import parameterized
 import numpy as np
 from scipy import stats as sp_stats
@@ -27,8 +26,8 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 tfd = tfp.distributions
 
@@ -37,11 +36,8 @@ tfd = tfp.distributions
 class BatchedRejectionSamplerTest(test_util.TestCase):
 
   def testBatchedLasVegasAlgorithm(self):
-    seed = test_util.test_seed()
-
     def uniform_less_than_point_five(seed):
-      seed_stream = SeedStream(seed, 'uniform_less_than_point_five')
-      values = tf.random.uniform([6], seed=seed_stream())
+      values = samplers.uniform([6], seed=seed)
       negative_values = -values
       good = tf.less(values, 0.5)
 
@@ -49,17 +45,17 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
 
     ((negative_values, values), _) = self.evaluate(
         brs.batched_las_vegas_algorithm(
-            uniform_less_than_point_five, seed=seed))
+            uniform_less_than_point_five,
+            seed=test_util.test_seed()))
+
     self.assertAllLess(values, 0.5)
     self.assertAllClose(-values, negative_values)
-
-    if tf.executing_eagerly():
-      tf.random.set_seed(seed)
 
     # Check for reproducibility.
     ((negative_values_2, values_2), _) = self.evaluate(
         brs.batched_las_vegas_algorithm(
-            uniform_less_than_point_five, seed=seed))
+            uniform_less_than_point_five,
+            seed=test_util.test_seed()))
     self.assertAllEqual(negative_values, negative_values_2)
     self.assertAllEqual(values, values_2)
 
@@ -69,8 +65,6 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
       dict(testcase_name='_dynamic_float32', is_static=False, dtype=tf.float32),
       dict(testcase_name='_dynamic_float64', is_static=False, dtype=tf.float64))
   def testBatchedRejectionBetaSample(self, is_static, dtype):
-    seed = test_util.test_seed()
-
     # We build a rejection sampler for two beta distributions (in a batch): a
     # beta(2, 5) and a beta(2, 2). Eyeballing an image on the wikipedia page,
     # these are upper bounded by rectangles of heights 2.5 and 1.6 respectively.
@@ -85,25 +79,22 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     def proposal_fn(seed):
       # Test static and dynamic shape of proposed samples.
       uniform_samples = self.maybe_static(
-          tf.random.uniform(
+          samplers.uniform(
               [samples_per_distribution, 2], seed=seed, dtype=dtype),
           is_static)
       return uniform_samples, tf.ones_like(uniform_samples) * upper_bounds
 
     all_samples, _ = self.evaluate(brs.batched_rejection_sampler(
-        proposal_fn, target_fn, seed=seed, dtype=dtype))
+        proposal_fn, target_fn, seed=test_util.test_seed(), dtype=dtype))
 
     for i in range(beta.shape[0]):
       samples = all_samples[:, i]
       ks, _ = sp_stats.kstest(samples, sp_stats.beta(alpha, beta[i]).cdf)
       self.assertLess(ks, 0.02)
 
-    if tf.executing_eagerly():
-      tf.random.set_seed(seed)
-
     # Check for reproducibility.
     all_samples_2, _ = self.evaluate(brs.batched_rejection_sampler(
-        proposal_fn, target_fn, seed=seed, dtype=dtype))
+        proposal_fn, target_fn, seed=test_util.test_seed(), dtype=dtype))
     self.assertAllEqual(all_samples, all_samples_2)
 
 if __name__ == '__main__':

@@ -185,8 +185,6 @@ class NdtrGradientTest(test_util.TestCase):
 
   def _test_grad_finite(self, dtype):
     x = tf.constant([-100., 0., 100.], dtype=dtype)
-    output = (special_math.log_ndtr(x) if self._use_log
-              else special_math.ndtr(x))
     fn = special_math.log_ndtr if self._use_log else special_math.ndtr
     # Not having the lambda sanitzer means we'd get an `IndexError` whenever
     # the user supplied function has default args.

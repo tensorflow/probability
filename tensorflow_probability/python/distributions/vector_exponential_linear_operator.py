@@ -25,6 +25,7 @@ from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -194,13 +195,19 @@ class VectorExponentialLinearOperator(
           loc, scale)
 
       super(VectorExponentialLinearOperator, self).__init__(
-          distribution=exponential.Exponential(
-              rate=tf.ones([], dtype=scale.dtype),
-              allow_nan_stats=allow_nan_stats),
+          # TODO(b/137665504): Use batch-adding meta-distribution to set the
+          # batch shape instead of tf.ones.
+          # We use `Sample` instead of `Independent` because `Independent`
+          # requires concatenating `batch_shape` and `event_shape`, which loses
+          # static `batch_shape` information when `event_shape` is not
+          # statically known.
+          distribution=sample.Sample(
+              exponential.Exponential(
+                  rate=tf.ones(batch_shape, dtype=scale.dtype),
+                  allow_nan_stats=allow_nan_stats),
+              event_shape),
           bijector=affine_linear_operator_bijector.AffineLinearOperator(
               shift=loc, scale=scale, validate_args=validate_args),
-          batch_shape=batch_shape,
-          event_shape=event_shape,
           validate_args=validate_args,
           name=name)
       self._parameters = parameters

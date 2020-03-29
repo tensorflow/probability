@@ -47,6 +47,7 @@ multi_substrate_py_library(
         ":numeric",
         ":random_ops",
         ":root_search",
+        ":scan_associative",
         ":sparse",
         ":special",
         "//tensorflow_probability/python/math/ode",
@@ -217,6 +218,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -256,6 +258,7 @@ multi_substrate_py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:samplers",
     ],
 )
 
@@ -343,6 +346,34 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "scan_associative",
+    srcs = ["scan_associative.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "scan_associative_test",
+    size = "medium",
+    srcs = ["scan_associative_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    shard_count = 4,
+    srcs_version = "PY2AND3",
+    deps = [
+        ":scan_associative",
+        # numpy dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 

@@ -177,7 +177,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     # Check sample means
     x = samples_val[:, :, :, 1, 1, :]
     self.assertAllClose(
-        x.reshape(10 * 11 * 12, 2).mean(axis=0), mu[1, 1], atol=0.05)
+        x.reshape(10 * 11 * 12, 2).mean(axis=0), mu[1, 1], atol=0.1)
 
     # Check that log_prob(samples) works
     log_prob_val = self.evaluate(mvn.log_prob(samples_val))

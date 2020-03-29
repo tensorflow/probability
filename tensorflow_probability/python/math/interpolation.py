@@ -305,7 +305,7 @@ def interp_regular_1d_grid(x,
   y_ref = tf.exp(tf.linspace(start=0., stop=10., num=200))
 
   interp_regular_1d_grid(
-      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=1., y_ref=y_ref)
+      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=10., y_ref=y_ref)
   ==> approx [exp(6.0), exp(0.5), exp(3.3)]
   ```
 
@@ -434,7 +434,7 @@ def batch_interp_regular_1d_grid(x,
   y_ref = tf.exp(tf.linspace(start=0., stop=10., 20))
 
   batch_interp_regular_1d_grid(
-      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=1., y_ref=y_ref)
+      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=10., y_ref=y_ref)
   ==> approx [exp(6.0), exp(0.5), exp(3.3)]
   ```
 

@@ -145,16 +145,18 @@ class Gumbel(transformed_distribution.TransformedDistribution):
       # cause samples to lie in `(inf, -inf]` instead of `(inf, -inf)`. To fix
       # this, we use `np.finfo(dtype_util.as_numpy_dtype(self.dtype).tiny`
       # because it is the smallest, positive, 'normal' number.
+      batch_shape = distribution_util.get_broadcast_shape(loc, scale)
       super(Gumbel, self).__init__(
+          # TODO(b/137665504): Use batch-adding meta-distribution to set the
+          # batch shape instead of tf.ones.
           distribution=uniform.Uniform(
               low=np.finfo(dtype_util.as_numpy_dtype(dtype)).tiny,
-              high=tf.ones([], dtype=dtype),
+              high=tf.ones(batch_shape, dtype=dtype),
               allow_nan_stats=allow_nan_stats),
           # The Gumbel bijector encodes the CDF function as the forward,
           # and hence needs to be inverted.
           bijector=invert_bijector.Invert(
               self._gumbel_bijector, validate_args=validate_args),
-          batch_shape=distribution_util.get_broadcast_shape(loc, scale),
           parameters=parameters,
           name=name)
 

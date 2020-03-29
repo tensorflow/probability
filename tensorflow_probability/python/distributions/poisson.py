@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -193,7 +194,7 @@ class Poisson(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     lam = self._rate_parameter_no_checks()
-    return tf.random.poisson(lam=lam, shape=[n], dtype=self.dtype, seed=seed)
+    return samplers.poisson(shape=[n], lam=lam, dtype=self.dtype, seed=seed)
 
   def rate_parameter(self, name=None):
     """Rate vec computed from non-`None` input arg (`rate` or `log_rate`)."""

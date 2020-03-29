@@ -140,7 +140,6 @@ py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        # tensorflow/contrib :contrib_py dep,
     ],
 )
 
@@ -181,6 +180,7 @@ py3_test(
     shard_count = 2,
     tags = [
         "no-oss-ci",
+        "tf2-broken",
         "tf2-kokoro-broken",
     ],
     deps = [
@@ -225,7 +225,10 @@ py3_test(
     ],
     main = "deep_exponential_family.py",
     python_version = "PY3",
-    tags = ["tf2-kokoro-broken"],
+    tags = [
+        "tf2-broken",
+        "tf2-kokoro-broken",
+    ],
     deps = [
         ":deep_exponential_family_lib",
     ],
@@ -323,7 +326,6 @@ py_library(
         # absl/flags dep,
         # six dep,
         # tensorflow dep,
-        # tensorflow/contrib /lookup:lookup_py dep,
     ],
 )
 
@@ -449,7 +451,10 @@ py3_test(
     ],
     main = "cifar10_bnn.py",
     python_version = "PY3",
-    tags = ["tf2-kokoro-broken"],
+    tags = [
+        "tf2-broken",
+        "tf2-kokoro-broken",
+    ],
     deps = [
         ":cifar10_bnn_lib",
     ],

@@ -25,6 +25,8 @@ import six
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -178,10 +180,6 @@ class JointDistribution(distribution_lib.Distribution):
   def _flatten(self, *args, **kwargs):
     self._get_single_sample_distributions()
     return super(JointDistribution, self)._flatten(*args, **kwargs)
-
-  @property
-  def model(self):
-    return self._model
 
   @abc.abstractmethod
   def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
@@ -494,6 +492,9 @@ class JointDistribution(distribution_lib.Distribution):
       return self._sample_n(
           sample_shape, seed=seed() if callable(seed) else seed, value=value)
 
+  def _default_event_space_bijector(self):
+    return _DefaultJointBijector(self)
+
 
 def get_explicit_name_for_component(d):
   """Returns the explicitly-passed `name` of a Distribution, or None."""
@@ -615,3 +616,122 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
                 for a, b in zip(s[1:], s[:-1])]
   with tf.control_dependencies(assertions):
     return tuple(tf.identity(x) for x in flat_xs)
+
+
+class _DefaultJointBijector(bijector_lib.Bijector):
+  """Minimally-viable event space bijector for `JointDistribution`."""
+
+  # TODO(b/148485798): Support joint bijectors in TransformedDistribution.
+  def __init__(self, jd):
+    with tf.name_scope('default_joint_bijector') as name:
+      super(_DefaultJointBijector, self).__init__(
+          forward_min_event_ndims=0,  # Dummy value, unused.
+          validate_args=jd.validate_args,
+          name=name)
+      self._jd = jd
+
+  def _check_inputs_not_none(self, value):
+    if any(x is None for x in tf.nest.flatten(value)):
+      raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
+
+  # pylint: disable=protected-access
+  def _evaluate_bijector(self, bijector_fn, values):
+    gen = self._jd._model_coroutine()
+    outputs = []
+    d = next(gen)
+    index = 0
+    try:
+      while True:
+        dist = d.distribution if type(d).__name__ == 'Root' else d
+        bijector = dist._experimental_default_event_space_bijector()
+
+        # For discrete distributions, the default event space bijector is None.
+        # For a joint distribution's discrete components, we want the behavior
+        # of the Identity bijector.
+        bijector = (identity_bijector.Identity()
+                    if bijector is None else bijector)
+
+        out, y = bijector_fn(bijector, values[index])
+        outputs.append(out)
+        d = gen.send(y)
+        index += 1
+    except StopIteration:
+      pass
+    return outputs
+
+  def _event_shapes(self, input_shapes, event_shape_attr):
+    """For forward/inverse static event shapes."""
+    input_shapes = self._jd._model_flatten(input_shapes)
+    support_bijectors = [
+        d._experimental_default_event_space_bijector()
+        for d in self._jd._get_single_sample_distributions()]
+    output_shapes = [
+        getattr(bijector, event_shape_attr)(input_shape)
+        for (bijector, input_shape) in zip(support_bijectors, input_shapes)]
+    return self._jd._model_unflatten(output_shapes)
+
+  def forward(self, values):
+    values = self._jd._model_flatten(values)
+    self._check_inputs_not_none(values)
+
+    def bijector_fn(bijector, value):
+      y = bijector.forward(value)
+      return y, y
+
+    out = self._evaluate_bijector(bijector_fn, values)
+    return self._jd._model_unflatten(out)
+
+  def inverse(self, values):
+    self._check_inputs_not_none(values)
+    values = self._jd._model_flatten(values)
+
+    def bijector_fn(bijector, value):
+      x = bijector.inverse(value)
+      return x, value
+
+    out = self._evaluate_bijector(bijector_fn, values)
+    return self._jd._model_unflatten(out)
+
+  def forward_log_det_jacobian(self, values, event_ndims):
+    self._check_inputs_not_none(values)
+    values = self._jd._model_flatten(values)
+    event_ndims = self._jd._model_flatten(event_ndims)
+
+    def bijector_fn(bijector, value):
+      x, event_ndims = value
+      y = bijector.forward(x)
+      fldj = bijector.forward_log_det_jacobian(x, event_ndims)
+      return fldj, y
+
+    fldjs = self._evaluate_bijector(bijector_fn, list(zip(values, event_ndims)))
+    return sum(fldjs)
+
+  def inverse_log_det_jacobian(self, values, event_ndims):
+    self._check_inputs_not_none(values)
+    values = self._jd._model_flatten(values)
+    event_ndims = self._jd._model_flatten(event_ndims)
+
+    def bijector_fn(bijector, value):
+      y, event_ndims = value
+      ildj = bijector.inverse_log_det_jacobian(y, event_ndims)
+      return ildj, y
+
+    ildjs = self._evaluate_bijector(bijector_fn, list(zip(values, event_ndims)))
+    return sum(ildjs)
+  # pylint: enable=protected-access
+
+  # TODO(b/148485931): Fix bijector caching.
+  def forward_event_shape(self, input_shapes):
+    return self._event_shapes(input_shapes, 'forward_event_shape')
+
+  def forward_event_shape_tensor(self, input_shapes):
+    self._check_inputs_not_none(input_shapes)
+    return self._event_shapes(input_shapes, 'forward_event_shape_tensor')
+
+  def inverse_event_shape(self, output_shapes):
+    return self._event_shapes(output_shapes, 'inverse_event_shape')
+
+  def inverse_event_shape_tensor(self, output_shapes):
+    self._check_inputs_not_none(output_shapes)
+    return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
+

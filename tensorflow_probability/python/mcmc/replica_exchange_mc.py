@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
+from tensorflow_probability.python.mcmc import random_walk_metropolis
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 # pylint: disable=g-direct-tensorflow-import
@@ -753,11 +754,17 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
                 kr.accepted_results.target_log_prob),
             grads_target_log_prob=_swap_then_retemper(
                 kr.accepted_results.grads_target_log_prob)))
+  elif isinstance(kr.accepted_results,
+                  random_walk_metropolis.UncalibratedRandomWalkResults):
+    kr = kr._replace(
+        accepted_results=kr.accepted_results._replace(
+            target_log_prob=_swap_then_retemper(
+                kr.accepted_results.target_log_prob)))
   else:
     # TODO(b/143702650) Handle other kernels.
     raise NotImplementedError(
-        '`Only HMC Kernels are handled at this time.  Please file a request '
-        'with the TensorFlow Probability team.')
+        'Only HMC and RWMH Kernels are handled at this time. Please file a '
+        'request with the TensorFlow Probability team.')
 
   return kr
 

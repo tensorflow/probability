@@ -128,7 +128,6 @@ class ScaleMatvecLinearOperator(bijector.Bijector):
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
-    if is_init != any([tensor_util.is_ref(v) for v in
-                       self.scale.trainable_variables]):
+    if is_init != any(tensor_util.is_ref(v) for v in self.scale.variables):
       return [self.scale.assert_non_singular()]
     return []

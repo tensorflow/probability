@@ -31,9 +31,9 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = ['VonMisesFisher']
@@ -352,16 +352,15 @@ class VonMisesFisher(distribution.Distribution):
         tf.compat.dimension_value(self.event_shape[0]) or
         self._event_shape_tensor(mean_direction=mean_direction)[0])
     basis = tf.concat([[1.], tf.zeros([event_dim - 1], dtype=self.dtype)],
-                      axis=0),
+                      axis=0)
     u = tf.math.l2_normalize(basis - mean_direction, axis=-1)
     return samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u
 
   def _sample_3d(self, n, mean_direction, concentration, seed=None):
     """Specialized inversion sampler for 3D."""
-    seed = SeedStream(seed, salt='von_mises_fisher_3d')
     u_shape = tf.concat([[n], self._batch_shape_tensor(
         mean_direction=mean_direction, concentration=concentration)], axis=0)
-    z = tf.random.uniform(u_shape, seed=seed(), dtype=self.dtype)
+    z = samplers.uniform(u_shape, seed=seed, dtype=self.dtype)
     # TODO(bjp): Higher-order odd dim analytic CDFs are available in [1], could
     # be bisected for bounded sampling runtime (i.e. not rejection sampling).
     # [1]: Inversion sampler via: https://ieeexplore.ieee.org/document/7347705/
@@ -382,7 +381,8 @@ class VonMisesFisher(distribution.Distribution):
     return u[..., tf.newaxis]
 
   def _sample_n(self, n, seed=None):
-    seed = SeedStream(seed, salt='vom_mises_fisher')
+    dim0_seed, otherdims_seed = samplers.split_seed(seed,
+                                                    salt='von_mises_fisher')
     # The sampling strategy relies on the fact that vMF variates are symmetric
     # about the mean direction. Accordingly, if we have a sampling strategy for
     # the away-from-mean angle, then we can uniformly sample the remaining
@@ -413,7 +413,7 @@ class VonMisesFisher(distribution.Distribution):
       samples_dim0 = self._sample_3d(n,
                                      mean_direction=mean_direction,
                                      concentration=concentration,
-                                     seed=seed)
+                                     seed=dim0_seed)
     else:
       # Wood'94 provides a rejection algorithm to sample the x coordinate.
       # Wood'94 definition of b:
@@ -427,20 +427,23 @@ class VonMisesFisher(distribution.Distribution):
       c = concentration * x + dim * tf.math.log1p(-x**2)
       beta = beta_lib.Beta(dim / 2, dim / 2)
 
-      def cond_fn(w, should_continue):
-        del w
+      def cond_fn(w, should_continue, seed):
+        del w, seed
         return tf.reduce_any(should_continue)
 
-      def body_fn(w, should_continue):
-        z = beta.sample(sample_shape=sample_batch_shape, seed=seed())
+      def body_fn(w, should_continue, seed):
+        """While loop body for sampling the angle `w`."""
+        beta_seed, unif_seed, next_seed = samplers.split_seed(seed, n=3)
+        z = beta.sample(sample_shape=sample_batch_shape, seed=beta_seed)
         # set_shape needed here because of b/139013403
         tensorshape_util.set_shape(z, w.shape)
         w = tf.where(should_continue,
                      (1. - (1. + b) * z) / (1. - (1. - b) * z),
                      w)
-        w = tf.debugging.check_numerics(w, 'w')
-        unif = tf.random.uniform(
-            sample_batch_shape, seed=seed(), dtype=self.dtype)
+        if not self.allow_nan_stats:
+          w = tf.debugging.check_numerics(w, 'w')
+        unif = samplers.uniform(
+            sample_batch_shape, seed=unif_seed, dtype=self.dtype)
         # set_shape needed here because of b/139013403
         tensorshape_util.set_shape(unif, w.shape)
         should_continue = should_continue & (
@@ -448,12 +451,13 @@ class VonMisesFisher(distribution.Distribution):
             # Use log1p(-unif) to prevent log(0) and ensure that log(1) is
             # possible.
             tf.math.log1p(-unif))
-        return w, should_continue
+        return w, should_continue, next_seed
 
       w = tf.zeros(sample_batch_shape, dtype=self.dtype)
       should_continue = tf.ones(sample_batch_shape, dtype=tf.bool)
-      samples_dim0 = tf.while_loop(
-          cond=cond_fn, body=body_fn, loop_vars=(w, should_continue))[0]
+      samples_dim0, _, _ = tf.while_loop(
+          cond=cond_fn, body=body_fn,
+          loop_vars=(w, should_continue, dim0_seed))
       samples_dim0 = samples_dim0[..., tf.newaxis]
     if not self._allow_nan_stats:
       # Verify samples are w/in -1, 1, with useful error output tensors (top
@@ -470,19 +474,19 @@ class VonMisesFisher(distribution.Distribution):
     samples_otherdims_shape = tf.concat([sample_batch_shape, [event_dim - 1]],
                                         axis=0)
     unit_otherdims = tf.math.l2_normalize(
-        tf.random.normal(
-            samples_otherdims_shape, seed=seed(), dtype=self.dtype),
+        samplers.normal(
+            samples_otherdims_shape, seed=otherdims_seed, dtype=self.dtype),
         axis=-1)
     samples = tf.concat([
         samples_dim0,  # we must avoid sqrt(1 - (>1)**2)
         tf.sqrt(tf.maximum(1 - samples_dim0**2, 0.)) * unit_otherdims
     ], axis=-1)
     samples = tf.math.l2_normalize(samples, axis=-1)
-    if not self._allow_nan_stats:
+    if not self.allow_nan_stats:
       samples = tf.debugging.check_numerics(samples, 'samples')
 
     # Runtime assert that samples are unit length.
-    if not self._allow_nan_stats:
+    if not self.allow_nan_stats:
       worst, _ = tf.math.top_k(
           tf.reshape(tf.abs(1 - tf.linalg.norm(samples, axis=-1)), [-1]))
       with tf.control_dependencies([
@@ -495,7 +499,7 @@ class VonMisesFisher(distribution.Distribution):
         samples = tf.identity(samples)
     # The samples generated are symmetric around a mode at (1, 0, 0, ...., 0).
     # Now, we move the mode to `self.mean_direction` using a rotation matrix.
-    if not self._allow_nan_stats:
+    if not self.allow_nan_stats:
       # Assert that the basis vector rotates to the mean direction, as expected.
       basis = tf.cast(tf.concat([[1.], tf.zeros([event_dim - 1])], axis=0),
                       self.dtype)

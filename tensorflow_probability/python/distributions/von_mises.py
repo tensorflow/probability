@@ -34,9 +34,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = ['VonMises']
 
@@ -475,8 +475,8 @@ def _von_mises_cdf_normal(x, concentration, dtype):
   def cdf_func(concentration):
     """A helper function that is passed to value_and_gradient."""
     # z is an "almost Normally distributed" random variable.
-    z = ((np.sqrt(2. / np.pi) / tf.math.bessel_i0e(concentration)) *
-         tf.sin(.5 * x))
+    z = (tf.constant(np.sqrt(2. / np.pi), dtype=dtype)
+         / tf.math.bessel_i0e(concentration)) * tf.sin(.5 * x)
 
     # This is the correction described in [1] which reduces the error
     # of the Normal approximation.
@@ -523,7 +523,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
     [2] Michael Figurnov, Shakir Mohamed, Andriy Mnih. "Implicit
     Reparameterization Gradients", 2018.
   """
-  seed = SeedStream(seed, salt='von_mises')
+  seed = samplers.sanitize_seed(seed, salt='von_mises')
   concentration = tf.convert_to_tensor(
       concentration, dtype=dtype, name='concentration')
 
@@ -573,30 +573,32 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
 
     s = tf.where(concentration > s_concentration_cutoff, s_exact, s_approximate)
 
-    def loop_body(done, u, w):
+    def loop_body(done, u, w, seed):
       """Resample the non-accepted points."""
       # We resample u each time completely. Only its sign is used outside the
       # loop, which is random.
-      u = tf.random.uniform(
-          shape, minval=-1., maxval=1., dtype=dtype, seed=seed())
+      u_seed, v_seed, next_seed = samplers.split_seed(seed, n=3)
+      u = samplers.uniform(
+          shape, minval=-1., maxval=1., dtype=dtype, seed=u_seed)
       z = tf.cos(np.pi * u)
       # Update the non-accepted points.
       w = tf.where(done, w, (1. + s * z) / (s + z))
       y = concentration * (s - w)
 
-      v = tf.random.uniform(
-          shape, minval=0., maxval=1., dtype=dtype, seed=seed())
+      v = samplers.uniform(
+          shape, minval=0., maxval=1., dtype=dtype, seed=v_seed)
       accept = (y * (2. - y) >= v) | (tf.math.log(y / v) + 1. >= y)
 
-      return done | accept, u, w
+      return done | accept, u, w, next_seed
 
-    _, u, w = tf.while_loop(
+    _, u, w, _ = tf.while_loop(
         cond=lambda done, *_: ~tf.reduce_all(done),
         body=loop_body,
         loop_vars=(
             tf.zeros(shape, dtype=tf.bool, name='done'),
             tf.zeros(shape, dtype=dtype, name='u'),
             tf.zeros(shape, dtype=dtype, name='w'),
+            seed,
         ),
         # The expected number of iterations depends on concentration.
         # It monotonically increases from one iteration for concentration = 0 to
@@ -604,7 +606,6 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
         # We use a limit of 100 iterations to avoid infinite loops
         # for very large / nan concentration.
         maximum_iterations=100,
-        parallel_iterations=1 if seed.original_seed is None else 10,
     )
 
     x = tf.sign(u) * tf.math.acos(w)

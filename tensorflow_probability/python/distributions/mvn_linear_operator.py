@@ -25,6 +25,7 @@ from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -195,14 +196,19 @@ class MultivariateNormalLinearOperator(
     if loc is not None:
       bijector = shift_bijector.Shift(
           shift=loc, validate_args=validate_args)(bijector)
-
     super(MultivariateNormalLinearOperator, self).__init__(
-        distribution=normal.Normal(
-            loc=tf.zeros([], dtype=dtype),
-            scale=tf.ones([], dtype=dtype)),
+        # TODO(b/137665504): Use batch-adding meta-distribution to set the batch
+        # shape instead of tf.zeros.
+        # We use `Sample` instead of `Independent` because `Independent`
+        # requires concatenating `batch_shape` and `event_shape`, which loses
+        # static `batch_shape` information when `event_shape` is not statically
+        # known.
+        distribution=sample.Sample(
+            normal.Normal(
+                loc=tf.zeros(batch_shape, dtype=dtype),
+                scale=tf.ones([], dtype=dtype)),
+            event_shape),
         bijector=bijector,
-        batch_shape=batch_shape,
-        event_shape=event_shape,
         validate_args=validate_args,
         name=name)
     self._parameters = parameters

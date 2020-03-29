@@ -136,7 +136,7 @@ python -m pip install --upgrade --user "tensorflow<2" "tensorflow_probability<0.
 
 Note: Since [TensorFlow](https://www.tensorflow.org/install) is *not* included
 as a dependency of the TensorFlow Probability package (in `setup.py`), you must
-explicitly install the TensorFlow package (`tensorflow` or `tensorflow-gpu`).
+explicitly install the TensorFlow package (`tensorflow` or `tensorflow-cpu`).
 This allows us to maintain one package instead of separate packages for CPU and
 GPU-enabled TensorFlow. See the
 [TFP release notes](https://github.com/tensorflow/probability/releases) for more

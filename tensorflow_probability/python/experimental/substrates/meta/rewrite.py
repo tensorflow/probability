@@ -42,12 +42,15 @@ TF_REPLACEMENTS = {
         'import tensorflow_probability as tfp; '
         'tfp = tfp.experimental.substrates.numpy',
     'from tensorflow.python.ops.linalg':
-        'from tensorflow_probability.python.internal.backend.numpy'
+        'from tensorflow_probability.python.internal.backend.numpy',
+    'from tensorflow.python.ops import parallel_for':
+        'from tensorflow_probability.python.internal.backend.numpy '
+        'import functional_ops as parallel_for',
 }
 
 DISABLED_BY_PKG = {
     'bijectors':
-        ('masked_autoregressive', 'scale_matvec_lu', 'real_nvp'),
+        ('scale_matvec_lu', 'real_nvp'),
     'distributions':
         ('internal.moving_stats',),
     'math':
@@ -55,11 +58,22 @@ DISABLED_BY_PKG = {
     'mcmc':
         ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
          'slice_sampler_kernel'),
+    'optimizer': ('bfgs', 'bfgs_utils', 'differential_evolution', 'lbfgs',
+                  'nelder_mead', 'proximal_hessian_sparse', 'sgld',
+                  'variational_sgd', 'convergence_criteria'),
+    'experimental':
+        ('auto_batching', 'composite_tensor', 'edward2', 'linalg',
+         'marginalize', 'mcmc', 'nn', 'substrates', 'vi'),
 }
-LIBS = ('bijectors', 'distributions', 'math', 'mcmc', 'stats', 'util')
+LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
+        'optimizer', 'stats', 'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
-             'dtype_util', 'hypothesis_testlib', 'prefer_static',
-             'special_math', 'tensor_util', 'test_combinations', 'test_util')
+             'dtype_util', 'hypothesis_testlib', 'nest_util', 'prefer_static',
+             'samplers', 'special_math', 'tensor_util', 'test_combinations',
+             'test_util')
+OPTIMIZERS = ('linesearch',)
+LINESEARCH = ('internal',)
+SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')
 
 PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
 
@@ -94,7 +108,15 @@ def main(argv):
       for lib in LIBS
   })
   replacements.update({
+      '._numpy import inference_gym':
+          '.inference_gym import _numpy as inference_gym',
       '._numpy import psd_kernels': '.psd_kernels import _numpy as psd_kernels',
+      '._numpy.inference_gym import targets':
+          '.inference_gym.targets import _numpy as targets',
+      '._numpy.inference_gym.targets': '.inference_gym.targets._numpy',
+      '._numpy.inference_gym import internal':
+          '.inference_gym.internal import _numpy as internal',
+      '._numpy.inference_gym.internal': '.inference_gym.internal._numpy',
       'math._numpy.psd_kernels': 'math.psd_kernels._numpy',
       'util.seed_stream': 'util._numpy.seed_stream',
   })
@@ -113,6 +135,35 @@ def main(argv):
       'tensorflow_probability.python.internal._numpy import {}'.format(internal)
       for internal in INTERNALS
   })
+  replacements.update({
+      'tensorflow_probability.python.optimizer._numpy import {}'.format(  # pylint: disable=g-complex-comprehension
+          optimizer):
+      'tensorflow_probability.python.optimizer.{} import _numpy as {}'.format(
+          optimizer, optimizer)
+      for optimizer in OPTIMIZERS
+  })
+  replacements.update({
+      'tensorflow_probability.python.optimizer._numpy.{}'.format(  # pylint: disable=g-complex-comprehension
+          optimizer):
+      'tensorflow_probability.python.optimizer.{}._numpy'.format(
+          optimizer)
+      for optimizer in OPTIMIZERS
+  })
+  replacements.update({
+      'tensorflow_probability.python.optimizer._numpy.linesearch '  # pylint: disable=g-complex-comprehension
+      'import {}'.format(linesearch):
+      'tensorflow_probability.python.optimizer.linesearch.{} '
+      'import _numpy as {}'.format(
+          linesearch, linesearch)
+      for linesearch in LINESEARCH
+  })
+  replacements.update({
+      'tensorflow_probability.python.optimizer.linesearch._numpy.{}'.format(  # pylint: disable=g-complex-comprehension
+          linesearch):
+      'tensorflow_probability.python.optimizer.linesearch.{}._numpy'.format(
+          linesearch)
+      for linesearch in LINESEARCH
+  })
   # pylint: disable=g-complex-comprehension
   replacements.update({
       'tensorflow.python.ops import {}'.format(private):
@@ -122,6 +173,11 @@ def main(argv):
   })
   # pylint: enable=g-complex-comprehension
 
+  # TODO(bjp): Delete this block after TFP uses stateless samplers.
+  replacements.update({
+      'tf.random.{}'.format(sampler): 'tf.random.stateless_{}'.format(sampler)
+      for sampler in SAMPLERS
+  })
   replacements.update({
       'self._maybe_assert_dtype': '# self._maybe_assert_dtype',
       'SKIP_DTYPE_CHECKS = False': 'SKIP_DTYPE_CHECKS = True',
@@ -129,6 +185,8 @@ def main(argv):
           '# @test_util.test_all_tf_execution_regimes',
       '@test_util.test_graph_and_eager_modes':
           '# @test_util.test_graph_and_eager_modes',
+      '@test_util.test_graph_mode_only':
+          '# @test_util.test_graph_mode_only',
       'TestCombinationsTest(test_util.TestCase)':
           'TestCombinationsDoNotTest(object)',
       '@six.add_metaclass(TensorMetaClass)':

@@ -244,7 +244,7 @@ class BinomialTest(test_util.TestCase):
 
   def testUnivariateLogConcaveDistributionRejectionSamplerGeometric(self):
     seed = test_util.test_seed()
-    n = int(1e5)
+    n = int(5e5)
 
     probs = np.float32([0.7, 0.8, 0.3, 0.2])
     geometric = tfd.Geometric(probs=probs)
@@ -319,6 +319,18 @@ class BinomialTest(test_util.TestCase):
          total_count * probs))
     self.assertAllEqual(samples, expected_samples)
 
+  def testSampleWithZeroCountsAndNanSuccessProbability(self):
+    # With zero counts, should sample 0 successes even if success probability is
+    # nan; and should not interfere with the rest of the batch.
+    total_count = tf.constant([23., 0.], dtype=tf.float32)
+    probs = tf.constant([1., np.nan], dtype=tf.float32)
+    dist = tfd.Binomial(
+        total_count=total_count, probs=probs, validate_args=False)
+    samples, expected_samples = self.evaluate(
+        (dist.sample(seed=test_util.test_seed()),
+         total_count))
+    self.assertAllEqual(samples, expected_samples)
+
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
     d = tfd.Binomial(total_count=1, logits=x, validate_args=True)
@@ -342,6 +354,8 @@ class BinomialTest(test_util.TestCase):
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'No gradient for while loops in JAX backend.')
   def testNotReparameterized(self):
     def f(n):
       b = tfd.Binomial(n, 0.5)

@@ -73,6 +73,7 @@ del _ensure_tf_install
 
 
 # from tensorflow_probability.google import staging  # DisableOnExport
+# from tensorflow_probability.google import tfp_google  # DisableOnExport
 from tensorflow_probability.python import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.version import __version__
 # pylint: enable=g-import-not-at-top

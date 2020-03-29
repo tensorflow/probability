@@ -33,10 +33,13 @@ import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+import tensorflow_probability.python.experimental.substrates.numpy as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal.backend import numpy as numpy_backend
+from tensorflow_probability.python.internal.backend import numpy as nptf
+from tensorflow_probability.python.internal.backend.numpy import functional_ops as np_pfor
+from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
 
 
 ALLOW_NAN = False
@@ -70,7 +73,10 @@ class TestCase(dict):
     super(TestCase, self).__init__(
         testcase_name='_' + name.replace('.', '_'),
         tensorflow_function=_getattr(tf, name),
-        numpy_function=_getattr(numpy_backend, name),
+        numpy_function=_getattr(
+            nptf,
+            name.replace('random.', 'random.stateless_'
+                        ).replace('random.stateless_gamma', 'random.gamma')),
         strategy_list=strategy_list,
         **kwargs)
 
@@ -292,8 +298,8 @@ def uniform_params(draw):
 def gamma_params():
   def dict_to_params(d):
     return (d['shape'],  # sample shape
-            d['params'][0].astype(d['dtype'].as_numpy_dtype),  # alpha
-            (d['params'][1].astype(d['dtype'].as_numpy_dtype)  # beta (or None)
+            d['params'][0].astype(d['dtype']),  # alpha
+            (d['params'][1].astype(d['dtype'])  # beta (or None)
              if d['include_beta'] else None),
             d['dtype'])  # dtype
   return hps.fixed_dictionaries(
@@ -303,7 +309,7 @@ def gamma_params():
            params=n_same_shape(n=2, elements=positive_floats()),
            # pylint: enable=no-value-for-parameter
            include_beta=hps.booleans(),
-           dtype=hps.sampled_from([tf.float32, tf.float64]))
+           dtype=hps.sampled_from([np.float32, np.float64]))
       ).map(dict_to_params)  # dtype
 
 
@@ -378,7 +384,7 @@ def gather_params(draw):
 @hps.composite
 def gather_nd_params(draw):
   if JAX_MODE:
-  # Restricting batch_dims to be positive for now
+    # Restricting batch_dims to be positive for now
     batch_dims = draw(hps.integers(min_value=0, max_value=4))
   else:
     batch_dims = 0
@@ -530,7 +536,7 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=2),
                             dtype=np.float32,
                             elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-4, rtol=1e-4),
+             atol=2e-4, rtol=2e-4),
     TestCase('signal.rfft3d',
              [single_arrays(shape=fft_shapes(fft_dim=3),
                             dtype=np.float32,
@@ -555,17 +561,17 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=1),
                             dtype=np.complex64,
                             elements=complex_numbers(max_magnitude=1e3))],
-             atol=2e-4, rtol=2e-4),
+             atol=3e-4, rtol=3e-4),
     TestCase('signal.irfft2d',
              [single_arrays(shape=fft_shapes(fft_dim=2),
                             dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-4, rtol=1e-4),
+                            elements=complex_numbers(max_magnitude=5e2))],
+             atol=2e-4, rtol=2e-4),
     TestCase('signal.irfft3d',
              [single_arrays(shape=fft_shapes(fft_dim=3),
                             dtype=np.complex64,
                             elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-4, rtol=1e-4),
+             atol=2e-4, rtol=2e-4),
 
     # ArgSpec(args=['a', 'b', 'transpose_a', 'transpose_b', 'adjoint_a',
     #               'adjoint_b', 'a_is_sparse', 'b_is_sparse', 'name'],
@@ -912,7 +918,7 @@ def _maybe_convert_to_tensors(args):
 class NumpyTest(test_util.TestCase):
 
   def _base_test_convert_to_tensor(self, nmpy):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     self.assertEqual(
         nmpy.complex64,
         convert_to_tensor(nmpy.complex64(1 + 2j), dtype_hint=tf.int32).dtype)
@@ -942,20 +948,20 @@ class NumpyTest(test_util.TestCase):
     self._base_test_convert_to_tensor(onp)
 
   def test_convert_to_tensor_scalar_default(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     self.assertEqual(np.complex128, convert_to_tensor(1. + 2j).dtype)
     self.assertEqual(np.float32, convert_to_tensor(1.).dtype)
     self.assertEqual(np.int32, convert_to_tensor(1).dtype)
 
   def test_convert_to_tensor_dimension(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     shape = tf1.Dimension(1)
 
     tensor_shape = convert_to_tensor(shape)
     self.assertNotIsInstance(tensor_shape, tf1.Dimension)
 
   def test_convert_to_tensor_tensorshape(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
+    convert_to_tensor = nptf.convert_to_tensor
     shape = tf.TensorShape((1, 2))
 
     tensor_shape = convert_to_tensor(shape)
@@ -967,6 +973,92 @@ class NumpyTest(test_util.TestCase):
 
     for dim in tensor_shape:
       self.assertNotIsInstance(dim, tf1.Dimension)
+
+  @test_util.numpy_disable_gradient_test
+  def test_while_loop_gradients(self):
+
+    def _fn(x):
+
+      def _cond_fn(i, _):
+        return i < 3.
+
+      def _body_fn(i, val):
+        return i + 1, val + 1.
+
+      return nptf.while_loop(
+          cond=_cond_fn, body=_body_fn, loop_vars=(0, x),
+          maximum_iterations=5)[1]
+
+    _, grad = tfp.math.value_and_gradient(_fn, 0.)
+    self.assertIsNotNone(grad)
+
+  def test_scan_no_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(lambda x, y: x + y, elems)),
+        nptf.scan(lambda x, y: x + y, elems))
+
+  def test_scan_with_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(lambda x, y: x + y, elems, initializer=7)),
+        nptf.scan(lambda x, y: x + y, elems, initializer=7))
+
+  def test_scan_with_struct(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y, x[1] - y), elems, initializer=(7, 3))),
+        nptf.scan(lambda x, y: (x[0] + y, x[1] - y), elems, initializer=(7, 3)))
+
+  def test_scan_with_struct_elems(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = (np.int32([7, 8]), np.int32([9, 1]))
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init)),
+        nptf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init))
+
+  def test_scan_with_struct_elems_reverse(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = (np.int32([7, 8]), np.int32([9, 1]))
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init,
+            reverse=True)),
+        nptf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init,
+            reverse=True))
+
+  def test_pfor(self):
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(lambda x: tf.ones([]), 7)),
+        np_pfor.pfor(lambda x: nptf.ones([]), 7))
+
+  def test_pfor_with_closure(self):
+    val = np.arange(7.)[:, np.newaxis]
+    tf_val = tf.constant(val)
+    def tf_fn(x):
+      return tf.gather(tf_val, x)**2
+    def np_fn(x):
+      return nptf.gather(val, x)**2
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        np_pfor.pfor(np_fn, 7))
+
+  def test_pfor_with_closure_multi_out(self):
+    val = np.arange(7.)[:, np.newaxis]
+    tf_val = tf.constant(val)
+    def tf_fn(x):
+      return tf.gather(tf_val, x)**2, tf.gather(tf_val, x)
+    def np_fn(x):
+      return nptf.gather(val, x)**2, nptf.gather(val, x)
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        np_pfor.pfor(np_fn, 7))
 
   def evaluate(self, tensors):
     if tf.executing_eagerly():

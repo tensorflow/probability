@@ -22,6 +22,7 @@ from __future__ import print_function
 from tensorflow_probability.python.stats.calibration import brier_decomposition
 from tensorflow_probability.python.stats.calibration import brier_score
 from tensorflow_probability.python.stats.calibration import expected_calibration_error
+from tensorflow_probability.python.stats.calibration import expected_calibration_error_quantiles
 from tensorflow_probability.python.stats.leave_one_out import log_loomean_exp
 from tensorflow_probability.python.stats.leave_one_out import log_loosum_exp
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
@@ -58,6 +59,7 @@ __all__ = [
     'count_integers',
     'covariance',
     'expected_calibration_error',
+    'expected_calibration_error_quantiles',
     'find_bins',
     'histogram',
     'log_average_probs',

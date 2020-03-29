@@ -21,6 +21,7 @@ load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "py3_test",  # @unused
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -41,6 +42,7 @@ multi_substrate_py_library(
         ":batch_reshape",
         ":bernoulli",
         ":beta",
+        ":beta_binomial",
         ":binomial",
         ":blockwise",
         ":categorical",
@@ -48,6 +50,7 @@ multi_substrate_py_library(
         ":chi",
         ":chi2",
         ":cholesky_lkj",
+        ":continuous_bernoulli",
         ":deterministic",
         ":dirichlet",
         ":dirichlet_multinomial",
@@ -79,6 +82,7 @@ multi_substrate_py_library(
         ":joint_distribution_sequential",
         ":kullback_leibler",
         ":kumaraswamy",
+        ":lambertw_f",
         ":laplace",
         ":linear_gaussian_ssm",
         ":lkj",
@@ -187,6 +191,25 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "beta_binomial",
+    srcs = ["beta_binomial.py"],
+    deps = [
+        ":beta",
+        ":binomial",
+        ":distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -205,10 +228,10 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:random_ops",
-        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -316,6 +339,20 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "continuous_bernoulli",
+    srcs = ["continuous_bernoulli.py"],
+    deps = [
+        ":distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "deterministic",
     srcs = ["deterministic.py"],
     deps = [
@@ -380,6 +417,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -422,6 +460,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -454,10 +493,12 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:batched_rejection_sampler",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -627,6 +668,23 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "hypothesis_testlib",
+    testonly = 1,
+    srcs = ["hypothesis_testlib.py"],
+    deps = [
+        # absl/logging dep,
+        # hypothesis dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "independent",
     srcs = ["independent.py"],
     deps = [
@@ -687,6 +745,8 @@ multi_substrate_py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:docstring_util",
@@ -749,7 +809,6 @@ multi_substrate_py_library(
         ":joint_distribution",
         ":kullback_leibler",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -797,6 +856,19 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "lambertw_f",
+    srcs = ["lambertw_f.py"],
+    deps = [
+        ":normal",
+        ":transformed_distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -959,6 +1031,7 @@ multi_substrate_py_library(
     deps = [
         ":kullback_leibler",
         ":normal",
+        ":sample",
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
@@ -1345,6 +1418,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:numeric",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -1483,6 +1557,7 @@ multi_substrate_py_library(
     srcs = ["vector_exponential_linear_operator.py"],
     deps = [
         ":exponential",
+        ":sample",
         ":transformed_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:affine_linear_operator",
@@ -1635,10 +1710,24 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "beta_binomial_test",
+    size = "medium",
+    srcs = ["beta_binomial_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "binomial_test",
     size = "medium",
     srcs = ["binomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -1692,7 +1781,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "chi_test",
     srcs = ["chi_test.py"],
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1705,7 +1793,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "chi2_test",
     srcs = ["chi2_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1734,9 +1822,23 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "continuous_bernoulli_test",
+    size = "medium",
+    srcs = ["continuous_bernoulli_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "deterministic_test",
     srcs = ["deterministic_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1830,7 +1932,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "finite_discrete_test",
     srcs = ["finite_discrete_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -1844,11 +1945,13 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["gamma_test.py"],
     jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1954,7 +2057,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "half_normal_test",
     srcs = ["half_normal_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -1967,6 +2069,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "hidden_markov_model_test",
+    size = "medium",
     srcs = ["hidden_markov_model_test.py"],
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
@@ -1985,7 +2088,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["horseshoe_test.py"],
     jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2016,7 +2118,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["inverse_gamma_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
     shard_count = 5,
     deps = [
         # numpy dep,
@@ -2083,7 +2184,6 @@ multi_substrate_py_test(
     name = "joint_distribution_named_test",
     srcs = ["joint_distribution_named_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -2132,10 +2232,31 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "lambertw_f_test",
+    srcs = ["lambertw_f_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":lambertw_f",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "linear_gaussian_ssm_test",
     size = "medium",
     srcs = ["linear_gaussian_ssm_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "large",
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
@@ -2255,7 +2376,6 @@ multi_substrate_py_test(
     name = "multivariate_student_t_test",
     size = "medium",
     srcs = ["multivariate_student_t_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 3,
     deps = [
@@ -2281,7 +2401,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "mvn_diag_test",
     srcs = ["mvn_diag_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2380,7 +2499,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "onehot_categorical_test",
     srcs = ["onehot_categorical_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2393,8 +2511,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "ordered_logistic_test",
     srcs = ["ordered_logistic_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2407,8 +2524,6 @@ multi_substrate_py_test(
     name = "pareto_test",
     size = "medium",
     srcs = ["pareto_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     shard_count = 3,
     deps = [
         # numpy dep,
@@ -2422,7 +2537,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "pert_test",
     srcs = ["pert_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2465,6 +2579,7 @@ multi_substrate_py_test(
     name = "poisson_test",
     srcs = ["poisson_test.py"],
     jax_size = "medium",
+    shard_count = 2,
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2507,7 +2622,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "quantized_distribution_test",
     srcs = ["quantized_distribution_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2534,7 +2648,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "relaxed_onehot_categorical_test",
     srcs = ["relaxed_onehot_categorical_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2573,7 +2687,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["half_student_t_test.py"],
     jax_size = "medium",
-    jax_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2614,6 +2727,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "transformed_distribution_test",
+    size = "medium",
     srcs = ["transformed_distribution_test.py"],
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
@@ -2633,7 +2747,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["triangular_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
         # numpy dep,
@@ -2648,7 +2761,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "truncated_normal_test",
     srcs = ["truncated_normal_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 10,
     deps = [
@@ -2664,8 +2776,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "uniform_test",
     srcs = ["uniform_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2693,8 +2803,6 @@ multi_substrate_py_test(
     name = "vector_diffeomixture_test",
     size = "medium",
     srcs = ["vector_diffeomixture_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2719,8 +2827,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["von_mises_fisher_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
         ":von_mises_fisher",
@@ -2739,7 +2845,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["von_mises_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2755,8 +2860,6 @@ multi_substrate_py_test(
     name = "wishart_test",
     srcs = ["wishart_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2789,18 +2892,42 @@ py_test(
     shard_count = 40,
     tags = ["hypothesis"],
     deps = [
-        # absl/logging dep,
+        ":hypothesis_testlib",
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/bijectors:hypothesis_testlib",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py3_test(
+    name = "jax_transformation_test",
+    size = "large",
+    srcs = ["jax_transformation_test.py"],
+    python_version = "PY3",
+    shard_count = 40,
+    srcs_version = "PY3",
+    tags = [
+        "hypothesis",
+        "notap",
+    ],
+    deps = [
+        ":hypothesis_testlib.jax",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # jax dep,
+        # numpy dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib.jax",
+        "//tensorflow_probability/python/internal:tensor_util.jax",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util.jax",
     ],
 )
 
@@ -2835,6 +2962,7 @@ exports_files(
         "chi.py",
         "chi2.py",
         "cholesky_lkj.py",
+        "continuous_bernoulli.py",
         "deterministic.py",
         "dirichlet.py",
         "dirichlet_multinomial.py",
@@ -2867,6 +2995,7 @@ exports_files(
         "kumaraswamy.py",
         "kumaraswamy_test.py",
         "laplace.py",
+        "lambertw_f.py",
         "linear_gaussian_ssm.py",
         "lkj.py",
         "logistic.py",

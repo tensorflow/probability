@@ -22,10 +22,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import util
 from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
@@ -209,8 +209,10 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         samples of observed series generated from the sampled `latents`.
     """
     with tf.name_scope('joint_sample_n'):
-      strm = util.SeedStream(
-          seed, 'LocalLevelStateSpaceModel_joint_sample_n')
+      (initial_level_seed,
+       level_jumps_seed,
+       prior_observation_seed) = samplers.split_seed(
+           seed, n=3, salt='LocalLevelStateSpaceModel_joint_sample_n')
 
       if self.batch_shape.is_fully_defined():
         batch_shape = self.batch_shape.as_list()
@@ -228,20 +230,22 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           linear_gaussian_ssm._augment_sample_shape(  # pylint: disable=protected-access
               self.initial_state_prior,
               sample_and_batch_shape,
-              self.validate_args), seed=strm())
+              self.validate_args),
+          seed=initial_level_seed)
 
       # Sample the latent random walk and observed noise, more efficiently than
       # the generic loop in `LinearGaussianStateSpaceModel`.
-      level_jumps = (tf.random.normal(
-          prefer_static.concat([sample_and_batch_shape,
-                                [self.num_timesteps - 1]], axis=0),
-          dtype=self.dtype, seed=strm()) * self.level_scale[..., tf.newaxis])
+      level_jumps = self.level_scale[..., tf.newaxis] * samplers.normal(
+          prefer_static.concat(
+              [sample_and_batch_shape, [self.num_timesteps - 1]], axis=0),
+          dtype=self.dtype, seed=level_jumps_seed)
       prior_level_sample = tf.cumsum(tf.concat(
           [initial_level, level_jumps], axis=-1), axis=-1)
       prior_observation_sample = prior_level_sample + (  # Sample noise.
-          tf.random.normal(prefer_static.shape(prior_level_sample),
-                           dtype=self.dtype, seed=strm()) *
-          self.observation_noise_scale[..., tf.newaxis])
+          self.observation_noise_scale[..., tf.newaxis] *
+          samplers.normal(prefer_static.shape(prior_level_sample),
+                          dtype=self.dtype,
+                          seed=prior_observation_seed))
 
       return (prior_level_sample[..., tf.newaxis],
               prior_observation_sample[..., tf.newaxis])

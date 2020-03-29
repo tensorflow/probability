@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -139,7 +140,7 @@ class HalfCauchy(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     shape = tf.concat([[n], self._batch_shape_tensor(
         loc=loc, scale=scale)], 0)
-    probs = tf.random.uniform(
+    probs = samplers.uniform(
         shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     # Quantile function.
     return loc + scale * tf.tan((np.pi / 2) * probs)

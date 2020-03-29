@@ -28,8 +28,8 @@ from tensorflow_probability.python.distributions import half_cauchy
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -199,11 +199,12 @@ class Horseshoe(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     scale = tf.convert_to_tensor(self.scale)
     shape = tf.concat([[n], tf.shape(scale)], axis=0)
-    seed = SeedStream(seed, salt='random_horseshoe')
-    local_shrinkage = self._half_cauchy.sample(shape, seed=seed())
+    shrinkage_seed, sample_seed = samplers.split_seed(seed,
+                                                      salt='random_horseshoe')
+    local_shrinkage = self._half_cauchy.sample(shape, seed=shrinkage_seed)
     shrinkage = scale * local_shrinkage
-    sampled = tf.random.normal(
-        shape=shape, mean=0., stddev=1., dtype=scale.dtype, seed=seed())
+    sampled = samplers.normal(
+        shape=shape, mean=0., stddev=1., dtype=scale.dtype, seed=sample_seed)
     return sampled * shrinkage
 
   def _mean(self):

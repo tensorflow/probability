@@ -50,7 +50,7 @@ class _TriangularTest(object):
     # loc = low, loc + scale = high, loc + c * scale = peak.
     # We invert this mapping here.
     return stats.triang(
-        c=(peak - low)/(high - low),
+        c=(peak - low) / (high - low),
         loc=low,
         scale=(high - low))
 

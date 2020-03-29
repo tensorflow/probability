@@ -20,12 +20,14 @@ from __future__ import print_function
 
 from tensorflow_probability.python.optimizer.convergence_criteria.convergence_criterion import ConvergenceCriterion
 from tensorflow_probability.python.optimizer.convergence_criteria.loss_not_decreasing import LossNotDecreasing
+from tensorflow_probability.python.optimizer.convergence_criteria.successive_gradients_are_uncorrelated import SuccessiveGradientsAreUncorrelated
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'ConvergenceCriterion',
     'LossNotDecreasing',
+    'SuccessiveGradientsAreUncorrelated',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

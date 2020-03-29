@@ -121,7 +121,7 @@ class Chi2Test(test_util.TestCase):
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
     self.assertAllClose(true_kl, kl_, atol=0., rtol=5e-13)
-    self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=5e-2)
+    self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=.08)
 
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])

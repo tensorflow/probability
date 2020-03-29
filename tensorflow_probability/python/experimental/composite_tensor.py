@@ -112,9 +112,18 @@ def _make_convertible(cls):
     def _type_spec(self):
       kwargs = dict(self.parameters)
       param_specs = {}
-      for k in self._params_event_ndims():
+      try:
+        params_event_ndims = self._params_event_ndims()  # pylint: disable=protected-access
+      except NotImplementedError:
+        params_event_ndims = {}
+      for k in params_event_ndims:
         if k in kwargs and kwargs[k] is not None:
-          param_specs[k] = tf.TensorSpec.from_tensor(kwargs.pop(k))
+          v = kwargs.pop(k)
+          param_specs[k] = tf.TensorSpec.from_tensor(v)
+      for k, v in list(kwargs.items()):
+        if isinstance(v, CompositeTensor):
+          param_specs[k] = v._type_spec  # pylint: disable=protected-access
+          kwargs.pop(k)
       return _DistributionTypeSpec(
           clsid, param_specs=param_specs, kwargs=kwargs)
 
@@ -169,13 +178,15 @@ def as_composite(obj):
   try:
     params_event_ndims = obj._params_event_ndims()  # pylint: disable=protected-access
   except NotImplementedError:
-    raise NotImplementedError(mk_err_msg())
+    params_event_ndims = {}
   for k in params_event_ndims:
     # Use dtype inference from ctor.
     if k in kwargs and kwargs[k] is not None:
       v = getattr(obj, k, kwargs[k])
       kwargs[k] = tf.convert_to_tensor(v, name=k)
   for k, v in kwargs.items():
+    if isinstance(v, distributions.Distribution):
+      kwargs[k] = as_composite(v)
     if tensor_util.is_ref(v):
       kwargs[k] = tf.convert_to_tensor(v, name=k)
   result = cls(**kwargs)

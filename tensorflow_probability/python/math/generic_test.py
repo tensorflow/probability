@@ -410,6 +410,45 @@ class Log1mexpTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class LogCoshTest(test_util.TestCase):
+
+  def testLogCoshNonNegative(self):
+    x = np.logspace(-10., 6., 100)
+    self.assertAllGreaterEqual(tfp.math.log_cosh(x), 0.)
+
+  def testLogCoshAtZero(self):
+    self.assertAllClose(0., self.evaluate(tfp.math.log_cosh(0.)))
+
+  def testLogCoshSymmetric(self):
+    x = np.linspace(0., 20., 100)
+    self.assertAllClose(
+        self.evaluate(tfp.math.log_cosh(x)),
+        self.evaluate(tfp.math.log_cosh(-x)))
+
+  def testLogCoshNoInf(self):
+    # Check that the computation succeeds over a large range of values.
+    x = np.logspace(10., 20., 100)
+    self.assertAllEqual(
+        np.zeros(x.shape, dtype=np.bool),
+        self.evaluate(tf.math.is_inf(tfp.math.log_cosh(x))))
+
+  def testLogCosh(self):
+    x = np.linspace(10., 40., 100)
+    self.assertAllClose(
+        np.log(np.cosh(x)), self.evaluate(tfp.math.log_cosh(x)))
+
+    # Test for small values
+    x = np.logspace(-10, -2, 100)
+    self.assertAllClose(
+        np.log(np.cosh(x)), self.evaluate(tfp.math.log_cosh(x)))
+
+    # Test for larger values.
+    x = np.logspace(1., 2., 100)
+    self.assertAllClose(
+        np.log(np.cosh(x)), self.evaluate(tfp.math.log_cosh(x)))
+
+
+@test_util.test_all_tf_execution_regimes
 class Smootherstep(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test

@@ -34,6 +34,7 @@ py_library(
     deps = [
         ":convergence_criterion",
         ":loss_not_decreasing",
+        ":successive_gradients_are_uncorrelated",
         # six dep,
         # tensorflow dep,
     ],
@@ -60,10 +61,33 @@ py_library(
     ],
 )
 
+py_library(
+    name = "successive_gradients_are_uncorrelated",
+    srcs = ["successive_gradients_are_uncorrelated.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":convergence_criterion",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
 py_test(
     name = "loss_not_decreasing_test",
     size = "medium",
     srcs = ["loss_not_decreasing_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "successive_gradients_are_uncorrelated_test",
+    size = "medium",
+    srcs = ["successive_gradients_are_uncorrelated_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

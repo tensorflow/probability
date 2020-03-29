@@ -18,10 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
-
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
@@ -33,6 +30,7 @@ __all__ = [
     'complex128',
     'complex64',
     'double',
+    'DType',
     'float16',
     'float32',
     'float64',
@@ -58,6 +56,8 @@ __all__ = [
 
 JAX_MODE = False
 
+DType = np.dtype  # pylint: disable=invalid-name
+
 
 def _complex(real, imag, name=None):  # pylint: disable=unused-argument
   dtype = utils.common_dtype([real, imag], dtype_hint=float32)
@@ -73,7 +73,7 @@ def _complex(real, imag, name=None):  # pylint: disable=unused-argument
 # --- Begin Public Functions --------------------------------------------------
 
 as_dtype = utils.copy_docstring(
-    tf.as_dtype,
+    'tf.as_dtype',
     lambda type_value: np.dtype(  # pylint: disable=g-long-lambda
         type_value.name if hasattr(type_value, 'name') else type_value).type)
 
@@ -81,7 +81,7 @@ real_dtype = lambda dtype: np.real(np.zeros((0,), dtype=as_dtype(dtype))).dtype
 
 bool = np.bool  # pylint: disable=redefined-builtin
 
-complex = utils.copy_docstring(tf.complex, _complex)  # pylint: disable=redefined-builtin
+complex = utils.copy_docstring('tf.complex', _complex)  # pylint: disable=redefined-builtin
 
 complex128 = np.complex128
 

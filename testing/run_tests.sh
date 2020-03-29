@@ -80,8 +80,8 @@ install_python_packages() {
   pip install tf-nightly==$TF_VERSION_STR
 
   # The following unofficial dependencies are used only by tests.
-  # TODO(b/148685448): Unpin Hypothesis version.
-  pip install hypothesis==4.36.0 matplotlib mock scipy
+  # TODO(b/148685448): Unpin Hypothesis and coverage versions.
+  pip install hypothesis==3.56.5 coverage==4.4.2 matplotlib mock scipy
 
   # Install additional TFP dependencies.
   pip install decorator cloudpickle
@@ -99,7 +99,7 @@ install_python_packages() {
 call_with_log_folding install_bazel
 call_with_log_folding install_python_packages
 
-test_tags_to_skip="(gpu|requires-gpu-sm35|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
+test_tags_to_skip="(gpu|requires-gpu-nvidia|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
 
 # Given a test size (small, medium, large), a number of shards and a shard ID,
 # query and print a list of tests of the given size to run in the given shard.

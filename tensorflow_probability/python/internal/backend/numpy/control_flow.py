@@ -18,12 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import ops
 
 
 __all__ = [
@@ -89,7 +87,21 @@ def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-na
     def override_cond_fn(args):
       return cond(*args)
     return lax.while_loop(override_cond_fn, override_body_fn, loop_vars)
-  else:  # Use else to avoid linter saying these functions are already defined.
+  elif back_prop:
+    def override_body_fn(args, _):
+      c = cond(*args)
+      sc = ops.get_static_value(c)
+      if sc is None:
+        args = lax.cond(c, args, lambda args: body(*args), args,
+                        lambda args: args)
+      elif sc:
+        args = body(*args)
+      return args, ()
+
+    loop_vars, _ = lax.scan(
+        override_body_fn, loop_vars, xs=None, length=maximum_iterations)
+    return loop_vars
+  else:
     def override_body_fn(args):
       i, args = args
       return i + 1, body(*args)
@@ -103,13 +115,13 @@ def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-na
 # --- Begin Public Functions --------------------------------------------------
 
 cond = utils.copy_docstring(
-    tf.cond,
+    'tf.cond',
     _cond_jax if JAX_MODE else _cond)
 
 no_op = utils.copy_docstring(
-    tf.no_op,
+    'tf.no_op',
     _no_op)
 
 while_loop = utils.copy_docstring(
-    tf.while_loop,
+    'tf.while_loop',
     _while_loop_jax if JAX_MODE else _while_loop)

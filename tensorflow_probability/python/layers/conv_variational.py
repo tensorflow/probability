@@ -25,7 +25,6 @@ from tensorflow_probability.python.distributions import kullback_leibler as kl_l
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.layers import util as tfp_layers_util
-from tensorflow_probability.python.math import random_rademacher
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.layers import utils as tf_layers_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import nn_ops  # pylint: disable=g-direct-tensorflow-import
@@ -1090,6 +1089,12 @@ class _ConvFlipout(_ConvVariational):
       channels = input_shape[-1]
 
     seed_stream = SeedStream(self.seed, salt='ConvFlipout')
+
+    def random_rademacher(shape, dtype=tf.float32, seed=None):
+      int_dtype = tf.int64 if tf.as_dtype(dtype) != tf.int32 else tf.int32
+      random_bernoulli = tf.random.uniform(
+          shape, minval=0, maxval=2, dtype=int_dtype, seed=seed)
+      return tf.cast(2 * random_bernoulli - 1, dtype)
 
     sign_input = random_rademacher(
         tf.concat([batch_shape,

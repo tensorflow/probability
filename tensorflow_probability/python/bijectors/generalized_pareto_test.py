@@ -33,7 +33,7 @@ class GeneralizedParetoTest(test_util.TestCase):
     bijector_test_util.assert_scalar_congruency(
         tfb.GeneralizedPareto(
             loc=1., scale=3., concentration=2., validate_args=True),
-        lower_x=-7., upper_x=7., eval_func=self.evaluate, rtol=.1)
+        lower_x=-7., upper_x=7., eval_func=self.evaluate, rtol=.15)
 
   def testScalarCongruencyNegativeConcentration(self):
     bijector_test_util.assert_scalar_congruency(

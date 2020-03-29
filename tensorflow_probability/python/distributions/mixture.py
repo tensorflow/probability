@@ -59,8 +59,8 @@ class Mixture(distribution.Distribution):
 
   # Plot the PDF.
   import matplotlib.pyplot as plt
-  x = tf.linspace(-2., 3., int(1e4)).eval()
-  plt.plot(x, bimix_gauss.prob(x).eval());
+  x = tf.linspace(-2., 3., int(1e4))
+  plt.plot(x, bimix_gauss.prob(x))
   ```
 
   """

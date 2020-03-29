@@ -47,6 +47,11 @@ if release:
 else:
   project_name = 'tfp-nightly'
 
+if release:
+  TFDS_PACKAGE = 'tensorflow-datasets >= 2.2.0'
+else:
+  TFDS_PACKAGE = 'tfds-nightly'
+
 
 class BinaryDistribution(Distribution):
   """This class is needed in order to create OS specific wheels."""
@@ -100,5 +105,6 @@ setup(
     keywords='tensorflow probability statistics bayesian machine learning',
     extras_require={  # e.g. `pip install tfp-nightly[jax]`
         'jax': ['jax', 'jaxlib'],
+        'tfds': [TFDS_PACKAGE],
     }
 )

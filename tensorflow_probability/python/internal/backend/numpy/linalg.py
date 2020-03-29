@@ -18,28 +18,37 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-
-# pylint: disable=unused-import
-from tensorflow_probability.python.internal.backend.numpy import adjoint_registrations as _adjoint_registrations
-from tensorflow_probability.python.internal.backend.numpy import cholesky_registrations as _cholesky_registrations
-from tensorflow_probability.python.internal.backend.numpy import inverse_registrations as _inverse_registrations
-from tensorflow_probability.python.internal.backend.numpy import linear_operator_algebra as _linear_operator_algebra
-from tensorflow_probability.python.internal.backend.numpy import matmul_registrations as _matmul_registrations
-from tensorflow_probability.python.internal.backend.numpy import solve_registrations as _solve_registrations
-
+# pylint: disable=g-import-not-at-top
 # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.linalg_impl import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_block_diag import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_block_lower_triangular import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_circulant import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_composition import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_diag import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_full_matrix import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_identity import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_kronecker import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_low_rank_update import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_lower_triangular import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_toeplitz import *
-from tensorflow_probability.python.internal.backend.numpy.linear_operator_zeros import *
+
+# Don't crash if we can't import bazel-generated numpy versions of TF
+# LinearOperators. This allows external developers to run TF tests without
+# installing bazel.
+try:
+  # pylint: disable=unused-import
+  from tensorflow_probability.python.internal.backend.numpy import adjoint_registrations as _adjoint_registrations
+  from tensorflow_probability.python.internal.backend.numpy import cholesky_registrations as _cholesky_registrations
+  from tensorflow_probability.python.internal.backend.numpy import inverse_registrations as _inverse_registrations
+  from tensorflow_probability.python.internal.backend.numpy import linear_operator_algebra as _linear_operator_algebra
+  from tensorflow_probability.python.internal.backend.numpy import matmul_registrations as _matmul_registrations
+  from tensorflow_probability.python.internal.backend.numpy import solve_registrations as _solve_registrations
+
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_block_diag import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_block_lower_triangular import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_circulant import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_composition import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_diag import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_full_matrix import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_identity import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_kronecker import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_low_rank_update import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_lower_triangular import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_toeplitz import *
+  from tensorflow_probability.python.internal.backend.numpy.linear_operator_zeros import *
+except ImportError:
+  import sys
+  # Backend should only fail importing if we're running pytest.
+  if 'pytest' not in sys.modules:
+    raise

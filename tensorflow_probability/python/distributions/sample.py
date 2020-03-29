@@ -163,7 +163,11 @@ class Sample(distribution_lib.Distribution):
     ], axis=0)
 
   def _event_shape(self):
-    sample_shape = tf.TensorShape(tf.get_static_value(self.sample_shape))
+    s = tf.get_static_value(self.sample_shape)
+    if tensorshape_util.rank(s) == 1:
+      sample_shape = tf.TensorShape(s)
+    else:
+      sample_shape = tensorshape_util.constant_value_as_shape(self.sample_shape)
     if (tensorshape_util.rank(sample_shape) is None or
         tensorshape_util.rank(self.distribution.event_shape) is None):
       return tf.TensorShape(None)
@@ -180,10 +184,12 @@ class Sample(distribution_lib.Distribution):
     perm = prefer_static.concat([
         [0],
         prefer_static.range(1 + fake_sample_ndims,
-                            1 + fake_sample_ndims + batch_ndims),
-        prefer_static.range(1, 1 + fake_sample_ndims),
+                            1 + fake_sample_ndims + batch_ndims,
+                            dtype=tf.int32),
+        prefer_static.range(1, 1 + fake_sample_ndims, dtype=tf.int32),
         prefer_static.range(1 + fake_sample_ndims + batch_ndims,
-                            1 + fake_sample_ndims + batch_ndims + event_ndims),
+                            1 + fake_sample_ndims + batch_ndims + event_ndims,
+                            dtype=tf.int32),
     ], axis=0)
     x = self.distribution.sample(
         prefer_static.concat([[n], sample_shape], axis=0),

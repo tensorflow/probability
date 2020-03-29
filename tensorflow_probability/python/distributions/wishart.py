@@ -33,9 +33,9 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -180,11 +180,11 @@ class WishartLinearOperator(distribution.Distribution):
 
     ndims = batch_ndims + 3  # sample_ndims=1, event_ndims=2
     shape = tf.concat([[n], batch_shape, event_shape], 0)
-    stream = SeedStream(seed, salt='Wishart')
+    normal_seed, gamma_seed = samplers.split_seed(seed, salt='Wishart')
 
     # Complexity: O(nbk**2)
-    x = tf.random.normal(
-        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=stream())
+    x = samplers.normal(
+        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=normal_seed)
 
     # Complexity: O(nbk)
     # This parameterization is equivalent to Chi2, i.e.,
@@ -193,12 +193,12 @@ class WishartLinearOperator(distribution.Distribution):
         self._scale.batch_shape_tensor(),
         dtype=dtype_util.base_dtype(df.dtype))
 
-    g = tf.random.gamma(
+    g = samplers.gamma(
         shape=[n],
         alpha=self._multi_gamma_sequence(0.5 * expanded_df, self._dimension()),
         beta=0.5,
         dtype=self.dtype,
-        seed=stream())
+        seed=gamma_seed)
 
     # Complexity: O(nbk**2)
     x = tf.linalg.band_part(x, -1, 0)  # Tri-lower.

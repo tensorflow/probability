@@ -30,6 +30,7 @@ py_library(
     deps = [
         "//tensorflow_probability/python/experimental/substrates/numpy/bijectors",
         "//tensorflow_probability/python/experimental/substrates/numpy/distributions",
+        "//tensorflow_probability/python/experimental/substrates/numpy/experimental",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal",
         "//tensorflow_probability/python/experimental/substrates/numpy/stats",
         "//tensorflow_probability/python/experimental/substrates/numpy/util",

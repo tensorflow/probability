@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
     'log_add_exp',
+    'log_cosh',
     'log_sub_exp',
     'log_combinations',
     'log1mexp',
@@ -448,7 +449,7 @@ def log1mexp(x, name=None):
   """Compute `log(1 - exp(-|x|))` in a numerically stable way.
 
   Args:
-    x: Float `Tensor` broadcastable with `y`.
+    x: Float `Tensor`.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., `'log1mexp'`).
 
@@ -469,6 +470,46 @@ def log1mexp(x, name=None):
         # This switching point is recommended in [1].
         x < np.log(2), tf.math.log(-tf.math.expm1(-x)),
         tf.math.log1p(-tf.math.exp(-x)))
+
+
+def log_cosh(x, name=None):
+  """Compute `log(cosh(x))` in a numerically stable way.
+
+  Args:
+    x: Float `Tensor`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log_cosh'`).
+
+  Returns:
+    log_cosh: `log_cosh(x)`.
+  """
+  # log(cosh(x)) = log(e^x + e^-x) - log(2).
+  # For x > 0, we can rewrite this as x + log(1 + e^(-2 * x)) - log(2).
+  # The second term will be small when x is large, so we don't get any large
+  # cancellations.
+  # Similarly for x < 0, we can rewrite the expression as -x + log(1 + e^(2 *
+  # x)) - log(2)
+  # This gives us abs(x) + softplus(-2 * abs(x)) - log(2)
+
+  # For x close to zero, we can write the taylor series of softplus(
+  # -2 * abs(x)) to see that we get;
+  # log(2) - abs(x) + x**2 / 2. - x**4 / 12 + x**6 / 45. + O(x**8)
+  # We can cancel out terms to get:
+  # x ** 2 / 2.  * (1. - x ** 2 / 6) + x ** 6 / 45. + O(x**8)
+  # For x < 45 * sixthroot(smallest normal), all higher level terms
+  # disappear and we can use the above expression.
+  with tf.name_scope(name or 'log_cosh'):
+    dtype = dtype_util.common_dtype([x], dtype_hint=tf.float32)
+    numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    x = tf.math.abs(x)
+    logcosh = x + tf.math.softplus(-2 * x) - np.log(2).astype(numpy_dtype)
+    bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
+    return tf.where(
+        x <= bound,
+        tf.math.exp(
+            tf.math.log(x) + tf.math.log1p(-tf.square(x) / 6.)),
+        logcosh)
 
 
 def soft_sorting_matrix(x, temperature, name=None):

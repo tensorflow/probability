@@ -26,6 +26,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
@@ -136,6 +137,12 @@ class LinearRegression(StructuralTimeSeries):
 
   """
 
+  @deprecation.deprecated(
+      '2020-06-01', 'Previously, the batch shape of `weights_prior` was '
+      'overridden to equal the batch shape of the design matrix when '
+      '`weights_prior.event_shape` is scalar. This behavior is deprecated, '
+      'and `weights_prior` must be defined with the desired batch shape (see '
+      'note on batch shapes in the constructor docstring).')
   def __init__(self,
                design_matrix,
                weights_prior=None,

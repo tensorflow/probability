@@ -626,7 +626,7 @@ class _BatchReshapeTest(object):
     eps = 1e-6
     bijector_test_util.assert_scalar_congruency(
         reshape_dist._experimental_default_event_space_bijector(),
-        lower_x=2+eps, upper_x=10-eps, eval_func=self.evaluate)
+        lower_x=2+eps, upper_x=10-eps, eval_func=self.evaluate, rtol=.15)
 
   def test_default_event_space_bijector_bijective_and_finite(self):
     batch_shape = [5, 1, 4]

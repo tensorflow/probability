@@ -31,9 +31,9 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'InverseGaussian',
@@ -154,13 +154,13 @@ class InverseGaussian(distribution.Distribution):
     # https://www.jstor.org/stable/2683801
     concentration = tf.convert_to_tensor(self.concentration)
     loc = tf.convert_to_tensor(self.loc)
-    seed = SeedStream(seed, 'inverse_gaussian')
+    chi2_seed, unif_seed = samplers.split_seed(seed, salt='inverse_gaussian')
     shape = tf.concat([[n], self._batch_shape_tensor(
         loc=loc, concentration=concentration)], axis=0)
-    sampled_chi2 = tf.square(tf.random.normal(
-        shape, mean=0., stddev=1., seed=seed(), dtype=self.dtype))
-    sampled_uniform = tf.random.uniform(
-        shape, minval=0., maxval=1., seed=seed(), dtype=self.dtype)
+    sampled_chi2 = tf.square(samplers.normal(
+        shape, seed=chi2_seed, dtype=self.dtype))
+    sampled_uniform = samplers.uniform(
+        shape, seed=unif_seed, dtype=self.dtype)
     sampled = (
         loc + tf.square(loc) * sampled_chi2 / (2. * concentration) -
         loc / (2. * concentration) *

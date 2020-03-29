@@ -88,10 +88,11 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
         shift_and_log_scale_fn=lambda x: [None, affine.forward(x)],
         validate_args=True)
     td = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
+        # TODO(b/137665504): Use batch-adding meta-distribution to set the batch
+        # shape instead of tf.zeros.
+        distribution=tfd.Sample(
+            tfd.Normal(tf.zeros(batch_shape), 1.), [event_size]),
         bijector=ar_flow,
-        event_shape=[event_size],
-        batch_shape=batch_shape,
         validate_args=True)
     x_shape = np.concatenate([sample_shape, batch_shape, [event_size]], axis=0)
     x = 2. * self._rng.random_sample(x_shape).astype(np.float32) - 1.

@@ -20,8 +20,6 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow.compat.v2 as tf
-
 # pylint: disable=unused-import
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import bitwise
@@ -46,6 +44,7 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
+# TODO(b/151669121): Remove dependency on TF
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 # pylint: enable=unused-import
 
@@ -72,10 +71,10 @@ compat = collections.namedtuple('compat', 'dimension_value')(
     lambda dim: None if dim is None else int(dim))
 
 function = utils.copy_docstring(
-    tf.function,
+    'tf.function',
     _function)
 
 eye = linalg.eye
 matmul = linalg.matmul
 
-del collections, tf, utils
+del collections, utils

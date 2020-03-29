@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
@@ -132,7 +133,7 @@ class Pareto(distribution.Distribution):
         [[n],
          self._batch_shape_tensor(concentration=concentration, scale=scale)],
         axis=0)
-    sampled = tf.random.uniform(shape, maxval=1., seed=seed, dtype=self.dtype)
+    sampled = samplers.uniform(shape, maxval=1., seed=seed, dtype=self.dtype)
     log_sample = tf.math.log(scale) - tf.math.log1p(-sampled) / concentration
     return tf.exp(log_sample)
 

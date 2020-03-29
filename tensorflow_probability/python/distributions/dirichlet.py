@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -220,7 +221,7 @@ class Dirichlet(distribution.Distribution):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
-    gamma_sample = tf.random.gamma(
+    gamma_sample = samplers.gamma(
         shape=[n], alpha=self.concentration, dtype=self.dtype, seed=seed)
     return gamma_sample / tf.reduce_sum(gamma_sample, axis=-1, keepdims=True)
 

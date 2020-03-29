@@ -24,6 +24,7 @@ from tensorflow_probability.python.distributions.autoregressive import Autoregre
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
 from tensorflow_probability.python.distributions.bernoulli import Bernoulli
 from tensorflow_probability.python.distributions.beta import Beta
+from tensorflow_probability.python.distributions.beta_binomial import BetaBinomial
 from tensorflow_probability.python.distributions.binomial import Binomial
 from tensorflow_probability.python.distributions.blockwise import Blockwise
 from tensorflow_probability.python.distributions.categorical import Categorical
@@ -31,6 +32,7 @@ from tensorflow_probability.python.distributions.cauchy import Cauchy
 from tensorflow_probability.python.distributions.chi import Chi
 from tensorflow_probability.python.distributions.chi2 import Chi2
 from tensorflow_probability.python.distributions.cholesky_lkj import CholeskyLKJ
+from tensorflow_probability.python.distributions.continuous_bernoulli import ContinuousBernoulli
 from tensorflow_probability.python.distributions.deterministic import Deterministic
 from tensorflow_probability.python.distributions.deterministic import VectorDeterministic
 from tensorflow_probability.python.distributions.dirichlet import Dirichlet
@@ -146,6 +148,7 @@ __all__ = [
     'BatchReshape',
     'Bernoulli',
     'Beta',
+    'BetaBinomial',
     'Binomial',
     'Blockwise',
     'Categorical',

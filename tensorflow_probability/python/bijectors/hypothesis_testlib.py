@@ -154,6 +154,10 @@ def bijector_supports():
       'FillTriangular':
           BijectorSupport(
               Support.VECTOR_SIZE_TRIANGULAR, Support.MATRIX_LOWER_TRIL),
+      'FrechetCDF':
+          # The domain is dependent on the `loc` parameter of FrechetCDF,
+          # hence is handled in the test harness.
+          BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
       'GumbelCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
@@ -386,4 +390,11 @@ def power_transform_constraint(power):
     if power == 0:
       return x
     return tf.math.softplus(x) - 1. / power
+  return constrain
+
+
+def frechet_constraint(loc):
+  """Maps `s` to [loc, inf)."""
+  def constrain(x):
+    return loc + tf.math.softplus(x)
   return constrain
