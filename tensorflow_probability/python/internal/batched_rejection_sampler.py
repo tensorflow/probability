@@ -134,7 +134,10 @@ def batched_rejection_sampler(
       proposal_seed, mask_seed = samplers.split_seed(
           seed, salt='batched_rejection_sampler')
       proposed_samples, proposed_values = proposal_fn(proposal_seed)
-      good_samples_mask = tf.less_equal(
+      # The comparison needs to be strictly less to avoid spurious acceptances
+      # when the uniform samples exactly 0 (or when the product underflows to
+      # 0).
+      good_samples_mask = tf.less(
           proposed_values * samplers.uniform(
               prefer_static.shape(proposed_samples),
               seed=mask_seed,

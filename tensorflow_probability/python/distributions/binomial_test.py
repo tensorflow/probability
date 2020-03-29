@@ -331,6 +331,19 @@ class BinomialTest(test_util.TestCase):
          total_count))
     self.assertAllEqual(samples, expected_samples)
 
+  def testSampleInBounds(self):
+    # Regression test for b/152660887.
+    # This number of samples suffices to make the test fail about 45 times out
+    # of 100 under --vary_seed (before applying the fix, that is).
+    num_samples = 1000000
+    total_count = tf.constant([1.], dtype=tf.float32)
+    probs = tf.constant([0.], dtype=tf.float32)
+    dist = tfd.Binomial(
+        total_count=total_count, probs=probs, validate_args=True)
+    samples = self.evaluate(
+        dist.sample(num_samples, seed=test_util.test_seed()))
+    self.assertAllEqual(samples, tf.zeros_like(samples))
+
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
     d = tfd.Binomial(total_count=1, logits=x, validate_args=True)
