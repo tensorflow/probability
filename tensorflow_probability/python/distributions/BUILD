@@ -2365,9 +2365,13 @@ multi_substrate_py_test(
     jax_size = "medium",
     numpy_tags = ["notap"],
     deps = [
+        # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:hypothesis_testlib",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

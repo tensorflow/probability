@@ -446,6 +446,12 @@ def kolmogorov_smirnov_distance(
     return tf.maximum(low_distances, high_distances)
 
 
+def left_continuous_cdf_discrete_distribution(dist):
+  def left_cdf(x):
+    return dist.cdf(x) - dist.prob(x)
+  return left_cdf
+
+
 def kolmogorov_smirnov_distance_two_sample(samples1, samples2, name=None):
   """Computes the Kolmogorov-Smirnov distance between the given empirical CDFs.
 

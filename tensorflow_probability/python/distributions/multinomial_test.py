@@ -17,11 +17,16 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+import hypothesis as hp
+from hypothesis import strategies as hps
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
+from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -337,6 +342,54 @@ class MultinomialTest(test_util.TestCase):
     self.assertAllEqual([4, 4], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
+
+  def propSampleCorrectMarginals(
+      self, dist, special_class, under_hypothesis=False):
+    # Property: When projected on one class, multinomial should sample the
+    # binomial distribution.
+    seed = test_util.test_seed()
+    num_samples = 120000
+    needed = self.evaluate(st.min_num_samples_for_dkwm_cdf_test(
+        0.02, false_fail_rate=1e-9, false_pass_rate=1e-9))
+    self.assertGreater(num_samples, needed)
+    samples = dist.sample(num_samples, seed=seed)
+    successes = samples[..., special_class]
+    prob_success = dist._probs_parameter_no_checks()[..., special_class]
+    if under_hypothesis:
+      hp.note('Expected probability of success {}'.format(prob_success))
+      hp.note('Successes obtained {}'.format(successes))
+    expected_dist = tfd.Binomial(dist.total_count, probs=prob_success)
+    self.evaluate(st.assert_true_cdf_equal_by_dkwm(
+        successes, expected_dist.cdf,
+        st.left_continuous_cdf_discrete_distribution(expected_dist),
+        false_fail_rate=1e-9))
+
+  def testSampleCorrectMarginals(self):
+    dist1 = tfd.Multinomial(50., probs=[0.25, 0.25, 0.25, 0.25])
+    self.propSampleCorrectMarginals(dist1, 2)
+    dist2 = tfd.Multinomial([0., 1., 25., 100.], probs=[0., 0.1, 0.35, 0.55])
+    self.propSampleCorrectMarginals(dist2, 0)
+    self.propSampleCorrectMarginals(dist2, 1)
+    self.propSampleCorrectMarginals(dist2, 2)
+
+  @test_util.test_all_tf_execution_regimes
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def manual_testSampleCorrectMarginalsWithHypothesis(self, data):
+    # You probably want --test_timeout=300 for this one
+    dist = data.draw(dhps.distributions(dist_name='Multinomial'))
+    special_class = data.draw(
+        hps.sampled_from(range(dist._probs_parameter_no_checks().shape[-1])))
+    # TODO(axch): Drawing the test seed inside the property will interact poorly
+    # with --vary_seed under Hypothesis, because the seed will change as
+    # Hypothesis tries to shrink failing examples.  It would be better to
+    # compute the test seed outside the test method somehow, so each example
+    # gets the same one.
+    # TODO(axch): Not sure how to think about the false positive rate of this
+    # test.  Hypothesis will try an adversarial search to make the statistical
+    # assertion fail, which seems like a multiple comparisons problem with a
+    # combinatorially large space of alternatives?
+    self.propSampleCorrectMarginals(dist, special_class, under_hypothesis=True)
 
   def testNotReparameterized(self):
     if tf1.control_flow_v2_enabled():
