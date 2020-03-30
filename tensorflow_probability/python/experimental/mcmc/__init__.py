@@ -20,12 +20,16 @@ from __future__ import print_function
 
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
+from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
+from tensorflow_probability.python.experimental.mcmc.particle_filter import reconstruct_trajectories
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import sample_sequential_monte_carlo
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'EllipticalSliceSampler',
     'NoUTurnSampler',
+    'particle_filter',
+    'reconstruct_trajectories',
     'sample_sequential_monte_carlo',
 ]
 

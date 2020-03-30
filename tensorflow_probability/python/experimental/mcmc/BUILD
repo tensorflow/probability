@@ -37,6 +37,7 @@ py_library(
     deps = [
         ":elliptical_slice_sampler",
         ":nuts_autobatching",
+        ":particle_filter",
         ":sample_sequential_monte_carlo",
         # tensorflow dep,
     ],
@@ -167,6 +168,32 @@ py_test(
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "particle_filter",
+    srcs = ["particle_filter.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_test(
+    name = "particle_filter_test",
+    size = "medium",
+    srcs = ["particle_filter_test.py"],
+    deps = [
+        ":particle_filter",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
