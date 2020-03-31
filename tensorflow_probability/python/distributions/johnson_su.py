@@ -42,18 +42,20 @@ __all__ = [
 class JohnsonSU(transformed_distribution.TransformedDistribution):
   """Johnson's SU-distribution.
 
-  This distribution has parameters: shape parameters `gamma` and `delta`,
-  location `loc`, and `scale`.
+  This distribution has parameters: shape parameters `skewness` and
+  `tailweight`, location `loc`, and `scale`.
 
   #### Mathematical details
 
   The probability density function (pdf) is,
 
   ```none
-  pdf(x; gamma, delta, xi, sigma) = exp(-0.5 (gamma + delta arcsinh(y))**2) / Z
+  pdf(x; s, t, xi, sigma) = exp(-0.5 (s + t arcsinh(y))**2) / Z
   where,
+  s = skewness
+  t = tailweight
   y = (x - xi) / sigma
-  Z = sigma sqrt(2 pi) sqrt(1 + y**2) / delta
+  Z = sigma sqrt(2 pi) sqrt(1 + y**2) / t
   ```
 
   where:
@@ -66,7 +68,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
   constructed as,
 
   ```none
-  X ~ JohnsonSU(gamma, delta, loc=0, scale=1)
+  X ~ JohnsonSU(skewness, tailweight, loc=0, scale=1)
   Y = loc + scale * X
   ```
 
@@ -79,7 +81,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
   tfd = tfp.distributions
 
   # Define a single scalar Johnson's SU-distribution.
-  single_dist = tfd.JohnsonSU(gamma=-2., delta=2., loc=1.1, scale=1.5)
+  single_dist = tfd.JohnsonSU(skewness=-2., tailweight=2., loc=1.1, scale=1.5)
 
   # Evaluate the pdf at 1, returning a scalar Tensor.
   single_dist.prob(1.)
@@ -87,7 +89,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
   # Define a batch of two scalar valued Johnson SU's.
   # The first has shape parameters 1 and 2, mean 3, and scale 11.
   # The second 4, 5, 6 and 22.
-  multi_dist = tfd.JohnsonSU(gamma=[1, 4], delta=[2, 5],
+  multi_dist = tfd.JohnsonSU(skewness=[1, 4], tailweight=[2, 5],
                              loc=[3, 6], scale=[11, 22.])
 
   # Evaluate the pdf of the first distribution on 0, and the second on 1.5,
@@ -102,8 +104,8 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
 
   ```python
   # Define a batch of two Johnson's SU distributions.
-  # Both have gamma 2, delta 3 and mean 1, but different scales.
-  dist = tfd.JohnsonSU(gamma=2, delta=3, loc=1, scale=[11, 22.])
+  # Both have skewness 2, tailweight 3 and mean 1, but different scales.
+  dist = tfd.JohnsonSU(skewness=2, tailweight=3, loc=1, scale=[11, 22.])
 
   # Evaluate the pdf of both distributions on the same point, 3.0,
   # returning a length 2 tensor.
@@ -113,11 +115,12 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
   Compute the gradients of samples w.r.t. the parameters:
 
   ```python
-  gamma = tf.Variable(2.0)
-  delta = tf.Variable(3.0)
+  skewness = tf.Variable(2.0)
+  tailweight = tf.Variable(3.0)
   loc = tf.Variable(2.0)
   scale = tf.Variable(11.0)
-  dist = tfd.JohnsonSU(gamma=gamma, delta=delta, loc=loc, scale=scale)
+  dist = tfd.JohnsonSU(skewness=skewness, tailweight=tailweight, loc=loc,
+                       scale=scale)
   with tf.GradientTape() as tape:
     samples = dist.sample(5)  # Shape [5]
     loss = tf.reduce_mean(tf.square(samples))  # Arbitrary loss function
@@ -128,8 +131,8 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
   """
 
   def __init__(self,
-               gamma,
-               delta,
+               skewness,
+               tailweight,
                loc,
                scale,
                validate_args=False,
@@ -137,18 +140,17 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
                name=None):
     """Construct Johnson's SU distributions.
 
-    The distributions have shape parameteres `delta` and `gamma`, mean `loc`,
-    and scale `scale`.
+    The distributions have shape parameteres `tailweight` and `skewness`,
+    mean `loc`, and scale `scale`.
 
-    The parameters `delta`, `gamma`, `loc`, and `scale` must be shaped in a way
-    that supports broadcasting (e.g. `gamma + delta + loc + scale` is a valid
-    operation).
+    The parameters `tailweight`, `skewness`, `loc`, and `scale` must be shaped
+    in a way that supports broadcasting
+    (e.g. `skewness + tailweight + loc + scale` is a valid operation).
 
     Args:
-      gamma: Floating-point `Tensor`. The shape parameter(s) of the
-        distribution(s).
-      delta: Floating-point `Tensor`. The shape parameter(s) of the
-        distribution(s). `delta` must contain only positive values.
+      skewness: Floating-point `Tensor`. Skewness of the distribution(s).
+      tailweight: Floating-point `Tensor`. Tail weight of the
+        distribution(s). `tailweight` must contain only positive values.
       loc: Floating-point `Tensor`. The mean(s) of the distribution(s).
       scale: Floating-point `Tensor`. The scaling factor(s) for the
         distribution(s). Note that `scale` is not technically the standard
@@ -165,28 +167,30 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
-      TypeError: if any of gamma, delta, loc and scale are different dtypes.
+      TypeError: if any of skewness, tailweight, loc and scale are different
+        dtypes.
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'JohnsonSU') as name:
-      dtype = dtype_util.common_dtype([gamma, delta, loc, scale], tf.float32)
-      self._gamma = tensor_util.convert_nonref_to_tensor(
-          gamma, name='gamma', dtype=dtype)
-      self._delta = tensor_util.convert_nonref_to_tensor(
-          delta, name='delta', dtype=dtype)
+      dtype = dtype_util.common_dtype([skewness, tailweight, loc, scale],
+                                      tf.float32)
+      self._skewness = tensor_util.convert_nonref_to_tensor(
+          skewness, name='skewness', dtype=dtype)
+      self._tailweight = tensor_util.convert_nonref_to_tensor(
+          tailweight, name='tailweight', dtype=dtype)
       self._loc = tensor_util.convert_nonref_to_tensor(
           loc, name='loc', dtype=dtype)
       self._scale = tensor_util.convert_nonref_to_tensor(
           scale, name='scale', dtype=dtype)
-      dtype_util.assert_same_float_dtype((self._gamma, self._delta,
-                                          self._loc, self._scale))
 
       norm_shift = invert_bijector.Invert(
-          shift_bijector.Shift(shift=self._gamma, validate_args=validate_args)
+          shift_bijector.Shift(shift=self._skewness,
+                               validate_args=validate_args)
       )
 
       norm_scale = invert_bijector.Invert(
-          scale_bijector.Scale(scale=self._delta, validate_args=validate_args)
+          scale_bijector.Scale(scale=self._tailweight,
+                               validate_args=validate_args)
       )
 
       sinh = inline_bijector.Inline(
@@ -209,7 +213,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
       bijector = shift(scale(sinh(norm_scale(norm_shift))))
 
       batch_shape = distribution_util.get_broadcast_shape(
-          self._gamma, self._delta, self._loc, self._scale)
+          self._skewness, self._tailweight, self._loc, self._scale)
 
       super(JohnsonSU, self).__init__(
           distribution=normal.Normal(
@@ -226,22 +230,22 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
   @staticmethod
   def _param_shapes(sample_shape):
     return dict(
-        zip(('gamma', 'delta', 'loc', 'scale'),
+        zip(('skewness', 'tailweight', 'loc', 'scale'),
             ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 4)))
 
   @classmethod
   def _params_event_ndims(cls):
-    return dict(gamma=0, delta=0, loc=0, scale=0)
+    return dict(skewness=0, tailweight=0, loc=0, scale=0)
 
   @property
-  def gamma(self):
-    """Gamma shape parameters in these Johnson's SU distribution(s)."""
-    return self._gamma
+  def skewness(self):
+    """Skewness of these Johnson's SU distribution(s)."""
+    return self._skewness
 
   @property
-  def delta(self):
-    """Delta shape parameters in these Johnson's SU distribution(s)."""
-    return self._delta
+  def tailweight(self):
+    """Tail weight of these Johnson's SU distribution(s)."""
+    return self._tailweight
 
   @property
   def loc(self):
@@ -254,22 +258,21 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
     return self._scale
 
   def _mean(self):
-    gamma, delta, scale, loc = [tf.convert_to_tensor(v)
-                                for v in (self.gamma, self.delta, self.scale,
-                                          self.loc)]
+    skewness, tailweight, scale, loc = (
+        [tf.convert_to_tensor(v)
+         for v in (self.skewness, self.tailweight, self.scale, self.loc)])
 
-    return loc - scale * tf.math.exp(0.5 / tf.math.square(delta)) * \
-      tf.math.sinh(gamma / delta)
+    return (loc - scale * tf.math.exp(0.5 / tf.math.square(tailweight)) *
+            tf.math.sinh(skewness / tailweight))
 
   def _variance(self):
-    gamma, delta, scale = [tf.convert_to_tensor(v)
-                           for v in (self.gamma, self.delta, self.scale)]
+    skewness, tailweight, scale = (
+        [tf.convert_to_tensor(v)
+         for v in (self.skewness, self.tailweight, self.scale)])
 
-    inv_delta = 1./delta
-    inv_delta_2 = inv_delta**2
-
-    variance = 0.5 * scale**2 * tf.math.expm1(inv_delta_2) * \
-        (tf.math.exp(inv_delta_2) * tf.math.cosh(2. * gamma * inv_delta) + 1.)
+    variance = (0.5 * scale**2 * tf.math.expm1(1./tailweight**2) *
+                (tf.math.exp(1./tailweight**2) *
+                 tf.math.cosh(2. * skewness / tailweight) + 1.))
 
     return tf.broadcast_to(variance, self.batch_shape_tensor())
 
@@ -277,9 +280,9 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
     assertions = super(JohnsonSU, self)._parameter_control_dependencies(is_init)
 
     if self.validate_args:
-      if is_init != tensor_util.is_ref(self.delta):
+      if is_init != tensor_util.is_ref(self.tailweight):
         assertions.append(assert_util.assert_positive(
-            self.delta, message='Argument `delta` must be positive.'))
+            self.tailweight, message='Argument `tailweight` must be positive.'))
       if is_init != tensor_util.is_ref(self.scale):
         assertions.append(assert_util.assert_positive(
             self.scale, message='Argument `scale` must be positive.'))

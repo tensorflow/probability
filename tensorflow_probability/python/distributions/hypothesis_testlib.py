@@ -162,7 +162,7 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'InverseGaussian.loc':
         tfp_hps.softplus_plus_eps(),
-    'JohnsonSU.delta':
+    'JohnsonSU.tailweight':
         tfp_hps.softplus_plus_eps(),
     'VonMisesFisher.mean_direction':  # max ndims is 3 to avoid instability.
         lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :3]) + 1e-6, -1),
