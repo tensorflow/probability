@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 # Dependency imports
 
 import numpy as np
@@ -25,6 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
+from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import simple_heuristic_tuning
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -68,8 +70,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         st.kolmogorov_smirnov_distance_two_sample(
             final_state, likelihood_dist.sample(5000, seed=seed)))
 
-  # TODO(junpenglao) Enable this test.
-  def DISABLED_testSampleEndtoEndXLA(self):
+  def testSampleEndtoEndXLA(self):
     """An end-to-end test of sampling using SMC."""
     if tf.executing_eagerly() or tf.config.experimental_functions_run_eagerly():
       self.skipTest('No need to test XLA under all execution regimes.')
@@ -143,25 +144,30 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
           likelihood_log_prob_fn,
           prior_jd.sample(1000, seed=seed),
           make_kernel_fn=make_transform_hmc_kernel_fn,
-          optimal_accept=0.7,
+          tuning_fn=functools.partial(simple_heuristic_tuning,
+                                      optimal_accept=.7),
           max_num_steps=50,
           parallel_iterations=1,
           seed=seed)
 
     n_stage, (b0, b1, mu_out, sigma_out, weight), _ = run_smc()
 
-    self.assertTrue(self.evaluate(n_stage), 15)
+    (
+        n_stage, b0, b1, mu_out, sigma_out, weight
+    ) = self.evaluate((n_stage, b0, b1, mu_out, sigma_out, weight))
 
-    # Compare the SMC posterior with the result from a carefully calibrated HMC.
+    self.assertTrue(n_stage, 15)
+
+    # Compare the SMC posterior with the result from a calibrated HMC.
     self.assertAllClose(tf.reduce_mean(b0), 0.016, atol=0.005, rtol=0.005)
     self.assertAllClose(tf.reduce_mean(b1), 1.245, atol=0.005, rtol=0.005)
     self.assertAllClose(tf.reduce_mean(weight), 0.27, atol=0.01, rtol=0.01)
-    self.assertAllClose(tf.reduce_mean(mu_out), 0.13, atol=0.1, rtol=0.1)
+    self.assertAllClose(tf.reduce_mean(mu_out), 0.13, atol=0.2, rtol=0.2)
     self.assertAllClose(tf.reduce_mean(sigma_out), 0.46, atol=0.5, rtol=0.5)
 
     self.assertAllClose(tf.math.reduce_std(b0), 0.031, atol=0.005, rtol=0.005)
-    self.assertAllClose(tf.math.reduce_std(b1), 0.068, atol=0.005, rtol=0.005)
-    self.assertAllClose(tf.math.reduce_std(weight), 0.1, atol=0.01, rtol=0.01)
+    self.assertAllClose(tf.math.reduce_std(b1), 0.068, atol=0.1, rtol=0.1)
+    self.assertAllClose(tf.math.reduce_std(weight), 0.1, atol=0.1, rtol=0.1)
 
 
 if __name__ == '__main__':

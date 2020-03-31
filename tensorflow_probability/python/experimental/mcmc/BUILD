@@ -202,6 +202,7 @@ py_library(
     srcs = ["sample_sequential_monte_carlo.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:generic",

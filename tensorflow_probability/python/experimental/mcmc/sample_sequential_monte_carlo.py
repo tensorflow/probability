@@ -20,9 +20,12 @@ from __future__ import print_function
 
 import collections
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.math.generic import log1mexp
+from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import random_walk_metropolis
@@ -33,18 +36,22 @@ from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
+    'default_make_hmc_kernel_fn',
+    'gen_make_hmc_kernel_fn',
+    'gen_make_transform_hmc_kernel_fn',
+    'make_rwmh_kernel_fn',
     'sample_sequential_monte_carlo',
+    'simple_heuristic_tuning',
 ]
 
 
 PRINT_DEBUG = False
-TUNE_STEPS = True
 
 ParticleInfo = collections.namedtuple(
     'ParticleInfo',
     [
-        'accept_prob',  # acceptance probability per particle
-        'scalings',
+        'log_accept_prob',  # log acceptance probability per particle
+        'log_scalings',
         'tempered_log_prob',
         'likelihood_log_prob',
     ])
@@ -157,6 +164,65 @@ def gen_make_hmc_kernel_fn(num_leapfrog_steps=10):
 default_make_hmc_kernel_fn = gen_make_hmc_kernel_fn()
 
 
+def simple_heuristic_tuning(num_steps,
+                            log_scalings,
+                            log_accept_prob,
+                            optimal_accept=0.234,
+                            target_accept_prob=0.99,
+                            name=None):
+  """Tune the number of steps and scaling of one mutation.
+
+  # TODO(b/152412213): Better explanation of the heuristic used here.
+
+  This is a simple heuristic for tuning the number of steps of the next
+  mutation, as well as the scaling of a transition kernel (e.g., step size in
+  HMC, scale of a Normal proposal in RWMH) using the acceptance probability from
+  the previous mutation stage in SMC.
+
+  Args:
+    num_steps: The initial number of steps for the next mutation, to be tune.
+    log_scalings: The log of the scale of the proposal kernel
+    log_accept_prob: The log of the acceptance ratio from the last mutation.
+    optimal_accept: Optimal acceptance ratio for a Transitional Kernel. Default
+      value is 0.234 (Optimal for Random Walk Metropolis kernel).
+    target_accept_prob: Target acceptance probability at the end of one mutation
+      step. Default value: 0.99
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None`.
+
+  Returns:
+    num_steps: The number of steps for the next mutation.
+    new_log_scalings: The log of the scale of the proposal kernel for the next
+      mutation.
+
+  """
+  with tf.name_scope(name or 'simple_heuristic_tuning'):
+    optimal_accept = tf.constant(optimal_accept, dtype=log_accept_prob.dtype)
+    target_accept_prob = tf.constant(
+        target_accept_prob, dtype=log_accept_prob.dtype)
+    log_half_constant = tf.constant(np.log(.5), dtype=log_scalings.dtype)
+
+    avg_log_scalings = reduce_logmeanexp(log_scalings)
+    avg_log_accept_prob = reduce_logmeanexp(log_accept_prob)
+
+    avg_log_scaling_target = avg_log_scalings + (
+        tf.exp(avg_log_accept_prob) - optimal_accept)
+    new_log_scalings = log_half_constant + log_add_exp(
+        avg_log_scaling_target,
+        log_scalings + (tf.exp(log_accept_prob) - optimal_accept)
+        )
+
+    num_replica = ps.size0(log_accept_prob)
+    num_proposed = tf.cast(
+        num_replica * num_steps, dtype=avg_log_accept_prob.dtype)
+    log_avg_accept = tf.math.maximum(-tf.math.log(num_proposed),
+                                     avg_log_accept_prob)
+    num_steps = tf.cast(
+        tf.math.log1p(-target_accept_prob) / log1mexp(log_avg_accept),
+        dtype=num_steps.dtype)
+    return num_steps, new_log_scalings
+
+
 # TODO(b/152412213) Experitment to improve recommendation on static parmaeters
 def sample_sequential_monte_carlo(
     prior_log_prob_fn,
@@ -165,8 +231,7 @@ def sample_sequential_monte_carlo(
     max_num_steps=25,
     max_stage=100,
     make_kernel_fn=make_rwmh_kernel_fn,
-    optimal_accept=0.234,
-    target_accept_prob=0.99,
+    tuning_fn=simple_heuristic_tuning,
     ess_threshold_ratio=0.5,
     parallel_iterations=10,
     seed=None,
@@ -197,7 +262,7 @@ def sample_sequential_monte_carlo(
       independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
     max_num_steps: The maximum number of kernel transition steps in one mutation
       of the MC samples. Note that the actual number of steps in one mutation is
-      tuned during sampling and likely lower than the max_num_steps.
+      tuned during sampling and likely lower than the max_num_step.
     max_stage: Integer number of the stage for increasing the temperature
       from 0 to 1.
     make_kernel_fn: Python `callable` which returns a `TransitionKernel`-like
@@ -208,10 +273,9 @@ def sample_sequential_monte_carlo(
       which is an interpolation between the supplied `target_log_prob_fn` and
       `proposal_log_prob_fn`; it is this interpolated function which is used as
       an argument to `make_kernel_fn`.
-    optimal_accept: Optimal acceptance ratio for a Transitional Kernel. Default
-      to 0.234 for Random Walk Metropolis kernel.
-    target_accept_prob: Target acceptance probability at the end of one mutation
-      step.
+    tuning_fn: Python `callable` which takes the number of steps, the log
+      scaling, and the log acceptance ratio from the last mutation and output
+      the number of steps and log scaling for the next mutation.
     ess_threshold_ratio: Target ratio for effective sample size.
     parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
@@ -250,7 +314,7 @@ def sample_sequential_monte_carlo(
       likelihood_log_prob = likelihood_log_prob_fn(*init_state)
 
       # Default to the optimal for normal distributed targets.
-      # TODO(b/152412213): Revisit this tuning.
+      # TODO(b/152412213): Revisit this default parameter.
       scale_start = (
           tf.constant(2.38 ** 2, dtype=likelihood_log_prob.dtype) /
           tf.constant(dimension, dtype=likelihood_log_prob.dtype))
@@ -270,8 +334,8 @@ def sample_sequential_monte_carlo(
       mh_results = _find_inner_mh_results(pkr)
 
       particle_info = ParticleInfo(
-          accept_prob=ps.ones_like(likelihood_log_prob),
-          scalings=scalings,
+          log_accept_prob=ps.zeros_like(likelihood_log_prob),
+          log_scalings=tf.math.log(scalings),
           tempered_log_prob=mh_results.accepted_results.target_log_prob,
           likelihood_log_prob=likelihood_log_prob,
       )
@@ -343,38 +407,14 @@ def sample_sequential_monte_carlo(
 
         return next_state, next_particle_info
 
-    def tuning(num_steps, scalings, accept_prob):
-      """Tune scaling and/or num_steps based on the acceptance rate."""
-      num_proposed = num_replica * num_steps
-      accept_prob = tf.cast(accept_prob, dtype=scalings.dtype)
-      avg_scaling = tf.exp(tf.math.log(tf.reduce_mean(scalings))
-                           + (tf.reduce_mean(accept_prob) - optimal_accept))
-      scalings = 0.5 * (
-          avg_scaling +
-          tf.exp(tf.math.log(scalings) +
-                 (accept_prob - optimal_accept))
-      )
-
-      if TUNE_STEPS:
-        avg_accept = tf.math.maximum(
-            1.0 / tf.cast(num_proposed, dtype=accept_prob.dtype),
-            tf.reduce_mean(accept_prob))
-        num_steps = tf.clip_by_value(
-            tf.cast(
-                tf.math.log1p(
-                    -tf.cast(target_accept_prob, dtype=avg_accept.dtype)) /
-                tf.math.log1p(-avg_accept),
-                dtype=num_steps.dtype), 2, max_num_steps)
-
-      return num_steps, scalings
-
     def mutate(
         current_state,
-        scalings,
+        log_scalings,
         num_steps,
         inverse_temperature):
       """Mutate the state using a Transition kernel."""
       with tf.name_scope('mutate_states'):
+        scalings = tf.exp(log_scalings)
         kernel = make_kernel_fn(
             _make_tempered_target_log_prob_fn(
                 prior_log_prob_fn,
@@ -386,18 +426,19 @@ def sample_sequential_monte_carlo(
         pkr = kernel.bootstrap_results(current_state)
         mh_results = _find_inner_mh_results(pkr)
 
-        def mutate_onestep(i, state, pkr, accept_count):
+        def mutate_onestep(i, state, pkr, log_accept_prob_sum):
           next_state, next_kernel_results = kernel.one_step(state, pkr)
           mh_results = _find_inner_mh_results(pkr)
-          # TODO(b/152412213) Cumulate log_acceptance_ratio instead.
-          accept_count += tf.cast(mh_results.is_accepted, accept_count.dtype)
-          return i+1, next_state, next_kernel_results, accept_count
+          log_accept_prob = tf.minimum(mh_results.log_accept_ratio, 0.)
+          log_accept_prob_sum = log_add_exp(
+              log_accept_prob_sum, log_accept_prob)
+          return i + 1, next_state, next_kernel_results, log_accept_prob_sum
 
         (
             _,
             next_state,
             next_kernel_results,
-            accept_count
+            log_accept_prob_sum
         ) = tf.while_loop(
             cond=lambda i, *args: i < num_steps,
             body=mutate_onestep,
@@ -405,48 +446,21 @@ def sample_sequential_monte_carlo(
                 tf.zeros([], dtype=tf.int32),
                 current_state,
                 pkr,
-                tf.zeros_like(mh_results.is_accepted, tf.float32)),
+                # we accumulate the acceptance probability in log space.
+                tf.fill(
+                    ps.shape(mh_results.log_accept_ratio),
+                    tf.constant(-np.inf, mh_results.log_accept_ratio.dtype))
+                ),
             parallel_iterations=parallel_iterations
             )
         next_mh_results = _find_inner_mh_results(next_kernel_results)
-
+        avg_log_accept_prob_per_particle = log_accept_prob_sum - tf.math.log(
+            tf.cast(num_steps + 1, log_accept_prob_sum.dtype))
         return (next_state,
-                accept_count / tf.cast(num_steps + 1, accept_count.dtype),
+                avg_log_accept_prob_per_particle,
                 next_mh_results.accepted_results.target_log_prob)
 
-    pkr = preprocess_state(current_state)
-    # Run once
-    new_marginal, new_inv_temperature, log_weights = update_weights_temperature(
-        pkr.inverse_temperature,
-        pkr.particle_info.likelihood_log_prob)
-    if PRINT_DEBUG:
-      tf.print(
-          'Stage:', 0,
-          'Beta:', new_inv_temperature,
-          'n_steps:', pkr.num_steps,
-          'accept:', tf.reduce_mean(
-              pkr.particle_info.accept_prob),
-          'scaling:', tf.reduce_mean(pkr.particle_info.scalings)
-          )
-    resampled_state, resampled_particle_info = resample(
-        log_weights, current_state, pkr.particle_info, seed_stream())
-    next_state, acceptance_rate, tempered_log_prob = mutate(
-        resampled_state,
-        resampled_particle_info.scalings,
-        pkr.num_steps,
-        new_inv_temperature)
-    next_pkr = SMCResults(
-        num_steps=pkr.num_steps,
-        inverse_temperature=new_inv_temperature,
-        log_marginal_likelihood=pkr.log_marginal_likelihood + new_marginal,
-        particle_info=ParticleInfo(
-            accept_prob=acceptance_rate,
-            scalings=resampled_particle_info.scalings,
-            tempered_log_prob=tempered_log_prob,
-            likelihood_log_prob=likelihood_log_prob_fn(*next_state),
-        ))
-
-    # Stage > 0
+    # One SMC steps.
     def smc_body_fn(stage, state, smc_kernel_result):
       """Run one stage of SMC with constant temperature."""
       (
@@ -462,31 +476,45 @@ def sample_sequential_monte_carlo(
             'Stage:', stage,
             'Beta:', new_inv_temperature,
             'n_steps:', smc_kernel_result.num_steps,
-            'accept:', tf.reduce_mean(
-                smc_kernel_result.particle_info.accept_prob),
-            'scaling:', tf.reduce_mean(smc_kernel_result.particle_info.scalings)
+            'accept:', tf.exp(reduce_logmeanexp(
+                smc_kernel_result.particle_info.log_accept_prob)),
+            'scaling:', tf.exp(reduce_logmeanexp(
+                smc_kernel_result.particle_info.log_scalings))
             )
       resampled_state, resampled_particle_info = resample(
           log_weights, state, smc_kernel_result.particle_info, seed_stream())
-      num_steps, scalings = tuning(
+      next_num_steps, next_log_scalings = tuning_fn(
           smc_kernel_result.num_steps,
-          resampled_particle_info.scalings,
-          resampled_particle_info.accept_prob)
-      next_state, acceptance_rate, tempered_log_prob = mutate(
-          resampled_state, scalings, num_steps, new_inv_temperature)
+          resampled_particle_info.log_scalings,
+          resampled_particle_info.log_accept_prob)
+      # Skip tuning at stage 0.
+      next_num_steps = tf.where(stage == 0,
+                                smc_kernel_result.num_steps,
+                                next_num_steps)
+      next_log_scalings = tf.where(stage == 0,
+                                   resampled_particle_info.log_scalings,
+                                   next_log_scalings)
+      next_num_steps = tf.clip_by_value(next_num_steps, 2, max_num_steps)
+
+      next_state, log_accept_prob, tempered_log_prob = mutate(
+          resampled_state,
+          next_log_scalings,
+          next_num_steps,
+          new_inv_temperature)
       next_pkr = SMCResults(
-          num_steps=num_steps,
+          num_steps=next_num_steps,
           inverse_temperature=new_inv_temperature,
           log_marginal_likelihood=(new_marginal +
                                    smc_kernel_result.log_marginal_likelihood),
           particle_info=ParticleInfo(
-              accept_prob=acceptance_rate,
-              scalings=scalings,
+              log_accept_prob=log_accept_prob,
+              log_scalings=next_log_scalings,
               tempered_log_prob=tempered_log_prob,
               likelihood_log_prob=likelihood_log_prob_fn(*next_state),
           ))
       return stage + 1, next_state, next_pkr
 
+    current_pkr = preprocess_state(current_state)
     (
         n_stage,
         final_state,
@@ -497,9 +525,9 @@ def sample_sequential_monte_carlo(
         ),
         body=smc_body_fn,
         loop_vars=(
-            tf.ones([], dtype=tf.int32),
-            next_state,
-            next_pkr),
+            tf.zeros([], dtype=tf.int32),
+            current_state,
+            current_pkr),
         parallel_iterations=parallel_iterations
         )
     if unwrap_state_list:
