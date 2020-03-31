@@ -542,6 +542,26 @@ class GeneralTest(test_util.TestCase):
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
 
+  def test_initialize_solver_internal_state(self, solver):
+    jacobian_diag_part = np.float64([-0.5, -1.])
+    ode_fn = lambda time, state: jacobian_diag_part * state
+    initial_time = 0.
+    initial_state = np.float64([1., 2.])
+    final_time = 2.
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL, validate_args=True)
+    solver_internal_state = solver_instance._initialize_solver_internal_state(
+        ode_fn, initial_time, initial_state)
+    results = solver_instance.solve(
+        ode_fn,
+        initial_time,
+        initial_state,
+        solution_times=tfp.math.ode.ChosenBySolver(final_time),
+        previous_solver_internal_state=solver_internal_state)
+    times, states = self.evaluate([results.times, results.states])
+    states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
+                          times[:, np.newaxis]) * initial_state
+    self.assertAllClose(states, states_exact)
+
 
 if __name__ == '__main__':
   tf.test.main()

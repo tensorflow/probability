@@ -442,6 +442,16 @@ class Solver(object):
     """Abstract method called by `solve`; to be implemented by child classes."""
     pass
 
+  @abc.abstractmethod
+  def _initialize_solver_internal_state(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+  ):
+    """Initializes the solver internal state."""
+    pass
+
 
 class Results(
     collections.namedtuple(
