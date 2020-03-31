@@ -31,7 +31,6 @@ from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import random_walk_metropolis
 from tensorflow_probability.python.mcmc import transformed_kernel
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.mcmc.sample_annealed_importance import _find_inner_mh_results
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
@@ -64,6 +63,22 @@ SMCResults = collections.namedtuple(
         'log_marginal_likelihood',
         'particle_info',  # A namedtuple of ParticleInfo
     ])
+
+
+def gather_mh_like_result(results):
+  """Gather log_accept_ratio and target_log_prob from kernel result."""
+  # For MH kernel result.
+  if (hasattr(results, 'proposed_results')
+      and hasattr(results, 'accepted_results')):
+    return results.log_accept_ratio, results.accepted_results.target_log_prob
+  # For NUTS kernel result.
+  if (hasattr(results, 'log_accept_ratio')
+      and hasattr(results, 'target_log_prob')):
+    return results.log_accept_ratio, results.target_log_prob
+  # For TransformTransitionKernel Result.
+  if hasattr(results, 'inner_results'):
+    return gather_mh_like_result(results.inner_results)
+  raise TypeError('Cannot find MH results.')
 
 
 def _make_tempered_target_log_prob_fn(
@@ -331,12 +346,12 @@ def sample_sequential_monte_carlo(
           scalings,
           seed=seed_stream())
       pkr = kernel.bootstrap_results(current_state)
-      mh_results = _find_inner_mh_results(pkr)
+      _, kernel_target_log_prob = gather_mh_like_result(pkr)
 
       particle_info = ParticleInfo(
           log_accept_prob=ps.zeros_like(likelihood_log_prob),
           log_scalings=tf.math.log(scalings),
-          tempered_log_prob=mh_results.accepted_results.target_log_prob,
+          tempered_log_prob=kernel_target_log_prob,
           likelihood_log_prob=likelihood_log_prob,
       )
 
@@ -424,12 +439,12 @@ def sample_sequential_monte_carlo(
             scalings,
             seed=seed_stream())
         pkr = kernel.bootstrap_results(current_state)
-        mh_results = _find_inner_mh_results(pkr)
+        kernel_log_accept_ratio, _ = gather_mh_like_result(pkr)
 
         def mutate_onestep(i, state, pkr, log_accept_prob_sum):
           next_state, next_kernel_results = kernel.one_step(state, pkr)
-          mh_results = _find_inner_mh_results(pkr)
-          log_accept_prob = tf.minimum(mh_results.log_accept_ratio, 0.)
+          kernel_log_accept_ratio, _ = gather_mh_like_result(pkr)
+          log_accept_prob = tf.minimum(kernel_log_accept_ratio, 0.)
           log_accept_prob_sum = log_add_exp(
               log_accept_prob_sum, log_accept_prob)
           return i + 1, next_state, next_kernel_results, log_accept_prob_sum
@@ -448,17 +463,17 @@ def sample_sequential_monte_carlo(
                 pkr,
                 # we accumulate the acceptance probability in log space.
                 tf.fill(
-                    ps.shape(mh_results.log_accept_ratio),
-                    tf.constant(-np.inf, mh_results.log_accept_ratio.dtype))
+                    ps.shape(kernel_log_accept_ratio),
+                    tf.constant(-np.inf, kernel_log_accept_ratio.dtype))
                 ),
             parallel_iterations=parallel_iterations
             )
-        next_mh_results = _find_inner_mh_results(next_kernel_results)
+        _, kernel_target_log_prob = gather_mh_like_result(next_kernel_results)
         avg_log_accept_prob_per_particle = log_accept_prob_sum - tf.math.log(
             tf.cast(num_steps + 1, log_accept_prob_sum.dtype))
         return (next_state,
                 avg_log_accept_prob_per_particle,
-                next_mh_results.accepted_results.target_log_prob)
+                kernel_target_log_prob)
 
     # One SMC steps.
     def smc_body_fn(stage, state, smc_kernel_result):

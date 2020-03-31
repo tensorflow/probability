@@ -18,14 +18,19 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+
 import functools
 # Dependency imports
+from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import compute_hmc_step_size
+from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
+from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import make_rwmh_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import simple_heuristic_tuning
 from tensorflow_probability.python.internal import test_util
 
@@ -33,10 +38,34 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
+def make_test_nuts_kernel_fn(target_log_prob_fn,
+                             init_state,
+                             scalings,
+                             seed=None):
+  """Set up a function to generate nuts kernel for testing."""
+  max_tree_depth = 3
+
+  state_std = [
+      tf.math.reduce_std(x, axis=0, keepdims=True)
+      for x in init_state
+  ]
+  step_size = compute_hmc_step_size(scalings, state_std, max_tree_depth**2)
+  return tfp.mcmc.NoUTurnSampler(
+      target_log_prob_fn=target_log_prob_fn,
+      step_size=step_size,
+      max_tree_depth=max_tree_depth,
+      seed=seed)
+
+
 @test_util.test_all_tf_execution_regimes
 class SampleSequentialMonteCarloTest(test_util.TestCase):
 
-  def testMixtureTargetLogProb(self):
+  @parameterized.named_parameters(
+      ('RWMH', make_rwmh_kernel_fn, 0.45),
+      ('HMC', gen_make_hmc_kernel_fn(5), 0.651),
+      ('NUTS', make_test_nuts_kernel_fn, 0.8),
+  )
+  def testMixtureTargetLogProb(self, make_kernel_fn, optimal_accept):
     seed = test_util.test_seed()
     n = 4
     mu = np.ones(n) * (1. / 2)
@@ -60,15 +89,18 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         lambda x: init_log_prob,
         likelihood_dist.log_prob,
         init_state,
+        make_kernel_fn=make_kernel_fn,
+        tuning_fn=functools.partial(simple_heuristic_tuning,
+                                    optimal_accept=optimal_accept),
         max_num_steps=50,
         parallel_iterations=1,
-        seed=seed)
+        seed=None if tf.executing_eagerly() else seed)
 
-    self.assertTrue(self.evaluate(n_stage), 15)
+    assert_cdf_equal_sample = st.assert_true_cdf_equal_by_dkwm_two_sample(
+        final_state, likelihood_dist.sample(5000, seed=seed))
 
-    self.evaluate(
-        st.kolmogorov_smirnov_distance_two_sample(
-            final_state, likelihood_dist.sample(5000, seed=seed)))
+    n_stage, _ = self.evaluate((n_stage, assert_cdf_equal_sample))
+    self.assertTrue(n_stage, 15)
 
   def testSampleEndtoEndXLA(self):
     """An end-to-end test of sampling using SMC."""

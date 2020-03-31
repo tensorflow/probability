@@ -216,6 +216,7 @@ py_test(
     size = "medium",
     timeout = "long",
     srcs = ["sample_sequential_monte_carlo_test.py"],
+    shard_count = 2,
     deps = [
         # numpy dep,
         # tensorflow dep,
