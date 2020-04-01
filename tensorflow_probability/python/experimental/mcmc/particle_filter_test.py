@@ -310,6 +310,102 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllClose(
         lps, estimated_step_log_marginal_likelihoods, atol=0.5)
 
+  def test_model_can_use_state_history(self):
+
+    initial_state_prior = tfd.JointDistributionNamed(
+        {'x': tfd.Poisson(1.)})
+
+    # Deterministic dynamics compute a Fibonacci sequence.
+    def fibbonaci_transition_fn(step, state, state_history):
+      del step
+      del state
+      return tfd.JointDistributionNamed(
+          {'x': tfd.Deterministic(
+              tf.reduce_sum(state_history['x'][-2:], axis=0))})
+
+    # We'll observe the ratio of the current and previous state.
+    def observe_ratio_of_last_two_states_fn(_, state, state_history=None):
+      ratio = tf.ones_like(state['x'])
+      if state_history is not None:
+        ratio = state['x'] / (state_history['x'][-1] + 1e-6)  # avoid div. by 0.
+      return tfd.Normal(loc=ratio, scale=0.1)
+
+    # The ratios between successive terms of a Fibbonaci sequence
+    # should, in the limit, approach the golden ratio.
+    golden_ratio = (1. + np.sqrt(5.)) / 2.
+    observed_ratios = np.array([golden_ratio] * 10).astype(self.dtype)
+
+    particles, parent_indices, lps = self.evaluate(
+        tfp.experimental.mcmc.particle_filter(
+            observed_ratios,
+            initial_state_prior=initial_state_prior,
+            transition_fn=fibbonaci_transition_fn,
+            observation_fn=observe_ratio_of_last_two_states_fn,
+            num_particles=100,
+            num_steps_state_history_to_pass=2,
+            seed=test_util.test_seed()))
+    trajectories = self.evaluate(
+        tfp.experimental.mcmc.reconstruct_trajectories(
+            particles, parent_indices))
+
+    # Verify that we actually produced Fibonnaci sequences.
+    self.assertAllClose(
+        trajectories['x'][2:],
+        trajectories['x'][1:-1] + trajectories['x'][:-2])
+
+    # Ratios should get closer to golden as the series progresses, so
+    # likelihoods will increase.
+    self.assertAllGreater(lps[2:] - lps[:-2], 0.0)
+
+    # Any particles that sampled initial values of 0. should have been
+    # discarded, since those lead to degenerate series that do not approach
+    # the golden ratio.
+    self.assertAllGreaterEqual(trajectories['x'][0], 1.)
+
+  def test_model_can_use_observation_history(self):
+
+    weights = np.array([0.1, -0.2, 0.7]).astype(self.dtype)
+
+    # Define an autoregressive model on observations. This ignores the
+    # state entirely; it depends only on previous observations.
+    initial_state_prior = tfd.JointDistributionNamed(
+        {'dummy_state': tfd.Deterministic(0.)})
+    def dummy_transition_fn(_, state, **kwargs):
+      del kwargs
+      return tfd.JointDistributionNamed(
+          tf.nest.map_structure(tfd.Deterministic, state))
+    def autoregressive_observation_fn(step, _, observation_history=None):
+      loc = 0.
+      if observation_history is not None:
+        num_terms = prefer_static.minimum(step, len(weights))
+        usable_weights = tf.convert_to_tensor(weights)[-num_terms:]
+        loc = tf.reduce_sum(usable_weights * observation_history)
+      return tfd.Normal(loc, 1.0)
+
+    # Manually compute the conditional log-probs of a series of observations
+    # under the autoregressive model.
+    observations = np.array(
+        [0.1, 3., -0.7, 1.1, 0., 14., -3., 5.8]).astype(self.dtype)
+    expected_locs = []
+    for current_step in range(len(observations)):
+      start_step = max(0, current_step - len(weights))
+      context_length = current_step - start_step
+      expected_locs.append(
+          np.sum(observations[start_step : current_step] *
+                 weights[len(weights)-context_length:]))
+    expected_lps = self.evaluate(
+        tfd.Normal(expected_locs, scale=1.0).log_prob(observations))
+
+    # Check that the particle filter gives the same log-probs.
+    _, _, lps = self.evaluate(tfp.experimental.mcmc.particle_filter(
+        observations,
+        initial_state_prior=initial_state_prior,
+        transition_fn=dummy_transition_fn,
+        observation_fn=autoregressive_observation_fn,
+        num_particles=2,
+        num_steps_observation_history_to_pass=len(weights)))
+    self.assertAllClose(expected_lps, lps)
+
 
 class ParticleFilterTestFloat32(_ParticleFilterTest):
   dtype = np.float32
