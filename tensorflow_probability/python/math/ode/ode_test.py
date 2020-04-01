@@ -30,6 +30,34 @@ _RTOL = 1e-8
 _ATOL = 1e-12
 
 
+class StepSizeHeuristicAdjointSolver(tfp.math.ode.Solver):
+  """Adjoint solver which propagates step size between solves."""
+
+  def __init__(self, make_solver_fn, first_step_size):
+    self._first_step_size = first_step_size
+    self._make_solver_fn = make_solver_fn
+    solver = make_solver_fn(first_step_size)
+    super(StepSizeHeuristicAdjointSolver, self).__init__(
+        use_pfor_to_compute_jacobian=solver._use_pfor_to_compute_jacobian,
+        validate_args=solver._validate_args,
+        make_adjoint_solver_fn=None,
+        name='Adjoint' + solver.name,
+    )
+
+  def _solve(self, **kwargs):
+    step_size = kwargs.pop('previous_solver_internal_state')
+    results = self._make_solver_fn(step_size).solve(**kwargs)
+    return results._replace(
+        solver_internal_state=results.solver_internal_state.step_size)
+
+  def _initialize_solver_internal_state(self, **kwargs):
+    del kwargs
+    return self._first_step_size
+
+  def _adjust_solver_internal_state_for_state_jump(self, **kwargs):
+    return kwargs['previous_solver_internal_state']
+
+
 @test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
@@ -374,6 +402,56 @@ class GradientTest(test_util.TestCase):
     grad = self.evaluate(tape.gradient(final_state, initial_state))
     grad_exact = 1. / (1. - initial_state_value * final_time)**2
     self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
+
+  def test_riccati_custom_adjoint_solver(self, solver):
+    ode_fn = lambda time, state: (state - time)**2 + 1.
+    initial_time = 0.
+    initial_state_value = 0.5
+    initial_state = tf.constant(initial_state_value, dtype=tf.float64)
+    final_time = 1.
+    solution_times = np.linspace(initial_time, final_time, 4)
+    jacobian_fn = lambda time, state: 2. * (state - time)
+
+    # Instrument the adjoint solver for testing.
+    first_step_size = np.float64(1.)
+    last_initial_step_size = tf.Variable(0., dtype=tf.float64)
+    self.evaluate(last_initial_step_size.initializer)
+
+    class _InstrumentedSolver(StepSizeHeuristicAdjointSolver):
+
+      def solve(self, **kwargs):
+        with tf.control_dependencies([
+            last_initial_step_size.assign(
+                kwargs['previous_solver_internal_state'])
+        ]):
+          return super(_InstrumentedSolver, self).solve(**kwargs)
+
+    adjoint_solver = _InstrumentedSolver(
+        make_solver_fn=lambda step_size: solver(  # pylint: disable=g-long-lambda
+            rtol=_RTOL,
+            atol=_ATOL,
+            first_step_size=step_size),
+        first_step_size=first_step_size)
+
+    solver_instance = solver(
+        rtol=_RTOL, atol=_ATOL, make_adjoint_solver_fn=lambda: adjoint_solver)
+    with tf.GradientTape() as tape:
+      tape.watch(initial_state)
+      results = solver_instance.solve(
+          ode_fn,
+          initial_time,
+          initial_state,
+          solution_times=solution_times,
+          jacobian_fn=jacobian_fn)
+      final_state = results.states[-1]
+    grad = self.evaluate(tape.gradient(final_state, initial_state))
+    last_initial_step_size = self.evaluate(last_initial_step_size)
+    grad_exact = 1. / (1. - initial_state_value * final_time)**2
+    self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
+    # This indicates that the adaptation carried over to the final solve. We
+    # expect the step size to decrease because we purposefully made the initial
+    # step size way too large.
+    self.assertLess(last_initial_step_size, first_step_size)
 
   def test_linear_ode(self, solver):
     if not tf2.enabled():

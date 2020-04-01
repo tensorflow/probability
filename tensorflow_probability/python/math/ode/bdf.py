@@ -99,6 +99,7 @@ class BDF(base.Solver):
       bdf_coefficients=(-0.1850, -1. / 9., -0.0823, -0.0415, 0.),
       evaluate_jacobian_lazily=False,
       use_pfor_to_compute_jacobian=True,
+      make_adjoint_solver_fn=None,
       validate_args=False,
       name='bdf',
   ):
@@ -163,6 +164,10 @@ class BDF(base.Solver):
         parallel for in computing the Jacobian when `jacobian_fn` is not
         specified.
         Default value: `True`.
+      make_adjoint_solver_fn: Callable that takes no arguments that constructs a
+        `Solver` instance. The created solver is used in the adjoint senstivity
+        analysis to compute gradients (if they are requested).
+        Default value: A callable that returns this solver.
       validate_args: Whether to validate input with asserts. If `validate_args`
         is `False` and the inputs are invalid, correct behavior is not
         guaranteed.
@@ -170,7 +175,12 @@ class BDF(base.Solver):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'bdf').
     """
-    super(BDF, self).__init__(use_pfor_to_compute_jacobian, validate_args, name)
+    super(BDF, self).__init__(
+        use_pfor_to_compute_jacobian=use_pfor_to_compute_jacobian,
+        make_adjoint_solver_fn=make_adjoint_solver_fn,
+        validate_args=validate_args,
+        name=name,
+    )
     # The default values of `rtol` and `atol` match `scipy.integrate.solve_ivp`.
     self._rtol = rtol
     self._atol = atol

@@ -43,10 +43,18 @@ __all__ = [
 class Solver(object):
   """Base class for an ODE solver."""
 
-  def __init__(self, use_pfor_to_compute_jacobian, validate_args, name):
+  def __init__(self, use_pfor_to_compute_jacobian, make_adjoint_solver_fn,
+               validate_args, name):
     self._use_pfor_to_compute_jacobian = use_pfor_to_compute_jacobian
     self._validate_args = validate_args
     self._name = name
+    if make_adjoint_solver_fn is None:
+      make_adjoint_solver_fn = lambda: self
+    self._make_adjoint_solver_fn = make_adjoint_solver_fn
+
+  @property
+  def name(self):
+    return self._name
 
   def solve(
       self,
@@ -142,6 +150,9 @@ class Solver(object):
     tape.gradient(results.states, A)  # Fine.
     ```
 
+    By default, this uses the same solver for the augmented ODE. This can be
+    controlled via `make_adjoint_solver_fn`.
+
     #### References
 
     [1]: Chen, Tian Qi, et al. "Neural ordinary differential equations."
@@ -218,14 +229,14 @@ class Solver(object):
           constant_state_structure, flat_constants)
 
       results = self._solve(
-          functools.partial(ode_fn, **constants),
-          initial_time,
-          initial_state,
-          solution_times,
-          jacobian_fn,
-          jacobian_sparsity,
-          batch_ndims,
-          previous_solver_internal_state,
+          ode_fn=functools.partial(ode_fn, **constants),
+          initial_time=initial_time,
+          initial_state=initial_state,
+          solution_times=solution_times,
+          jacobian_fn=jacobian_fn,
+          jacobian_sparsity=jacobian_sparsity,
+          batch_ndims=batch_ndims,
+          previous_solver_internal_state=previous_solver_internal_state,
       )
       results = Results(
           times=tf.stop_gradient(results.times),
@@ -237,6 +248,7 @@ class Solver(object):
 
       def grad_fn(*dresults, **kwargs):
         """Adjoint sensitivity method to compute gradients."""
+        adjoint_solver = self._make_adjoint_solver_fn()
         dresults = tf.nest.pack_sequence_as(results, dresults)
         dstates = dresults.states
         # The signature grad_fn(*dresults, variables=None) is not valid Python 2
@@ -284,6 +296,7 @@ class Solver(object):
           result_state_arrays = [
               tf.TensorArray(  # pylint: disable=g-complex-comprehension
                   dtype=component.dtype, size=num_result_times - 1,
+                  clear_after_read=False,
                   element_shape=component.shape[1:]).unstack(component)
               for component in tf.nest.flatten(results.states)
           ]
@@ -292,6 +305,7 @@ class Solver(object):
           dresult_state_arrays = [
               tf.TensorArray(  # pylint: disable=g-complex-comprehension
                   dtype=component.dtype, size=num_result_times - 1,
+                  clear_after_read=False,
                   element_shape=component.shape[1:]).unstack(component)
               for component in tf.nest.flatten(dstates)
           ]
@@ -377,43 +391,76 @@ class Solver(object):
             return (negative_derivatives, adjoint_ode, adjoint_variables_ode,
                     adjoint_constants_ode)
 
-          def reverse_to_result_time(n, augmented_state, _):
+          def make_augmented_state(n, prev_augmented_state):
+            """Constructs the augmented state for step `n`."""
+            (_, adjoint_state, adjoint_variable_state,
+             adjoint_constant_state) = prev_augmented_state
+            initial_state = _read_solution_components(
+                result_state_arrays,
+                input_state_structure,
+                n - 1,
+            )
+            initial_adjoint = _read_solution_components(
+                dresult_state_arrays,
+                input_state_structure,
+                n - 1,
+            )
+            initial_adjoint_state = rk_util.weighted_sum(
+                [1.0, 1.0], [adjoint_state, initial_adjoint])
+            augmented_state = (
+                initial_state,
+                initial_adjoint_state,
+                adjoint_variable_state,
+                adjoint_constant_state,
+            )
+            return augmented_state
+
+          def reverse_to_result_time(n, augmented_state, solver_internal_state,
+                                     _):
             """Integrates the augmented system backwards in time."""
             lower_bound_of_integration = result_time_array.read(n)
             upper_bound_of_integration = result_time_array.read(n - 1)
-            (_, adjoint_state, adjoint_variable_state,
-             adjoint_constant_state) = augmented_state
-            initial_state = _read_solution_components(
-                result_state_arrays, input_state_structure, n - 1)
-            initial_adjoint = _read_solution_components(
-                dresult_state_arrays, input_state_structure, n - 1)
-            initial_adjoint_state = rk_util.weighted_sum(
-                [1.0, 1.0], [adjoint_state, initial_adjoint])
-            initial_augmented_state = (initial_state, initial_adjoint_state,
-                                       adjoint_variable_state,
-                                       adjoint_constant_state)
+            initial_augmented_state = make_augmented_state(n, augmented_state)
             # TODO(b/138304303): Allow the user to specify the Hessian of
             # `ode_fn` so that we can get the Jacobian of the adjoint system.
             # TODO(b/143624114): Support higher order derivatives.
-            augmented_results = self._solve(
+            solver_internal_state = (
+                adjoint_solver._adjust_solver_internal_state_for_state_jump(  # pylint: disable=protected-access
+                    ode_fn=augmented_ode_fn,
+                    initial_time=-lower_bound_of_integration,
+                    initial_state=initial_augmented_state,
+                    previous_solver_internal_state=solver_internal_state,
+                    previous_state=augmented_state,
+                ))
+            augmented_results = adjoint_solver.solve(
                 ode_fn=augmented_ode_fn,
                 initial_time=-lower_bound_of_integration,
                 initial_state=initial_augmented_state,
                 solution_times=[-upper_bound_of_integration],
-                batch_ndims=batch_ndims
+                batch_ndims=batch_ndims,
+                previous_solver_internal_state=solver_internal_state,
             )
             # Results added an extra time dim of size 1, squeeze it.
             select_result = lambda x: tf.squeeze(x, [0])
             result_state = augmented_results.states
             result_state = tf.nest.map_structure(select_result, result_state)
             status = augmented_results.diagnostics.status
-            return n - 1, result_state, status
+            return (n - 1, result_state,
+                    augmented_results.solver_internal_state, status)
 
-          _, augmented_state, _ = tf.while_loop(
-              lambda n, _, status: (n >= 1) & tf.equal(status, 0),
+          initial_n = num_result_times - 1
+          solver_internal_state = adjoint_solver._initialize_solver_internal_state(  # pylint: disable=protected-access
+              ode_fn=augmented_ode_fn,
+              initial_time=result_time_array.read(initial_n),
+              initial_state=make_augmented_state(initial_n,
+                                                 terminal_augmented_state),
+          )
+
+          _, augmented_state, _, _ = tf.while_loop(
+              lambda n, _as, _sis, status: (n >= 1) & tf.equal(status, 0),
               reverse_to_result_time,
-              (num_result_times - 1, terminal_augmented_state, 0),
-              back_prop=False
+              (initial_n, terminal_augmented_state, solver_internal_state, 0),
+              back_prop=False,
           )
           (_, adjoint_state, adjoint_variables,
            adjoint_constants) = augmented_state
@@ -451,6 +498,23 @@ class Solver(object):
   ):
     """Initializes the solver internal state."""
     pass
+
+  def _adjust_solver_internal_state_for_state_jump(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+      previous_solver_internal_state,
+      previous_state,
+  ):
+    """Adjust the previous internal state in response to a state jump."""
+    del previous_solver_internal_state
+    del previous_state
+    return self._initialize_solver_internal_state(
+        ode_fn=ode_fn,
+        initial_time=initial_time,
+        initial_state=initial_state,
+    )
 
 
 class Results(
