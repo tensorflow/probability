@@ -224,7 +224,7 @@ class Chain(bijector.Bijector):
 
   def _inverse(self, y, **kwargs):
     for b in self.bijectors:
-      y = b.inverse(y, **kwargs.get(b.name, {}))
+      y = b.inverse(y, **kwargs.get(b.name, {}), **kwargs)
     return y
 
   def _inverse_log_det_jacobian(self, y, **kwargs):
@@ -245,7 +245,7 @@ class Chain(bijector.Bijector):
     # TODO(b/129973548): Document and simplify.
     for b in self.bijectors:
       ildj = ildj + b.inverse_log_det_jacobian(
-          y, event_ndims=event_ndims, **kwargs.get(b.name, {}))
+          y, event_ndims=event_ndims, **kwargs.get(b.name, {}), **kwargs)
 
       if _use_static_shape(y, event_ndims):
         event_shape = b.inverse_event_shape(event_shape)
@@ -261,12 +261,12 @@ class Chain(bijector.Bijector):
           event_ndims = event_ndims_
           event_shape = event_shape_
 
-      y = b.inverse(y, **kwargs.get(b.name, {}))
+      y = b.inverse(y, **kwargs.get(b.name, {}), **kwargs)
     return ildj
 
   def _forward(self, x, **kwargs):
     for b in reversed(self.bijectors):
-      x = b.forward(x, **kwargs.get(b.name, {}))
+      x = b.forward(x, **kwargs.get(b.name, {}), **kwargs)
     return x
 
   def _forward_log_det_jacobian(self, x, **kwargs):
@@ -288,7 +288,7 @@ class Chain(bijector.Bijector):
     # TODO(b/129973548): Document and simplify.
     for b in reversed(self.bijectors):
       fldj = fldj + b.forward_log_det_jacobian(
-          x, event_ndims=event_ndims, **kwargs.get(b.name, {}))
+          x, event_ndims=event_ndims, **kwargs.get(b.name, {}), **kwargs)
       if _use_static_shape(x, event_ndims):
         event_shape = b.forward_event_shape(event_shape)
         event_ndims = self._maybe_get_static_event_ndims(
@@ -303,6 +303,6 @@ class Chain(bijector.Bijector):
           event_ndims = event_ndims_
           event_shape = event_shape_
 
-      x = b.forward(x, **kwargs.get(b.name, {}))
+      x = b.forward(x, **kwargs.get(b.name, {}), **kwargs)
 
     return fldj
