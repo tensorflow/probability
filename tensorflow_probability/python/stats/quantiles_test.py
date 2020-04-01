@@ -744,7 +744,8 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     # So this test only passes if we use double for the percentile indices.
     # If float is used, it fails with InvalidArgumentError about an index out of
     # bounds.
-    x = tf.linspace(0., 3e7, num=int(3e7))
+    # TODO(davmre): change `num` back to `int(3e7)` once linspace doesn't break.
+    x = tf.linspace(0., 3e7, num=int(3e7) + 2)
     minval = tfp.stats.percentile(x, q=0, validate_args=True,
                                   interpolation=self._interpolation)
     self.assertAllEqual(0, self.evaluate(minval))
