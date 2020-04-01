@@ -21,11 +21,10 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math
-from tensorflow_probability.python.bijectors import inline as inline_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import shift as shift_bijector
+from tensorflow_probability.python.bijectors import sinh as sinh_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
@@ -193,16 +192,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
                                validate_args=validate_args)
       )
 
-      sinh = inline_bijector.Inline(
-          forward_fn=tf.sinh,
-          inverse_fn=tf.asinh,
-          forward_log_det_jacobian_fn=lambda x: tf.math.log(tf.math.cosh(x)),
-          inverse_log_det_jacobian_fn=lambda y: -0.5 * math.log1psquare(y),
-          forward_min_event_ndims=0,
-          is_increasing=lambda: True,
-          validate_args=validate_args,
-          name='sinh'
-      )
+      sinh = sinh_bijector.Sinh(validate_args=validate_args)
 
       scale = scale_bijector.Scale(scale=self._scale,
                                    validate_args=validate_args)

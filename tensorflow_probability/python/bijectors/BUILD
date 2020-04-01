@@ -87,6 +87,7 @@ multi_substrate_py_library(
         ":scale_matvec_tril",
         ":shift",
         ":sigmoid",
+        ":sinh",
         ":sinh_arcsinh",
         ":soft_clip",
         ":softfloor",
@@ -667,6 +668,16 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sinh",
+    srcs = ["sinh.py"],
+    deps = [
+        ":bijector",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 
@@ -1487,6 +1498,20 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "sinh_test",
+    size = "small",
+    srcs = ["sinh_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "sinh_arcsinh_test",
     size = "small",
     srcs = ["sinh_arcsinh_test.py"],
@@ -1732,6 +1757,8 @@ exports_files(
         "shift.py",
         "sigmoid.py",
         "sigmoid_test.py",
+        "sinh.py",
+        "sinh_test.py",
         "sinh_arcsinh.py",
         "sinh_arcsinh_test.py",
         "soft_clip.py",
