@@ -148,9 +148,10 @@ def _ndtr(x):
   z = tf.abs(w)
   y = tf.where(
       z < half_sqrt_2,
-      1. + tf.math.erf(w),
-      tf.where(w > 0., 2. - tf.math.erfc(z), tf.math.erfc(z)))
-  return 0.5 * y
+      tf.constant(1., dtype=x.dtype) + tf.math.erf(w),
+      tf.where(w > 0., tf.constant(2., dtype=x.dtype) - tf.math.erfc(z),
+               tf.math.erfc(z)))
+  return tf.constant(0.5, dtype=x.dtype) * y
 
 
 def log_ndtr(x, series_order=3, name="log_ndtr"):
@@ -249,7 +250,7 @@ def _log_ndtr_lower(x, series_order):
   """Asymptotic expansion version of `Log[cdf(x)]`, appropriate for `x<<-1`."""
   x_2 = tf.square(x)
   # Log of the term multiplying (1 + sum)
-  log_scale = (-0.5 * x_2 - tf.math.log(-x)
+  log_scale = (tf.constant(-0.5, dtype=x.dtype) * x_2 - tf.math.log(-x)
                - tf.constant(0.5 * np.log(2. * np.pi), dtype=x.dtype))
   return log_scale + tf.math.log(_log_ndtr_asymptotic_series(x, series_order))
 
@@ -270,7 +271,7 @@ def _log_ndtr_asymptotic_series(x, series_order):
     else:
       even_sum += y
     x_2n *= x_2
-  return 1. + even_sum - odd_sum
+  return tf.ones_like(x) + even_sum - odd_sum
 
 
 def _double_factorial(n):

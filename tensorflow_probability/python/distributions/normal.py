@@ -192,8 +192,8 @@ class Normal(distribution.Distribution):
 
   def _log_prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
-    log_unnormalized = -0.5 * tf.math.squared_difference(
-        x / scale, self.loc / scale)
+    log_unnormalized = (tf.constant(-0.5, dtype=self.dtype) *
+                        tf.math.squared_difference(x / scale, self.loc / scale))
     log_normalization = tf.constant(
         0.5 * np.log(2. * np.pi), dtype=self.dtype) + tf.math.log(scale)
     return log_unnormalized - log_normalization
