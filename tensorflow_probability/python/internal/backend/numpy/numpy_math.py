@@ -192,10 +192,15 @@ def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disa
 
   dtype = utils.numpy_dtype(dtype)
   num_buckets = np.max(arr) + 1
-  if minlength is not None:
-    num_buckets = np.maximum(num_buckets, minlength)
-  if maxlength is not None:
-    num_buckets = np.minimum(num_buckets, maxlength)
+  if minlength is not None and maxlength is not None and minlength == maxlength:
+    # In the case where we can use minlength directly, this helps avoids the
+    # use of an abstract value, which prevents JAX JIT.
+    num_buckets = minlength
+  else:
+    if minlength is not None:
+      num_buckets = np.maximum(num_buckets, minlength)
+    if maxlength is not None:
+      num_buckets = np.minimum(num_buckets, maxlength)
   one_hots = one_hot(arr, num_buckets)
   # Reduce over every dimension except the last one.
   axes = tuple(range(0, one_hots.ndim - 1))
