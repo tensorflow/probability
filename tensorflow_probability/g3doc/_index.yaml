@@ -14,7 +14,8 @@
 # ============================================================================
 book_path: /probability/_book.yaml
 project_path: /probability/_project.yaml
-description: <!--no description-->
+description: A library to combine probabilistic models and deep learning on modern hardware (TPU,
+ GPU) for data scientists, statisticians, ML researchers, and practitioners.
 landing_page:
   custom_css_path: /site-assets/css/style.css
   rows:
