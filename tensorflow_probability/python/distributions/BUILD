@@ -2583,6 +2583,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "poisson_test",
+    size = "medium",
     srcs = ["poisson_test.py"],
     jax_size = "medium",
     shard_count = 2,
@@ -2591,6 +2592,7 @@ multi_substrate_py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

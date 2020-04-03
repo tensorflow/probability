@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -31,6 +32,7 @@ from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     'Poisson',
+    'random_poisson_rejection_sampler',
 ]
 
 
@@ -236,3 +238,182 @@ class Poisson(distribution.Distribution):
       return assertions
     assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
     return assertions
+
+
+def _random_poisson_high_rate(sample_shape,
+                              log_rate,
+                              internal_dtype=tf.float64,
+                              seed=None):
+  """Samples from the Poisson distribution using transformed rejection sampling.
+
+  Given a CDF F(x), and G(x), a dominating distribution chosen such that it is
+  close to the inverse CDF F^-1(x), compute the following steps:
+
+  1) Generate U and V, two independent random variates. Set U = U - 0.5 (this
+  step isn't strictly necessary, but is done to make some calculations symmetric
+  and convenient. Henceforth, G is defined on [-0.5, 0.5]).
+
+  2) If V <= alpha * F'(G(U)) * G'(U), return floor(G(U)), else return to
+  step 1. alpha is the acceptance probability of the rejection algorithm.
+  The dominating distribution in this case:
+    G(u) = (2 * a / (2 - |u|) + b) * u + c
+
+  For more details on transformed rejection, see [1].
+
+  Args:
+    sample_shape: The output sample shape. Must broadcast with `log_rate`.
+    log_rate: Floating point tensor, log rate.
+    internal_dtype: dtype to use for internal computations.
+    seed: (optional) The random seed.
+
+  Returns:
+    Samples from the poisson distribution using transformed rejection.
+
+  #### References
+
+  [1]: W. Hormann, G. Derflinger, The Transformed Rejection Method For
+  Generating Random Variables, An Alternative To The Ratio Of Uniforms Method
+  (1994), Manuskript, Institut f. Statistik, Wirtschaftsuniversitat
+  """
+  rate = tf.math.exp(log_rate)
+
+  b = 0.931 + 2.53 * tf.math.exp(0.5 * log_rate)
+  a = -0.059 + 0.02483 * b
+  inverse_alpha = 1.1239 + 1.1328 / (b - 3.4)
+
+  def generate_and_test_samples(seed):
+    """Generate and test samples."""
+    u_seed, v_seed = samplers.split_seed(seed)
+
+    u = samplers.uniform(sample_shape, dtype=internal_dtype, seed=u_seed)
+    u = u - 0.5
+    u_shifted = 0.5 - tf.math.abs(u)
+
+    v = samplers.uniform(sample_shape, dtype=internal_dtype, seed=v_seed)
+
+    k = tf.math.floor(((2. * a) / u_shifted + b) * u + rate + 0.43)
+
+    good_sample_mask = (u_shifted >= 0.07) & (v <= 0.9277 - 3.6224 / (b - 2.))
+
+    s = tf.math.log(v * inverse_alpha / (a / tf.math.square(u_shifted) + b))
+    t = -rate + k * log_rate - tf.math.lgamma(k + 1)
+
+    good_sample_mask = good_sample_mask | (s <= t)
+    # Make sure the sample is within bounds.
+    good_sample_mask = good_sample_mask & (k >= 0) & ((u_shifted >= 0.013) |
+                                                      (v <= u_shifted))
+    return k, good_sample_mask
+
+  samples = brs.batched_las_vegas_algorithm(
+      generate_and_test_samples, seed=seed)[0]
+
+  return samples
+
+
+def _random_poisson_low_rate(sample_shape,
+                             rate,
+                             internal_dtype=tf.float64,
+                             seed=None):
+  """Samples from the Poisson distribution using Knuth's algorithm.
+
+  We use an algorithm attributed to Knuth: Seminumerical Algorithms. Art of
+  Computer Programming, Volume 2. This algorithm runs in O(rate) time, and
+  requires O(rate) uniform variates. This algorithm is performant for rate ~<10.
+
+  Given a Poisson process, the time between events is exponentially distributed.
+  If we have a Poisson process with rate lambda, then, the time between events
+  is distributed as Exp(lambda). If X ~ Uniform(0, 1), then Y ~ Exp(lambda)
+  where Y = -log(X) / lambda. Thus, to simulate a Poisson draw, we can sample
+  X_i ~ Exp(lambda), and we will haver N ~ Poisson(lambda), where N is the
+  smallest number such that sum_i^N X_i > 1.
+
+  Args:
+    sample_shape: The output sample shape. Must broadcast with `rate`.
+    rate: Floating point tensor, rate.
+    internal_dtype: (optional) dtype to use for internal computations.
+    seed: (optional) The random seed.
+
+  Returns:
+    Samples from the poisson distribution.
+  """
+  exp_neg_rate = tf.math.exp(-rate)
+
+  def loop_body(should_continue, samples, prod, num_iters, seed):
+    u_seed, next_seed = samplers.split_seed(seed)
+    prod = prod * samplers.uniform(
+        sample_shape, dtype=internal_dtype, seed=u_seed)
+    accept = should_continue & (prod <= exp_neg_rate)
+    samples = tf.where(accept, num_iters, samples)
+    return [
+        should_continue & (~accept), samples, prod, num_iters + 1, next_seed
+    ]
+
+  _, samples, _, _, _ = tf.while_loop(
+      cond=lambda should_continue, *ignore: tf.reduce_any(should_continue),
+      body=loop_body,
+      loop_vars=[
+          tf.ones(sample_shape, dtype=tf.bool),  # should_continue
+          tf.zeros(sample_shape, dtype=tf.int32),  # samples
+          tf.ones(sample_shape, dtype=internal_dtype),  # prod
+          tf.zeros([], dtype=tf.int32),  # num_iters
+          seed,  # seed
+      ],
+      # Using a Chernoff-like bound, we can show that for lambda < 10,
+      # Pr[X >= lambda + n] <= exp(-n^2 / 2(lambda + n)) < exp(-90). Hence,
+      # there is miniscule probability that, even after a union bound over
+      # batch size, a poisson sample with rate < 10 would attain a value > 200.
+      maximum_iterations=200,
+  )
+  return samples
+
+
+def random_poisson_rejection_sampler(sample_shape,
+                                     log_rate,
+                                     internal_dtype=tf.float64,
+                                     seed=None):
+  """Samples from the Poisson distribution.
+
+  The sampling algorithm is rejection sampling.
+
+  Args:
+    sample_shape: The output sample shape. Must broadcast with `log_rate`.
+    log_rate: Floating point tensor, log rate.
+    internal_dtype: dtype to use for internal computations.
+    seed: (optional) The random seed.
+
+  Returns:
+    Samples from the poisson distribution.
+  """
+  output_dtype = dtype_util.common_dtype([log_rate], dtype_hint=tf.float32)
+  good_params_mask = ~tf.math.is_nan(log_rate)
+
+  seed_lo, seed_hi = samplers.split_seed(seed)
+
+  # First, we sample the values for which rate >= 10.
+  # When replacing NaN or < 10 values, use 100 for log rate, since that leads
+  # to a high-likelihood of the rejection sampler accepting on the first pass.
+  high_params_mask = good_params_mask & tf.math.greater_equal(
+      log_rate, np.log(10.))
+  cast_log_rate = tf.cast(log_rate, internal_dtype)
+  safe_log_rate = tf.where(high_params_mask, cast_log_rate, 100.)
+  high_rate_samples = _random_poisson_high_rate(
+      sample_shape,
+      log_rate=safe_log_rate,
+      internal_dtype=internal_dtype,
+      seed=seed_hi)
+  high_rate_samples = tf.cast(high_rate_samples, output_dtype)
+
+  # Next, we sample the values for which rate < 10. When replacing NaN or high
+  # values, use a small number so that the sum-of-exponentials sampler
+  # terminates on the first pass with high likelihood.
+  low_params_mask = good_params_mask & ~high_params_mask
+  safe_rate = tf.where(low_params_mask, tf.math.exp(cast_log_rate), 1e-5)
+  low_rate_samples = _random_poisson_low_rate(
+      sample_shape, rate=safe_rate, internal_dtype=internal_dtype, seed=seed_lo)
+  low_rate_samples = tf.cast(low_rate_samples, output_dtype)
+
+  samples = tf.where(
+      good_params_mask,
+      tf.where(high_params_mask, high_rate_samples, low_rate_samples), np.nan)
+
+  return samples

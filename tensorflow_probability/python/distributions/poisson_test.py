@@ -22,6 +22,8 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import poisson as poisson_dist
+from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
@@ -381,6 +383,121 @@ class PoissonLogRateTest(PoissonTest):
     grad = tape.gradient(loss, dist.trainable_variables)
     self.assertLen(grad, 1)
     self.assertAllNotNone(grad)
+
+
+@test_util.test_all_tf_execution_regimes
+class PoissonSampleLogRateTest(test_util.TestCase):
+
+  def testSamplePoissonLowRates(self):
+    # Low log rate (< log(10.)) samples would use Knuth's algorithm.
+    rate = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5]
+    log_rate = np.log(rate)
+    num_samples = int(1e5)
+    self.assertLess(
+        self.evaluate(
+            st.min_num_samples_for_dkwm_cdf_test(
+                discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
+        num_samples)
+
+    samples = self.evaluate(
+        poisson_dist.random_poisson_rejection_sampler(
+            [num_samples, 10], log_rate, seed=test_util.test_seed()))
+
+    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
+    self.evaluate(
+        st.assert_true_cdf_equal_by_dkwm(
+            samples,
+            poisson.cdf,
+            st.left_continuous_cdf_discrete_distribution(poisson),
+            false_fail_rate=1e-9))
+
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+        stats.poisson.mean(rate),
+        rtol=0.01)
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_variance(samples, axis=0)),
+        stats.poisson.var(rate),
+        rtol=0.05)
+
+  def testSamplePoissonHighRates(self):
+    # High rate (>= log(10.)) samples would use rejection sampling.
+    rate = [10., 10.5, 11., 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5]
+    log_rate = np.log(rate)
+    num_samples = int(1e5)
+    self.assertLess(
+        self.evaluate(
+            st.min_num_samples_for_dkwm_cdf_test(
+                discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
+        num_samples)
+
+    samples = self.evaluate(
+        poisson_dist.random_poisson_rejection_sampler(
+            [num_samples, 10], log_rate, seed=test_util.test_seed()))
+
+    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
+    self.evaluate(
+        st.assert_true_cdf_equal_by_dkwm(
+            samples,
+            poisson.cdf,
+            st.left_continuous_cdf_discrete_distribution(poisson),
+            false_fail_rate=1e-9))
+
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+        stats.poisson.mean(rate),
+        rtol=0.01)
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_variance(samples, axis=0)),
+        stats.poisson.var(rate),
+        rtol=0.05)
+
+  def testSamplePoissonLowAndHighRates(self):
+    rate = [1., 3., 5., 6., 7., 10., 13.0, 14., 15., 18.]
+    log_rate = np.log(rate)
+    num_samples = int(1e5)
+    self.assertLess(
+        self.evaluate(
+            st.min_num_samples_for_dkwm_cdf_test(
+                discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
+        num_samples)
+
+    samples = self.evaluate(
+        poisson_dist.random_poisson_rejection_sampler(
+            [num_samples, 10], log_rate, seed=test_util.test_seed()))
+
+    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
+    self.evaluate(
+        st.assert_true_cdf_equal_by_dkwm(
+            samples,
+            poisson.cdf,
+            st.left_continuous_cdf_discrete_distribution(poisson),
+            false_fail_rate=1e-9))
+
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+        stats.poisson.mean(rate),
+        rtol=0.01)
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_variance(samples, axis=0)),
+        stats.poisson.var(rate),
+        rtol=0.05)
+
+  def testSamplePoissonInvalidRates(self):
+    rate = [np.nan, -1., 0., 5., 7., 10., 13.0, 14., 15., 18.]
+    log_rate = np.log(rate)
+    samples = self.evaluate(
+        poisson_dist.random_poisson_rejection_sampler(
+            [int(1e5), 10], log_rate, seed=test_util.test_seed()))
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+        stats.poisson.mean(rate),
+        rtol=0.01)
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_variance(samples, axis=0)),
+        stats.poisson.var(rate),
+        rtol=0.05)
+
 
 if __name__ == '__main__':
   tf.test.main()
