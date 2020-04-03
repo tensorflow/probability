@@ -670,68 +670,76 @@ class _DefaultJointBijector(bijector_lib.Bijector):
         for (bijector, input_shape) in zip(support_bijectors, input_shapes)]
     return self._jd._model_unflatten(output_shapes)
 
-  def forward(self, values):
-    values = self._jd._model_flatten(values)
-    self._check_inputs_not_none(values)
+  def forward(self, values, name=None):
+    with tf.name_scope(name or 'forward'):
+      values = self._jd._model_flatten(values)
+      self._check_inputs_not_none(values)
 
-    def bijector_fn(bijector, value):
-      y = bijector.forward(value)
-      return y, y
+      def bijector_fn(bijector, value):
+        y = bijector.forward(value)
+        return y, y
 
-    out = self._evaluate_bijector(bijector_fn, values)
-    return self._jd._model_unflatten(out)
+      out = self._evaluate_bijector(bijector_fn, values)
+      return self._jd._model_unflatten(out)
 
-  def inverse(self, values):
-    self._check_inputs_not_none(values)
-    values = self._jd._model_flatten(values)
+  def inverse(self, values, name=None):
+    with tf.name_scope(name or 'inverse'):
+      self._check_inputs_not_none(values)
+      values = self._jd._model_flatten(values)
 
-    def bijector_fn(bijector, value):
-      x = bijector.inverse(value)
-      return x, value
+      def bijector_fn(bijector, value):
+        x = bijector.inverse(value)
+        return x, value
 
-    out = self._evaluate_bijector(bijector_fn, values)
-    return self._jd._model_unflatten(out)
+      out = self._evaluate_bijector(bijector_fn, values)
+      return self._jd._model_unflatten(out)
 
-  def forward_log_det_jacobian(self, values, event_ndims):
-    self._check_inputs_not_none(values)
-    values = self._jd._model_flatten(values)
-    event_ndims = self._jd._model_flatten(event_ndims)
+  def forward_log_det_jacobian(self, values, event_ndims, name=None):
+    with tf.name_scope(name or 'forward_log_det_jacobian'):
+      self._check_inputs_not_none(values)
+      values = self._jd._model_flatten(values)
+      event_ndims = self._jd._model_flatten(event_ndims)
 
-    def bijector_fn(bijector, value):
-      x, event_ndims = value
-      y = bijector.forward(x)
-      fldj = bijector.forward_log_det_jacobian(x, event_ndims)
-      return fldj, y
+      def bijector_fn(bijector, value):
+        x, event_ndims = value
+        y = bijector.forward(x)
+        fldj = bijector.forward_log_det_jacobian(x, event_ndims)
+        return fldj, y
 
-    fldjs = self._evaluate_bijector(bijector_fn, list(zip(values, event_ndims)))
-    return sum(fldjs)
+      fldjs = self._evaluate_bijector(bijector_fn,
+                                      list(zip(values, event_ndims)))
+      return sum(fldjs)
 
-  def inverse_log_det_jacobian(self, values, event_ndims):
-    self._check_inputs_not_none(values)
-    values = self._jd._model_flatten(values)
-    event_ndims = self._jd._model_flatten(event_ndims)
+  def inverse_log_det_jacobian(self, values, event_ndims, name=None):
+    with tf.name_scope(name or 'inverse_log_det_jacobian'):
+      self._check_inputs_not_none(values)
+      values = self._jd._model_flatten(values)
+      event_ndims = self._jd._model_flatten(event_ndims)
 
-    def bijector_fn(bijector, value):
-      y, event_ndims = value
-      ildj = bijector.inverse_log_det_jacobian(y, event_ndims)
-      return ildj, y
+      def bijector_fn(bijector, value):
+        y, event_ndims = value
+        ildj = bijector.inverse_log_det_jacobian(y, event_ndims)
+        return ildj, y
 
-    ildjs = self._evaluate_bijector(bijector_fn, list(zip(values, event_ndims)))
-    return sum(ildjs)
+      ildjs = self._evaluate_bijector(bijector_fn,
+                                      list(zip(values, event_ndims)))
+      return sum(ildjs)
   # pylint: enable=protected-access
 
   # TODO(b/148485931): Fix bijector caching.
   def forward_event_shape(self, input_shapes):
     return self._event_shapes(input_shapes, 'forward_event_shape')
 
-  def forward_event_shape_tensor(self, input_shapes):
-    self._check_inputs_not_none(input_shapes)
-    return self._event_shapes(input_shapes, 'forward_event_shape_tensor')
+  def forward_event_shape_tensor(self, input_shapes, name=None):
+    with tf.name_scope(name or 'forward_event_shape_tensor'):
+      self._check_inputs_not_none(input_shapes)
+      return self._event_shapes(input_shapes, 'forward_event_shape_tensor')
 
   def inverse_event_shape(self, output_shapes):
     return self._event_shapes(output_shapes, 'inverse_event_shape')
 
-  def inverse_event_shape_tensor(self, output_shapes):
-    self._check_inputs_not_none(output_shapes)
-    return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
+  def inverse_event_shape_tensor(self, output_shapes, name=None):
+    with tf.name_scope('inverse_event_shape_tensor'):
+      self._check_inputs_not_none(output_shapes)
+      return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
 
