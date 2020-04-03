@@ -370,12 +370,13 @@ class BinomialTest(test_util.TestCase):
   @test_util.jax_disable_test_missing_functionality(
       'No gradient for while loops in JAX backend.')
   def testNotReparameterized(self):
-    def f(n):
-      b = tfd.Binomial(n, 0.5)
+    def f(n, p):
+      b = tfd.Binomial(n, p)
       return b.sample(5, seed=test_util.test_seed())
 
-    _, grad_n = tfp.math.value_and_gradient(f, 10.)
+    _, [grad_n, grad_p] = tfp.math.value_and_gradient(f, [10., 0.5])
     self.assertIsNone(grad_n)
+    self.assertIsNone(grad_p)
 
 
 @test_util.test_all_tf_execution_regimes

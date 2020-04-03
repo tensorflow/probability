@@ -93,12 +93,14 @@ def _run_function_under_strategies(user_fn, iters, config, hardware,
   def run_one(function, runtime, print_intermediates):
     """Run user_fn. See public API for details."""
     first_iter_time, total_time = _run_function(function, iters)
-    new_dict = _merge_dicts({'runtime': runtime,
-                             'hardware': hardware,
-                             'iters': iters,
-                             'first_iter_time': first_iter_time,
-                             'total_time': total_time},
-                            extra_columns)
+    new_dict = _merge_dicts(
+        {'runtime': runtime,
+         'hardware': hardware,
+         'iters': iters,
+         'first_iter_time': first_iter_time,
+         'total_time': total_time,
+         'avg_warm_iter_time': (total_time - first_iter_time) / (iters - 1)},
+        extra_columns)
 
     if print_intermediates:
       print('New benchmark result:')

@@ -2361,9 +2361,11 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "multinomial_test",
+    size = "medium",
     srcs = ["multinomial_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
+    shard_count = 5,
     deps = [
         # hypothesis dep,
         # numpy dep,

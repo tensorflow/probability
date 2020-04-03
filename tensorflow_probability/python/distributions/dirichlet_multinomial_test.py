@@ -470,6 +470,20 @@ class DirichletMultinomialTest(test_util.TestCase):
     self.assertIsNone(grad_total_count)
     self.assertIsNone(grad_concentration)
 
+  def testSamplesHaveCorrectTotalCounts(self):
+    seed_stream = test_util.test_seed_stream()
+    concentration = 1. + 2. * tf.random.uniform(
+        shape=[4], dtype=np.float32, seed=seed_stream())
+    total_count = tf.constant(list(range(1000)), dtype=np.float32)
+    dist = tfd.DirichletMultinomial(
+        total_count=total_count,
+        concentration=concentration,
+        validate_args=True)
+    n = int(1e2)
+    x = dist.sample(n, seed=seed_stream())
+    for i in range(n):
+      self.assertAllEqual(tf.reduce_sum(x[i, ...], axis=-1), total_count)
+
 
 @test_util.test_all_tf_execution_regimes
 class DirichletMultinomialFromVariableTest(test_util.TestCase):

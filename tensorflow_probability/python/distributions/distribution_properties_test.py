@@ -128,9 +128,9 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'BetaBinomial',  # No converter for While
     'Binomial',  # No converter for While
-    'DirichletMultinomial',  # No converter for TensorListFromTensor
+    'DirichletMultinomial',  # No converter for StatelessWhile
     'Gamma',  # No converter for While
-    'Multinomial',  # No converter for TensorListFromTensor
+    'Multinomial',  # No converter for StatelessWhile
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
     'VonMises',  # No converter for While

@@ -250,7 +250,7 @@ class Binomial(distribution.Distribution):
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
-               name='Binomial'):
+               name=None):
     """Initialize a batch of Binomial distributions.
 
     Args:
@@ -281,7 +281,7 @@ class Binomial(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError(
           'Construct `Binomial` with `probs` or `logits`, but not both.')
-    with tf.name_scope(name) as name:
+    with tf.name_scope(name or 'Binomial') as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, dtype=dtype, name='total_count')

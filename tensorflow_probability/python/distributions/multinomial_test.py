@@ -16,7 +16,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import unittest
+
 # Dependency imports
+from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
@@ -246,6 +249,9 @@ class MultinomialTest(test_util.TestCase):
     self.assertEqual((6, 3, 3, 3), covariance2.shape)
 
   def testCovarianceFromSampling(self):
+    if tf.executing_eagerly():
+      raise unittest.SkipTest(
+          'testCovarianceFromSampling is too slow to test in Eager mode')
     # We will test mean, cov, var, stddev on a Multinomial constructed via
     # broadcast between alpha, n.
     theta = np.array([[1., 2, 3],
@@ -254,7 +260,7 @@ class MultinomialTest(test_util.TestCase):
     n = np.array([[10., 9.], [8., 7.], [6., 5.]], dtype=np.float32)
     # batch_shape=[3, 2], event_shape=[3]
     dist = tfd.Multinomial(n, theta, validate_args=True)
-    x = dist.sample(int(1000e3), seed=test_util.test_seed())
+    x = dist.sample(int(100e3), seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
@@ -281,10 +287,10 @@ class MultinomialTest(test_util.TestCase):
         dist.variance(),
         dist.stddev(),
     ])
-    self.assertAllClose(sample_mean_, analytic_mean, atol=0.01, rtol=0.01)
-    self.assertAllClose(sample_cov_, analytic_cov, atol=0.01, rtol=0.01)
-    self.assertAllClose(sample_var_, analytic_var, atol=0.01, rtol=0.01)
-    self.assertAllClose(sample_stddev_, analytic_stddev, atol=0.01, rtol=0.01)
+    self.assertAllClose(sample_mean_, analytic_mean, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_cov_, analytic_cov, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_var_, analytic_var, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_stddev_, analytic_stddev, atol=0.1, rtol=0.1)
 
   def testSampleUnbiasedNonScalarBatch(self):
     dist = tfd.Multinomial(
@@ -320,7 +326,7 @@ class MultinomialTest(test_util.TestCase):
         total_count=5.,
         logits=tf.math.log(2. * self._rng.rand(4).astype(np.float32)),
         validate_args=True)
-    n = int(5e3)
+    n = int(3e4)
     x = dist.sample(n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
@@ -364,15 +370,19 @@ class MultinomialTest(test_util.TestCase):
         st.left_continuous_cdf_discrete_distribution(expected_dist),
         false_fail_rate=1e-9))
 
-  def testSampleCorrectMarginals(self):
-    dist1 = tfd.Multinomial(50., probs=[0.25, 0.25, 0.25, 0.25])
-    self.propSampleCorrectMarginals(dist1, 2)
-    dist2 = tfd.Multinomial([0., 1., 25., 100.], probs=[0., 0.1, 0.35, 0.55])
-    self.propSampleCorrectMarginals(dist2, 0)
-    self.propSampleCorrectMarginals(dist2, 1)
-    self.propSampleCorrectMarginals(dist2, 2)
+  @parameterized.parameters(
+      (50., [0.25, 0.25, 0.25, 0.25], 2),
+      ([0., 1., 25., 100.], [0., 0.1, 0.35, 0.55], 0),
+      ([0., 1., 25., 100.], [0., 0.1, 0.35, 0.55], 1),
+      ([0., 1., 25., 100.], [0., 0.1, 0.35, 0.55], 2),
+  )
+  def testSampleCorrectMarginals(self, total_counts, probs, index):
+    if tf.executing_eagerly():
+      raise unittest.SkipTest(
+          'testSampleCorrectMarginals is too slow to test in Eager mode')
+    dist = tfd.Multinomial(total_counts, probs=probs)
+    self.propSampleCorrectMarginals(dist, index)
 
-  @test_util.test_all_tf_execution_regimes
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def manual_testSampleCorrectMarginalsWithHypothesis(self, data):
