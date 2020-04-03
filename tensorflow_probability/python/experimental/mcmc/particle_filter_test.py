@@ -52,17 +52,14 @@ class _ParticleFilterTest(test_util.TestCase):
                          high=tf.broadcast_to(100.0, state_shape))
 
     observations = tf.zeros((9,), dtype=self.dtype)
-    particles, indices, _ = self.evaluate(
-        tfp.experimental.mcmc.particle_filter(
+    trajectories, _ = self.evaluate(
+        tfp.experimental.mcmc.infer_trajectories(
             observations=observations,
             initial_state_prior=initial_state_prior,
             transition_fn=particle_dynamics,
             observation_fn=particle_observations,
             num_particles=16384,
             seed=test_util.test_seed()))
-
-    trajectories = self.evaluate(
-        tfp.experimental.mcmc.reconstruct_trajectories(particles, indices))
     position = trajectories['position']
 
     # The trajectories have the following properties:
@@ -212,16 +209,14 @@ class _ParticleFilterTest(test_util.TestCase):
         34.,   44.,  25.,  27.])
     # pylint: enable=bad-whitespace
 
-    particles, indices, _ = self.evaluate(
-        tfp.experimental.mcmc.particle_filter(
+    trajectories, _ = self.evaluate(
+        tfp.experimental.mcmc.infer_trajectories(
             observations=observations,
             initial_state_prior=initial_state_prior,
             transition_fn=infection_dynamics,
             observation_fn=infection_observations,
             num_particles=100,
             seed=test_util.test_seed()))
-    trajectories = self.evaluate(
-        tfp.experimental.mcmc.reconstruct_trajectories(particles, indices))
 
     # The susceptible population should decrease over time.
     self.assertAllLessEqual(
@@ -335,8 +330,8 @@ class _ParticleFilterTest(test_util.TestCase):
     golden_ratio = (1. + np.sqrt(5.)) / 2.
     observed_ratios = np.array([golden_ratio] * 10).astype(self.dtype)
 
-    particles, parent_indices, lps = self.evaluate(
-        tfp.experimental.mcmc.particle_filter(
+    trajectories, lps = self.evaluate(
+        tfp.experimental.mcmc.infer_trajectories(
             observed_ratios,
             initial_state_prior=initial_state_prior,
             transition_fn=fibbonaci_transition_fn,
@@ -344,9 +339,6 @@ class _ParticleFilterTest(test_util.TestCase):
             num_particles=100,
             num_steps_state_history_to_pass=2,
             seed=test_util.test_seed()))
-    trajectories = self.evaluate(
-        tfp.experimental.mcmc.reconstruct_trajectories(
-            particles, parent_indices))
 
     # Verify that we actually produced Fibonnaci sequences.
     self.assertAllClose(

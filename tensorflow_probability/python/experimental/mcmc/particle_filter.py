@@ -22,6 +22,7 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -29,8 +30,9 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util import SeedStream
 
 __all__ = [
+    'infer_trajectories',
     'particle_filter',
-    'reconstruct_trajectories'
+    'reconstruct_trajectories',
 ]
 
 
@@ -119,20 +121,7 @@ ParticleFilterAccumulatedQuantities = collections.namedtuple(
     ])
 
 
-def particle_filter(observations,
-                    initial_state_prior,
-                    transition_fn,
-                    observation_fn,
-                    num_particles,
-                    initial_state_proposal=None,
-                    proposal_fn=None,
-                    rejuvenation_kernel_fn=None,  # TODO(davmre): not yet supported. pylint: disable=unused-argument
-                    num_steps_state_history_to_pass=None,
-                    num_steps_observation_history_to_pass=None,
-                    seed=None,
-                    name=None):
-  """Samples a series of particles representing filtered latent states.
-
+particle_filter_arg_str = """
   Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
   by the `initial_state_prior`.
 
@@ -182,26 +171,9 @@ def particle_filter(observations,
     seed: Python `int` seed for random ops.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'particle_filter'`).
-  Returns:
-    particles: a (structure of) Tensor(s) matching the latent state, each
-      of shape
-      `concat([[num_timesteps, b1, ..., bN, num_particles], event_shape])`,
-      representing unbiased samples from the series of (filtering) distributions
-      `p(latent_states[t] | observations[:t])`.
-    parent_indices: `int` `Tensor` of shape
-      `[num_timesteps, b1, ..., bN, num_particles]`,
-      such that `parent_indices[t, k]` gives the index of the particle at
-      time `t - 1` that the `k`th particle at time `t` is immediately descended
-      from. See also
-      `tfp.experimental.mcmc.reconstruct_trajectories`.
-    step_log_marginal_likelihoods: float `Tensor` of shape
-      `[num_timesteps, b1, ..., bN]`,
-      giving the natural logarithm of an unbiased estimate of
-      `p(observations[t] | observations[:t])` at each timestep `t`. Note that (
-      by [Jensen's inequality](
-      https://en.wikipedia.org/wiki/Jensen%27s_inequality))
-      this is *smaller* in expectation than the true
-      `log p(observations[t] | observations[:t])`.
+"""
+
+non_markovian_specification_str = """
 
   #### Non-Markovian models (state and observation history).
 
@@ -226,6 +198,42 @@ def particle_filter(observations,
   initial step, `observation_history=None` will be passed and should be
   handled appropriately. At subsequent steps, `observation_history[-1]`
   refers to the observation at the previous timestep, and so on.
+"""
+
+
+@docstring_util.expand_docstring(
+    particle_filter_arg_str=particle_filter_arg_str)
+def infer_trajectories(observations,
+                       initial_state_prior,
+                       transition_fn,
+                       observation_fn,
+                       num_particles,
+                       initial_state_proposal=None,
+                       proposal_fn=None,
+                       rejuvenation_kernel_fn=None,
+                       num_steps_state_history_to_pass=None,
+                       num_steps_observation_history_to_pass=None,
+                       seed=None,
+                       name=None):  # pylint: disable=g-doc-args
+  """Use particle filtering to sample from the posterior over trajectories.
+
+  ${particle_filter_arg_str}
+  Returns:
+    trajectories: a (structure of) Tensor(s) matching the latent state, each
+      of shape
+      `concat([[num_timesteps, b1, ..., bN, num_particles], event_shape])`,
+      representing unbiased samples from the posterior distribution
+      `p(latent_states | observations)`.
+    step_log_marginal_likelihoods: float `Tensor` of shape
+      `[num_timesteps, b1, ..., bN]`,
+      giving the natural logarithm of an unbiased estimate of
+      `p(observations[t] | observations[:t])` at each timestep `t`. Note that
+      (by [Jensen's inequality](
+      https://en.wikipedia.org/wiki/Jensen%27s_inequality))
+      this is *smaller* in expectation than the true
+      `log p(observations[t] | observations[:t])`.
+
+  ${non_markovian_specification_str}
 
   #### Examples
 
@@ -276,38 +284,101 @@ def particle_filter(observations,
   observed_positions = tfd.Normal(loc=tf.linspace(0.4, 0.8, 0.01),
                                   scale=0.1).sample()
 
-  # Run particle filtering.
-  (particles,       # {'position': [40, 1000], 'velocity': [40, 1000]}
-   parent_indices,  #  [40, 1000]
-   _) = tfp.experimental.mcmc.particle_filter(
-          observations=observed_positions,
-          initial_state_prior=initial_state_prior,
-          transition_fn=transition_fn,
-          observation_fn=observation_fn,
-          num_particles=1000)
+  # Run particle filtering to sample plausible trajectories.
+  (trajectories,  # {'position': [40, 1000], 'velocity': [40, 1000]}
+   lps) = tfp.experimental.mcmc.infer_trajectories(
+            observations=observed_positions,
+            initial_state_prior=initial_state_prior,
+            transition_fn=transition_fn,
+            observation_fn=observation_fn,
+            num_particles=1000)
   ```
 
-  The particle filter samples from the "filtering" distribution over latent
+  For all `i`, `trajectories['position'][:, i]` is a sample from the
+  posterior over position sequences, given the observations:
+  `p(state[0:T] | observations[0:T])`. Often, the sampled trajectories
+  will be highly redundant in their earlier timesteps, because most
+  of the initial particles have been discarded through resampling
+  (this problem is known as 'particle degeneracy'; see section 3.5 of
+  [Doucet and Johansen][1]).
+  In such cases it may be useful to also consider the series of *filtering*
+  distributions `p(state[t] | observations[:t])`, in which each latent state
+  is inferred conditioned only on observations up to that point in time; these
+  may be computed using `tfp.mcmc.experimental.particle_filter`.
+
+  [1] Arnaud Doucet and Adam M. Johansen. A tutorial on particle
+      filtering and smoothing: Fifteen years later.
+      _Handbook of nonlinear filtering_, 12(656-704), 2009.
+      https://www.stats.ox.ac.uk/~doucet/doucet_johansen_tutorialPF2011.pdf
+
+  """
+  with tf.name_scope(name or 'infer_trajectories') as name:
+    particles, parent_indices, step_log_marginal_likelihoods = particle_filter(
+        observations=observations,
+        initial_state_prior=initial_state_prior,
+        transition_fn=transition_fn,
+        observation_fn=observation_fn,
+        num_particles=num_particles,
+        initial_state_proposal=initial_state_proposal,
+        proposal_fn=proposal_fn,
+        rejuvenation_kernel_fn=rejuvenation_kernel_fn,
+        num_steps_state_history_to_pass=num_steps_state_history_to_pass,
+        num_steps_observation_history_to_pass=(
+            num_steps_observation_history_to_pass),
+        seed=seed,
+        name=name)
+    return (reconstruct_trajectories(particles, parent_indices),
+            step_log_marginal_likelihoods)
+
+
+@docstring_util.expand_docstring(
+    particle_filter_arg_str=particle_filter_arg_str,
+    non_markovian_specification_str=non_markovian_specification_str)
+def particle_filter(observations,
+                    initial_state_prior,
+                    transition_fn,
+                    observation_fn,
+                    num_particles,
+                    initial_state_proposal=None,
+                    proposal_fn=None,
+                    rejuvenation_kernel_fn=None,  # TODO(davmre): not yet supported. pylint: disable=unused-argument
+                    num_steps_state_history_to_pass=None,
+                    num_steps_observation_history_to_pass=None,
+                    seed=None,
+                    name=None):  # pylint: disable=g-doc-args
+  """Samples a series of particles representing filtered latent states.
+
+  The particle filter samples from the sequence of "filtering" distributions
+  `p(state[t] | observations[:t])` over latent
   states: at each point in time, this is the distribution conditioned on all
-  observations *up to that time*. For example,
-  `particles['position'][t]` contains `num_particles` samples from the
-  distribution `p(position[t] | observed_positions[:t])`. Because
-  particles may be resampled, there is no relationship between a particle
-  at time `t` and the particle with the same index at time `t + 1`.
+  observations *up to that time*. Because particles may be resampled, a particle
+  at time `t` may be different from the particle with the same index at time
+  `t + 1`. To reconstruct trajectories by tracing back through the resampling
+  process, see `tfp.mcmc.experimental.reconstruct_trajectories`.
 
-  We may, however, trace back through the resampling steps to reconstruct
-  samples of entire latent trajectories.
+  ${particle_filter_arg_str}
+  Returns:
+    particles: a (structure of) Tensor(s) matching the latent state, each
+      of shape
+      `concat([[num_timesteps, b1, ..., bN, num_particles], event_shape])`,
+      representing unbiased samples from the series of (filtering) distributions
+      `p(latent_states[t] | observations[:t])`.
+    parent_indices: `int` `Tensor` of shape
+      `[num_timesteps, b1, ..., bN, num_particles]`,
+      such that `parent_indices[t, k]` gives the index of the particle at
+      time `t - 1` that the `k`th particle at time `t` is immediately descended
+      from. See also
+      `tfp.experimental.mcmc.reconstruct_trajectories`.
+    step_log_marginal_likelihoods: float `Tensor` of shape
+      `[num_timesteps, b1, ..., bN]`,
+      giving the natural logarithm of an unbiased estimate of
+      `p(observations[t] | observations[:t])` at each timestep `t`. Note that (
+      by [Jensen's inequality](
+      https://en.wikipedia.org/wiki/Jensen%27s_inequality))
+      this is *smaller* in expectation than the true
+      `log p(observations[t] | observations[:t])`.
 
-  ```python
-  trajectories = tfp.experimental.mcmc.reconstruct_trajectories(
-       particles, parent_indices)
-  ```
-
-  Here, `trajectories['position'][:, i]` contains the history of positions
-  sampled for what became the `i`th particle at the final timestep. These
-  are samples from the 'smoothed' posterior over trajectories, given all
-  observations: `p(position[0:T] | observed_position[0:T])`.
-
+  ${non_markovian_specification_str}
   """
   seed = SeedStream(seed, 'particle_filter')
   with tf.name_scope(name or 'particle_filter'):

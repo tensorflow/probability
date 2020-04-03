@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
+from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
 from tensorflow_probability.python.experimental.mcmc.particle_filter import reconstruct_trajectories
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
@@ -33,14 +34,15 @@ from tensorflow.python.util.all_util import remove_undocumented  # pylint: disab
 _allowed_symbols = [
     'EllipticalSliceSampler',
     'NoUTurnSampler',
-    'particle_filter',
-    'reconstruct_trajectories',
+    'infer_trajectories',
     'default_make_hmc_kernel_fn',
     'gen_make_hmc_kernel_fn',
     'gen_make_transform_hmc_kernel_fn',
     'make_rwmh_kernel_fn',
+    'particle_filter',
     'sample_sequential_monte_carlo',
     'simple_heuristic_tuning',
+    'reconstruct_trajectories',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
