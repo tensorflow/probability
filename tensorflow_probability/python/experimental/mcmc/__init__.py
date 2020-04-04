@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
+from tensorflow_probability.python.experimental.mcmc.particle_filter import ess_below_threshold
 from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
 from tensorflow_probability.python.experimental.mcmc.particle_filter import reconstruct_trajectories
@@ -34,6 +35,7 @@ from tensorflow.python.util.all_util import remove_undocumented  # pylint: disab
 _allowed_symbols = [
     'EllipticalSliceSampler',
     'NoUTurnSampler',
+    'ess_below_threshold',
     'infer_trajectories',
     'default_make_hmc_kernel_fn',
     'gen_make_hmc_kernel_fn',

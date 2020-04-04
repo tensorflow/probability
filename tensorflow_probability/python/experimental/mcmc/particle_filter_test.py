@@ -101,14 +101,17 @@ class _ParticleFilterTest(test_util.TestCase):
         np.arange(num_timesteps).astype(self.dtype)[..., None, None] +
         true_initial_positions)
 
-    particles, parent_indices, step_log_marginal_likelihoods = self.evaluate(
-        tfp.experimental.mcmc.particle_filter(
-            observations=observed_positions,
-            initial_state_prior=initial_state_prior,
-            transition_fn=transition_fn,
-            observation_fn=observation_fn,
-            num_particles=num_particles,
-            seed=test_util.test_seed()))
+    (particles,
+     log_weights,
+     parent_indices,
+     step_log_marginal_likelihoods) = self.evaluate(
+         tfp.experimental.mcmc.particle_filter(
+             observations=observed_positions,
+             initial_state_prior=initial_state_prior,
+             transition_fn=transition_fn,
+             observation_fn=observation_fn,
+             num_particles=num_particles,
+             seed=test_util.test_seed()))
 
     self.assertAllEqual(particles['position'].shape,
                         [num_timesteps] + batch_shape + [num_particles])
@@ -121,15 +124,16 @@ class _ParticleFilterTest(test_util.TestCase):
 
     self.assertAllClose(
         self.evaluate(
-            tf.reduce_mean(particles['position'], axis=-1)),
+            tf.reduce_sum(tf.exp(log_weights) *
+                          particles['position'], axis=-1)),
         observed_positions,
         atol=0.1)
 
+    velocity_means = tf.reduce_sum(tf.exp(log_weights) *
+                                   particles['velocity'], axis=-1)
     self.assertAllClose(
-        self.evaluate(
-            tf.reduce_mean(particles['velocity'], axis=(0, -1))),
-        true_velocities,
-        atol=0.05)
+        self.evaluate(tf.reduce_mean(velocity_means, axis=0)),
+        true_velocities, atol=0.05)
 
     # Uncertainty in velocity should decrease over time.
     velocity_stddev = self.evaluate(
@@ -239,8 +243,8 @@ class _ParticleFilterTest(test_util.TestCase):
     proposal_fn = (lambda step, state: tfd.Normal(  # pylint: disable=g-long-lambda
         loc=tf.ones_like(state) * observations[step + 1], scale=1.0))
 
-    particles, parent_indices, _ = self.evaluate(
-        tfp.experimental.mcmc.particle_filter(
+    trajectories, _ = self.evaluate(
+        tfp.experimental.mcmc.infer_trajectories(
             observations=observations,
             initial_state_prior=initial_state_prior,
             transition_fn=transition_fn,
@@ -249,9 +253,6 @@ class _ParticleFilterTest(test_util.TestCase):
             initial_state_proposal=initial_state_proposal,
             proposal_fn=proposal_fn,
             seed=test_util.test_seed()))
-    trajectories = self.evaluate(
-        tfp.experimental.mcmc.reconstruct_trajectories(particles,
-                                                       parent_indices))
     self.assertAllClose(trajectories,
                         tf.convert_to_tensor(
                             tf.convert_to_tensor(observations)[..., None] *
@@ -283,23 +284,25 @@ class _ParticleFilterTest(test_util.TestCase):
     # Approximate the filtering means and marginal likelihood(s) using
     # the particle filter.
     # pylint: disable=g-long-lambda
-    (particles, _, estimated_step_log_marginal_likelihoods) = self.evaluate(
-        tfp.experimental.mcmc.particle_filter(
-            observations=observations,
-            initial_state_prior=initial_state_prior,
-            transition_fn=lambda _, previous_state: tfd.MultivariateNormalTriL(
-                loc=transition_noise.loc + tf.linalg.matvec(
-                    transition_matrix, previous_state),
-                scale_tril=transition_noise.scale_tril),
-            observation_fn=lambda _, state: tfd.MultivariateNormalTriL(
-                loc=observation_noise.loc + tf.linalg.matvec(
-                    observation_matrix, state),
-                scale_tril=observation_noise.scale_tril),
-            num_particles=1000,
-            seed=test_util.test_seed()))
+    (particles, log_weights, _,
+     estimated_step_log_marginal_likelihoods) = self.evaluate(
+         tfp.experimental.mcmc.particle_filter(
+             observations=observations,
+             initial_state_prior=initial_state_prior,
+             transition_fn=lambda _, previous_state: tfd.MultivariateNormalTriL(
+                 loc=transition_noise.loc + tf.linalg.matvec(
+                     transition_matrix, previous_state),
+                 scale_tril=transition_noise.scale_tril),
+             observation_fn=lambda _, state: tfd.MultivariateNormalTriL(
+                 loc=observation_noise.loc + tf.linalg.matvec(
+                     observation_matrix, state),
+                 scale_tril=observation_noise.scale_tril),
+             num_particles=1000,
+             seed=test_util.test_seed()))
     # pylint: enable=g-long-lambda
 
-    particle_means = np.mean(particles, axis=1)
+    particle_means = np.sum(
+        particles * np.exp(log_weights)[..., np.newaxis], axis=1)
     self.assertAllClose(filtered_means, particle_means, atol=0.1, rtol=0.1)
 
     self.assertAllClose(
@@ -389,7 +392,7 @@ class _ParticleFilterTest(test_util.TestCase):
         tfd.Normal(expected_locs, scale=1.0).log_prob(observations))
 
     # Check that the particle filter gives the same log-probs.
-    _, _, lps = self.evaluate(tfp.experimental.mcmc.particle_filter(
+    _, _, _, lps = self.evaluate(tfp.experimental.mcmc.particle_filter(
         observations,
         initial_state_prior=initial_state_prior,
         transition_fn=dummy_transition_fn,
