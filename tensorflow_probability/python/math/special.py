@@ -12,22 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-
 """Implements special functions in TensorFlow.
 
-The Lambert W function is the inverse of `z = u * exp(u)`, i. e., it is the
-function that satisfies `u = W(z) * exp(W(z))`.  The solution cannot
-be expressed as elementary functions and is thus part of the *special*
-functions in mathematics.  See https://en.wikipedia.org/wiki/Lambert_W_function.
-
-In general it is a complex-values function with multiple branches. The `k=0`
-branch is knowns as the *principal branch* of the Lambert W function and is
-implemented here. See also `scipy.special.lambertw`.
-
-# References
-
-Corless, R.M., Gonnet, G.H., Hare, D.E.G. et al. On the LambertW function.
-Adv Comput Math 5, 329-359 (1996) doi:10.1007/BF02124750
 """
 
 from __future__ import absolute_import
@@ -41,8 +27,11 @@ from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
-    "lambertw",
-    "lambertw_winitzki_approx",
+    'lambertw',
+    'lambertw_winitzki_approx',
+    'log_gamma_correction',
+    'log_gamma_difference',
+    'lbeta',
 ]
 
 
@@ -64,7 +53,7 @@ def lambertw_winitzki_approx(z, name=None):
   Returns:
     lambertw_winitzki_approx: Approximation for W(z) for z >= -1/exp(1).
   """
-  with tf.name_scope(name or "lambertw_winitzki_approx"):
+  with tf.name_scope(name or 'lambertw_winitzki_approx'):
     z = tf.convert_to_tensor(z)
     # See eq (38) here:
     # https://pdfs.semanticscholar.org/e934/24f33e2742016ef18c36a80788400d2f17b4.pdf
@@ -123,7 +112,7 @@ def _lambertw_principal_branch(z, name=None):
   Returns:
     lambertw_principal_branch: A Tensor with same shape and same dtype as `z`.
   """
-  with tf.name_scope(name or "lambertw_principal_branch"):
+  with tf.name_scope(name or 'lambertw_principal_branch'):
     z = tf.convert_to_tensor(z)
     np_finfo = np.finfo(dtype_util.as_numpy_dtype(z.dtype))
     tolerance = tf.convert_to_tensor(2. * np_finfo.resolution, dtype=z.dtype)
@@ -141,10 +130,22 @@ def _lambertw_principal_branch(z, name=None):
 def lambertw(z, name=None):
   """Computes Lambert W of `z` element-wise.
 
-  The Lambert W function is the inverse of `z = w * tf.exp(w)`.  Lambert W is a
-  complex-valued function, but here it returns only the real part of the image
-  of the function. It also only returns the principal branch (also known as
-  branch `0`).
+  The Lambert W function is the inverse of `z = u * exp(u)`, i. e., it is the
+  function that satisfies `u = W(z) * exp(W(z))`.  The solution cannot be
+  expressed as a composition of elementary functions and is thus part of the
+  *special* functions in mathematics.  See
+  https://en.wikipedia.org/wiki/Lambert_W_function.
+
+  In general it is a complex-valued function with multiple branches. The `k=0`
+  branch is known as the *principal branch* of the Lambert W function and is
+  implemented here. See also `scipy.special.lambertw`.
+
+  This code returns only the real part of the image of the Lambert W function.
+
+  # References
+
+  Corless, R.M., Gonnet, G.H., Hare, D.E.G. et al. On the LambertW function.
+  Adv Comput Math 5, 329-359 (1996) doi:10.1007/BF02124750
 
   Args:
     z: A Tensor with type `float32` or `float64`.
@@ -154,7 +155,7 @@ def lambertw(z, name=None):
     lambertw: The Lambert W function evaluated at `z`. A Tensor with same shape
       and same dtype as `z`.
   """
-  with tf.name_scope(name or "lambertw"):
+  with tf.name_scope(name or 'lambertw'):
     z = tf.convert_to_tensor(z)
     wz = _lambertw_principal_branch(z, name)
 
@@ -181,3 +182,212 @@ def lambertw(z, name=None):
       return grad_wz
 
     return wz, grad
+
+
+def log_gamma_correction(x, name=None):
+  """Returns the error of the Stirling approximation to lgamma(x) for x >= 8.
+
+  This is useful for accurately evaluating ratios between Gamma functions, as
+  happens when trying to compute Beta functions.
+
+  Specifically,
+  ```
+  lgamma(x) approx (x - 0.5) * log(x) - x + 0.5 log (2 pi)
+                   + log_gamma_correction(x)
+  ```
+  for x >= 8.
+
+  This is the function called Delta in [1], eq (30).  We implement it with
+  the rational minimax approximation given in [1], eq (32).
+
+  References:
+
+  [1] DiDonato and Morris, "Significant Digit Computation of the Incomplete Beta
+      Function Ratios", 1988.  Technical report NSWC TR 88-365, Naval Surface
+      Warfare Center (K33), Dahlgren, VA 22448-5000.  Section IV, Auxiliary
+      Functions.  https://apps.dtic.mil/dtic/tr/fulltext/u2/a210118.pdf
+
+  Args:
+    x: Floating-point Tensor at which to evaluate the log gamma correction
+      elementwise.  The approximation is accurate when x >= 8.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    lgamma_corr: Tensor of elementwise log gamma corrections.
+  """
+  with tf.name_scope(name or 'log_gamma_correction'):
+    dtype = dtype_util.common_dtype([x], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+
+    minimax_coeff = tf.constant([
+        0.833333333333333e-01,
+        -0.277777777760991e-02,
+        0.793650666825390e-03,
+        -0.595202931351870e-03,
+        0.837308034031215e-03,
+        -0.165322962780713e-02,
+    ], dtype=dtype)
+
+    inverse_x = 1 / x
+    inverse_x_squared = inverse_x * inverse_x
+    accum = minimax_coeff[5]
+    for i in reversed(range(5)):
+      accum = accum * inverse_x_squared + minimax_coeff[i]
+    return accum * inverse_x
+
+
+def _log_gamma_difference_big_y(x, y):
+  """Returns lgamma(y) - lgamma(x + y), accurately if 0 <= x <= y and y >= 8.
+
+  This is more accurate than subtracting lgammas directly because lgamma grows
+  as `x log(x) - x + o(x)`, and thus subtracting the value of lgamma for two
+  close, large arguments incurs catastrophic cancellation.
+
+  The method is to partition lgamma into the Striling approximation and the
+  correction `log_gamma_correction`, symbolically cancel the former, and compute
+  and subtract the latter.
+
+  Args:
+    x: Floating-point Tensor.  `x` should be non-negative, and elementwise no
+      more than `y`.
+    y: Floating-point Tensor.  `y` should be elementwise no less than 8.
+
+  Returns:
+    lgamma_diff: Floating-point Tensor, the difference lgamma(y) - lgamma(x+y),
+      computed elementwise.
+  """
+  cancelled_stirling = (-1 * (x + y - 0.5) * tf.math.log1p(x / y)
+                        - x * tf.math.log(y) + x)
+  correction = log_gamma_correction(y) - log_gamma_correction(x + y)
+  return correction + cancelled_stirling
+
+
+@tf.custom_gradient
+def log_gamma_difference(x, y, name=None):
+  """Returns lgamma(y) - lgamma(x + y), accurately.
+
+  This is more accurate than subtracting lgammas directly because lgamma grows
+  as `x log(x) - x + o(x)`, and thus subtracting the value of lgamma for two
+  close, large arguments incurs catastrophic cancellation.
+
+  The method is to partition lgamma into the Striling approximation and the
+  correction `log_gamma_correction`, symbolically cancel the former, and compute
+  and subtract the latter.
+
+  Args:
+    x: Floating-point Tensor.  `x` should be non-negative, and elementwise no
+      more than `y`.
+    y: Floating-point Tensor.  `y` should be elementwise no less than 8.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    lgamma_diff: Floating-point Tensor, the difference lgamma(y) - lgamma(x+y),
+      computed elementwise.
+  """
+  with tf.name_scope(name or 'log_gamma_difference'):
+    dtype = dtype_util.common_dtype([x, y], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    y = tf.convert_to_tensor(y, dtype=dtype)
+
+    big_y = _log_gamma_difference_big_y(x, y)
+    small_y = tf.math.lgamma(y) - tf.math.lgamma(x + y)
+    answer = tf.where(y >= 8, big_y, small_y)
+
+    def grad(danswer):
+      # Computing the gradient naively as the difference of digammas because (i)
+      # digamma grows slower than gamma, so gets into bad cancellations later,
+      # and (ii) doing better is work.  This matches what the gradient would be
+      # if the forward pass were computed naively as the difference of lgammas.
+      px = -tf.math.digamma(x + y)
+      py = tf.math.digamma(y) + px
+      return [px * danswer, py * danswer]
+
+    return answer, grad
+
+
+def _lbeta_no_gradient(x, y):
+  """Computes log(Beta(x, y)) with autodiff gradients only."""
+  # Flip args if needed so y >= x.  Beta is mathematically symmetric but our
+  # method for computing it is not.
+  x, y = tf.minimum(x, y), tf.maximum(x, y)
+
+  log2pi = tf.constant(np.log(2 * np.pi), dtype=x.dtype)
+  # Two large arguments case: y >= x >= 8.
+  log_beta_two_large = (0.5 * log2pi
+                        - 0.5 * tf.math.log(y)
+                        + log_gamma_correction(x)
+                        + log_gamma_correction(y)
+                        - log_gamma_correction(x + y)
+                        + (x - 0.5) * tf.math.log(x / (x + y))
+                        - y * tf.math.log1p(x / y))
+
+  # One large argument case: x < 8, y >= 8.
+  log_beta_one_large = tf.math.lgamma(x) + _log_gamma_difference_big_y(x, y)
+
+  # Small arguments case: x <= y < 8.
+  log_beta_small = tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
+
+  # Reference [1] has two more arms, for cases where x or y falls into the
+  # interval (2, 8).  In these cases, reference [1] recommends iteratively
+  # reducing the arguments using the identity
+  #   B(x, y) = B(x - 1, y) * (x - 1) / (x + y - 1)
+  # so they fall in the interval [1, 2].  We choose not to do that here to avoid
+  # a TensorFlow while loop, and hope that subtracting lgammas will be accurate
+  # enough for the user's purposes.
+
+  return tf.where(x >= 8,
+                  log_beta_two_large,
+                  tf.where(y >= 8,
+                           log_beta_one_large,
+                           log_beta_small))
+
+
+@tf.custom_gradient
+def _lbeta_gradient(x, y):
+  """Computes log(Beta(x, y)) with correct custom gradient."""
+  answer = _lbeta_no_gradient(x, y)
+  def gradient(danswer):
+    total_digamma = tf.math.digamma(x + y)
+    px = tf.math.digamma(x) - total_digamma
+    py = tf.math.digamma(y) - total_digamma
+    return [px * danswer, py * danswer]
+  return answer, gradient
+
+
+def lbeta(x, y, name=None):
+  """Returns log(Beta(x, y)).
+
+  This is semantically equal to
+    lgamma(x) + lgamma(y) - lgamma(x + y)
+  but the method is more accurate for arguments above 8.
+
+  The reason for accuracy loss in the naive computation is catastrophic
+  cancellation between the lgammas.  This method avoids the numeric cancellation
+  by explicitly decomposing lgamma into the Stirling approximation and an
+  explicit `log_gamma_correction`, and cancelling the large terms from the
+  Striling analytically.
+
+  The computed gradients are the same as for the naive forward computation,
+  because (i) digamma grows much slower than lgamma, so cancellations aren't as
+  bad, and (ii) it's simpler and faster than trying to be more accurate.
+
+  References:
+
+  [1] DiDonato and Morris, "Significant Digit Computation of the Incomplete Beta
+      Function Ratios", 1988.  Technical report NSWC TR 88-365, Naval Surface
+      Warfare Center (K33), Dahlgren, VA 22448-5000.  Section IV, Auxiliary
+      Functions.  https://apps.dtic.mil/dtic/tr/fulltext/u2/a210118.pdf
+
+  Args:
+    x: Floating-point Tensor.
+    y: Floating-point Tensor.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    lbeta: Tensor of elementwise log beta(x, y).
+  """
+  with tf.name_scope(name or 'tfp_lbeta'):
+    dtype = dtype_util.common_dtype([x, y], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    y = tf.convert_to_tensor(y, dtype=dtype)
+    return _lbeta_gradient(x, y)

@@ -57,6 +57,9 @@ from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
+from tensorflow_probability.python.math.special import lbeta
+from tensorflow_probability.python.math.special import log_gamma_correction
+from tensorflow_probability.python.math.special import log_gamma_difference
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
@@ -73,11 +76,14 @@ _allowed_symbols = [
     'interp_regular_1d_grid',
     'lambertw',
     'lambertw_winitzki_approx',
+    'lbeta',
     'log1mexp',
     'log1psquare',
     'log_add_exp',
     'log_combinations',
     'log_cosh',
+    'log_gamma_correction',
+    'log_gamma_difference',
     'log_sub_exp',
     'lu_matrix_inverse',
     'lu_reconstruct',
