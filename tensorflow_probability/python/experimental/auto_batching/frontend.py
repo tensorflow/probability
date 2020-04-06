@@ -88,6 +88,7 @@ def _parse_and_analyze(f, autobatch_functions):
     entity_info: An AutoGraph `EntityInfo` object, with some information
       about `f`.  Required for initializing `_AutoBatchingTransformer`.
   """
+  # TODO(mdan): Replace all this boilerplate with FunctionTranspiler.
   namespace = {}
 
   # Get the AST of the function
@@ -95,18 +96,35 @@ def _parse_and_analyze(f, autobatch_functions):
   node, _ = parser.parse_entity(f, future_features=future_features)
 
   # Boilerplate for AutoGraph transforms
-  entity_info = transformer.EntityInfo(
-      source_code='',
-      source_file=None,
-      future_features=future_features,
-      namespace=namespace)
-  program_ctx = converter.ProgramContext(
-      options=converter.ConversionOptions(recursive=True),
-      autograph_module=None)
-  ctx = converter.EntityContext(
-      namer=naming.Namer(namespace),
-      entity_info=entity_info,
-      program_ctx=program_ctx)
+  if hasattr(converter, 'EntityContext'):
+    # TF 2.2-
+    entity_info = transformer.EntityInfo(
+        source_code='',
+        source_file=None,
+        future_features=future_features,
+        namespace=namespace)
+    program_ctx = converter.ProgramContext(
+        options=converter.ConversionOptions(recursive=True),
+        autograph_module=None)
+    ctx = converter.EntityContext(
+        namer=naming.Namer(namespace),
+        entity_info=entity_info,
+        program_ctx=program_ctx)
+  else:
+    # TF 2.3+
+    entity_info = transformer.EntityInfo(
+        name=f.__name__,
+        source_code='',
+        source_file=None,
+        future_features=future_features,
+        namespace=namespace)
+    program_ctx = converter.ProgramContext(
+        options=converter.ConversionOptions(recursive=True),
+        autograph_module=None)
+    ctx = transformer.Context(
+        info=entity_info,
+        namer=naming.Namer(namespace),
+        user_context=program_ctx)
 
   # Canonicalize away break statements
   node = converter.standard_analysis(node, ctx, is_initial=True)
