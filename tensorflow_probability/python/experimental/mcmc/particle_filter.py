@@ -32,7 +32,7 @@ __all__ = [
     'ess_below_threshold',
     'infer_trajectories',
     'particle_filter',
-    'reconstruct_trajectories',
+    'reconstruct_trajectories'
 ]
 
 
@@ -122,12 +122,20 @@ def ess_below_threshold(unnormalized_log_weights, threshold=0.5):
                       prefer_static.log(threshold))
 
 
-ParticleFilterAccumulatedQuantities = collections.namedtuple(
-    'ParticleFilterAccumulatedQuantities',
-    ['all_resampled_particles',
-     'all_log_weights',
-     'all_parent_indices',
-     'all_step_log_marginal_likelihoods',
+ParticleFilterStepResults = collections.namedtuple(
+    'ParticleFilterStepResults',
+    ['particles',
+     'log_weights',
+     'parent_indices',
+     'step_log_marginal_likelihood'
+    ])
+
+
+ParticleFilterLoopVariables = collections.namedtuple(
+    'ParticleFilterLoopVariables',
+    ['step',
+     'previous_step_results',
+     'accumulated_step_results',
      'state_history'  # Set to `tf.zeros([0])` if not tracked.
     ])
 
@@ -457,36 +465,25 @@ def particle_filter(observations,
         prefer_static.log(num_particles))
 
     # Initialize from the prior, and incorporate the first observation.
-    (initial_resampled_particles,
-     initial_log_weights,
-     initial_parent_indices,
-     initial_step_log_marginal_likelihood) = _filter_one_step(
-         step=0,
-         # `previous_particles` at the first step is a dummy quantity, used only
-         # to convey state structure and num_particles to an optional
-         # proposal fn.
-         previous_particles=prior_fn(0, []).sample(),
-         log_weights=log_uniform_weights,
-         observation=tf.nest.map_structure(
-             lambda x: tf.gather(x, 0), observations),
-         transition_fn=prior_fn,
-         observation_fn=observation_fn,
-         proposal_fn=prior_proposal_fn,
-         resample_criterion_fn=resample_criterion_fn,
-         seed=seed)
-
-    loop_vars = _initialize_accumulated_quantities(
-        initial_resampled_particles,
-        initial_log_weights,
-        initial_parent_indices,
-        initial_step_log_marginal_likelihood,
-        num_steps_state_history_to_pass,
-        num_timesteps)
+    initial_step_results = _filter_one_step(
+        step=0,
+        # `previous_particles` at the first step is a dummy quantity, used only
+        # to convey state structure and num_particles to an optional
+        # proposal fn.
+        previous_particles=prior_fn(0, []).sample(),
+        log_weights=log_uniform_weights,
+        observation=tf.nest.map_structure(
+            lambda x: tf.gather(x, 0), observations),
+        transition_fn=prior_fn,
+        observation_fn=observation_fn,
+        proposal_fn=prior_proposal_fn,
+        resample_criterion_fn=resample_criterion_fn,
+        seed=seed)
 
     def _loop_body(step,
-                   resampled_particles,
-                   log_weights,
-                   accumulated_quantities):
+                   previous_step_results,
+                   accumulated_step_results,
+                   state_history):
       """Take one step in dynamics and accumulate marginal likelihood."""
 
       current_observation = tf.nest.map_structure(
@@ -497,79 +494,48 @@ def particle_filter(observations,
         history_to_pass_into_fns['observation_history'] = _gather_history(
             observations, step, num_steps_observation_history_to_pass)
       if num_steps_state_history_to_pass:
-        history_to_pass_into_fns['state_history'] = (
-            accumulated_quantities.state_history)
+        history_to_pass_into_fns['state_history'] = state_history
 
-      (resampled_particles,
-       log_weights,
-       parent_indices,
-       step_log_marginal_likelihood) = _filter_one_step(
-           step=step,
-           previous_particles=resampled_particles,
-           log_weights=log_weights,
-           observation=current_observation,
-           transition_fn=functools.partial(
-               transition_fn, **history_to_pass_into_fns),
-           observation_fn=functools.partial(
-               observation_fn, **history_to_pass_into_fns),
-           proposal_fn=(
-               None if proposal_fn is None else
-               functools.partial(proposal_fn, **history_to_pass_into_fns)),
-           resample_criterion_fn=resample_criterion_fn,
-           seed=seed)
+      new_step_results = _filter_one_step(
+          step=step,
+          previous_particles=previous_step_results.particles,
+          log_weights=previous_step_results.log_weights,
+          observation=current_observation,
+          transition_fn=functools.partial(
+              transition_fn, **history_to_pass_into_fns),
+          observation_fn=functools.partial(
+              observation_fn, **history_to_pass_into_fns),
+          proposal_fn=(
+              None if proposal_fn is None else
+              functools.partial(proposal_fn, **history_to_pass_into_fns)),
+          resample_criterion_fn=resample_criterion_fn,
+          seed=seed)
 
-      new_accumulated_quantities = _write_accumulated_quantities(
-          step,
-          accumulated_quantities,
-          resampled_particles,
-          log_weights,
-          parent_indices,
-          step_log_marginal_likelihood)
+      return _update_loop_variables(
+          step, new_step_results, accumulated_step_results, state_history)
 
-      return (step + 1,
-              resampled_particles,
-              log_weights,
-              new_accumulated_quantities)
+    loop_results = tf.while_loop(
+        cond=lambda step, *_: step < num_timesteps,
+        body=_loop_body,
+        loop_vars=_initialize_loop_variables(
+            initial_step_results,
+            num_steps_state_history_to_pass,
+            num_timesteps))
 
-    (_,
-     _,
-     _,
-     loop_results) = tf.while_loop(
-         cond=lambda step, *_: step < num_timesteps,
-         body=_loop_body,
-         loop_vars=(1,
-                    initial_resampled_particles,
-                    initial_log_weights,
-                    loop_vars))
-
-    return (tf.nest.map_structure(lambda ta: ta.stack(),
-                                  loop_results.all_resampled_particles),
-            loop_results.all_log_weights.stack(),
-            loop_results.all_parent_indices.stack(),
-            loop_results.all_step_log_marginal_likelihoods.stack())
+    return tf.nest.map_structure(lambda ta: ta.stack(),
+                                 loop_results.accumulated_step_results)
 
 
-def _initialize_accumulated_quantities(initial_resampled_particles,
-                                       initial_log_weights,
-                                       initial_parent_indices,
-                                       initial_step_log_marginal_likelihood,
-                                       num_steps_state_history_to_pass,
-                                       num_timesteps):
+def _initialize_loop_variables(initial_step_results,
+                               num_steps_state_history_to_pass,
+                               num_timesteps):
   """Initialize arrays and other quantities passed through the filter loop."""
 
   # Create arrays to store particles, indices, and likelihoods, and write
   # their initial values.
-  all_resampled_particles = tf.nest.map_structure(
+  step_results_arrays = tf.nest.map_structure(
       lambda x: tf.TensorArray(dtype=x.dtype, size=num_timesteps).write(0, x),
-      initial_resampled_particles)
-  all_log_weights = tf.TensorArray(
-      dtype=initial_log_weights.dtype, size=num_timesteps).write(
-          0, initial_log_weights)
-  all_parent_indices = tf.TensorArray(
-      dtype=tf.int32, size=num_timesteps).write(0, initial_parent_indices)
-  all_step_log_marginal_likelihoods = tf.TensorArray(
-      dtype=initial_step_log_marginal_likelihood.dtype,
-      size=num_timesteps).write(0, initial_step_log_marginal_likelihood)
+      initial_step_results)
 
   # Because `while_loop` requires Tensor values, we'll represent the lack of
   # state history by a static-shape empty Tensor.
@@ -584,66 +550,55 @@ def _initialize_accumulated_quantities(initial_resampled_particles,
             x[tf.newaxis, ...],
             prefer_static.concat([[num_steps_state_history_to_pass],
                                   prefer_static.shape(x)], axis=0)),
-        initial_resampled_particles)
+        initial_step_results.particles)
 
-  return ParticleFilterAccumulatedQuantities(
-      all_resampled_particles=all_resampled_particles,
-      all_log_weights=all_log_weights,
-      all_parent_indices=all_parent_indices,
-      all_step_log_marginal_likelihoods=all_step_log_marginal_likelihoods,
+  return ParticleFilterLoopVariables(
+      step=1,
+      previous_step_results=initial_step_results,
+      accumulated_step_results=step_results_arrays,
       state_history=state_history)
 
 
-def _write_accumulated_quantities(step,
-                                  accumulated_quantities,
-                                  resampled_particles,
-                                  log_weights,
-                                  parent_indices,
-                                  step_log_marginal_likelihood):
+def _update_loop_variables(step,
+                           current_step_results,
+                           accumulated_step_results,
+                           state_history):
   """Update the loop state to reflect a step of filtering."""
 
   # Write particles, indices, and likelihoods to their respective arrays.
-  all_resampled_particles = tf.nest.map_structure(
+  accumulated_step_results = tf.nest.map_structure(
       lambda x, y: x.write(step, y),
-      accumulated_quantities.all_resampled_particles,
-      resampled_particles)
-  all_log_weights = accumulated_quantities.all_log_weights.write(
-      step, log_weights)
-  all_parent_indices = accumulated_quantities.all_parent_indices.write(
-      step, parent_indices)
-  all_step_log_marginal_likelihoods = (
-      accumulated_quantities.all_step_log_marginal_likelihoods.write(
-          step, step_log_marginal_likelihood))
+      accumulated_step_results, current_step_results)
 
-  state_history = accumulated_quantities.state_history
   history_is_empty = (tf.is_tensor(state_history) and
                       state_history.shape[0] == 0)
   if not history_is_empty:
-    batch_shape = prefer_static.shape(parent_indices)[1:-1]
+    batch_shape = prefer_static.shape(
+        current_step_results.parent_indices)[1:-1]
     batch_rank = prefer_static.rank_from_shape(batch_shape)
 
     # Permute the particles from previous steps to match the current resampled
     # indices, so that the state history reflects coherent trajectories.
     def update_state_history_to_use_current_indices(x):
       return tf.gather(x[-1:],
-                       parent_indices,
+                       current_step_results.parent_indices,
                        axis=batch_rank + 1,
                        batch_dims=batch_rank)
     resampled_state_history = tf.nest.map_structure(
         update_state_history_to_use_current_indices,
-        accumulated_quantities.state_history)
+        state_history)
 
     # Update the history by concat'ing the carried-forward elements with the
     # most recent state.
     state_history = tf.nest.map_structure(
         lambda h, s: tf.concat([h, s[tf.newaxis, ...]], axis=0),
-        resampled_state_history, resampled_particles)
+        resampled_state_history,
+        current_step_results.particles)
 
-  return ParticleFilterAccumulatedQuantities(
-      all_resampled_particles=all_resampled_particles,
-      all_log_weights=all_log_weights,
-      all_parent_indices=all_parent_indices,
-      all_step_log_marginal_likelihoods=all_step_log_marginal_likelihoods,
+  return ParticleFilterLoopVariables(
+      step=step + 1,
+      previous_step_results=current_step_results,
+      accumulated_step_results=accumulated_step_results,
       state_history=state_history)
 
 
@@ -704,10 +659,11 @@ def _filter_one_step(step,
          (resampled_particles, resample_indices, uniform_weights),
          (proposed_particles, dummy_indices, log_weights))
 
-  return (resampled_particles,
-          log_weights,
-          resample_indices,
-          step_log_marginal_likelihood)
+  return ParticleFilterStepResults(
+      particles=resampled_particles,
+      log_weights=log_weights,
+      parent_indices=resample_indices,
+      step_log_marginal_likelihood=step_log_marginal_likelihood)
 
 
 def _propose_with_log_weights(step,
