@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.internal import assert_util
@@ -32,7 +33,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math.random_ops import random_rademacher
 
 
 _binomial_sample_note = """
@@ -157,7 +157,7 @@ def _log_concave_rejection_sampler(
 
     unsigned_offsets = tf.where(on_top_mask, top_offsets, exponential_offsets)
     offsets = tf.round(
-        random_rademacher(
+        tfp_math.random_rademacher(
             mode_shape, seed=random_rademacher_seed, dtype=dtype) *
         unsigned_offsets)
 
@@ -333,9 +333,11 @@ class Binomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _log_prob(self, counts):
-    logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
-    unnorm = _log_unnormalized_prob(logits, counts, total_count)
+    if self._logits is not None:
+      unnorm = _log_unnormalized_prob_logits(self._logits, counts, total_count)
+    else:
+      unnorm = _log_unnormalized_prob_probs(self._probs, counts, total_count)
     norm = _log_normalization(counts, total_count)
     return unnorm - norm
 
@@ -445,16 +447,25 @@ class Binomial(distribution.Distribution):
     return assertions
 
 
-def _log_unnormalized_prob(logits, counts, total_count):
-  """Log unnormalized probability."""
+def _log_unnormalized_prob_logits(logits, counts, total_count):
+  """Log unnormalized probability from logits."""
+  logits = tf.convert_to_tensor(logits)
   return (-tf.math.multiply_no_nan(tf.math.softplus(-logits), counts) -
           tf.math.multiply_no_nan(
               tf.math.softplus(logits), total_count - counts))
 
 
+def _log_unnormalized_prob_probs(probs, counts, total_count):
+  """Log unnormalized probability from probs."""
+  probs = tf.convert_to_tensor(probs)
+  return (tf.math.multiply_no_nan(tf.math.log(probs), counts) +
+          tf.math.multiply_no_nan(
+              tf.math.log1p(-probs), total_count - counts))
+
+
 def _log_normalization(counts, total_count):
-  return (tf.math.lgamma(1. + total_count - counts) +
-          tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + total_count))
+  return (tfp_math.lbeta(1. + counts, 1. + total_count - counts) +
+          tf.math.log(1. + total_count))
 
 
 def _maybe_broadcast(a, b):

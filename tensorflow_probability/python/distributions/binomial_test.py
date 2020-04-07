@@ -319,6 +319,33 @@ class BinomialTest(test_util.TestCase):
          total_count * probs))
     self.assertAllEqual(samples, expected_samples)
 
+  def testSampleWithLargeCountAndSmallProbs(self):
+    total_count = tf.constant(1e6, dtype=tf.float32)
+    probs = tf.constant(1e-6, dtype=tf.float32)
+    dist = tfd.Binomial(total_count=total_count,
+                        probs=probs, validate_args=True)
+    small_probs = self.evaluate(dist.prob([0., 1., 2.]))
+    # Approximate analytic probabilities for very small counts for this
+    # binomial:
+    # - p(0) = (1 - 1e-6)**1e6 \approx 1/e
+    # - p(1) = p(0) * 1e6 * 1e-6 * 1/(1 - 1e-6)
+    #        \approx 1/e * 1/(1 - 1e-6) \approx 1/e
+    # - p(2) = p(0) * 1e6**2 * choose(2, 1e6) / (1 - 1e-6)**2
+    #        \approx 1/e * 1e6 * 1/(1e6 - 1) * 1/2 * 1/(1 - 1e-6)**2
+    #        \approx 1/(2*e)
+    expected_probs = [np.exp(-1.), np.exp(-1.), np.exp(-1.) / 2.]
+    self.assertAllClose(small_probs, expected_probs)
+    small_log_probs = self.evaluate(dist.log_prob([0., 1., 2.]))
+    expected_log_probs = [-1., -1., -1. - np.log(2)]
+    self.assertAllClose(small_log_probs, expected_log_probs, rtol=5e-6)
+
+    n = 1000
+    sample_avg = self.evaluate(
+        tf.reduce_mean(dist.sample(n, seed=test_util.test_seed())))
+    # `sample_avg` has mean 1 and variance ~1/n.  So `sample_avg` should be
+    # within `4.9 / sqrt(n)` of 1 with probability `1 - 1e-6`.
+    self.assertAllClose(sample_avg, 1., atol=4.9/np.sqrt(n))
+
   def testSampleWithZeroCountsAndNanSuccessProbability(self):
     # With zero counts, should sample 0 successes even if success probability is
     # nan; and should not interfere with the rest of the batch.
