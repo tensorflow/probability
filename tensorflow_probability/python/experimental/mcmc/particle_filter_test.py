@@ -148,6 +148,22 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllEqual([num_timesteps] + batch_shape + [num_particles],
                         trajectories['velocity'].shape)
 
+    # Verify that `infer_trajectories` also works on batches.
+    trajectories, step_log_marginal_likelihoods = self.evaluate(
+        tfp.experimental.mcmc.infer_trajectories(
+            observations=observed_positions,
+            initial_state_prior=initial_state_prior,
+            transition_fn=transition_fn,
+            observation_fn=observation_fn,
+            num_particles=num_particles,
+            seed=test_util.test_seed()))
+    self.assertAllEqual([num_timesteps] + batch_shape + [num_particles],
+                        trajectories['position'].shape)
+    self.assertAllEqual([num_timesteps] + batch_shape + [num_particles],
+                        trajectories['velocity'].shape)
+    self.assertAllEqual(step_log_marginal_likelihoods.shape,
+                        [num_timesteps] + batch_shape)
+
   def test_reconstruct_trajectories_toy_example(self):
     particles = tf.convert_to_tensor([[1, 2, 3], [4, 5, 6,], [7, 8, 9]])
     # 1  --  4  -- 7

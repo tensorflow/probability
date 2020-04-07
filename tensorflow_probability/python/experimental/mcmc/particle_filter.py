@@ -364,12 +364,15 @@ def infer_trajectories(observations,
     final_log_weights = log_weights[-1, ...]
     batch_rank = prefer_static.rank_from_shape(
         prefer_static.shape(final_log_weights)[:-1])
-    resample_indices = dist_util.move_dimension(
+    final_indices = dist_util.move_dimension(
         categorical.Categorical(final_log_weights).sample(
-            num_particles, seed=seed), 0, -1)
+            num_particles, seed=seed), source_idx=0, dest_idx=-1)
+    final_indices_tiled_over_time = tf.broadcast_to(
+        final_indices, prefer_static.shape(parent_indices))
     trajectories = tf.nest.map_structure(
         lambda x: tf.gather(  # pylint: disable=g-long-lambda
-            x, resample_indices, axis=batch_rank + 1, batch_dims=batch_rank),
+            x, final_indices_tiled_over_time,
+            axis=batch_rank + 1, batch_dims=batch_rank + 1),
         weighted_trajectories)
 
     return trajectories, step_log_marginal_likelihoods
