@@ -1251,5 +1251,30 @@ class _HiddenMarkovModelAssertionTest(
           transition_matrix.assign(transition_matrix_data2)]):
         self.evaluate(model.mean())
 
+  def test_github_issue_854(self):
+    nstates = 3
+    data = np.random.randint(low=0, high=10, size=(5, 7, 11))
+    p_init = tfd.Categorical(probs=np.ones(nstates) / nstates)
+    pswitch = 0.05
+    pt = pswitch / (nstates - 1) * np.ones([nstates, nstates], dtype=np.float32)
+    np.fill_diagonal(pt, 1 - pswitch)
+    p_trans = tfd.Categorical(probs=pt)
+    # prior on NB probability
+    p_nb = self.evaluate(tfd.Beta(2, 5).sample([nstates, data.shape[-1]],
+                                               seed=test_util.test_seed()))
+    p_emission = tfd.Independent(tfd.NegativeBinomial(1, probs=p_nb),
+                                 reinterpreted_batch_ndims=1)
+    hmm = tfd.HiddenMarkovModel(
+        initial_distribution=p_init,
+        transition_distribution=p_trans,
+        observation_distribution=p_emission,
+        num_steps=data.shape[-2])
+
+    self.assertAllEqual(data.shape[-2:],
+                        tf.shape(hmm.sample(seed=test_util.test_seed())))
+    self.assertAllEqual(data.shape[:1],
+                        tf.shape(hmm.log_prob(data)))
+
+
 if __name__ == '__main__':
   tf.test.main()

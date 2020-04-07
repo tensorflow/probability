@@ -428,11 +428,13 @@ class HiddenMarkovModel(distribution.Distribution):
 
     # Move index into sequence of observations to front so we can apply
     # tf.foldl
-    working_obs = distribution_util.move_dimension(working_obs, -1 - r,
-                                                   0)[..., tf.newaxis]
+    working_obs = distribution_util.move_dimension(working_obs, -1 - r, 0)
     # working_obs :: num_steps batch_shape underlying_event_shape
-    observation_probs = (
-        observation_distribution.log_prob(working_obs))
+    working_obs = tf.expand_dims(working_obs, -1 - r)
+    # working_obs :: num_steps batch_shape 1 underlying_event_shape
+
+    observation_probs = observation_distribution.log_prob(working_obs)
+    # observation_probs :: num_steps batch_shape num_states
 
     def forward_step(log_prev_step, log_prob_observation):
       return _log_vector_matrix(log_prev_step,
