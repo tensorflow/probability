@@ -192,12 +192,12 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
 
     # Compare the SMC posterior with the result from a calibrated HMC.
     self.assertAllClose(tf.reduce_mean(b0), 0.016, atol=0.005, rtol=0.005)
-    self.assertAllClose(tf.reduce_mean(b1), 1.245, atol=0.005, rtol=0.005)
+    self.assertAllClose(tf.reduce_mean(b1), 1.245, atol=0.005, rtol=0.035)
     self.assertAllClose(tf.reduce_mean(weight), 0.27, atol=0.01, rtol=0.01)
     self.assertAllClose(tf.reduce_mean(mu_out), 0.13, atol=0.2, rtol=0.2)
     self.assertAllClose(tf.reduce_mean(sigma_out), 0.46, atol=0.5, rtol=0.5)
 
-    self.assertAllClose(tf.math.reduce_std(b0), 0.031, atol=0.005, rtol=0.005)
+    self.assertAllClose(tf.math.reduce_std(b0), 0.031, atol=0.015, rtol=0.3)
     self.assertAllClose(tf.math.reduce_std(b1), 0.068, atol=0.1, rtol=0.1)
     self.assertAllClose(tf.math.reduce_std(weight), 0.1, atol=0.1, rtol=0.1)
 
