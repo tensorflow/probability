@@ -20,9 +20,41 @@ from __future__ import print_function
 
 import functools
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
+
+def _lock_in_non_vectorized_args(fn, arg_structure, flat_core_ndims, flat_args):
+  """Wraps `fn` to take only those args with non-`None` core ndims."""
+
+  # Extract the indices and values of args where core_ndims is not `None`.
+  (vectorized_arg_indices,
+   vectorized_arg_core_ndims,
+   vectorized_args) = [], [], []
+  if any(nd is not None for nd in flat_core_ndims):
+    vectorized_arg_indices, vectorized_arg_core_ndims, vectorized_args = zip(*[
+        (i, nd, tf.convert_to_tensor(t))
+        for i, (nd, t) in enumerate(zip(flat_core_ndims, flat_args))
+        if nd is not None])
+
+  vectorized_arg_index_set = set(vectorized_arg_indices)
+
+  def fn_of_vectorized_args(vectorized_args):
+    vectorized_args_by_index = dict(
+        zip(vectorized_arg_indices, vectorized_args))
+    # Substitute the vectorized args into the original argument
+    # structure.
+    new_args_with_original_structure = nest.pack_sequence_as(
+        arg_structure, [vectorized_args_by_index[i]
+                        if i in vectorized_arg_index_set
+                        else v for (i, v) in enumerate(flat_args)])
+    return fn(*new_args_with_original_structure)
+
+  return (vectorized_arg_core_ndims,
+          vectorized_args,
+          fn_of_vectorized_args)
 
 
 # TODO(b/145252136): merge `make_rank_polymorphic` into core TensorFlow.
@@ -31,10 +63,15 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
 
   Args:
     fn: Python `callable` `result = fn(*args)` where all arguments
-      and the returned result(s) are (structures of) Tensors.
-    core_ndims: structure matching `args` of `int` Tensors, containing the
-      expected rank of each argument in an unvectorized call to `fn`. May
-      alternately be a single scalar Tensor `int` applicable to all `args`.
+      and the returned result(s) are (structures of) Tensors. Non-`Tensor`
+      arguments may also be passed through by specifying a value of `None`
+      in `core_ndims`.
+    core_ndims: structure of `int` Tensors and/or `None` values, of the same
+      structure as `args`. Each `int` contains the
+      expected rank of the corresponding `Tensor` argument in an unvectorized
+      call to `fn`; `None` values denote arguments that should not be vectorized
+      (e.g., non-`Tensor` arguments). May alternately be a single scalar
+      Tensor `int` applicable to all `args`.
     validate_args: whether to add runtime checks.
       Default value: `False`.
     name: Python `str` name prefixed to ops created by `vectorized_fn`.
@@ -59,6 +96,26 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
   add_vector_to_scalar = make_rank_polymorphic(add, core_ndims=(1, 0))
   add_vector_to_scalar(tf.constant([1., 2.]), tf.constant([3., 4., 5.]))
     # ==> Returns [[4., 5.], [5., 6.], [6., 7.]]
+  ```
+
+  Lifted functions may accept non-`Tensor` args, denoted by `None` values in
+  `core_ndims`. These values will be passed unmodified to the underlying
+  function. For example, we could generalize `add` above to take an
+  arbitrary binary operation, specified as a Python callable.
+
+  ```python
+  import operator
+  def apply_binop(fn, a, b):
+    return fn(a, b)
+  apply_binop(operator.mul, tf.constant([1., 2.]), tf.constant(3.))
+    # ==> Returns [3., 6.]
+
+  # Batching, we pass the `fn` arg by specifying `core_ndims` of `None`.
+  apply_binop_to_vector_and_scalar = make_rank_polymorphic(
+    apply_binop, core_ndims=(None, 1, 0))
+  apply_binop_to_vector_and_scalar(
+    operator.mul, tf.constant([1., 2.]), tf.constant([3., 4., 5.]))
+    # ==> Returns [[3., 6.], [4., 8.], [5., 10.]]
   ```
 
   #### Limitations
@@ -109,13 +166,19 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
       # Build flat lists of all argument parts and their corresponding core
       # ndims.
       flat_core_ndims = nest.flatten(core_ndims_structure)
-      parts = tf.nest.flatten(nest.map_structure_up_to(
-          core_ndims_structure, tf.convert_to_tensor, args, check_types=False))
-      if len(parts) != len(flat_core_ndims):
-        raise ValueError('Number of args does not match `core_ndims` '
-                         '({} vs {}). Saw argument parts {}; core '
-                         'ndims {}.'.format(len(parts), len(flat_core_ndims),
-                                            parts, flat_core_ndims))
+      flat_args = nest.flatten_up_to(
+          core_ndims_structure, args, check_types=False)
+
+      # Filter to only the `Tensor`-valued args (taken to be those with `None`
+      # values for `core_ndims`). Other args will be passed through to `fn`
+      # unmodified.
+      (vectorized_arg_core_ndims,
+       vectorized_args,
+       fn_of_vectorized_args) = _lock_in_non_vectorized_args(
+           fn,
+           arg_structure=core_ndims_structure,
+           flat_core_ndims=flat_core_ndims,
+           flat_args=flat_args)
 
       # `vectorized_map` requires all inputs to have a single, common batch
       # dimension `[n]`. So we broadcast all input parts to a common
@@ -123,20 +186,23 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
 
       # First, compute how many 'extra' (batch) ndims each part has. This must
       # be nonnegative.
-      part_shapes = [tf.shape(part) for part in parts]
+      vectorized_arg_shapes = [tf.shape(arg) for arg in vectorized_args]
       batch_ndims = [
-          prefer_static.rank_from_shape(part_shape) - nd
-          for (part_shape, nd) in zip(part_shapes, flat_core_ndims)]
+          prefer_static.rank_from_shape(arg_shape) - nd
+          for (arg_shape, nd) in zip(
+              vectorized_arg_shapes, vectorized_arg_core_ndims)]
       static_ndims = [tf.get_static_value(nd) for nd in batch_ndims]
       if any([nd and nd < 0 for nd in static_ndims]):
         raise ValueError('Cannot broadcast a Tensor having lower rank than the '
                          'specified `core_ndims`! (saw input ranks {}, '
                          '`core_ndims` {}).'.format(
                              tf.nest.map_structure(
-                                 prefer_static.rank_from_shape, part_shapes),
-                             flat_core_ndims))
+                                 prefer_static.rank_from_shape,
+                                 vectorized_arg_shapes),
+                             vectorized_arg_core_ndims))
       if validate_args:
-        for nd, part, core_nd in zip(batch_ndims, parts, flat_core_ndims):
+        for nd, part, core_nd in zip(
+            batch_ndims, vectorized_args, vectorized_arg_core_ndims):
           assertions.append(tf.debugging.assert_non_negative(
               nd, message='Cannot broadcast a Tensor having lower rank than '
               'the specified `core_ndims`! (saw {} vs minimum rank {}).'.format(
@@ -145,11 +211,14 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
       # Next, split each part's shape into batch and core shapes, and
       # broadcast the batch shapes.
       with tf.control_dependencies(assertions):
-        batch_shapes, core_shapes = zip(*[
-            (part_shape[:nd], part_shape[nd:])
-            for (part_shape, nd) in zip(part_shapes, batch_ndims)])
-        broadcast_batch_shape = functools.reduce(
-            prefer_static.broadcast_shape, batch_shapes, [])
+        empty_shape = np.zeros([0], dtype=np.int32)
+        batch_shapes, core_shapes = empty_shape, empty_shape
+        if vectorized_arg_shapes:
+          batch_shapes, core_shapes = zip(*[
+              (arg_shape[:nd], arg_shape[nd:])
+              for (arg_shape, nd) in zip(vectorized_arg_shapes, batch_ndims)])
+        broadcast_batch_shape = (
+            functools.reduce(prefer_static.broadcast_shape, batch_shapes, []))
 
       # Flatten all of the batch dimensions into one.
       n = tf.cast(prefer_static.reduce_prod(broadcast_batch_shape), tf.int32)
@@ -161,25 +230,22 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
         # into the single leading dimension `[n]`.
         # TODO(b/145227909): If/when vmap supports broadcasting, use nested vmap
         # when batch rank is static so that we can exploit broadcasting.
-        broadcast_parts = [
-            tf.broadcast_to(part, prefer_static.concat([broadcast_batch_shape,
-                                                        core_shape], axis=0))
-            for (part, core_shape) in zip(parts, core_shapes)]
-        parts_with_flattened_batch_dim = [
+        broadcast_vectorized_args = [
+            tf.broadcast_to(part, prefer_static.concat(
+                [broadcast_batch_shape, core_shape], axis=0))
+            for (part, core_shape) in zip(vectorized_args, core_shapes)]
+        vectorized_args_with_flattened_batch_dim = [
             tf.reshape(part, prefer_static.concat([[n], core_shape], axis=0))
-            for (part, core_shape) in zip(broadcast_parts, core_shapes)]
+            for (part, core_shape) in zip(
+                broadcast_vectorized_args, core_shapes)]
+        batched_result = tf.vectorized_map(
+            fn_of_vectorized_args, vectorized_args_with_flattened_batch_dim)
 
-        # Run the vectorized computation
-        batched_result = tf.vectorized_map(lambda args: fn(*args),
-                                           nest.pack_sequence_as(
-                                               args,
-                                               parts_with_flattened_batch_dim))
-
-        # Unflatten the result
+        # Unflatten any `Tensor`s in the result.
+        unflatten = lambda x: tf.reshape(x, prefer_static.concat([  # pylint: disable=g-long-lambda
+            broadcast_batch_shape, prefer_static.shape(x)[1:]], axis=0))
         result = nest.map_structure(
-            lambda x: tf.reshape(x, prefer_static.concat([  # pylint: disable=g-long-lambda
-                broadcast_batch_shape, prefer_static.shape(x)[1:]], axis=0)),
-            batched_result)
+            lambda x: unflatten(x) if tf.is_tensor(x) else x, batched_result)
     return result
 
   return vectorized_fn

@@ -118,5 +118,33 @@ class VectorizationTest(test_util.TestCase):
             self.maybe_static(tf.zeros([5]), is_static=False),
             self.maybe_static(tf.zeros([2, 1, 5]), is_static=False)))
 
+  def test_can_escape_vectorization_with_none_ndims(self):
+
+    # Suppose the original fn supports `None` as an input.
+    fn = lambda x, y: (tf.reduce_sum(x, axis=0), y[0] if y is not None else y)
+
+    polymorphic_fn = vectorization_util.make_rank_polymorphic(
+        fn, core_ndims=[1, None])
+    rx, ry = polymorphic_fn([[1., 2., 4.], [3., 5., 7.]], None)
+    self.assertAllEqual(rx.shape, [2])
+    self.assertIsNone(ry)
+
+    single_arg_polymorphic_fn = vectorization_util.make_rank_polymorphic(
+        lambda y: fn(tf.convert_to_tensor([1., 2., 3.]), y), core_ndims=None)
+    rx, ry = self.evaluate(single_arg_polymorphic_fn(
+        tf.convert_to_tensor([[1., 3.], [2., 4.]])))
+    self.assertAllEqual(ry, [1., 3.])
+
+  def test_docstring_example_passing_fn_arg(self):
+    def apply_binop(fn, a, b):
+      return fn(a, b)
+    apply_binop_to_vector_and_scalar = vectorization_util.make_rank_polymorphic(
+        apply_binop, core_ndims=(None, 1, 0))
+    r = self.evaluate(apply_binop_to_vector_and_scalar(
+        lambda a, b: a * b, tf.constant([1., 2.]), tf.constant([3., 4., 5.])))
+    self.assertAllEqual(r, np.array(
+        [[3., 6.], [4., 8.], [5., 10.]], dtype=np.float32))
+
+
 if __name__ == '__main__':
   tf.test.main()

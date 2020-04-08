@@ -316,7 +316,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "vectorization_util",
     srcs = ["vectorization_util.py"],
     srcs_version = "PY2AND3",
@@ -411,10 +411,12 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "vectorization_util_test",
     size = "small",
     srcs = ["vectorization_util_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         ":test_util",
         ":vectorization_util",
