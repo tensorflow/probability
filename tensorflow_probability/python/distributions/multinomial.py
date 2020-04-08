@@ -258,10 +258,10 @@ class Multinomial(distribution.Distribution):
     log_p = (
         tf.math.log(self._probs)
         if self._logits is None else tf.math.log_softmax(self._logits))
-    return (
-        tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
-        tfp_math.log_combinations(
-            self.total_count, counts))  # -log_normalization
+    log_unnorm_prob = tf.reduce_sum(
+        tf.math.multiply_no_nan(log_p, counts), axis=-1)
+    neg_log_normalizer = tfp_math.log_combinations(self.total_count, counts)
+    return log_unnorm_prob + neg_log_normalizer
 
   def _mean(self):
     p = self._probs_parameter_no_checks()

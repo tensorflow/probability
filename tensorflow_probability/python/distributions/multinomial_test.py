@@ -198,6 +198,12 @@ class MultinomialTest(test_util.TestCase):
     self.evaluate(pmf)
     self.assertEqual((4, 3), pmf.shape)
 
+  def testPmfZeros(self):
+    dist = tfd.Multinomial(1000, probs=[0.7, 0.0, 0.3], validate_args=True)
+    x = [489, 0, 511]
+    dist2 = tfd.Binomial(1000, probs=0.7)
+    self.assertAllClose(dist2.log_prob(x[0]), dist.log_prob(x), rtol=1e-5)
+
   def testMultinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]

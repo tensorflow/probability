@@ -44,14 +44,16 @@ __all__ = [
 
 
 def log_combinations(n, counts, name='log_combinations'):
-  """Multinomial coefficient.
+  """Log multinomial coefficient.
 
-  Given `n` and `counts`, where `counts` has last dimension `k`, we compute
+  Given `n` and `counts`, where `counts` has last dimension `k`, we define
   the multinomial coefficient as:
 
-  ```n! / sum_i n_i!```
+  ```n! / prod_i n_i!```
 
   where `i` runs over all `k` classes.
+
+  This function computes the natural logarithm of the multinomial coefficient.
 
   Args:
     n: Floating-point `Tensor` broadcastable with `counts`. This represents `n`
@@ -61,8 +63,8 @@ def log_combinations(n, counts, name='log_combinations'):
     name: A name for this operation (optional).
 
   Returns:
-    log_combinations: `Tensor` representing the multinomial coefficient between
-      `n` and `counts`.
+    log_combinations: `Tensor` representing the log of the multinomial
+      coefficient between `n` and `counts`.
   """
   # First a bit about the number of ways counts could have come in:
   # E.g. if counts = [1, 2], then this is 3 choose 2.
