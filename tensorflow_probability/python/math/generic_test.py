@@ -447,6 +447,12 @@ class LogCoshTest(test_util.TestCase):
     self.assertAllClose(
         np.log(np.cosh(x)), self.evaluate(tfp.math.log_cosh(x)))
 
+  @test_util.numpy_disable_gradient_test
+  def testLogCoshGrad(self):
+    x = np.linspace(-30., 30., 100)
+    err = self.compute_max_gradient_error(tfp.math.log_cosh, [x])
+    self.assertLess(err, 1e-6)
+
 
 @test_util.test_all_tf_execution_regimes
 class Smootherstep(test_util.TestCase):

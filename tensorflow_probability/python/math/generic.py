@@ -474,6 +474,7 @@ def log1mexp(x, name=None):
         tf.math.log1p(-tf.math.exp(-x)))
 
 
+@tf.custom_gradient
 def log_cosh(x, name=None):
   """Compute `log(cosh(x))` in a numerically stable way.
 
@@ -504,14 +505,20 @@ def log_cosh(x, name=None):
     dtype = dtype_util.common_dtype([x], dtype_hint=tf.float32)
     numpy_dtype = dtype_util.as_numpy_dtype(dtype)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
-    x = tf.math.abs(x)
-    logcosh = x + tf.math.softplus(-2 * x) - np.log(2).astype(numpy_dtype)
+    abs_x = tf.math.abs(x)
+    logcosh = abs_x + tf.math.softplus(-2 * abs_x) - np.log(2).astype(
+        numpy_dtype)
     bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
-    return tf.where(
-        x <= bound,
+    answer = tf.where(
+        abs_x <= bound,
         tf.math.exp(
-            tf.math.log(x) + tf.math.log1p(-tf.square(x) / 6.)),
+            tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
         logcosh)
+
+    # The gradient of log(cosh(x)) is tanh(x)
+    def grad(dy):
+      return dy * tf.math.tanh(x)
+    return answer, grad
 
 
 def soft_sorting_matrix(x, temperature, name=None):
