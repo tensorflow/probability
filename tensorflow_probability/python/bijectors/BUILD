@@ -676,7 +676,6 @@ multi_substrate_py_library(
     srcs = ["sinh.py"],
     deps = [
         ":bijector",
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/math",
     ],
