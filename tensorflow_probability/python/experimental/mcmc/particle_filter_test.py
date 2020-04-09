@@ -481,8 +481,74 @@ class _ParticleFilterTest(test_util.TestCase):
         transition_fn=dummy_transition_fn,
         observation_fn=autoregressive_observation_fn,
         num_particles=2,
-        num_steps_observation_history_to_pass=len(weights)))
+        num_steps_observation_history_to_pass=len(weights),
+        seed=test_util.test_seed()))
     self.assertAllClose(expected_lps, lps)
+
+  def test_proposal_weights_dont_affect_marginal_likelihood(self):
+    observation = np.array([-1.3, 0.7]).astype(self.dtype)
+    # This particle filter has proposals different from the dynamics,
+    # so internally it will use proposal weights in addition to observation
+    # weights. It should still get the observation likelihood correct.
+    _, lps = self.evaluate(tfp.experimental.mcmc.infer_trajectories(
+        observation,
+        initial_state_prior=tfd.Normal(loc=0., scale=1.),
+        transition_fn=lambda _, x: tfd.Normal(loc=x, scale=1.),
+        observation_fn=lambda _, x: tfd.Normal(loc=x, scale=1.),
+        initial_state_proposal=tfd.Normal(loc=0., scale=5.),
+        proposal_fn=lambda _, x: tfd.Normal(loc=x, scale=5.),
+        num_particles=1024,
+        seed=test_util.test_seed()))
+
+    # Compare marginal likelihood against that
+    # from the true (jointly normal) marginal distribution.
+    y1_marginal_dist = tfd.Normal(loc=0., scale=np.sqrt(1. + 1.))
+    y2_conditional_dist = (
+        lambda y1: tfd.Normal(loc=y1 / 2., scale=np.sqrt(5. / 2.)))
+    true_lps = [y1_marginal_dist.log_prob(observation[0]),
+                y2_conditional_dist(observation[0]).log_prob(observation[1])]
+    # The following line passes at atol = 0.01 if num_particles = 32768.
+    self.assertAllClose(true_lps, lps, atol=0.1)
+
+  def test_can_step_dynamics_faster_than_observations(self):
+    initial_state_prior = tfd.JointDistributionNamed({
+        'position': tfd.Deterministic(1.),
+        'velocity': tfd.Deterministic(0.)
+    })
+
+    # Use 100 steps between observations to integrate a simple harmonic
+    # oscillator.
+    dt = 0.01
+    def simple_harmonic_motion_transition_fn(_, state):
+      return tfd.JointDistributionNamed({
+          'position': tfd.Normal(
+              loc=state['position'] + dt * state['velocity'], scale=dt*0.01),
+          'velocity': tfd.Normal(
+              loc=state['velocity'] - dt * state['position'], scale=dt*0.01)
+      })
+
+    def observe_position(_, state):
+      return tfd.Normal(loc=state['position'], scale=0.01)
+
+    particles, _, _, lps = self.evaluate(tfp.experimental.mcmc.particle_filter(
+        # 'Observing' the values we'd expect from a proper integrator should
+        # give high likelihood if our discrete approximation is good.
+        observations=tf.convert_to_tensor([tf.math.cos(0.),
+                                           tf.math.cos(1.)]),
+        initial_state_prior=initial_state_prior,
+        transition_fn=simple_harmonic_motion_transition_fn,
+        observation_fn=observe_position,
+        num_particles=1024,
+        num_transitions_per_observation=100,
+        seed=test_util.test_seed()))
+
+    self.assertLen(particles['position'], 101)
+    self.assertAllClose(np.mean(particles['position'], axis=-1),
+                        tf.math.cos(dt * np.arange(101)),
+                        atol=0.04)
+    self.assertLen(lps, 2)
+    self.assertGreater(lps[0], 3.)
+    self.assertGreater(lps[1], 3.)
 
 
 class ParticleFilterTestFloat32(_ParticleFilterTest):

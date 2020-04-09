@@ -195,8 +195,8 @@ particle_filter_arg_str = """
 
   Args:
     observations: a (structure of) Tensors, each of shape
-      `concat([[num_timesteps, b1, ..., bN], event_shape])` with optional
-      batch dimensions `b1, ..., bN`.
+      `concat([[num_observation_steps, b1, ..., bN], event_shape])` with
+      optional batch dimensions `b1, ..., bN`.
     initial_state_prior: a (joint) distribution over the initial latent state,
       with optional batch shape `[b1, ..., bN]`.
     transition_fn: callable returning a (joint) distribution over the next
@@ -230,15 +230,23 @@ particle_filter_arg_str = """
       `p(x[t] | y[t], x[t-1])` at each step `t`, and `transition_kernel`
       should be an instance of `tfp.mcmc.TransitionKernel`.
       Default value: `None`.  # TODO(davmre): not yet supported.
-    num_steps_state_history_to_pass: Python `int` number of steps to
+    num_transitions_per_observation: scalar Tensor positive `int` number of
+      state transitions between regular observation points. A value of `1`
+      indicates that there is an observation at every timestep,
+      `2` that every other step is observed, and so on. Values greater than `1`
+      may be used with an appropriately-chosen transition function to
+      approximate continuous-time dynamics. The initial and final steps
+      (steps `0` and `num_timesteps - 1`) are always observed.
+      Default value: `None`.
+    num_steps_state_history_to_pass: scalar Python `int` number of steps to
       include in the optional `state_history` argument to `transition_fn`,
       `observation_fn`, and `proposal_fn`. If `None`, this argument
       will not be passed.
       Default value: `None`.
-    num_steps_observation_history_to_pass: Python `int` number of steps to
-      include in the optional `observation_history` argument to `transition_fn`,
-      `observation_fn`, and `proposal_fn`. If `None`, this argument
-      will not be passed.
+    num_steps_observation_history_to_pass: scalar Python `int` number of steps
+      to include in the optional `observation_history` argument to
+      `transition_fn`, `observation_fn`, and `proposal_fn`. If `None`, this
+      argument will not be passed.
       Default value: `None`.
     seed: Python `int` seed for random ops.
     name: Python `str` name for ops created by this method.
@@ -284,6 +292,7 @@ def infer_trajectories(observations,
                        proposal_fn=None,
                        resample_criterion_fn=ess_below_threshold,
                        rejuvenation_kernel_fn=None,
+                       num_transitions_per_observation=1,
                        num_steps_state_history_to_pass=None,
                        num_steps_observation_history_to_pass=None,
                        seed=None,
@@ -298,7 +307,7 @@ def infer_trajectories(observations,
       representing unbiased samples from the posterior distribution
       `p(latent_states | observations)`.
     step_log_marginal_likelihoods: float `Tensor` of shape
-      `[num_timesteps, b1, ..., bN]`,
+      `[num_observation_steps, b1, ..., bN]`,
       giving the natural logarithm of an unbiased estimate of
       `p(observations[t] | observations[:t])` at each timestep `t`. Note that
       (by [Jensen's inequality](
@@ -402,6 +411,7 @@ def infer_trajectories(observations,
          proposal_fn=proposal_fn,
          resample_criterion_fn=resample_criterion_fn,
          rejuvenation_kernel_fn=rejuvenation_kernel_fn,
+         num_transitions_per_observation=num_transitions_per_observation,
          num_steps_state_history_to_pass=num_steps_state_history_to_pass,
          num_steps_observation_history_to_pass=(
              num_steps_observation_history_to_pass),
@@ -434,6 +444,7 @@ def particle_filter(observations,
                     proposal_fn=None,
                     resample_criterion_fn=ess_below_threshold,
                     rejuvenation_kernel_fn=None,  # TODO(davmre): not yet supported. pylint: disable=unused-argument
+                    num_transitions_per_observation=1,
                     num_steps_state_history_to_pass=None,
                     num_steps_observation_history_to_pass=None,
                     seed=None,
@@ -469,10 +480,10 @@ def particle_filter(observations,
       from. See also
       `tfp.experimental.mcmc.reconstruct_trajectories`.
     step_log_marginal_likelihoods: float `Tensor` of shape
-      `[num_timesteps, b1, ..., bN]`,
+      `[num_observation_steps, b1, ..., bN]`,
       giving the natural logarithm of an unbiased estimate of
-      `p(observations[t] | observations[:t])` at each timestep `t`. Note that (
-      by [Jensen's inequality](
+      `p(observations[t] | observations[:t])` at each observed timestep `t`.
+      Note that (by [Jensen's inequality](
       https://en.wikipedia.org/wiki/Jensen%27s_inequality))
       this is *smaller* in expectation than the true
       `log p(observations[t] | observations[:t])`.
@@ -481,8 +492,10 @@ def particle_filter(observations,
   """
   seed = SeedStream(seed, 'particle_filter')
   with tf.name_scope(name or 'particle_filter'):
-    num_timesteps = prefer_static.shape(
+    num_observation_steps = prefer_static.shape(
         tf.nest.flatten(observations)[0])[0]
+    num_timesteps = (
+        1 + num_transitions_per_observation * (num_observation_steps - 1))
 
     # If no criterion is specified, default is to resample at every step.
     if not resample_criterion_fn:
@@ -531,13 +544,21 @@ def particle_filter(observations,
                    state_history):
       """Take one step in dynamics and accumulate marginal likelihood."""
 
+      step_has_observation = (
+          # The second of these conditions subsumes the first, but both are
+          # useful because the first can often be evaluated statically.
+          prefer_static.equal(num_transitions_per_observation, 1) |
+          prefer_static.equal(step % num_transitions_per_observation, 0))
+      observation_idx = step // num_transitions_per_observation
       current_observation = tf.nest.map_structure(
-          lambda x, step=step: tf.gather(x, step), observations)
+          lambda x, step=step: tf.gather(x, observation_idx), observations)
 
       history_to_pass_into_fns = {}
       if num_steps_observation_history_to_pass:
         history_to_pass_into_fns['observation_history'] = _gather_history(
-            observations, step, num_steps_observation_history_to_pass)
+            observations,
+            observation_idx,
+            num_steps_observation_history_to_pass)
       if num_steps_state_history_to_pass:
         history_to_pass_into_fns['state_history'] = state_history
 
@@ -554,6 +575,7 @@ def particle_filter(observations,
               None if proposal_fn is None else
               functools.partial(proposal_fn, **history_to_pass_into_fns)),
           resample_criterion_fn=resample_criterion_fn,
+          has_observation=step_has_observation,
           seed=seed)
 
       return _update_loop_variables(
@@ -567,8 +589,16 @@ def particle_filter(observations,
             num_steps_state_history_to_pass,
             num_timesteps))
 
-    return tf.nest.map_structure(lambda ta: ta.stack(),
-                                 loop_results.accumulated_step_results)
+    results = tf.nest.map_structure(lambda ta: ta.stack(),
+                                    loop_results.accumulated_step_results)
+    if num_transitions_per_observation != 1:
+      # Return a log-prob for each observed step.
+      observed_steps = prefer_static.range(
+          0, num_timesteps, num_transitions_per_observation)
+      results = results._replace(
+          step_log_marginal_likelihood=tf.gather(
+              results.step_log_marginal_likelihood, observed_steps))
+    return results
 
 
 def _initialize_loop_variables(initial_step_results,
@@ -648,6 +678,7 @@ def _filter_one_step(step,
                      observation_fn,
                      proposal_fn,
                      resample_criterion_fn,
+                     has_observation=True,
                      seed=None):
   """Advances the particle filter by a single time step."""
   with tf.name_scope('filter_one_step'):
@@ -660,12 +691,19 @@ def _filter_one_step(step,
         transition_fn=transition_fn,
         proposal_fn=proposal_fn,
         seed=seed)
+    log_weights = tf.nn.log_softmax(proposal_log_weights + log_weights, axis=-1)
 
-    observation_log_weights = _compute_observation_log_weights(
-        step, proposed_particles, observation, observation_fn)
-    unnormalized_log_weights = (log_weights +
-                                proposal_log_weights +
-                                observation_log_weights)
+    # If this step has an observation, compute its weights and marginal
+    # likelihood (and otherwise, leave weights unchanged).
+    observation_log_weights = prefer_static.cond(
+        has_observation,
+        lambda: prefer_static.broadcast_to(  # pylint: disable=g-long-lambda
+            _compute_observation_log_weights(
+                step, proposed_particles, observation, observation_fn),
+            prefer_static.shape(log_weights)),
+        lambda: tf.zeros_like(log_weights))
+
+    unnormalized_log_weights = log_weights + observation_log_weights
     step_log_marginal_likelihood = tf.math.reduce_logsumexp(
         unnormalized_log_weights, axis=0)
     log_weights = (unnormalized_log_weights - step_log_marginal_likelihood)
