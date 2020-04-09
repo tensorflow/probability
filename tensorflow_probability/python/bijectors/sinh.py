@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 
 
@@ -66,13 +67,4 @@ class Sinh(bijector.Bijector):
   # `-0.5 * math.log1psquare(y)` has lower numerical precision.
 
   def _forward_log_det_jacobian(self, x):
-    #  This formula is mathematically equivalent to
-    #  `tf.math.log(tf.math.cosh(x))`, however this code is more numerically
-    #  stable.
-    #  Derivation:
-    #    log(cosh(x))
-    #    = log(e^x + e^-x) - log(2)
-    #    = log(x * (1 + e^-2x)) - log(2)
-    #    = x + log(1 + e^-2x) - log(2)
-    #    = x + softplus(-2x) - log(2)
-    return x + tf.math.softplus(-2. * x) - np.log(2.)
+    return tfp_math.log_cosh(x)
