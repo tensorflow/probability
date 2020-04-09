@@ -63,7 +63,7 @@ DISABLED_BY_PKG = {
                   'variational_sgd', 'convergence_criteria'),
     'experimental':
         ('auto_batching', 'composite_tensor', 'edward2', 'linalg',
-         'marginalize', 'mcmc', 'nn', 'substrates', 'vi'),
+         'marginalize', 'mcmc', 'nn', 'sequential', 'substrates', 'vi'),
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'stats', 'util')
