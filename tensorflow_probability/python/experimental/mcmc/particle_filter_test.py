@@ -21,11 +21,78 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.particle_filter import SampleParticles
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+
+@test_util.test_all_tf_execution_regimes
+class SampleParticlesTest(test_util.TestCase):
+
+  def test_sample_particles_works_with_joint_distributions(self):
+    num_particles = 3
+    jd = tfd.JointDistributionNamed({'x': tfd.Normal(0., 1.)})
+    sp = SampleParticles(jd, num_particles=num_particles)
+
+    # Check that SampleParticles has the correct shapes.
+    self.assertAllEqualNested(jd.event_shape, sp.event_shape)
+    self.assertAllEqualNested(
+        *self.evaluate((jd.event_shape_tensor(), sp.event_shape_tensor())))
+    self.assertAllEqualNested(
+        tf.nest.map_structure(
+            lambda x: np.concatenate([[num_particles], x], axis=0),
+            jd.batch_shape),
+        tf.nest.map_structure(tensorshape_util.as_list, sp.batch_shape))
+    self.assertAllEqualNested(
+        *self.evaluate(
+            (tf.nest.map_structure(
+                lambda x: tf.concat([[num_particles], x], axis=0),
+                jd.batch_shape_tensor()),
+             sp.batch_shape_tensor())))
+
+    # Check that sample and log-prob work, and that we can take the log-prob
+    # of a sample.
+    x = self.evaluate(sp.sample())
+    lp = self.evaluate(sp.log_prob(x))
+    self.assertAllEqual(
+        [part.shape for part in tf.nest.flatten(x)], [[num_particles]])
+    self.assertAllEqual(
+        [part.shape for part in tf.nest.flatten(lp)], [[num_particles]])
+
+  def test_sample_particles_works_with_batch_and_event_shape(self):
+    num_particles = 3
+    d = tfd.MultivariateNormalDiag(loc=tf.zeros([2, 4]),
+                                   scale_diag=tf.ones([2, 4]))
+    sp = SampleParticles(d, num_particles=num_particles)
+
+    # Check that SampleParticles has the correct shapes.
+    self.assertAllEqual(sp.event_shape, d.event_shape)
+    self.assertAllEqual(sp.batch_shape,
+                        np.concatenate([[num_particles],
+                                        d.batch_shape], axis=0))
+
+    # Draw a sample, combining sample shape, batch shape, num_particles, *and*
+    # event_shape, and check that it has the correct shape, and that we can
+    # compute a log_prob with the correct shape.
+    sample_shape = [5, 1]
+    x = self.evaluate(sp.sample(sample_shape, seed=test_util.test_seed()))
+    self.assertAllEqual(x.shape,  # [5, 3, 1, 2, 4]
+                        np.concatenate([sample_shape,
+                                        [num_particles],
+                                        d.batch_shape,
+                                        d.event_shape],
+                                       axis=0))
+    lp = self.evaluate(sp.log_prob(x))
+    self.assertAllEqual(lp.shape,
+                        np.concatenate([sample_shape,
+                                        [num_particles],
+                                        d.batch_shape],
+                                       axis=0))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -85,7 +152,7 @@ class _ParticleFilterTest(test_util.TestCase):
     def transition_fn(_, previous_state):
       return tfd.JointDistributionNamed({
           'position': tfd.Normal(
-              loc=previous_state['position'] +previous_state['velocity'],
+              loc=previous_state['position'] + previous_state['velocity'],
               scale=0.1),
           'velocity': tfd.Normal(loc=previous_state['velocity'], scale=0.01)})
 
@@ -114,38 +181,38 @@ class _ParticleFilterTest(test_util.TestCase):
              seed=test_util.test_seed()))
 
     self.assertAllEqual(particles['position'].shape,
-                        [num_timesteps] + batch_shape + [num_particles])
+                        [num_timesteps, num_particles] + batch_shape)
     self.assertAllEqual(particles['velocity'].shape,
-                        [num_timesteps] + batch_shape + [num_particles])
+                        [num_timesteps, num_particles] + batch_shape)
     self.assertAllEqual(parent_indices.shape,
-                        [num_timesteps] + batch_shape + [num_particles])
+                        [num_timesteps, num_particles] + batch_shape)
     self.assertAllEqual(step_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
 
     self.assertAllClose(
         self.evaluate(
             tf.reduce_sum(tf.exp(log_weights) *
-                          particles['position'], axis=-1)),
+                          particles['position'], axis=1)),
         observed_positions,
         atol=0.1)
 
     velocity_means = tf.reduce_sum(tf.exp(log_weights) *
-                                   particles['velocity'], axis=-1)
+                                   particles['velocity'], axis=1)
     self.assertAllClose(
         self.evaluate(tf.reduce_mean(velocity_means, axis=0)),
         true_velocities, atol=0.05)
 
     # Uncertainty in velocity should decrease over time.
     velocity_stddev = self.evaluate(
-        tf.math.reduce_std(particles['velocity'], axis=-1))
+        tf.math.reduce_std(particles['velocity'], axis=1))
     self.assertAllLess((velocity_stddev[-1] - velocity_stddev[0]), 0.)
 
     trajectories = self.evaluate(
         tfp.experimental.mcmc.reconstruct_trajectories(particles,
                                                        parent_indices))
-    self.assertAllEqual([num_timesteps] + batch_shape + [num_particles],
+    self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['position'].shape)
-    self.assertAllEqual([num_timesteps] + batch_shape + [num_particles],
+    self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['velocity'].shape)
 
     # Verify that `infer_trajectories` also works on batches.
@@ -157,9 +224,9 @@ class _ParticleFilterTest(test_util.TestCase):
             observation_fn=observation_fn,
             num_particles=num_particles,
             seed=test_util.test_seed()))
-    self.assertAllEqual([num_timesteps] + batch_shape + [num_particles],
+    self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['position'].shape)
-    self.assertAllEqual([num_timesteps] + batch_shape + [num_particles],
+    self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['velocity'].shape)
     self.assertAllEqual(step_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
