@@ -59,7 +59,7 @@ class _CholeskyExtend(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testCholeskyExtensionRandomized(self, data):
-    jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 1e-5
+    jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 5e-5
     target_bs = data.draw(hpnp.array_shapes())
     prev_bs, new_bs = data.draw(tfp_hps.broadcasting_shapes(target_bs, 2))
     ones = tf.TensorShape([1] * len(target_bs))
