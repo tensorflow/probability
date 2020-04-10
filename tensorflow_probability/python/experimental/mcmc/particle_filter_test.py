@@ -21,7 +21,11 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.particle_filter import _scatter_nd_batch
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_independent
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_minimum_variance
 from tensorflow_probability.python.experimental.mcmc.particle_filter import SampleParticles
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -165,7 +169,8 @@ class _ParticleFilterTest(test_util.TestCase):
         *batch_shape).astype(self.dtype)
     observed_positions = (
         true_velocities *
-        np.arange(num_timesteps).astype(self.dtype)[..., None, None] +
+        np.arange(num_timesteps).astype(
+            self.dtype)[..., tf.newaxis, tf.newaxis] +
         true_initial_positions)
 
     (particles,
@@ -243,6 +248,107 @@ class _ParticleFilterTest(test_util.TestCase):
                                                        parent_indices))
     self.assertAllEqual(
         np.array([[1, 2, 2], [4, 6, 6], [7, 8, 9]]), trajectories)
+
+  def test_categorical_resampler_zero_final_class(self):
+    probs = [1.0, 0.0]
+    resampled = resample_independent(tf.math.log(probs), 1000, [])
+    self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
+
+  # TODO(b/153689734): rewrite so as not to use `move_dimension`.
+  def test_categorical_resampler_chi2(self):
+    # Test categorical resampler using chi-squared test.
+
+    num_probs = 50
+    num_distributions = 3
+    unnormalized_probs = tfd.Uniform(
+        low=np.float64(0),
+        high=np.float64(1.)).sample([num_distributions, num_probs], seed=42)
+    probs = unnormalized_probs / tf.reduce_sum(
+        unnormalized_probs, axis=-1, keepdims=True)
+
+    # chi-squared test is valid as long as `num_samples` is
+    # large compared to `num_probs`.
+    num_particles = 10000
+    num_samples = 2
+
+    sample = resample_independent(
+        tf.math.log(dist_util.move_dimension(probs,
+                                             source_idx=-1,
+                                             dest_idx=0)),
+        num_particles,
+        [num_samples])
+    sample = dist_util.move_dimension(sample,
+                                      source_idx=0,
+                                      dest_idx=-1)
+    # TODO(dpiponi): reimplement this test in vectorized form rather than with
+    # loops.
+    for sample_index in range(num_samples):
+      for prob_index in range(num_distributions):
+        counts = tf.scatter_nd(
+            indices=sample[sample_index, prob_index][:, tf.newaxis],
+            updates=tf.ones(num_particles, dtype=tf.int32),
+            shape=[num_probs])
+        expected_samples = probs[prob_index] * num_particles
+        chi2 = tf.reduce_sum(
+            (tf.cast(counts, tf.float64) -
+             expected_samples)**2 / expected_samples,
+            axis=-1)
+        self.assertAllLess(
+            tfd.Chi2(df=np.float64(num_probs - 1)).cdf(chi2),
+            0.9999)
+
+  def test_minimum_variance_resampler_zero_final_class(self):
+    probs = [1.0, 0.0]
+    resampled = resample_minimum_variance(tf.math.log(probs), 1000, [])
+    self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
+
+  def test_categorical_resampler_large(self):
+    num_probs = 10000
+    probs = tf.ones((num_probs,)) / num_probs
+    self.evaluate(resample_independent(tf.math.log(probs), num_probs, []))
+
+  def test_minimum_variance_resampler_large(self):
+    num_probs = 10000
+    probs = tf.ones((num_probs,)) / num_probs
+    self.evaluate(resample_minimum_variance(tf.math.log(probs), num_probs, []))
+
+  # TODO(b/153689734): rewrite so as not to use `move_dimension`.
+  def test_minimum_variance_resampler_means(self):
+    # Distinct samples with this resampler aren't independent
+    # so a chi-squared test is inappropriate.
+    # However, because it reduces variance by design, we
+    # can, with high probability,  place sharp bounds on the
+    # values of the sample means.
+    num_distributions = 3
+    num_probs = 16
+    probs = tfd.Uniform(
+        low=0.0, high=1.0).sample([num_distributions, num_probs])
+    probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
+    num_samples = 10000
+    num_particles = 20
+    resampled = resample_minimum_variance(
+        tf.math.log(dist_util.move_dimension(probs,
+                                             source_idx=-1,
+                                             dest_idx=0)),
+        num_particles, [num_samples])
+    resampled = dist_util.move_dimension(resampled,
+                                         source_idx=0,
+                                         dest_idx=-1)
+    # TODO(dpiponi): reimplement this test in vectorized form rather than with
+    # loops.
+    for i in range(num_distributions):
+      histogram = tf.reduce_mean(
+          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
+                            tf.ones((num_samples, num_particles)),
+                            (num_samples, num_probs),
+                            batch_dims=1),
+          axis=0)
+      means = histogram / num_particles
+      means_, probs_ = self.evaluate([means, probs[i]])
+
+      # TODO(dpiponi): it should be possible to compute the exact distribution
+      # of these means and choose `atol` in a more principled way.
+      self.assertAllClose(means_, probs_, atol=0.01)
 
   def test_epidemiological_model(self):
     # A toy, discrete version of an SIR (Susceptible, Infected, Recovered)
@@ -338,7 +444,8 @@ class _ParticleFilterTest(test_util.TestCase):
             seed=test_util.test_seed()))
     self.assertAllClose(trajectories,
                         tf.convert_to_tensor(
-                            tf.convert_to_tensor(observations)[..., None] *
+                            tf.convert_to_tensor(
+                                observations)[..., tf.newaxis] *
                             tf.ones([num_particles])), atol=1.0)
 
   def test_estimated_prob_approximates_true_prob(self):
