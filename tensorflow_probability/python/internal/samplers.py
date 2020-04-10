@@ -28,7 +28,6 @@ import six
 import tensorflow.compat.v2 as tf
 
 __all__ = [
-    'binomial',
     'categorical',
     'gamma',
     'normal',
@@ -90,21 +89,6 @@ def split_seed(seed, n=2, salt=None, name=None):
     if isinstance(n, six.integer_types):
       seeds = tf.unstack(seeds)
     return seeds
-
-
-def binomial(
-    shape,
-    counts,
-    probs,
-    output_dtype=tf.int32,
-    seed=None,
-    name=None):
-  """As `tf.random.Generator.binomial`, handling stateful/stateless `seed`s."""
-  with tf.name_scope(name or 'binomial'):
-    seed = sanitize_seed(seed)
-    return tf.random.stateless_binomial(
-        shape=shape, seed=seed, counts=counts, probs=probs,
-        output_dtype=output_dtype)
 
 
 def categorical(

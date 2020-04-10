@@ -44,6 +44,7 @@ __all__ = [
     'control_dependencies',
     'convert_to_tensor',
     'custom_gradient',
+    'device',
     'dimension_value',
     'enable_v2_behavior',
     'executing_eagerly',
@@ -276,6 +277,8 @@ def _custom_gradient(f):
 
 custom_gradient = utils.copy_docstring(
     'tf.custom_gradient', _custom_gradient)
+
+device = lambda _: _NullContext()
 
 executing_eagerly = utils.copy_docstring(
     'tf.executing_eagerly',

@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import sys
 
 from absl.testing import parameterized
 import hypothesis as hp
@@ -112,9 +111,6 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 )
 
 EXTRA_TENSOR_CONVERSION_DISTS = {
-    # binomial rejection sampler converts many times
-    'BetaBinomial': sys.maxsize,
-    'Binomial': sys.maxsize,  # binomial rejection sampler converts many times
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
     'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter

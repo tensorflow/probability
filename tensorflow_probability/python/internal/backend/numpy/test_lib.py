@@ -30,12 +30,16 @@ import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import tensorflow.compat.v2 as tf
 
 __all__ = [
+    'is_gpu_available',
     'Benchmark',
     'TestCase',
 ]
 
 
 # --- Begin Public Functions --------------------------------------------------
+
+
+is_gpu_available = lambda: False
 
 
 class Benchmark(tf.test.Benchmark):

@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_math import soft
 
 
 __all__ = [
+    'stateless_binomial',
     'stateless_categorical',
     'gamma',
     'stateless_gamma',
@@ -63,6 +64,13 @@ def _bcast_shape(base_shape, args):
     if arg is not None:
       bc_arr = bc_arr + np.zeros(np.shape(arg) + (0,))
   return bc_arr.shape[:-1]
+
+
+def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # pylint: disable=unused-argument
+  rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
+  probs = np.where(counts > 0, probs, 0)
+  samps = rng.binomial(np.int64(counts), np.float64(probs), shape)
+  return samps.astype(utils.numpy_dtype(output_dtype))
 
 
 def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
@@ -253,6 +261,10 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
 
 
 # --- Begin Public Functions --------------------------------------------------
+
+stateless_binomial = utils.copy_docstring(
+    'tf.random.stateless_binomial',
+    _binomial)
 
 # TODO(b/147874898): rewrite samplers to use stateless signature. In the
 # meantime, we copy docstrings from stateful random samplers.

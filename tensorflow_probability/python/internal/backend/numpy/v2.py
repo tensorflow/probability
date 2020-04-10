@@ -49,19 +49,29 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 # pylint: enable=unused-import
 
 
+JAX_MODE = False
+
+
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
               experimental_relax_shapes=False, experimental_compile=None):  # pylint: disable=unused-argument
   """Dummy version of `tf.function`."""
+  transform = lambda fn: fn
+  if experimental_compile:
+    if JAX_MODE:
+      from jax import jit  # pylint: disable=g-import-not-at-top
+      transform = jit
+    else:
+      raise NotImplementedError('Could not find compiler: Numpy only.')
   # This code path is for the `foo = tf.function(foo, ...)` use case.
   if func is not None:
-    return func
+    return transform(func)
   # This code path is for the following use case:
   #   @tf.function(...)
   #   def foo(...):
   #      ...
   # This case is equivalent to `foo = tf.function(...)(foo)`.
-  return lambda inner_function: inner_function
+  return transform
 
 
 # --- Begin Public Functions --------------------------------------------------

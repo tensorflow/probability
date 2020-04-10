@@ -226,6 +226,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:batched_rejection_sampler",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:implementation_selection",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:samplers",
@@ -1728,13 +1729,29 @@ multi_substrate_py_test(
     name = "binomial_test",
     size = "medium",
     srcs = ["binomial_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_test(
+    name = "binomial_test_gpu",
+    size = "medium",
+    srcs = ["binomial_test.py"],
+    main = "binomial_test.py",
+    tags = ["requires-gpu-nvidia"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -2169,8 +2186,8 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "joint_distribution_coroutine_test",
+    size = "medium",
     srcs = ["joint_distribution_coroutine_test.py"],
-    jax_size = "medium",
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2194,8 +2211,8 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "joint_distribution_sequential_test",
+    size = "medium",
     srcs = ["joint_distribution_sequential_test.py"],
-    jax_size = "medium",
     numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,

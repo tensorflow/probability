@@ -287,6 +287,14 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       with self.test_session():
         return _compute_error()
 
+  def skip_if_no_xla(self):
+    try:
+      tf.function(lambda: tf.constant(0), experimental_compile=True)()
+    except (tf.errors.UnimplementedError, NotImplementedError) as e:
+      if 'Could not find compiler' in str(e):
+        self.skipTest('XLA not available')
+
+
 if JAX_MODE:
   from jax import jacrev  # pylint: disable=g-import-not-at-top
   from jax import vmap  # pylint: disable=g-import-not-at-top

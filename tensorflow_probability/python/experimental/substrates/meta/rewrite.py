@@ -68,9 +68,9 @@ DISABLED_BY_PKG = {
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'stats', 'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
-             'dtype_util', 'hypothesis_testlib', 'nest_util', 'prefer_static',
-             'samplers', 'special_math', 'tensor_util', 'test_combinations',
-             'test_util')
+             'dtype_util', 'hypothesis_testlib', 'implementation_selection',
+             'nest_util', 'prefer_static', 'samplers', 'special_math',
+             'tensor_util', 'test_combinations', 'test_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')
@@ -209,6 +209,9 @@ def main(argv):
 
   for find, replace in replacements.items():
     contents = contents.replace(find, replace)
+
+  if not FLAGS.numpy_to_jax:
+    contents = contents.replace('NUMPY_MODE = False', 'NUMPY_MODE = True')
   if FLAGS.numpy_to_jax:
     contents = contents.replace('substrates.numpy', 'substrates.jax')
     contents = contents.replace('self._numpy', 'SELF_NUMPY')

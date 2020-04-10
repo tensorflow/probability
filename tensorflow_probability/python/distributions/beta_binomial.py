@@ -220,10 +220,12 @@ class BetaBinomial(distribution.Distribution):
   def _params_list_as_tensors(self):
     return [tf.convert_to_tensor(p) for p in self._params_list()]
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, params=None):
+    if params is None:
+      params = self._params_list()
     return functools.reduce(
         prefer_static.broadcast_shape,
-        [prefer_static.shape(t) for t in self._params_list()])
+        [prefer_static.shape(t) for t in params])
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,
@@ -238,11 +240,12 @@ class BetaBinomial(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     seed_stream = SeedStream(seed, 'beta_binomial')
 
-    total_count, concentration1, concentration0 = self._params_list_as_tensors()
+    params = self._params_list_as_tensors()
+    batch_shape = self._batch_shape_tensor(params=params)
+    total_count, concentration1, concentration0 = params
 
-    batch_shape_tensor = self.batch_shape_tensor()
     probs = beta.Beta(
-        tf.broadcast_to(concentration1, batch_shape_tensor),
+        tf.broadcast_to(concentration1, batch_shape),
         concentration0,
         validate_args=self.validate_args).sample(
             n, seed=seed_stream())

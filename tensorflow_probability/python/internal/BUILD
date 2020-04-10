@@ -153,6 +153,37 @@ py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "implementation_selection",
+    srcs = ["implementation_selection.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal/backend/numpy",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "implementation_selection_test",
+    srcs = ["implementation_selection_test.py"],
+    deps = [
+        ":implementation_selection",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_test(
+    name = "implementation_selection_test_gpu",
+    srcs = ["implementation_selection_test.py"],
+    main = "implementation_selection_test.py",
+    tags = ["requires-gpu-nvidia"],
+    deps = [
+        ":implementation_selection",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
 py_library(
     name = "monte_carlo",
     srcs = ["monte_carlo.py"],

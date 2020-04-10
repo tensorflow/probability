@@ -24,7 +24,8 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions.binomial import _log_concave_rejection_sampler
+from tensorflow_probability.python.distributions import binomial as binomial_lib
+from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
@@ -248,8 +249,9 @@ class BinomialTest(test_util.TestCase):
 
     probs = np.float32([0.7, 0.8, 0.3, 0.2])
     geometric = tfd.Geometric(probs=probs)
-    x = _log_concave_rejection_sampler(
-        geometric, sample_shape=[n], distribution_minimum=0, seed=seed)
+    x = binomial_lib._log_concave_rejection_sampler(
+        mode=geometric.mode(), prob_fn=geometric.prob, dtype=geometric.dtype,
+        sample_shape=[n], distribution_minimum=0, seed=seed)
 
     x = x + 1  ## scipy.stats.geom is 1-indexed instead of 0-indexed.
     sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
@@ -394,6 +396,7 @@ class BinomialTest(test_util.TestCase):
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
+  @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
       'No gradient for while loops in JAX backend.')
   def testNotReparameterized(self):
@@ -442,6 +445,54 @@ class BinomialFromVariableTest(test_util.TestCase):
 
     self.evaluate(probs.assign([0.75]))
     self.evaluate(d.probs_parameter())
+
+
+@test_util.test_graph_and_eager_modes
+class BinomialSamplingTest(test_util.TestCase):
+
+  @test_util.jax_disable_test_missing_functionality('tf stateless_binomial')
+  def testSampleCPU(self):
+    with tf.device('CPU'):
+      _, runtime = self.evaluate(
+          binomial_lib._random_binomial(
+              shape=tf.constant([], dtype=tf.int32),
+              counts=tf.constant(10.), probs=tf.constant(.5),
+              seed=test_util.test_seed()))
+    self.assertEqual(implementation_selection._RUNTIME_CPU, runtime)
+
+  def testSampleGPU(self):
+    # Debugging tip: --vmodule=implementation_selector=2,function_api_info=3
+    # helps debug errors like: Skipping optimization due to error while loading
+    # function libraries: Invalid argument: Functions
+    # '__inference__binomial_cpu_1184' and '__inference__binomial_noncpu_2305'
+    # both implement 'binomial_76a77701-978a-4299-ad23-ff0d5c7598cb' but their
+    # signatures do not match.
+    if not tf.test.is_gpu_available():
+      self.skipTest('no GPU')
+    with tf.device('GPU'):
+      _, runtime = self.evaluate(binomial_lib._random_binomial(
+          shape=tf.constant([], dtype=tf.int32),
+          counts=tf.constant(10.), probs=tf.constant(.5),
+          seed=test_util.test_seed()))
+    self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
+
+  def testSampleXLA(self):
+    self.skip_if_no_xla()
+    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    probs = np.random.rand(4, 3).astype(np.float32)
+    counts = np.float32([4, 11., 20.])
+    dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
+    # Verify the compile succeeds going all the way through the distribution.
+    self.evaluate(
+        tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
+                    experimental_compile=True)())
+    # Also test the low-level sampler and verify the XLA-friendly variant.
+    _, runtime = self.evaluate(
+        tf.function(binomial_lib._random_binomial, experimental_compile=True)(
+            shape=tf.constant([], dtype=tf.int32),
+            counts=tf.constant(10.), probs=tf.constant(.5),
+            seed=test_util.test_seed()))
+    self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
 
 
 if __name__ == '__main__':
