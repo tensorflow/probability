@@ -23,6 +23,8 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
@@ -99,7 +101,8 @@ def make_rwmh_kernel_fn(target_log_prob_fn, init_state, scalings, seed=None):
   with tf.name_scope('make_rwmh_kernel_fn'):
     seed = SeedStream(seed, salt='make_rwmh_kernel_fn')
     state_std = [
-        tf.math.reduce_std(x, axis=0, keepdims=True) for x in init_state
+        tf.math.reduce_std(x, axis=0, keepdims=True)
+        for x in init_state
     ]
     step_size = [
         s * ps.cast(  # pylint: disable=g-complex-comprehension
@@ -135,7 +138,7 @@ def gen_make_transform_hmc_kernel_fn(unconstraining_bijectors,
     with tf.name_scope('make_transformed_hmc_kernel_fn'):
       seed = SeedStream(seed, salt='make_transformed_hmc_kernel_fn')
       state_std = [
-          bij.inverse(
+          bij.inverse(  # pylint: disable=g-complex-comprehension
               tf.math.reduce_std(bij.forward(x), axis=0, keepdims=True))
           for x, bij in zip(init_state, unconstraining_bijectors)
       ]
@@ -179,6 +182,38 @@ def gen_make_hmc_kernel_fn(num_leapfrog_steps=10):
 default_make_hmc_kernel_fn = gen_make_hmc_kernel_fn()
 
 
+# Generate a default function for resampling particle and their associated
+# properties according to some (log) weights
+# TODO(junpenglao): Unify it with the _resample function in particale_filter.py
+def resample_particle_and_info(particles, log_weights, seed=None):
+  """Resamples the current particles according to provided weights.
+
+  Args:
+    particles: Nested structure of `Tensor`s each of shape
+      `[num_particles, b1, ..., bN, ...]`, where
+      `b1, ..., bN` are optional batch dimensions.
+    log_weights: float `Tensor` of shape `[num_particles, b1, ..., bN]`, where
+      `b1, ..., bN` are optional batch dimensions.
+    seed: Python `int` random seed.
+  Returns:
+    resampled_particles: Nested structure of `Tensor`s, matching `particles`.
+    resample_indices: int `Tensor` of shape `[num_particles, b1, ..., bN]`.
+  """
+  with tf.name_scope('resample'):
+    num_particles = ps.size0(log_weights)
+
+    log_probs = tf.math.log_softmax(log_weights, axis=0)
+    # TODO(junpenglao): use an `axis` specifiable categorical sampler to avoid
+    # transpose below.
+    resample_indices = categorical.Categorical(
+        logits=dist_util.move_dimension(log_probs, 0, -1)
+        ).sample(num_particles, seed=seed)
+    resampled_particles = tf.nest.map_structure(
+        lambda x: mcmc_util.index_remapping_gather(x, resample_indices),
+        particles)
+  return resampled_particles, resample_indices
+
+
 def simple_heuristic_tuning(num_steps,
                             log_scalings,
                             log_accept_prob,
@@ -217,8 +252,9 @@ def simple_heuristic_tuning(num_steps,
         target_accept_prob, dtype=log_accept_prob.dtype)
     log_half_constant = tf.constant(np.log(.5), dtype=log_scalings.dtype)
 
-    avg_log_scalings = reduce_logmeanexp(log_scalings)
-    avg_log_accept_prob = reduce_logmeanexp(log_accept_prob)
+    avg_log_scalings = reduce_logmeanexp(log_scalings, axis=0)
+    avg_log_accept_prob = reduce_logmeanexp(
+        log_accept_prob, axis=0)
 
     avg_log_scaling_target = avg_log_scalings + (
         tf.exp(avg_log_accept_prob) - optimal_accept)
@@ -227,15 +263,19 @@ def simple_heuristic_tuning(num_steps,
         log_scalings + (tf.exp(log_accept_prob) - optimal_accept)
         )
 
-    num_replica = ps.size0(log_accept_prob)
+    num_particles = ps.shape(log_accept_prob)[-1]
     num_proposed = tf.cast(
-        num_replica * num_steps, dtype=avg_log_accept_prob.dtype)
+        num_particles * num_steps, dtype=avg_log_accept_prob.dtype)
+    # max(1/num_proposed, average_accept_ratio)
     log_avg_accept = tf.math.maximum(-tf.math.log(num_proposed),
                                      avg_log_accept_prob)
     num_steps = tf.cast(
         tf.math.log1p(-target_accept_prob) / log1mexp(log_avg_accept),
         dtype=num_steps.dtype)
-    return num_steps, new_log_scalings
+    # We choose the number of steps from the batch that takes the longest,
+    # hence this is a reduce over all axes.
+    max_step_across_batch = tf.reduce_max(num_steps)
+    return max_step_across_batch, new_log_scalings
 
 
 # TODO(b/152412213) Experitment to improve recommendation on static parmaeters
@@ -257,14 +297,17 @@ def sample_sequential_monte_carlo(
   to sample from a series of distributions that slowly interpolates between
   an initial 'prior' distribution:
 
-  `exp(prior_log_prob_fn(x))`
+    `exp(prior_log_prob_fn(x))`
 
   and the target 'posterior' distribution:
 
-  `exp(prior_log_prob_fn(x) + target_log_prob_fn(x))`,
+    `exp(prior_log_prob_fn(x) + target_log_prob_fn(x))`,
 
   by mutating a collection of MC samples (i.e., particles). The approach is also
-  known as Particle Filter in some literature.
+  known as Particle Filter in some literature. The current implemenetation is
+  largely based on  Del Moral et al [1], which adapts the tempering sequence
+  adaptively (base on the effective sample size) and the scaling of the mutation
+  kernel (base on the sample covariance of the particles) at each stage.
 
   Args:
     prior_log_prob_fn: Python callable that returns the log density of the
@@ -306,6 +349,12 @@ def sample_sequential_monte_carlo(
     final_kernel_results: `collections.namedtuple` of internal calculations used
       to advance the chain.
 
+  #### References
+
+  [1] Del Moral, Pierre, Arnaud Doucet, and Ajay Jasra. An adaptive sequential
+      Monte Carlo method for approximate Bayesian computation.
+      _Statistics and Computing_, 22.5(1009-1020), 2012.
+
   """
 
   with tf.name_scope(name or 'sample_sequential_monte_carlo'):
@@ -318,65 +367,72 @@ def sample_sequential_monte_carlo(
         tf.convert_to_tensor(s, dtype_hint=tf.float32) for s in current_state
     ]
 
-    num_replica = ps.size0(current_state[0])
+    # Initial preprocessing at Stage 0
+    likelihood_log_prob = likelihood_log_prob_fn(*current_state)
+
+    likelihood_rank = ps.rank(likelihood_log_prob)
+    dimension = ps.reduce_sum([
+        ps.reduce_prod(ps.shape(x)[likelihood_rank:]) for x in current_state])
+
+    # We infer the particle shapes from the resulting likelihood:
+    # [num_particles, b1, ..., bN]
+    particle_shape = ps.shape(likelihood_log_prob)
+    num_particles, batch_shape = particle_shape[0], particle_shape[1:]
     effective_sample_size_threshold = tf.cast(
-        num_replica * ess_threshold_ratio, tf.int32)
+        num_particles * ess_threshold_ratio, tf.int32)
 
-    def preprocess_state(init_state):
-      """Initial preprocessing at Stage 0."""
-      dimension = ps.reduce_sum([
-          ps.reduce_prod(ps.shape(x)[1:]) for x in init_state])
-      likelihood_log_prob = likelihood_log_prob_fn(*init_state)
+    # TODO(b/152412213): Revisit this default parameter.
+    # Default to the optimal scaling of a random walk kernel for a d-dimensional
+    # normal distributed targets: 2.38 ** 2 / d.
+    # For more detail see:
+    # Roberts GO, Gelman A, Gilks WR. Weak convergence and optimal scaling of
+    # random walk Metropolis algorithms. _The annals of applied probability_.
+    # 1997;7(1):110-20.
+    scale_start = (
+        tf.constant(2.38 ** 2, dtype=likelihood_log_prob.dtype) /
+        tf.constant(dimension, dtype=likelihood_log_prob.dtype))
 
-      # Default to the optimal for normal distributed targets.
-      # TODO(b/152412213): Revisit this default parameter.
-      scale_start = (
-          tf.constant(2.38 ** 2, dtype=likelihood_log_prob.dtype) /
-          tf.constant(dimension, dtype=likelihood_log_prob.dtype))
-      # TODO(b/152412213): Enable batch of batches style by using non-scalar
-      # inverse_temperature
-      inverse_temperature = tf.zeros([], dtype=likelihood_log_prob.dtype)
-      scalings = ps.ones_like(likelihood_log_prob) * ps.minimum(scale_start, 1.)
-      kernel = make_kernel_fn(
-          _make_tempered_target_log_prob_fn(
-              prior_log_prob_fn,
-              likelihood_log_prob_fn,
-              inverse_temperature),
-          init_state,
-          scalings,
-          seed=seed_stream())
-      pkr = kernel.bootstrap_results(current_state)
-      _, kernel_target_log_prob = gather_mh_like_result(pkr)
+    inverse_temperature = tf.zeros(batch_shape, dtype=likelihood_log_prob.dtype)
+    scalings = ps.ones_like(likelihood_log_prob) * ps.minimum(scale_start, 1.)
+    kernel = make_kernel_fn(
+        _make_tempered_target_log_prob_fn(
+            prior_log_prob_fn,
+            likelihood_log_prob_fn,
+            inverse_temperature),
+        current_state,
+        scalings,
+        seed=seed_stream)
+    pkr = kernel.bootstrap_results(current_state)
+    _, kernel_target_log_prob = gather_mh_like_result(pkr)
 
-      particle_info = ParticleInfo(
-          log_accept_prob=ps.zeros_like(likelihood_log_prob),
-          log_scalings=tf.math.log(scalings),
-          tempered_log_prob=kernel_target_log_prob,
-          likelihood_log_prob=likelihood_log_prob,
-      )
+    particle_info = ParticleInfo(
+        log_accept_prob=ps.zeros_like(likelihood_log_prob),
+        log_scalings=tf.math.log(scalings),
+        tempered_log_prob=kernel_target_log_prob,
+        likelihood_log_prob=likelihood_log_prob,
+    )
 
-      return SMCResults(
-          num_steps=tf.convert_to_tensor(
-              max_num_steps, dtype=tf.int32, name='num_steps'),
-          inverse_temperature=inverse_temperature,
-          log_marginal_likelihood=tf.constant(
-              0., dtype=likelihood_log_prob.dtype),
-          particle_info=particle_info
-      )
+    current_pkr = SMCResults(
+        num_steps=tf.convert_to_tensor(
+            max_num_steps, dtype=tf.int32, name='num_steps'),
+        inverse_temperature=inverse_temperature,
+        log_marginal_likelihood=tf.zeros_like(inverse_temperature),
+        particle_info=particle_info
+    )
 
     def update_weights_temperature(inverse_temperature, likelihood_log_prob):
       """Calculate the next inverse temperature and update weights."""
-
-      likelihood_diff = likelihood_log_prob - tf.reduce_max(likelihood_log_prob)
+      likelihood_diff = likelihood_log_prob - tf.reduce_max(
+          likelihood_log_prob, axis=0)
 
       def _body_fn(new_beta, upper_beta, lower_beta, eff_size, log_weights):
         """One iteration of the temperature and weight update."""
         new_beta = (lower_beta + upper_beta) / 2.0
         log_weights = (new_beta - inverse_temperature) * likelihood_diff
-        log_weights_norm = (log_weights -
-                            tf.math.reduce_logsumexp(log_weights))
+        log_weights_norm = tf.math.log_softmax(log_weights, axis=0)
         eff_size = tf.cast(
-            tf.exp(-tf.math.reduce_logsumexp(2 * log_weights_norm)), tf.int32)
+            tf.exp(-tf.math.reduce_logsumexp(2 * log_weights_norm, axis=0)),
+            tf.int32)
         upper_beta = tf.where(
             eff_size < effective_sample_size_threshold,
             new_beta, upper_beta)
@@ -385,16 +441,24 @@ def sample_sequential_monte_carlo(
             lower_beta, new_beta)
         return new_beta, upper_beta, lower_beta, eff_size, log_weights
 
+      def _cond_fn(new_beta, upper_beta, lower_beta, eff_size, *_):  # pylint: disable=unused-argument
+        # TODO(junpenglao): revisit threshold below to be dtype specific.
+        threshold = 1e-6
+        return (
+            tf.math.reduce_any(upper_beta - lower_beta > threshold) &
+            tf.math.reduce_any(eff_size != effective_sample_size_threshold)
+            )
+
       (new_beta, upper_beta, lower_beta, eff_size, log_weights) = tf.while_loop(  # pylint: disable=unused-variable
-          cond=lambda new_beta, upper_beta, lower_beta, eff_size, *_:  # pylint: disable=g-long-lambda
-          (upper_beta - lower_beta > 1e-6) &
-          (eff_size != effective_sample_size_threshold),
+          cond=_cond_fn,
           body=_body_fn,
           loop_vars=(
               tf.zeros_like(inverse_temperature),
-              tf.cast(2.0, inverse_temperature.dtype),
+              tf.fill(
+                  ps.shape(inverse_temperature),
+                  tf.constant(2, inverse_temperature.dtype)),
               inverse_temperature,
-              tf.cast(0, tf.int32),
+              tf.zeros_like(inverse_temperature, dtype=tf.int32),
               tf.zeros_like(likelihood_diff)),
           parallel_iterations=parallel_iterations
           )
@@ -403,24 +467,10 @@ def sample_sequential_monte_carlo(
                              log_weights,
                              (1. - inverse_temperature) * likelihood_diff)
       marginal_loglike_ = reduce_logmeanexp(
-          (new_beta - inverse_temperature) * likelihood_log_prob)
+          (new_beta - inverse_temperature) * likelihood_log_prob, axis=0)
+      new_inverse_temperature = tf.clip_by_value(new_beta, 0., 1.)
 
-      return marginal_loglike_, tf.clip_by_value(new_beta, 0., 1.), log_weights
-
-    def resample(log_weights, current_state, particle_info, seed=None):
-      """Resample particles based on importance weights."""
-      with tf.name_scope('resample_particles'):
-        seed = SeedStream(seed, salt='resample_particles')
-        resampling_indexes = tf.random.categorical(
-            [log_weights], ps.reduce_prod(*ps.shape(log_weights)), seed=seed())
-        next_state = tf.nest.map_structure(
-            lambda x: tf.reshape(tf.gather(x, resampling_indexes), ps.shape(x)),
-            current_state)
-        next_particle_info = tf.nest.map_structure(
-            lambda x: tf.reshape(tf.gather(x, resampling_indexes), ps.shape(x)),
-            particle_info)
-
-        return next_state, next_particle_info
+      return marginal_loglike_, new_inverse_temperature, log_weights
 
     def mutate(
         current_state,
@@ -437,7 +487,7 @@ def sample_sequential_monte_carlo(
                 inverse_temperature),
             current_state,
             scalings,
-            seed=seed_stream())
+            seed=seed_stream)
         pkr = kernel.bootstrap_results(current_state)
         kernel_log_accept_ratio, _ = gather_mh_like_result(pkr)
 
@@ -492,12 +542,15 @@ def sample_sequential_monte_carlo(
             'Beta:', new_inv_temperature,
             'n_steps:', smc_kernel_result.num_steps,
             'accept:', tf.exp(reduce_logmeanexp(
-                smc_kernel_result.particle_info.log_accept_prob)),
+                smc_kernel_result.particle_info.log_accept_prob, axis=0)),
             'scaling:', tf.exp(reduce_logmeanexp(
-                smc_kernel_result.particle_info.log_scalings))
+                smc_kernel_result.particle_info.log_scalings, axis=0))
             )
-      resampled_state, resampled_particle_info = resample(
-          log_weights, state, smc_kernel_result.particle_info, seed_stream())
+      (resampled_state,
+       resampled_particle_info), _ = resample_particle_and_info(
+           (state, smc_kernel_result.particle_info),
+           log_weights,
+           seed=seed_stream)
       next_num_steps, next_log_scalings = tuning_fn(
           smc_kernel_result.num_steps,
           resampled_particle_info.log_scalings,
@@ -529,15 +582,14 @@ def sample_sequential_monte_carlo(
           ))
       return stage + 1, next_state, next_pkr
 
-    current_pkr = preprocess_state(current_state)
     (
         n_stage,
         final_state,
         final_kernel_results
     ) = tf.while_loop(
-        cond=lambda i, state, pkr: (i < max_stage) & (  # pylint: disable=g-long-lambda
-            pkr.inverse_temperature < 1.
-        ),
+        cond=lambda i, state, pkr: (  # pylint: disable=g-long-lambda
+            (i < max_stage) &
+            tf.reduce_any(pkr.inverse_temperature < 1.)),
         body=smc_body_fn,
         loop_vars=(
             tf.zeros([], dtype=tf.int32),

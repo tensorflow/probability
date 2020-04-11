@@ -67,17 +67,21 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
   )
   def testMixtureTargetLogProb(self, make_kernel_fn, optimal_accept):
     seed = test_util.test_seed()
-    n = 4
-    mu = np.ones(n) * (1. / 2)
+    # Generate a 2 component Gaussian Mixture in 3 dimension
+    nd = 3
     w = 0.1
+    mixture_weight = tf.constant([w, 1. - w], tf.float64)
+    mu = np.ones(nd) * .5
+    component_loc = tf.cast(np.asarray([mu, -mu]), tf.float64)
 
-    proposal = tfd.Sample(tfd.Normal(0., 10.), sample_shape=n)
+    proposal = tfd.Sample(tfd.Normal(tf.constant(0., tf.float64), 10.),
+                          sample_shape=nd)
     init_state = proposal.sample(5000, seed=seed)
 
     likelihood_dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(probs=[w, 1. - w]),
+        mixture_distribution=tfd.Categorical(probs=mixture_weight),
         components_distribution=tfd.MultivariateNormalDiag(
-            loc=np.asarray([mu, -mu]).astype(np.float32),
+            loc=component_loc,
             scale_identity_multiplier=[.1, .2]))
 
     # Uniform prior
@@ -97,10 +101,56 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         seed=None if tf.executing_eagerly() else seed)
 
     assert_cdf_equal_sample = st.assert_true_cdf_equal_by_dkwm_two_sample(
-        final_state, likelihood_dist.sample(5000, seed=seed))
+        final_state, likelihood_dist.sample(5000, seed=seed), 1e-5)
 
     n_stage, _ = self.evaluate((n_stage, assert_cdf_equal_sample))
-    self.assertTrue(n_stage, 15)
+    self.assertLess(n_stage, 15)
+
+  def testMixtureMultiBatch(self):
+    seed = test_util.test_seed()
+    # Generate 3 copies (batches) of 2 component Gaussian Mixture in 2 dimension
+    nd = 2
+    n_batch = 3
+    w = tf.constant([0.1, .25, .5], tf.float64)
+    mixture_weight = tf.transpose(tf.stack([w, 1. - w]))
+    mu = np.ones(nd) * .5
+    loc = tf.cast(np.asarray([mu, -mu]), tf.float64)
+    component_loc = tf.repeat(loc[tf.newaxis, ...], n_batch, axis=0)
+
+    likelihood_dist = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(
+            probs=mixture_weight),
+        components_distribution=tfd.MultivariateNormalDiag(
+            loc=component_loc,
+            scale_identity_multiplier=[.1, .2]))
+
+    proposal = tfd.Sample(tfd.Normal(tf.constant(0., tf.float64), 10.),
+                          sample_shape=nd)
+    init_state = proposal.sample([5000, n_batch], seed=seed)
+    log_prob_fn = likelihood_dist.log_prob
+    print(log_prob_fn(init_state).shape)
+
+    # Uniform prior
+    init_log_prob = tf.zeros_like(log_prob_fn(init_state))
+
+    [
+        n_stage, final_state, _
+    ] = tfp.experimental.mcmc.sample_sequential_monte_carlo(
+        lambda x: init_log_prob,
+        log_prob_fn,
+        init_state,
+        make_kernel_fn=make_test_nuts_kernel_fn,
+        tuning_fn=functools.partial(simple_heuristic_tuning,
+                                    optimal_accept=0.8),
+        max_num_steps=50,
+        parallel_iterations=1,
+        seed=None if tf.executing_eagerly() else seed)
+
+    assert_cdf_equal_sample = st.assert_true_cdf_equal_by_dkwm_two_sample(
+        final_state, likelihood_dist.sample(5000, seed=seed), 1e-5)
+
+    n_stage, _ = self.evaluate((n_stage, assert_cdf_equal_sample))
+    self.assertLess(n_stage, 15)
 
   def testSampleEndtoEndXLA(self):
     """An end-to-end test of sampling using SMC."""
