@@ -25,9 +25,8 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-#from tensorflow_probability.python.bijectors import affine_scalar
-from tensorflow_probability.python.bijectors import shift
-from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift as shift_lib
+from tensorflow_probability.python.bijectors import scale as scale_lib
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -308,16 +307,13 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
         raise ValueError('Exactly one of `shift_and_log_scale_fn` and '
                          '`bijector_fn` should be specified.')
       if shift_and_log_scale_fn:
-        shift_and_log_scale_fn.build([shift_and_log_scale_fn._event_size])
-        self.model = shift_and_log_scale_fn._network
         def _bijector_fn(x, **condition_kwargs):
           params = shift_and_log_scale_fn(x, **condition_kwargs)
           if tf.is_tensor(params):
-            loc, log_scale = tf.unstack(params, num=2, axis=-1)
+            shift, log_scale = tf.unstack(params, num=2, axis=-1)
           else:
-            loc, log_scale = params
-          return shift.Shift(loc)(scale.Scale(tf.exp(log_scale)))
-          #return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+            shift, log_scale = params
+          return shift_lib.Shift(shift)(scale_lib.Scale(tf.exp(log_scale)))
         bijector_fn = _bijector_fn
 
       if validate_args:
@@ -604,12 +600,12 @@ def masked_autoregressive_default_template(hidden_layers,
         x = tf.reshape(x, shape=input_shape)
         return x, None
       x = tf.reshape(x, shape=tf.concat([input_shape, [2]], axis=0))
-      loc, log_scale = tf.unstack(x, num=2, axis=-1)
+      shift, log_scale = tf.unstack(x, num=2, axis=-1)
       which_clip = (
           tf.clip_by_value
           if log_scale_clip_gradient else clip_by_value_preserve_gradient)
       log_scale = which_clip(log_scale, log_scale_min_clip, log_scale_max_clip)
-      return loc, log_scale
+      return shift, log_scale
 
     return tf1.make_template(name, _fn)
 
@@ -812,11 +808,11 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
                event_shape=None,
                conditional=False,
                conditional_shape=None,
-               conditional_input_all_layers=True,
+               conditional_input_layers="all_layers",
                hidden_units=None,
                input_order='left-to-right',
                hidden_degrees='equal',
-               activation=tf.keras.activations.linear,
+               activation=None,
                use_bias=True,
                kernel_initializer='glorot_uniform',
                bias_initializer='zeros',
@@ -842,8 +838,12 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         int), specifying the shape of the conditional input to this layer. If
         not specified, the conditional shape is inferred when this layer
         is first called or built.
-      conditional_input_all_layers: Python boolean whether to add conditional
-        input to all layers or just the first one.
+      conditional_input_layers: Python `str` describing how to add conditional
+        parameters to the autoregressive network. When "all_layers" the
+        conditional input will be combined with the network at every layer,
+        whilst "first_layer" combines the conditional input only at the first
+        layer which is then passed through the network autoregressively.
+        Default: 'all_layers'.
       hidden_units: Python `list`-like of non-negative integers, specifying
         the number of units in each hidden layer.
       input_order: Order of degrees to the input units: 'random',
@@ -854,7 +854,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         'equal', 'random'.  If 'equal', hidden units in each layer are allocated
         equally (up to a remainder term) to each degree.  Default: 'equal'.
       activation: An activation function.  See `tf.keras.layers.Dense`. Default:
-        `tf.keras.activations.linear,`.
+        `None`.
       use_bias: Whether or not the dense layers constructed in this layer
         should have a bias term.  See `tf.keras.layers.Dense`.  Default: `True`.
       kernel_initializer: Initializer for the `Dense` kernel weight
@@ -883,7 +883,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     self._conditional = conditional
     self._conditional_shape = (_list(conditional_shape) if conditional_shape
                                is not None else None)
-    self._all_layers = conditional_input_all_layers
+    self._conditional_layers = conditional_input_layers
     self._hidden_units = hidden_units if hidden_units is not None else []
     self._input_order_param = input_order
     self._hidden_degrees = hidden_degrees
@@ -903,8 +903,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       self._event_ndims = len(self._event_shape)
 
       if self._event_ndims != 1:
-        raise ValueError('Parameter `event_shape` must describe a rank-1 shape.'
-                         ' `event_shape: {!r}`'.format(event_shape))
+        raise ValueError('Parameter `event_shape` must describe a rank-1 shape. '
+                         '`event_shape: {!r}`'.format(event_shape))
 
     if self._conditional:
       if self._conditional_shape is not None:
@@ -912,8 +912,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         self._conditional_ndims = len(self._conditional_shape)
 
         if self._conditional_ndims != 1:
-          raise ValueError('Parameter `conditional_shape` must describe a'
-                            ' rank-1 shape. `conditional_shape: {!r}`'.format(
+          raise ValueError('Parameter `conditional_shape` must describe a '
+                            'rank-1 shape. `conditional_shape: {!r}`'.format(
                             conditional_shape))
 
     # To be built in `build`.
@@ -925,11 +925,11 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     """See tfkl.Layer.build."""
     if self._conditional:
       if self._event_shape is None:
-        raise ValueError('`event_shape` must be provided when using'
-                         ' conditional autoregressive network')
+        raise ValueError('`event_shape` must be provided when using '
+                         'conditional autoregressive network')
       if self._conditional_shape is None:
-        raise ValueError('`conditional_shape` must be provided when using'
-                         ' conditional autoregressive network')
+        raise ValueError('`conditional_shape` must be provided when using '
+                         'conditional autoregressive network')
       if (input_shape[-1] != self._event_shape[-1]):
         raise ValueError('Invalid final dimension of `input_shape`. '
                          'Expected `{!r}`, but got `{!r}`'.format(
@@ -964,18 +964,17 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     layers = [tf.keras.layers.Input((self._event_size,), dtype=self.dtype)]
     input_layer = layers[0]
     if self._conditional:
-        conditional_input = tf.keras.layers.Input((self._conditional_size,),
-                                                  dtype=self.dtype)
-        input_layer = [input_layer, conditional_input]
+      conditional_input = tf.keras.layers.Input((self._conditional_size,),
+                                                dtype=self.dtype)
+      input_layer = [input_layer, conditional_input]
 
     # Input-to-hidden, hidden-to-hidden, and hidden-to-output layers:
     #  [..., self._event_size] -> [..., self._hidden_units[0]].
     #  [..., self._hidden_units[k-1]] -> [..., self._hidden_units[k]].
     #  [..., self._hidden_units[-1]] -> [..., event_size * self._params].
     layer_output_sizes = self._hidden_units + [self._event_size * self._params]
-    layer_output_sizes = self._hidden_units + [self._event_size * self._params]
     for k in range(len(self._masks)):
-      this_autoregressive = tf.keras.layers.Dense(
+      autoregressive_layer = tf.keras.layers.Dense(
         layer_output_sizes[k],
         activation=None,
         use_bias=self._use_bias,
@@ -988,8 +987,10 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           self._masks[k], self._kernel_constraint),
         bias_constraint=self._bias_constraint,
         dtype=self.dtype)(layers[-1])
-      if self._conditional and (self._all_layers or (k == 0)):
-        this_conditional = tf.keras.layers.Dense(
+      if (self._conditional and
+            ((self._conditional_layers == "all_layers") or
+            ((self._conditional_layers == "first_layer") and (k == 0)))):
+        conditional_layer = tf.keras.layers.Dense(
           layer_output_sizes[k],
           activation=None,
           use_bias=False,
@@ -1001,19 +1002,19 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           bias_constraint=None,
           dtype=self.dtype)(conditional_input)
         layers.append(tf.keras.layers.Add()([
-          this_autoregressive,
-          this_conditional]))
+          autoregressive_layer,
+          conditional_layer]))
       else:
-        layers.append(this_autoregressive)
+        layers.append(autoregressive_layer)
       if k + 1 < len(self._masks):
-        layers.append(self._activation(layers[-1]))
+        layers.append(tf.keras.activations.get(self._activation)(layers[-1]))
     self._network = tf.keras.models.Model(
       inputs=input_layer,
       outputs=layers[-1])
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
 
-  def call(self, x, **kwargs):
+  def call(self, x, conditional=None):
     """See tfkl.Layer.call."""
     with tf.name_scope(self.name or 'AutoregressiveNetwork_call'):
       x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
@@ -1022,12 +1023,10 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
       if self._conditional:
-        if "conditional" not in kwargs.keys():
+        if "conditional" is None:
           raise ValueError('`conditional` must be passed as a named arguement')
-        elif kwargs["conditional"] is None:
-          raise ValueError('the value of `conditional` cannot be `None`')
-        else:
-          conditional = kwargs["conditional"]
+        conditional = tf.convert_to_tensor(x, dtype=self.dtype,
+                                           name="conditional")
         if tensorshape_util.rank(conditional.shape) == 1:
           conditional = conditional[tf.newaxis, ...]
         x = [x, conditional]

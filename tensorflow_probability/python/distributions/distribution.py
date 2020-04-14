@@ -958,19 +958,9 @@ class Distribution(_BaseDistribution):
     """
     return self._call_sample_n(sample_shape, seed, name, **kwargs)
 
-  def convert_conditional(self, kwargs):
-    if "conditional" in kwargs.keys():
-      if kwargs["conditional"] is None:
-        kwargs.pop("conditional")
-      else:
-        kwargs["conditional"] = _convert_to_tensor(
-          kwargs["conditional"], name="conditional", dtype_hint=self.dtype)
-    return kwargs
-
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
     value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
-    kwargs = self.convert_conditional(kwargs)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_prob'):
         return self._log_prob(value, **kwargs)
@@ -996,7 +986,6 @@ class Distribution(_BaseDistribution):
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
     value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
-    kwargs = self.convert_conditional(kwargs)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_prob'):
         return self._prob(value, **kwargs)
@@ -1022,7 +1011,6 @@ class Distribution(_BaseDistribution):
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
     value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
-    kwargs = self.convert_conditional(kwargs)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_cdf'):
         return self._log_cdf(value, **kwargs)
@@ -1058,7 +1046,6 @@ class Distribution(_BaseDistribution):
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
     value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
-    kwargs = self.convert_conditional(kwargs)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_cdf'):
         return self._cdf(value, **kwargs)
@@ -1095,7 +1082,6 @@ class Distribution(_BaseDistribution):
   def _call_log_survival_function(self, value, name, **kwargs):
     """Wrapper around _log_survival_function."""
     value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
-    kwargs = self.convert_conditional(kwargs)
     with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._log_survival_function(value, **kwargs)
@@ -1138,7 +1124,6 @@ class Distribution(_BaseDistribution):
   def _call_survival_function(self, value, name, **kwargs):
     """Wrapper around _survival_function."""
     value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
-    kwargs = self.convert_conditional(kwargs)
     with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._survival_function(value, **kwargs)
@@ -1196,7 +1181,6 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       dtype = tf.float32 if tf.nest.is_nested(self.dtype) else self.dtype
       value = tf.convert_to_tensor(value, name='value', dtype_hint=dtype)
-      kwargs = self.convert_conditional(kwargs)
       if self.validate_args:
         value = distribution_util.with_dependencies([
             assert_util.assert_less_equal(value, tf.cast(1, value.dtype),
