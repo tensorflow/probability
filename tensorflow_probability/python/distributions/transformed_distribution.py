@@ -514,10 +514,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       # returned result.
       y = self.bijector.forward(x, **bijector_kwargs)
       if "conditional" in kwargs.keys():
-        y = tf.reshape(y,
-                       tf.concat([n_samples,
-                                  n_conditional,
-                                  batch_event_shape], 0))
+        y = tf.stack(tf.split(y, c), axis=1)
         sample_shape = tf.concat([n_samples, n_conditional], 0)
       y = self._set_sample_static_shape(y, sample_shape)
 

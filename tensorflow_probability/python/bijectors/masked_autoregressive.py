@@ -1023,7 +1023,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
       if self._conditional:
-        if "conditional" is None:
+        if conditional is None:
           raise ValueError('`conditional` must be passed as a named arguement')
         conditional = tf.convert_to_tensor(x, dtype=self.dtype,
                                            name="conditional")
