@@ -57,7 +57,6 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
-        # tensorflow_datasets/testing dep,
     ],
 )
 
