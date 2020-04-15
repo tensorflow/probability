@@ -28,6 +28,9 @@ from absl import flags
 from absl import logging
 from absl.testing import parameterized
 import numpy as np
+# Reimporting numpy to prevent the reference to onp.random from being rewritten
+# for the Jax backend, while allowing rewrites of other numpy references.
+import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -692,6 +695,41 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
       arguments or command line flags.
   """
   return SeedStream(test_seed(hardcoded_seed), salt=salt)
+
+
+def test_np_rng(hardcoded_seed=None):
+  """Returns a command-line-controllable Numpy PRNG for unit tests.
+
+  When seeding unit-test PRNGs, we want:
+
+  - The seed to be fixed to an arbitrary value most of the time, so the test
+    doesn't flake even if its failure probability is noticeable.
+
+  - To switch to different seeds per run when using --runs_per_test to measure
+    the test's failure probability.
+
+  - To set the seed to a specific value when reproducing a low-probability event
+    (e.g., debugging a crash that only some seeds trigger).
+
+  To those ends, this function returns a `np.random.RandomState` seeded with
+  `test_seed` (which see).  The latter respects the command line flags
+  `--fixed_seed=<seed>` and `--vary_seed` (Boolean, default False).
+  `--vary_seed` uses system entropy to produce unpredictable seeds.
+  `--fixed_seed` takes precedence over `--vary_seed` when both are present.
+
+  Args:
+    hardcoded_seed: Optional Python value.  The seed to use if both the
+      `--vary_seed` and `--fixed_seed` flags are unset.  This should usually be
+      unnecessary, since a test should pass with any seed.
+
+  Returns:
+    rng: A `np.random.RandomState` instance seeded with 17, unless otherwise
+      specified by arguments or command line flags.
+  """
+  raw_seed = test_seed(hardcoded_seed=hardcoded_seed)
+  # Jax backend doesn't have the random module; but it shouldn't be needed,
+  # because this helper should only be used to generate test data.
+  return onp.random.RandomState(seed=raw_seed % 2**32)
 
 
 def floats_near(target, how_many, dtype=np.float32):
