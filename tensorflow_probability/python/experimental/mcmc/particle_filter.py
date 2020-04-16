@@ -708,9 +708,11 @@ def _filter_one_step(step,
         lambda: tf.zeros_like(log_weights))
 
     unnormalized_log_weights = log_weights + observation_log_weights
-    step_log_marginal_likelihood = tf.math.reduce_logsumexp(
-        unnormalized_log_weights, axis=0)
-    log_weights = (unnormalized_log_weights - step_log_marginal_likelihood)
+    log_weights = tf.nn.log_softmax(unnormalized_log_weights, axis=0)
+    # Every entry of `log_weights` differs from `unnormalized_log_weights`
+    # by the same normalizing constant. We extract that constant by examining
+    # an arbitrary entry.
+    step_log_marginal_likelihood = unnormalized_log_weights[0] - log_weights[0]
 
     # Adaptive resampling: resample particles iff the specified criterion.
     do_resample = resample_criterion_fn(unnormalized_log_weights)
