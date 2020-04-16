@@ -45,7 +45,7 @@ class _GLMTestHarness(object):
     expected_variance_, expected_grad_mean_ = self.evaluate([
         expected_variance, expected_grad_mean])
     self.assertEqual(self.model.is_canonical,
-                     np.all(expected_variance_ == expected_grad_mean_))
+                     np.allclose(expected_variance_, expected_grad_mean_))
 
   def testCallWorksCorrectly(self):
     predicted_linear_response = np.stack([
@@ -124,6 +124,18 @@ class BernoulliNormalCDFTest(test_util.TestCase, _GLMTestHarness):
       return n.cdf(r)
     self.expected = tfp.glm.CustomExponentialFamily(
         lambda mu: tfd.Bernoulli(probs=mu), normal_cdf)
+
+
+@test_util.test_all_tf_execution_regimes
+class BinomialTest(test_util.TestCase, _GLMTestHarness):
+
+  def setUp(self):
+    self.dtype = np.float32
+    self.counts = (3 * np.ones(2 * 11 * 1).reshape(2, 11, 1)).astype(self.dtype)
+    self.model = tfp.glm.Binomial(self.counts)
+    self.expected = tfp.glm.CustomExponentialFamily(
+        lambda mu: tfd.Binomial(self.counts, probs=mu / self.counts),
+        lambda r: self.counts * tf.nn.sigmoid(r))
 
 
 @test_util.test_all_tf_execution_regimes

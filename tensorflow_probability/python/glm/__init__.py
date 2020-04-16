@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.glm.family import Bernoulli
 from tensorflow_probability.python.glm.family import BernoulliNormalCDF
+from tensorflow_probability.python.glm.family import Binomial
 from tensorflow_probability.python.glm.family import CustomExponentialFamily
 from tensorflow_probability.python.glm.family import ExponentialFamily
 from tensorflow_probability.python.glm.family import GammaExp
@@ -46,6 +47,7 @@ _allowed_symbols = [
     'convergence_criteria_small_relative_norm_weights_change',
     'Bernoulli',
     'BernoulliNormalCDF',
+    'Binomial',
     'CustomExponentialFamily',
     'ExponentialFamily',
     'GammaExp',

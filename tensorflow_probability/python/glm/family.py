@@ -31,6 +31,7 @@ from tensorflow_probability.python.math.gradient import value_and_gradient
 __all__ = [
     'Bernoulli',
     'BernoulliNormalCDF',
+    'Binomial',
     'CustomExponentialFamily',
     'GammaExp',
     'GammaSoftplus',
@@ -268,6 +269,37 @@ class BernoulliNormalCDF(ExponentialFamily):
     # logit(ncdf(r)) = log(ncdf(r)) - log(1-ncdf(r)) = logncdf(r) - lognsf(r).
     logits = d.log_cdf(r) - d.log_survival_function(r)
     return tfd.Bernoulli(logits=logits).log_prob(y)
+
+
+class Binomial(ExponentialFamily):
+  """`Binomial(total_count, probs=mean)` where`
+  `mean = total_count * sigmoid(matmul(X, weights))`.
+  """
+
+  def __init__(self, total_count, name=None):
+    """Creates the ExponentialFamily.
+
+    Args:
+      total_count: Non-negative tensor defining a batch of Binomial
+        distributions. Its components should be equal to integer values.
+      name: Python `str` used as TF namescope for ops created by member
+        functions. Default value: `None` (i.e., the subclass name).
+    """
+    super(Binomial, self).__init__(name)
+    self._is_canonical = True
+    self._total_count = total_count
+
+  @property
+  def total_count(self):
+    return self._total_count
+    
+  def _call(self, r):
+    mean = self._total_count * tf.nn.sigmoid(r)
+    variance = grad_mean = mean * tf.nn.sigmoid(-r)
+    return mean, variance, grad_mean
+
+  def _log_prob(self, y, r):
+    return tfd.Binomial(self._total_count, logits=r).log_prob(y)
 
 
 class GammaExp(ExponentialFamily):
