@@ -109,7 +109,7 @@ class ExponentialFamily(object):
 
     Args:
       predicted_linear_response: `float`-like `Tensor` corresponding to
-        `tf.matmul(model_matrix, weights)`.
+        `tf.linalg.matmul(model_matrix, weights)`.
       name: Python `str` used as TF namescope for ops created by member
         functions. Default value: `None` (i.e., 'call').
 
@@ -127,12 +127,12 @@ class ExponentialFamily(object):
     """
     with self._name_scope(name, 'call'):
       predicted_linear_response = tf.convert_to_tensor(
-          value=predicted_linear_response, name='predicted_linear_response')
+          predicted_linear_response, name='predicted_linear_response')
       return self._call(predicted_linear_response)
 
   def _log_prob(self, response, predicted_linear_response):
-    """Implements the log-probability computation."""
-    raise NotImplementedError('`_log_prob` is not implemented.')
+    """Implementation for `log_prob` public function."""
+    return self.as_distribution(predicted_linear_response).log_prob(response)
 
   def log_prob(self, response, predicted_linear_response, name=None):
     """Computes `D(param=mean(r)).log_prob(response)` for linear response, `r`.
@@ -141,7 +141,7 @@ class ExponentialFamily(object):
       response: `float`-like `Tensor` representing observed ("actual")
         responses.
       predicted_linear_response: `float`-like `Tensor` corresponding to
-        `tf.matmul(model_matrix, weights)`.
+        `tf.linalg.matmul(model_matrix, weights)`.
       name: Python `str` used as TF namescope for ops created by member
         functions. Default value: `None` (i.e., 'log_prob').
 
@@ -150,14 +150,48 @@ class ExponentialFamily(object):
         representing the distribution prescribed log-probability of the observed
         `response`s.
     """
-
     with self._name_scope(name, 'log_prob'):
-      dtype = dtype_util.common_dtype([response, predicted_linear_response])
+      dtype = dtype_util.common_dtype([response, predicted_linear_response],
+                                      dtype_hint=tf.float32)
       response = tf.convert_to_tensor(
-          value=response, dtype=dtype, name='response')
+          response, dtype=dtype, name='response')
       predicted_linear_response = tf.convert_to_tensor(
-          value=predicted_linear_response, name='predicted_linear_response')
+          predicted_linear_response, dtype=dtype,
+          name='predicted_linear_response')
       return self._log_prob(response, predicted_linear_response)
+
+  def _as_distribution(self, predicted_linear_response):
+    """Implementation for `as_distribution` public function."""
+    raise NotImplementedError('`_as_distribution` is not implemented.')
+
+  def as_distribution(self, predicted_linear_response, name=None):
+    """Builds a mean parameterized TFP Distribution from linear response.
+
+    Example:
+
+    ```python
+    model = tfp.glm.Bernoulli()
+    r = tfp.glm.compute_predicted_linear_response(x, w)
+    yhat = model.as_distribution(r)
+    ```
+
+    Args:
+      predicted_linear_response: `response`-shaped `Tensor` representing linear
+        predictions based on new `model_coefficients`, i.e.,
+        `tfp.glm.compute_predicted_linear_response(
+           model_matrix, model_coefficients, offset)`.
+      name: Python `str` used as TF namescope for ops created by member
+        functions. Default value: `None` (i.e., 'log_prob').
+
+    Returns:
+      model: `tfp.distributions.Distribution`-like object with mean
+        parameterized by `predicted_linear_response`.
+    """
+    with self._name_scope(name, 'as_distribution'):
+      predicted_linear_response = tf.convert_to_tensor(
+          predicted_linear_response, dtype_hint=tf.float32,
+          name='predicted_linear_response')
+      return self._as_distribution(predicted_linear_response)
 
   def __str__(self):
     return 'tfp.glm.family.{type_name}(\'{self_name}\')'.format(
@@ -177,8 +211,7 @@ class ExponentialFamily(object):
         yield scope
 
 
-class CustomExponentialFamily(
-    ExponentialFamily):
+class CustomExponentialFamily(ExponentialFamily):
   """Constucts GLM from arbitrary distribution and inverse link function."""
 
   def __init__(self,
@@ -195,7 +228,7 @@ class CustomExponentialFamily(
         `mean = linear_model_to_mean_fn(matmul(model_matrix, weights))`.
       linear_model_to_mean_fn: Python `callable` which returns the
         distribution's required mean as computed from the predicted linear
-        response, `matmul(model_matrix, weights)`.
+        response, `tf.linalg.matmul(model_matrix, weights)`.
       is_canonical: Python `bool` indicating that taken together,
         `distribution_fn` and `linear_model_to_mean_fn` imply that the
         distribution's `variance` is equivalent to `d/dr
@@ -228,13 +261,13 @@ class CustomExponentialFamily(
     variance = self._distribution_fn(mean).variance()
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
+  def _as_distribution(self, r):
     mean = self._inverse_link_fn(r)
-    return self._distribution_fn(mean).log_prob(y)
+    return self._distribution_fn(mean)
 
 
 class Bernoulli(ExponentialFamily):
-  """`Bernoulli(probs=mean)` where `mean = sigmoid(matmul(X, weights))`."""
+  """`Bernoulli(probs=mean)` where `mean = sigmoid(X @ weights)`."""
 
   _is_canonical = True
 
@@ -243,36 +276,34 @@ class Bernoulli(ExponentialFamily):
     variance = grad_mean = mean * tf.nn.sigmoid(-r)
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
-    return tfd.Bernoulli(logits=r).log_prob(y)
+  def _as_distribution(self, r):
+    return tfd.Bernoulli(logits=r)
 
 
 class BernoulliNormalCDF(ExponentialFamily):
-  """`Bernoulli(probs=mean)` where
-  `mean = Normal(0, 1).cdf(matmul(X, weights))`."""
+  """`Bernoulli(probs=mean)` where `mean = Normal(0, 1).cdf(X @ weights)`."""
 
   _is_canonical = False
 
   def _call(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
-    d = tfd.Normal(loc=np.array(0, dtype), scale=np.array(1, dtype))
+    d = tfd.Normal(loc=tf.zeros([], dtype), scale=tf.ones([], dtype))
     mean = d.cdf(r)
     # var = cdf(r) * cdf(-r) but cdf(-r) = 1 - cdf(r) = survival_function(r).
     variance = mean * d.survival_function(r)
     grad_mean = d.prob(r)
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
+  def _as_distribution(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
-    d = tfd.Normal(loc=np.array(0, dtype), scale=np.array(1, dtype))
+    d = tfd.Normal(loc=tf.zeros([], dtype), scale=tf.ones([], dtype))
     # logit(ncdf(r)) = log(ncdf(r)) - log(1-ncdf(r)) = logncdf(r) - lognsf(r).
     logits = d.log_cdf(r) - d.log_survival_function(r)
-    return tfd.Bernoulli(logits=logits).log_prob(y)
+    return tfd.Bernoulli(logits=logits)
 
 
 class GammaExp(ExponentialFamily):
-  """`Gamma(concentration=1, rate=1 / mean)` where
-  `mean = exp(matmul(X, weights))`."""
+  """`Gamma(concentration=1, rate=1 / mean)` where `mean = exp(X @ w))`."""
 
   _is_canonical = False
 
@@ -281,15 +312,13 @@ class GammaExp(ExponentialFamily):
     variance = mean**2
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
+  def _as_distribution(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
-    g = tfd.Gamma(concentration=np.array(1, dtype), rate=tf.exp(-r))
-    return g.log_prob(y)
+    return tfd.Gamma(concentration=tf.ones([], dtype), rate=tf.exp(-r))
 
 
 class GammaSoftplus(ExponentialFamily):
-  """`Gamma(concentration=1, rate=1 / mean)` where
-  `mean = softplus(matmul(X, weights))`."""
+  """`Gamma(concentration=1, rate=1 / mean)` where `mean = softplus(X @ w))`."""
 
   _is_canonical = False
 
@@ -299,15 +328,14 @@ class GammaSoftplus(ExponentialFamily):
     grad_mean = tf.nn.sigmoid(r)
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
+  def _as_distribution(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
     mean = tf.nn.softplus(r)
-    g = tfd.Gamma(concentration=np.array(1, dtype), rate=1./mean)
-    return g.log_prob(y)
+    return tfd.Gamma(concentration=tf.ones([], dtype), rate=1. / mean)
 
 
 class Poisson(ExponentialFamily):
-  """`Poisson(rate=mean)` where `mean = exp(matmul(X, weights))`."""
+  """`Poisson(rate=mean)` where `mean = exp(X @ weights)`."""
 
   _is_canonical = True
 
@@ -315,12 +343,12 @@ class Poisson(ExponentialFamily):
     mean = variance = grad_mean = tf.exp(r)
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
-    return tfd.Poisson(log_rate=r).log_prob(y)
+  def _as_distribution(self, r):
+    return tfd.Poisson(log_rate=r)
 
 
 class PoissonSoftplus(ExponentialFamily):
-  """`Poisson(rate=mean)` where `mean = softplus(matmul(X, weights))`."""
+  """`Poisson(rate=mean)` where `mean = softplus(X @ weights)`."""
 
   _is_canonical = False
 
@@ -329,13 +357,13 @@ class PoissonSoftplus(ExponentialFamily):
     grad_mean = tf.nn.sigmoid(r)
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
-    return tfd.Poisson(rate=tf.nn.softplus(r)).log_prob(y)
+  def _as_distribution(self, r):
+    return tfd.Poisson(rate=tf.nn.softplus(r))
 
 
 class LogNormal(ExponentialFamily):
   """`LogNormal(loc=log(mean) - log(2) / 2, scale=sqrt(log(2)))` where
-  `mean = exp(matmul(X, weights))`.
+  `mean = exp(X @ weights)`.
   """
 
   _is_canonical = False
@@ -345,18 +373,16 @@ class LogNormal(ExponentialFamily):
     variance = mean**2.
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
-    dtype = dtype_util.as_numpy_dtype(r.dtype)
-    log_y = tf.math.log(y)
-    s2 = np.log(2.).astype(dtype)
-    return -log_y + tfd.Normal(
+  def _as_distribution(self, r):
+    s2 = np.log(2.).astype(dtype_util.as_numpy_dtype(r.dtype))
+    return tfd.LogNormal(
         loc=r - 0.5 * s2,
-        scale=np.sqrt(s2)).log_prob(log_y)
+        scale=np.sqrt(s2))
 
 
 class LogNormalSoftplus(ExponentialFamily):
   """`LogNormal(loc=log(mean) - log(2) / 2, scale=sqrt(log(2)))`
-  `mean = softplus(matmul(X, weights))`.
+  `mean = softplus(X @ weights)`.
   """
 
   _is_canonical = False
@@ -367,17 +393,15 @@ class LogNormalSoftplus(ExponentialFamily):
     grad_mean = tf.nn.sigmoid(r)
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
-    dtype = dtype_util.as_numpy_dtype(r.dtype)
-    log_y = tf.math.log(y)
-    s2 = np.log(2.).astype(dtype)
-    return tfd.Normal(
+  def _as_distribution(self, r):
+    s2 = np.log(2.).astype(dtype_util.as_numpy_dtype(r.dtype))
+    return tfd.LogNormal(
         loc=tf.math.log(tf.nn.softplus(r)) - 0.5 * s2,
-        scale=np.sqrt(s2)).log_prob(log_y) - log_y
+        scale=np.sqrt(s2))
 
 
 class Normal(ExponentialFamily):
-  """`Normal(loc=mean, scale=1)` where `mean = matmul(X, weights)`."""
+  """`Normal(loc=mean, scale=1)` where `mean = X @ weights`."""
 
   _is_canonical = True
 
@@ -386,22 +410,22 @@ class Normal(ExponentialFamily):
     variance = grad_mean = tf.ones_like(r)
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
+  def _as_distribution(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
-    return tfd.Normal(loc=r, scale=np.array(1, dtype)).log_prob(y)
+    return tfd.Normal(loc=r, scale=tf.ones([], dtype))
 
 
 class NormalReciprocal(ExponentialFamily):
-  """`Normal(loc=mean, scale=1)` where `mean = 1 / matmul(X, weights)`."""
+  """`Normal(loc=mean, scale=1)` where `mean = 1 / (X @ weights)`."""
 
   _is_canonical = False
 
   def _call(self, r):
     mean = 1. / r
     variance = tf.ones_like(r)
-    grad_mean = -1. / r**2
+    grad_mean = -r**-2
     return mean, variance, grad_mean
 
-  def _log_prob(self, y, r):
+  def _as_distribution(self, r):
     dtype = dtype_util.as_numpy_dtype(r.dtype)
-    return tfd.Normal(loc=1. / r, scale=np.array(1, dtype)).log_prob(y)
+    return tfd.Normal(loc=1. / r, scale=tf.ones([], dtype))
