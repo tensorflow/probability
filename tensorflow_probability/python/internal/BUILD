@@ -75,6 +75,27 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "cache_util",
+    srcs = ["cache_util.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "cache_util_test",
+    size = "small",
+    srcs = ["cache_util_test.py"],
+    deps = [
+        ":cache_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 py_library(
     name = "docstring_util",
     srcs = [
