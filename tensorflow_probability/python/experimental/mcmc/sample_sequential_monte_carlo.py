@@ -83,15 +83,15 @@ def gather_mh_like_result(results):
   raise TypeError('Cannot find MH results.')
 
 
-def _make_tempered_target_log_prob_fn(
-    prior_log_prob_fn, likelihood_log_prob_fn, temperatures):
+def default_make_tempered_target_log_prob_fn(
+    prior_log_prob_fn, likelihood_log_prob_fn, inverse_temperatures):
   """Helper which creates inner kernel target_log_prob_fn."""
   def _tempered_target_log_prob(*args):
     priorlogprob = tf.identity(prior_log_prob_fn(*args),
                                name='prior_log_prob')
     loglike = tf.identity(likelihood_log_prob_fn(*args),
                           name='likelihood_log_prob')
-    return tf.identity(priorlogprob + loglike * temperatures,
+    return tf.identity(priorlogprob + loglike * inverse_temperatures,
                        name='tempered_logp')
   return _tempered_target_log_prob
 
@@ -287,6 +287,7 @@ def sample_sequential_monte_carlo(
     max_stage=100,
     make_kernel_fn=make_rwmh_kernel_fn,
     tuning_fn=simple_heuristic_tuning,
+    make_tempered_target_log_prob_fn=default_make_tempered_target_log_prob_fn,
     ess_threshold_ratio=0.5,
     parallel_iterations=10,
     seed=None,
@@ -327,19 +328,23 @@ def sample_sequential_monte_carlo(
       object. Must take one argument representing the `TransitionKernel`'s
       `target_log_prob_fn`. The `target_log_prob_fn` argument represents the
       `TransitionKernel`'s target log distribution.  Note:
-      `sample_annealed_importance_chain` creates a new `target_log_prob_fn`
+      `sample_sequential_monte_carlo` creates a new `target_log_prob_fn`
       which is an interpolation between the supplied `target_log_prob_fn` and
       `proposal_log_prob_fn`; it is this interpolated function which is used as
       an argument to `make_kernel_fn`.
     tuning_fn: Python `callable` which takes the number of steps, the log
       scaling, and the log acceptance ratio from the last mutation and output
       the number of steps and log scaling for the next mutation.
+    make_tempered_target_log_prob_fn: Python `callable` that takes the
+      `prior_log_prob_fn`, `likelihood_log_prob_fn`, and `inverse_temperatures`
+      and creates a `target_log_prob_fn` `callable` that pass to
+      `make_kernel_fn`.
     ess_threshold_ratio: Target ratio for effective sample size.
     parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
     seed: Python integer or TFP seedstream to seed the random number generator.
     name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., 'sample_annealed_importance_chain').
+      Default value: `None` (i.e., 'sample_sequential_monte_carlo').
 
   Returns:
     n_stage: Number of the mutation stage SMC ran.
@@ -395,7 +400,7 @@ def sample_sequential_monte_carlo(
     inverse_temperature = tf.zeros(batch_shape, dtype=likelihood_log_prob.dtype)
     scalings = ps.ones_like(likelihood_log_prob) * ps.minimum(scale_start, 1.)
     kernel = make_kernel_fn(
-        _make_tempered_target_log_prob_fn(
+        make_tempered_target_log_prob_fn(
             prior_log_prob_fn,
             likelihood_log_prob_fn,
             inverse_temperature),
@@ -481,7 +486,7 @@ def sample_sequential_monte_carlo(
       with tf.name_scope('mutate_states'):
         scalings = tf.exp(log_scalings)
         kernel = make_kernel_fn(
-            _make_tempered_target_log_prob_fn(
+            make_tempered_target_log_prob_fn(
                 prior_log_prob_fn,
                 likelihood_log_prob_fn,
                 inverse_temperature),
