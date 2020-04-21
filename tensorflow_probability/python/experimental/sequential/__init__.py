@@ -18,11 +18,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.sequential.ensemble_adjustment_kalman_filter import ensemble_adjustment_kalman_filter_update
+from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import ensemble_kalman_filter_predict
+from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import ensemble_kalman_filter_update
+from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import EnsembleKalmanFilterState
+from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import inflate_by_scaled_identity_fn
 from tensorflow_probability.python.experimental.sequential.extended_kalman_filter import extended_kalman_filter
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'extended_kalman_filter',
+    'EnsembleKalmanFilterState',
+    'ensemble_kalman_filter_predict',
+    'ensemble_kalman_filter_update',
+    'ensemble_adjustment_kalman_filter_update',
+    'inflate_by_scaled_identity_fn',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)
