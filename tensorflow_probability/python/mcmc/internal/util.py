@@ -26,6 +26,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
@@ -520,22 +521,54 @@ def warn_if_parameters_are_not_simple_tensors(params_dict):
               param_name))
 
 
-def index_remapping_gather(params, indices, name='index_remapping_gather'):
-  """Uses `indices` to remap values from `axis` of `params`.
+def index_remapping_gather(params,
+                           indices,
+                           axis=0,
+                           indices_axis=0,
+                           name='index_remapping_gather'):
+  """Gather values from `axis` of `params` using `indices_axis` of `indices`.
 
-  If `rank(params) = rank(indices) = 3`, this returns `remapped`:
-  `remapped[i, j, k] = params[indices[i, j, k], j, k]`.
+  The shape of `indices` must broadcast to that of `params` when
+  their `indices_axis` and `axis` (respectively) are aligned:
 
-  In general, with `rank(indices) = K <= N = rank(params)`,
+  ```python
+  # params.shape:
+  [p[0],  ..., ...,         p[axis], ..., ..., p[rank(params)] - 1])
+  # indices.shape:
+        [i[0], ..., i[indices_axis], ..., i[rank(indices)] - 1])
+  ```
 
-  ```remapped[i, ..., N] = params[indices[i,...,K], 1,..., N].```
+  In particular, `params` must have at least as many
+  leading dimensions as `indices` (`axis >= indices_axis`), and at least as many
+  trailing dimensions (`rank(params) - axis >= rank(indices) - indices_axis`).
+
+  The `result` has the same shape as `params`, except that the dimension
+  of size `p[axis]` is replaced by one of size `i[indices_axis]`:
+
+  ```python
+  # result.shape:
+  [p[0],  ..., ..., i[indices_axis], ..., ..., p[rank(params) - 1]]
+  ```
+
+  In the case where `rank(params) == 5`, `rank(indices) == 3`, `axis = 2`, and
+  `indices_axis = 1`, the result is given by
+
+   ```python
+   # alignment is:                       v axis
+   # params.shape    ==   [p[0], p[1], p[2], p[3], p[4]]
+   # indices.shape   ==         [i[0], i[1], i[2]]
+   #                                     ^ indices_axis
+   result[i, j, k, l, m] = params[i, j, indices[j, k, l], l, m]
+  ```
 
   Args:
     params:  `N-D` `Tensor` (`N > 0`) from which to gather values.
       Number of dimensions must be known statically.
-    indices: `Tensor` with values in `{0, ..., params.shape[0]-1}`, and
-      `indices.shape[1:]` able to do a left-justified broadcast with
-      `params.shape[1:]`.
+    indices: `Tensor` with values in `{0, ..., params.shape[axis] - 1}`, whose
+      shape broadcasts to that of `params` as described above.
+    axis: Python `int` axis of `params` from which to gather.
+    indices_axis: Python `int` axis of `indices` to align with the `axis`
+      over which `params` is gathered.
     name: String name for scoping created ops.
 
   Returns:
@@ -550,11 +583,30 @@ def index_remapping_gather(params, indices, name='index_remapping_gather'):
 
     params_ndims = params.shape.ndims
     indices_ndims = indices.shape.ndims
+    # `axis` dtype must match ndims, which are 64-bit Python ints.
+    axis = tf.get_static_value(tf.convert_to_tensor(axis, dtype=tf.int64))
+    indices_axis = tf.get_static_value(
+        tf.convert_to_tensor(indices_axis, dtype=tf.int64))
 
     if params_ndims is None:
       raise ValueError(
           'Rank of `params`, must be known statically. This is due to '
           'tf.gather not accepting a `Tensor` for `batch_dims`.')
+
+    if axis is None:
+      raise ValueError(
+          '`axis` must be known statically. This is due to '
+          'tf.gather not accepting a `Tensor` for `batch_dims`.')
+
+    if indices_axis is None:
+      raise ValueError(
+          '`indices_axis` must be known statically. This is due to '
+          'tf.gather not accepting a `Tensor` for `batch_dims`.')
+
+    if indices_axis > axis:
+      raise ValueError(
+          '`indices_axis` should be <= `axis`, but was {} > {}'.format(
+              indices_axis, axis))
 
     if params_ndims < 1:
       raise ValueError(
@@ -564,32 +616,42 @@ def index_remapping_gather(params, indices, name='index_remapping_gather'):
       raise ValueError(
           'Rank of indices should be `> 0`, but was {}'.format(indices_ndims))
 
-    if indices_ndims is not None and indices_ndims > params_ndims:
+    if (indices_ndims is not None and
+        (indices_ndims - indices_axis > params_ndims - axis)):
       raise ValueError(
-          'Rank of `params` ({}) must be >= rank of `indices` ({}), but was '
-          'not'.format(params_ndims, indices_ndims))
+          '`rank(params) - axis` ({} - {}) must be >= `rank(indices) - '
+          'indices_axis` ({} - {}), but was not.'.format(
+              params_ndims, axis, indices_ndims, indices_axis))
 
-    # tf.gather requires batch dims to have identical shape.
-    bcast_shape = prefer_static.pad(
-        prefer_static.shape(params)[1:],
-        paddings=[[1, 0]],
-        constant_values=prefer_static.size0(indices))
-    indices = left_justified_broadcast_to(indices, bcast_shape)
+    # `tf.gather` requires the axis to be the rightmost batch ndim. So, we
+    # transpose `indices_axis` to be the rightmost dimension of `indices`...
+    transposed_indices = dist_util.move_dimension(indices,
+                                                  source_idx=indices_axis,
+                                                  dest_idx=-1)
 
-    # perm_fwd rotates dimensions left, perm_rev rotates right.
-    perm_fwd = prefer_static.pad(prefer_static.range(1, params_ndims),
-                                 paddings=[[0, 1]],
-                                 constant_values=0)
-    perm_rev = prefer_static.pad(prefer_static.range(params_ndims - 1),
-                                 paddings=[[1, 0]],
-                                 constant_values=params_ndims - 1)
+    # ... and `axis` to be the corresponding (aligned as in the docstring)
+    # dimension of `params`.
+    broadcast_indices_ndims = indices_ndims + (axis - indices_axis)
+    transposed_params = dist_util.move_dimension(
+        params,
+        source_idx=axis,
+        dest_idx=broadcast_indices_ndims - 1)
 
-    # result_t[i, ..., N] = params_t[i, ..., N-1, indices_t[i, ..., N]].
-    # I.e., we're gathering on axis=-1, with all but the last dim a batch dim.
-    result_t = tf.gather(
-        # Transpose params/indices so that the `axis` dimension is rightmost.
-        tf.transpose(params, perm_fwd),
-        tf.transpose(indices, perm_fwd),
-        batch_dims=params_ndims - 1, axis=-1)
+    # Next we broadcast `indices` so that its shape has the same prefix as
+    # `params.shape`.
+    transposed_params_shape = prefer_static.shape(transposed_params)
+    result_shape = prefer_static.concat([
+        transposed_params_shape[:broadcast_indices_ndims - 1],
+        prefer_static.shape(indices)[indices_axis:indices_axis + 1],
+        transposed_params_shape[broadcast_indices_ndims:]], axis=0)
+    broadcast_indices = prefer_static.broadcast_to(
+        transposed_indices,
+        result_shape[:broadcast_indices_ndims])
 
-    return tf.transpose(result_t, perm_rev)
+    result_t = tf.gather(transposed_params,
+                         broadcast_indices,
+                         batch_dims=broadcast_indices_ndims - 1,
+                         axis=broadcast_indices_ndims - 1)
+    return dist_util.move_dimension(result_t,
+                                    source_idx=broadcast_indices_ndims - 1,
+                                    dest_idx=axis)
