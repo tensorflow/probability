@@ -122,7 +122,7 @@ class Exponential(gamma.Gamma):
 
   def _log_survival_function(self, value):
     rate = tf.convert_to_tensor(self._rate)
-    return self._log_prob(value, rate=rate) - tf.math.log(rate)
+    return - value * rate
 
   def _sample_n(self, n, seed=None):
     rate = tf.convert_to_tensor(self.rate)

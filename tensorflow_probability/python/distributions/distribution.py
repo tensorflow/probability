@@ -1374,6 +1374,34 @@ class Distribution(_BaseDistribution):
     # must ensure that assertions are applied for both `self` and `other`.
     return self._kl_divergence(other)
 
+  def cross_entropy_with_quantiles(self, pred_true, quantiles,
+                                   name="cross_entropy_with_quantiles"):
+    """Computes the cross entropy given quantiles.
+
+    Args:
+      pred_true: A `Tensor` of the same type and shape as `quantiles`.
+      quantiles: A `Tensor` of type `self.dtype`.
+      name: Python `str` prepended to names of ops created by this function.
+
+    Returns:
+      cross_entropy: `self.dtype` `Tensor` of the same shape as `quantiles`
+      with the componentwise cross entropy losses.
+
+    Raises:
+      ValueError: If `quantiles` and `pred_true` do not have the same shape.
+    """
+    with self._name_and_control_scope(name):
+      try:
+        pred_true.get_shape().merge_with(quantiles.get_shape())
+      except ValueError:
+        raise ValueError(
+          "quantiles and pred_true must have the same shape (%s vs %s)" %
+          (quantiles.get_shape(), pred_true.get_shape()))
+      ft = - tf.math.multiply_no_nan(self.log_cdf(quantiles), pred_true)
+      st = - tf.math.multiply_no_nan(self.log_survival_function(quantiles),
+                                     1.-pred_true)
+      return ft + st
+
   def _default_event_space_bijector(self):
     raise NotImplementedError(
         '_default_event_space_bijector` is not implemented: {}'.format(

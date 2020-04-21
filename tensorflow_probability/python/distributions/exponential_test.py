@@ -231,5 +231,45 @@ class ExponentialTest(test_util.TestCase):
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
+  def testExponentialCrossEntropyWithQuantiles(self):
+    batch_size = 7
+    lam_v = 2.0
+    lam = tf.constant([lam_v] * batch_size)
+
+    exponential = tfd.Exponential(rate=lam, validate_args=True)
+
+    # No numerical issue
+    pred_true = np.array([0., 1., 1., 0., 1., 0., 0.], dtype=np.float32)
+    quantiles = np.array([0.1, 2.5, 4.0, 0.1, 1.0, 2.0, 2.5], dtype=np.float32)
+
+    cross_entropy = exponential.cross_entropy_with_quantiles(
+      tf.convert_to_tensor(pred_true),
+      tf.convert_to_tensor(quantiles))
+    self.assertEqual(cross_entropy.shape, (7,))
+
+    expected_cross_entropy = - pred_true * tf.math.log(
+      exponential.cdf(quantiles)
+    ) - (1. - pred_true) * tf.math.log(1. - exponential.cdf(quantiles))
+    self.assertAllClose(self.evaluate(cross_entropy),
+                        self.evaluate(expected_cross_entropy))
+
+    # Numerical issue
+    pred_true = np.array([0., 0., 0., 0., 1., 0., 0.], dtype=np.float32)
+    quantiles = np.array([1e-1., 1e-2, 30., 40., 50., 60., 70.0],
+                         dtype=np.float32)
+    cross_entropy = exponential.cross_entropy_with_quantiles(
+      tf.convert_to_tensor(pred_true),
+      tf.convert_to_tensor(quantiles))
+    expected_cross_entropy = lam_v * quantiles
+    expected_cross_entropy[4] = 0.
+    self.assertAllClose(self.evaluate(cross_entropy),
+                        expected_cross_entropy)
+    wrong_cross_entropy = - pred_true * tf.math.log(
+      exponential.cdf(quantiles)
+    ) - (1. - pred_true) * tf.math.log(1. - exponential.cdf(quantiles))
+    self.assertTrue(
+      np.all(np.not_equal(self.evaluate(wrong_cross_entropy),
+                          expected_cross_entropy)))
+
 if __name__ == "__main__":
   tf.test.main()
