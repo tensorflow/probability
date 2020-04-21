@@ -25,7 +25,7 @@ from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import docstring_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -81,7 +81,7 @@ class SampleParticles(distribution_lib.Distribution):
 
   def _batch_shape_tensor(self, **kwargs):
     return tf.nest.map_structure(
-        lambda b: prefer_static.concat([[self.num_particles], b], axis=0),
+        lambda b: ps.concat([[self.num_particles], b], axis=0),
         self.distribution.batch_shape_tensor(**kwargs))
 
   def _log_prob(self, x, **kwargs):
@@ -99,7 +99,7 @@ class SampleParticles(distribution_lib.Distribution):
   # TODO(b/152797117): Override _sample_n, once it supports joint distributions.
   def sample(self, sample_shape=(), seed=None, name=None):
     with tf.name_scope(name or 'sample_particles'):
-      sample_shape = prefer_static.concat([
+      sample_shape = ps.concat([
           dist_util.expand_to_vector(sample_shape),
           [self.num_particles]], axis=0)
       return self.distribution.sample(sample_shape, seed=seed)
@@ -117,15 +117,15 @@ def _batch_gather(params, indices, axis=0):
   Returns:
     result: `Tensor` of the same type and shape as `params`.
   """
-  params_rank = prefer_static.rank_from_shape(prefer_static.shape(params))
-  indices_rank = prefer_static.rank_from_shape(prefer_static.shape(indices))
+  params_rank = ps.rank_from_shape(ps.shape(params))
+  indices_rank = ps.rank_from_shape(ps.shape(indices))
   params_with_axis_on_right = dist_util.move_dimension(
       params, source_idx=axis, dest_idx=-1)
-  indices_with_axis_on_right = prefer_static.broadcast_to(
+  indices_with_axis_on_right = ps.broadcast_to(
       dist_util.move_dimension(indices,
                                source_idx=axis - (params_rank - indices_rank),
                                dest_idx=-1),
-      prefer_static.shape(params_with_axis_on_right))
+      ps.shape(params_with_axis_on_right))
 
   result = tf.gather(params_with_axis_on_right,
                      indices_with_axis_on_right,
@@ -136,35 +136,34 @@ def _batch_gather(params, indices, axis=0):
 
 def _dummy_indices_like(indices):
   """Returns dummy indices ([0, 1, 2, ...]) with batch shape like `indices`."""
-  indices_shape = prefer_static.shape(indices)
+  indices_shape = ps.shape(indices)
   num_particles = indices_shape[0]
   return tf.broadcast_to(
-      prefer_static.reshape(
-          prefer_static.range(num_particles),
-          prefer_static.concat([[num_particles],
-                                prefer_static.ones([
-                                    prefer_static.rank_from_shape(
-                                        indices_shape) - 1], dtype=np.int32)],
-                               axis=0)),
+      ps.reshape(
+          ps.range(num_particles),
+          ps.concat([[num_particles],
+                     ps.ones([ps.rank_from_shape(indices_shape) - 1],
+                             dtype=np.int32)],
+                    axis=0)),
       indices_shape)
 
 
 def _gather_history(structure, step, num_steps):
   """Gather up to `num_steps` of history from a nested structure."""
-  initial_step = prefer_static.maximum(0, step - num_steps)
+  initial_step = ps.maximum(0, step - num_steps)
   return tf.nest.map_structure(
-      lambda x: tf.gather(x, prefer_static.range(initial_step, step)),
+      lambda x: tf.gather(x, ps.range(initial_step, step)),
       structure)
 
 
 def ess_below_threshold(unnormalized_log_weights, threshold=0.5):
   """Determines if the effective sample size is much less than num_particles."""
   with tf.name_scope('ess_below_threshold'):
-    num_particles = prefer_static.shape(unnormalized_log_weights)[0]
+    num_particles = ps.shape(unnormalized_log_weights)[0]
     log_weights = tf.math.log_softmax(unnormalized_log_weights, axis=0)
     log_ess = -tf.math.reduce_logsumexp(2 * log_weights, axis=0)
-    return log_ess < (prefer_static.log(num_particles) +
-                      prefer_static.log(threshold))
+    return log_ess < (ps.log(num_particles) +
+                      ps.log(threshold))
 
 
 ParticleFilterStepResults = collections.namedtuple(
@@ -496,7 +495,7 @@ def particle_filter(observations,
   """
   seed = SeedStream(seed, 'particle_filter')
   with tf.name_scope(name or 'particle_filter'):
-    num_observation_steps = prefer_static.shape(
+    num_observation_steps = ps.shape(
         tf.nest.flatten(observations)[0])[0]
     num_timesteps = (
         1 + num_transitions_per_observation * (num_observation_steps - 1))
@@ -517,14 +516,14 @@ def particle_filter(observations,
     # Initially the particles all have the same weight, `1. / num_particles`.
     broadcast_batch_shape = tf.convert_to_tensor(
         functools.reduce(
-            prefer_static.broadcast_shape,
+            ps.broadcast_shape,
             tf.nest.flatten(initial_state_prior.batch_shape_tensor()),
             []), dtype=tf.int32)
-    log_uniform_weights = prefer_static.zeros(
-        prefer_static.concat([
+    log_uniform_weights = ps.zeros(
+        ps.concat([
             [num_particles],
             broadcast_batch_shape], axis=0),
-        dtype=tf.float32) - prefer_static.log(num_particles)
+        dtype=tf.float32) - ps.log(num_particles)
 
     # Initialize from the prior, and incorporate the first observation.
     initial_step_results = _filter_one_step(
@@ -551,8 +550,8 @@ def particle_filter(observations,
       step_has_observation = (
           # The second of these conditions subsumes the first, but both are
           # useful because the first can often be evaluated statically.
-          prefer_static.equal(num_transitions_per_observation, 1) |
-          prefer_static.equal(step % num_transitions_per_observation, 0))
+          ps.equal(num_transitions_per_observation, 1) |
+          ps.equal(step % num_transitions_per_observation, 0))
       observation_idx = step // num_transitions_per_observation
       current_observation = tf.nest.map_structure(
           lambda x, step=step: tf.gather(x, observation_idx), observations)
@@ -597,7 +596,7 @@ def particle_filter(observations,
                                     loop_results.accumulated_step_results)
     if num_transitions_per_observation != 1:
       # Return a log-prob for each observed step.
-      observed_steps = prefer_static.range(
+      observed_steps = ps.range(
           0, num_timesteps, num_transitions_per_observation)
       results = results._replace(
           step_log_marginal_likelihood=tf.gather(
@@ -627,8 +626,8 @@ def _initialize_loop_variables(initial_step_results,
     state_history = tf.nest.map_structure(
         lambda x: tf.broadcast_to(  # pylint: disable=g-long-lambda
             x[tf.newaxis, ...],
-            prefer_static.concat([[num_steps_state_history_to_pass],
-                                  prefer_static.shape(x)], axis=0)),
+            ps.concat([[num_steps_state_history_to_pass],
+                       ps.shape(x)], axis=0)),
         initial_step_results.particles)
 
   return ParticleFilterLoopVariables(
@@ -687,7 +686,7 @@ def _filter_one_step(step,
   """Advances the particle filter by a single time step."""
   with tf.name_scope('filter_one_step'):
     seed = SeedStream(seed, 'filter_one_step')
-    num_particles = prefer_static.shape(log_weights)[0]
+    num_particles = ps.shape(log_weights)[0]
 
     proposed_particles, proposal_log_weights = _propose_with_log_weights(
         step=step - 1,
@@ -699,12 +698,12 @@ def _filter_one_step(step,
 
     # If this step has an observation, compute its weights and marginal
     # likelihood (and otherwise, leave weights unchanged).
-    observation_log_weights = prefer_static.cond(
+    observation_log_weights = ps.cond(
         has_observation,
-        lambda: prefer_static.broadcast_to(  # pylint: disable=g-long-lambda
+        lambda: ps.broadcast_to(  # pylint: disable=g-long-lambda
             _compute_observation_log_weights(
                 step, proposed_particles, observation, observation_fn),
-            prefer_static.shape(log_weights)),
+            ps.shape(log_weights)),
         lambda: tf.zeros_like(log_weights))
 
     unnormalized_log_weights = log_weights + observation_log_weights
@@ -727,12 +726,12 @@ def _filter_one_step(step,
     resampled_particles, resample_indices = _resample(
         proposed_particles, log_weights, resample_independent, seed=seed)
 
-    uniform_weights = (prefer_static.zeros_like(log_weights) -
-                       prefer_static.log(num_particles))
+    uniform_weights = (ps.zeros_like(log_weights) -
+                       ps.log(num_particles))
     (resampled_particles,
      resample_indices,
      log_weights) = tf.nest.map_structure(
-         lambda r, p: prefer_static.where(do_resample, r, p),
+         lambda r, p: ps.where(do_resample, r, p),
          (resampled_particles, resample_indices, uniform_weights),
          (proposed_particles,
           _dummy_indices_like(resample_indices),
@@ -825,7 +824,7 @@ def _resample(particles, log_weights, resample_fn, seed=None):
     resample_indices: int `Tensor` of shape `[num_particles, b1, ..., bN]`.
   """
   with tf.name_scope('resample'):
-    weights_shape = prefer_static.shape(log_weights)
+    weights_shape = ps.shape(log_weights)
     num_particles = weights_shape[0]
     log_probs = tf.math.log_softmax(log_weights, axis=0)
     resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
@@ -893,16 +892,16 @@ def resample_independent(log_probs, event_size, sample_shape,
     log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
     log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
 
-    batch_shape = prefer_static.shape(log_probs)[:-1]
-    num_markers = prefer_static.shape(log_probs)[-1]
+    batch_shape = ps.shape(log_probs)[:-1]
+    num_markers = ps.shape(log_probs)[-1]
 
     # `working_shape` specifies the total number of events
     # we will be generating.
-    working_shape = prefer_static.concat([sample_shape, batch_shape], axis=0)
+    working_shape = ps.concat([sample_shape, batch_shape], axis=0)
     # `points_shape` is the shape of the final result.
-    points_shape = prefer_static.concat([working_shape, [event_size]], axis=0)
+    points_shape = ps.concat([working_shape, [event_size]], axis=0)
     # `markers_shape` is the shape of the markers we temporarily insert.
-    markers_shape = prefer_static.concat([working_shape, [num_markers]], axis=0)
+    markers_shape = ps.concat([working_shape, [num_markers]], axis=0)
     # Generate one real point for each particle.
     log_points = -exponential.Exponential(
         rate=tf.constant(1.0, dtype=log_probs.dtype)).sample(
@@ -932,23 +931,23 @@ def resample_independent(log_probs, event_size, sample_shape,
     # two in the last.
     #
     # All of these computations are carried out in batched form.
-    markers = prefer_static.concat(
+    markers = ps.concat(
         [tf.zeros(points_shape, dtype=tf.int32),
          tf.ones(markers_shape, dtype=tf.int32)],
         axis=-1)
     log_marker_positions = tf.broadcast_to(
         tf.math.cumulative_logsumexp(log_probs, axis=-1),
         markers_shape)
-    log_points_and_markers = prefer_static.concat(
+    log_points_and_markers = ps.concat(
         [log_points, log_marker_positions], axis=-1)
     indices = tf.argsort(log_points_and_markers, axis=-1, stable=False)
     sorted_markers = tf.gather_nd(
         markers,
         indices[..., tf.newaxis],
         batch_dims=(
-            prefer_static.rank_from_shape(sample_shape) +
-            prefer_static.rank_from_shape(batch_shape)))
-    markers_and_samples = prefer_static.cast(
+            ps.rank_from_shape(sample_shape) +
+            ps.rank_from_shape(batch_shape)))
+    markers_and_samples = ps.cast(
         tf.cumsum(sorted_markers, axis=-1), dtype=tf.int32)
     markers_and_samples = tf.minimum(markers_and_samples, num_markers - 1)
     # Collect up samples, omitting markers.
@@ -988,7 +987,7 @@ def _scatter_nd_batch(indices, updates, shape, batch_dims=0):
   # data that can be losslessly converted to `tf.float64` and back.
   dtype = updates.dtype
   internal_dtype = tf.float64
-  multipliers = prefer_static.cast(updates, internal_dtype)
+  multipliers = ps.cast(updates, internal_dtype)
   with tf.GradientTape() as tape:
     zeros = tf.zeros(shape, dtype=internal_dtype)
     tape.watch(zeros)
@@ -997,7 +996,7 @@ def _scatter_nd_batch(indices, updates, shape, batch_dims=0):
         indices,
         batch_dims=batch_dims)
   grad = tape.gradient(weighted_gathered, zeros)
-  return prefer_static.cast(grad, dtype=dtype)
+  return ps.cast(grad, dtype=dtype)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -1043,9 +1042,8 @@ def resample_minimum_variance(
     log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
     log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
 
-    batch_shape = prefer_static.shape(log_probs)[:-1]
-    working_shape = prefer_static.concat([sample_shape, batch_shape],
-                                         axis=-1)
+    batch_shape = ps.shape(log_probs)[:-1]
+    working_shape = ps.concat([sample_shape, batch_shape], axis=-1)
     log_cdf = tf.math.cumulative_logsumexp(log_probs[..., :-1],
                                            axis=-1)
     # Each resampling requires a single uniform random variable
@@ -1055,14 +1053,14 @@ def resample_minimum_variance(
             working_shape, seed=seed)[..., tf.newaxis]
     # It is possible for numerical error to result in a cumulative
     # sum that exceeds 1 so we need to clip.
-    markers = prefer_static.cast(
+    markers = ps.cast(
         tf.floor(event_size * tf.math.exp(log_cdf) + offset), tf.int32)
     indices = markers[..., tf.newaxis]
-    updates = tf.ones(prefer_static.shape(indices)[:-1], dtype=tf.int32)
-    scatter_shape = prefer_static.concat(
+    updates = tf.ones(ps.shape(indices)[:-1], dtype=tf.int32)
+    scatter_shape = ps.concat(
         [working_shape, [event_size + 1]], axis=-1)
-    batch_dims = (prefer_static.rank_from_shape(sample_shape) +
-                  prefer_static.rank_from_shape(batch_shape))
+    batch_dims = (ps.rank_from_shape(sample_shape) +
+                  ps.rank_from_shape(batch_shape))
     x = _scatter_nd_batch(indices, updates, scatter_shape,
                           batch_dims=batch_dims)
 
