@@ -23,6 +23,7 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -203,9 +204,7 @@ class GammaGamma(distribution.Distribution):
     mixing_rate = tf.convert_to_tensor(self.mixing_rate)
 
     log_normalization = (
-        tf.math.lgamma(concentration) +
-        tf.math.lgamma(mixing_concentration) -
-        tf.math.lgamma(concentration + mixing_concentration) -
+        tfp_math.lbeta(concentration, mixing_concentration) -
         mixing_concentration * tf.math.log(mixing_rate))
 
     log_unnormalized_prob = (tf.math.xlogy(concentration - 1., x) -

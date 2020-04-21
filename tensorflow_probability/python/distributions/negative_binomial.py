@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -179,9 +180,8 @@ class NegativeBinomial(distribution.Distribution):
     logits = self._logits_parameter_no_checks()
     log_unnormalized_prob = (total_count * tf.math.log_sigmoid(-logits) +
                              x * tf.math.log_sigmoid(logits))
-    log_normalization = (-tf.math.lgamma(total_count + x) +
-                         tf.math.lgamma(1. + x) +
-                         tf.math.lgamma(total_count))
+    log_normalization = (tfp_math.lbeta(1. + x, total_count) +
+                         tf.math.log(total_count + x))
     return log_unnormalized_prob - log_normalization
 
   def _mean(self, logits=None):

@@ -21,9 +21,12 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
+# Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
+# Need this for private symbol broadcast_gradient_args
+from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -262,7 +265,18 @@ def _log_gamma_difference_big_y(x, y):
   return correction + cancelled_stirling
 
 
-@tf.custom_gradient
+def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
+  if (a.shape.is_fully_defined() and b.shape.is_fully_defined() and
+      a.shape == b.shape):
+    return [grad_a, grad_b]
+  a_shape = tf.shape(a)
+  b_shape = tf.shape(b)
+  ra, rb = array_ops.broadcast_gradient_args(a_shape, b_shape)
+  grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
+  grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)
+  return [grad_a, grad_b]
+
+
 def log_gamma_difference(x, y, name=None):
   """Returns lgamma(y) - lgamma(x + y), accurately.
 
@@ -289,20 +303,31 @@ def log_gamma_difference(x, y, name=None):
     x = tf.convert_to_tensor(x, dtype=dtype)
     y = tf.convert_to_tensor(y, dtype=dtype)
 
-    big_y = _log_gamma_difference_big_y(x, y)
-    small_y = tf.math.lgamma(y) - tf.math.lgamma(x + y)
-    answer = tf.where(y >= 8, big_y, small_y)
+    @tf.custom_gradient
+    def _log_gamma_difference(x, y):
+      """lgamma(y) - lgamma(x + y), accurately."""
+      big_y = _log_gamma_difference_big_y(x, y)
+      small_y = tf.math.lgamma(y) - tf.math.lgamma(x + y)
+      answer = tf.where(y >= 8, big_y, small_y)
 
-    def grad(danswer):
-      # Computing the gradient naively as the difference of digammas because (i)
-      # digamma grows slower than gamma, so gets into bad cancellations later,
-      # and (ii) doing better is work.  This matches what the gradient would be
-      # if the forward pass were computed naively as the difference of lgammas.
-      px = -tf.math.digamma(x + y)
-      py = tf.math.digamma(y) + px
-      return [px * danswer, py * danswer]
+      def grad(danswer):
+        """Gradient of _log_gamma_difference."""
+        # Computing the gradient naively as the difference of digammas because
+        # (i) digamma grows slower than gamma, so gets into bad cancellations
+        # later, and (ii) doing better is work.  This matches what the gradient
+        # would be if the forward pass were computed naively as the difference
+        # of lgammas.
+        #
+        # Note: This gradient assumes x and y are the same shape; this needs to
+        # be arranged by pre-broadcasting before calling
+        # `_log_gamma_difference`.
+        px = -tf.math.digamma(x + y)
+        py = tf.math.digamma(y) + px
+        return _fix_gradient_for_broadcasting(x, y, px * danswer, py * danswer)
 
-    return answer, grad
+      return answer, grad
+
+    return _log_gamma_difference(x, y)
 
 
 def _lbeta_no_gradient(x, y):
@@ -347,10 +372,12 @@ def _lbeta_gradient(x, y):
   """Computes log(Beta(x, y)) with correct custom gradient."""
   answer = _lbeta_no_gradient(x, y)
   def gradient(danswer):
+    # This gradient assumes x and y are the same shape; this needs to be
+    # arranged by pre-broadcasting before calling `_lbeta_gradient`.
     total_digamma = tf.math.digamma(x + y)
     px = tf.math.digamma(x) - total_digamma
     py = tf.math.digamma(y) - total_digamma
-    return [px * danswer, py * danswer]
+    return _fix_gradient_for_broadcasting(x, y, px * danswer, py * danswer)
   return answer, gradient
 
 

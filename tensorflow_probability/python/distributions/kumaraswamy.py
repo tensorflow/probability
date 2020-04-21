@@ -211,9 +211,9 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
                                               tf.shape(total_concentration))
     expanded_concentration0 = tf.broadcast_to(concentration0,
                                               tf.shape(total_concentration))
-    beta_arg0 = 1 + n / expanded_concentration1
-    beta_arg = tf.stack([beta_arg0, expanded_concentration0], -1)
-    return tf.math.log(expanded_concentration0) + tf.math.lbeta(beta_arg)
+    beta_arg = 1 + n / expanded_concentration1
+    return (tf.math.log(expanded_concentration0) +
+            tfp_math.lbeta(beta_arg, expanded_concentration0))
 
   def _mean(self):
     return tf.exp(self._log_moment(1))

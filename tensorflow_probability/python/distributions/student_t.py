@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -98,8 +99,7 @@ def log_prob(x, df, loc, scale):
   log_unnormalized_prob = -0.5 * (df + 1.) * log1psquare(y)
   log_normalization = (
       tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
-      0.5 * np.log(np.pi) + tf.math.lgamma(0.5 * df) -
-      tf.math.lgamma(0.5 * (df + 1.)))
+      0.5 * np.log(np.pi) + tfp_math.log_gamma_difference(0.5, 0.5 * df))
   return log_unnormalized_prob - log_normalization
 
 
@@ -139,11 +139,10 @@ def entropy(df, scale, batch_shape, dtype):
   Returns:
     A `Tensor` of the entropy for a Student's T with these parameters.
   """
-  v = tf.ones(batch_shape, dtype=dtype)[..., tf.newaxis]
-  u = v * df[..., tf.newaxis]
-  beta_arg = tf.concat([u, v], -1) / 2.
+  v = tf.ones(batch_shape, dtype=dtype)
+  u = v * df
   return (tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
-          tf.math.lbeta(beta_arg) + 0.5 * (df + 1.) *
+          tfp_math.lbeta(u / 2., v / 2.) + 0.5 * (df + 1.) *
           (tf.math.digamma(0.5 * (df + 1.)) - tf.math.digamma(0.5 * df)))
 
 

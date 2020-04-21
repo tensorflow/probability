@@ -159,6 +159,11 @@ VECTORIZED_LOGPROB_ATOL.update({
     'LKJ': 1e-3,
 })
 
+VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
+VECTORIZED_LOGPROB_RTOL.update({
+    'NegativeBinomial': 1e-5,
+})
+
 
 def extra_tensor_conversions_allowed(dist):
   """Returns number of extra tensor conversions allowed for the input dist."""
@@ -586,7 +591,8 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
       batch_lp = dist.log_prob(sample)
       pfor_lp_, batch_lp_ = self.evaluate((pfor_lp, batch_lp))
       self.assertAllClose(pfor_lp_, batch_lp_,
-                          atol=VECTORIZED_LOGPROB_ATOL[dist_name])
+                          atol=VECTORIZED_LOGPROB_ATOL[dist_name],
+                          rtol=VECTORIZED_LOGPROB_RTOL[dist_name])
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}

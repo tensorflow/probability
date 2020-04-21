@@ -134,6 +134,20 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(gx, simple_gx)
     self.assertAllClose(gy, simple_gy)
 
+  def testLogGammaDifferenceGradientBroadcasting(self):
+    def simple_difference(x, y):
+      return tf.math.lgamma(y) - tf.math.lgamma(x + y)
+    x = tf.constant(1.)
+    y = tf.constant([[1., 2., 3.], [4., 5., 6.]])
+    _, [simple_gx_, simple_gy_] = tfp.math.value_and_gradient(
+        simple_difference, [x, y])
+    _, [gx_, gy_] = tfp.math.value_and_gradient(
+        tfp_math.log_gamma_difference, [x, y])
+    simple_gx, simple_gy, gx, gy = self.evaluate(
+        [simple_gx_, simple_gy_, gx_, gy_])
+    self.assertAllClose(gx, simple_gx)
+    self.assertAllClose(gy, simple_gy)
+
   def testLogBeta(self):
     x = tfp.distributions.HalfCauchy(loc=1., scale=15.).sample(
         10000, test_util.test_seed())
@@ -158,6 +172,19 @@ class SpecialTest(test_util.TestCase):
         10000, test_util.test_seed())
     y = tfp.distributions.HalfCauchy(loc=1., scale=15.).sample(
         10000, test_util.test_seed())
+    _, [simple_gx_, simple_gy_] = tfp.math.value_and_gradient(
+        simple_lbeta, [x, y])
+    _, [gx_, gy_] = tfp.math.value_and_gradient(tfp_math.lbeta, [x, y])
+    simple_gx, simple_gy, gx, gy = self.evaluate(
+        [simple_gx_, simple_gy_, gx_, gy_])
+    self.assertAllClose(gx, simple_gx)
+    self.assertAllClose(gy, simple_gy)
+
+  def testLogBetaGradientBroadcasting(self):
+    def simple_lbeta(x, y):
+      return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
+    x = tf.constant(1.)
+    y = tf.constant([[1., 2., 3.], [4., 5., 6.]])
     _, [simple_gx_, simple_gy_] = tfp.math.value_and_gradient(
         simple_lbeta, [x, y])
     _, [gx_, gy_] = tfp.math.value_and_gradient(tfp_math.lbeta, [x, y])

@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -275,8 +276,7 @@ class Beta(distribution.Distribution):
             tf.math.xlog1py(concentration0 - 1., -x))
 
   def _log_normalization(self, concentration1, concentration0):
-    return (tf.math.lgamma(concentration1) + tf.math.lgamma(concentration0) -
-            tf.math.lgamma(concentration1 + concentration0))
+    return tfp_math.lbeta(concentration1, concentration0)
 
   def _entropy(self):
     concentration1 = tf.convert_to_tensor(self.concentration1)
