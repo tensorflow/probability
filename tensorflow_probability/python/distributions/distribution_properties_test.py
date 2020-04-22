@@ -157,6 +157,7 @@ VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
     'CholeskyLKJ': 1e-4,
     'LKJ': 1e-3,
+    'BetaBinomial': 1e-5,
 })
 
 VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
