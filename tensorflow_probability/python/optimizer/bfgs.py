@@ -79,6 +79,7 @@ def minimize(value_and_gradients_function,
              parallel_iterations=1,
              stopping_condition=None,
              validate_args=True,
+             max_line_search_iterations=50,
              name=None):
   """Applies the BFGS algorithm to minimize a differentiable function.
 
@@ -166,6 +167,8 @@ def minimize(value_and_gradients_function,
       parameters are checked for validity despite possibly degrading runtime
       performance. When `False` invalid inputs may silently render incorrect
       outputs.
+    max_line_search_iterations: Python int. The maximum number of iterations
+      for the `hager_zhang` line search algorithm.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'minimize' is used.
 
@@ -274,7 +277,8 @@ def minimize(value_and_gradients_function,
       next_state = bfgs_utils.line_search_step(
           current_state,
           value_and_gradients_function, actual_search_direction,
-          tolerance, f_relative_tolerance, x_tolerance, stopping_condition)
+          tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
+          max_line_search_iterations)
 
       # Update the inverse Hessian if needed and continue.
       return [_update_inv_hessian(current_state, next_state)]
