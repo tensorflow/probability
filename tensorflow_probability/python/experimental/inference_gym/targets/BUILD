@@ -147,6 +147,7 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "sparse_logistic_regression_test",
     srcs = ["sparse_logistic_regression_test.py"],
+    jax_size = "medium",
     deps = [
         ":sparse_logistic_regression",
         # absl/testing:parameterized dep,
