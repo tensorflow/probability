@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.mcmc.particle_filter import _scatter_nd_batch
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_independent
 from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_minimum_variance
 from tensorflow_probability.python.experimental.mcmc.particle_filter import SampleParticles
@@ -251,7 +252,8 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_categorical_resampler_zero_final_class(self):
     probs = [1.0, 0.0]
-    resampled = resample_independent(tf.math.log(probs), 1000, [])
+    resampled = resample_independent(
+        tf.math.log(probs), 1000, [], seed=test_util.test_seed())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -262,7 +264,8 @@ class _ParticleFilterTest(test_util.TestCase):
     num_distributions = 3
     unnormalized_probs = tfd.Uniform(
         low=np.float64(0),
-        high=np.float64(1.)).sample([num_distributions, num_probs], seed=42)
+        high=np.float64(1.)).sample([num_distributions, num_probs],
+                                    seed=test_util.test_seed())
     probs = unnormalized_probs / tf.reduce_sum(
         unnormalized_probs, axis=-1, keepdims=True)
 
@@ -276,7 +279,8 @@ class _ParticleFilterTest(test_util.TestCase):
                                              source_idx=-1,
                                              dest_idx=0)),
         num_particles,
-        [num_samples])
+        [num_samples],
+        seed=test_util.test_seed())
     sample = dist_util.move_dimension(sample,
                                       source_idx=0,
                                       dest_idx=-1)
@@ -299,18 +303,24 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_minimum_variance_resampler_zero_final_class(self):
     probs = [1.0, 0.0]
-    resampled = resample_minimum_variance(tf.math.log(probs), 1000, [])
+    resampled = resample_minimum_variance(
+        tf.math.log(probs), 1000, [], seed=test_util.test_seed())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
   def test_categorical_resampler_large(self):
     num_probs = 10000
     probs = tf.ones((num_probs,)) / num_probs
-    self.evaluate(resample_independent(tf.math.log(probs), num_probs, []))
+    self.evaluate(
+        resample_independent(
+            tf.math.log(probs), num_probs, [], seed=test_util.test_seed()))
 
   def test_minimum_variance_resampler_large(self):
     num_probs = 10000
     probs = tf.ones((num_probs,)) / num_probs
-    self.evaluate(resample_minimum_variance(tf.math.log(probs), num_probs, []))
+    self.evaluate(
+        resample_minimum_variance(
+            tf.math.log(probs), num_probs, [],
+            seed=test_util.test_seed()))
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_minimum_variance_resampler_means(self):
@@ -322,11 +332,51 @@ class _ParticleFilterTest(test_util.TestCase):
     num_distributions = 3
     num_probs = 16
     probs = tfd.Uniform(
-        low=0.0, high=1.0).sample([num_distributions, num_probs])
+        low=0.0, high=1.0).sample([num_distributions, num_probs],
+                                  seed=test_util.test_seed())
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
     num_samples = 10000
     num_particles = 20
     resampled = resample_minimum_variance(
+        tf.math.log(dist_util.move_dimension(probs,
+                                             source_idx=-1,
+                                             dest_idx=0)),
+        num_particles, [num_samples], seed=test_util.test_seed())
+    resampled = dist_util.move_dimension(resampled,
+                                         source_idx=0,
+                                         dest_idx=-1)
+    # TODO(dpiponi): reimplement this test in vectorized form rather than with
+    # loops.
+    for i in range(num_distributions):
+      histogram = tf.reduce_mean(
+          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
+                            tf.ones((num_samples, num_particles)),
+                            (num_samples, num_probs),
+                            batch_dims=1),
+          axis=0)
+      means = histogram / num_particles
+      means_, probs_ = self.evaluate([means, probs[i]])
+
+      # TODO(dpiponi): it should be possible to compute the exact distribution
+      # of these means and choose `atol` in a more principled way.
+      self.assertAllClose(means_, probs_, atol=0.01)
+
+  # TODO(b/153689734): rewrite so as not to use `move_dimension`.
+  def test_minimum_error_resampler_means(self):
+    # Distinct samples with this resampler aren't independent
+    # so a chi-squared test is inappropriate.
+    # However, because it reduces variance by design, we
+    # can, with high probability,  place sharp bounds on the
+    # values of the sample means.
+    num_distributions = 3
+    num_probs = 8
+    probs = tfd.Uniform(
+        low=0.0, high=1.0).sample([num_distributions, num_probs],
+                                  seed=test_util.test_seed())
+    probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
+    num_samples = 4
+    num_particles = 10000
+    resampled = resample_deterministic_minimum_error(
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
@@ -346,9 +396,7 @@ class _ParticleFilterTest(test_util.TestCase):
       means = histogram / num_particles
       means_, probs_ = self.evaluate([means, probs[i]])
 
-      # TODO(dpiponi): it should be possible to compute the exact distribution
-      # of these means and choose `atol` in a more principled way.
-      self.assertAllClose(means_, probs_, atol=0.01)
+      self.assertAllClose(means_, probs_, atol=1.0 / num_particles)
 
   def test_epidemiological_model(self):
     # A toy, discrete version of an SIR (Susceptible, Infected, Recovered)

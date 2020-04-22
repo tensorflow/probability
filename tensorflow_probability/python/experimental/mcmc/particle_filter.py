@@ -14,6 +14,8 @@
 # ============================================================================
 """Particle filtering."""
 
+from __future__ import print_function
+
 import collections
 import functools
 
@@ -37,7 +39,8 @@ __all__ = [
     'particle_filter',
     'reconstruct_trajectories',
     'resample_independent',
-    'resample_minimum_variance'
+    'resample_minimum_variance',
+    'resample_deterministic_minimum_error'
 ]
 
 
@@ -816,7 +819,8 @@ def _resample(particles, log_weights, resample_fn, seed=None):
       `b1, ..., bN` are optional batch dimensions.
     resample_fn: choose the function used for resampling.
       Use 'resample_minimum_variance' for minimum variance resampling.
-      Use 'resample_independent' for independent resamples.
+      Use 'resample_deterministic_minimum_error' for minimum error resampling.
+      Use 'resample_independent' for independent resampling.
     seed: Python `int` random seed.
 
   Returns:
@@ -953,8 +957,7 @@ def resample_independent(log_probs, event_size, sample_shape,
     # Collect up samples, omitting markers.
     resampled = tf.reshape(markers_and_samples[tf.equal(sorted_markers, 0)],
                            points_shape)
-    resampled = dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
-    return resampled
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
 
 
 # TODO(b/153199903): replace this function with `tf.scatter_nd` when
@@ -1065,5 +1068,136 @@ def resample_minimum_variance(
                           batch_dims=batch_dims)
 
     resampled = tf.cumsum(x, axis=-1)[..., :-1]
-    resampled = dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
-    return resampled
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+
+
+def _finite_differences(sums):
+  """The inverse of `tf.cumsum` with `axis=-1`."""
+  return ps.concat(
+      [sums[..., :1], sums[..., 1:] - sums[..., :-1]], axis=-1)
+
+
+def _samples_from_counts(values, counts, total_number):
+  """Construct sequences of values from tabulated numbers of counts."""
+  extended_result_shape = ps.concat(
+      [ps.shape(counts)[:-1],
+       [total_number + 1]], axis=0)
+  padded_counts = ps.concat(
+      [ps.zeros_like(counts[..., :1]),
+       counts[..., :-1]], axis=-1)
+  edge_positions = ps.cumsum(padded_counts, axis=-1)
+  # We need to scatter `values` into an array according to
+  # the given `counts`.
+  # Because the final result typically consists of sequences of samples
+  # that are constant in blocks, we can scatter just the finite
+  # differences of the values (which become the 'edges' of the blocks)
+  # and then cumulatively sum them back up
+  # at the end. (Reminiscent of run length encoding.)
+  # Eg. suppose we have values = `[0, 2, 1]`
+  # and counts = `[2, 3, 4]`
+  # Then the output we require is `[0, 0, 2, 2, 2, 1, 1, 1, 1]`.
+  # The finite differences of the input are:
+  #   `[0, 2, -1]`.
+  # The finite differences of the output are:
+  #   `[0, 0, 2, 0, 0, -1, 0, 0, 0]`.
+  # The latter is the former scattered into a larger array.
+  #
+  # So the algorithm is essentially
+  # compute finite differences -> scatter -> undo finite differences
+  edge_heights = _finite_differences(values)
+  edges = _scatter_nd_batch(
+      edge_positions[..., tf.newaxis],
+      edge_heights,
+      extended_result_shape,
+      batch_dims=ps.rank_from_shape(ps.shape(counts)) - 1)
+
+  result = tf.cumsum(edges, axis=-1)[..., :-1]
+  return result
+
+
+# TODO(b/153689734): rewrite so as not to use `move_dimension`.
+def resample_deterministic_minimum_error(
+    log_probs, event_size, sample_shape,
+    seed=None, name='resample_deterministic_minimum_error'):
+  """Deterministic minimum error resampler for sequential Monte Carlo.
+
+  This function is based on Algorithm #3 in [Maskell et al. (2006)][1].
+
+  Args:
+    log_probs: A tensor-valued batch of discrete log probability distributions.
+    event_size: the dimension of the vector considered a single draw.
+    sample_shape: the `sample_shape` determining the number of draws. Because
+      this resampler is deterministic it simply replicates the draw you
+      would get for `sample_shape=[1]`.
+    seed: This argument is unused but is present so that this function shares
+      its interface with the other resampling functions.
+      Default value: None
+    name: Python `str` name for ops created by this method.
+      Default value: `None` (i.e., `'resample_deterministic_minimum_error'`).
+
+  Returns:
+    resampled_indices: The result is similar to sampling with
+    ```python
+    expanded_sample_shape = tf.concat([sample_shape, [event_size]]), axis=-1)
+    tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
+    ```
+    but with values chosen deterministically so that the empirical distribution
+    is as close as possible to the specified distribution.
+    It is intended to provide a good representative sample, suitable for use
+    with Sequential Monte Carlo algorithms.
+
+  #### References
+  [1]: S. Maskell, B. Alun-Jones and M. Macleod. A Single Instruction Multiple
+       Data Particle Filter.
+       In 2006 IEEE Nonlinear Statistical Signal Processing Workshop.
+       http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
+
+  """
+  del seed
+
+  with tf.name_scope(name or 'resample_deterministic_minimum_error') as name:
+    sample_shape = tf.convert_to_tensor(sample_shape, dtype_hint=tf.int32)
+    log_probs = dist_util.move_dimension(
+        log_probs, source_idx=0, dest_idx=-1)
+    probs = tf.math.exp(log_probs)
+    prob_shape = ps.shape(probs)
+    pdf_size = prob_shape[-1]
+    # If we could draw fractional numbers of samples we would
+    # choose `ideal_numbers` for the number of each element.
+    ideal_numbers = event_size * probs
+    # We approximate the ideal numbers by truncating to integers
+    # and then repair the counts starting with the one with the
+    # largest fractional error and working our way down.
+    first_approximation = tf.floor(ideal_numbers)
+    missing_fractions = ideal_numbers - first_approximation
+    first_approximation = ps.cast(
+        first_approximation, dtype=tf.int32)
+    fraction_order = tf.argsort(missing_fractions, axis=-1)
+    # We sort the integer parts and fractional parts together.
+    batch_dims = ps.rank_from_shape(prob_shape) - 1
+    first_approximation = tf.gather_nd(
+        first_approximation,
+        fraction_order[..., tf.newaxis],
+        batch_dims=batch_dims)
+    missing_fractions = tf.gather_nd(
+        missing_fractions,
+        fraction_order[..., tf.newaxis],
+        batch_dims=batch_dims)
+    sample_defect = event_size - tf.reduce_sum(
+        first_approximation, axis=-1, keepdims=True)
+    unpermuted = tf.broadcast_to(
+        tf.range(pdf_size),
+        prob_shape)
+    increments = tf.cast(
+        unpermuted >= pdf_size - sample_defect,
+        dtype=first_approximation.dtype)
+    counts = first_approximation + increments
+    samples = _samples_from_counts(fraction_order, counts, event_size)
+    result_shape = tf.concat([sample_shape,
+                              prob_shape[:-1],
+                              [event_size]], axis=0)
+    # Replicate sample up to batch size.
+    # TODO(dpiponi): rather than replicating, spread the "error" over
+    # multiple samples with a minimum-discrepancy sequence.
+    resampled = tf.broadcast_to(samples, result_shape)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
