@@ -491,6 +491,21 @@ def xent_params(draw):
           labels=labels, logits=logits)).map(Kwargs))
 
 
+def _svd_post_process(vals):
+  # SVDs are not unique, so reconstruct input to test consistency (b/154538680).
+
+  # create_uv = False
+  if not isinstance(vals, tuple):
+    return vals
+  # create_uv = True
+  s, u, v = (np.array(x) for x in vals)
+  return np.matmul(
+      u,
+      s[..., None] *
+      # Vectorized matrix transpose.
+      np.swapaxes(v, -2, -1))
+
+
 # __Currently untested:__
 # broadcast_dynamic_shape
 # broadcast_static_shape
@@ -571,7 +586,7 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=3),
                             dtype=np.complex64,
                             elements=complex_numbers(max_magnitude=1e3))],
-             atol=2e-4, rtol=2e-4),
+             atol=4e-4, rtol=4e-4),
 
     # ArgSpec(args=['a', 'b', 'transpose_a', 'transpose_b', 'adjoint_a',
     #               'adjoint_b', 'a_is_sparse', 'b_is_sparse', 'name'],
@@ -609,6 +624,14 @@ NUMPY_TEST_CASES = [
         matmul_compatible_pairs(
             x_strategy=pd_matrices().map(np.linalg.cholesky))
     ]),
+
+    # ArgSpec(args=['tensor', 'full_matrices', 'compute_uv', 'name'],
+    #         varargs=None,
+    #         keywords=None,
+    #         defaults=(False, True, None))
+    TestCase('linalg.svd',
+             [single_arrays(shape=shapes(min_dims=2))],
+             post_processor=_svd_post_process),
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -1096,6 +1119,7 @@ class NumpyTest(test_util.TestCase):
                       rtol=1e-5,
                       jax_disabled=False,
                       assert_shape_only=False,
+                      post_processor=None,
                       jax_kwargs=lambda: {}):
     if jax_disabled and JAX_MODE:
       self.skipTest('Test is disabled for JAX')
@@ -1120,6 +1144,9 @@ class NumpyTest(test_util.TestCase):
 
         kwargs.update(jax_kwargs() if JAX_MODE else {})
         numpy_value = np_fn(*args, **kwargs)
+        if post_processor is not None:
+          numpy_value = post_processor(numpy_value)
+          tensorflow_value = post_processor(tensorflow_value)
         if assert_shape_only:
 
           def assert_same_shape(x, y):

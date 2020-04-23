@@ -33,63 +33,7 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
-
-  def testDiagBroadcastBothBatchAndEvent(self):
-    # batch_shape: [3], event_shape: [2]
-    diag = np.array([[1., 2], [3, 4], [5, 6]])
-    # batch_shape: [1], event_shape: []
-    identity_multiplier = np.array([5.])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        scale_diag=diag,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[[1. + 5, 0], [0, 2 + 5]], [[3 + 5, 0], [0, 4 + 5]],
-                  [[5 + 5, 0], [0, 6 + 5]]]),
-        self.evaluate(dist.scale.to_dense()))
-
-  def testDiagBroadcastBothBatchAndEvent2(self):
-    # This test differs from `testDiagBroadcastBothBatchAndEvent` in that it
-    # broadcasts batch_shape's from both the `scale_diag` and
-    # `scale_identity_multiplier` args.
-    # batch_shape: [3], event_shape: [2]
-    diag = np.array([[1., 2], [3, 4], [5, 6]])
-    # batch_shape: [3, 1], event_shape: []
-    identity_multiplier = np.array([[5.], [4], [3]])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        scale_diag=diag,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllEqual([3, 3, 2, 2], dist.scale.to_dense().shape)
-
-  def testDiagBroadcastOnlyEvent(self):
-    # batch_shape: [3], event_shape: [2]
-    diag = np.array([[1., 2], [3, 4], [5, 6]])
-    # batch_shape: [3], event_shape: []
-    identity_multiplier = np.array([5., 4, 3])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        scale_diag=diag,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[[1. + 5, 0], [0, 2 + 5]], [[3 + 4, 0], [0, 4 + 4]],
-                  [[5 + 3, 0], [0, 6 + 3]]]),  # shape: [3, 2, 2]
-        self.evaluate(dist.scale.to_dense()))
-
-  def testDiagBroadcastMultiplierAndLoc(self):
-    # batch_shape: [], event_shape: [3]
-    loc = np.array([1., 0, -1])
-    # batch_shape: [3], event_shape: []
-    identity_multiplier = np.array([5., 4, 3])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        loc=loc,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[[5, 0, 0], [0, 5, 0], [0, 0, 5]],
-                  [[4, 0, 0], [0, 4, 0], [0, 0, 4]], [[3, 0, 0], [0, 3, 0],
-                                                      [0, 0, 3]]]),
-        self.evaluate(dist.scale.to_dense()))
+    super(MultivariateNormalDiagPlusLowRankTest, self).setUp()
 
   def testMean(self):
     mu = [-1.0, 1.0]
@@ -103,6 +47,48 @@ class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
         scale_perturb_diag=diag_small,
         validate_args=True)
     self.assertAllEqual(mu, self.evaluate(dist.mean()))
+
+  @test_util.tf_tape_safety_test
+  def testVariableLocation(self):
+    loc = tf.Variable([1., 1.])
+    d = tfd.MultivariateNormalDiagPlusLowRank(loc=loc, validate_args=True)
+    self.evaluate(loc.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, loc))
+
+  @test_util.tf_tape_safety_test
+  def testVariableScaleDiag(self):
+    scale_diag = tf.Variable([1., 1.])
+    d = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_diag=scale_diag, validate_args=True)
+    self.evaluate(scale_diag.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_diag))
+
+  @test_util.tf_tape_safety_test
+  def testVariableScalePerturbFactor(self):
+    scale_perturb_factor = tf.Variable([[1.], [2.]])
+    d = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_perturb_factor=scale_perturb_factor, validate_args=True)
+    self.evaluate(scale_perturb_factor.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_perturb_factor))
+
+  @test_util.tf_tape_safety_test
+  def testVariableScalePerturbDiag(self):
+    scale_perturb_factor = tf.constant([[1.], [2.]])
+    scale_perturb_diag = tf.Variable([3.])
+    d = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_perturb_factor=scale_perturb_factor,
+        scale_perturb_diag=scale_perturb_diag,
+        validate_args=True)
+    self.evaluate(scale_perturb_diag.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_perturb_diag))
 
   def testSample(self):
     # TODO(jvdillon): This test should be the basis of a new test fixture which

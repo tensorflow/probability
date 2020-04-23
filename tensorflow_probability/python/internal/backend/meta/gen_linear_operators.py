@@ -134,6 +134,8 @@ def gen_module(module_name):
 
   code = code.replace('self.dtype.real_dtype', 'dtypes.real_dtype(self.dtype)')
   code = code.replace('dtype.real_dtype', 'dtypes.real_dtype(dtype)')
+  code = code.replace('.as_numpy_dtype', '')
+
   print(code)
   print('import numpy as np')
   print('from tensorflow_probability.python.internal.backend.numpy import '
