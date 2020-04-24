@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -244,3 +245,30 @@ class Cauchy(distribution.Distribution):
       assertions.append(assert_util.assert_positive(
           self.scale, message='Argument `scale` must be positive.'))
     return assertions
+
+@kullback_leibler.RegisterKL(Cauchy, Cauchy)
+def _kl_cauchy_cauchy(a, b, name=None):
+  """
+  Calculate the batched KL divergence KL(a || b) with a and b Cauchy.
+
+  Note that this KL divergence is symmetric in its arguments.
+
+  Args:
+    a: instance of a Cauchy distribution object.
+    b: instance of a Cauchy distribution object.
+    name: Name to use for created operations.
+      Default value: `None` (i.e., `'kl_cauchy_cauchy'`).
+
+  Returns:
+    kl_div: Batchwise KL(a || b)
+  """
+  with tf.name_scope(name or 'kl_cauchy_cauchy'):
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_scale = tf.convert_to_tensor(b.scale)
+    b_loc = tf.convert_to_tensor(b.loc)
+    scale_sum_square = tf.math.square(a_scale + b_scale)
+    loc_diff_square = tf.math.squared_difference(a.loc, b_loc)
+
+    return (tf.math.log(scale_sum_square + loc_diff_square) -
+            tf.math.log(4. * a_scale) - tf.math.log(b_scale))
+
