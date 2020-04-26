@@ -99,19 +99,43 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     return self._concentration
 
   def _mean(self):
-    b = 1. / self.concentration
-    mean = self.scale / sinc(b)
-    return tf.where(tf.greater(self.concentration, 1.), mean, np.nan)
+    concentration = tf.convert_to_tensor(self.concentration)
+    with tf.control_dependencies(
+        [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
+          assert_util.assert_less(
+            tf.ones([], dtype=self.dtype),
+            concentration,
+            message='Mean undefined for concentration <= 1.'),
+        ]):
+      b = 1. / self.concentration
+      mean = self.scale / sinc(b)
+      return tf.where(self.concentration > 1., mean, np.nan)
 
   def _variance(self):
-    b = 1. / self.concentration
-    variance = self.scale ** 2 * (1. / sinc(2*b) - 1. / sinc(b)**2)
-    return tf.where(tf.greater(self.concentration, 2.), variance, np.nan)
+    concentration = tf.convert_to_tensor(self.concentration)
+    with tf.control_dependencies(
+        [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
+          assert_util.assert_less(
+            2. * tf.ones([], dtype=self.dtype),
+            concentration,
+            message='Variance undefined for concentration <= 2.'),
+        ]):
+      b = 1. / self.concentration
+      variance = self.scale ** 2 * (1. / sinc(2*b) - 1. / sinc(b)**2)
+      return tf.where(self.concentration > 2., variance, np.nan)
 
   def _mode(self):
-    mode = self.scale * ((self.concentration - 1.)/(self.concentration + 1.)
-                         )**(1./self.concentration)
-    return tf.where(tf.greater(self.concentration, 1.), mode, np.nan)
+    concentration = tf.convert_to_tensor(self.concentration)
+    with tf.control_dependencies(
+        [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
+          assert_util.assert_less(
+            tf.ones([], dtype=self.dtype),
+            concentration,
+            message='Mode undefined for concentration <= 1.'),
+        ]):
+      mode = self.scale * ((self.concentration - 1.)/(self.concentration + 1.)
+                           )**(1./self.concentration)
+      return tf.where(self.concentration > 1., mode, np.nan)
 
   def _entropy(self):
     return (tf.math.log(self.scale / self.concentration) + 2.) / tf.math.log(2.)
