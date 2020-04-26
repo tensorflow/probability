@@ -69,6 +69,7 @@ TF2_FRIENDLY_DISTS = (
     'Kumaraswamy',
     'Laplace',
     'LKJ',
+    'LogLogistic',
     'LogNormal',
     'Logistic',
     'Normal',
