@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -138,7 +138,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
       return tf.where(self.concentration > 1., mode, np.nan)
 
   def _entropy(self):
-    return (tf.math.log(self.scale / self.concentration) + 2.) / tf.math.log(2.)
+    return (tf.math.log(self.scale / self.concentration) + 2.) / np.log(2.)
 
   def _sample_control_dependencies(self, x):
     assertions = []
