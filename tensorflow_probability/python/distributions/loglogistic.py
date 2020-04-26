@@ -172,4 +172,4 @@ def sinc(x, name=None):
   name = name or "sinc"
   with tf.name_scope(name):
     x *= np.pi
-    return tf.math.sin(x)/x
+    return tf.where(x != 0., tf.math.sin(x)/x, 1.)
