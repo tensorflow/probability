@@ -49,6 +49,7 @@ class LogLogiticTest(test_util.TestCase):
     dist = tfd.LogLogistic(scale=scale, concentration=concentration,
                            validate_args=True)
 
+    b = 1. / concentration
     variance = scale ** 2 * (1. / np.sinc(2 * b) - 1. / np.sinc(b) ** 2)
     variance[:2] = np.nan
     self.assertAllClose(self.evaluate(dist.variance()), variance)
