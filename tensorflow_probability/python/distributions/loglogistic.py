@@ -46,7 +46,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
     The LogLogistic distribution models positive-valued random variables
     whose logarithm is logisticly distributed with mean `log(scale)` and
-    scale `1/concentration`. It is constructed as the exponential
+    scale `1 / concentration`. It is constructed as the exponential
     transformation of a Logistic distribution.
 
     Args:
