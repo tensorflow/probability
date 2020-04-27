@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ class LogLogiticTest(test_util.TestCase):
   def setUp(self):
     self._rng = np.random.RandomState(123)
 
-  def testLogLogisticStats(self):
+  def testLogLogisticMean(self):
     scale = np.float32([3., 1.5, 0.75])
     concentration = np.float32([0.4, 1.1, 2.1])
     dist = tfd.LogLogistic(scale=scale, concentration=concentration,
@@ -43,16 +43,33 @@ class LogLogiticTest(test_util.TestCase):
     mean[0] = np.nan
     self.assertAllClose(self.evaluate(dist.mean()), mean)
 
+  def testLogLogisticVariance(self):
+    scale = np.float32([3., 1.5, 0.75])
+    concentration = np.float32([0.4, 1.1, 2.1])
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
+
     variance = scale ** 2 * (1. / np.sinc(2 * b) - 1. / np.sinc(b) ** 2)
     variance[:2] = np.nan
     self.assertAllClose(self.evaluate(dist.variance()), variance)
     self.assertAllClose(self.evaluate(dist.stddev()),
                         np.sqrt(self.evaluate(dist.variance())))
 
+  def testLogLogisticMode(self):
+    scale = np.float32([3., 1.5, 0.75])
+    concentration = np.float32([0.4, 1.1, 2.1])
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
     mode = scale * ((concentration - 1.) / (concentration + 1.)
                     ) ** (1. / concentration)
     mode[0] = np.nan
     self.assertAllClose(self.evaluate(dist.mode()), mode)
+
+  def testLogLogisticEntropy(self):
+    scale = np.float32([3., 1.5, 0.75])
+    concentration = np.float32([0.4, 1.1, 2.1])
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
 
     entropy = np.log2(np.e ** 2 * scale / concentration)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy)
