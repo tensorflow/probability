@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -180,12 +179,12 @@ class MockKLDivergence(object):
 @test_util.test_all_tf_execution_regimes
 class ConvVariational(object):
 
-  def maybe_transpose_inputs(self, inputs):
+  def maybe_transpose_tensor(self, tensor):
     if self.data_format == 'channels_first':
-      order = channels_last_to_first(list(range(inputs.shape.rank)))
-      return tf.transpose(a=inputs, perm=order)
+      order = channels_last_to_first(list(range(tensor.shape.rank)))
+      return tf.transpose(a=tensor, perm=order)
     else:
-      return inputs
+      return tensor
 
   def _testKerasLayer(self, layer_class):  # pylint: disable=invalid-name
     def kernel_posterior_fn(dtype, shape, name, trainable, add_variable_fn):
@@ -241,7 +240,7 @@ class ConvVariational(object):
       elif layer_class in (tfp.layers.Convolution3DReparameterization,
                            tfp.layers.Convolution3DFlipout):
         inputs = tf.random.uniform([2, 3, 3, 3, 1], seed=1)
-      inputs = self.maybe_transpose_inputs(inputs)
+      inputs = self.maybe_transpose_tensor(inputs)
 
       # No keys.
       input_dependent_losses = layer.get_losses_for(inputs=None)
@@ -273,7 +272,7 @@ class ConvVariational(object):
       elif layer_class in (tfp.layers.Convolution3DReparameterization,
                            tfp.layers.Convolution3DFlipout):
         inputs = tf.random.uniform([2, 3, 3, 3, 1], seed=1)
-      inputs = self.maybe_transpose_inputs(inputs)
+      inputs = self.maybe_transpose_tensor(inputs)
 
       # No keys.
       input_dependent_losses = layer.get_losses_for(inputs=None)
@@ -307,7 +306,7 @@ class ConvVariational(object):
       inputs = tf.random.uniform([batch_size, depth, height, width, channels],
                                  seed=seed())
       kernel_size = (2, 2, 2)
-    inputs = self.maybe_transpose_inputs(inputs)
+    inputs = self.maybe_transpose_tensor(inputs)
 
     kernel_shape = kernel_size + (channels, filters)
     kernel_posterior = MockDistribution(
@@ -547,7 +546,7 @@ class ConvVariational(object):
         inputs = tf.random.uniform([batch_size, depth, height, width, channels],
                                    seed=seed())
         kernel_size = (2, 2, 2)
-      inputs = self.maybe_transpose_inputs(inputs)
+      inputs = self.maybe_transpose_tensor(inputs)
 
       kernel_shape = kernel_size + (channels, filters)
       bias_size = (filters,)
@@ -597,26 +596,30 @@ class ConvVariational(object):
                       np.prod(outputs_one_.shape))
 
   def _testLayerInSequential(self, layer_class):  # pylint: disable=invalid-name
-    with self.cached_session() as sess:
-      if layer_class in (tfp.layers.Convolution1DReparameterization,
-                         tfp.layers.Convolution1DFlipout):
-        inputs = tf.random.uniform([2, 3, 1])
-      elif layer_class in (tfp.layers.Convolution2DReparameterization,
-                           tfp.layers.Convolution2DFlipout):
-        inputs = tf.random.uniform([2, 3, 3, 1])
-      elif layer_class in (tfp.layers.Convolution3DReparameterization,
-                           tfp.layers.Convolution3DFlipout):
-        inputs = tf.random.uniform([2, 3, 3, 3, 1])
-      inputs = self.maybe_transpose_inputs(inputs)
+    if layer_class in (tfp.layers.Convolution1DReparameterization,
+                       tfp.layers.Convolution1DFlipout):
+      inputs = tf.random.uniform([2, 3, 1])
+      outputs = tf.random.uniform([2, 1, 2])
+    elif layer_class in (tfp.layers.Convolution2DReparameterization,
+                         tfp.layers.Convolution2DFlipout):
+      inputs = tf.random.uniform([2, 3, 3, 1])
+      outputs = tf.random.uniform([2, 1, 1, 2])
+    elif layer_class in (tfp.layers.Convolution3DReparameterization,
+                         tfp.layers.Convolution3DFlipout):
+      inputs = tf.random.uniform([2, 3, 3, 3, 1])
+      outputs = tf.random.uniform([2, 1, 1, 1, 2])
+    inputs = self.maybe_transpose_tensor(inputs)
+    outputs = self.maybe_transpose_tensor(outputs)
 
-      net = tf.keras.Sequential([
-          layer_class(filters=2, kernel_size=3, data_format=self.data_format),
-          layer_class(filters=2, kernel_size=1, data_format=self.data_format)])
-      output = net(inputs)
+    net = tf.keras.Sequential([
+        layer_class(filters=2, kernel_size=3, data_format=self.data_format),
+        layer_class(filters=2, kernel_size=1, data_format=self.data_format)])
 
-      # Verify that the network runs without errors
-      sess.run(tf1.global_variables_initializer())
-      sess.run(output)
+    net.compile(loss='mse', optimizer='adam')
+    net.fit(inputs, outputs, batch_size=2, epochs=3, steps_per_epoch=2)
+
+    batch_output = self.evaluate(net(inputs))
+    self.assertAllEqual(outputs.shape, batch_output.shape)
 
   def testKerasLayerConvolution1DReparameterization(self):
     self._testKerasLayer(tfp.layers.Convolution1DReparameterization)
