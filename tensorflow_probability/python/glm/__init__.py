@@ -26,6 +26,8 @@ from tensorflow_probability.python.glm.family import GammaExp
 from tensorflow_probability.python.glm.family import GammaSoftplus
 from tensorflow_probability.python.glm.family import LogNormal
 from tensorflow_probability.python.glm.family import LogNormalSoftplus
+from tensorflow_probability.python.glm.family import NegativeBinomial
+from tensorflow_probability.python.glm.family import NegativeBinomialSoftplus
 from tensorflow_probability.python.glm.family import Normal
 from tensorflow_probability.python.glm.family import NormalReciprocal
 from tensorflow_probability.python.glm.family import Poisson
@@ -54,6 +56,8 @@ _allowed_symbols = [
     'GammaSoftplus',
     'LogNormal',
     'LogNormalSoftplus',
+    'NegativeBinomial',
+    'NegativeBinomialSoftplus',
     'Normal',
     'NormalReciprocal',
     'Poisson',

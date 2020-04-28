@@ -98,6 +98,8 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
