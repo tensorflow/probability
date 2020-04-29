@@ -26,8 +26,9 @@ from scipy import special as sp_special
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+
+from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
 tfd = tfp.distributions
@@ -313,6 +314,52 @@ class SoftplusInverseTest(test_util.TestCase):
     # Equivalent to `assertAllTrue` (if it existed).
     self.assertAllEqual(
         np.ones_like(grads).astype(np.bool), np.isfinite(grads))
+
+
+@test_util.test_all_tf_execution_regimes
+class LogCumsumExpTests(test_util.TestCase):
+
+  def _testCumulativeLogSumExp(self, x, axis=0):
+    result_naive = tf.cumsum(tf.exp(x), axis=axis)
+    result_fused = tf.exp(tfp.math.log_cumsum_exp(x, axis=axis))
+    self.assertAllClose(result_naive, result_fused)
+
+  def testMinusInfinity(self):
+    x = np.log([0., 0., 1., 1., 1., 1., 0., 0.])
+    self._testCumulativeLogSumExp(x)
+
+  def test1D(self):
+    x = np.arange(10) / 10.0 - 0.5
+    self._testCumulativeLogSumExp(x)
+
+  def test2D(self):
+    x = np.reshape(np.arange(20) / 20.0 - 0.5, (2, 10))
+    for axis in (-2, -1, 0, 1):
+      self._testCumulativeLogSumExp(x, axis=axis)
+
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      'Relies on Tensorflow gradient_checker')
+  def testGradient(self):
+    x = np.arange(10) / 10.0 - 0.5
+    x = tf.convert_to_tensor(x, dtype=tf.float64)
+    grad_naive_theoretical, _ = gradient_checker_v2.compute_gradient(
+        lambda y: tf.cumsum(tf.exp(y)), [x])
+    grad_fused_theoretical, _ = gradient_checker_v2.compute_gradient(
+        lambda y: tf.exp(tfp.math.log_cumsum_exp(y)),
+        [x])
+    self.assertAllClose(grad_fused_theoretical, grad_naive_theoretical)
+
+  def test1DLarge(self):
+    # This test ensures that the operation is correct even when the naive
+    # implementation would overflow.
+    x = tf.convert_to_tensor(np.arange(20) * 20.0, dtype=tf.float32)
+    result_fused = self.evaluate(tfp.math.log_cumsum_exp(x))
+    result_map = self.evaluate(tf.map_fn(
+        lambda i: tf.reduce_logsumexp(x[:i + 1]),
+        tf.range(tf.shape(x)[0]),
+        dtype=x.dtype))
+    self.assertAllClose(result_fused, result_map)
 
 
 @test_util.test_all_tf_execution_regimes

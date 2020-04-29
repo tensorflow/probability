@@ -26,6 +26,7 @@ from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import log_cosh
+from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.generic import log_sub_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
@@ -82,6 +83,7 @@ _allowed_symbols = [
     'log_add_exp',
     'log_combinations',
     'log_cosh',
+    'log_cumsum_exp',
     'log_gamma_correction',
     'log_gamma_difference',
     'log_sub_exp',
