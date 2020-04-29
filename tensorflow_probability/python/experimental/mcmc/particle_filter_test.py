@@ -177,7 +177,7 @@ class _ParticleFilterTest(test_util.TestCase):
     (particles,
      log_weights,
      parent_indices,
-     step_log_marginal_likelihoods) = self.evaluate(
+     incremental_log_marginal_likelihoods) = self.evaluate(
          tfp.experimental.mcmc.particle_filter(
              observations=observed_positions,
              initial_state_prior=initial_state_prior,
@@ -192,7 +192,7 @@ class _ParticleFilterTest(test_util.TestCase):
                         [num_timesteps, num_particles] + batch_shape)
     self.assertAllEqual(parent_indices.shape,
                         [num_timesteps, num_particles] + batch_shape)
-    self.assertAllEqual(step_log_marginal_likelihoods.shape,
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
 
     self.assertAllClose(
@@ -222,7 +222,7 @@ class _ParticleFilterTest(test_util.TestCase):
                         trajectories['velocity'].shape)
 
     # Verify that `infer_trajectories` also works on batches.
-    trajectories, step_log_marginal_likelihoods = self.evaluate(
+    trajectories, incremental_log_marginal_likelihoods = self.evaluate(
         tfp.experimental.mcmc.infer_trajectories(
             observations=observed_positions,
             initial_state_prior=initial_state_prior,
@@ -234,7 +234,7 @@ class _ParticleFilterTest(test_util.TestCase):
                         trajectories['position'].shape)
     self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['velocity'].shape)
-    self.assertAllEqual(step_log_marginal_likelihoods.shape,
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
 
   def test_reconstruct_trajectories_toy_example(self):
@@ -523,7 +523,7 @@ class _ParticleFilterTest(test_util.TestCase):
     # the particle filter.
     # pylint: disable=g-long-lambda
     (particles, log_weights, _,
-     estimated_step_log_marginal_likelihoods) = self.evaluate(
+     estimated_incremental_log_marginal_likelihoods) = self.evaluate(
          tfp.experimental.mcmc.particle_filter(
              observations=observations,
              initial_state_prior=initial_state_prior,
@@ -535,7 +535,7 @@ class _ParticleFilterTest(test_util.TestCase):
                  loc=observation_noise.loc + tf.linalg.matvec(
                      observation_matrix, state),
                  scale_tril=observation_noise.scale_tril),
-             num_particles=1000,
+             num_particles=1024,
              seed=test_util.test_seed()))
     # pylint: enable=g-long-lambda
 
@@ -544,7 +544,7 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllClose(filtered_means, particle_means, atol=0.1, rtol=0.1)
 
     self.assertAllClose(
-        lps, estimated_step_log_marginal_likelihoods, atol=0.5)
+        lps, estimated_incremental_log_marginal_likelihoods, atol=0.6)
 
   def test_model_can_use_state_history(self):
 
@@ -701,9 +701,91 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllClose(np.mean(particles['position'], axis=-1),
                         tf.math.cos(dt * np.arange(101)),
                         atol=0.04)
-    self.assertLen(lps, 2)
+    self.assertLen(lps, 101)
     self.assertGreater(lps[0], 3.)
-    self.assertGreater(lps[1], 3.)
+    self.assertGreater(lps[-1], 3.)
+
+  def test_custom_trace_fn(self):
+
+    def trace_fn(step_results):
+      # Traces the mean and stddev of the particle population at each step.
+      weights = tf.exp(step_results.log_weights)
+      mean = tf.reduce_sum(weights * step_results.particles, axis=0)
+      variance = tf.reduce_sum(
+          weights * (step_results.particles - mean[tf.newaxis, ...])**2)
+      return {'mean': mean,
+              'stddev': tf.sqrt(variance),
+              # In real usage we would likely not track the particles and
+              # weights. We keep them here just so we can double-check the
+              # stats, below.
+              'particles': step_results.particles,
+              'weights': weights}
+
+    results = self.evaluate(
+        tfp.experimental.mcmc.particle_filter(
+            observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+            initial_state_prior=tfd.Normal(0., 1.),
+            transition_fn=lambda _, state: tfd.Normal(state, 1.),
+            observation_fn=lambda _, state: tfd.Normal(state, 1.),
+            num_particles=1024,
+            trace_fn=trace_fn,
+            seed=test_util.test_seed()))
+
+    # Verify that posterior means are increasing.
+    self.assertAllGreater(results['mean'][1:] - results['mean'][:-1], 0.)
+
+    # Check that our traced means and scales match values computed
+    # by averaging over particles after the fact.
+    all_means = self.evaluate(tf.reduce_sum(
+        results['weights'] * results['particles'], axis=1))
+    all_variances = self.evaluate(
+        tf.reduce_sum(
+            results['weights'] *
+            (results['particles'] - all_means[..., tf.newaxis])**2,
+            axis=1))
+    self.assertAllClose(results['mean'], all_means)
+    self.assertAllClose(results['stddev'], np.sqrt(all_variances))
+
+  def test_step_indices_to_trace(self):
+    num_particles = 1024
+    (particles_1_3,
+     log_weights_1_3,
+     parent_indices_1_3,
+     incremental_log_marginal_likelihood_1_3) = self.evaluate(
+         tfp.experimental.mcmc.particle_filter(
+             observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+             initial_state_prior=tfd.Normal(0., 1.),
+             transition_fn=lambda _, state: tfd.Normal(state, 10.),
+             observation_fn=lambda _, state: tfd.Normal(state, 0.1),
+             num_particles=num_particles,
+             step_indices_to_trace=[1, 3],
+             seed=test_util.test_seed()))
+    self.assertLen(particles_1_3, 2)
+    self.assertLen(log_weights_1_3, 2)
+    self.assertLen(parent_indices_1_3, 2)
+    self.assertLen(incremental_log_marginal_likelihood_1_3, 2)
+    means = np.sum(np.exp(log_weights_1_3) * particles_1_3, axis=1)
+    self.assertAllClose(means, [3., 7.], atol=1.)
+
+    (final_particles,
+     final_log_weights,
+     final_cumulative_lp) = self.evaluate(
+         tfp.experimental.mcmc.particle_filter(
+             observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+             initial_state_prior=tfd.Normal(0., 1.),
+             transition_fn=lambda _, state: tfd.Normal(state, 10.),
+             observation_fn=lambda _, state: tfd.Normal(state, 0.1),
+             num_particles=num_particles,
+             trace_fn=lambda r: (r.particles,  # pylint: disable=g-long-lambda
+                                 r.log_weights,
+                                 r.accumulated_log_marginal_likelihood),
+             step_indices_to_trace=-1,
+             seed=test_util.test_seed()))
+    self.assertLen(final_particles, num_particles)
+    self.assertLen(final_log_weights, num_particles)
+    self.assertEqual(final_cumulative_lp.shape, ())
+    means = np.sum(np.exp(final_log_weights) * final_particles)
+    self.assertAllClose(means, 9., atol=1.5)
 
 
 class ParticleFilterTestFloat32(_ParticleFilterTest):
