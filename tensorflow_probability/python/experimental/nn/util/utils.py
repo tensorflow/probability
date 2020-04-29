@@ -469,7 +469,7 @@ def make_kernel_bias(
     kernel_initializer: ...
       Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
     bias_initializer: ...
-      Default value: `None` (i.e., `tf.zeros`).
+      Default value: `None` (i.e., `tf.initializers.zeros()`).
     kernel_batch_ndims: ...
       Default value: `0`.
     bias_batch_ndims: ...
@@ -521,7 +521,7 @@ def make_kernel_bias(
   if kernel_initializer is None:
     kernel_initializer = nn_init_lib.glorot_uniform()
   if bias_initializer is None:
-    bias_initializer = tf.zeros
+    bias_initializer = tf.initializers.zeros()
   return (
       tf.Variable(_try_call_init_fn(kernel_initializer,
                                     kernel_shape,
@@ -567,7 +567,7 @@ def make_kernel_bias_prior_spike_and_slab(
     kernel_initializer: Ignored.
       Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
     bias_initializer: Ignored.
-      Default value: `None` (i.e., `tf.zeros`).
+      Default value: `None` (i.e., `tf.initializers.zeros()`).
     kernel_batch_ndims: ...
       Default value: `0`.
     bias_batch_ndims: ...
@@ -611,7 +611,7 @@ def make_kernel_bias_posterior_mvn_diag(
     kernel_initializer: ...
       Default value: `None` (i.e., `tf.initializers.glorot_uniform()`).
     bias_initializer: ...
-      Default value: `None` (i.e., `tf.zeros`).
+      Default value: `None` (i.e., `tf.initializers.zeros()`).
     kernel_batch_ndims: ...
       Default value: `0`.
     bias_batch_ndims: ...
@@ -629,7 +629,7 @@ def make_kernel_bias_posterior_mvn_diag(
   if kernel_initializer is None:
     kernel_initializer = nn_init_lib.glorot_uniform()
   if bias_initializer is None:
-    bias_initializer = tf.zeros
+    bias_initializer = tf.initializers.zeros()
   make_loc = lambda init_fn, shape, batch_ndims, name: tf.Variable(  # pylint: disable=g-long-lambda
       _try_call_init_fn(init_fn, shape, dtype, batch_ndims),
       name=name + '_loc')
