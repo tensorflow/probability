@@ -38,11 +38,8 @@ __all__ = [
 
 def _default_kwargs_split_fn(kwargs):
   """Default `kwargs` `dict` getter."""
-  other = {key: kwargs[key] for key in kwargs
-    if ((key != "distribution_kwargs") or (key != "bijector_kwargs"))}
-  distribution_kwargs = kwargs.get("distribution_kwargs", {})
-  bijector_kwargs = kwargs.get("bijector_kwargs", {})
-  return (distribution_kwargs, {**bijector_kwargs, **other})
+  return (kwargs.get('distribution_kwargs', {}),
+          kwargs.get('bijector_kwargs', {}))
 
 
 def _pick_scalar_condition(pred, cond_true, cond_false):
@@ -475,22 +472,6 @@ class TransformedDistribution(distribution_lib.Distribution):
     with self._name_and_control_scope(name):
       sample_shape = tf.convert_to_tensor(
           sample_shape, dtype=tf.int32, name='sample_shape')
-      if "conditional" in kwargs.keys():
-        if kwargs["conditional"] is None:
-          kwargs.pop("conditional")
-        else:
-          kwargs["conditional"] = tf.convert_to_tensor(
-            kwargs["conditional"], dtype=self.dtype, name="conditional")
-          conditional_shape = tf.convert_to_tensor(
-            kwargs["conditional"].shape[0], dtype=tf.int32,
-            name="conditional_shape")
-          kwargs["conditional"] = tf.repeat(
-            kwargs["conditional"], sample_shape, axis=0)
-          n_samples, n = self._expand_sample_shape_to_vector(sample_shape,
-                                                             "n_samples")
-          n_conditional, c = self._expand_sample_shape_to_vector(
-            conditional_shape, "n_conditional")
-          sample_shape = tf.multiply(n, c)
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
 
@@ -513,9 +494,6 @@ class TransformedDistribution(distribution_lib.Distribution):
       # work, it is imperative that this is the last modification to the
       # returned result.
       y = self.bijector.forward(x, **bijector_kwargs)
-      if "conditional" in kwargs.keys():
-        y = tf.stack(tf.split(y, c), axis=1)
-        sample_shape = tf.concat([n_samples, n_conditional], 0)
       y = self._set_sample_static_shape(y, sample_shape)
 
       return y
