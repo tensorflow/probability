@@ -420,5 +420,11 @@ class BetaTest(test_util.TestCase):
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
+  def testGradientOfLogProbEvalutates(self):
+    def f(a):
+      return tfd.Beta(a, 10).log_prob(.5)
+    self.evaluate(tfp.math.value_and_gradient(f, [100.0]))
+
+
 if __name__ == '__main__':
   tf.test.main()

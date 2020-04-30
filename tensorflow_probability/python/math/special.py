@@ -25,8 +25,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
-# Need this for private symbol broadcast_gradient_args
-from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -266,12 +265,14 @@ def _log_gamma_difference_big_y(x, y):
 
 
 def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
-  if (a.shape.is_fully_defined() and b.shape.is_fully_defined() and
+  """Reduces broadcast dimensions for a custom gradient."""
+  if (tensorshape_util.is_fully_defined(a.shape) and
+      tensorshape_util.is_fully_defined(b.shape) and
       a.shape == b.shape):
     return [grad_a, grad_b]
   a_shape = tf.shape(a)
   b_shape = tf.shape(b)
-  ra, rb = array_ops.broadcast_gradient_args(a_shape, b_shape)
+  ra, rb = tf.raw_ops.BroadcastGradientArgs(s0=a_shape, s1=b_shape)
   grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
   grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)
   return [grad_a, grad_b]
