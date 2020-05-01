@@ -21,6 +21,7 @@ import functools
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import exponential
@@ -39,7 +40,8 @@ __all__ = [
     'particle_filter',
     'reconstruct_trajectories',
     'resample_independent',
-    'resample_minimum_variance',
+    'resample_stratified',
+    'resample_systematic',
     'resample_deterministic_minimum_error'
 ]
 
@@ -914,7 +916,7 @@ def _resample(particles, log_weights, resample_fn, seed=None):
     log_weights: float `Tensor` of shape `[num_particles, b1, ..., bN]`, where
       `b1, ..., bN` are optional batch dimensions.
     resample_fn: choose the function used for resampling.
-      Use 'resample_minimum_variance' for minimum variance resampling.
+      Use 'resample_systematic' for systematic resampling.
       Use 'resample_deterministic_minimum_error' for minimum error resampling.
       Use 'resample_independent' for independent resampling.
     seed: Python `int` random seed.
@@ -951,9 +953,220 @@ def reconstruct_trajectories(particles, parent_indices, name=None):
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
+def _resample_using_log_points(log_probs, sample_shape, log_points, name=None):
+  """Resample from `log_probs` using supplied points in interval `[0, 1]`."""
+
+  # We divide up the unit interval [0, 1] according to the provided
+  # probability distributions using `cumulative_logsumexp`.
+  # At the end of each division we place a 'marker'.
+  # We use points on the unit interval supplied by caller.
+  # We sort the combination of points and markers. The number
+  # of points between the markers defining a division gives the number
+  # of samples we require in that division.
+  # For example, suppose `probs` is `[0.2, 0.3, 0.5]`.
+  # We divide up `[0, 1]` using 3 markers:
+  #
+  #     |     |          |
+  # 0.  0.2   0.5        1.0  <- markers
+  #
+  # Suppose we are given four points: [0.1, 0.25, 0.9, 0.75]
+  # After sorting the combination we get:
+  #
+  # 0.1  0.25     0.75 0.9    <- points
+  #  *  | *   |    *    *|
+  # 0.   0.2 0.5         1.0  <- markers
+  #
+  # We have one sample in the first category, one in the second and
+  # two in the last.
+  #
+  # All of these computations are carried out in batched form.
+
+  with tf.name_scope(name or 'resample_using_log_points') as name:
+    points_shape = ps.shape(log_points)
+    batch_shape, [num_markers] = ps.split(ps.shape(log_probs),
+                                          num_or_size_splits=[-1, 1])
+
+    # `working_shape` specifies the total number of events
+    # we will be generating.
+    working_shape = ps.concat([sample_shape, batch_shape], axis=0)
+    # `markers_shape` is the shape of the markers we temporarily insert.
+    markers_shape = ps.concat([working_shape, [num_markers]], axis=0)
+
+    markers = ps.concat(
+        [tf.ones(markers_shape, dtype=tf.int32),
+         tf.zeros(points_shape, dtype=tf.int32)],
+        axis=-1)
+    log_marker_positions = tf.broadcast_to(
+        tfp.math.log_cumsum_exp(log_probs, axis=-1),
+        markers_shape)
+    log_markers_and_points = ps.concat(
+        [log_marker_positions, log_points], axis=-1)
+    # Stable sort is used to ensure that no points get sorted between
+    # markers that have zero distance between them. This ensures that
+    # there will never be a sample drawn whose probability is intended
+    # to be zero even when a point falls on the edge of the
+    # corresponding zero-width bucket.
+    indices = tf.argsort(log_markers_and_points, axis=-1, stable=True)
+    sorted_markers = tf.gather_nd(
+        markers,
+        indices[..., tf.newaxis],
+        batch_dims=(
+            ps.rank_from_shape(sample_shape) +
+            ps.rank_from_shape(batch_shape)))
+    markers_and_samples = ps.cast(
+        tf.cumsum(sorted_markers, axis=-1), dtype=tf.int32)
+    markers_and_samples = tf.minimum(markers_and_samples, num_markers - 1)
+    # Collect up samples, omitting markers.
+    resampled = tf.reshape(markers_and_samples[tf.equal(sorted_markers, 0)],
+                           points_shape)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+
+
+# TODO(b/153689734): rewrite so as not to use `move_dimension`.
 def resample_independent(log_probs, event_size, sample_shape,
                          seed=None, name=None):
   """Categorical resampler for sequential Monte Carlo.
+
+  The return value from this function is similar to sampling with
+  ```python
+  expanded_sample_shape = tf.concat([[event_size], sample_shape]), axis=-1)
+  tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
+  ```
+  but with values sorted along the first axis. It can be considered to be
+  sampling events made up of a length-`event_size` vector of draws from
+  the `Categorical` distribution. For large input values this function should
+  give better performance than using `Categorical`.
+  The sortedness is an unintended side effect of the algorithm that is
+  harmless in the context of simple SMC algorithms.
+
+  This implementation is based on the algorithms in [Maskell et al. (2006)][1].
+  It is also known as multinomial resampling as described in
+  [Doucet et al. (2011)][2].
+
+  Args:
+    log_probs: A tensor-valued batch of discrete log probability distributions.
+    event_size: the dimension of the vector considered a single draw.
+    sample_shape: the `sample_shape` determining the number of draws.
+    seed: Python '`int` used to seed calls to `tf.random.*`.
+      Default value: None (i.e. no seed).
+    name: Python `str` name for ops created by this method.
+      Default value: `None` (i.e., `'resample_independent'`).
+
+  Returns:
+    resampled_indices: a tensor of samples.
+
+  #### References
+
+  [1]: S. Maskell, B. Alun-Jones and M. Macleod. A Single Instruction Multiple
+       Data Particle Filter.
+       In 2006 IEEE Nonlinear Statistical Signal Processing Workshop.
+       http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
+  [2]: A. Doucet & A. M. Johansen. Tutorial on Particle Filtering and
+       Smoothing: Fifteen Years Later
+       In 2011 The Oxford Handbook of Nonlinear Filtering
+       https://www.stats.ox.ac.uk/~doucet/doucet_johansen_tutorialPF2011.pdf
+
+  """
+  with tf.name_scope(name or 'resample_independent') as name:
+    log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
+    log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
+    points_shape = ps.concat([sample_shape,
+                              ps.shape(log_probs)[:-1],
+                              [event_size]], axis=0)
+    log_points = -exponential.Exponential(
+        rate=tf.constant(1.0, dtype=log_probs.dtype)).sample(
+            points_shape, seed=seed)
+
+    return _resample_using_log_points(log_probs, sample_shape, log_points)
+
+
+# TODO(b/153689734): rewrite so as not to use `move_dimension`.
+def resample_systematic(log_probs, event_size, sample_shape,
+                        seed=None, name=None):
+  """A systematic resampler for sequential Monte Carlo.
+
+  The value returned from this function is similar to sampling with
+  ```python
+  expanded_sample_shape = tf.concat([[event_size], sample_shape]), axis=-1)
+  tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
+  ```
+  but with values sorted along the first axis. It can be considered to be
+  sampling events made up of a length-`event_size` vector of draws from
+  the `Categorical` distribution. However, although the elements of
+  this event have the appropriate marginal distribution, they are not
+  independent of each other. Instead they are drawn using a stratified
+  sampling method that in some sense reduces variance and is suitable for
+  use with Sequential Monte Carlo algorithms as described in
+  [Doucet et al. (2011)][2].
+  The sortedness is an unintended side effect of the algorithm that is
+  harmless in the context of simple SMC algorithms.
+
+  This implementation is based on the algorithms in [Maskell et al. (2006)][1]
+  where it is called minimum variance resampling.
+
+  Args:
+    log_probs: A tensor-valued batch of discrete log probability distributions.
+    event_size: the dimension of the vector considered a single draw.
+    sample_shape: the `sample_shape` determining the number of draws.
+    seed: Python '`int` used to seed calls to `tf.random.*`.
+      Default value: None (i.e. no seed).
+    name: Python `str` name for ops created by this method.
+      Default value: `None` (i.e., `'resample_systematic'`).
+
+  Returns:
+    resampled_indices: a tensor of samples.
+
+  #### References
+  [1]: S. Maskell, B. Alun-Jones and M. Macleod. A Single Instruction Multiple
+       Data Particle Filter.
+       In 2006 IEEE Nonlinear Statistical Signal Processing Workshop.
+       http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
+  [2]: A. Doucet & A. M. Johansen. Tutorial on Particle Filtering and
+       Smoothing: Fifteen Years Later
+       In 2011 The Oxford Handbook of Nonlinear Filtering
+       https://www.stats.ox.ac.uk/~doucet/doucet_johansen_tutorialPF2011.pdf
+
+  """
+  with tf.name_scope(name or 'resample_systematic') as name:
+    log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
+    log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
+    working_shape = ps.concat([sample_shape,
+                               ps.shape(log_probs)[:-1]], axis=0)
+    points_shape = ps.concat([working_shape, [event_size]], axis=0)
+    # Draw a single offset for each event.
+    interval_width = ps.cast(1. / event_size, dtype=log_probs.dtype)
+    offsets = uniform.Uniform(
+        low=ps.cast(0., dtype=log_probs.dtype),
+        high=interval_width).sample(
+            working_shape, seed=seed)[..., tf.newaxis]
+    even_spacing = tf.linspace(
+        start=ps.cast(0., dtype=log_probs.dtype),
+        stop=1 - interval_width,
+        num=event_size) + offsets
+    log_points = tf.broadcast_to(tf.math.log(even_spacing), points_shape)
+
+    return _resample_using_log_points(log_probs, sample_shape, log_points)
+
+
+# TODO(b/153689734): rewrite so as not to use `move_dimension`.
+def resample_stratified(log_probs, event_size, sample_shape,
+                        seed=None, name=None):
+  """Stratified resampler for sequential Monte Carlo.
+
+  The value returned from this algorithm is similar to sampling with
+  ```python
+  expanded_sample_shape = tf.concat([[event_size], sample_shape]), axis=-1)
+  tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
+  ```
+  but with values sorted along the first axis. It can be considered to be
+  sampling events made up of a length-`event_size` vector of draws from
+  the `Categorical` distribution. However, although the elements of
+  this event have the appropriate marginal distribution, they are not
+  independent of each other. Instead they are drawn using a low variance
+  stratified sampling method suitable for use with Sequential Monte
+  Carlo algorithms.
+  The sortedness is an unintended side effect of the algorithm that is
+  harmless in the context of simple SMC algorithms.
 
   This function is based on Algorithm #1 in the paper
   [Maskell et al. (2006)][1].
@@ -968,17 +1181,7 @@ def resample_independent(log_probs, event_size, sample_shape,
       Default value: `None` (i.e., `'resample_independent'`).
 
   Returns:
-    resampled_indices: The result is similar to sampling with
-    ```python
-    expanded_sample_shape = tf.concat([[event_size], sample_shape]), axis=-1)
-    tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
-    ```
-    but with values sorted along the first axis. It can be considered to be
-    sampling events made up of a length-`event_size` vector of draws from
-    the `Categorical` distribution. For large input values this function should
-    give better performance than using `Categorical`.
-    The sortedness is an unintended side effect of the algorithm that is
-    harmless in the context of simple SMC algorithms.
+    resampled_indices: a tensor of samples.
 
   #### References
 
@@ -988,72 +1191,26 @@ def resample_independent(log_probs, event_size, sample_shape,
        http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
 
   """
-  with tf.name_scope(name or 'resample_independent') as name:
+  with tf.name_scope(name or 'resample_stratified') as name:
     log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
     log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
+    points_shape = ps.concat([sample_shape,
+                              ps.shape(log_probs)[:-1],
+                              [event_size]], axis=0)
+    # Draw an offset for every element of an event.
+    interval_width = ps.cast(1. / event_size, dtype=log_probs.dtype)
+    offsets = uniform.Uniform(low=ps.cast(0., dtype=log_probs.dtype),
+                              high=interval_width).sample(
+                                  points_shape, seed=seed)
+    # The unit interval is divided into equal partitions and each point
+    # is a random offset into a partition.
+    even_spacing = tf.linspace(
+        start=ps.cast(0., dtype=log_probs.dtype),
+        stop=1 - interval_width,
+        num=event_size) + offsets
+    log_points = tf.math.log(even_spacing)
 
-    batch_shape = ps.shape(log_probs)[:-1]
-    num_markers = ps.shape(log_probs)[-1]
-
-    # `working_shape` specifies the total number of events
-    # we will be generating.
-    working_shape = ps.concat([sample_shape, batch_shape], axis=0)
-    # `points_shape` is the shape of the final result.
-    points_shape = ps.concat([working_shape, [event_size]], axis=0)
-    # `markers_shape` is the shape of the markers we temporarily insert.
-    markers_shape = ps.concat([working_shape, [num_markers]], axis=0)
-    # Generate one real point for each particle.
-    log_points = -exponential.Exponential(
-        rate=tf.constant(1.0, dtype=log_probs.dtype)).sample(
-            points_shape, seed=seed)
-
-    # We divide up the unit interval [0, 1] according to the provided
-    # probability distributions using `cumsum`.
-    # At the end of each division we place a 'marker'.
-    # We generate random points on the unit interval.
-    # We sort the combination of points and markers. The number
-    # of points between the markers defining a division gives the number
-    # of samples we require in that division.
-    # For example, suppose `probs` is `[0.2, 0.3, 0.5]`.
-    # We divide up `[0, 1]` using 3 markers:
-    #
-    #     |     |          |
-    # 0.  0.2   0.5        1.0  <- markers
-    #
-    # Suppose we generate four points: [0.1, 0.25, 0.9, 0.75]
-    # After sorting the combination we get:
-    #
-    # 0.1  0.25     0.75 0.9    <- points
-    #  *  | *   |    *    *|
-    # 0.   0.2 0.5         1.0  <- markers
-    #
-    # We have one sample in the first category, one in the second and
-    # two in the last.
-    #
-    # All of these computations are carried out in batched form.
-    markers = ps.concat(
-        [tf.zeros(points_shape, dtype=tf.int32),
-         tf.ones(markers_shape, dtype=tf.int32)],
-        axis=-1)
-    log_marker_positions = tf.broadcast_to(
-        tf.math.cumulative_logsumexp(log_probs, axis=-1),
-        markers_shape)
-    log_points_and_markers = ps.concat(
-        [log_points, log_marker_positions], axis=-1)
-    indices = tf.argsort(log_points_and_markers, axis=-1, stable=False)
-    sorted_markers = tf.gather_nd(
-        markers,
-        indices[..., tf.newaxis],
-        batch_dims=(
-            ps.rank_from_shape(sample_shape) +
-            ps.rank_from_shape(batch_shape)))
-    markers_and_samples = ps.cast(
-        tf.cumsum(sorted_markers, axis=-1), dtype=tf.int32)
-    markers_and_samples = tf.minimum(markers_and_samples, num_markers - 1)
-    # Collect up samples, omitting markers.
-    resampled = tf.reshape(markers_and_samples[tf.equal(sorted_markers, 0)],
-                           points_shape)
-    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+    return _resample_using_log_points(log_probs, sample_shape, log_points)
 
 
 # TODO(b/153199903): replace this function with `tf.scatter_nd` when
@@ -1098,75 +1255,6 @@ def _scatter_nd_batch(indices, updates, shape, batch_dims=0):
   return ps.cast(grad, dtype=dtype)
 
 
-# TODO(b/153689734): rewrite so as not to use `move_dimension`.
-def resample_minimum_variance(
-    log_probs, event_size, sample_shape, seed=None, name=None):
-  """Minimum variance resampler for sequential Monte Carlo.
-
-  This function is based on Algorithm #2 in [Maskell et al. (2006)][1].
-
-  Args:
-    log_probs: A tensor-valued batch of discrete log probability distributions.
-    event_size: the dimension of the vector considered a single draw.
-    sample_shape: the `sample_shape` determining the number of draws.
-    seed: Python '`int` used to seed calls to `tf.random.*`.
-      Default value: None (i.e. no seed).
-    name: Python `str` name for ops created by this method.
-      Default value: `None` (i.e., `'resample_minimum_variance'`).
-
-  Returns:
-    resampled_indices: The result is similar to sampling with
-    ```python
-    expanded_sample_shape = tf.concat([[event_size], sample_shape]), axis=-1)
-    tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
-    ```
-    but with values sorted along the first axis. It can be considered to be
-    sampling events made up of a length-`event_size` vector of draws from
-    the `Categorical` distribution. However, although the elements of
-    this event have the appropriate marginal distribution, they are not
-    independent of each other. Instead they have been chosen so as to form
-    a good representative sample, suitable for use with Sequential Monte
-    Carlo algorithms.
-    The sortedness is an unintended side effect of the algorithm that is
-    harmless in the context of simple SMC algorithms.
-
-  #### References
-  [1]: S. Maskell, B. Alun-Jones and M. Macleod. A Single Instruction Multiple
-       Data Particle Filter.
-       In 2006 IEEE Nonlinear Statistical Signal Processing Workshop.
-       http://people.ds.cam.ac.uk/fanf2/hermes/doc/antiforgery/stats.pdf
-
-  """
-  with tf.name_scope(name or 'resample_minimum_variance') as name:
-    log_probs = tf.convert_to_tensor(log_probs, dtype_hint=tf.float32)
-    log_probs = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
-
-    batch_shape = ps.shape(log_probs)[:-1]
-    working_shape = ps.concat([sample_shape, batch_shape], axis=-1)
-    log_cdf = tf.math.cumulative_logsumexp(log_probs[..., :-1],
-                                           axis=-1)
-    # Each resampling requires a single uniform random variable
-    offset = uniform.Uniform(
-        low=tf.constant(0., log_cdf.dtype),
-        high=tf.constant(1., log_cdf.dtype)).sample(
-            working_shape, seed=seed)[..., tf.newaxis]
-    # It is possible for numerical error to result in a cumulative
-    # sum that exceeds 1 so we need to clip.
-    markers = ps.cast(
-        tf.floor(event_size * tf.math.exp(log_cdf) + offset), tf.int32)
-    indices = markers[..., tf.newaxis]
-    updates = tf.ones(ps.shape(indices)[:-1], dtype=tf.int32)
-    scatter_shape = ps.concat(
-        [working_shape, [event_size + 1]], axis=-1)
-    batch_dims = (ps.rank_from_shape(sample_shape) +
-                  ps.rank_from_shape(batch_shape))
-    x = _scatter_nd_batch(indices, updates, scatter_shape,
-                          batch_dims=batch_dims)
-
-    resampled = tf.cumsum(x, axis=-1)[..., :-1]
-    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
-
-
 def _finite_differences(sums):
   """The inverse of `tf.cumsum` with `axis=-1`."""
   return ps.concat(
@@ -1175,6 +1263,7 @@ def _finite_differences(sums):
 
 def _samples_from_counts(values, counts, total_number):
   """Construct sequences of values from tabulated numbers of counts."""
+
   extended_result_shape = ps.concat(
       [ps.shape(counts)[:-1],
        [total_number + 1]], axis=0)
@@ -1182,6 +1271,7 @@ def _samples_from_counts(values, counts, total_number):
       [ps.zeros_like(counts[..., :1]),
        counts[..., :-1]], axis=-1)
   edge_positions = ps.cumsum(padded_counts, axis=-1)
+
   # We need to scatter `values` into an array according to
   # the given `counts`.
   # Because the final result typically consists of sequences of samples
@@ -1217,10 +1307,23 @@ def resample_deterministic_minimum_error(
     seed=None, name='resample_deterministic_minimum_error'):
   """Deterministic minimum error resampler for sequential Monte Carlo.
 
+    The return value of this function is similar to sampling with
+    ```python
+    expanded_sample_shape = tf.concat([sample_shape, [event_size]]), axis=-1)
+    tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
+    ```
+    but with values chosen deterministically so that the empirical distribution
+    is as close as possible to the specified distribution.
+    (Note that the empirical distribution can only exactly equal the requested
+    distribution if multiplying every probability by `event_size` gives
+    an integer. So in general this is a biased "sampler".)
+    It is intended to provide a good representative sample, suitable for use
+    with some Sequential Monte Carlo algorithms.
+
   This function is based on Algorithm #3 in [Maskell et al. (2006)][1].
 
   Args:
-    log_probs: A tensor-valued batch of discrete log probability distributions.
+    log_probs: a tensor-valued batch of discrete log probability distributions.
     event_size: the dimension of the vector considered a single draw.
     sample_shape: the `sample_shape` determining the number of draws. Because
       this resampler is deterministic it simply replicates the draw you
@@ -1232,15 +1335,7 @@ def resample_deterministic_minimum_error(
       Default value: `None` (i.e., `'resample_deterministic_minimum_error'`).
 
   Returns:
-    resampled_indices: The result is similar to sampling with
-    ```python
-    expanded_sample_shape = tf.concat([sample_shape, [event_size]]), axis=-1)
-    tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
-    ```
-    but with values chosen deterministically so that the empirical distribution
-    is as close as possible to the specified distribution.
-    It is intended to provide a good representative sample, suitable for use
-    with Sequential Monte Carlo algorithms.
+    resampled_indices: a tensor of samples.
 
   #### References
   [1]: S. Maskell, B. Alun-Jones and M. Macleod. A Single Instruction Multiple
@@ -1284,7 +1379,7 @@ def resample_deterministic_minimum_error(
     unpermuted = tf.broadcast_to(
         tf.range(pdf_size),
         prob_shape)
-    increments = tf.cast(
+    increments = ps.cast(
         unpermuted >= pdf_size - sample_defect,
         dtype=first_approximation.dtype)
     counts = first_approximation + increments

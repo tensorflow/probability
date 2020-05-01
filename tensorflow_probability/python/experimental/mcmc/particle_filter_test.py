@@ -21,10 +21,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.particle_filter import _resample_using_log_points
 from tensorflow_probability.python.experimental.mcmc.particle_filter import _scatter_nd_batch
 from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_independent
-from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_minimum_variance
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_stratified
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_systematic
 from tensorflow_probability.python.experimental.mcmc.particle_filter import SampleParticles
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static
@@ -303,7 +305,7 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_minimum_variance_resampler_zero_final_class(self):
     probs = [1.0, 0.0]
-    resampled = resample_minimum_variance(
+    resampled = resample_systematic(
         tf.math.log(probs), 1000, [], seed=test_util.test_seed())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
@@ -318,7 +320,7 @@ class _ParticleFilterTest(test_util.TestCase):
     num_probs = 10000
     probs = tf.ones((num_probs,)) / num_probs
     self.evaluate(
-        resample_minimum_variance(
+        resample_systematic(
             tf.math.log(probs), num_probs, [],
             seed=test_util.test_seed()))
 
@@ -337,7 +339,7 @@ class _ParticleFilterTest(test_util.TestCase):
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
     num_samples = 10000
     num_particles = 20
-    resampled = resample_minimum_variance(
+    resampled = resample_systematic(
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
@@ -397,6 +399,72 @@ class _ParticleFilterTest(test_util.TestCase):
       means_, probs_ = self.evaluate([means, probs[i]])
 
       self.assertAllClose(means_, probs_, atol=1.0 / num_particles)
+
+  # TODO(b/153689734): rewrite so as not to use `move_dimension`.
+  def test_stratified_resampler_means(self):
+    # Distinct samples with this resampler aren't independent
+    # so a chi-squared test is inappropriate.
+    # However, because it reduces variance by design, we
+    # can, with high probability,  place sharp bounds on the
+    # values of the sample means.
+    num_distributions = 3
+    num_probs = 8
+    probs = tfd.Uniform(
+        low=0.0, high=1.0).sample([num_distributions, num_probs],
+                                  seed=test_util.test_seed())
+    probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
+    num_samples = 4
+    num_particles = 10000
+    resampled = resample_stratified(
+        tf.math.log(dist_util.move_dimension(probs,
+                                             source_idx=-1,
+                                             dest_idx=0)),
+        num_particles, [num_samples])
+    resampled = dist_util.move_dimension(resampled,
+                                         source_idx=0,
+                                         dest_idx=-1)
+    # TODO(dpiponi): reimplement this test in vectorized form rather than with
+    # loops.
+    for i in range(num_distributions):
+      histogram = tf.reduce_mean(
+          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
+                            tf.ones((num_samples, num_particles)),
+                            (num_samples, num_probs),
+                            batch_dims=1),
+          axis=0)
+      means = histogram / num_particles
+      means_, probs_ = self.evaluate([means, probs[i]])
+
+      self.assertAllClose(means_, probs_, atol=0.1)
+
+  def test_resample_using_extremal_log_points(self):
+    n = 8
+
+    one = np.float32(1)
+    almost_one = np.nextafter(one, np.float32(0))
+    sample_shape = []
+    log_points_zero = tf.math.log(tf.zeros(n, tf.float32))
+    log_points_almost_one = tf.fill([n], tf.math.log(almost_one))
+    log_probs_beginning = tf.math.log(
+        tf.concat([[one], tf.zeros(n - 1, dtype=tf.float32)], axis=0))
+    log_probs_end = tf.math.log(tf.concat([tf.zeros(n - 1, dtype=tf.float32),
+                                           [one]], axis=0))
+
+    indices = _resample_using_log_points(
+        log_probs_beginning, sample_shape, log_points_zero)
+    self.assertAllEqual(indices, tf.zeros(n, dtype=tf.float32))
+
+    indices = _resample_using_log_points(
+        log_probs_end, sample_shape, log_points_zero)
+    self.assertAllEqual(indices, tf.fill([n], n - 1))
+
+    indices = _resample_using_log_points(
+        log_probs_beginning, sample_shape, log_points_almost_one)
+    self.assertAllEqual(indices, tf.zeros(n, dtype=tf.float32))
+
+    indices = _resample_using_log_points(
+        log_probs_end, sample_shape, log_points_almost_one)
+    self.assertAllEqual(indices, tf.fill([n], n - 1))
 
   def test_epidemiological_model(self):
     # A toy, discrete version of an SIR (Susceptible, Infected, Recovered)
