@@ -60,6 +60,25 @@ def make_test_nuts_kernel_fn(target_log_prob_fn,
 @test_util.test_all_tf_execution_regimes
 class SampleSequentialMonteCarloTest(test_util.TestCase):
 
+  def testCorrectStepSizeTransformedkernel(self):
+    scalings = .1
+    bijector = tfb.Sigmoid()
+    prior = tfd.Beta(.1, .1)
+    likelihood = tfd.Beta(5., 5.)
+    init_state = [tf.clip_by_value(prior.sample(10000), 1e-5, 1.-1e-5)]
+    make_transform_kernel_fn = gen_make_transform_hmc_kernel_fn(
+        [bijector], num_leapfrog_steps=1)
+
+    kernel = make_transform_kernel_fn(likelihood.log_prob,
+                                      init_state,
+                                      scalings=scalings)
+    step_size, expected_step_size = self.evaluate([
+        tf.squeeze(kernel.inner_kernel.step_size),
+        scalings * tf.math.reduce_std(bijector.inverse(init_state))
+    ])
+    self.assertAllGreater(step_size, 0.)
+    self.assertAllEqual(step_size, expected_step_size)
+
   @parameterized.named_parameters(
       ('RWMH', make_rwmh_kernel_fn, 0.45),
       ('HMC', gen_make_hmc_kernel_fn(5), 0.651),
@@ -224,11 +243,11 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
       return tfp.experimental.mcmc.sample_sequential_monte_carlo(
           prior_jd.log_prob,
           likelihood_log_prob_fn,
-          prior_jd.sample(1000, seed=seed),
+          prior_jd.sample([1000, 5], seed=seed),
           make_kernel_fn=make_transform_hmc_kernel_fn,
           tuning_fn=functools.partial(simple_heuristic_tuning,
-                                      optimal_accept=.7),
-          max_num_steps=50,
+                                      optimal_accept=.6),
+          min_num_steps=10,
           parallel_iterations=1,
           seed=seed)
 
@@ -243,7 +262,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     # Compare the SMC posterior with the result from a calibrated HMC.
     self.assertAllClose(tf.reduce_mean(b0), 0.016, atol=0.005, rtol=0.005)
     self.assertAllClose(tf.reduce_mean(b1), 1.245, atol=0.005, rtol=0.035)
-    self.assertAllClose(tf.reduce_mean(weight), 0.27, atol=0.01, rtol=0.01)
+    self.assertAllClose(tf.reduce_mean(weight), 0.27, atol=0.02, rtol=0.02)
     self.assertAllClose(tf.reduce_mean(mu_out), 0.13, atol=0.2, rtol=0.2)
     self.assertAllClose(tf.reduce_mean(sigma_out), 0.46, atol=0.5, rtol=0.5)
 

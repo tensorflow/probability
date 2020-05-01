@@ -137,9 +137,11 @@ def gen_make_transform_hmc_kernel_fn(unconstraining_bijectors,
 
     with tf.name_scope('make_transformed_hmc_kernel_fn'):
       seed = SeedStream(seed, salt='make_transformed_hmc_kernel_fn')
+      # TransformedTransitionKernel doesn't modify the input step size, thus we
+      # need to pass the appropriate step size that are already in unconstrained
+      # space
       state_std = [
-          bij.inverse(  # pylint: disable=g-complex-comprehension
-              tf.math.reduce_std(bij.forward(x), axis=0, keepdims=True))
+          tf.math.reduce_std(bij.inverse(x), axis=0, keepdims=True)
           for x, bij in zip(init_state, unconstraining_bijectors)
       ]
       step_size = compute_hmc_step_size(scalings, state_std, num_leapfrog_steps)
