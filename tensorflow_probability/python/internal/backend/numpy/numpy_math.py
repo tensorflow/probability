@@ -571,7 +571,7 @@ log1p = utils.copy_docstring(
 
 log_sigmoid = utils.copy_docstring(
     'tf.math.log_sigmoid',
-    lambda x, name=None: -np.log1p(np.exp(-x)))
+    lambda x, name=None: -_softplus(-x))
 
 log_softmax = utils.copy_docstring(
     'tf.math.log_softmax',
@@ -821,8 +821,10 @@ softmax = utils.copy_docstring(
 
 
 def _softplus(x, name=None):  # pylint: disable=unused-argument
-  # TODO(b/146563881): Investigate improving numerical accuracy here.
   if not JAX_MODE:
+    # This is effectively inlining jax.nn.softplus, which is (currently)
+    # defined as np.logaddexp(x, 0.).
+    # Both are numerically fine (see discussion in b/146563881).
     return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.)
   return jax.nn.softplus(x)
 

@@ -63,7 +63,6 @@ multi_substrate_py_test(
     name = "batched_rejection_sampler_test",
     size = "medium",
     srcs = ["batched_rejection_sampler_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":batched_rejection_sampler",
         ":samplers",

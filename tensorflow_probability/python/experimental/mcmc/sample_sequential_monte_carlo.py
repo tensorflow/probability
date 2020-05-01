@@ -283,6 +283,7 @@ def sample_sequential_monte_carlo(
     prior_log_prob_fn,
     likelihood_log_prob_fn,
     current_state,
+    min_num_steps=2,
     max_num_steps=25,
     max_stage=100,
     make_kernel_fn=make_rwmh_kernel_fn,
@@ -306,7 +307,7 @@ def sample_sequential_monte_carlo(
 
   by mutating a collection of MC samples (i.e., particles). The approach is also
   known as Particle Filter in some literature. The current implemenetation is
-  largely based on  Del Moral et al [1], which adapts the tempering sequence
+  largely based on Del Moral et al [1], which adapts the tempering sequence
   adaptively (base on the effective sample size) and the scaling of the mutation
   kernel (base on the sample covariance of the particles) at each stage.
 
@@ -316,9 +317,12 @@ def sample_sequential_monte_carlo(
     likelihood_log_prob_fn: Python callable which takes an argument like
       `current_state` (or `*current_state` if it's a list) and returns its
       (possibly unnormalized) log-density under the likelihood distribution.
-    current_state: `Tensor` or Python `list` of `Tensor`s representing the
-      current state(s) of the Markov chain(s). The first `r` dimensions index
-      independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
+    current_state: Nested structure of `Tensor`s, each of shape
+      `concat([[num_particles, b1, ..., bN], latent_part_event_shape])`, where
+      `b1, ..., bN` are optional batch dimensions. Each batch represents an
+      independent SMC run.
+    min_num_steps: The minimal number of kernel transition steps in one mutation
+      of the MC samples.
     max_num_steps: The maximum number of kernel transition steps in one mutation
       of the MC samples. Note that the actual number of steps in one mutation is
       tuned during sampling and likely lower than the max_num_step.
@@ -567,7 +571,8 @@ def sample_sequential_monte_carlo(
       next_log_scalings = tf.where(stage == 0,
                                    resampled_particle_info.log_scalings,
                                    next_log_scalings)
-      next_num_steps = tf.clip_by_value(next_num_steps, 2, max_num_steps)
+      next_num_steps = tf.clip_by_value(
+          next_num_steps, min_num_steps, max_num_steps)
 
       next_state, log_accept_prob, tempered_log_prob = mutate(
           resampled_state,

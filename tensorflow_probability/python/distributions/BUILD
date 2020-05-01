@@ -1721,7 +1721,6 @@ multi_substrate_py_test(
     name = "beta_binomial_test",
     size = "medium",
     srcs = ["beta_binomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -1875,7 +1874,6 @@ multi_substrate_py_test(
     name = "dirichlet_multinomial_test",
     size = "medium",
     srcs = ["dirichlet_multinomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
@@ -2258,7 +2256,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "lambertw_f_test",
     srcs = ["lambertw_f_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":lambertw_f",
@@ -2492,8 +2489,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "negative_binomial_test",
     srcs = ["negative_binomial_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2654,7 +2650,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "quantized_distribution_test",
     srcs = ["quantized_distribution_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
