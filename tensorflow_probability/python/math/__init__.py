@@ -39,6 +39,7 @@ from tensorflow_probability.python.math.interpolation import batch_interp_regula
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
 from tensorflow_probability.python.math.linalg import cholesky_concat
+from tensorflow_probability.python.math.linalg import cholesky_update
 from tensorflow_probability.python.math.linalg import fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
@@ -68,6 +69,7 @@ _allowed_symbols = [
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
     'cholesky_concat',
+    'cholesky_update',
     'clip_by_value_preserve_gradient',
     'custom_gradient',
     'dense_to_sparse',

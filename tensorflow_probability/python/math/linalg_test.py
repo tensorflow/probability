@@ -119,6 +119,103 @@ class CholeskyExtend64Dynamic(_CholeskyExtend):
 del _CholeskyExtend
 
 
+class _CholeskyUpdate(test_util.TestCase):
+
+  def testCholeskyUpdate(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    xs = tf1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+    k = tfp.math.psd_kernels.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    chol = tf.linalg.cholesky(mat)
+
+    u = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    u = tf1.placeholder_with_default(
+        u, shape=u.shape if self.use_static_shape else None)
+
+    new_chol_expected = tf.linalg.cholesky(
+        mat + tf.linalg.matmul(u, u, transpose_b=True))
+    new_chol = tfp.math.cholesky_update(chol, tf.squeeze(u, axis=-1))
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+
+  def testCholeskyUpdateBatches(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample((3, 1, 7)).astype(self.dtype)[..., tf.newaxis]
+    xs = tf1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+    k = tfp.math.psd_kernels.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    chol = tf.linalg.cholesky(mat)
+
+    u = rng.random_sample((1, 5, 7)).astype(self.dtype)[..., tf.newaxis]
+    u = tf1.placeholder_with_default(
+        u, shape=u.shape if self.use_static_shape else None)
+    multiplier = rng.random_sample((2, 1, 1)).astype(self.dtype)
+
+    new_chol_expected = tf.linalg.cholesky(
+        mat + multiplier[..., np.newaxis, np.newaxis] * tf.linalg.matmul(
+            u, u, transpose_b=True))
+    new_chol = tfp.math.cholesky_update(
+        chol, tf.squeeze(u, axis=-1), multiplier=multiplier)
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testCholeskyUpdateRandomized(self, data):
+    target_bs = data.draw(hpnp.array_shapes())
+    chol_bs, u_bs, multiplier_bs = data.draw(
+        tfp_hps.broadcasting_shapes(target_bs, 3))
+    l = data.draw(hps.integers(min_value=1, max_value=12))
+
+    rng_seed = data.draw(hps.integers(min_value=0, max_value=2**32 - 1))
+    rng = np.random.RandomState(seed=rng_seed)
+    xs = rng.uniform(size=chol_bs + (l, 1))
+    hp.note(xs)
+    xs = xs.astype(self.dtype)
+    xs = tf1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+
+    k = tfp.math.psd_kernels.MaternOneHalf()
+    jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 5e-5
+
+    mat = k.matrix(xs, xs) + jitter(l)
+    chol = tf.linalg.cholesky(mat)
+
+    u = rng.uniform(size=u_bs + (l,))
+    hp.note(u)
+    u = u.astype(self.dtype)
+    u = tf1.placeholder_with_default(
+        u, shape=u.shape if self.use_static_shape else None)
+
+    multiplier = rng.uniform(size=multiplier_bs)
+    hp.note(multiplier)
+    multiplier = multiplier.astype(self.dtype)
+    multiplier = tf1.placeholder_with_default(
+        multiplier, shape=multiplier.shape if self.use_static_shape else None)
+
+    new_chol_expected = tf.linalg.cholesky(
+        mat + multiplier[..., tf.newaxis, tf.newaxis] * tf.linalg.matmul(
+            u[..., tf.newaxis], u[..., tf.newaxis, :]))
+
+    new_chol = tfp.math.cholesky_update(chol, u, multiplier=multiplier)
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+
+
+@test_util.test_all_tf_execution_regimes
+class CholeskyUpdate32Static(_CholeskyUpdate):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@test_util.test_all_tf_execution_regimes
+class CholeskyUpdate64Dynamic(_CholeskyUpdate):
+  dtype = np.float64
+  use_static_shape = False
+
+del _CholeskyUpdate
+
+
 class _PivotedCholesky(test_util.TestCase):
 
   def _random_batch_psd(self, dim):
