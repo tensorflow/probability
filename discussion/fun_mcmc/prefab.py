@@ -154,14 +154,15 @@ def adaptive_hamiltonian_monte_carlo_init(
 def adaptive_hamiltonian_monte_carlo_step(
     adaptive_hmc_state: 'AdaptiveHamiltonianMonteCarloState',
     target_log_prob_fn: 'fun_mc.PotentialFn',
-    num_adaptation_steps: 'Optional[int]',
-    variance_window_steps: 'int' = 100,
+    num_adaptation_steps: 'Optional[fun_mc.IntTensor]',
+    variance_window_steps: 'fun_mc.IntTensor' = 100,
     trajectory_length_factor: 'fun_mc.FloatTensor' = 1.,
-    num_trajectory_ramp_steps: 'Optional[int]' = None,
-    trajectory_warmup_power=1.,
-    step_size_adaptation_rate: 'fun_mc.FloatTensor' = 1e-2,
-    step_size_adaptation_rate_decay_power=0.1,
-    target_accept_prob: 'float' = 0.8,
+    num_trajectory_ramp_steps: 'Optional[int]' = 100,
+    trajectory_warmup_power: 'fun_mc.FloatTensor' = 1.,
+    max_num_leapfrog_steps: 'Optional[int]' = 100,
+    step_size_adaptation_rate: 'fun_mc.FloatTensor' = 0.05,
+    step_size_adaptation_rate_decay_power: 'fun_mc.FloatTensor' = 0.1,
+    target_accept_prob: 'fun_mc.FloatTensor' = 0.8,
     seed: 'Any' = None,
 ) -> ('Tuple[AdaptiveHamiltonianMonteCarloState, '
       'AdaptiveHamiltonianMonteCarloExtra]'):
@@ -208,6 +209,7 @@ def adaptive_hamiltonian_monte_carlo_step(
       `trajectory_length_factor`.
     trajectory_warmup_power: Power of the polynomial schedule for
       `trajectory_length_factor` warmup.
+    max_num_leapfrog_steps: Maximum number of leapfrog steps to take.
     step_size_adaptation_rate: Step size adaptation rate.,
     step_size_adaptation_rate_decay_power:  Power of the polynomial schedule for
       `trajectory_length_factor` warmup.
@@ -323,6 +325,8 @@ def adaptive_hamiltonian_monte_carlo_step(
   step_size = tf.exp(log_step_size_opt_state.state)
   num_leapfrog_steps = tf.cast(
       tf.math.ceil(max_scale * trajectory_length_factor / step_size), tf.int32)
+  if max_num_leapfrog_steps is not None:
+    num_leapfrog_steps = tf.minimum(max_num_leapfrog_steps, num_leapfrog_steps)
   # We implement mass-matrix adaptation via step size rescaling, as this is a
   # little bit simpler to code up.
   step_size = util.map_tree(lambda scale: scale / max_scale * step_size, scale)
@@ -342,7 +346,7 @@ def adaptive_hamiltonian_monte_carlo_step(
   running_var_state, _ = fun_mc.running_variance_step(
       running_var_state,
       hmc_state.state,
-      axis=tuple(range(chain_ndims)),
+      axis=tuple(range(chain_ndims)) if chain_ndims else None,
       window_size=int(np.prod(hmc_state.target_log_prob.shape)) *
       variance_window_steps)
 
