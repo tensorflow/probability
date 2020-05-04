@@ -146,16 +146,17 @@ def trace(state, fn, num_steps, parallel_iterations=10):
   def cond(i, *_):
     return i < num_steps
 
+  static_length = tf.get_static_value(num_steps)
+
   _, state, untraced, arrays = tf.while_loop(
       cond=cond,
       body=body,
       loop_vars=(start_idx, state, first_untraced, arrays),
       parallel_iterations=parallel_iterations,
+      maximum_iterations=static_length,
   )
 
   traced = tf.nest.map_structure(lambda a: a.stack(), arrays)
-
-  static_length = tf.get_static_value(num_steps)
 
   def _merge_static_length(x):
     x.set_shape(tf.TensorShape(static_length).concatenate(x.shape[1:]))
