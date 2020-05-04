@@ -41,6 +41,9 @@ util = backend.util
 real_tf.enable_v2_behavior()
 
 
+TestNamedTuple = collections.namedtuple('TestNamedTuple', 'x, y')
+
+
 def _test_seed():
   return tfp_test_util.test_seed() % (2**32 - 1)
 
@@ -211,6 +214,77 @@ class FunMCMCTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
     self.assertEqual(3, fun_mcmc.call_fn(sum_fn, [1, 2]))
     self.assertEqual(3, fun_mcmc.call_fn(sum_fn, {'a': 1, 'b': 2}))
+
+  @parameterized.named_parameters(
+      ('ArgsToTuple1', (1,), {}, (1,)),
+      ('ArgsToList1', (1,), {}, [1]),
+      ('ArgsToTuple3', (1, 2, 3), {}, [1, 2, 3]),
+      ('ArgsToList3', (1, 2, 3), {}, [1, 2, 3]),
+      ('ArgsToOrdDict3',
+       (1, 2, 3), {}, collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])),
+      ('ArgsKwargsToOrdDict3', (1, 2), {
+          'a': 3
+      }, collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])),
+      ('KwargsToOrdDict3', (), {
+          'a': 3,
+          'b': 2,
+          'c': 1
+      }, collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])),
+      ('KwargsToDict3', (), {
+          'a': 3,
+          'b': 2,
+          'c': 1
+      }, {
+          'c': 1,
+          'b': 2,
+          'a': 3
+      }),
+      ('ArgsToNamedTuple', (TestNamedTuple(1, 2),), {}, TestNamedTuple(1, 2)),
+      ('KwargsToNamedTuple', (), {
+          'a': TestNamedTuple(1, 2)
+      }, TestNamedTuple(1, 2)),
+      ('ArgsToScalar', (1,), {}, 1),
+      ('KwargsToScalar', (), {
+          'a': 1
+      }, 1),
+      ('Tuple0', (), {}, ()),
+      ('List0', (), {}, []),
+      ('Dict0', (), {}, {}),
+  )
+  def testRecoverStateFromArgs(self, args, kwargs, state_structure):
+    state = fun_mcmc.fun_mcmc_lib.recover_state_from_args(
+        args, kwargs, state_structure)
+    self.assertEqual(type(state_structure), type(state))
+    self.assertAllEqual(state_structure, state)
+
+  @parameterized.named_parameters(
+      ('BadKwargs', (), {
+          'a': 1,
+          'b': 2
+      }, 'c'),
+      ('ArgsOverlap', (1, 2), {
+          'c': 1,
+          'b': 2
+      }, 'a'),
+  )
+  def testRecoverStateFromArgsMissing(self, args, kwargs, missing):
+    state_structure = collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])
+    with self.assertRaisesRegexp(ValueError,
+                                 'Missing \'{}\' from kwargs.'.format(missing)):
+      fun_mcmc.fun_mcmc_lib.recover_state_from_args(args, kwargs,
+                                                    state_structure)
+
+  @parameterized.named_parameters(
+      ('Tuple1', {
+          'a': 1
+      }, (1,)),
+      ('List1', {
+          'a': 1
+      }, [1]),
+  )
+  def testRecoverStateFromArgsNoKwargs(self, kwargs, state_structure):
+    with self.assertRaisesRegexp(ValueError, 'This wrapper does not'):
+      fun_mcmc.fun_mcmc_lib.recover_state_from_args((), kwargs, state_structure)
 
   def testBroadcastStructure(self):
     struct = fun_mcmc.maybe_broadcast_structure(1, [1, 2])

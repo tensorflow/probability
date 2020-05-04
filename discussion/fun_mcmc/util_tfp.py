@@ -43,8 +43,6 @@ def bijector_to_transform_fn(
     (*args, **kwargs) ->
       transformed_state, [(), forward_ldj]
   ```
-  Note that currently it is forbidden to pass both `args` and `kwargs` to the
-  wrapper.
 
   It also has an `inverse` property that contains the inverse transformation.
 
@@ -69,14 +67,7 @@ def bijector_to_transform_fn(
 
   def transform_fn(bijector, *args, **kwargs):
     """Transport map implemented via the bijector."""
-    if args and kwargs:
-      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
-                       'this wrapper.')
-    if kwargs:
-      args = kwargs
-    # Use state_structure to recover the structure of args that has been lossily
-    # transmitted via *args and **kwargs.
-    state = util.unflatten_tree(state_structure, util.flatten_tree(args))
+    state = fun_mcmc_lib.recover_state_from_args(args, kwargs, state_structure)
 
     value = util.map_tree_up_to(bijector, lambda b, x: b(x), bijector, state)
     ldj = sum(

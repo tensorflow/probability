@@ -298,6 +298,51 @@ def call_fn(
     return fn(args)
 
 
+def recover_state_from_args(args: 'Sequence[Any]',
+                            kwargs: 'Mapping[Text, Any]',
+                            state_structure: 'Any') -> 'Any':
+  """Attempts to recover the state that was transmitted via *args, **kwargs."""
+  orig_args = args
+  if isinstance(state_structure, collections.Mapping):
+    state = type(state_structure)()
+    # Mappings can be ordered and not ordered, and this information is lost when
+    # passed via **kwargs. We iterate using the reference structure order so we
+    # can reconstruct it. For unordered mappings the order doesn't matter. We
+    # specifically don't use any sort of explicit sorting here, as that would
+    # destroy the order of orderered mappings.
+    for k in state_structure.keys():
+      # This emulates the positional argument passing.
+      if args:
+        state[k] = args[0]
+        args = args[1:]
+      else:
+        if k not in kwargs:
+          raise ValueError(
+              ('Missing \'{}\' from kwargs.\nargs=\n{}\nkwargs=\n{}\n'
+               'state_structure=\n{}').format(k, orig_args, kwargs,
+                                              _tree_repr(state_structure)))
+        state[k] = kwargs[k]
+    return state
+  elif (isinstance(state_structure, collections.Sequence) and
+        not mcmc_util.is_namedtuple_like(state_structure)):
+    # Sadly, we have no way of inferring the state index from kwargs, so we
+    # disallow them.
+    # TODO(siege): We could support length-1 sequences in principle.
+    if kwargs:
+      raise ValueError('This wrapper does not accept keyword arguments for a '
+                       'sequence-like state structure=\n{}'.format(
+                           _tree_repr(state_structure)))
+    return type(state_structure)(args)
+  elif args:
+    return args[0]
+  elif kwargs:
+    return next(iter(kwargs.values()))
+  else:
+    # Must be the case that the state_structure is actually empty.
+    assert not state_structure
+    return state_structure
+
+
 def call_potential_fn(
     fn: 'PotentialFn',
     args: 'Union[Tuple[Any], Mapping[Text, Any], Any]',
@@ -529,8 +574,6 @@ def reparameterize_potential_fn(
       transformed_potential, [original_space_state, potential_extra,
                               transport_map_fn_extra]
   ```
-  Note that currently it is forbidden to pass both `args` and `kwargs` to the
-  wrapper.
 
   You can also pass `init_state` in the original space and this function will
   return the inverse transformed state as the 2nd return value. This requires
@@ -564,17 +607,10 @@ def reparameterize_potential_fn(
 
   def wrapper(*args, **kwargs):
     """Transformed wrapper."""
-    if args and kwargs:
-      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
-                       'this wrapper.')
-    if kwargs:
-      args = kwargs
-
-    real_state_structure = state_structure if init_state is None else init_state
-    # Use state_structure to recover the structure of args that has been lossily
-    # transmitted via *args and **kwargs.
-    transformed_state = util.unflatten_tree(real_state_structure,
-                                            util.flatten_tree(args))
+    real_state_structure = (
+        state_structure if state_structure is not None else init_state)
+    transformed_state = recover_state_from_args(args, kwargs,
+                                                real_state_structure)
 
     if track_volume:
       state, map_extra, ldj = call_transport_map_with_ldj(
@@ -614,8 +650,6 @@ def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
     (*args, **kwargs) ->
       transformed_space_state, [original_space_state, original_log_prob_extra]
   ```
-  Note that currently it is forbidden to pass both `args` and `kwargs` to the
-  wrapper.
 
   For convenience you can also pass the initial state (in the original space),
   and this function will return the inverse transformed state as the 2nd return
@@ -638,14 +672,7 @@ def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
     """Transformed wrapper."""
     bijector_ = bijector
 
-    if args and kwargs:
-      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
-                       'this wrapper.')
-    if kwargs:
-      args = kwargs
-    # Use bijector_ to recover the structure of args that has been lossily
-    # transmitted via *args and **kwargs.
-    args = util.unflatten_tree(bijector_, util.flatten_tree(args))
+    args = recover_state_from_args(args, kwargs, bijector_)
 
     args = util.map_tree(lambda x: 0. + x, args)
 
