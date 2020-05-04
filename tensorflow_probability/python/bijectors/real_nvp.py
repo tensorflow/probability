@@ -68,7 +68,7 @@ class RealNVP(bijector_lib.Bijector):
   [Papamakarios et al. (2016)][4]) such that each are broadcastable with the
   arguments to `forward` and `inverse`, i.e., such that the calculations in
   `forward`, `inverse` [below] are possible. For convenience,
-  `real_nvp_default_nvp` is offered as a possible `shift_and_log_scale_fn`
+  `real_nvp_default_template` is offered as a possible `shift_and_log_scale_fn`
   function.
 
   NICE [(Dinh et al., 2014)][2] is a special case of the Real NVP bijector
