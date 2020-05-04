@@ -673,7 +673,6 @@ def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
     bijector_ = bijector
 
     args = recover_state_from_args(args, kwargs, bijector_)
-
     args = util.map_tree(lambda x: 0. + x, args)
 
     original_space_args = util.map_tree(lambda b, x: b.forward(x), bijector_,
@@ -1134,8 +1133,11 @@ def hamiltonian_monte_carlo_init(
   Returns:
     hmc_state: State of the `hamiltonian_monte_carlo` `TransitionOperator`.
   """
-  target_log_prob, state_extra, state_grads = call_potential_fn_with_grads(
-      target_log_prob_fn, util.map_tree(tf.convert_to_tensor, state))
+  state = util.map_tree(tf.convert_to_tensor, state)
+  target_log_prob, state_extra, state_grads = util.map_tree(
+      tf.convert_to_tensor,
+      call_potential_fn_with_grads(target_log_prob_fn, state),
+  )
   return HamiltonianMonteCarloState(state, state_grads, target_log_prob,
                                     state_extra)
 
@@ -1504,16 +1506,20 @@ def adam_step(adam_state: 'AdamState',
   beta_1 = maybe_broadcast_structure(beta_1, state)
   beta_2 = maybe_broadcast_structure(beta_2, state)
   epsilon = maybe_broadcast_structure(epsilon, state)
-  t = tf.cast(adam_state.t + 1, tf.float32)
+  t = adam_state.t + 1
 
   def _one_part(state, g, m, v, learning_rate, beta_1, beta_2, epsilon):
-    lr_t = learning_rate * (
-        tf.math.sqrt(1. - tf.math.pow(beta_2, t)) /
-        (1. - tf.math.pow(beta_1, t)))
+    """Updates one part of the state."""
+    t_f = tf.cast(t, state.dtype)
+    beta_1 = tf.convert_to_tensor(beta_1, state.dtype)
+    beta_2 = tf.convert_to_tensor(beta_2, state.dtype)
+    learning_rate = learning_rate * (
+        tf.math.sqrt(1. - tf.math.pow(beta_2, t_f)) /
+        (1. - tf.math.pow(beta_1, t_f)))
 
     m_t = beta_1 * m + (1. - beta_1) * g
     v_t = beta_2 * v + (1. - beta_2) * tf.square(g)
-    state = state - lr_t * m_t / (tf.math.sqrt(v_t) + epsilon)
+    state = state - learning_rate * m_t / (tf.math.sqrt(v_t) + epsilon)
     return state, m_t, v_t
 
   loss, loss_extra, grads = call_potential_fn_with_grads(loss_fn, state)
@@ -1741,7 +1747,8 @@ def running_variance_step(
               tf.square(num_points_f + additional_points_f))
     else:
       vec_shape = tf.shape(vec)
-      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
+      additional_points = tf.cast(
+          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
       additional_points_f = tf.cast(additional_points, vec.dtype)
       new_variance = (
           num_points_f * (num_points_f + additional_points_f) * variance +
@@ -1873,7 +1880,8 @@ def running_covariance_step(
               tf.square(num_points_f + additional_points_f))
     else:
       vec_shape = tf.shape(vec)
-      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
+      additional_points = tf.cast(
+          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
       additional_points_f = tf.cast(additional_points, vec.dtype)
       new_covariance = (
           num_points_f * (num_points_f + additional_points_f) * covariance +
@@ -1972,7 +1980,8 @@ def running_mean_step(
       additional_points_f = 1
     else:
       vec_shape = tf.shape(vec)
-      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
+      additional_points = tf.cast(
+          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
       additional_points_f = tf.cast(additional_points, vec.dtype)
       centered_vec = tf.reduce_sum(centered_vec, axis)
     new_mean = mean + centered_vec / (num_points_f + additional_points_f)
@@ -2388,7 +2397,6 @@ def simple_dual_averages_step(
   """
   state = sda_state.state
   step = sda_state.step
-  step_f = tf.cast(step, tf.float32)
   shrink_point = maybe_broadcast_structure(shrink_point, state)
   shrink_weight = maybe_broadcast_structure(shrink_weight, state)
 
@@ -2397,6 +2405,8 @@ def simple_dual_averages_step(
   grad_rms, _ = running_mean_step(sda_state.grad_running_mean_state, grads)
 
   def _one_part(shrink_point, shrink_weight, grad_running_mean):
+    shrink_point = tf.convert_to_tensor(shrink_point, grad_running_mean.dtype)
+    step_f = tf.cast(step, grad_running_mean.dtype)
     return shrink_point - tf.sqrt(step_f) / shrink_weight * grad_running_mean
 
   state = util.map_tree(_one_part, shrink_point, shrink_weight, grad_rms.mean)

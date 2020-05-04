@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 
 from jax import random as jax_random
+from jax.config import config as jax_config
 import tensorflow.compat.v2 as real_tf
 
 from discussion import fun_mcmc
@@ -32,22 +33,30 @@ util = backend.util
 tfp = backend.tfp
 
 real_tf.enable_v2_behavior()
+jax_config.update('jax_enable_x64', True)
 
 
 def _test_seed():
   return tfp_test_util.test_seed() % (2**32 - 1)
 
 
-class PrefabTestTensorFlow(tfp_test_util.TestCase):
+class PrefabTestTensorFlow32(tfp_test_util.TestCase):
 
   _is_on_jax = False
 
   def setUp(self):
-    super(PrefabTestTensorFlow, self).setUp()
+    super(PrefabTestTensorFlow32, self).setUp()
     backend.set_backend(backend.TENSORFLOW, backend.MANUAL_TRANSFORMS)
 
   def _make_seed(self, seed):
     return seed
+
+  @property
+  def _dtype(self):
+    return tf.float32
+
+  def _constant(self, value):
+    return tf.constant(value, self._dtype)
 
   def testAdaptiveHMC(self):
     num_chains = 16
@@ -57,9 +66,10 @@ class PrefabTestTensorFlow(tfp_test_util.TestCase):
 
     # Setup the model and state constraints.
     model = tfp.distributions.JointDistributionSequential([
-        tfp.distributions.Normal(loc=0., scale=1.),
+        tfp.distributions.Normal(loc=self._constant(0.), scale=1.),
         tfp.distributions.Independent(
-            tfp.distributions.LogNormal(loc=[1., 1.], scale=0.5), 1),
+            tfp.distributions.LogNormal(
+                loc=self._constant([1., 1.]), scale=0.5), 1),
     ])
     bijector = [tfp.bijectors.Identity(), tfp.bijectors.Exp()]
     transform_fn = fun_mcmc.util_tfp.bijector_to_transform_fn(
@@ -69,8 +79,10 @@ class PrefabTestTensorFlow(tfp_test_util.TestCase):
       return model.log_prob(x), ()
 
     # Start out at zeros (in the unconstrained space).
-    state, _ = transform_fn(
-        *[tf.zeros([num_chains] + list(e)) for e in model.event_shape])
+    state, _ = transform_fn(*[
+        tf.zeros([num_chains] + list(e), dtype=self._dtype)
+        for e in model.event_shape
+    ])
 
     reparam_log_prob_fn, reparam_state = fun_mcmc.reparameterize_potential_fn(
         target_log_prob_fn, transform_fn, state)
@@ -123,16 +135,30 @@ class PrefabTestTensorFlow(tfp_test_util.TestCase):
     self.assertAllClose(model.variance(), sample_var, rtol=0.1, atol=0.1)
 
 
-class PrefabTestJAX(PrefabTestTensorFlow):
+class PrefabTestJAX32(PrefabTestTensorFlow32):
 
   _is_on_jax = True
 
   def setUp(self):
-    super(PrefabTestJAX, self).setUp()
+    super(PrefabTestJAX32, self).setUp()
     backend.set_backend(backend.JAX, backend.MANUAL_TRANSFORMS)
 
   def _make_seed(self, seed):
     return jax_random.PRNGKey(seed)
+
+
+class PrefabTestTensorFlow64(PrefabTestTensorFlow32):
+
+  @property
+  def _dtype(self):
+    return tf.float64
+
+
+class PrefabTestJAX64(PrefabTestJAX32):
+
+  @property
+  def _dtype(self):
+    return tf.float64
 
 
 if __name__ == '__main__':

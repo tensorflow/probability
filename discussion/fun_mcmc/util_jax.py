@@ -168,9 +168,8 @@ def trace(state, fn, num_steps, **_):
       trace_arrays = map_tree(lambda a, e: jax.ops.index_update(a, i, e),
                               trace_arrays, traced)
       return (state, untraced, trace_arrays)
-
     state, untraced, traced = lax.fori_loop(
-        0,
+        np.asarray(0, num_steps.dtype),
         num_steps,
         wrapper,
         (state, untraced_init, trace_arrays),

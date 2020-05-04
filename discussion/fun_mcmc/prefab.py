@@ -53,9 +53,12 @@ def _polynomial_decay(step: 'fun_mc.AnyTensor',
                       decay_steps: 'fun_mc.AnyTensor',
                       final_step_size: 'fun_mc.FloatTensor',
                       power: 'fun_mc.FloatTensor' = 1.) -> 'fun_mc.FloatTensor':
-  step = tf.minimum(step, decay_steps)
-  step = tf.cast(step, step_size.dtype)
-  step_mult = (1. - step / decay_steps)**power
+  """Polynomial decay step size schedule."""
+  step_size = tf.convert_to_tensor(step_size)
+  step_f = tf.cast(step, step_size.dtype)
+  decay_steps_f = tf.cast(decay_steps, step_size.dtype)
+  step_mult = (1. - step_f / decay_steps_f)**power
+  step_mult = tf.where(step >= decay_steps, tf.zeros_like(step_mult), step_mult)
   return step_mult * (step_size - final_step_size) + final_step_size
 
 
@@ -112,6 +115,7 @@ def adaptive_hamiltonian_monte_carlo_init(
       `TransitionOperator`.
   """
   hmc_state = fun_mc.hamiltonian_monte_carlo_init(state, target_log_prob_fn)
+  dtype = util.flatten_tree(hmc_state.state)[0].dtype
   chain_ndims = len(hmc_state.target_log_prob.shape)
   running_var_state = fun_mc.running_variance_init(
       shape=util.map_tree(lambda s: s.shape[chain_ndims:], hmc_state.state),
@@ -137,13 +141,14 @@ def adaptive_hamiltonian_monte_carlo_init(
           lambda v, init_s: tf.ones_like(v) * init_s**2,
           running_var_state.variance, initial_scale),
   )
-  log_step_size_opt_state = fun_mc.adam_init(tf.math.log(step_size))
+  log_step_size_opt_state = fun_mc.adam_init(
+      tf.math.log(tf.convert_to_tensor(step_size, dtype=dtype)))
 
   return AdaptiveHamiltonianMonteCarloState(
       hmc_state=hmc_state,
       running_var_state=running_var_state,
       log_step_size_opt_state=log_step_size_opt_state,
-      step=0)
+      step=tf.zeros([], tf.int32))
 
 
 def adaptive_hamiltonian_monte_carlo_step(
@@ -356,7 +361,8 @@ def adaptive_hamiltonian_monte_carlo_step(
     )
 
   # Update the scalar step size as a function of acceptance rate.
-  p_accept = tf.reduce_mean(tf.exp(tf.minimum(hmc_extra.log_accept_ratio, 0.)))
+  p_accept = tf.reduce_mean(
+      tf.exp(tf.minimum(hmc_extra.log_accept_ratio, tf.zeros([], dtype))))
   p_accept = tf.where(
       tf.math.is_finite(p_accept), p_accept, tf.zeros_like(p_accept))
 

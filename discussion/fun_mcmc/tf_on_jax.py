@@ -156,6 +156,7 @@ tf.newaxis = None
 _impl_np()(np.exp)
 _impl_np()(np.einsum)
 _impl_np()(np.float32)
+_impl_np()(np.float64)
 _impl_np()(np.int32)
 _impl_np()(np.maximum)
 _impl_np()(np.minimum)
