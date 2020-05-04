@@ -260,8 +260,9 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
         [tf.convert_to_tensor(v)
          for v in (self.skewness, self.tailweight, self.scale)])
 
-    variance = (0.5 * scale**2 * tf.math.expm1(1./tailweight**2) *
-                (tf.math.exp(1./tailweight**2) *
+    variance = (0.5 * tf.math.square(scale) *
+                tf.math.expm1(1./tf.math.square(tailweight)) *
+                (tf.math.exp(1./tf.math.square(tailweight)) *
                  tf.math.cosh(2. * skewness / tailweight) + 1.))
 
     return tf.broadcast_to(variance, self.batch_shape_tensor())
