@@ -35,6 +35,41 @@ util_tfp = fun_mcmc.util_tfp
 real_tf.enable_v2_behavior()
 
 
+class DupBijector(tfp.bijectors.Bijector):
+  """Test, multi-part bijector."""
+
+  def __init__(self):
+    super(DupBijector, self).__init__(
+        forward_min_event_ndims=0,
+        validate_args=False,
+        parameters={},
+        name='dup')
+
+  def forward(self, x, **kwargs):
+    return [x, x]
+
+  def inverse(self, y, **kwargs):
+    return y[0]
+
+  def forward_event_shape(self, x_shape, **kwargs):
+    return [x_shape, x_shape]
+
+  def inverse_event_shape(self, y_shape, **kwargs):
+    return y_shape
+
+  def forward_log_det_jacobian(self, x, event_ndims, **kwargs):
+    return 0.
+
+  def inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
+    return 0.
+
+  def forward_dtype(self, x_dtype, **kwargs):
+    return [x_dtype, x_dtype]
+
+  def inverse_dtype(self, y_dtype, **kwargs):
+    return y_dtype[0]
+
+
 class UtilTFPTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
 
   def setUp(self):
@@ -110,6 +145,27 @@ class UtilTFPTestTensorFlow(real_tf.test.TestCase, parameterized.TestCase):
          ])], inv)
     self.assertAllClose(-true_fwd_ldj, inv_ldj1)
     self.assertAllClose(-true_fwd_ldj, inv_ldj2)
+
+  def testBijectorToTransformFnMulti(self):
+    bijector = DupBijector()
+    state = tf.ones([1, 2])
+    transform_fn = util_tfp.bijector_to_transform_fn(
+        bijector, state_structure=state, batch_ndims=1)
+
+    fwd, (_, fwd_ldj1), fwd_ldj2 = fun_mcmc.call_transport_map_with_ldj(
+        transform_fn, state)
+    self.assertAllClose([np.ones([1, 2]), np.ones([1, 2])], fwd)
+
+    self.assertAllClose(0., fwd_ldj1)
+    self.assertAllClose(0., fwd_ldj2)
+
+    inverse_transform_fn = backend.util.inverse_fn(transform_fn)
+    inv, (_, inv_ldj1), inv_ldj2 = fun_mcmc.call_transport_map_with_ldj(
+        inverse_transform_fn,
+        [tf.ones([1, 2]), tf.ones([2, 1])])
+    self.assertAllClose(tf.ones([1, 2]), inv)
+    self.assertAllClose(0., inv_ldj1)
+    self.assertAllClose(0., inv_ldj2)
 
 
 class UtilTFPTestJAX(UtilTFPTestTensorFlow):
