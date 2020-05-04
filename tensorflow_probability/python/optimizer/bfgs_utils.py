@@ -93,7 +93,7 @@ def get_initial_state_args(value_and_gradients_function,
 
 def line_search_step(state, value_and_gradients_function, search_direction,
                      grad_tolerance, f_relative_tolerance, x_tolerance,
-                     stopping_condition):
+                     stopping_condition, max_iterations):
   """Performs the line search step of the BFGS search procedure.
 
   Uses hager_zhang line search procedure to compute a suitable step size
@@ -123,6 +123,8 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       tensors are `converged` and `failed`, indicating the current status of
       each respective batch member; the return value states whether the
       algorithm should stop.
+    max_iterations: A Python integer that is used as the maximum number of
+      iterations of the hager_zhang line search algorithm
   Returns:
     A copy of the input state with the following fields updated:
       converged: a Boolean `Tensor` of shape `[...]` indicating whether the
@@ -150,7 +152,8 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       line_search_value_grad_func,
       initial_step_size=_broadcast(1, state.position),
       value_at_zero=val_0,
-      converged=inactive)  # No search needed for these.
+      converged=inactive,
+      max_iterations=max_iterations)  # No search needed for these.
 
   state_after_ls = update_fields(
       state,

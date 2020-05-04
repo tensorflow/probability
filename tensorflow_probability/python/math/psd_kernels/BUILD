@@ -245,6 +245,7 @@ multi_substrate_py_test(
     name = "feature_scaled_test",
     size = "small",
     srcs = ["feature_scaled_test.py"],
+    jax_size = "medium",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

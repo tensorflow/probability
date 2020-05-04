@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tempfile
+
 # Dependency imports
 
 from absl.testing import parameterized
@@ -314,6 +316,12 @@ class WeightNormTest(test_util.TestCase):
     self.assertAllClose(true_init_g, self.evaluate(norm_layer.g))
     self.assertAllClose(true_init_bias, self.evaluate(norm_layer.layer.bias))
 
+  def testCheckpoint(self):
+    model = self._define_model('sequential', self.data_dim, self.num_hidden)
+    self.evaluate([v.initializer for v in model.weights])
+    checkpoint = tf.train.Checkpoint(model=model)
+    model_dir = tempfile.mkdtemp()
+    checkpoint.save(file_prefix=model_dir)
 
 if __name__ == '__main__':
   tf.test.main()

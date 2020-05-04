@@ -26,7 +26,6 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import _reverse
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import one_hot
 from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
-from tensorflow_probability.python.internal.backend.numpy.ops import _custom_gradient
 
 scipy_special = utils.try_import('scipy.special')
 
@@ -572,7 +571,7 @@ log1p = utils.copy_docstring(
 
 log_sigmoid = utils.copy_docstring(
     'tf.math.log_sigmoid',
-    lambda x, name=None: -np.log1p(np.exp(-x)))
+    lambda x, name=None: -_softplus(-x))
 
 log_softmax = utils.copy_docstring(
     'tf.math.log_softmax',
@@ -821,16 +820,13 @@ softmax = utils.copy_docstring(
     _softmax)
 
 
-# TODO(srvasude): Remove this once
-# https://github.com/google/jax/issues/2107 is fixed.
-@_custom_gradient
 def _softplus(x, name=None):  # pylint: disable=unused-argument
-  # TODO(b/146563881): Investigate improving numerical accuracy here.
-  def grad(dy):
-    return dy * scipy_special.expit(x)
   if not JAX_MODE:
-    return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.), grad
-  return jax.nn.softplus(x), grad
+    # This is effectively inlining jax.nn.softplus, which is (currently)
+    # defined as np.logaddexp(x, 0.).
+    # Both are numerically fine (see discussion in b/146563881).
+    return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.)
+  return jax.nn.softplus(x)
 
 
 softplus = utils.copy_docstring(

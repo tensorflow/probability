@@ -32,6 +32,8 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":ensemble_adjustment_kalman_filter",
+        ":ensemble_kalman_filter",
         ":extended_kalman_filter",
         # tensorflow dep,
     ],
@@ -50,6 +52,28 @@ py_library(
     ],
 )
 
+py_library(
+    name = "ensemble_kalman_filter",
+    srcs = ["ensemble_kalman_filter.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
+    name = "ensemble_adjustment_kalman_filter",
+    srcs = ["ensemble_adjustment_kalman_filter.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
 py_test(
     name = "extended_kalman_filter_test",
     size = "large",
@@ -58,6 +82,34 @@ py_test(
     # shard_count = 6,
     deps = [
         ":extended_kalman_filter",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "ensemble_kalman_filter_test",
+    size = "medium",
+    srcs = ["ensemble_kalman_filter_test.py"],
+    deps = [
+        ":ensemble_kalman_filter",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "ensemble_adjustment_kalman_filter_test",
+    size = "medium",
+    srcs = ["ensemble_adjustment_kalman_filter_test.py"],
+    deps = [
+        ":ensemble_adjustment_kalman_filter",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

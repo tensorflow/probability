@@ -22,6 +22,7 @@ import functools
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import binomial
 from tensorflow_probability.python.distributions import distribution
@@ -256,8 +257,9 @@ class BetaBinomial(distribution.Distribution):
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)
   def _log_prob(self, counts):
     n, c1, c0 = self._params_list_as_tensors()
-    return (_log_combinations(n, counts) +
-            _log_beta(c1 + counts, n + c0 - counts) - _log_beta(c1, c0))
+    return (_log_combinations(n, counts)
+            + tfp_math.lbeta(c1 + counts, n + c0 - counts)
+            - tfp_math.lbeta(c1, c0))
 
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)
   def _prob(self, counts):
@@ -315,10 +317,4 @@ class BetaBinomial(distribution.Distribution):
 
 def _log_combinations(n, k):
   """Computes log(Gamma(n+1) / (Gamma(k+1) * Gamma(n-k+1))."""
-  return (
-      tf.math.lgamma(n + 1) - tf.math.lgamma(k + 1) - tf.math.lgamma(n - k + 1))
-
-
-def _log_beta(x, y):
-  """Computes log(Gamma(x) * Gamma(y) / Gamma(x+y))."""
-  return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
+  return -tfp_math.lbeta(k + 1, n - k + 1) - tf.math.log(n + 1)

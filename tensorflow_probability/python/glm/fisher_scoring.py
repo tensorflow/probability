@@ -20,15 +20,19 @@ from __future__ import print_function
 
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 
 
 __all__ = [
     'fit',
     'fit_one_step',
+    'compute_predicted_linear_response',
     'convergence_criteria_small_relative_norm_weights_change',
 ]
 
@@ -457,7 +461,7 @@ def fit_one_step(
     #   model_coefficients_next = tf.matrix_triangular_solve(
     #       r, c, lower=False, name='model_coefficients_next')
 
-    predicted_linear_response_next = calculate_linear_predictor(
+    predicted_linear_response_next = compute_predicted_linear_response(
         model_matrix,
         model_coefficients_next,
         offset,
@@ -629,7 +633,7 @@ def prepare_args(model_matrix,
       else:
         # We were given model_coefficients but not the predicted linear
         # response.
-        predicted_linear_response = calculate_linear_predictor(
+        predicted_linear_response = compute_predicted_linear_response(
             model_matrix, model_coefficients, offset)
     else:
       predicted_linear_response = tf.convert_to_tensor(
@@ -646,12 +650,33 @@ def prepare_args(model_matrix,
   ]
 
 
-def calculate_linear_predictor(model_matrix, model_coefficients, offset=None,
-                               name=None):
-  """Computes `model_matrix @ model_coefficients + offset`."""
-  with tf.name_scope(name or 'calculate_linear_predictor'):
-    predicted_linear_response = tf.linalg.matvec(model_matrix,
-                                                 model_coefficients)
+def compute_predicted_linear_response(
+    model_matrix, model_coefficients, offset=None, name=None):
+  """Computes `model_matrix @ model_coefficients + offset`.
+
+  Args:
+    model_matrix: (Batch of) `float`-like, matrix-shaped `Tensor` where each row
+      represents a sample's features.
+    model_coefficients: (Batch of) vector-shaped `Tensor` representing the model
+      coefficients, one for each column in `model_matrix`. Must have same
+      `dtype` as `model_matrix`.
+    offset: Optional `Tensor` representing constant shift applied to
+      `predicted_linear_response`.  Must broadcast to `response`.
+      Default value: `None` (i.e., `tf.zeros_like(predicted_linear_response)`).
+    name: Python `str` used as name prefix to ops created by this function.
+      Default value: `None` (i.e., `"compute_predicted_linear_response"`).
+
+  Returns:
+    predicted_linear_response: `response`-shaped `Tensor` representing linear
+      predictions based on new `model_coefficients`, i.e.,
+      `tf.linalg.matvec(model_matrix, model_coefficients) + offset`.
+  """
+  with tf.name_scope(name or 'compute_predicted_linear_response'):
+    if isinstance(model_matrix, (tf.SparseTensor, tf1.SparseTensorValue)):
+      matvecmul = sparse_or_dense_matvecmul
+    else:
+      matvecmul = tf.linalg.matvec
+    predicted_linear_response = matvecmul(model_matrix, model_coefficients)
     if offset is not None:
       predicted_linear_response += offset
     return predicted_linear_response

@@ -24,8 +24,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math.scan_associative import scan_associative
 
 
 __all__ = [
@@ -33,6 +35,7 @@ __all__ = [
     'log_cosh',
     'log_sub_exp',
     'log_combinations',
+    'log_cumsum_exp',
     'log1mexp',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
@@ -78,6 +81,37 @@ def log_combinations(n, counts, name='log_combinations'):
     counts_factorial = tf.math.lgamma(counts + 1)
     redundant_permutations = tf.reduce_sum(counts_factorial, axis=-1)
     return total_permutations - redundant_permutations
+
+
+# TODO(b/154562929): Remove this once the built-in op supports XLA.
+def log_cumsum_exp(x, axis=-1, name=None):
+  """Computes log(cumsum(exp(x))).
+
+  This is a pure-TF implementation of `tf.math.cumulative_logsumexp`; unlike
+  the built-in op, it supports XLA compilation. It uses a similar algorithmic
+  technique (parallel prefix sum) as the built-in op, so it has similar numerics
+  and asymptotic performace. However, this implemenentation currently has higher
+  overhead, so it is significantly slower on smaller inputs (`n < 10000`).
+
+  Args:
+    x: the `Tensor` to sum over.
+    axis: int `Tensor` axis to sum over.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'cumulative_logsumexp'`).
+  Returns:
+    cumulative_logsumexp: `Tensor` of the same shape as `x`.
+  """
+  with tf.name_scope(name or 'cumulative_logsumexp'):
+    x = tf.convert_to_tensor(x, name='x')
+    # TODO(b/154873585) Support `axis` in scan_associative to avoid transposing.
+    def safe_logsumexp(x, y):
+      result = log_add_exp(x, y)
+      # Remove spurious `NaN`s that arise from subtracting infinities.
+      return tf.where(tf.math.is_finite(result), result, -np.inf)
+    x = dist_util.move_dimension(x, source_idx=axis, dest_idx=0)
+    return dist_util.move_dimension(scan_associative(safe_logsumexp, x),
+                                    source_idx=0,
+                                    dest_idx=axis)
 
 
 def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):

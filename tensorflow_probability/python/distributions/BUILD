@@ -191,7 +191,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -210,6 +210,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -300,6 +301,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
     ],
 )
 
@@ -318,6 +320,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
     ],
 )
 
@@ -336,6 +339,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:special",
     ],
 )
 
@@ -912,6 +916,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -1402,6 +1407,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
     ],
 )
 
@@ -1420,6 +1426,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:numeric",
+        "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -1714,7 +1721,6 @@ multi_substrate_py_test(
     name = "beta_binomial_test",
     size = "medium",
     srcs = ["beta_binomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -1868,7 +1874,6 @@ multi_substrate_py_test(
     name = "dirichlet_multinomial_test",
     size = "medium",
     srcs = ["dirichlet_multinomial_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
@@ -2251,7 +2256,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "lambertw_f_test",
     srcs = ["lambertw_f_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":lambertw_f",
@@ -2485,8 +2489,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "negative_binomial_test",
     srcs = ["negative_binomial_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2647,7 +2650,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "quantized_distribution_test",
     srcs = ["quantized_distribution_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,

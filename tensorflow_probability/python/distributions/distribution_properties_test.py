@@ -157,6 +157,12 @@ VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
     'CholeskyLKJ': 1e-4,
     'LKJ': 1e-3,
+    'BetaBinomial': 1e-5,
+})
+
+VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
+VECTORIZED_LOGPROB_RTOL.update({
+    'NegativeBinomial': 1e-5,
 })
 
 
@@ -586,7 +592,8 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
       batch_lp = dist.log_prob(sample)
       pfor_lp_, batch_lp_ = self.evaluate((pfor_lp, batch_lp))
       self.assertAllClose(pfor_lp_, batch_lp_,
-                          atol=VECTORIZED_LOGPROB_ATOL[dist_name])
+                          atol=VECTORIZED_LOGPROB_ATOL[dist_name],
+                          rtol=VECTORIZED_LOGPROB_RTOL[dist_name])
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}

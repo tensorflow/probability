@@ -198,18 +198,33 @@ class _ProximalHessianTest(object):
             response_,
             convert_to_sparse_tensor=use_sparse_tensor))
 
-    model_coefficients_, is_converged_, _ = self.evaluate(
-        tfp.glm.fit_sparse(
-            model_matrix,
-            response,
-            model,
-            model_coefficients_start,
-            l1_regularizer=800.,
-            l2_regularizer=None,
-            maximum_iterations=10,
-            maximum_full_sweeps_per_iteration=10,
-            tolerance=1e-6,
-            learning_rate=None))
+    def has_xla():
+      try:
+        tf.function(lambda: tf.constant(0), experimental_compile=True)()
+        return True
+      except (tf.errors.UnimplementedError, NotImplementedError, ValueError):
+        return False
+
+    # We need to ensure `fit_sparse` works with XLA. Note:
+    # - In eager mode test regime, this `tf.function` will be ignored.
+    # - Many sparse ops are not supported by XLA so we can't and don't test this
+    #   use case.
+    compile_with_xla = has_xla() and not use_sparse_tensor
+    @tf.function(autograph=False, experimental_compile=compile_with_xla)
+    def run():
+      model_coefficients, is_converged, _ = tfp.glm.fit_sparse(
+          model_matrix,
+          response,
+          model,
+          model_coefficients_start,
+          l1_regularizer=800.,
+          l2_regularizer=None,
+          maximum_iterations=10,
+          maximum_full_sweeps_per_iteration=10,
+          tolerance=1e-6,
+          learning_rate=None)
+      return model_coefficients, is_converged
+    model_coefficients_, is_converged_ = self.evaluate(run())
 
     # Ensure that we have converged and learned coefficients are close to the
     # true coefficients.

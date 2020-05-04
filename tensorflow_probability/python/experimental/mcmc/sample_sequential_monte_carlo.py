@@ -83,15 +83,15 @@ def gather_mh_like_result(results):
   raise TypeError('Cannot find MH results.')
 
 
-def _make_tempered_target_log_prob_fn(
-    prior_log_prob_fn, likelihood_log_prob_fn, temperatures):
+def default_make_tempered_target_log_prob_fn(
+    prior_log_prob_fn, likelihood_log_prob_fn, inverse_temperatures):
   """Helper which creates inner kernel target_log_prob_fn."""
   def _tempered_target_log_prob(*args):
     priorlogprob = tf.identity(prior_log_prob_fn(*args),
                                name='prior_log_prob')
     loglike = tf.identity(likelihood_log_prob_fn(*args),
                           name='likelihood_log_prob')
-    return tf.identity(priorlogprob + loglike * temperatures,
+    return tf.identity(priorlogprob + loglike * inverse_temperatures,
                        name='tempered_logp')
   return _tempered_target_log_prob
 
@@ -137,9 +137,11 @@ def gen_make_transform_hmc_kernel_fn(unconstraining_bijectors,
 
     with tf.name_scope('make_transformed_hmc_kernel_fn'):
       seed = SeedStream(seed, salt='make_transformed_hmc_kernel_fn')
+      # TransformedTransitionKernel doesn't modify the input step size, thus we
+      # need to pass the appropriate step size that are already in unconstrained
+      # space
       state_std = [
-          bij.inverse(  # pylint: disable=g-complex-comprehension
-              tf.math.reduce_std(bij.forward(x), axis=0, keepdims=True))
+          tf.math.reduce_std(bij.inverse(x), axis=0, keepdims=True)
           for x, bij in zip(init_state, unconstraining_bijectors)
       ]
       step_size = compute_hmc_step_size(scalings, state_std, num_leapfrog_steps)
@@ -283,10 +285,12 @@ def sample_sequential_monte_carlo(
     prior_log_prob_fn,
     likelihood_log_prob_fn,
     current_state,
+    min_num_steps=2,
     max_num_steps=25,
     max_stage=100,
     make_kernel_fn=make_rwmh_kernel_fn,
     tuning_fn=simple_heuristic_tuning,
+    make_tempered_target_log_prob_fn=default_make_tempered_target_log_prob_fn,
     ess_threshold_ratio=0.5,
     parallel_iterations=10,
     seed=None,
@@ -305,7 +309,7 @@ def sample_sequential_monte_carlo(
 
   by mutating a collection of MC samples (i.e., particles). The approach is also
   known as Particle Filter in some literature. The current implemenetation is
-  largely based on  Del Moral et al [1], which adapts the tempering sequence
+  largely based on Del Moral et al [1], which adapts the tempering sequence
   adaptively (base on the effective sample size) and the scaling of the mutation
   kernel (base on the sample covariance of the particles) at each stage.
 
@@ -315,9 +319,12 @@ def sample_sequential_monte_carlo(
     likelihood_log_prob_fn: Python callable which takes an argument like
       `current_state` (or `*current_state` if it's a list) and returns its
       (possibly unnormalized) log-density under the likelihood distribution.
-    current_state: `Tensor` or Python `list` of `Tensor`s representing the
-      current state(s) of the Markov chain(s). The first `r` dimensions index
-      independent chains, `r = tf.rank(target_log_prob_fn(*current_state))`.
+    current_state: Nested structure of `Tensor`s, each of shape
+      `concat([[num_particles, b1, ..., bN], latent_part_event_shape])`, where
+      `b1, ..., bN` are optional batch dimensions. Each batch represents an
+      independent SMC run.
+    min_num_steps: The minimal number of kernel transition steps in one mutation
+      of the MC samples.
     max_num_steps: The maximum number of kernel transition steps in one mutation
       of the MC samples. Note that the actual number of steps in one mutation is
       tuned during sampling and likely lower than the max_num_step.
@@ -327,19 +334,23 @@ def sample_sequential_monte_carlo(
       object. Must take one argument representing the `TransitionKernel`'s
       `target_log_prob_fn`. The `target_log_prob_fn` argument represents the
       `TransitionKernel`'s target log distribution.  Note:
-      `sample_annealed_importance_chain` creates a new `target_log_prob_fn`
+      `sample_sequential_monte_carlo` creates a new `target_log_prob_fn`
       which is an interpolation between the supplied `target_log_prob_fn` and
       `proposal_log_prob_fn`; it is this interpolated function which is used as
       an argument to `make_kernel_fn`.
     tuning_fn: Python `callable` which takes the number of steps, the log
       scaling, and the log acceptance ratio from the last mutation and output
       the number of steps and log scaling for the next mutation.
+    make_tempered_target_log_prob_fn: Python `callable` that takes the
+      `prior_log_prob_fn`, `likelihood_log_prob_fn`, and `inverse_temperatures`
+      and creates a `target_log_prob_fn` `callable` that pass to
+      `make_kernel_fn`.
     ess_threshold_ratio: Target ratio for effective sample size.
     parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
     seed: Python integer or TFP seedstream to seed the random number generator.
     name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., 'sample_annealed_importance_chain').
+      Default value: `None` (i.e., 'sample_sequential_monte_carlo').
 
   Returns:
     n_stage: Number of the mutation stage SMC ran.
@@ -395,7 +406,7 @@ def sample_sequential_monte_carlo(
     inverse_temperature = tf.zeros(batch_shape, dtype=likelihood_log_prob.dtype)
     scalings = ps.ones_like(likelihood_log_prob) * ps.minimum(scale_start, 1.)
     kernel = make_kernel_fn(
-        _make_tempered_target_log_prob_fn(
+        make_tempered_target_log_prob_fn(
             prior_log_prob_fn,
             likelihood_log_prob_fn,
             inverse_temperature),
@@ -481,7 +492,7 @@ def sample_sequential_monte_carlo(
       with tf.name_scope('mutate_states'):
         scalings = tf.exp(log_scalings)
         kernel = make_kernel_fn(
-            _make_tempered_target_log_prob_fn(
+            make_tempered_target_log_prob_fn(
                 prior_log_prob_fn,
                 likelihood_log_prob_fn,
                 inverse_temperature),
@@ -562,7 +573,8 @@ def sample_sequential_monte_carlo(
       next_log_scalings = tf.where(stage == 0,
                                    resampled_particle_info.log_scalings,
                                    next_log_scalings)
-      next_num_steps = tf.clip_by_value(next_num_steps, 2, max_num_steps)
+      next_num_steps = tf.clip_by_value(
+          next_num_steps, min_num_steps, max_num_steps)
 
       next_state, log_accept_prob, tempered_log_prob = mutate(
           resampled_state,

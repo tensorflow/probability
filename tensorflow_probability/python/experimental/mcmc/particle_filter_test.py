@@ -21,9 +21,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.particle_filter import _resample_using_log_points
 from tensorflow_probability.python.experimental.mcmc.particle_filter import _scatter_nd_batch
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_independent
-from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_minimum_variance
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_stratified
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_systematic
 from tensorflow_probability.python.experimental.mcmc.particle_filter import SampleParticles
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static
@@ -176,7 +179,7 @@ class _ParticleFilterTest(test_util.TestCase):
     (particles,
      log_weights,
      parent_indices,
-     step_log_marginal_likelihoods) = self.evaluate(
+     incremental_log_marginal_likelihoods) = self.evaluate(
          tfp.experimental.mcmc.particle_filter(
              observations=observed_positions,
              initial_state_prior=initial_state_prior,
@@ -191,7 +194,7 @@ class _ParticleFilterTest(test_util.TestCase):
                         [num_timesteps, num_particles] + batch_shape)
     self.assertAllEqual(parent_indices.shape,
                         [num_timesteps, num_particles] + batch_shape)
-    self.assertAllEqual(step_log_marginal_likelihoods.shape,
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
 
     self.assertAllClose(
@@ -221,7 +224,7 @@ class _ParticleFilterTest(test_util.TestCase):
                         trajectories['velocity'].shape)
 
     # Verify that `infer_trajectories` also works on batches.
-    trajectories, step_log_marginal_likelihoods = self.evaluate(
+    trajectories, incremental_log_marginal_likelihoods = self.evaluate(
         tfp.experimental.mcmc.infer_trajectories(
             observations=observed_positions,
             initial_state_prior=initial_state_prior,
@@ -233,7 +236,7 @@ class _ParticleFilterTest(test_util.TestCase):
                         trajectories['position'].shape)
     self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['velocity'].shape)
-    self.assertAllEqual(step_log_marginal_likelihoods.shape,
+    self.assertAllEqual(incremental_log_marginal_likelihoods.shape,
                         [num_timesteps] + batch_shape)
 
   def test_reconstruct_trajectories_toy_example(self):
@@ -251,7 +254,8 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_categorical_resampler_zero_final_class(self):
     probs = [1.0, 0.0]
-    resampled = resample_independent(tf.math.log(probs), 1000, [])
+    resampled = resample_independent(
+        tf.math.log(probs), 1000, [], seed=test_util.test_seed())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -262,7 +266,8 @@ class _ParticleFilterTest(test_util.TestCase):
     num_distributions = 3
     unnormalized_probs = tfd.Uniform(
         low=np.float64(0),
-        high=np.float64(1.)).sample([num_distributions, num_probs], seed=42)
+        high=np.float64(1.)).sample([num_distributions, num_probs],
+                                    seed=test_util.test_seed())
     probs = unnormalized_probs / tf.reduce_sum(
         unnormalized_probs, axis=-1, keepdims=True)
 
@@ -276,7 +281,8 @@ class _ParticleFilterTest(test_util.TestCase):
                                              source_idx=-1,
                                              dest_idx=0)),
         num_particles,
-        [num_samples])
+        [num_samples],
+        seed=test_util.test_seed())
     sample = dist_util.move_dimension(sample,
                                       source_idx=0,
                                       dest_idx=-1)
@@ -299,18 +305,24 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_minimum_variance_resampler_zero_final_class(self):
     probs = [1.0, 0.0]
-    resampled = resample_minimum_variance(tf.math.log(probs), 1000, [])
+    resampled = resample_systematic(
+        tf.math.log(probs), 1000, [], seed=test_util.test_seed())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
   def test_categorical_resampler_large(self):
     num_probs = 10000
     probs = tf.ones((num_probs,)) / num_probs
-    self.evaluate(resample_independent(tf.math.log(probs), num_probs, []))
+    self.evaluate(
+        resample_independent(
+            tf.math.log(probs), num_probs, [], seed=test_util.test_seed()))
 
   def test_minimum_variance_resampler_large(self):
     num_probs = 10000
     probs = tf.ones((num_probs,)) / num_probs
-    self.evaluate(resample_minimum_variance(tf.math.log(probs), num_probs, []))
+    self.evaluate(
+        resample_systematic(
+            tf.math.log(probs), num_probs, [],
+            seed=test_util.test_seed()))
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_minimum_variance_resampler_means(self):
@@ -322,11 +334,51 @@ class _ParticleFilterTest(test_util.TestCase):
     num_distributions = 3
     num_probs = 16
     probs = tfd.Uniform(
-        low=0.0, high=1.0).sample([num_distributions, num_probs])
+        low=0.0, high=1.0).sample([num_distributions, num_probs],
+                                  seed=test_util.test_seed())
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
     num_samples = 10000
     num_particles = 20
-    resampled = resample_minimum_variance(
+    resampled = resample_systematic(
+        tf.math.log(dist_util.move_dimension(probs,
+                                             source_idx=-1,
+                                             dest_idx=0)),
+        num_particles, [num_samples], seed=test_util.test_seed())
+    resampled = dist_util.move_dimension(resampled,
+                                         source_idx=0,
+                                         dest_idx=-1)
+    # TODO(dpiponi): reimplement this test in vectorized form rather than with
+    # loops.
+    for i in range(num_distributions):
+      histogram = tf.reduce_mean(
+          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
+                            tf.ones((num_samples, num_particles)),
+                            (num_samples, num_probs),
+                            batch_dims=1),
+          axis=0)
+      means = histogram / num_particles
+      means_, probs_ = self.evaluate([means, probs[i]])
+
+      # TODO(dpiponi): it should be possible to compute the exact distribution
+      # of these means and choose `atol` in a more principled way.
+      self.assertAllClose(means_, probs_, atol=0.01)
+
+  # TODO(b/153689734): rewrite so as not to use `move_dimension`.
+  def test_minimum_error_resampler_means(self):
+    # Distinct samples with this resampler aren't independent
+    # so a chi-squared test is inappropriate.
+    # However, because it reduces variance by design, we
+    # can, with high probability,  place sharp bounds on the
+    # values of the sample means.
+    num_distributions = 3
+    num_probs = 8
+    probs = tfd.Uniform(
+        low=0.0, high=1.0).sample([num_distributions, num_probs],
+                                  seed=test_util.test_seed())
+    probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
+    num_samples = 4
+    num_particles = 10000
+    resampled = resample_deterministic_minimum_error(
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
@@ -346,9 +398,73 @@ class _ParticleFilterTest(test_util.TestCase):
       means = histogram / num_particles
       means_, probs_ = self.evaluate([means, probs[i]])
 
-      # TODO(dpiponi): it should be possible to compute the exact distribution
-      # of these means and choose `atol` in a more principled way.
-      self.assertAllClose(means_, probs_, atol=0.01)
+      self.assertAllClose(means_, probs_, atol=1.0 / num_particles)
+
+  # TODO(b/153689734): rewrite so as not to use `move_dimension`.
+  def test_stratified_resampler_means(self):
+    # Distinct samples with this resampler aren't independent
+    # so a chi-squared test is inappropriate.
+    # However, because it reduces variance by design, we
+    # can, with high probability,  place sharp bounds on the
+    # values of the sample means.
+    num_distributions = 3
+    num_probs = 8
+    probs = tfd.Uniform(
+        low=0.0, high=1.0).sample([num_distributions, num_probs],
+                                  seed=test_util.test_seed())
+    probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
+    num_samples = 4
+    num_particles = 10000
+    resampled = resample_stratified(
+        tf.math.log(dist_util.move_dimension(probs,
+                                             source_idx=-1,
+                                             dest_idx=0)),
+        num_particles, [num_samples])
+    resampled = dist_util.move_dimension(resampled,
+                                         source_idx=0,
+                                         dest_idx=-1)
+    # TODO(dpiponi): reimplement this test in vectorized form rather than with
+    # loops.
+    for i in range(num_distributions):
+      histogram = tf.reduce_mean(
+          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
+                            tf.ones((num_samples, num_particles)),
+                            (num_samples, num_probs),
+                            batch_dims=1),
+          axis=0)
+      means = histogram / num_particles
+      means_, probs_ = self.evaluate([means, probs[i]])
+
+      self.assertAllClose(means_, probs_, atol=0.1)
+
+  def test_resample_using_extremal_log_points(self):
+    n = 8
+
+    one = np.float32(1)
+    almost_one = np.nextafter(one, np.float32(0))
+    sample_shape = []
+    log_points_zero = tf.math.log(tf.zeros(n, tf.float32))
+    log_points_almost_one = tf.fill([n], tf.math.log(almost_one))
+    log_probs_beginning = tf.math.log(
+        tf.concat([[one], tf.zeros(n - 1, dtype=tf.float32)], axis=0))
+    log_probs_end = tf.math.log(tf.concat([tf.zeros(n - 1, dtype=tf.float32),
+                                           [one]], axis=0))
+
+    indices = _resample_using_log_points(
+        log_probs_beginning, sample_shape, log_points_zero)
+    self.assertAllEqual(indices, tf.zeros(n, dtype=tf.float32))
+
+    indices = _resample_using_log_points(
+        log_probs_end, sample_shape, log_points_zero)
+    self.assertAllEqual(indices, tf.fill([n], n - 1))
+
+    indices = _resample_using_log_points(
+        log_probs_beginning, sample_shape, log_points_almost_one)
+    self.assertAllEqual(indices, tf.zeros(n, dtype=tf.float32))
+
+    indices = _resample_using_log_points(
+        log_probs_end, sample_shape, log_points_almost_one)
+    self.assertAllEqual(indices, tf.fill([n], n - 1))
 
   def test_epidemiological_model(self):
     # A toy, discrete version of an SIR (Susceptible, Infected, Recovered)
@@ -475,7 +591,7 @@ class _ParticleFilterTest(test_util.TestCase):
     # the particle filter.
     # pylint: disable=g-long-lambda
     (particles, log_weights, _,
-     estimated_step_log_marginal_likelihoods) = self.evaluate(
+     estimated_incremental_log_marginal_likelihoods) = self.evaluate(
          tfp.experimental.mcmc.particle_filter(
              observations=observations,
              initial_state_prior=initial_state_prior,
@@ -487,7 +603,7 @@ class _ParticleFilterTest(test_util.TestCase):
                  loc=observation_noise.loc + tf.linalg.matvec(
                      observation_matrix, state),
                  scale_tril=observation_noise.scale_tril),
-             num_particles=1000,
+             num_particles=1024,
              seed=test_util.test_seed()))
     # pylint: enable=g-long-lambda
 
@@ -496,7 +612,7 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllClose(filtered_means, particle_means, atol=0.1, rtol=0.1)
 
     self.assertAllClose(
-        lps, estimated_step_log_marginal_likelihoods, atol=0.5)
+        lps, estimated_incremental_log_marginal_likelihoods, atol=0.6)
 
   def test_model_can_use_state_history(self):
 
@@ -653,9 +769,91 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllClose(np.mean(particles['position'], axis=-1),
                         tf.math.cos(dt * np.arange(101)),
                         atol=0.04)
-    self.assertLen(lps, 2)
+    self.assertLen(lps, 101)
     self.assertGreater(lps[0], 3.)
-    self.assertGreater(lps[1], 3.)
+    self.assertGreater(lps[-1], 3.)
+
+  def test_custom_trace_fn(self):
+
+    def trace_fn(step_results):
+      # Traces the mean and stddev of the particle population at each step.
+      weights = tf.exp(step_results.log_weights)
+      mean = tf.reduce_sum(weights * step_results.particles, axis=0)
+      variance = tf.reduce_sum(
+          weights * (step_results.particles - mean[tf.newaxis, ...])**2)
+      return {'mean': mean,
+              'stddev': tf.sqrt(variance),
+              # In real usage we would likely not track the particles and
+              # weights. We keep them here just so we can double-check the
+              # stats, below.
+              'particles': step_results.particles,
+              'weights': weights}
+
+    results = self.evaluate(
+        tfp.experimental.mcmc.particle_filter(
+            observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+            initial_state_prior=tfd.Normal(0., 1.),
+            transition_fn=lambda _, state: tfd.Normal(state, 1.),
+            observation_fn=lambda _, state: tfd.Normal(state, 1.),
+            num_particles=1024,
+            trace_fn=trace_fn,
+            seed=test_util.test_seed()))
+
+    # Verify that posterior means are increasing.
+    self.assertAllGreater(results['mean'][1:] - results['mean'][:-1], 0.)
+
+    # Check that our traced means and scales match values computed
+    # by averaging over particles after the fact.
+    all_means = self.evaluate(tf.reduce_sum(
+        results['weights'] * results['particles'], axis=1))
+    all_variances = self.evaluate(
+        tf.reduce_sum(
+            results['weights'] *
+            (results['particles'] - all_means[..., tf.newaxis])**2,
+            axis=1))
+    self.assertAllClose(results['mean'], all_means)
+    self.assertAllClose(results['stddev'], np.sqrt(all_variances))
+
+  def test_step_indices_to_trace(self):
+    num_particles = 1024
+    (particles_1_3,
+     log_weights_1_3,
+     parent_indices_1_3,
+     incremental_log_marginal_likelihood_1_3) = self.evaluate(
+         tfp.experimental.mcmc.particle_filter(
+             observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+             initial_state_prior=tfd.Normal(0., 1.),
+             transition_fn=lambda _, state: tfd.Normal(state, 10.),
+             observation_fn=lambda _, state: tfd.Normal(state, 0.1),
+             num_particles=num_particles,
+             step_indices_to_trace=[1, 3],
+             seed=test_util.test_seed()))
+    self.assertLen(particles_1_3, 2)
+    self.assertLen(log_weights_1_3, 2)
+    self.assertLen(parent_indices_1_3, 2)
+    self.assertLen(incremental_log_marginal_likelihood_1_3, 2)
+    means = np.sum(np.exp(log_weights_1_3) * particles_1_3, axis=1)
+    self.assertAllClose(means, [3., 7.], atol=1.)
+
+    (final_particles,
+     final_log_weights,
+     final_cumulative_lp) = self.evaluate(
+         tfp.experimental.mcmc.particle_filter(
+             observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+             initial_state_prior=tfd.Normal(0., 1.),
+             transition_fn=lambda _, state: tfd.Normal(state, 10.),
+             observation_fn=lambda _, state: tfd.Normal(state, 0.1),
+             num_particles=num_particles,
+             trace_fn=lambda r: (r.particles,  # pylint: disable=g-long-lambda
+                                 r.log_weights,
+                                 r.accumulated_log_marginal_likelihood),
+             step_indices_to_trace=-1,
+             seed=test_util.test_seed()))
+    self.assertLen(final_particles, num_particles)
+    self.assertLen(final_log_weights, num_particles)
+    self.assertEqual(final_cumulative_lp.shape, ())
+    means = np.sum(np.exp(final_log_weights) * final_particles)
+    self.assertAllClose(means, 9., atol=1.5)
 
 
 class ParticleFilterTestFloat32(_ParticleFilterTest):

@@ -49,11 +49,13 @@ from tensorflow.python.autograph.pyct import qual_names
 from tensorflow.python.autograph.pyct import templates
 from tensorflow.python.autograph.pyct import transformer
 from tensorflow.python.autograph.pyct.common_transformers import anf
+from tensorflow.python.autograph.pyct.static_analysis import activity
 
 
 # For backward compatibility:
 # - `compiler` will be renamed to `loader` in TF 2.2+.
 # - `naming` will be moved to `core` in TF 2.2+.
+# - 'converter.standard_analysis` will no longer be needed in TF 2.3+.
 try:
   from tensorflow.python.autograph.pyct import naming  # pylint:disable=g-import-not-at-top
 except ImportError:
@@ -65,6 +67,9 @@ except ImportError:
 
   loader = compiler
   loader.load_ast = compiler.ast_to_object
+
+converter.standard_analysis = getattr(
+    converter, 'standard_analysis', (lambda node, *_, **__: node))
 
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
@@ -127,15 +132,15 @@ def _parse_and_analyze(f, autobatch_functions):
         user_context=program_ctx)
 
   # Canonicalize away break statements
-  node = converter.standard_analysis(node, ctx, is_initial=True)
+  node = converter.standard_analysis(node, ctx)
   node = break_statements.transform(node, ctx)
 
   # Canonicalize away continue statements
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = converter.standard_analysis(node, ctx)
   node = continue_statements.transform(node, ctx)
 
   # Force single returns
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = converter.standard_analysis(node, ctx)
   node = return_statements.transform(node, ctx, default_to_null_return=False)
 
   # Transform into ANF
@@ -159,7 +164,8 @@ def _parse_and_analyze(f, autobatch_functions):
        maybe_replace_function_argument),
   ]
   node = anf.transform(node, ctx, config=anf_config)
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = qual_names.resolve(node)
+  node = activity.resolve(node, ctx)
 
   return node, ctx
 

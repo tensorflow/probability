@@ -17,6 +17,7 @@
 # [internal] load python3.bzl
 
 NO_REWRITE_NEEDED = [
+    "internal:cache_util",
     "internal:docstring_util",
     "internal:name_util",
     "internal:reparameterization",

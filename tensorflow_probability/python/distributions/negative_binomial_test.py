@@ -22,6 +22,7 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
@@ -269,6 +270,10 @@ class NegativeBinomialTest(test_util.TestCase):
     self.assertAllClose(
         *self.evaluate([1. - d.prob(0.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
+
+  def testGradientOfLogProbEvalutates(self):
+    self.evaluate(tfp.math.value_and_gradient(
+        tfd.NegativeBinomial(0.1, 0.).log_prob, [0.1]))
 
 
 @test_util.test_all_tf_execution_regimes

@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import shift as shift_bijector
@@ -276,8 +277,9 @@ class HalfStudentT(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     log_correction = (
         tf.math.log(scale) + np.log(2.) + 0.5 *
-        (tf.math.log(df) - np.log(np.pi)) + tf.math.lgamma(0.5 * (df + 1.)) -
-        tf.math.lgamma(0.5 * df) - tf.math.log(df - 1))
+        (tf.math.log(df) - np.log(np.pi)) -
+        tfp_math.log_gamma_difference(0.5, 0.5 * df) -
+        tf.math.log(df - 1))
     mean = tf.math.exp(log_correction) + loc
     if self.allow_nan_stats:
       return tf.where(df > 1., mean,
@@ -310,9 +312,8 @@ class HalfStudentT(distribution.Distribution):
         tf.ones(self._batch_shape_tensor(df=df, scale=scale),
                 dtype=self.dtype) * tf.square(scale) * df / first_denom -
         tf.math.exp(2. * tf.math.log(scale) + np.log(4.) + tf.math.log(df) -
-                    np.log(np.pi) - 2. * tf.math.log(second_denom) + 2. *
-                    (tf.math.lgamma(0.5 *
-                                    (df + 1.)) - tf.math.lgamma(0.5 * df))))
+                    np.log(np.pi) - 2. * tf.math.log(second_denom) -
+                    2. * tfp_math.log_gamma_difference(0.5, 0.5 * df)))
     # When 1 < df <= 2, variance is infinite.
     result_where_defined = tf.where(
         df > 2., var,

@@ -87,6 +87,7 @@ def minimize(value_and_gradients_function,
              max_iterations=50,
              parallel_iterations=1,
              stopping_condition=None,
+             max_line_search_iterations=50,
              name=None):
   """Applies the L-BFGS algorithm to minimize a differentiable function.
 
@@ -167,6 +168,8 @@ def minimize(value_and_gradients_function,
       which only stops when all batch members have either converged or failed.
       An alternative is tfp.optimizer.converged_any which stops as soon as one
       batch member has converged, or when all have failed.
+    max_line_search_iterations: Python int. The maximum number of iterations
+      for the `hager_zhang` line search algorithm.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'minimize' is used.
 
@@ -235,7 +238,8 @@ def minimize(value_and_gradients_function,
       next_state = bfgs_utils.line_search_step(
           current_state,
           value_and_gradients_function, search_direction,
-          tolerance, f_relative_tolerance, x_tolerance, stopping_condition)
+          tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
+          max_line_search_iterations)
 
       # If not failed or converged, update the Hessian estimate.
       should_update = ~(next_state.converged | next_state.failed)

@@ -26,6 +26,7 @@ from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import log_cosh
+from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.generic import log_sub_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
@@ -38,6 +39,7 @@ from tensorflow_probability.python.math.interpolation import batch_interp_regula
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
 from tensorflow_probability.python.math.linalg import cholesky_concat
+from tensorflow_probability.python.math.linalg import cholesky_update
 from tensorflow_probability.python.math.linalg import fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
@@ -67,6 +69,7 @@ _allowed_symbols = [
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
     'cholesky_concat',
+    'cholesky_update',
     'clip_by_value_preserve_gradient',
     'custom_gradient',
     'dense_to_sparse',
@@ -82,6 +85,7 @@ _allowed_symbols = [
     'log_add_exp',
     'log_combinations',
     'log_cosh',
+    'log_cumsum_exp',
     'log_gamma_correction',
     'log_gamma_difference',
     'log_sub_exp',

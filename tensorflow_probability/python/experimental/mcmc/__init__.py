@@ -24,6 +24,10 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter import ess_
 from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
 from tensorflow_probability.python.experimental.mcmc.particle_filter import reconstruct_trajectories
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_deterministic_minimum_error
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_independent
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_stratified
+from tensorflow_probability.python.experimental.mcmc.particle_filter import resample_systematic
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
@@ -45,6 +49,10 @@ _allowed_symbols = [
     'sample_sequential_monte_carlo',
     'simple_heuristic_tuning',
     'reconstruct_trajectories',
+    'resample_deterministic_minimum_error',
+    'resample_independent',
+    'resample_stratified',
+    'resample_systematic',
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

@@ -95,7 +95,7 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
       output_padding=None,  # keras::ConvTranspose::output_padding
       # Weights
       init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros
+      init_bias_fn=None,    # tf.initializers.zeros()
       make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
       dtype=tf.float32,
       # Misc
@@ -157,7 +157,7 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
+        Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_kernel_bias_fn: ...
         Default value: `tfp.experimental.nn.util.make_kernel_bias`.
       dtype: ...
@@ -346,7 +346,7 @@ class ConvolutionTransposeVariationalReparameterization(
       output_padding=None,  # keras::ConvTranspose::output_padding
       # Weights
       init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros
+      init_bias_fn=None,    # tf.initializers.zeros()
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -415,7 +415,7 @@ class ConvolutionTransposeVariationalReparameterization(
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
+        Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.
@@ -560,7 +560,7 @@ class ConvolutionTransposeVariationalFlipout(
       output_padding=None,  # keras::ConvTranspose::output_padding
       # Weights
       init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.zeros
+      init_bias_fn=None,    # tf.initializers.zeros()
       make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
       make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
@@ -629,7 +629,7 @@ class ConvolutionTransposeVariationalFlipout(
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
       init_bias_fn: ...
-        Default value: `None` (i.e., `tf.zeros`).
+        Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
           `tfp.experimental.nn.util.make_kernel_bias_posterior_mvn_diag`.

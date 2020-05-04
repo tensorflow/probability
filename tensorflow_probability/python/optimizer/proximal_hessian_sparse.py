@@ -240,8 +240,8 @@ def minimize_one_step(gradient_unregularized_loss,
           _sparse_or_dense_matmul_onehot(
               hessian_unregularized_loss_outer, coord)**2,
           axis=-1)
-      unregularized_component = (
-          hessian_unregularized_loss_middle[..., coord] * inner_square)
+      unregularized_component = inner_square * tf.gather(
+          hessian_unregularized_loss_middle, coord, axis=-1)
       l2_component = _mul_or_none(2., l2_regularizer)
       return _add_ignoring_nones(unregularized_component, l2_component)
 
@@ -351,13 +351,15 @@ def minimize_one_step(gradient_unregularized_loss,
 
       # Recall that x_update and hess_matmul_x_update has the rightmost
       # dimension transposed to the leftmost dimension.
-      w_old = x_start[..., coord] + x_update[coord, ...]
+      w_old = (tf.gather(x_start, coord, axis=-1) +
+               tf.gather(x_update, coord, axis=0))
       # This is the coordinatewise Newton update if no L1 regularization.
       # In above notation, newton_step = -t * (approximation of d/dz|z=0 ULLSC).
       second_deriv = _hessian_diag_elt_with_l2(coord)
       newton_step = -_mul_ignoring_nones(  # pylint: disable=invalid-unary-operand-type
-          learning_rate, grad_loss_with_l2[..., coord] +
-          hess_matmul_x_update[coord, ...]) / second_deriv
+          learning_rate,
+          (tf.gather(grad_loss_with_l2, coord, axis=-1) +
+           tf.gather(hess_matmul_x_update, coord, axis=0))) / second_deriv
 
       # Applying the soft-threshold operator accounts for L1 regularization.
       # In above notation, delta =

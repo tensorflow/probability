@@ -49,6 +49,7 @@ __all__ = [
     'set_diag',
     'slogdet',
     'solve',
+    'svd',
     'tensordot',
     'trace',
     'triangular_solve',
@@ -63,7 +64,6 @@ __all__ = [
     # 'l2_normalize'
     # 'qr',
     # 'sqrtm',
-    # 'svd',
     # 'tensor_diag',
     # 'tensor_diag_part',
     # 'tridiagonal_solve',
@@ -270,6 +270,17 @@ def _solve(matrix, rhs, adjoint=False, name=None):  # pylint: disable=redefined-
   return result.reshape(*rhs.shape)
 
 
+def _svd(tensor, full_matrices=False, compute_uv=True, name=None):
+  del name
+  ret = np.linalg.svd(
+      tensor, full_matrices=full_matrices, compute_uv=compute_uv)
+  if compute_uv:
+    u, s, vh = ret
+    # Batched matrix transpose.
+    return s, u, np.conj(np.swapaxes(vh, -2, -1))
+  return ret
+
+
 def _tensordot(a, b, axes, name=None):  # pylint: disable=redefined-outer-name
   del name
   return np.tensordot(a, b, axes=axes)
@@ -399,6 +410,10 @@ matrix_transpose = utils.copy_docstring(
     _matrix_transpose)
 
 solve = utils.copy_docstring('tf.linalg.solve', _solve)
+
+svd = utils.copy_docstring(
+    'tf.linalg.svd',
+    _svd)
 
 tensordot = utils.copy_docstring(
     'tf.linalg.tensordot',

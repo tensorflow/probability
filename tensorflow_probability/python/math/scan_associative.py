@@ -14,6 +14,7 @@
 # ============================================================================
 """Utilities for parallel calculation of prefix sums."""
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
@@ -42,8 +43,11 @@ def _validate_elem_length(max_num_levels, elems_flat):
 
   elem_length = prefer_static.shape(elems_flat[0])[0]
 
-  size_limit = 2**(max_num_levels + 1)
-  enough_levels = prefer_static.less(elem_length, size_limit)
+  # The default size limit will overflow a 32-bit int, so make sure we're
+  # using 64-bit.
+  size_limit = 2**(prefer_static.cast(max_num_levels, np.int64) + 1)
+  enough_levels = prefer_static.less(
+      prefer_static.cast(elem_length, np.int64), size_limit)
   enough_levels_ = tf.get_static_value(enough_levels)
   if enough_levels_ is None:
     assertions.append(

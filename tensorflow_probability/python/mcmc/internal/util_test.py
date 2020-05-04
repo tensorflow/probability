@@ -283,6 +283,47 @@ class IndexRemappingGatherTest(test_util.TestCase):
         for k in range(params.shape[2]):
           self.assertEqual(params[indices[i, j], j, k], result_[i, j, k])
 
+  def test_params_rank3_indices_rank1_axis_1(self):
+    axis = 1
+    params = np.random.randint(10, 100, size=[4, 5, 2])
+    indices = np.random.randint(0, params.shape[axis], size=[6])
+
+    result = util.index_remapping_gather(params, indices, axis=axis)
+    self.assertAllEqual(
+        params.shape[:axis] +
+        indices.shape[:1] +
+        params.shape[axis + 1:],
+        result.shape)
+    result_ = self.evaluate(result)
+
+    for i in range(params.shape[0]):
+      for j in range(indices.shape[0]):
+        for k in range(params.shape[2]):
+          self.assertEqual(params[i, indices[j], k], result_[i, j, k])
+
+  def test_params_rank5_indices_rank3_axis_2_iaxis_1(self):
+    axis = 2
+    indices_axis = 1
+    params = np.random.randint(10, 100, size=[4, 5, 2, 3, 4])
+    indices = np.random.randint(0, params.shape[axis], size=[5, 6, 3])
+
+    result = util.index_remapping_gather(
+        params, indices, axis=axis, indices_axis=indices_axis)
+    self.assertAllEqual(
+        params.shape[:axis] +
+        indices.shape[indices_axis:indices_axis + 1] +
+        params.shape[axis + 1:],
+        result.shape)
+    result_ = self.evaluate(result)
+
+    for i in range(params.shape[0]):
+      for j in range(params.shape[1]):
+        for k in range(indices.shape[1]):
+          for l in range(params.shape[3]):
+            for m in range(params.shape[4]):
+              self.assertEqual(params[i, j, indices[j, k, l], l, m],
+                               result_[i, j, k, l, m])
+
 
 class MakeInnermostSetterTest(test_util.TestCase):
 
