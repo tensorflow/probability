@@ -119,6 +119,17 @@ class CholeskyExtend64Dynamic(_CholeskyExtend):
 del _CholeskyExtend
 
 
+def push_apart(xs, axis, shift=1e-3):
+  """Push values of `xs` apart from each other by `shift`, along `axis`."""
+  # The method is to scale the displacement by each item's sort position, so the
+  # 10th item in sorted order gets moved by 10 * shift, the 11th by 11 * shift,
+  # etc.  This way, each item moves `shift` away from each of its neighbors.
+  inv_perm = np.argsort(xs, axis=axis)
+  perm = np.argsort(inv_perm, axis=axis)
+  offsets = np.reshape(np.arange(perm.size), newshape=perm.shape) * perm * shift
+  return xs + offsets
+
+
 class _CholeskyUpdate(test_util.TestCase):
 
   def testCholeskyUpdate(self):
@@ -170,7 +181,7 @@ class _CholeskyUpdate(test_util.TestCase):
 
     rng_seed = data.draw(hps.integers(min_value=0, max_value=2**32 - 1))
     rng = np.random.RandomState(seed=rng_seed)
-    xs = rng.uniform(size=chol_bs + (l, 1))
+    xs = push_apart(rng.uniform(size=chol_bs + (l, 1)), axis=-2)
     hp.note(xs)
     xs = xs.astype(self.dtype)
     xs = tf1.placeholder_with_default(
