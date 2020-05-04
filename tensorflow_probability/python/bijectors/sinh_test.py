@@ -54,7 +54,7 @@ class SinhBijectorTest(test_util.TestCase):
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
         tfb.Sinh(), lower_x=-7., upper_x=7., eval_func=self.evaluate,
-        n=int(10e4), rtol=.5)
+        n=int(1e4), rtol=.5)
 
   @parameterized.parameters(np.float32, np.float64)
   def testBijectiveAndFinite(self, dtype):
