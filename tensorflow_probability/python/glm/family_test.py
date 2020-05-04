@@ -146,6 +146,19 @@ class BernoulliNormalCDFTest(test_util.TestCase, _GLMTestHarness):
 
 
 @test_util.test_all_tf_execution_regimes
+class BinomialTest(test_util.TestCase, _GLMTestHarness):
+
+  def setUp(self):
+    super(BinomialTest, self).setUp()
+    self.dtype = np.float32
+    n = 2.
+    self.model = tfp.glm.Binomial(n)
+    self.expected = tfp.glm.CustomExponentialFamily(
+        lambda mu: tfd.Binomial(n, probs=mu / n),
+        lambda r: n * tf.nn.sigmoid(r))
+
+
+@test_util.test_all_tf_execution_regimes
 class GammaExpTest(test_util.TestCase, _GLMTestHarness):
 
   def setUp(self):

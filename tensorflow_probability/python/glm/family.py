@@ -32,6 +32,7 @@ from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 __all__ = [
     'Bernoulli',
     'BernoulliNormalCDF',
+    'Binomial',
     'CustomExponentialFamily',
     'ExponentialFamily',
     'GammaExp',
@@ -309,6 +310,27 @@ class BernoulliNormalCDF(ExponentialFamily):
     d = tfd.Normal(loc=tf.zeros([], dtype), scale=tf.ones([], dtype))
     # logit(ncdf(r)) = log(ncdf(r)) - log(1-ncdf(r)) = logncdf(r) - lognsf(r).
     return d.log_cdf(r) - d.log_survival_function(r)
+
+
+class Binomial(ExponentialFamily):
+  """`Binomial(total_count, probs=mean)`.
+
+  Where `mean = total_count * sigmoid(matmul(X, weights))`.
+  """
+
+  def __init__(self, total_count=1., name=None):
+    self._total_count = total_count
+    super(Binomial, self).__init__(name=name)
+
+  def _call(self, r):
+    mean = self._total_count * tf.nn.sigmoid(r)
+    variance = grad_mean = mean * tf.nn.sigmoid(-r)
+    return mean, variance, grad_mean
+
+  def _as_distribution(self, r):
+    total_count = DeferredTensor(
+        self._total_count, lambda x: tf.cast(x, r.dtype), dtype=r.dtype)
+    return tfd.Binomial(total_count=total_count, logits=r)
 
 
 class GammaExp(ExponentialFamily):
