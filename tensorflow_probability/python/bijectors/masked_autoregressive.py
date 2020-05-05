@@ -1001,15 +1001,15 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
             bias_constraint=None,
             dtype=self.dtype)(conditional_input)
         layers.append(tf.keras.layers.Add()([
-          autoregressive_layer,
-          conditional_layer]))
+            autoregressive_layer,
+            conditional_layer]))
       else:
         layers.append(autoregressive_layer)
       if k + 1 < len(self._masks):
         layers.append(tf.keras.activations.get(self._activation)(layers[-1]))
     self._network = tf.keras.models.Model(
-      inputs=input_layer,
-      outputs=layers[-1])
+        inputs=input_layer,
+        outputs=layers[-1])
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
 
@@ -1031,7 +1031,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           conditional = conditional[tf.newaxis, ...]
         x = [x, conditional]
         output_shape = tf.concat(
-            [tf.broadcast_dynamic_shape(conditional_batch_shape, 
+            [tf.broadcast_dynamic_shape(conditional_batch_shape,
                                         input_shape[:-1]),
              input_shape[-1:]], axis=0)
       else:
