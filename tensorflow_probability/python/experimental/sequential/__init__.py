@@ -24,14 +24,19 @@ from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filte
 from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import EnsembleKalmanFilterState
 from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import inflate_by_scaled_identity_fn
 from tensorflow_probability.python.experimental.sequential.extended_kalman_filter import extended_kalman_filter
+from tensorflow_probability.python.experimental.sequential.iterated_filter import geometric_cooling_schedule
+from tensorflow_probability.python.experimental.sequential.iterated_filter import IteratedFilter
+
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
+    'IteratedFilter',
     'extended_kalman_filter',
     'EnsembleKalmanFilterState',
     'ensemble_kalman_filter_predict',
     'ensemble_kalman_filter_update',
     'ensemble_adjustment_kalman_filter_update',
+    'geometric_cooling_schedule',
     'inflate_by_scaled_identity_fn',
 ]
 

@@ -35,6 +35,7 @@ py_library(
         ":ensemble_adjustment_kalman_filter",
         ":ensemble_kalman_filter",
         ":extended_kalman_filter",
+        ":iterated_filter",
         # tensorflow dep,
     ],
 )
@@ -114,6 +115,30 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "iterated_filter",
+    srcs = ["iterated_filter.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+py_test(
+    name = "iterated_filter_test",
+    srcs = ["iterated_filter_test.py"],
+    deps = [
+        ":iterated_filter",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
