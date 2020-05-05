@@ -903,8 +903,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       self._event_ndims = len(self._event_shape)
 
       if self._event_ndims != 1:
-        raise ValueError('Parameter `event_shape` must describe a rank-1 shape. '
-                         '`event_shape: {!r}`'.format(event_shape))
+        raise ValueError('Parameter `event_shape` must describe a rank-1 '
+                         'shape. `event_shape: {!r}`'.format(event_shape))
 
     if self._conditional:
       if self._conditional_shape is not None:
@@ -913,8 +913,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
         if self._conditional_ndims != 1:
           raise ValueError('Parameter `conditional_shape` must describe a '
-                            'rank-1 shape. `conditional_shape: {!r}`'.format(
-                            conditional_shape))
+                           'rank-1 shape. `conditional_shape: {!r}`'.format(
+                               conditional_shape))
 
     # To be built in `build`.
     self._input_order = None
@@ -930,11 +930,10 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       if self._conditional_shape is None:
         raise ValueError('`conditional_shape` must be provided when using '
                          'conditional autoregressive network')
-      if (input_shape[-1] != self._event_shape[-1]):
+      if input_shape[-1] != self._event_shape[-1]:
         raise ValueError('Invalid final dimension of `input_shape`. '
                          'Expected `{!r}`, but got `{!r}`'.format(
-      self._event_shape[-1],
-      input_shape[-1]))
+                             self._event_shape[-1], input_shape[-1]))
     else:
       if self._event_shape is None:
         # `event_shape` wasn't specied at __init__, so infer from `input_shape`
@@ -975,32 +974,32 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     layer_output_sizes = self._hidden_units + [self._event_size * self._params]
     for k in range(len(self._masks)):
       autoregressive_layer = tf.keras.layers.Dense(
-        layer_output_sizes[k],
-        activation=None,
-        use_bias=self._use_bias,
-        kernel_initializer=_make_masked_initializer(
-          self._masks[k], self._kernel_initializer),
-        bias_initializer=self._bias_initializer,
-        kernel_regularizer=self._kernel_regularizer,
-        bias_regularizer=self._bias_regularizer,
-        kernel_constraint=_make_masked_constraint(
-          self._masks[k], self._kernel_constraint),
-        bias_constraint=self._bias_constraint,
-        dtype=self.dtype)(layers[-1])
-      if (self._conditional and
-            ((self._conditional_layers == "all_layers") or
-            ((self._conditional_layers == "first_layer") and (k == 0)))):
-        conditional_layer = tf.keras.layers.Dense(
           layer_output_sizes[k],
           activation=None,
-          use_bias=False,
-          kernel_initializer=self._kernel_initializer,
-          bias_initializer=None,
+          use_bias=self._use_bias,
+          kernel_initializer=_make_masked_initializer(
+              self._masks[k], self._kernel_initializer),
+          bias_initializer=self._bias_initializer,
           kernel_regularizer=self._kernel_regularizer,
-          bias_regularizer=None,
-          kernel_constraint=self._kernel_constraint,
-          bias_constraint=None,
-          dtype=self.dtype)(conditional_input)
+          bias_regularizer=self._bias_regularizer,
+          kernel_constraint=_make_masked_constraint(
+              self._masks[k], self._kernel_constraint),
+          bias_constraint=self._bias_constraint,
+          dtype=self.dtype)(layers[-1])
+      if (self._conditional and
+          ((self._conditional_layers == "all_layers") or
+           ((self._conditional_layers == "first_layer") and (k == 0)))):
+        conditional_layer = tf.keras.layers.Dense(
+            layer_output_sizes[k],
+            activation=None,
+            use_bias=False,
+            kernel_initializer=self._kernel_initializer,
+            bias_initializer=None,
+            kernel_regularizer=self._kernel_regularizer,
+            bias_regularizer=None,
+            kernel_constraint=self._kernel_constraint,
+            bias_constraint=None,
+            dtype=self.dtype)(conditional_input)
         layers.append(tf.keras.layers.Add()([
           autoregressive_layer,
           conditional_layer]))
