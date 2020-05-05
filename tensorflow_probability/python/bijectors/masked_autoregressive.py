@@ -1026,11 +1026,18 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           raise ValueError('`conditional` must be passed as a named arguement')
         conditional = tf.convert_to_tensor(conditional, dtype=self.dtype,
                                            name="conditional")
+        conditional_batch_shape = tf.shape(conditional)[:-1]
         if tensorshape_util.rank(conditional.shape) == 1:
           conditional = conditional[tf.newaxis, ...]
         x = [x, conditional]
+        output_shape = tf.concat(
+            [tf.broadcast_dynamic_shape(conditional_batch_shape, 
+                                        input_shape[:-1]),
+             input_shape[-1:]], axis=0)
+      else:
+        output_shape = input_shape
       return tf.reshape(self._network(x),
-                        tf.concat([input_shape, [self._params]], axis=0))
+                        tf.concat([output_shape, [self._params]], axis=0))
 
   def compute_output_shape(self, input_shape):
     """See tfkl.Layer.compute_output_shape."""
