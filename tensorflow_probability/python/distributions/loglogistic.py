@@ -134,7 +134,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
             message='Mode undefined for concentration <= 1.'),
         ]):
       mode = self.scale * tf.math.exp(
-        (tf.math.logp(c - 1.) - tf.math.log1p(c)) / c)
+        (tf.math.log(c - 1.) - tf.math.log1p(c)) / c)
       return tf.where(c > 1., mode, np.nan)
 
   def _entropy(self):
