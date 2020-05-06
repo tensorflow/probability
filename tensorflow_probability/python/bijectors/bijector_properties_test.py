@@ -649,7 +649,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     n = 3
     xs = self._draw_domain_tensor(bijector, data, event_dim, sample_shape=[n])
     ys = bijector.forward(xs)
-    vectorized_ys = tf.vectorized_map(bijector.forward, xs)
+    vectorized_ys = tf.vectorized_map(bijector.forward, xs,
+                                      fallback_to_while_loop=False)
     self.assertAllClose(*self.evaluate((ys, vectorized_ys)),
                         atol=atol, rtol=rtol)
 
@@ -660,7 +661,8 @@ class BijectorPropertiesTest(test_util.TestCase):
             max_value=prefer_static.rank_from_shape(xs.shape) - 1))
     fldj_fn = functools.partial(bijector.forward_log_det_jacobian,
                                 event_ndims=event_ndims)
-    vectorized_fldj = tf.vectorized_map(fldj_fn, xs)
+    vectorized_fldj = tf.vectorized_map(fldj_fn, xs,
+                                        fallback_to_while_loop=False)
     fldj = tf.broadcast_to(fldj_fn(xs), tf.shape(vectorized_fldj))
     self.assertAllClose(*self.evaluate((fldj, vectorized_fldj)),
                         atol=atol, rtol=rtol)
@@ -668,7 +670,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     # Inverse
     ys = self._draw_codomain_tensor(bijector, data, event_dim, sample_shape=[n])
     xs = bijector.inverse(ys)
-    vectorized_xs = tf.vectorized_map(bijector.inverse, ys)
+    vectorized_xs = tf.vectorized_map(bijector.inverse, ys,
+                                      fallback_to_while_loop=False)
     self.assertAllClose(*self.evaluate((xs, vectorized_xs)),
                         atol=atol, rtol=rtol)
 
@@ -679,7 +682,8 @@ class BijectorPropertiesTest(test_util.TestCase):
             max_value=prefer_static.rank_from_shape(ys.shape) - 1))
     ildj_fn = functools.partial(bijector.inverse_log_det_jacobian,
                                 event_ndims=event_ndims)
-    vectorized_ildj = tf.vectorized_map(ildj_fn, ys)
+    vectorized_ildj = tf.vectorized_map(ildj_fn, ys,
+                                        fallback_to_while_loop=False)
     ildj = tf.broadcast_to(ildj_fn(ys), tf.shape(vectorized_ildj))
     self.assertAllClose(*self.evaluate((ildj, vectorized_ildj)),
                         atol=atol, rtol=rtol)

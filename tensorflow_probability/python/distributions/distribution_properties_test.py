@@ -122,16 +122,11 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 # blacklisted by the autovectorization tests. Since not all distributions are
 # in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
-    'BetaBinomial',  # No converter for While
-    'Binomial',  # No converter for While
     'DirichletMultinomial',  # No converter for StatelessWhile
-    'Gamma',  # No converter for While
+    'Gamma',  # "Incompatible shapes" error. (b/150712618).
     'Multinomial',  # No converter for StatelessWhile
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
-    'VonMises',  # No converter for While
-    'VonMisesFisher',  # No converter for While
-    'Zipf',  # No converter for While
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
@@ -584,11 +579,16 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
       sample = self.evaluate(dist.sample(num_samples, seed=seed))
     else:
       sample = self.evaluate(tf.vectorized_map(
-          lambda i: dist.sample(seed=seed), tf.range(num_samples)))
+          lambda i: dist.sample(seed=seed),
+          tf.range(num_samples),
+          fallback_to_while_loop=False))
     hp.note('Drew samples {}'.format(sample))
 
     if dist_name not in LOGPROB_AUTOVECTORIZATION_IS_BROKEN:
-      pfor_lp = tf.vectorized_map(dist.log_prob, tf.convert_to_tensor(sample))
+      pfor_lp = tf.vectorized_map(
+          dist.log_prob,
+          tf.convert_to_tensor(sample),
+          fallback_to_while_loop=False)
       batch_lp = dist.log_prob(sample)
       pfor_lp_, batch_lp_ = self.evaluate((pfor_lp, batch_lp))
       self.assertAllClose(pfor_lp_, batch_lp_,
