@@ -73,7 +73,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
           concentration, name='concentration', dtype=dtype)
       super(LogLogistic, self).__init__(
           distribution=logistic.Logistic(loc=tf.math.log(self.scale),
-                                         scale=1./self.concentration),
+                                         scale=tf.math.reciprocal(self.concentration)),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
           parameters=parameters,
