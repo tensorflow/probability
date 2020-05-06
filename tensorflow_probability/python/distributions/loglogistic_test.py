@@ -22,6 +22,8 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+from scipy import stats
+
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
@@ -38,10 +40,10 @@ class LogLogiticTest(test_util.TestCase):
     dist = tfd.LogLogistic(scale=scale, concentration=concentration,
                            validate_args=True)
 
-    b = 1. / concentration
-    mean = scale / np.sinc(b)
-    mean[0] = np.nan
-    self.assertAllClose(self.evaluate(dist.mean()), mean)
+    self.assertAllClose(
+      self.evaluate(dist.mean()),
+      stats.fisk.mean(loc=0., scale=scale, c=concentration)
+    )
 
   def testLogLogisticVariance(self):
     scale = np.float32([3., 1.5, 0.75])
@@ -49,12 +51,14 @@ class LogLogiticTest(test_util.TestCase):
     dist = tfd.LogLogistic(scale=scale, concentration=concentration,
                            validate_args=True)
 
-    b = 1. / concentration
-    variance = scale ** 2 * (1. / np.sinc(2 * b) - 1. / np.sinc(b) ** 2)
-    variance[:2] = np.nan
-    self.assertAllClose(self.evaluate(dist.variance()), variance)
-    self.assertAllClose(self.evaluate(dist.stddev()),
-                        np.sqrt(self.evaluate(dist.variance())))
+    self.assertAllClose(
+      self.evaluate(dist.variance()),
+      stats.fisk.var(loc=0., scale=scale, c=concentration)
+    )
+    self.assertAllClose(
+      self.evaluate(dist.stddev()),
+      stats.fisk.std(loc=0., scale=scale, c=concentration)
+    )
 
   def testLogLogisticMode(self):
     scale = np.float32([3., 1.5, 0.75])
@@ -64,7 +68,10 @@ class LogLogiticTest(test_util.TestCase):
     mode = scale * ((concentration - 1.) / (concentration + 1.)
                     ) ** (1. / concentration)
     mode[0] = np.nan
-    self.assertAllClose(self.evaluate(dist.mode()), mode)
+    self.assertAllClose(
+      self.evaluate(dist.mode()),
+      mode
+    )
 
   def testLogLogisticEntropy(self):
     scale = np.float32([3., 1.5, 0.75])
@@ -72,8 +79,10 @@ class LogLogiticTest(test_util.TestCase):
     dist = tfd.LogLogistic(scale=scale, concentration=concentration,
                            validate_args=True)
 
-    entropy = np.log2(np.e ** 2 * scale / concentration)
-    self.assertAllClose(self.evaluate(dist.entropy()), entropy)
+    self.assertAllClose(
+      self.evaluate(dist.entropy()),
+      stats.fisk.entropy(loc=0., scale=scale, c=concentration)
+    )
 
   def testLogLogisticSample(self):
     scale, concentration = 1.5, 3.
@@ -88,29 +97,33 @@ class LogLogiticTest(test_util.TestCase):
                         atol=0.5)
 
   def testLogLogisticPDF(self):
-    scale, concentration = 1.5, 0.4
+    scale = 1.5
+    concentration = 0.4
     dist = tfd.LogLogistic(scale=scale, concentration=concentration,
                            validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     log_pdf = dist.log_prob(x)
-    analytical_log_pdf = np.log(
-        ((concentration/scale) * (x/scale) ** (concentration - 1)
-         ) / (1 + (x/scale) ** concentration) ** 2)
 
-    self.assertAllClose(self.evaluate(log_pdf), analytical_log_pdf)
+    self.assertAllClose(
+      self.evaluate(log_pdf),
+      stats.fisk.logpdf(x, loc=0., scale=scale, c=concentration)
+    )
 
   def testLogLogisticCDF(self):
-    scale, concentration = 1.5, 0.4
+    scale = 1.5
+    concentration = 0.4
     dist = tfd.LogLogistic(scale=scale, concentration=concentration,
                            validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     cdf = dist.cdf(x)
-    analytical_cdf = 1. / (1 + (x / scale) ** (- concentration))
-    self.assertAllClose(self.evaluate(cdf), analytical_cdf)
+    self.assertAllClose(
+      self.evaluate(cdf),
+      stats.fisk.cdf(x, loc=0., scale=scale, c=concentration)
+    )
 
   def testAssertValidSample(self):
     dist = tfd.LogLogistic(scale=[1., 1., 4.], concentration=2.,

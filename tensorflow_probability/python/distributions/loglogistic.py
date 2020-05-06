@@ -138,7 +138,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
       return tf.where(c > 1., mode, np.nan)
 
   def _entropy(self):
-    return (tf.math.log(self.scale / self.concentration) + 2.) / np.log(2.)
+    return 2. + tf.math.log(self.scale) - tf.math.log(self.concentration)
 
   def _sample_control_dependencies(self, x):
     assertions = []
