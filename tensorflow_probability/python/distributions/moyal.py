@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-  'Moyal',
+    'Moyal',
 ]
 
 
