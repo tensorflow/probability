@@ -135,7 +135,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
         ]):
       mode = self.scale * tf.math.exp(
         (tf.math.log(c - 1.) - tf.math.log1p(c)) / c)
-      return tf.where(c > 1., mode, np.nan)
+      return tf.where(c > 1., mode, 0.)
 
   def _entropy(self):
     return 2. + tf.math.log(self.scale) - tf.math.log(self.concentration)

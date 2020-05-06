@@ -67,7 +67,7 @@ class LogLogiticTest(test_util.TestCase):
                            validate_args=True)
     mode = scale * ((concentration - 1.) / (concentration + 1.)
                     ) ** (1. / concentration)
-    mode[0] = np.nan
+    mode[0] = 0.
     self.assertAllClose(
       self.evaluate(dist.mode()),
       mode
