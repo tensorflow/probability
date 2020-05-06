@@ -261,7 +261,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
          for v in (self.skewness, self.tailweight, self.scale)])
 
     variance = (0.5 * tf.math.square(scale) *
-                tf.math.expm1(1./tf.math.square(tailweight)) *
+                tf.math.expm1(tf.math.reciprocal(tf.math.square(tailweight))) *
                 (tf.math.exp(1./tf.math.square(tailweight)) *
                  tf.math.cosh(2. * skewness / tailweight) + 1.))
 
