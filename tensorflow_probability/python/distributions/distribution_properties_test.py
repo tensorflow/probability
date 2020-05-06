@@ -112,7 +112,6 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 )
 
 EXTRA_TENSOR_CONVERSION_DISTS = {
-    'JohnsonSU': 2,  # extra `scale` usage from chain bijector
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
     'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter
