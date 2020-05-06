@@ -88,8 +88,9 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
   @property
   def loc(self):
-    """Distribution parameter for the pre-transformed mean."""
-    return self.distribution.loc
+    """Distribution parameter."""
+    # TODO(npfp): Add loc to the distribution
+    return 0.
 
   @property
   def scale(self):
