@@ -270,7 +270,7 @@ class _MoyalTest(object):
                       1 / b_scale * (a_loc - b_loc + a_scale *
                                      (np.euler_gamma + np.log(2.)) -
                                      b_scale * (1 + np.euler_gamma +
-                                             np.log(2.)) - 2 * b_scale *
+                                                np.log(2.)) - 2 * b_scale *
                                      np.log(a_scale) +
                                      2 * b_scale * np.log(b_scale))))
 

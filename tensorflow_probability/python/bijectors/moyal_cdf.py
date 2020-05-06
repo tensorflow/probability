@@ -30,7 +30,7 @@ from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-  'MoyalCDF',
+    'MoyalCDF',
 ]
 
 
@@ -45,7 +45,7 @@ class MoyalCDF(bijector.Bijector):
   ```none
   Y ~ MoyalCDF(loc, scale)
   pdf(y; loc, scale) = exp(
-    - 1/2 * ( (y - loc) / scale + exp(- (y - loc) / scale) ) ) / 
+    - 1/2 * ( (y - loc) / scale + exp(- (y - loc) / scale) ) ) /
     (sqrt(2 * pi) * scale)
   ```
   """
@@ -60,7 +60,7 @@ class MoyalCDF(bijector.Bijector):
     Args:
       loc: Float-like `Tensor` that is the same dtype and is
         broadcastable with `scale`.
-        This is `loc` in 
+        This is `loc` in
         `Y = g(X) = erfc(exp(- 1/2 * (X - loc) / scale) / sqrt(2))`.
       scale: Positive Float-like `Tensor` that is the same dtype and is
         broadcastable with `loc`.
