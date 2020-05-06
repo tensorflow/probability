@@ -125,6 +125,21 @@ class LogLogiticTest(test_util.TestCase):
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
+    pdf = dist.prob(x)
+
+    self.assertAllClose(
+      self.evaluate(pdf),
+      stats.fisk.pdf(x, loc=0., scale=scale, c=concentration)
+    )
+
+  def testLogLogisticLogPDF(self):
+    scale = 1.5
+    concentration = 0.4
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
+
+    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+
     log_pdf = dist.log_prob(x)
 
     self.assertAllClose(
@@ -144,6 +159,34 @@ class LogLogiticTest(test_util.TestCase):
     self.assertAllClose(
       self.evaluate(cdf),
       stats.fisk.cdf(x, loc=0., scale=scale, c=concentration)
+    )
+
+  def testLogLogisticLogCDF(self):
+    scale = 1.5
+    concentration = 0.4
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
+
+    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+
+    log_cdf = dist.log_cdf(x)
+    self.assertAllClose(
+      self.evaluate(log_cdf),
+      stats.fisk.logcdf(x, loc=0., scale=scale, c=concentration)
+    )
+
+  def testLogLogisticLogSurvival(self):
+    scale = 1.5
+    concentration = 0.4
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True)
+
+    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+
+    logsf = dist.log_survival_function(x)
+    self.assertAllClose(
+      self.evaluate(logsf),
+      stats.fisk.logsf(x, loc=0., scale=scale, c=concentration)
     )
 
   def testAssertValidSample(self):

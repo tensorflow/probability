@@ -143,6 +143,25 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     return 2. + tf.math.log(self.scale) - tf.math.log(self.concentration)
 
+  def _log_z(self, x):
+    """Returns log of the standardized input."""
+    # TODO(npfp): Add loc
+    with tf.name_scope('log_standardize'):
+      return tf.math.log(x) - tf.math.log(self.scale)
+
+  def _log_prob(self, x):
+    return (tf.math.log(self.concentration) - tf.math.log(self.scale)
+            + (self.concentration - 1.) * self._log_z(x)
+            - 2 * tf.math.log1p(
+              tf.math.exp(self.concentration * self._log_z(x)))
+            )
+
+  def _log_cdf(self, x):
+    return -tf.math.log1p(tf.math.exp(-self.concentration * self._log_z(x)))
+
+  def _log_survival_function(self, x):
+    return - self.concentration * self._log_z(x) + self._log_cdf(x)
+
   def _sample_control_dependencies(self, x):
     assertions = []
     if not self.validate_args:
