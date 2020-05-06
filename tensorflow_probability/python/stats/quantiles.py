@@ -552,7 +552,7 @@ def percentile(x,
 
     # Sort (in ascending order) everything which allows multiple calls to sort
     # only once (under the hood) and use CSE.
-    sorted_y = _sort_tensor(y)
+    sorted_y = tf.sort(y, axis=-1, direction='ASCENDING')
 
     d = tf.cast(tf.shape(y)[-1], tf.float64)
 
@@ -893,11 +893,3 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
     full_shape = tf.concat(
         [other_shape, [-1]] if right_end else [[-1], other_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)
-
-
-def _sort_tensor(tensor):
-  """Use `sort` to sort a `Tensor` in ascending order along
-     the last dimension."""
-  sorted_ = tf.sort(tensor, axis=-1, direction='ASCENDING')
-  tensorshape_util.set_shape(sorted_, tensor.shape)
-  return sorted_
