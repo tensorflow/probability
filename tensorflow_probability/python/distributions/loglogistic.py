@@ -51,9 +51,9 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
     Args:
       scale: Floating-point `Tensor`;
-        the scale of the log-Logistic distribution(s).
+        the scale of the log-logistic distribution(s).
       concentration: Floating-point `Tensor`;
-        the shape of the log- Logistic distribution(s).
+        the shape of the log-logistic distribution(s).
       validate_args: Python `bool`, default `False`. Whether to validate input
         with asserts. If `validate_args` is `False`, and the inputs are
         invalid, correct behavior is not guaranteed.
