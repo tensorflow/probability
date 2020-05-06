@@ -126,8 +126,19 @@ def push_apart(xs, axis, shift=1e-3):
   # etc.  This way, each item moves `shift` away from each of its neighbors.
   inv_perm = np.argsort(xs, axis=axis)
   perm = np.argsort(inv_perm, axis=axis)
-  offsets = np.reshape(np.arange(perm.size), newshape=perm.shape) * perm * shift
-  return xs + offsets
+  return xs + perm * shift
+
+
+class PushApartTest(test_util.TestCase):
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testPreservesSortOrder(self, data):
+    dtype = data.draw(hpnp.floating_dtypes())
+    xs = data.draw(hpnp.arrays(dtype, 10, unique=True))
+    pushed = push_apart(xs, axis=-1)
+    hp.note(pushed)
+    self.assertAllEqual(np.argsort(xs, axis=-1), np.argsort(pushed, axis=-1))
 
 
 class _CholeskyUpdate(test_util.TestCase):
