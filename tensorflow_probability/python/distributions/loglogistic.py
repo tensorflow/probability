@@ -72,8 +72,11 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
       self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, name='concentration', dtype=dtype)
       super(LogLogistic, self).__init__(
-          distribution=logistic.Logistic(loc=tf.math.log(self.scale),
-                                         scale=tf.math.reciprocal(self.concentration)),
+          distribution=logistic.Logistic(
+            loc=tf.math.log(self.scale),
+            scale=tf.math.reciprocal(self.concentration),
+            allow_nan_stats=allow_nan_stats
+          ),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
           parameters=parameters,

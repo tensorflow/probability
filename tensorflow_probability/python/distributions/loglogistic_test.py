@@ -45,6 +45,15 @@ class LogLogiticTest(test_util.TestCase):
       stats.fisk.mean(loc=0., scale=scale, c=concentration)
     )
 
+  def testLogLogisticMeanNoNanAllowed(self):
+    scale = np.float32([3., 1.5, 0.75])
+    concentration = np.float32([0.4, 1.1, 2.1])
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True, allow_nan_stats=False)
+
+    with self.assertRaisesOpError('Condition x < y.*'):
+      self.evaluate(dist.mean())
+
   def testLogLogisticVariance(self):
     scale = np.float32([3., 1.5, 0.75])
     concentration = np.float32([0.4, 1.1, 2.1])
@@ -59,6 +68,18 @@ class LogLogiticTest(test_util.TestCase):
       self.evaluate(dist.stddev()),
       stats.fisk.std(loc=0., scale=scale, c=concentration)
     )
+
+  def testLogLogisticVarianceNoNanAllowed(self):
+    scale = np.float32([3., 1.5, 0.75])
+    concentration = np.float32([0.4, 1.1, 2.1])
+    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
+                           validate_args=True, allow_nan_stats=False)
+
+    with self.assertRaisesOpError('Condition x < y.*'):
+      self.evaluate(dist.mean())
+
+    with self.assertRaisesOpError('Condition x < y.*'):
+      self.evaluate(dist.stddev())
 
   def testLogLogisticMode(self):
     scale = np.float32([3., 1.5, 0.75])
