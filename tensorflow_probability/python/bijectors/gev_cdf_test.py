@@ -35,7 +35,7 @@ class GeneralizedExtremeValueCDFTest(test_util.TestCase):
   def testBijector(self):
     loc = 0.3
     scale = 5.
-    concentration = np.array([[[-1.], [0.], [1.]]], dtype=np.float32)
+    concentration = np.array([[[-5e-5], [0.], [1.]]], dtype=np.float32)
     bijector = tfb.GeneralizedExtremeValueCDF(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
     self.assertStartsWith(bijector.name, "generalizedextremevalue")

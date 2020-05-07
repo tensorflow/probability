@@ -62,6 +62,7 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
                scale=1.,
                concentration=0,
                validate_args=False,
+               tol=1e-5,
                name='generalizedextremevalue_cdf'):
     """Instantiates the `GeneralizedExtremeValueCDF` bijector.
 
@@ -86,6 +87,8 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
           scale, dtype=dtype, name='scale')
       self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, dtype=dtype, name='concentration')
+      self._tol = tensor_util.convert_nonref_to_tensor(
+          tol, dtype=dtype, name='tolerance')
       super(GeneralizedExtremeValueCDF, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=0,
@@ -126,32 +129,30 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
   def _forward(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       conc = tf.convert_to_tensor(self.concentration)
-      condition = tf.equal(conc, 0.)
 
       z = (x - self.loc) / self.scale
-      t = tf.where(condition, tf.exp(-z),
+      t = tf.where(tf.math.less_equal(tf.math.abs(conc), self._tol),
+                   tf.exp(-z),
                    tf.exp(-tf.math.log1p(z * conc) / conc))
       return tf.exp(-t)
 
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      t = - tf.math.log(y)
+      t = -tf.math.log(y)
 
       conc = tf.convert_to_tensor(self.concentration)
-      condition = tf.equal(conc, 0.)
-      z = tf.where(condition, -tf.math.log(t),
+      z = tf.where(tf.math.less_equal(tf.math.abs(conc), self._tol),
+                   -tf.math.log(t),
                    tf.math.expm1(-tf.math.log(t) * conc) / conc)
 
       return self.loc + self.scale * z
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      t = - tf.math.log(y)
+      t = -tf.math.log(y)
 
       conc = tf.convert_to_tensor(self.concentration)
-      condition = tf.equal(conc, 0.)
-      log_dt = tf.where(condition, -tf.math.log(t),
-                        (-conc - 1) * tf.math.log(t))
+      log_dt = (-conc - 1.) * tf.math.log(t)
 
       return tf.math.log(self.scale / y) + log_dt
 
@@ -161,8 +162,8 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
       z = (x - self.loc) / scale
 
       conc = tf.convert_to_tensor(self.concentration)
-      condition = tf.equal(conc, 0.)
-      log_t = tf.where(condition, -z,
+      log_t = tf.where(tf.math.less_equal(tf.math.abs(conc), self._tol),
+                       -z,
                        -tf.math.log1p(z * conc) / conc)
 
       return (conc + 1) * log_t - tf.exp(log_t) - tf.math.log(scale)
