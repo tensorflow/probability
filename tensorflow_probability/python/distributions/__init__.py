@@ -207,6 +207,7 @@ __all__ = [
     'Triangular',
     'TruncatedNormal',
     'Uniform',
+    'Moyal',
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalLinearOperator',
