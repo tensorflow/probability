@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -109,13 +109,13 @@ class MoyalCDF(bijector.Bijector):
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
       return (tf.math.square(tf.math.erfinv(1 - y)) +
-              tf.math.log(self.scale * np.sqrt(np.pi)) -
+              tf.math.log(self.scale) + 0.5 * np.log(np.pi) -
               tf.math.log(tf.math.erfinv(1 - y)))
 
   def _forward_log_det_jacobian(self, x):
     scale = tf.convert_to_tensor(self.scale)
     z = (x - self.loc) / scale
-    return -1/2 * (tf.exp(-z) + z + tf.math.log(2 * np.pi * tf.square(scale)))
+    return -0.5 * (tf.exp(-z) + z + np.log(2 * np.pi) + 2. * tf.math.log(scale))
 
   def _maybe_assert_valid_y(self, y):
     if not self.validate_args:

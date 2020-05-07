@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -262,9 +262,9 @@ class _MoyalTest(object):
     a = tfd.Moyal(loc=a_loc, scale=a_scale, validate_args=True)
     b = tfd.Moyal(loc=b_loc, scale=b_scale, validate_args=True)
 
-    true_kl = (1/2 * (np.power(2, a_scale/b_scale) *
+    true_kl = (0.5 * (np.power(2, a_scale/b_scale) *
                       np.exp((b_loc - a_loc) / b_scale +
-                             np.vectorize(np.math.lgamma)(1/2 +
+                             np.vectorize(np.math.lgamma)(0.5 +
                                                           a_scale/b_scale)) /
                       np.sqrt(np.pi) +
                       1 / b_scale * (a_loc - b_loc + a_scale *

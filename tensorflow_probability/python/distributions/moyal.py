@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -188,13 +188,13 @@ class Moyal(transformed_distribution.TransformedDistribution):
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast sigma.
     scale = self.scale * tf.ones_like(self.loc)
-    return (1/2 * (1. + 2 * tf.math.log(scale) +
+    return (0.5 * (1. + 2 * tf.math.log(scale) +
                    np.euler_gamma + np.log(4. * np.pi)))
 
   def _log_prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
     z = (x - self.loc) / scale
-    return - 1/2 * (z + tf.exp(-z)) - tf.math.log(np.sqrt(2. * np.pi) * scale)
+    return - 0.5 * (z + tf.exp(-z)) - tf.math.log(np.sqrt(2. * np.pi) * scale)
 
   def _mean(self):
     return self.loc + self.scale * (np.euler_gamma + np.log(2.))
@@ -232,9 +232,9 @@ def _kl_moyal_moyal(a, b, name=None):
     b_loc = tf.convert_to_tensor(b.loc)
     a_scale = tf.convert_to_tensor(a.scale)
     b_scale = tf.convert_to_tensor(b.scale)
-    return 1/2 * ((tf.math.pow(2, a_scale/b_scale) *
+    return 0.5 * ((tf.math.pow(2, a_scale/b_scale) *
                    tf.math.exp((b_loc - a_loc) / b_scale +
-                               tf.math.lgamma(1/2 + a_scale / b_scale))) /
+                               tf.math.lgamma(0.5 + a_scale / b_scale))) /
                   np.sqrt(np.pi) + (a_loc - b_loc) / b_scale - 1 +
                   (a_scale / b_scale - 1) * (np.euler_gamma + np.log(2.)) +
                   2 * (tf.math.log(b_scale / a_scale)))

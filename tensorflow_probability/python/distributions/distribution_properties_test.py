@@ -71,6 +71,7 @@ TF2_FRIENDLY_DISTS = (
     'LogNormal',
     'Logistic',
     'Normal',
+    'Moyal',
     'Multinomial',
     'NegativeBinomial',
     'OneHotCategorical',
