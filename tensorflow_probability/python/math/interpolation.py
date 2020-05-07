@@ -563,8 +563,8 @@ def batch_interp_regular_nd_grid(x,
   Interpolate a scalar function of two variables.
 
   ```python
-  x_ref_min = [0., 2 * np.pi]
-  x_ref_max = [0., 2 * np.pi]
+  x_ref_min = [0., 0.]
+  x_ref_max = [2 * np.pi, 2 * np.pi]
 
   # Build y_ref.
   x0s, x1s = tf.meshgrid(
