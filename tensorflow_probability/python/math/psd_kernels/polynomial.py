@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Polynomial and Linear kernel."""
+"""Polynomial, Linear and Constant kernel."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -269,6 +269,55 @@ class Linear(Polynomial):
         bias_variance=bias_variance,
         slope_variance=slope_variance,
         shift=shift,
+        exponent=None,
+        feature_ndims=feature_ndims,
+        validate_args=validate_args,
+        parameters=parameters,
+        name=name)
+
+
+class Constant(Polynomial):
+  """Constant Kernel.
+
+    This kernel when used in Gaussian Process Model, returns constant
+    covariance irrespective of the ``index_points``.
+    The Constant kernel is based on the Polynomial kernel without the
+    exponent, slope_variance and dot product term.
+
+    ```none
+    k(x, y) = bias_variance**2
+    ```
+  """
+
+  def __init__(self,
+               bias_variance=None,
+               feature_ndims=1,
+               validate_args=False,
+               name='Constant'):
+    """Construct a Constant kernel instance.
+
+    Args:
+      bias_variance: Positive floating point `Tensor` that controls the
+        variance from the origin. If bias = 0, there is no variance and the
+        fitted function goes through the origin (also known as the homogeneous
+        Constant kernel). Must be broadcastable with `slope_variance`,
+        `shift` and inputs to `apply` and `matrix` methods. A value of
+        `None` is treated like 0.
+        Default Value: `None`
+      feature_ndims: Python `int` number of rightmost dims to include in
+        kernel computation.
+        Default Value: 1
+      validate_args: If `True`, parameters are checked for validity despite
+        possibly degrading runtime performance.
+        Default Value: `False`
+      name: Python `str` name prefixed to Ops created by this class.
+        Default Value: `'Constant'`
+    """
+    parameters = dict(locals())
+    super(Constant, self).__init__(
+        bias_variance=bias_variance,
+        slope_variance=None,
+        shift=None,
         exponent=None,
         feature_ndims=feature_ndims,
         validate_args=validate_args,

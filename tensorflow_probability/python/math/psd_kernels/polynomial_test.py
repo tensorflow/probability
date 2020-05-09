@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for Polynomial and Linear."""
+"""Tests for Polynomial, Linear and Constant."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -262,6 +262,22 @@ class LinearTest(test_util.TestCase):
     x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
     self.assertAllClose(x.dot(y.T), self.evaluate(k.matrix(x, y)))
+
+
+@test_util.test_all_tf_execution_regimes
+class ConstantTest(test_util.TestCase):
+  """Test the Constant kernel."""
+
+  def testIsPolynomial(self):
+    # Constant kernel is subclass of Polynomial kernel
+    self.assertIsInstance(tfp.math.psd_kernels.Constant(),
+                          tfp.math.psd_kernels.Polynomial)
+
+  def testValuesAreCorrect(self):
+    k = tfp.math.psd_kernels.Constant()
+    x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
+    y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
+    self.assertAllClose(tf.ones([5, 4]), self.evaluate(k.matrix(x, y)))
 
 
 if __name__ == '__main__':
