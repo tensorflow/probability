@@ -28,6 +28,7 @@ from tensorflow_probability.python.math.psd_kernels.internal import util
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = [
+    'Constant',
     'Linear',
     'Polynomial',
 ]
@@ -300,8 +301,7 @@ class Constant(Polynomial):
       bias_variance: Positive floating point `Tensor` that controls the
         variance from the origin. If bias = 0, there is no variance and the
         fitted function goes through the origin (also known as the homogeneous
-        Constant kernel). Must be broadcastable with `slope_variance`,
-        `shift` and inputs to `apply` and `matrix` methods. A value of
+        Constant kernel). Inputs to `apply` and `matrix` methods. A value of
         `None` is treated like 0.
         Default Value: `None`
       feature_ndims: Python `int` number of rightmost dims to include in

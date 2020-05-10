@@ -42,6 +42,7 @@ _allowed_symbols = [
     'FeatureScaled',
     'FeatureTransformed',
     'KumaraswamyTransformed',
+    'Constant',
     'Linear',
     'MaternFiveHalves',
     'MaternOneHalf',
