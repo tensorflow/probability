@@ -316,7 +316,7 @@ class Constant(Polynomial):
     parameters = dict(locals())
     super(Constant, self).__init__(
         bias_variance=bias_variance,
-        slope_variance=None,
+        slope_variance=0,
         shift=None,
         exponent=None,
         feature_ndims=feature_ndims,

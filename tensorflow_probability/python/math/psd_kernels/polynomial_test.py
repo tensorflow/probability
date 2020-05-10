@@ -274,7 +274,7 @@ class ConstantTest(test_util.TestCase):
                           tfp.math.psd_kernels.Polynomial)
 
   def testValuesAreCorrect(self):
-    k = tfp.math.psd_kernels.Constant()
+    k = tfp.math.psd_kernels.Constant(1)
     x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
     self.assertAllClose(tf.ones([5, 4]), self.evaluate(k.matrix(x, y)))
