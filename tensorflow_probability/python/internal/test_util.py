@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import contextlib
 import os
-import sys
 import unittest
 
 from absl import flags
