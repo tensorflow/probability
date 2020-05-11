@@ -257,7 +257,6 @@ def _custom_gradient(f):
   if not JAX_MODE:
     # Numpy backend ignores custom gradients, so we do too.
     return lambda *args, **kwargs: f(*args, **kwargs)[0]
-  import jax  # pylint: disable=g-import-not-at-top
   def f_(*args, **kwargs):
     value, vjp = f(*args, **kwargs)
     def vjp_(cts_out):
@@ -287,7 +286,6 @@ executing_eagerly = utils.copy_docstring(
 
 def _get_static_value_jax(tensor, partial=False):
   del partial
-  import jax  # pylint: disable=g-import-not-at-top
   if isinstance(tensor, jax.core.Tracer):
     return None
   if isinstance(tensor, np.ndarray):
@@ -427,11 +425,13 @@ class NumpyVariable(wrapt.ObjectProxy):
 
 
 if JAX_MODE:
-  from jax.interpreters.xla import canonicalize_dtype_handlers  # pylint: disable=g-import-not-at-top
-  from jax.interpreters.xla import pytype_aval_mappings  # pylint: disable=g-import-not-at-top
-  canonicalize_dtype_handlers[NumpyVariable] = (
-      canonicalize_dtype_handlers[onp.ndarray])
-  pytype_aval_mappings[NumpyVariable] = pytype_aval_mappings[onp.ndarray]
+  import jax  # pylint: disable=g-import-not-at-top
+  jax.interpreters.xla.canonicalize_dtype_handlers[NumpyVariable] = (
+      jax.interpreters.xla.canonicalize_dtype_handlers[onp.ndarray])
+  jax.interpreters.xla.pytype_aval_mappings[NumpyVariable] = (
+      jax.interpreters.xla.pytype_aval_mappings[onp.ndarray])
+  jax.core.pytype_aval_mappings[NumpyVariable] = (
+      jax.core.pytype_aval_mappings[onp.ndarray])
 
 
 Variable = NumpyVariable
@@ -442,7 +442,6 @@ class _TensorMeta(type(np.ndarray)):
   @classmethod
   def __instancecheck__(cls, instance):
     if JAX_MODE:
-      import jax  # pylint: disable=g-import-not-at-top
       return isinstance(instance, (jax.xla.DeviceArray,
                                    jax.abstract_arrays.UnshapedArray,
                                    jax.core.Tracer))
