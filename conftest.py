@@ -18,3 +18,9 @@ collect_ignore = [
     "setup.py",
     "tensorflow_probability/python/experimental/substrates/"
 ]
+
+def pytest_sessionstart(session):
+  from absl import app
+  # Unlike bazel, `pytest` doesn't invoke `tf.test.run()` (which parses flags), so
+  # for external developers using pytest we just parse the flags directly.
+  app._register_and_parse_flags_with_usage()  # pylint: disable=protected-access

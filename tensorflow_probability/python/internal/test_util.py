@@ -23,7 +23,6 @@ import os
 import sys
 import unittest
 
-from absl import app
 from absl import flags
 from absl import logging
 from absl.testing import parameterized
@@ -71,11 +70,6 @@ flags.DEFINE_bool('vary_seed', False,
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
                      'Takes precedence over --vary-seed when both appear.'))
-
-# Unlike bazel, `pytest` doesn't invoke `tf.test.run()` (which parses flags), so
-# for external developers using pytest we just parse the flags directly.
-if 'pytest' in sys.modules:
-  app._register_and_parse_flags_with_usage()  # pylint: disable=protected-access
 
 
 class TestCase(tf.test.TestCase, parameterized.TestCase):
