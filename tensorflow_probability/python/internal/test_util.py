@@ -147,7 +147,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     if overall_exception:
       final_msg += str(overall_exception)
       raise AssertionError(final_msg)
-    elif exceptions_with_paths:
+    if exceptions_with_paths:
       for i, one_structure in enumerate(structure):
         final_msg += 'Structure {}:\n{}\n\n'.format(i, one_structure)
       final_msg += 'Exceptions:\n\n'
