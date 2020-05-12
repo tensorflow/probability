@@ -81,6 +81,7 @@ multi_substrate_py_library(
         ":joint_distribution_named",
         ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
+        ":joint_distribution_util",
         ":kullback_leibler",
         ":kumaraswamy",
         ":lambertw_f",
@@ -835,6 +836,17 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_distribution_util",
+    srcs = ["joint_distribution_util.py"],
+    deps = [
+        ":joint_distribution_named",
+        ":joint_distribution_sequential",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -2254,6 +2266,19 @@ multi_substrate_py_test(
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "joint_distribution_util_test",
+    size = "medium",
+    srcs = ["joint_distribution_util_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
