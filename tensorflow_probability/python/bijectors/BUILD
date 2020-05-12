@@ -1521,12 +1521,16 @@ multi_substrate_py_test(
     name = "softplus_test",
     size = "small",
     srcs = ["softplus_test.py"],
+    jax_size = "medium",
     deps = [
         ":bijector_test_util",
         ":bijectors",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
