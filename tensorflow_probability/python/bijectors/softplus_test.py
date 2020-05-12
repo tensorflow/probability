@@ -20,9 +20,11 @@ from __future__ import print_function
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_util
 
@@ -148,6 +150,25 @@ class SoftplusBijectorTest(test_util.TestCase):
         'Argument `hinge_softness` must be non-zero.'):
       with tf.control_dependencies([hinge_softness.assign(0.)]):
         self.evaluate(b.forward(0.5))
+
+  @parameterized.named_parameters(
+      ('32bitGraph', np.float32, False),
+      ('64bitGraph', np.float64, False),
+      ('32bitXLA', np.float32, True),
+      ('64bitXLA', np.float64, True),
+  )
+  @test_util.numpy_disable_gradient_test
+  def testLeftTailGrad(self, dtype, do_compile):
+    x = np.linspace(-50., -8., 1000).astype(dtype)
+
+    @tf.function(autograph=False, experimental_compile=do_compile)
+    def fn(x):
+      return tf.math.log(tfb.Softplus().forward(x))
+
+    _, grad = tfp_math.value_and_gradient(fn, x)
+
+    true_grad = 1 / (1 + np.exp(-x)) / np.log1p(np.exp(x))
+    self.assertAllClose(true_grad, self.evaluate(grad), atol=1e-3)
 
 
 if __name__ == '__main__':
