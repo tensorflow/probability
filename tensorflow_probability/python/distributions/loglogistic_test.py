@@ -35,80 +35,83 @@ class LogLogiticTest(test_util.TestCase):
     self._rng = np.random.RandomState(123)
 
   def testLogLogisticMean(self):
-    scale = np.float32([3., 1.5, 0.75])
-    concentration = np.float32([0.4, 1.1, 2.1])
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = np.float32([3., 1.5, 0.75])
+    loc = np.log(log_logistic_scale)
+    scale = np.float32([2.5, 0.9, 0.5])
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
       self.evaluate(dist.mean()),
-      stats.fisk.mean(loc=0., scale=scale, c=concentration)
+      stats.fisk.mean(loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticMeanNoNanAllowed(self):
-    scale = np.float32([3., 1.5, 0.75])
-    concentration = np.float32([0.4, 1.1, 2.1])
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True, allow_nan_stats=False)
+    log_logistic_scale = np.float32([3., 1.5, 0.75])
+    loc = np.log(log_logistic_scale)
+    scale = np.float32([0.4, 0.6, 1.5])
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True,
+                           allow_nan_stats=False)
 
     with self.assertRaisesOpError('Condition x < y.*'):
       self.evaluate(dist.mean())
 
   def testLogLogisticVariance(self):
-    scale = np.float32([3., 1.5, 0.75])
-    concentration = np.float32([0.4, 1.1, 2.1])
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = np.float32([3., 1.5, 0.75])
+    loc = np.log(log_logistic_scale)
+    scale = np.float32([0.4, 0.3, 1.5])
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
       self.evaluate(dist.variance()),
-      stats.fisk.var(loc=0., scale=scale, c=concentration)
+      stats.fisk.var(loc=0., scale=log_logistic_scale, c=1./scale)
     )
     self.assertAllClose(
       self.evaluate(dist.stddev()),
-      stats.fisk.std(loc=0., scale=scale, c=concentration)
+      stats.fisk.std(loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticVarianceNoNanAllowed(self):
-    scale = np.float32([3., 1.5, 0.75])
-    concentration = np.float32([0.4, 1.1, 2.1])
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True, allow_nan_stats=False)
+    log_logistic_scale = np.float32([3., 1.5, 0.75])
+    loc = np.log(log_logistic_scale)
+    scale = np.float32([0.4, 0.6, 1.5])
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True,
+                           allow_nan_stats=False)
 
     with self.assertRaisesOpError('Condition x < y.*'):
-      self.evaluate(dist.mean())
+      self.evaluate(dist.variance())
 
     with self.assertRaisesOpError('Condition x < y.*'):
       self.evaluate(dist.stddev())
 
   def testLogLogisticMode(self):
-    scale = np.float32([3., 1.5, 0.75])
-    concentration = np.float32([0.4, 1.1, 2.1])
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
-    mode = scale * ((concentration - 1.) / (concentration + 1.)
-                    ) ** (1. / concentration)
-    mode[0] = 0.
+    log_logistic_scale = np.float32([3., 1.5, 0.75])
+    loc = np.log(log_logistic_scale)
+    scale = np.float32([0.4, 0.6, 1.5])
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+
+    mode = log_logistic_scale * ((1. - scale) / (1. + scale)) ** scale
+    mode[2] = 0.
     self.assertAllClose(
       self.evaluate(dist.mode()),
       mode
     )
 
   def testLogLogisticEntropy(self):
-    scale = np.float32([3., 1.5, 0.75])
-    concentration = np.float32([0.4, 1.1, 2.1])
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = np.float32([3., 1.5, 0.75])
+    loc = np.log(log_logistic_scale)
+    scale = np.float32([0.4, 0.6, 1.5])
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
       self.evaluate(dist.entropy()),
-      stats.fisk.entropy(loc=0., scale=scale, c=concentration)
+      stats.fisk.entropy(loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticSample(self):
-    scale, concentration = 1.5, 3.
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = 1.5
+    loc = np.log(log_logistic_scale).astype(np.float32)
+    scale = 1./3
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
     samples = self.evaluate(dist.sample(6000, seed=test_util.test_seed()))
     self.assertAllClose(np.mean(samples),
                         self.evaluate(dist.mean()),
@@ -118,10 +121,10 @@ class LogLogiticTest(test_util.TestCase):
                         atol=0.5)
 
   def testLogLogisticPDF(self):
-    scale = 1.5
-    concentration = 0.4
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = 1.5
+    loc = np.log(log_logistic_scale)
+    scale = 1./0.4
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
@@ -129,14 +132,14 @@ class LogLogiticTest(test_util.TestCase):
 
     self.assertAllClose(
       self.evaluate(pdf),
-      stats.fisk.pdf(x, loc=0., scale=scale, c=concentration)
+      stats.fisk.pdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogPDF(self):
-    scale = 1.5
-    concentration = 0.4
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = 1.5
+    loc = np.log(log_logistic_scale)
+    scale = 1./0.4
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
@@ -144,59 +147,60 @@ class LogLogiticTest(test_util.TestCase):
 
     self.assertAllClose(
       self.evaluate(log_pdf),
-      stats.fisk.logpdf(x, loc=0., scale=scale, c=concentration)
+      stats.fisk.logpdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticCDF(self):
-    scale = 1.5
-    concentration = 0.4
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = 1.5
+    loc = np.log(log_logistic_scale)
+    scale = 1./0.4
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     cdf = dist.cdf(x)
     self.assertAllClose(
       self.evaluate(cdf),
-      stats.fisk.cdf(x, loc=0., scale=scale, c=concentration)
+      stats.fisk.cdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogCDF(self):
-    scale = 1.5
-    concentration = 0.4
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = 1.5
+    loc = np.log(log_logistic_scale)
+    scale = 1./0.4
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     log_cdf = dist.log_cdf(x)
     self.assertAllClose(
       self.evaluate(log_cdf),
-      stats.fisk.logcdf(x, loc=0., scale=scale, c=concentration)
+      stats.fisk.logcdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogSurvival(self):
-    scale = 1.5
-    concentration = 0.4
-    dist = tfd.LogLogistic(scale=scale, concentration=concentration,
-                           validate_args=True)
+    log_logistic_scale = 1.5
+    loc = np.log(log_logistic_scale)
+    scale = 1./0.4
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
 
     logsf = dist.log_survival_function(x)
     self.assertAllClose(
       self.evaluate(logsf),
-      stats.fisk.logsf(x, loc=0., scale=scale, c=concentration)
+      stats.fisk.logsf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testAssertValidSample(self):
-    dist = tfd.LogLogistic(scale=[1., 1., 4.], concentration=2.,
+    dist = tfd.LogLogistic(loc=np.log([1., 1., 4.]),
+                           scale=0.5,
                            validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(dist.cdf([3., -0.2, 1.]))
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfd.LogLogistic(scale=1., concentration=2., validate_args=True)
+    dist = tfd.LogLogistic(loc=0., scale=0.5, validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to 0'):
       dist._experimental_default_event_space_bijector().inverse(
           [-4.2, -1e-6, -1.3])
