@@ -57,6 +57,7 @@ from tensorflow_probability.python.distributions.horseshoe import Horseshoe
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
+from tensorflow_probability.python.distributions.johnson_su import JohnsonSU
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionCoroutineAutoBatched
@@ -178,6 +179,7 @@ __all__ = [
     'Horseshoe',
     'Independent',
     'InverseGamma',
+    'JohnsonSU',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionCoroutineAutoBatched',
