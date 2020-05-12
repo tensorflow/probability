@@ -104,7 +104,7 @@ class MoyalCDF(bijector.Bijector):
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
       return (self.loc - self.scale *
-              tf.math.log(2 * tf.math.square(tf.math.erfinv(1 - y))))
+              (np.log(2.) + 2. * tf.math.log(tf.math.erfinv(1 - y))))
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):

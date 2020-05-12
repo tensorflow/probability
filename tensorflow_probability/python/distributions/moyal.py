@@ -194,7 +194,8 @@ class Moyal(transformed_distribution.TransformedDistribution):
   def _log_prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
     z = (x - self.loc) / scale
-    return - 0.5 * (z + tf.exp(-z)) - tf.math.log(np.sqrt(2. * np.pi) * scale)
+    return (- 0.5 * (z + tf.exp(-z)) - 0.5 * np.log(2. * np.pi)
+            - tf.math.log(scale))
 
   def _mean(self):
     return self.loc + self.scale * (np.euler_gamma + np.log(2.))
@@ -232,9 +233,10 @@ def _kl_moyal_moyal(a, b, name=None):
     b_loc = tf.convert_to_tensor(b.loc)
     a_scale = tf.convert_to_tensor(a.scale)
     b_scale = tf.convert_to_tensor(b.scale)
-    return 0.5 * ((tf.math.pow(2, a_scale/b_scale) *
-                   tf.math.exp((b_loc - a_loc) / b_scale +
-                               tf.math.lgamma(0.5 + a_scale / b_scale))) /
-                  np.sqrt(np.pi) + (a_loc - b_loc) / b_scale - 1 +
+    exp_term = tf.math.exp(a_scale * np.log(2.) / b_scale +
+                           (b_loc - a_loc) / b_scale +
+                           tf.math.lgamma(0.5 + a_scale / b_scale)
+                           - 0.5 * np.log(np.pi))
+    return 0.5 * (exp_term + (a_loc - b_loc) / b_scale - 1 +
                   (a_scale / b_scale - 1) * (np.euler_gamma + np.log(2.)) +
-                  2 * (tf.math.log(b_scale / a_scale)))
+                  2 * tf.math.log(b_scale / a_scale))

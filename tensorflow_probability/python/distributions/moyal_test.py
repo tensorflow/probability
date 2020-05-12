@@ -262,30 +262,17 @@ class _MoyalTest(object):
     a = tfd.Moyal(loc=a_loc, scale=a_scale, validate_args=True)
     b = tfd.Moyal(loc=b_loc, scale=b_scale, validate_args=True)
 
-    true_kl = (0.5 * (np.power(2, a_scale/b_scale) *
-                      np.exp((b_loc - a_loc) / b_scale +
-                             np.vectorize(np.math.lgamma)(0.5 +
-                                                          a_scale/b_scale)) /
-                      np.sqrt(np.pi) +
-                      1 / b_scale * (a_loc - b_loc + a_scale *
-                                     (np.euler_gamma + np.log(2.)) -
-                                     b_scale * (1 + np.euler_gamma +
-                                                np.log(2.)) - 2 * b_scale *
-                                     np.log(a_scale) +
-                                     2 * b_scale * np.log(b_scale))))
-
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(3e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
 
-    self.assertAllClose(true_kl, kl_)
-    self.assertAllClose(true_kl, kl_sample_, atol=1e-15, rtol=1e-1)
+    self.assertAllClose(kl_, kl_sample_, atol=1e-15, rtol=1e-1)
 
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
-    self.assertAllEqual(true_zero_kl_, zero_kl_)
+    self.assertAllClose(true_zero_kl_, zero_kl_)
 
 
 @test_util.test_all_tf_execution_regimes
