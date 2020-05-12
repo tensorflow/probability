@@ -25,6 +25,7 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import shift as shift_lib
 from tensorflow_probability.python.bijectors import scale as scale_lib
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
@@ -313,7 +314,12 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
             shift, log_scale = tf.unstack(params, num=2, axis=-1)
           else:
             shift, log_scale = params
-          return shift_lib.Shift(shift)(scale_lib.Scale(tf.exp(log_scale)))
+          bijectors = []
+          if shift is not None:
+            bijectors.append(shift_lib.Shift(shift))
+          if log_scale is not None:
+            bijectors.append(scale_lib.Scale(tf.exp(log_scale)))
+          return chain.Chain(bijectors)
         bijector_fn = _bijector_fn
 
       if validate_args:
@@ -1006,7 +1012,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       else:
         layers.append(autoregressive_layer)
       if k + 1 < len(self._masks):
-        layers.append(tf.keras.activations.get(self._activation)(layers[-1]))
+        layers.append(
+            tf.keras.layers.Activation(self._activation)
+            (layers[-1]))
     self._network = tf.keras.models.Model(
         inputs=input_layer,
         outputs=layers[-1])

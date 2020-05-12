@@ -496,6 +496,7 @@ multi_substrate_py_library(
     deps = [
         ":affine_scalar",
         ":bijector",
+        ":chain",
         # numpy dep,
         # six dep,
         # tensorflow dep,
