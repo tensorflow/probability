@@ -2759,6 +2759,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "student_t_test",
+    size = "medium",
     srcs = ["student_t_test.py"],
     jax_size = "medium",
     deps = [
