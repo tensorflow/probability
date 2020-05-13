@@ -407,7 +407,11 @@ class NumpyVariable(wrapt.ObjectProxy):
   def __array__(self, dtype=None):
     if dtype is not None:
       dtype = utils.numpy_dtype(dtype)
-    return self.astype(dtype).__array__()
+      return self.__wrapped__.__array__(dtype)
+    # Passing in dtype=None to __array__ has differing behavior in numpy.
+    # When an `np.ndarray` has `.__array__(None)` invoked, the array is casted
+    # to `float64`. Thus we handle this case separately.
+    return self.__wrapped__.__array__()
 
   def assign(self, value):
     super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
