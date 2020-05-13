@@ -257,7 +257,7 @@ def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=un
 
 
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
-  x = np.array(x)
+  x = _convert_to_tensor(x)
   log_prod_gamma_x = np.sum(scipy_special.gammaln(x), axis=-1)
   sum_x = np.sum(x, axis=-1)
   log_gamma_sum_x = scipy_special.gammaln(sum_x)
@@ -266,6 +266,7 @@ def _lbeta(x, name=None):  # pylint: disable=unused-argument
 
 def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
   """Returns `max` or `mask` if `max` is not finite."""
+  x = _convert_to_tensor(x)
   m = np.max(x, axis=_astuple(axis), keepdims=keepdims)
   needs_masking = ~np.isfinite(m)
   if needs_masking.ndim > 0:
@@ -276,6 +277,7 @@ def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
 
 
 def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
+  logits = _convert_to_tensor(logits)
   axis = -1 if axis is None else axis
   y = logits - _max_mask_non_finite(logits, axis=axis, keepdims=True)
   y = np.exp(y)
@@ -298,7 +300,8 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
     return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
 
 
-def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin
+def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin,missing-docstring
+  input = _convert_to_tensor(input)
   n = int(input.shape[-1] - 1)
   # For the values, we sort the negative entries and choose the smallest ones
   # and negate. This is equivalent to choosing the largest entries
@@ -313,6 +316,7 @@ def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argume
 
 
 def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
+  data = _convert_to_tensor(data)
   del name
   if not JAX_MODE:
     raise NotImplementedError

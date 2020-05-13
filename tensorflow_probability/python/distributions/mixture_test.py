@@ -38,15 +38,6 @@ def _swap_first_last_axes(array):
   return array.transpose(transpose)
 
 
-def _set_seed(seed):
-  """Helper which uses graph seed if using TFE."""
-  # TODO(b/68017812): Deprecate once TFE supports seed.
-  if tf.executing_eagerly():
-    tf.random.set_seed(seed)
-    return None
-  return seed
-
-
 def _mixture_stddev_np(pi_vector, mu_vector, sigma_vector):
   """Computes the standard deviation of a univariate mixture distribution.
 
@@ -200,6 +191,10 @@ class MixtureTest(test_util.TestCase):
           ],
           use_static_graph=self.use_static_graph,
           validate_args=True)
+
+  @test_util.jax_disable_test_missing_functionality(
+      'Shapes are statically known in JAX.')
+  def testBrokenShapeUnknownCategories(self):
     with self.assertRaisesWithPredicateMatch(ValueError, r'Could not infer'):
       cat_logits = tf.Variable([[13., 19.]], shape=[1, None], dtype=tf.float32)
       tfd.Mixture(
@@ -207,6 +202,8 @@ class MixtureTest(test_util.TestCase):
           use_static_graph=self.use_static_graph,
           validate_args=True)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Shapes are statically known in JAX.')
   def testBrokenShapesDynamic(self):
     d0_param = tf.Variable([2., 3], shape=tf.TensorShape(None))
     d1_param = tf.Variable([1.], shape=tf.TensorShape(None))
@@ -525,10 +522,10 @@ class MixtureTest(test_util.TestCase):
         use_static_graph=self.use_static_graph)
     n = 4
     with _test_capture_normal_sample_outputs() as component_samples:
-      samples = dist.sample(n, seed=_set_seed(123))
+      samples = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.dtype, tf.float32)
     self.assertEqual((4,), samples.shape)
-    cat_samples = dist.cat.sample(n, seed=_set_seed(123))
+    cat_samples = dist.cat.sample(n, seed=test_util.test_seed())
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((4,), sample_values.shape)
@@ -552,8 +549,6 @@ class MixtureTest(test_util.TestCase):
 
     n = 100
     seed = test_util.test_seed()
-
-    tf.random.set_seed(seed)
     components = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -564,9 +559,9 @@ class MixtureTest(test_util.TestCase):
         name='mixture1',
         use_static_graph=self.use_static_graph,
         validate_args=True)
+    tf.random.set_seed(seed)
     samples1 = self.evaluate(dist1.sample(n, seed=seed))
 
-    tf.random.set_seed(seed)
     components2 = [
         tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
@@ -577,6 +572,7 @@ class MixtureTest(test_util.TestCase):
         name='mixture2',
         use_static_graph=self.use_static_graph,
         validate_args=True)
+    tf.random.set_seed(seed)
     samples2 = self.evaluate(dist2.sample(n, seed=seed))
 
     self.assertAllClose(samples1, samples2)
@@ -589,11 +585,14 @@ class MixtureTest(test_util.TestCase):
         event_shape=[2],
         use_static_graph=self.use_static_graph)
     n = 4
+    seed = test_util.test_seed()
     with _test_capture_mvndiag_sample_outputs() as component_samples:
-      samples = dist.sample(n, seed=_set_seed(123))
+      tf.random.set_seed(seed)
+      samples = dist.sample(n, seed=seed)
     self.assertEqual(samples.dtype, tf.float32)
     self.assertEqual((4, 2), samples.shape)
-    cat_samples = dist.cat.sample(n, seed=_set_seed(123))
+    tf.random.set_seed(seed)
+    cat_samples = dist.cat.sample(n, seed=seed)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((4, 2), sample_values.shape)
@@ -614,11 +613,14 @@ class MixtureTest(test_util.TestCase):
         num_components=num_components,
         use_static_graph=self.use_static_graph)
     n = 4
+    seed = test_util.test_seed()
     with _test_capture_normal_sample_outputs() as component_samples:
-      samples = dist.sample(n, seed=_set_seed(123))
+      tf.random.set_seed(seed)
+      samples = dist.sample(n, seed=seed)
     self.assertEqual(samples.dtype, tf.float32)
     self.assertEqual((4, 2, 3), samples.shape)
-    cat_samples = dist.cat.sample(n, seed=_set_seed(123))
+    tf.random.set_seed(seed)
+    cat_samples = dist.cat.sample(n, seed=seed)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((4, 2, 3), sample_values.shape)
@@ -651,14 +653,17 @@ class MixtureTest(test_util.TestCase):
         batch_shape_tensor=batch_shape_tensor,
         use_static_graph=self.use_static_graph)
     n = 5
+    seed = test_util.test_seed()
     with _test_capture_mvndiag_sample_outputs() as component_samples:
-      samples = dist.sample(n, seed=_set_seed(123))
+      tf.random.set_seed(seed)
+      samples = dist.sample(n, seed=seed)
     self.assertEqual(samples.dtype, tf.float32)
     if fully_known_batch_shape:
       self.assertEqual((5, 2, 3, 4), samples.shape)
     else:
       self.assertEqual([5, None, 3, 4], tensorshape_util.as_list(samples.shape))
-    cat_samples = dist.cat.sample(n, seed=_set_seed(123))
+    tf.random.set_seed(seed)
+    cat_samples = dist.cat.sample(n, seed=seed)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((5, 2, 3, 4), sample_values.shape)
@@ -870,9 +875,12 @@ class MixtureTest(test_util.TestCase):
         validate_args=True)
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'sample', 'entropy_lower_bound'):
+                   'entropy_lower_bound'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=2):
+      dist.sample(seed=test_util.test_seed())
 
     for method in ('prob', 'log_prob'):
       with tfp_hps.assert_no_excessive_var_usage('method', max_permissible=2):
