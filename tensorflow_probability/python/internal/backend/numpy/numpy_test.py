@@ -418,6 +418,28 @@ def gather_nd_params(draw):
 
 
 @hps.composite
+def repeat_params(draw):
+  input_array = draw(single_arrays())
+  rank = input_array.ndim
+  low, high = -rank, rank - 1
+  low, high = min(low, high), max(low, high)
+  axis = draw(hps.one_of(hps.just(None), hps.integers(low, high)))
+  if draw(hps.booleans()):
+    repeats = draw(hps.integers(1, 20))
+    if draw(hps.booleans()):
+      repeats = np.array([repeats])
+    return input_array, repeats, axis
+  if rank < 1:
+    repeats_shape = draw(hps.one_of(hps.just(()), hps.just((1,))))
+  else:
+    repeats_shape = (input_array.shape[axis] if axis is not None
+                     else np.size(input_array),)
+  repeats = draw(hnp.arrays(dtype=np.int32, shape=repeats_shape,
+                            elements=hps.integers(1, 20)))
+  return input_array, repeats, axis
+
+
+@hps.composite
 def searchsorted_params(draw):
   sorted_array_shape = shapes(min_dims=1)
   sorted_array = draw(single_arrays(shape=sorted_array_shape))
@@ -428,6 +450,25 @@ def searchsorted_params(draw):
       batch_shape=sorted_array.shape[:-1]))
   search_side = draw(hps.one_of(hps.just('left'), hps.just('right')))
   return sorted_array, values, search_side
+
+
+@hps.composite
+def segment_ids(draw, n):
+  lengths = []
+  rsum = 0
+  while rsum < n:
+    lengths.append(draw(hps.integers(1, n-rsum)))
+    rsum += lengths[-1]
+  return np.repeat(np.arange(len(lengths)), lengths)
+
+
+@hps.composite
+def segment_params(draw, shape=shapes(min_dims=1), dtype=None, elements=None,
+                   batch_shape=(), unique=False):
+  a = draw(single_arrays(shape=shape, dtype=dtype, elements=elements,
+                         batch_shape=batch_shape, unique=unique))
+  ids = draw(segment_ids(a.shape[0]))  # pylint: disable=no-value-for-parameter
+  return (a, ids)
 
 
 @hps.composite
@@ -716,6 +757,15 @@ NUMPY_TEST_CASES = [
     TestCase('math.reduce_variance',
              [array_axis_tuples(elements=floats(-1e6, 1e6))]),
 
+    TestCase('math.segment_max', [segment_params()]),
+    TestCase('math.segment_mean',
+             [segment_params()],
+             # need jax.numpy.bincount
+             jax_disabled=True),
+    TestCase('math.segment_min', [segment_params()]),
+    TestCase('math.segment_prod', [segment_params()]),
+    TestCase('math.segment_sum', [segment_params()]),
+
     # ArgSpec(args=['inputs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
     TestCase(
@@ -920,6 +970,9 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     # Array ops.
     TestCase('gather', [gather_params()]),
     TestCase('gather_nd', [gather_nd_params()]),
+    # TODO(leben): Fix bug in jax.numpy.repeat(array(0), 1, 0).
+    TestCase('repeat', [repeat_params()],
+             jax_disabled=True),
     TestCase('searchsorted', [searchsorted_params()]),
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),

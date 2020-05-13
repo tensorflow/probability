@@ -47,6 +47,7 @@ __all__ = [
     'rank',
     'reshape',
     'reverse',
+    'repeat',
     'roll',
     'searchsorted',
     'shape',
@@ -328,6 +329,11 @@ range = utils.copy_docstring(  # pylint: disable=redefined-builtin
 rank = utils.copy_docstring(
     'tf.rank',
     lambda input, name=None: np.int32(np.array(input).ndim))  # pylint: disable=redefined-builtin,g-long-lambda
+
+repeat = utils.copy_docstring(
+    'tf.repeat',
+    lambda input, repeats, axis=None, name=None: np.repeat(  # pylint: disable=g-long-lambda
+        input, repeats, axis=axis))
 
 reshape = utils.copy_docstring(
     'tf.reshape',

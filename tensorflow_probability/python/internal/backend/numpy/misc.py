@@ -35,6 +35,7 @@ __all__ = [
     'argsort',
     'histogram_fixed_width_bins',
     'is_tensor',
+    'print',
     'sort',
     'tensor_scatter_nd_add',
     'tensor_scatter_nd_sub',
@@ -75,6 +76,16 @@ def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=np.int32,
   indices = clip_by_value(indices, 0, nbins_float - 1).astype(
       utils.numpy_dtype(dtype))
   return indices
+
+
+def _print(*inputs, **kwargs):
+  print_args = {}
+  if 'output_stream' in kwargs:
+    print_args['file'] = kwargs['output_stream']
+  for k in ('sep', 'end'):
+    if k in kwargs:
+      print_args[k] = kwargs[k]
+  return builtin_print(*inputs, **print_args)
 
 
 def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable=unused-argument
@@ -151,6 +162,15 @@ argsort = utils.copy_docstring(
 histogram_fixed_width_bins = utils.copy_docstring(
     'tf.histogram_fixed_width_bins',
     _histogram_fixed_width_bins)
+
+
+builtin_print = print
+
+
+# pylint: disable=redefined-builtin
+print = utils.copy_docstring(
+    'tf.print',
+    _print)
 
 sort = utils.copy_docstring(
     'tf.sort',

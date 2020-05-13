@@ -58,7 +58,7 @@ def _cond(pred, true_fn=None, false_fn=None, name=None):
   return true_fn() if pred else false_fn()
 
 
-def _no_op(_):
+def _no_op(name=None):  # pylint: disable=unused-argument
   pass
 
 
