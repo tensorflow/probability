@@ -183,14 +183,29 @@ def as_composite(obj):
     # Use dtype inference from ctor.
     if k in kwargs and kwargs[k] is not None:
       v = getattr(obj, k, kwargs[k])
-      kwargs[k] = tf.convert_to_tensor(v, name=k)
+      try:
+        kwargs[k] = tf.convert_to_tensor(v, name=k)
+      except TypeError as e:
+        raise NotImplementedError(
+            mk_err_msg(
+                '(Unable to convert dependent entry \'{}\' of object '
+                '\'{}\': {})'.format(k, obj, str(e))))
   for k, v in kwargs.items():
     if isinstance(v, distributions.Distribution):
       kwargs[k] = as_composite(v)
     if tensor_util.is_ref(v):
-      kwargs[k] = tf.convert_to_tensor(v, name=k)
+      try:
+        kwargs[k] = tf.convert_to_tensor(v, name=k)
+      except TypeError as e:
+        raise NotImplementedError(
+            mk_err_msg(
+                '(Unable to convert dependent entry \'{}\' of object '
+                '\'{}\': {})'.format(k, obj, str(e))))
   result = cls(**kwargs)
   struct_coder = nested_structure_coder.StructureCoder()
-  if not struct_coder.can_encode(result._type_spec):  # pylint: disable=protected-access
-    raise NotImplementedError(mk_err_msg('(Unable to serialize.)'))
+  try:
+    struct_coder.encode_structure(result._type_spec)  # pylint: disable=protected-access
+  except nested_structure_coder.NotEncodableError as e:
+    raise NotImplementedError(
+        mk_err_msg('(Unable to serialize: {})'.format(str(e))))
   return result
