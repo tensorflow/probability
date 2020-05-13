@@ -467,8 +467,11 @@ class NutsTest(test_util.TestCase):
     # Test that we observe a fair among of divergence.
     self.assertAllGreater(divergence_count, 100)
 
-  def testSampleEndtoEnd(self):
+  def testSampleEndtoEndXLA(self):
     """An end-to-end test of sampling using NUTS."""
+    if tf.executing_eagerly() or tf.config.experimental_functions_run_eagerly():
+      self.skipTest('No need to test XLA under all execution regimes.')
+
     strm = test_util.test_seed_stream()
     predictors = tf.cast([
         201., 244., 47., 287., 203., 58., 210., 202., 198., 158., 165., 201.,
@@ -504,8 +507,11 @@ class NutsTest(test_util.TestCase):
 
     number_of_steps, burnin, nchain = 200, 50, 10
 
-    @tf.function(autograph=False)
+    @tf.function(autograph=False, experimental_compile=True)
     def run_chain_and_get_diagnostic():
+      # Ensure we're really in graph mode.
+      assert hasattr(tf.constant([]), 'graph')
+
       # random initialization of the starting postion of each chain
       b0, b1, df, _ = robust_lm.sample(nchain, seed=strm())
 
