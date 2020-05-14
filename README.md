@@ -158,16 +158,19 @@ python -m pip install --upgrade --user tf-nightly tfp-nightly
 ### Installing from Source
 
 You can also install from source. This requires the [Bazel](
-https://bazel.build/) build system.
+https://bazel.build/) build system. It is highly recommended that you install
+the nightly build of TensorFlow (`tf-nightly`) before trying to build
+TensorFlow Probability from source.
 
 ```shell
 # sudo apt-get install bazel git python-pip  # Ubuntu; others, see above links.
+python -m pip install --upgrade --user tf-nightly
 git clone https://github.com/tensorflow/probability.git
 cd probability
 bazel build --copt=-O3 --copt=-march=native :pip_pkg
 PKGDIR=$(mktemp -d)
 ./bazel-bin/pip_pkg $PKGDIR
-pip install --user --upgrade $PKGDIR/*.whl
+python -m pip install --upgrade --user $PKGDIR/*.whl
 ```
 
 ## Community
