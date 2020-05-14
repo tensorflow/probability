@@ -167,7 +167,7 @@ cd probability
 bazel build --copt=-O3 --copt=-march=native :pip_pkg
 PKGDIR=$(mktemp -d)
 ./bazel-bin/pip_pkg $PKGDIR
-pip install --user --upgrade $PKGDIR/*.whl
+python -m pip install --upgrade --user $PKGDIR/*.whl
 ```
 
 ## Community
