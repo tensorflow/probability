@@ -478,7 +478,12 @@ def test_graph_mode_only(test_class_or_method=None):
     decorator: A generated TF `test_combinations` decorator, or if
     `test_class_or_method` is not `None`, the generated decorator applied to
     that function.
+  Raises:
+    SkipTest: Raised when not running in the TF backend.
   """
+  if JAX_MODE or (tf.Variable == ops.NumpyVariable):
+    raise unittest.SkipTest('Ignoring TF Graph Mode tests in non-TF backends.')
+
   decorator = test_combinations.generate(
       test_combinations.combine(mode=['graph']),
       test_combinations=[EagerGraphCombination()])
