@@ -395,6 +395,7 @@ py_test(
     name = "hypothesis_testlib_test",
     size = "small",
     srcs = ["hypothesis_testlib_test.py"],
+    shard_count = 5,
     srcs_version = "PY2AND3",
     deps = [
         ":hypothesis_testlib",
