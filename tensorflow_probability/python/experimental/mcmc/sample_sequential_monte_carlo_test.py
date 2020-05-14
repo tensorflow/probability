@@ -20,6 +20,8 @@ from __future__ import print_function
 
 
 import functools
+import os
+
 # Dependency imports
 from absl.testing import parameterized
 
@@ -272,4 +274,8 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
+  # TODO(b/130689556) XLA's default fastmath config makes tests unstable.
+  os.environ['XLA_FLAGS'] = (os.environ.get('XLA_FLAGS', '') +
+                             ' --xla_cpu_fast_math_honor_nans=true'
+                             ' --xla_cpu_fast_math_honor_infs=true')
   tf.test.main()

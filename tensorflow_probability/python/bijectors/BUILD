@@ -1490,10 +1490,12 @@ multi_substrate_py_test(
     deps = [
         ":bijector_test_util",
         ":bijectors",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
