@@ -84,6 +84,7 @@ def log_combinations(n, counts, name='log_combinations'):
 
 
 # TODO(b/154562929): Remove this once the built-in op supports XLA.
+# TODO(b/156297366): Derivatives of this function may not always be correct.
 def log_cumsum_exp(x, axis=-1, name=None):
   """Computes log(cumsum(exp(x))).
 
@@ -107,7 +108,8 @@ def log_cumsum_exp(x, axis=-1, name=None):
     def safe_logsumexp(x, y):
       result = log_add_exp(x, y)
       # Remove spurious `NaN`s that arise from subtracting infinities.
-      return tf.where(tf.math.is_finite(result), result, -np.inf)
+      # TODO(b/130689556) Use `tf.is_finite` rather than a comparison.
+      return tf.where(result > -np.inf, result, -np.inf)
     x = dist_util.move_dimension(x, source_idx=axis, dest_idx=0)
     return dist_util.move_dimension(scan_associative(safe_logsumexp, x),
                                     source_idx=0,

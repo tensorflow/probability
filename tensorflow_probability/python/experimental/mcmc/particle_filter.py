@@ -1016,10 +1016,29 @@ def _resample_using_log_points(log_probs, sample_shape, log_points, name=None):
     markers_and_samples = ps.cast(
         tf.cumsum(sorted_markers, axis=-1), dtype=tf.int32)
     markers_and_samples = tf.minimum(markers_and_samples, num_markers - 1)
+
     # Collect up samples, omitting markers.
-    resampled = tf.reshape(markers_and_samples[tf.equal(sorted_markers, 0)],
-                           points_shape)
-    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+    samples_mask = tf.equal(sorted_markers, 0)
+
+    # The following block of code is equivalent to
+    # `samples = markers_and_samples[samples_mask]` however boolean mask
+    # indices are not supported by XLA.
+    # Instead we use `argsort` to pick out the top `num_samples`
+    # elements of `markers_and_samples` when sorted using `samples_mask`
+    # as key.
+    num_samples = points_shape[-1]
+    sample_locations = tf.argsort(
+        ps.cast(samples_mask, dtype=tf.int32),
+        direction='DESCENDING',
+        stable=True)
+    samples = tf.gather_nd(
+        markers_and_samples,
+        sample_locations[..., :num_samples, tf.newaxis],
+        batch_dims=(
+            ps.rank_from_shape(sample_shape) +
+            ps.rank_from_shape(batch_shape)))
+
+    return tf.reshape(samples, points_shape)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -1077,7 +1096,8 @@ def resample_independent(log_probs, event_size, sample_shape,
         rate=tf.constant(1.0, dtype=log_probs.dtype)).sample(
             points_shape, seed=seed)
 
-    return _resample_using_log_points(log_probs, sample_shape, log_points)
+    resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -1145,7 +1165,8 @@ def resample_systematic(log_probs, event_size, sample_shape,
         num=event_size) + offsets
     log_points = tf.broadcast_to(tf.math.log(even_spacing), points_shape)
 
-    return _resample_using_log_points(log_probs, sample_shape, log_points)
+    resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -1210,7 +1231,8 @@ def resample_stratified(log_probs, event_size, sample_shape,
         num=event_size) + offsets
     log_points = tf.math.log(even_spacing)
 
-    return _resample_using_log_points(log_probs, sample_shape, log_points)
+    resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
 
 
 # TODO(b/153199903): replace this function with `tf.scatter_nd` when
