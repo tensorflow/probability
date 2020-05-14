@@ -187,7 +187,7 @@ py_library(
 
 py_test(
     name = "particle_filter_test",
-    size = "medium",
+    size = "large",
     srcs = ["particle_filter_test.py"],
     deps = [
         ":particle_filter",
