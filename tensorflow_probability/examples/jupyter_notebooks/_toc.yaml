@@ -15,63 +15,62 @@
 toc:
 - heading: "Guide"
 - title: Overview
-  path: /probability/tutorials/A_Tour_of_TensorFlow_Probability
+  path: /probability/examples/A_Tour_of_TensorFlow_Probability
 - title: Distribution shapes
-  path: /probability/tutorials/Understanding_TensorFlow_Distributions_Shapes
+  path: /probability/examples/Understanding_TensorFlow_Distributions_Shapes
 - title: Distributions
-  path: /probability/tutorials/TensorFlow_Distributions_Tutorial
+  path: /probability/examples/TensorFlow_Distributions_Tutorial
 - title: Learnable distributions
-  path: /probability/tutorials/Learnable_Distributions_Zoo
+  path: /probability/examples/Learnable_Distributions_Zoo
 - title: Optimizers
-  path: /probability/tutorials/Optimizers_in_TensorFlow_Probability
+  path: /probability/examples/Optimizers_in_TensorFlow_Probability
 - heading: "Tutorials"
 - title:  Probabilistic regression
-  path: /probability/tutorials/Probabilistic_Layers_Regression
+  path: /probability/examples/Probabilistic_Layers_Regression
 - title: Bayes GMM
-  path: /probability/tutorials/Bayesian_Gaussian_Mixture_Model
+  path: /probability/examples/Bayesian_Gaussian_Mixture_Model
 - title: Bayes switchpoint
-  path: /probability/tutorials/Bayesian_Switchpoint_Analysis
+  path: /probability/examples/Bayesian_Switchpoint_Analysis
 - title: Eight schools
-  path: /probability/tutorials/Eight_Schools
+  path: /probability/examples/Eight_Schools
 - title: Factorial mixture
-  path: /probability/tutorials/Factorial_Mixture
+  path: /probability/examples/Factorial_Mixture
 - title: Gaussian Coupla
-  path: /probability/tutorials/Gaussian_Copula
+  path: /probability/examples/Gaussian_Copula
 - title: GP latent variable model
-  path: /probability/tutorials/Gaussian_Process_Latent_Variable_Model
+  path: /probability/examples/Gaussian_Process_Latent_Variable_Model
 - title: GP regression
-  path: /probability/tutorials/Gaussian_Process_Regression_In_TFP
+  path: /probability/examples/Gaussian_Process_Regression_In_TFP
 - title: Generalized linear models
-  path: /probability/tutorials/Generalized_Linear_Models
+  path: /probability/examples/Generalized_Linear_Models
 - title: FFJORD
-  path: /probability/tutorials/FFJORD_Demo
+  path: /probability/examples/FFJORD_Demo
 - title: Linear mixed effect models
-  path: /probability/tutorials/Linear_Mixed_Effects_Models
+  path: /probability/examples/Linear_Mixed_Effects_Models
 - title: Joint distribution
-  path: /probability/tutorials/Modeling_with_JointDistribution
+  path: /probability/examples/Modeling_with_JointDistribution
 - title: Multilevel modeling
-  path: /probability/tutorials/Multilevel_Modeling_Primer
+  path: /probability/examples/Multilevel_Modeling_Primer
 - title: Bayesian model selection
-  path: /probability/tutorials/Multiple_changepoint_detection_and_Bayesian_model_selection
+  path: /probability/examples/Multiple_changepoint_detection_and_Bayesian_model_selection
 - title: VAE
-  path: /probability/tutorials/Probabilistic_Layers_VAE
+  path: /probability/examples/Probabilistic_Layers_VAE
 - title: Probabilistic PCA
-  path: /probability/tutorials/Probabilistic_PCA
+  path: /probability/examples/Probabilistic_PCA
 - title: STS approximate inference
-  path: /probability/tutorials/STS_approximate_inference_for_models_with_non_Gaussian_observations
+  path: /probability/examples/STS_approximate_inference_for_models_with_non_Gaussian_observations
 - title: Time Series
-  path: /probability/tutorials/Structural_Time_Series_Modeling_Case_Studies_Atmospheric_CO2_and_Electricity_Demand
+  path: /probability/examples/Structural_Time_Series_Modeling_Case_Studies_Atmospheric_CO2_and_Electricity_Demand
 - title: Covariance estimation
-  path: /probability/tutorials/TensorFlow_Probability_Case_Study_Covariance_Estimation
+  path: /probability/examples/TensorFlow_Probability_Case_Study_Covariance_Estimation
 - title: "Tutorials (TF1)"
   style: accordion
   status: deprecated
   section:
   - title: DPMM using pSGLD
-    path: /probability/tutorials/Fitting_DPMM_Using_pSGLD
+    path: /probability/examples/Fitting_DPMM_Using_pSGLD
   - title: HLM R stan
-    status: deprecated
-    path: /probability/tutorials/HLM_TFP_R_Stan
+    path: /probability/examples/HLM_TFP_R_Stan
   - title: Variational inference
-    path: /probability/tutorials/Linear_Mixed_Effects_Model_Variational_Inference
+    path: /probability/examples/Linear_Mixed_Effects_Model_Variational_Inference
 
