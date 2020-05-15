@@ -1050,6 +1050,25 @@ class NumpyTest(test_util.TestCase):
     for dim in tensor_shape:
       self.assertNotIsInstance(dim, tf1.Dimension)
 
+  def test_concat_infers_dtype(self):
+    self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)
+    self.assertEqual(np.float32, nptf.concat([[], [1]], 0).dtype)
+    self.assertEqual(np.float32, nptf.concat([np.array([1], np.float32),
+                                              np.array([1], np.float64)],
+                                             0).dtype)
+    self.assertEqual(np.float64, nptf.concat([np.array([1], np.float64),
+                                              np.array([1], np.float32)],
+                                             0).dtype)
+    self.assertEqual(np.float32, nptf.concat([[np.float32(1)], [np.float64(1)]],
+                                             0).dtype)
+    self.assertEqual(np.float32, nptf.concat([[np.float64(1)], [np.float32(1)]],
+                                             0).dtype)
+    # TODO(sharadmv): rewrite these tests when convert_to_tensor is fixed
+    self.assertEqual(np.int32, nptf.concat([[np.int32(1)], [np.int64(1)]],
+                                           0).dtype)
+    self.assertEqual(np.int32, nptf.concat([[np.int64(1)], [np.int32(1)]],
+                                           0).dtype)
+
   @test_util.numpy_disable_gradient_test
   def test_while_loop_gradients(self):
 
