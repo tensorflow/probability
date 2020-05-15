@@ -38,7 +38,7 @@ __all__ = [
 
 
 class Moyal(transformed_distribution.TransformedDistribution):
-  """The scalar Moyal distribution with location `loc` and `scale` parameters.
+  """The Moyal distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details
 
@@ -229,6 +229,7 @@ def _kl_moyal_moyal(a, b, name=None):
     Batchwise KL(a || b)
   """
   with tf.name_scope(name or 'kl_moyal_moyal'):
+    # This KL divergence was calculated in Mathematica
     a_loc = tf.convert_to_tensor(a.loc)
     b_loc = tf.convert_to_tensor(b.loc)
     a_scale = tf.convert_to_tensor(a.scale)
