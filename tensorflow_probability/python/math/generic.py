@@ -410,7 +410,17 @@ def log_add_exp(x, y, name=None):
     dtype = dtype_util.common_dtype([x, y], dtype_hint=tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
     y = tf.convert_to_tensor(y, dtype=dtype, name='y')
-    return tf.maximum(x, y) + tf.math.softplus(-abs(x - y))
+
+    # The following is similar to using the standard method
+    # `tf.maximum(x, y) + tf.math.softplus(-abs(x - y))`
+    # to compute `log_add_exp`. However, both `tf.maximum` and
+    # `abs(x - y)` have discontinuities in their derivatives
+    # along `x == y`.
+    # This version ensures that the contribution of the discontinuities
+    # to the derivative all cancel leaving a continuous result without
+    # changing the domain in which the original was valid.
+    larger = tf.maximum(x, y)
+    return larger + tf.math.softplus((x - larger) + (y - larger))
 
 
 def smootherstep(x, name=None):
