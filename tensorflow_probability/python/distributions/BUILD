@@ -2209,6 +2209,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "johnson_su_test",
+    size = "medium",
     srcs = ["johnson_su_test.py"],
     numpy_tags = ["notap"],
     deps = [
