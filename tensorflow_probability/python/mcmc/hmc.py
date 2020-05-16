@@ -46,7 +46,8 @@ UncalibratedHamiltonianMonteCarloKernelResults = collections.namedtuple(
         'log_acceptance_correction',
         'target_log_prob',        # For "next_state".
         'grads_target_log_prob',  # For "next_state".
-        'next_momentum',
+        'initial_momentum',
+        'final_momentum',
         'step_size',
         'num_leapfrog_steps',
     ])
@@ -749,7 +750,8 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
               independent_chain_ndims),
           target_log_prob=next_target_log_prob,
           grads_target_log_prob=next_target_log_prob_grad_parts,
-          next_momentum=next_momentum_parts,
+          initial_momentum=current_momentum_parts,
+          final_momentum=next_momentum_parts,
       )
 
       return maybe_flatten(next_state_parts), new_kernel_results
@@ -770,7 +772,10 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
             log_acceptance_correction=tf.zeros_like(init_target_log_prob),
             target_log_prob=init_target_log_prob,
             grads_target_log_prob=init_grads_target_log_prob,
-            next_momentum=tf.nest.map_structure(tf.zeros_like, init_state),
+            initial_momentum=tf.nest.map_structure(
+                tf.zeros_like, init_state),
+            final_momentum=tf.nest.map_structure(
+                tf.zeros_like, init_state),
             # TODO(b/142590314): Try to use the following code once we commit to
             # a tensorization policy.
             # step_size=mcmc_util.prepare_state_parts(
@@ -792,7 +797,10 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
             log_acceptance_correction=tf.zeros_like(init_target_log_prob),
             target_log_prob=init_target_log_prob,
             grads_target_log_prob=init_grads_target_log_prob,
-            next_momentum=tf.nest.map_structure(tf.zeros_like, init_state),
+            initial_momentum=tf.nest.map_structure(
+                tf.zeros_like, init_state),
+            final_momentum=tf.nest.map_structure(
+                tf.zeros_like, init_state),
             step_size=[],
             num_leapfrog_steps=[]
         )
