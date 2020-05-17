@@ -87,7 +87,8 @@ class GammaTest(test_util.TestCase):
     param = tf.Variable(np.ones((8, 16, 16, 1)),
                         shape=tf.TensorShape([None, 16, 16, 1]))
     self.evaluate(param.initializer)
-    samples = self.evaluate(tfd.Gamma(param, param).sample())
+    samples = self.evaluate(
+        tfd.Gamma(param, param).sample(seed=test_util.test_seed()))
     self.assertEqual(samples.shape, (8, 16, 16, 1))
 
   def testGammaLogPDFMultidimensional(self):
@@ -252,27 +253,28 @@ class GammaTest(test_util.TestCase):
 
   def testGammaSampleReturnsNansForNonPositiveParameters(self):
     gamma = tfd.Gamma([1., 2.], 1., validate_args=False)
-    samples = self.evaluate(gamma.sample())
+    seed_stream = test_util.test_seed_stream()
+    samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllFinite(samples)
 
     gamma = tfd.Gamma([0., 2.], 1., validate_args=False)
-    samples = self.evaluate(gamma.sample())
+    samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [True, False])
 
     gamma = tfd.Gamma([1., -1.], 1., validate_args=False)
-    samples = self.evaluate(gamma.sample())
+    samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [False, True])
 
     gamma = tfd.Gamma([1., 2.], 0., validate_args=False)
-    samples = self.evaluate(gamma.sample())
+    samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllNan(samples)
 
     gamma = tfd.Gamma([1., 2.], -1., validate_args=False)
-    samples = self.evaluate(gamma.sample())
+    samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllNan(samples)
 

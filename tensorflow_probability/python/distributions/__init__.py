@@ -57,6 +57,7 @@ from tensorflow_probability.python.distributions.horseshoe import Horseshoe
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
+from tensorflow_probability.python.distributions.johnson_su import JohnsonSU
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionCoroutineAutoBatched
@@ -113,6 +114,7 @@ from tensorflow_probability.python.distributions.wishart import WishartTriL
 from tensorflow_probability.python.distributions.zipf import Zipf
 
 # Utilities/Other:
+from tensorflow_probability.python.distributions.joint_distribution_util import independent_joint_distribution_from_structure
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import mvn_conjugate_linear_update
@@ -178,6 +180,7 @@ __all__ = [
     'Horseshoe',
     'Independent',
     'InverseGamma',
+    'JohnsonSU',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionCoroutineAutoBatched',
@@ -234,6 +237,7 @@ __all__ = [
     'Zipf',
     'kl_divergence',
     'RegisterKL',
+    'independent_joint_distribution_from_structure',
     'mvn_conjugate_linear_update',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',

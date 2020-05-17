@@ -281,11 +281,11 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def testDeterministicSampling(self):
     seed = test_util.test_seed()
-    tf.random.set_seed(seed)
     dist = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(logits=[0., 0.]),
         components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]),
         validate_args=True)
+    tf.random.set_seed(seed)
     sample_1 = self.evaluate(dist.sample([100], seed=seed))
     tf.random.set_seed(seed)
     sample_2 = self.evaluate(dist.sample([100], seed=seed))
@@ -335,9 +335,12 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     # once, and thus incur no extra reads/concretizations of parameters.
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'mean', 'sample'):
+                   'mean'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=2):
+      dist.sample(seed=test_util.test_seed())
 
     for method in ('log_prob', 'prob'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):

@@ -74,12 +74,14 @@ multi_substrate_py_library(
         ":independent",
         ":inverse_gamma",
         ":inverse_gaussian",
+        ":johnson_su",
         ":joint_distribution",
         ":joint_distribution_auto_batched",
         ":joint_distribution_coroutine",
         ":joint_distribution_named",
         ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
+        ":joint_distribution_util",
         ":kullback_leibler",
         ":kumaraswamy",
         ":lambertw_f",
@@ -743,6 +745,24 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "johnson_su",
+    srcs = ["johnson_su.py"],
+    deps = [
+        ":normal",
+        ":transformed_distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/bijectors:sinh",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "joint_distribution",
     srcs = ["joint_distribution.py"],
     deps = [
@@ -816,6 +836,17 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_distribution_util",
+    srcs = ["joint_distribution_util.py"],
+    deps = [
+        ":joint_distribution_named",
+        ":joint_distribution_sequential",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -2177,6 +2208,20 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "johnson_su_test",
+    size = "medium",
+    srcs = ["johnson_su_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "joint_distribution_auto_batched_test",
     size = "medium",
     srcs = ["joint_distribution_auto_batched_test.py"],
@@ -2222,6 +2267,19 @@ multi_substrate_py_test(
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "joint_distribution_util_test",
+    size = "medium",
+    srcs = ["joint_distribution_util_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
@@ -2456,7 +2514,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "mvn_linear_operator_test",
     srcs = ["mvn_linear_operator_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -2727,6 +2784,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "student_t_test",
+    size = "medium",
     srcs = ["student_t_test.py"],
     jax_size = "medium",
     deps = [
@@ -3015,6 +3073,7 @@ exports_files(
         "inverse_gamma.py",
         "inverse_gaussian.py",
         "inverse_gaussian_test.py",
+        "johnson_su.py",
         "joint_distribution.py",
         "joint_distribution_coroutine.py",
         "joint_distribution_named.py",

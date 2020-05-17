@@ -361,9 +361,47 @@ class LogCumsumExpTests(test_util.TestCase):
         dtype=x.dtype))
     self.assertAllClose(result_fused, result_map)
 
+  @parameterized.named_parameters(
+      ('not_compiled', False),
+      ('xla_compiled', True))
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      '`GradientTape` does not have `jacobian` method')
+  def testGradientAtMinusInf(self, xla_compile):
+    # This ensures that cumulative sums involving `-np.inf` behave
+    # correctly even when compiled with XLA.
+    x = tf.constant([1., -np.inf, -np.inf, 4., 5., 6., 7., 8.])
+    @tf.function(experimental_compile=xla_compile)
+    def compute_jacobian(x):
+      with tf.GradientTape() as g:
+        g.watch(x)
+        y = tfp.math.log_cumsum_exp(x)
+      return g.jacobian(y, x)
+    # The rows of the Jacobian of `log_cumsum_exp` are given by
+    # `tf.math.softmax`.
+    rows = [tf.concat([tf.math.softmax(x[:i + 1]),
+                       tf.zeros([7 - i])], axis=0)
+            for i in range(8)]
+    expected_jacobian = tf.stack(rows, axis=0)
+    jacobian = compute_jacobian(x)
+    self.assertAllClose(jacobian, expected_jacobian, atol=1e-7)
+
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      '`GradientTape` does not have `jacobian` method')
+  def testGradientCumsumViaLogCumsumExp(self):
+    # Regression test for b/156297366.
+    x = tf.constant([1., 2., 3., 4.])
+    with tf.GradientTape(persistent=True) as g:
+      g.watch(x)
+      z = tf.exp(tfp.math.log_cumsum_exp(tf.math.log(x)))
+    expected_gradients = tfp.math.fill_triangular(tf.ones(4 * (4 + 1) // 2))
+    gradients = g.jacobian(z, x)
+    self.assertAllClose(gradients, expected_gradients, atol=1e-7)
+
 
 @test_util.test_all_tf_execution_regimes
-class LogAddExp(test_util.TestCase):
+class LogAddExpTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_small(self):
@@ -391,6 +429,17 @@ class LogAddExp(test_util.TestCase):
         tfp.math.value_and_gradient(tfp.math.log_add_exp, [x, y]))
     self.assertAllClose([1000., 1000.], z, atol=0., rtol=1e-5)
     self.assertAllEqual(1. - np.eye(2), g)
+
+  @test_util.numpy_disable_gradient_test
+  def test_equal_arguments(self):
+    # The standard way to compute `log_add_exp` makes use of
+    # the subexpression `abs(x - y)` which has a discontinuous
+    # gradient at `x == y`.
+    x = np.log(np.arange(1, 21, dtype=np.float32))
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_add_exp, [x, x]))
+    self.assertAllClose(np.log(2.0) + x, z, atol=0., rtol=1e-5)
+    self.assertAllClose(g, np.full([2, 20], 0.5))
 
 
 @test_util.test_all_tf_execution_regimes

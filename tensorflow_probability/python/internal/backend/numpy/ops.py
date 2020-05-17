@@ -257,7 +257,6 @@ def _custom_gradient(f):
   if not JAX_MODE:
     # Numpy backend ignores custom gradients, so we do too.
     return lambda *args, **kwargs: f(*args, **kwargs)[0]
-  import jax  # pylint: disable=g-import-not-at-top
   def f_(*args, **kwargs):
     value, vjp = f(*args, **kwargs)
     def vjp_(cts_out):
@@ -287,7 +286,6 @@ executing_eagerly = utils.copy_docstring(
 
 def _get_static_value_jax(tensor, partial=False):
   del partial
-  import jax  # pylint: disable=g-import-not-at-top
   if isinstance(tensor, jax.core.Tracer):
     return None
   if isinstance(tensor, np.ndarray):
@@ -409,7 +407,11 @@ class NumpyVariable(wrapt.ObjectProxy):
   def __array__(self, dtype=None):
     if dtype is not None:
       dtype = utils.numpy_dtype(dtype)
-    return self.astype(dtype).__array__()
+      return self.__wrapped__.__array__(dtype)
+    # Passing in dtype=None to __array__ has differing behavior in numpy.
+    # When an `np.ndarray` has `.__array__(None)` invoked, the array is casted
+    # to `float64`. Thus we handle this case separately.
+    return self.__wrapped__.__array__()
 
   def assign(self, value):
     super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
@@ -427,11 +429,13 @@ class NumpyVariable(wrapt.ObjectProxy):
 
 
 if JAX_MODE:
-  from jax.interpreters.xla import canonicalize_dtype_handlers  # pylint: disable=g-import-not-at-top
-  from jax.interpreters.xla import pytype_aval_mappings  # pylint: disable=g-import-not-at-top
-  canonicalize_dtype_handlers[NumpyVariable] = (
-      canonicalize_dtype_handlers[onp.ndarray])
-  pytype_aval_mappings[NumpyVariable] = pytype_aval_mappings[onp.ndarray]
+  import jax  # pylint: disable=g-import-not-at-top
+  jax.interpreters.xla.canonicalize_dtype_handlers[NumpyVariable] = (
+      jax.interpreters.xla.canonicalize_dtype_handlers[onp.ndarray])
+  jax.interpreters.xla.pytype_aval_mappings[NumpyVariable] = (
+      jax.interpreters.xla.pytype_aval_mappings[onp.ndarray])
+  jax.core.pytype_aval_mappings[NumpyVariable] = (
+      jax.core.pytype_aval_mappings[onp.ndarray])
 
 
 Variable = NumpyVariable
@@ -442,7 +446,6 @@ class _TensorMeta(type(np.ndarray)):
   @classmethod
   def __instancecheck__(cls, instance):
     if JAX_MODE:
-      import jax  # pylint: disable=g-import-not-at-top
       return isinstance(instance, (jax.xla.DeviceArray,
                                    jax.abstract_arrays.UnshapedArray,
                                    jax.core.Tracer))

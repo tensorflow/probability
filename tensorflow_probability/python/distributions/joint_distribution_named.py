@@ -287,5 +287,7 @@ def _convert_to_dict(x):
   if isinstance(x, collections.OrderedDict):
     return x
   if hasattr(x, '_asdict'):
-    return x._asdict()
+    # Wrap with `OrderedDict` to indicate that namedtuples have a well-defined
+    # order (by default, they convert to just `dict` in Python 3.8+).
+    return collections.OrderedDict(x._asdict())
   return dict(x)

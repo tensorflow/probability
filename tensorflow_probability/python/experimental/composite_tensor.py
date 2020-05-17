@@ -151,7 +151,55 @@ def as_composite(obj):
   `tfp.util.DeferredTensor`, or `tfp.util.TransformedVariable` references it
   closes over converted to tensors at the time this function is called. The
   type of the returned object will be a subclass of both `CompositeTensor` and
-  `type(obj)`.
+  `type(obj)`.  For this reason, one should be careful about using
+  `as_composite()`, especially for `tf.Module` objects.
+
+  For example, when the composite tensor is created even as part of a
+  `tf.Module`, it "fixes" the values of the `DeferredTensor` and `tf.Variable`
+  objects it uses:
+
+  ```python
+  class M(tf.Module):
+    def __init__(self):
+      self._v = tf.Variable(1.)
+      self._d = tfp.distributions.Normal(
+        tfp.util.DeferredTensor(self._v, lambda v: v + 1), 10)
+      self._dct = tfp.experimental.as_composite(self._d)
+
+    @tf.function
+    def mean(self):
+      return self._dct.mean()
+
+  m = M()
+  m.mean()
+  >>> <tf.Tensor: numpy=2.0>
+  m._v.assign(2.)  # Doesn't update the CompositeTensor distribution.
+  m.mean()
+  >>> <tf.Tensor: numpy=2.0>
+  ```
+
+  If, however, the creation of the composite is deferred to a method
+  call, then the Variable and DeferredTensor will be properly captured
+  and respected by the Module and its `SavedModel` (if it is serialized).
+
+  ```python
+  class M(tf.Module):
+    def __init__(self):
+      self._v = tf.Variable(1.)
+      self._d = tfp.distributions.Normal(
+        tfp.util.DeferredTensor(self._v, lambda v: v + 1), 10)
+
+    @tf.function
+    def d(self):
+      return tfp.experimental.as_composite(self._d)
+
+  m = M()
+  m.d().mean()
+  >>> <tf.Tensor: numpy=2.0>
+  m._v.assign(2.)
+  m.d().mean()
+  >>> <tf.Tensor: numpy=3.0>
+  ```
 
   Note: This method is best-effort and based on a heuristic for what the
   tensor parameters are and what the non-tensor parameters are. Things might be
@@ -183,14 +231,29 @@ def as_composite(obj):
     # Use dtype inference from ctor.
     if k in kwargs and kwargs[k] is not None:
       v = getattr(obj, k, kwargs[k])
-      kwargs[k] = tf.convert_to_tensor(v, name=k)
+      try:
+        kwargs[k] = tf.convert_to_tensor(v, name=k)
+      except TypeError as e:
+        raise NotImplementedError(
+            mk_err_msg(
+                '(Unable to convert dependent entry \'{}\' of object '
+                '\'{}\': {})'.format(k, obj, str(e))))
   for k, v in kwargs.items():
     if isinstance(v, distributions.Distribution):
       kwargs[k] = as_composite(v)
     if tensor_util.is_ref(v):
-      kwargs[k] = tf.convert_to_tensor(v, name=k)
+      try:
+        kwargs[k] = tf.convert_to_tensor(v, name=k)
+      except TypeError as e:
+        raise NotImplementedError(
+            mk_err_msg(
+                '(Unable to convert dependent entry \'{}\' of object '
+                '\'{}\': {})'.format(k, obj, str(e))))
   result = cls(**kwargs)
   struct_coder = nested_structure_coder.StructureCoder()
-  if not struct_coder.can_encode(result._type_spec):  # pylint: disable=protected-access
-    raise NotImplementedError(mk_err_msg('(Unable to serialize.)'))
+  try:
+    struct_coder.encode_structure(result._type_spec)  # pylint: disable=protected-access
+  except nested_structure_coder.NotEncodableError as e:
+    raise NotImplementedError(
+        mk_err_msg('(Unable to serialize: {})'.format(str(e))))
   return result

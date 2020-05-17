@@ -200,101 +200,98 @@ ParticleFilterLoopVariables = collections.namedtuple(
     ])
 
 
-particle_filter_arg_str = """
-  Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
-  by the `initial_state_prior`.
+particle_filter_arg_str = """\
+Each latent state is a `Tensor` or nested structure of `Tensor`s, as defined
+by the `initial_state_prior`.
 
-  Each of the `transition_fn`, `observation_fn`, and `proposal_fn` args,
-  if specified, takes arguments `(step, state)`, where `state` represents
-  the latent state at timestep `step`. These `fn`s may also, optionally, take
-  additional keyword arguments `state_history` and `observation_history`, which
-  will be passed if and only if the corresponding
-  `num_steps_state_history_to_pass` or `num_steps_observation_history_to_pass`
-  arguments are provided to this method. These are described further below.
+Each of the `transition_fn`, `observation_fn`, and `proposal_fn` args,
+if specified, takes arguments `(step, state)`, where `state` represents
+the latent state at timestep `step`. These `fn`s may also, optionally, take
+additional keyword arguments `state_history` and `observation_history`, which
+will be passed if and only if the corresponding
+`num_steps_state_history_to_pass` or `num_steps_observation_history_to_pass`
+arguments are provided to this method. These are described further below.
 
-  Args:
-    observations: a (structure of) Tensors, each of shape
-      `concat([[num_observation_steps, b1, ..., bN], event_shape])` with
-      optional batch dimensions `b1, ..., bN`.
-    initial_state_prior: a (joint) distribution over the initial latent state,
-      with optional batch shape `[b1, ..., bN]`.
-    transition_fn: callable returning a (joint) distribution over the next
-      latent state.
-    observation_fn: callable returning a (joint) distribution over the current
-      observation.
-    num_particles: `int` `Tensor` number of particles.
-    initial_state_proposal: a (joint) distribution over the initial latent
-      state, with optional batch shape `[b1, ..., bN]`. If `None`, the initial
-      particles are proposed from the `initial_state_prior`.
-      Default value: `None`.
-    proposal_fn: callable returning a (joint) proposal distribution over the
-      next latent state. If `None`, the dynamics model is used (
-      `proposal_fn == transition_fn`).
-      Default value: `None`.
-    resample_criterion_fn: optional Python `callable` with signature
-      `do_resample = resample_criterion_fn(log_weights)`,
-      where `log_weights` is a float `Tensor` of shape
-      `[b1, ..., bN, num_particles]` containing log (unnormalized) weights for
-      all particles at the current step. The return value `do_resample`
-      determines whether particles are resampled at the current step. In the
-      case `resample_criterion_fn==None`, particles are resampled at every step.
-      The default behavior resamples particles when the current effective
-      sample size falls below half the total number of particles. Note that
-      the resampling criterion is not used at the final step---there, particles
-      are always resampled, so that we return unweighted values.
-      Default value: `tfp.experimental.mcmc.ess_below_threshold`.
-    rejuvenation_kernel_fn: optional Python `callable` with signature
-      `transition_kernel = rejuvenation_kernel_fn(target_log_prob_fn)`
-      where `target_log_prob_fn` is a provided callable evaluating
-      `p(x[t] | y[t], x[t-1])` at each step `t`, and `transition_kernel`
-      should be an instance of `tfp.mcmc.TransitionKernel`.
-      Default value: `None`.  # TODO(davmre): not yet supported.
-    num_transitions_per_observation: scalar Tensor positive `int` number of
-      state transitions between regular observation points. A value of `1`
-      indicates that there is an observation at every timestep,
-      `2` that every other step is observed, and so on. Values greater than `1`
-      may be used with an appropriately-chosen transition function to
-      approximate continuous-time dynamics. The initial and final steps
-      (steps `0` and `num_timesteps - 1`) are always observed.
-      Default value: `None`.
-    num_steps_state_history_to_pass: scalar Python `int` number of steps to
-      include in the optional `state_history` argument to `transition_fn`,
-      `observation_fn`, and `proposal_fn`. If `None`, this argument
-      will not be passed.
-      Default value: `None`.
-    num_steps_observation_history_to_pass: scalar Python `int` number of steps
-      to include in the optional `observation_history` argument to
-      `transition_fn`, `observation_fn`, and `proposal_fn`. If `None`, this
-      argument will not be passed.
-      Default value: `None`.
-"""
+Args:
+  observations: a (structure of) Tensors, each of shape
+    `concat([[num_observation_steps, b1, ..., bN], event_shape])` with
+    optional batch dimensions `b1, ..., bN`.
+  initial_state_prior: a (joint) distribution over the initial latent state,
+    with optional batch shape `[b1, ..., bN]`.
+  transition_fn: callable returning a (joint) distribution over the next
+    latent state.
+  observation_fn: callable returning a (joint) distribution over the current
+    observation.
+  num_particles: `int` `Tensor` number of particles.
+  initial_state_proposal: a (joint) distribution over the initial latent
+    state, with optional batch shape `[b1, ..., bN]`. If `None`, the initial
+    particles are proposed from the `initial_state_prior`.
+    Default value: `None`.
+  proposal_fn: callable returning a (joint) proposal distribution over the
+    next latent state. If `None`, the dynamics model is used (
+    `proposal_fn == transition_fn`).
+    Default value: `None`.
+  resample_criterion_fn: optional Python `callable` with signature
+    `do_resample = resample_criterion_fn(log_weights)`,
+    where `log_weights` is a float `Tensor` of shape
+    `[b1, ..., bN, num_particles]` containing log (unnormalized) weights for
+    all particles at the current step. The return value `do_resample`
+    determines whether particles are resampled at the current step. In the
+    case `resample_criterion_fn==None`, particles are resampled at every step.
+    The default behavior resamples particles when the current effective
+    sample size falls below half the total number of particles. Note that
+    the resampling criterion is not used at the final step---there, particles
+    are always resampled, so that we return unweighted values.
+    Default value: `tfp.experimental.mcmc.ess_below_threshold`.
+  rejuvenation_kernel_fn: optional Python `callable` with signature
+    `transition_kernel = rejuvenation_kernel_fn(target_log_prob_fn)`
+    where `target_log_prob_fn` is a provided callable evaluating
+    `p(x[t] | y[t], x[t-1])` at each step `t`, and `transition_kernel`
+    should be an instance of `tfp.mcmc.TransitionKernel`.
+    Default value: `None`.  # TODO(davmre): not yet supported.
+  num_transitions_per_observation: scalar Tensor positive `int` number of
+    state transitions between regular observation points. A value of `1`
+    indicates that there is an observation at every timestep,
+    `2` that every other step is observed, and so on. Values greater than `1`
+    may be used with an appropriately-chosen transition function to
+    approximate continuous-time dynamics. The initial and final steps
+    (steps `0` and `num_timesteps - 1`) are always observed.
+    Default value: `None`.
+  num_steps_state_history_to_pass: scalar Python `int` number of steps to
+    include in the optional `state_history` argument to `transition_fn`,
+    `observation_fn`, and `proposal_fn`. If `None`, this argument
+    will not be passed.
+    Default value: `None`.
+  num_steps_observation_history_to_pass: scalar Python `int` number of steps
+    to include in the optional `observation_history` argument to
+    `transition_fn`, `observation_fn`, and `proposal_fn`. If `None`, this
+    argument will not be passed.
+    Default value: `None`."""
 
-non_markovian_specification_str = """
+non_markovian_specification_str = """\
+#### Non-Markovian models (state and observation history).
 
-  #### Non-Markovian models (state and observation history).
+Models that do not follow the [Markov property](
+https://en.wikipedia.org/wiki/Markov_property), which requires that the
+current state contains all information relevent to the future of the system,
+are supported by specifying `num_steps_state_history_to_pass` and/or
+`num_steps_observation_history_to_pass`. If these are specified, additional
+keyword arguments `state_history` and/or `observation_history` (respectively)
+will be passed to each of `transition_fn`, `observation_fn`, and
+`proposal_fn`.
 
-  Models that do not follow the [Markov property](
-  https://en.wikipedia.org/wiki/Markov_property), which requires that the
-  current state contains all information relevent to the future of the system,
-  are supported by specifying `num_steps_state_history_to_pass` and/or
-  `num_steps_observation_history_to_pass`. If these are specified, additional
-  keyword arguments `state_history` and/or `observation_history` (respectively)
-  will be passed to each of `transition_fn`, `observation_fn`, and
-  `proposal_fn`.
+The `state_history`, if requested, is a structure of `Tensor`s like
+the initial state, but with a batch dimension prefixed to every Tensor,
+of size `num_steps_state_history_to_pass` , so that
+`state_history[-1]` represents the previous state
+(for `transition_fn` and `proposal_fn`, this will equal the `state` arg),
+`state_history[-2]` the state before that, and so on.
 
-  The `state_history`, if requested, is a structure of `Tensor`s like
-  the initial state, but with a batch dimension prefixed to every Tensor,
-  of size `num_steps_state_history_to_pass` , so that
-  `state_history[-1]` represents the previous state
-  (for `transition_fn` and `proposal_fn`, this will equal the `state` arg),
-  `state_history[-2]` the state before that, and so on.
-
-  The `observation_history` is a structure like `observations`, but with leading
-  dimension of `minimum(step, num_steps_observation_history_to_pass)`. At the
-  initial step, `observation_history=None` will be passed and should be
-  handled appropriately. At subsequent steps, `observation_history[-1]`
-  refers to the observation at the previous timestep, and so on.
-"""
+The `observation_history` is a structure like `observations`, but with leading
+dimension of `minimum(step, num_steps_observation_history_to_pass)`. At the
+initial step, `observation_history=None` will be passed and should be
+handled appropriately. At subsequent steps, `observation_history[-1]`
+refers to the observation at the previous timestep, and so on."""
 
 
 @docstring_util.expand_docstring(
@@ -1016,10 +1013,29 @@ def _resample_using_log_points(log_probs, sample_shape, log_points, name=None):
     markers_and_samples = ps.cast(
         tf.cumsum(sorted_markers, axis=-1), dtype=tf.int32)
     markers_and_samples = tf.minimum(markers_and_samples, num_markers - 1)
+
     # Collect up samples, omitting markers.
-    resampled = tf.reshape(markers_and_samples[tf.equal(sorted_markers, 0)],
-                           points_shape)
-    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
+    samples_mask = tf.equal(sorted_markers, 0)
+
+    # The following block of code is equivalent to
+    # `samples = markers_and_samples[samples_mask]` however boolean mask
+    # indices are not supported by XLA.
+    # Instead we use `argsort` to pick out the top `num_samples`
+    # elements of `markers_and_samples` when sorted using `samples_mask`
+    # as key.
+    num_samples = points_shape[-1]
+    sample_locations = tf.argsort(
+        ps.cast(samples_mask, dtype=tf.int32),
+        direction='DESCENDING',
+        stable=True)
+    samples = tf.gather_nd(
+        markers_and_samples,
+        sample_locations[..., :num_samples, tf.newaxis],
+        batch_dims=(
+            ps.rank_from_shape(sample_shape) +
+            ps.rank_from_shape(batch_shape)))
+
+    return tf.reshape(samples, points_shape)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -1077,7 +1093,8 @@ def resample_independent(log_probs, event_size, sample_shape,
         rate=tf.constant(1.0, dtype=log_probs.dtype)).sample(
             points_shape, seed=seed)
 
-    return _resample_using_log_points(log_probs, sample_shape, log_points)
+    resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -1145,7 +1162,8 @@ def resample_systematic(log_probs, event_size, sample_shape,
         num=event_size) + offsets
     log_points = tf.broadcast_to(tf.math.log(even_spacing), points_shape)
 
-    return _resample_using_log_points(log_probs, sample_shape, log_points)
+    resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.
@@ -1210,7 +1228,8 @@ def resample_stratified(log_probs, event_size, sample_shape,
         num=event_size) + offsets
     log_points = tf.math.log(even_spacing)
 
-    return _resample_using_log_points(log_probs, sample_shape, log_points)
+    resampled = _resample_using_log_points(log_probs, sample_shape, log_points)
+    return dist_util.move_dimension(resampled, source_idx=-1, dest_idx=0)
 
 
 # TODO(b/153199903): replace this function with `tf.scatter_nd` when

@@ -720,6 +720,15 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
+  def test_one_dim_numpy_docs_example(self):
+    x = [[10.0, 7.0, 4.0], [3.0, 2.0, 1.0]]
+    for q in [0, 10.1, 25.1, 49.9, 50.0, 50.1, 50.01, 89, 100]:
+      expected_percentile = np.percentile(
+          x, q=q, interpolation=self._interpolation)
+      pct = tfp.stats.percentile(x, q=q, interpolation=self._interpolation)
+      self.assertAllEqual((), pct.shape)
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
+
   def test_invalid_interpolation_raises(self):
     x = [1., 5., 3., 2., 4.]
     with self.assertRaisesRegexp(ValueError, 'interpolation'):

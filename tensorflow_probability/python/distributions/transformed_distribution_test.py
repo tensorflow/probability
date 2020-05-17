@@ -817,11 +817,15 @@ class ExcessiveConcretizationTest(test_util.TestCase):
         batch_shape=batch_shape,
         validate_args=True)
 
-    for method in ('mean', 'sample', 'entropy', 'event_shape_tensor',
+    for method in ('mean', 'entropy', 'event_shape_tensor',
                    'batch_shape_tensor'):
       with tfp_hps.assert_no_excessive_var_usage(
           method, max_permissible=self.max_permissible[method]):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage(
+        'sample', max_permissible=self.max_permissible['sample']):
+      dist.sample(seed=test_util.test_seed())
 
     for method in ('log_prob', 'prob'):
       with tfp_hps.assert_no_excessive_var_usage(

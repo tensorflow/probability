@@ -47,6 +47,7 @@ __all__ = [
     'rank',
     'reshape',
     'reverse',
+    'repeat',
     'roll',
     'searchsorted',
     'shape',
@@ -119,6 +120,45 @@ def _gather(  # pylint: disable=unused-argument
   return np.reshape(
       res,
       params.shape[:axis] + indices.shape[batch_dims:] + params.shape[axis+1:])
+
+
+def _args_to_matching_arrays(args_list, dtype_hint=None):
+  """Converts a list to array using the first element for dtype.
+
+  This method is used to match the behavior of `tf.concat`.
+
+  Args:
+    args_list: A list or tuple of arguments.
+    dtype_hint: An optional hint used when converting the args to tensors.
+  Returns:
+    A list of tensors.
+  """
+  dtype = None
+  for arg in args_list:
+    if hasattr(arg, 'dtype'):
+      dtype = arg.dtype
+      break
+  if dtype is None:
+    ret = []
+    for arg in args_list:
+      ret.append(ops.convert_to_tensor(arg, dtype, dtype_hint=dtype_hint))
+      if dtype is None:
+        dtype = ret[-1].dtype
+  else:
+    ret = [ops.convert_to_tensor(arg, dtype) for arg in args_list]
+  return ret
+
+
+def _concat(values, axis, name='concat'):
+  del name
+  if axis is None:
+    raise ValueError('None values for `axis` argument not supported.')
+  if not isinstance(values, (list, tuple)):
+    values = [values]
+  if len(values) == 1:
+    return values[0]
+  values = _args_to_matching_arrays(values)
+  return np.concatenate(values, axis=axis)
 
 
 def _gather_nd_single(params, indices):
@@ -225,11 +265,12 @@ def _searchsorted(  # pylint: disable=unused-argument
 
 
 def _shape(input, out_type=np.int32, name=None):  # pylint: disable=redefined-builtin,unused-argument
-  return np.array(np.array(input).shape).astype(utils.numpy_dtype(out_type))
+  return ops.convert_to_tensor(ops.convert_to_tensor(input).shape).astype(
+      out_type)
 
 
 def _size(input, out_type=np.int32, name=None):  # pylint: disable=redefined-builtin, unused-argument
-  return np.prod(np.array(input).shape).astype(utils.numpy_dtype(out_type))
+  return np.prod(ops.convert_to_tensor(input).shape).astype(out_type)
 
 
 builtin_slice = slice  # pylint: disable=invalid-name
@@ -270,8 +311,8 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 concat = utils.copy_docstring(
     'tf.concat',
-    lambda values, axis, name='concat': (  # pylint: disable=g-long-lambda
-        np.concatenate([ops.convert_to_tensor(v) for v in values], axis)))
+    lambda values, axis, name='concat': _concat(values, axis))
+
 
 expand_dims = utils.copy_docstring(
     'tf.expand_dims',
@@ -328,6 +369,11 @@ range = utils.copy_docstring(  # pylint: disable=redefined-builtin
 rank = utils.copy_docstring(
     'tf.rank',
     lambda input, name=None: np.int32(np.array(input).ndim))  # pylint: disable=redefined-builtin,g-long-lambda
+
+repeat = utils.copy_docstring(
+    'tf.repeat',
+    lambda input, repeats, axis=None, name=None: np.repeat(  # pylint: disable=g-long-lambda
+        input, repeats, axis=axis))
 
 reshape = utils.copy_docstring(
     'tf.reshape',

@@ -131,11 +131,11 @@ __all__ = [
     'round',
     'rsqrt',
     # 'scalar_mul',
-    # 'segment_max',
-    # 'segment_mean',
-    # 'segment_min',
-    # 'segment_prod',
-    # 'segment_sum',
+    'segment_max',
+    'segment_mean',
+    'segment_min',
+    'segment_prod',
+    'segment_sum',
     'sigmoid',
     'sign',
     'sin',
@@ -257,7 +257,7 @@ def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=un
 
 
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
-  x = np.array(x)
+  x = _convert_to_tensor(x)
   log_prod_gamma_x = np.sum(scipy_special.gammaln(x), axis=-1)
   sum_x = np.sum(x, axis=-1)
   log_gamma_sum_x = scipy_special.gammaln(sum_x)
@@ -266,6 +266,7 @@ def _lbeta(x, name=None):  # pylint: disable=unused-argument
 
 def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
   """Returns `max` or `mask` if `max` is not finite."""
+  x = _convert_to_tensor(x)
   m = np.max(x, axis=_astuple(axis), keepdims=keepdims)
   needs_masking = ~np.isfinite(m)
   if needs_masking.ndim > 0:
@@ -275,7 +276,61 @@ def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
   return m
 
 
+def _segment_ids_to_np_indices(segment_ids):
+  if len(segment_ids) < 1:
+    return segment_ids
+  shifted = np.roll(segment_ids, 1, axis=0)
+  if JAX_MODE:
+    shifted = shifted.at[0].set(-1)
+  else:
+    shifted[0] = -1
+  return np.nonzero(segment_ids - shifted)[0]
+
+
+def _segment_max(data, segment_ids, name=None):  # pylint: disable=unused-argument
+  indices = _segment_ids_to_np_indices(segment_ids)
+  if JAX_MODE:
+    base = np.array(data)[indices]
+    return base.at[segment_ids].max(data)
+  else:
+    return np.maximum.reduceat(data, indices)
+
+
+def _segment_min(data, segment_ids, name=None):  # pylint: disable=unused-argument
+  indices = _segment_ids_to_np_indices(segment_ids)
+  if JAX_MODE:
+    base = np.array(data)[indices]
+    return base.at[segment_ids].min(data)
+  else:
+    return np.minimum.reduceat(data, indices)
+
+
+def _segment_prod(data, segment_ids, name=None):  # pylint: disable=unused-argument
+  indices = _segment_ids_to_np_indices(segment_ids)
+  if JAX_MODE:
+    base = np.ones_like(np.array(data)[indices])
+    return base.at[segment_ids].mul(data)
+  else:
+    return np.multiply.reduceat(data, indices)
+
+
+def _segment_sum(data, segment_ids, name=None):  # pylint: disable=unused-argument
+  indices = _segment_ids_to_np_indices(segment_ids)
+  if JAX_MODE:
+    base = np.zeros_like(np.array(data)[indices])
+    return base.at[segment_ids].add(data)
+  else:
+    return np.add.reduceat(data, indices)
+
+
+def _segment_mean(data, segment_ids, name=None):
+  sm = _segment_sum(data, segment_ids, name=name)
+  denom = np.bincount(segment_ids - segment_ids[0])
+  return sm / denom.reshape(denom.shape + (1,) * (data.ndim - 1))
+
+
 def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
+  logits = _convert_to_tensor(logits)
   axis = -1 if axis is None else axis
   y = logits - _max_mask_non_finite(logits, axis=axis, keepdims=True)
   y = np.exp(y)
@@ -298,7 +353,8 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
     return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
 
 
-def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin
+def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin,missing-docstring
+  input = _convert_to_tensor(input)
   n = int(input.shape[-1] - 1)
   # For the values, we sort the negative entries and choose the smallest ones
   # and negate. This is equivalent to choosing the largest entries
@@ -313,6 +369,7 @@ def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argume
 
 
 def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
+  data = _convert_to_tensor(data)
   del name
   if not JAX_MODE:
     raise NotImplementedError
@@ -779,25 +836,25 @@ rsqrt = utils.copy_docstring(
 #     'tf.math.scalar_mul',
 #     lambda data, segment_ids, name=None: np.scalar_mul)
 
-# segment_max = utils.copy_docstring(
-#     'tf.math.segment_max',
-#     lambda data, segment_ids, name=None: np.segment_max)
+segment_max = utils.copy_docstring(
+    'tf.math.segment_max',
+    _segment_max)
 
-# segment_mean = utils.copy_docstring(
-#     'tf.math.segment_mean',
-#     lambda data, segment_ids, name=None: np.segment_mean)
+segment_mean = utils.copy_docstring(
+    'tf.math.segment_mean',
+    _segment_mean)
 
-# segment_min = utils.copy_docstring(
-#     'tf.math.segment_min',
-#     lambda data, segment_ids, name=None: np.segment_min)
+segment_min = utils.copy_docstring(
+    'tf.math.segment_min',
+    _segment_min)
 
-# segment_prod = utils.copy_docstring(
-#     'tf.math.segment_prod',
-#     lambda data, segment_ids, name=None: np.segment_prod)
+segment_prod = utils.copy_docstring(
+    'tf.math.segment_prod',
+    _segment_prod)
 
-# segment_sum = utils.copy_docstring(
-#     'tf.math.segment_sum',
-#     lambda data, segment_ids, name=None: np.segment_sum)
+segment_sum = utils.copy_docstring(
+    'tf.math.segment_sum',
+    _segment_sum)
 
 sigmoid = utils.copy_docstring(
     'tf.math.sigmoid',

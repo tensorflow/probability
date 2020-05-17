@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -36,6 +37,16 @@ from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+
+def do_not_compile(f):
+  """The identity function decorator."""
+  return f
+
+
+def xla_compile(f):
+  """Decorator for XLA compilation."""
+  return tf.function(f, autograph=False, experimental_compile=True)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -252,21 +263,34 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllEqual(
         np.array([[1, 2, 2], [4, 6, 6], [7, 8, 9]]), trajectories)
 
-  def test_categorical_resampler_zero_final_class(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_categorical_resampler_zero_final_class(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     probs = [1.0, 0.0]
-    resampled = resample_independent(
+    resampled = maybe_compiler(resample_independent)(
         tf.math.log(probs), 1000, [], seed=test_util.test_seed())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
-  def test_categorical_resampler_chi2(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_categorical_resampler_chi2(self, maybe_compiler):
     # Test categorical resampler using chi-squared test.
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
 
     num_probs = 50
     num_distributions = 3
     unnormalized_probs = tfd.Uniform(
-        low=np.float64(0),
-        high=np.float64(1.)).sample([num_distributions, num_probs],
+        low=np.float32(0),
+        high=np.float32(1.)).sample([num_distributions, num_probs],
                                     seed=test_util.test_seed())
     probs = unnormalized_probs / tf.reduce_sum(
         unnormalized_probs, axis=-1, keepdims=True)
@@ -276,7 +300,7 @@ class _ParticleFilterTest(test_util.TestCase):
     num_particles = 10000
     num_samples = 2
 
-    sample = resample_independent(
+    sample = maybe_compiler(resample_independent)(
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
@@ -296,50 +320,79 @@ class _ParticleFilterTest(test_util.TestCase):
             shape=[num_probs])
         expected_samples = probs[prob_index] * num_particles
         chi2 = tf.reduce_sum(
-            (tf.cast(counts, tf.float64) -
+            (tf.cast(counts, tf.float32) -
              expected_samples)**2 / expected_samples,
             axis=-1)
         self.assertAllLess(
-            tfd.Chi2(df=np.float64(num_probs - 1)).cdf(chi2),
+            tfd.Chi2(df=np.float32(num_probs - 1)).cdf(chi2),
             0.9999)
 
-  def test_minimum_variance_resampler_zero_final_class(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_minimum_variance_resampler_zero_final_class(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     probs = [1.0, 0.0]
-    resampled = resample_systematic(
+    resampled = maybe_compiler(resample_systematic)(
         tf.math.log(probs), 1000, [], seed=test_util.test_seed())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
-  def test_categorical_resampler_large(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_categorical_resampler_large(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     num_probs = 10000
     probs = tf.ones((num_probs,)) / num_probs
     self.evaluate(
-        resample_independent(
+        maybe_compiler(resample_independent)(
             tf.math.log(probs), num_probs, [], seed=test_util.test_seed()))
 
-  def test_minimum_variance_resampler_large(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_minimum_variance_resampler_large(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     num_probs = 10000
     probs = tf.ones((num_probs,)) / num_probs
-    self.evaluate(
-        resample_systematic(
-            tf.math.log(probs), num_probs, [],
-            seed=test_util.test_seed()))
+    resampled = maybe_compiler(resample_systematic)(
+        tf.math.log(probs), num_probs, [],
+        seed=test_util.test_seed())
+    self.evaluate(resampled)
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
-  def test_minimum_variance_resampler_means(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_minimum_variance_resampler_means(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     # Distinct samples with this resampler aren't independent
     # so a chi-squared test is inappropriate.
     # However, because it reduces variance by design, we
     # can, with high probability,  place sharp bounds on the
     # values of the sample means.
     num_distributions = 3
+    num_samples = 10000
+    num_particles = 20
     num_probs = 16
     probs = tfd.Uniform(
         low=0.0, high=1.0).sample([num_distributions, num_probs],
                                   seed=test_util.test_seed())
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
-    num_samples = 10000
-    num_particles = 20
-    resampled = resample_systematic(
+
+    resampled = maybe_compiler(resample_systematic)(
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
@@ -364,7 +417,14 @@ class _ParticleFilterTest(test_util.TestCase):
       self.assertAllClose(means_, probs_, atol=0.01)
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
-  def test_minimum_error_resampler_means(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_minimum_error_resampler_means(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     # Distinct samples with this resampler aren't independent
     # so a chi-squared test is inappropriate.
     # However, because it reduces variance by design, we
@@ -372,13 +432,14 @@ class _ParticleFilterTest(test_util.TestCase):
     # values of the sample means.
     num_distributions = 3
     num_probs = 8
+    num_samples = 4
+    num_particles = 10000
     probs = tfd.Uniform(
         low=0.0, high=1.0).sample([num_distributions, num_probs],
                                   seed=test_util.test_seed())
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
-    num_samples = 4
-    num_particles = 10000
-    resampled = resample_deterministic_minimum_error(
+
+    resampled = maybe_compiler(resample_deterministic_minimum_error)(
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
@@ -401,7 +462,14 @@ class _ParticleFilterTest(test_util.TestCase):
       self.assertAllClose(means_, probs_, atol=1.0 / num_particles)
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
-  def test_stratified_resampler_means(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_stratified_resampler_means(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     # Distinct samples with this resampler aren't independent
     # so a chi-squared test is inappropriate.
     # However, because it reduces variance by design, we
@@ -415,7 +483,7 @@ class _ParticleFilterTest(test_util.TestCase):
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
     num_samples = 4
     num_particles = 10000
-    resampled = resample_stratified(
+    resampled = maybe_compiler(resample_stratified)(
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
@@ -437,7 +505,14 @@ class _ParticleFilterTest(test_util.TestCase):
 
       self.assertAllClose(means_, probs_, atol=0.1)
 
-  def test_resample_using_extremal_log_points(self):
+  @parameterized.named_parameters(
+      ('not_compiled', do_not_compile),
+      ('xla_compiled', xla_compile))
+  def test_resample_using_extremal_log_points(self, maybe_compiler):
+    if maybe_compiler == xla_compile and tf.executing_eagerly():
+      # Testing XLA in graph mode is sufficient.
+      return
+
     n = 8
 
     one = np.float32(1)
@@ -450,19 +525,19 @@ class _ParticleFilterTest(test_util.TestCase):
     log_probs_end = tf.math.log(tf.concat([tf.zeros(n - 1, dtype=tf.float32),
                                            [one]], axis=0))
 
-    indices = _resample_using_log_points(
+    indices = maybe_compiler(_resample_using_log_points)(
         log_probs_beginning, sample_shape, log_points_zero)
     self.assertAllEqual(indices, tf.zeros(n, dtype=tf.float32))
 
-    indices = _resample_using_log_points(
+    indices = maybe_compiler(_resample_using_log_points)(
         log_probs_end, sample_shape, log_points_zero)
     self.assertAllEqual(indices, tf.fill([n], n - 1))
 
-    indices = _resample_using_log_points(
+    indices = maybe_compiler(_resample_using_log_points)(
         log_probs_beginning, sample_shape, log_points_almost_one)
     self.assertAllEqual(indices, tf.zeros(n, dtype=tf.float32))
 
-    indices = _resample_using_log_points(
+    indices = maybe_compiler(_resample_using_log_points)(
         log_probs_end, sample_shape, log_points_almost_one)
     self.assertAllEqual(indices, tf.fill([n], n - 1))
 

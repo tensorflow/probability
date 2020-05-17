@@ -1,0 +1,76 @@
+# Copyright 2018 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+toc:
+- heading: "Guide"
+- title: Overview
+  path: /probability/examples/A_Tour_of_TensorFlow_Probability
+- title: Distribution shapes
+  path: /probability/examples/Understanding_TensorFlow_Distributions_Shapes
+- title: Distributions
+  path: /probability/examples/TensorFlow_Distributions_Tutorial
+- title: Learnable distributions
+  path: /probability/examples/Learnable_Distributions_Zoo
+- title: Optimizers
+  path: /probability/examples/Optimizers_in_TensorFlow_Probability
+- heading: "Tutorials"
+- title:  Probabilistic regression
+  path: /probability/examples/Probabilistic_Layers_Regression
+- title: Bayes GMM
+  path: /probability/examples/Bayesian_Gaussian_Mixture_Model
+- title: Bayes switchpoint
+  path: /probability/examples/Bayesian_Switchpoint_Analysis
+- title: Eight schools
+  path: /probability/examples/Eight_Schools
+- title: Factorial mixture
+  path: /probability/examples/Factorial_Mixture
+- title: Gaussian Coupla
+  path: /probability/examples/Gaussian_Copula
+- title: GP latent variable model
+  path: /probability/examples/Gaussian_Process_Latent_Variable_Model
+- title: GP regression
+  path: /probability/examples/Gaussian_Process_Regression_In_TFP
+- title: Generalized linear models
+  path: /probability/examples/Generalized_Linear_Models
+- title: FFJORD
+  path: /probability/examples/FFJORD_Demo
+- title: Linear mixed effect models
+  path: /probability/examples/Linear_Mixed_Effects_Models
+- title: Joint distribution
+  path: /probability/examples/Modeling_with_JointDistribution
+- title: Multilevel modeling
+  path: /probability/examples/Multilevel_Modeling_Primer
+- title: Bayesian model selection
+  path: /probability/examples/Multiple_changepoint_detection_and_Bayesian_model_selection
+- title: VAE
+  path: /probability/examples/Probabilistic_Layers_VAE
+- title: Probabilistic PCA
+  path: /probability/examples/Probabilistic_PCA
+- title: STS approximate inference
+  path: /probability/examples/STS_approximate_inference_for_models_with_non_Gaussian_observations
+- title: Time Series
+  path: /probability/examples/Structural_Time_Series_Modeling_Case_Studies_Atmospheric_CO2_and_Electricity_Demand
+- title: Covariance estimation
+  path: /probability/examples/TensorFlow_Probability_Case_Study_Covariance_Estimation
+- title: "Tutorials (TF1)"
+  style: accordion
+  status: deprecated
+  section:
+  - title: DPMM using pSGLD
+    path: /probability/examples/Fitting_DPMM_Using_pSGLD
+  - title: HLM R stan
+    path: /probability/examples/HLM_TFP_R_Stan
+  - title: Variational inference
+    path: /probability/examples/Linear_Mixed_Effects_Model_Variational_Inference
+

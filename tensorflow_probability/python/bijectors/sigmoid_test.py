@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 from scipy import special
 import tensorflow.compat.v2 as tf
@@ -149,6 +150,24 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
     self.assertAllEqual([100, 100], answers.shape)
     for ans1, hi1 in zip(self.evaluate(answers), hi):
       self.assertAllLessEqual(ans1, hi1)
+
+  @parameterized.named_parameters(
+      ('32bitGraph', np.float32, False),
+      ('64bitGraph', np.float64, False),
+      ('32bitXLA', np.float32, True),
+      ('64bitXLA', np.float64, True),
+  )
+  @test_util.numpy_disable_gradient_test
+  def testLeftTail(self, dtype, do_compile):
+    x = np.linspace(-50., -8., 1000).astype(dtype)
+
+    @tf.function(autograph=False, experimental_compile=do_compile)
+    def fn(x):
+      return tf.math.log(tfb.Sigmoid().forward(x))
+
+    vals = fn(x)
+    true_vals = -np.log1p(np.exp(-x))
+    self.assertAllClose(true_vals, self.evaluate(vals), atol=1e-3)
 
 
 if __name__ == '__main__':
