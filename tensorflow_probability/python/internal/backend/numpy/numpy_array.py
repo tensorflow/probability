@@ -230,11 +230,20 @@ def _pad(  # pylint: disable=unused-argument
 
 
 def _range(start, limit=None, delta=1, dtype=None, name='range'):  # pylint: disable=unused-argument
-  dtype = utils.numpy_dtype(dtype or utils.common_dtype([start], np.int32))
+  """Emulates tf.range."""
+   # Emulating dtype inference logic from tf.range
+  dtype = utils.numpy_dtype(dtype)
   start = ops.convert_to_tensor(start, dtype=dtype)
   limit = None if limit is None else ops.convert_to_tensor(limit, dtype=dtype)
   delta = ops.convert_to_tensor(delta, dtype=dtype)
-  return np.arange(start, limit, delta).astype(dtype)
+  if dtype is None:
+    dtype_hierarchy = [np.int32, np.int64, np.float32, np.float64]
+    inferred_dtype = max([arg.dtype for arg in [start, limit, delta]
+                          if arg is not None],
+                         key=dtype_hierarchy.index)
+  else:
+    inferred_dtype = dtype
+  return np.arange(start, limit, delta).astype(inferred_dtype)
 
 
 def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument

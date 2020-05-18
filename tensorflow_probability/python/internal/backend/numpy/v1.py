@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal.backend.numpy import linalg_impl
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
+from tensorflow_probability.python.internal.backend.numpy.ops import Dimension
 from tensorflow_probability.python.internal.backend.numpy.ops import Module
 from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
@@ -35,6 +36,7 @@ from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops impor
 
 
 __all__ = [
+    'Dimension',
     'Module',
     'Session',
     'TensorArray',

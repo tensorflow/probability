@@ -52,6 +52,7 @@ __all__ = [
     'is_tensor',
     'name_scope',
     'newaxis',
+    'register_tensor_conversion_function',
     'stop_gradient',
     'GradientTape',
     'Module',
@@ -111,69 +112,203 @@ def _control_dependencies(control_inputs):
   return _NullContext()
 
 
+tensor_conversion_registry = {}
+
+
+def register_tensor_conversion_function(base_type, conversion_func):
+  # No priority system like TensorFlow yet
+  tensor_conversion_registry[base_type] = conversion_func
+
+
 def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
   """Emulates tf.convert_to_tensor."""
-  assert not tf.is_tensor(value), value
+  dtype = utils.numpy_dtype(dtype)
+  dtype_hint = utils.numpy_dtype(dtype_hint)
   if is_tensor(value):
     if dtype is not None:
-      dtype = utils.numpy_dtype(dtype)
-      # if np.result_type(value, dtype) != dtype:
-      #   raise ValueError('Expected dtype {} but got {} with dtype {}.'.format(
-      #       dtype, value, value.dtype))
+      # In NumPy mode, we are lenient on the dtype compatibility check because
+      # some codepaths rely on flexible conversion from int/float64 to 32.
+      if JAX_MODE and value.dtype != dtype:
+        raise TypeError(('Tensor conversion requested dtype {} for array with '
+                         'dtype {}: {}').format(dtype, value.dtype, value))
       return value.astype(dtype)
     return value
-  if isinstance(value, Dimension):
-    value = _dimension_value(value)
-  elif isinstance(value, TensorShape):
-    value = np.array(value.as_list(), dtype=np.int32)
-  # In JAX mode, onp.ndarray/onp.generic are not identified as Tensor's.
-  # By default, use the dtype of the values passed in.
-  elif hasattr(value, 'dtype'):
-    if dtype is not None:
-      dtype = utils.numpy_dtype(dtype)
-      return np.array(value).astype(dtype)
-    return np.array(value)
-  if dtype is None and dtype_hint is not None:
-    dtype_hint = utils.numpy_dtype(dtype_hint)
-    value = np.array(value)
-    if np.size(value):
-      # Match TF behavior, which won't downcast e.g. float to int.
-      if np.issubdtype(value.dtype, np.complexfloating):
-        if not np.issubdtype(dtype_hint, np.complexfloating):
-          return value
-      if np.issubdtype(value.dtype, np.floating):
-        if not (np.issubdtype(dtype_hint, np.floating)
-                or np.issubdtype(dtype_hint, np.complexfloating)):
-          return value
-      if np.issubdtype(value.dtype, np.integer):
-        if not (np.issubdtype(dtype_hint, np.integer)
-                or np.issubdtype(dtype_hint, np.floating)
-                or np.issubdtype(dtype_hint, np.complexfloating)):
-          return value
-    return value.astype(dtype_hint)
 
-  np_value = np.array(value, dtype=utils.numpy_dtype(dtype or dtype_hint))
-  if np.issubdtype(np_value.dtype, np.object_):
-    raise ValueError('Numpy `object`s cannot be converted to `Tensor`s.')
-  # We have no hints. By default JAX (in x64 mode) and Numpy default to
-  # {int64,float64} which does not match with TF's default.
-  if dtype is None and dtype_hint is None:
-    # If the integer doesn't fit in int32, return an int64. This matches TF.
-    if isinstance(value, int):
-      if value > onp.iinfo(onp.int32).max or value < onp.iinfo(onp.int32).min:
-        return np.array(value, dtype=np.int64)
-    if np.issubdtype(np_value.dtype, np.floating):
-      return np_value.astype(np.float32)
-    if np.issubdtype(np_value.dtype, np.integer):
-      return np_value.astype(np.int32)
-  return np_value
+  conversion_func = tensor_conversion_registry.get(type(value),
+                                                   _default_convert_to_tensor)
+  ret = None
+  if dtype is None and dtype_hint is not None:
+    try:
+      ret = conversion_func(value, dtype=dtype_hint)
+    except (TypeError, ValueError):
+      pass
+
+  if ret is None:
+    ret = conversion_func(value, dtype=dtype)
+  return ret
+
+
+def _infer_dtype(value, default_dtype):
+  """Guesses an object's dtype."""
+  # Need to check for onp type first because onp types are subclasses of Python
+  # types.
+  if hasattr(value, 'dtype'):
+    # Duck-typing onp types
+    return value.dtype
+  elif isinstance(value, bool):
+    return np.bool
+  elif isinstance(value, six.integer_types):
+    return np.int32
+  elif isinstance(value, float):
+    return np.float32
+  elif isinstance(value, complex):
+    return np.complex128
+  else:
+    # Try inferring the type of first item in the object if possible.
+    try:
+      return _infer_dtype(value[0], default_dtype)
+    except (IndexError, TypeError):
+      return default_dtype
+    except KeyError:
+      raise ValueError(('Attempt to convert a value ({})'
+                        ' with an unsupported type ({}) to a Tensor.').format(
+                            value, type(value)))
+
+
+class _Int64ToInt32Error(TypeError):
+  """Error thrown when trying to convert an int64 to int32."""
+
+  def __init__(self, int_value):
+    self.int_value = int_value
+    super(_Int64ToInt32Error, self).__init__('Overflow when casting an int64 to'
+                                             ' an int32.')
+
+
+class _FloatToIntError(TypeError):
+  """Error thrown when trying to convert a float to an int."""
+
+
+def _is_int64(value):
+  return value > onp.iinfo(onp.int32).max or value < onp.iinfo(onp.int32).min
+
+
+def _default_convert_to_tensor(value, dtype=None):
+  """Default tensor conversion function for array, bool, int, float, and complex."""
+  inferred_dtype = _infer_dtype(value, np.float32)
+  # When a dtype is provided, we can go ahead and try converting to the dtype
+  # and force overflow/underflow if an int64 is converted to an int32.
+  if dtype is not None:
+    try:
+      return _default_convert_to_tensor_with_dtype(value, dtype)
+    except _Int64ToInt32Error as e:
+      # Force conversion to int32 if requested
+      return e.int_value
+  # If no dtype is provided, we try the inferred dtype and fallback to int64 or
+  # float32 depending on the type of conversion error we see.
+  try:
+    return _default_convert_to_tensor_with_dtype(value, inferred_dtype)
+  except _Int64ToInt32Error as e:
+    return np.array(value, dtype=np.int64)
+  except _FloatToIntError as e:
+    return np.array(value, dtype=np.float32)
+
+
+class TypeConversionError(TypeError):
+
+  def __init__(self, value, dtype):
+    super(TypeConversionError, self).__init__(
+        'Cannot convert {} to array of dtype {}'.format(value, dtype))
+
+
+class MixedTypesError(ValueError):
+
+  def __init__(self):
+    super(MixedTypesError, self).__init__('Can\'t convert Python sequence with'
+                                          ' mixed types to Tensor.')
+
+
+def _default_convert_to_tensor_with_dtype(value, dtype,
+                                          error_if_mismatch=False):
+  """Converts a value to a tensor with a given dtype.
+
+  Args:
+    value: An object to be converted to tensor.
+    dtype: A NPTF dtype.
+    error_if_mismatch: Enables a stricter check for use when converting an
+                       iterable from a tensor.
+  Returns:
+    A tensor.
+
+  Raises:
+    TypeConversionError: If type conversion fails.
+    MixedTypesError: If types are mismatched in an iterable context.
+    ValueError: If object isn't convertible to tensor.
+    _Int64ToInt32Error: If trying to convert an int64 to an int32.
+    _FloatToIntError: If trying to convert a float to an int.
+  """
+  is_arraylike = hasattr(value, 'dtype')
+  if is_arraylike:
+    # Duck-typed for `onp.array`/`onp.generic`
+    arr = np.array(value)
+    if dtype is not None:
+      # arr.astype(None) forces conversion to float64
+      return arr.astype(dtype)
+    return arr
+  elif isinstance(value, complex):
+    dtype_compatible = np.issubdtype(dtype, np.complexfloating)
+    if not dtype_compatible:
+      if error_if_mismatch:
+        raise MixedTypesError()
+      raise TypeConversionError(value, dtype)
+  elif isinstance(value, bool):
+    # Bool check needs to happen before int check because bools are instances of
+    # int.
+    dtype_compatible = (dtype == np.bool or np.issubdtype(dtype, np.integer)
+                        or np.issubdtype(dtype, np.floating))
+    if not dtype_compatible:
+      if error_if_mismatch:
+        raise MixedTypesError()
+      raise TypeError(value, dtype)
+  elif isinstance(value, six.integer_types):
+    if error_if_mismatch and not (np.issubdtype(dtype, np.integer)
+                                  or np.issubdtype(dtype, np.floating)):
+      raise MixedTypesError()
+    if dtype == np.int32 and _is_int64(value):
+      raise _Int64ToInt32Error(np.array(value, dtype=dtype))
+    if dtype == np.bool:
+      # Can't downcast an int to a bool
+      raise TypeConversionError(value, dtype)
+  elif isinstance(value, float):
+    if error_if_mismatch and not (np.issubdtype(dtype, np.integer)
+                                  or np.issubdtype(dtype, np.floating)):
+      raise MixedTypesError()
+    if np.issubdtype(dtype, np.integer):
+      raise _FloatToIntError(
+          'Cannot convert {} to array of dtype {}'.format(value, dtype))
+    if not (np.issubdtype(dtype, np.floating)
+            or np.issubdtype(dtype, np.complexfloating)):
+      raise TypeConversionError(value, dtype)
+  else:
+    # Try to iterate through object and throw ValueError if we can't.
+    if hasattr(value, '__getitem__'):
+      ret = []
+      error_in_list = False
+      for v in value:
+        ret.append(_default_convert_to_tensor_with_dtype(
+            v, dtype, error_if_mismatch=error_in_list))
+        error_in_list = True
+      value = ret
+    else:
+      raise ValueError(
+          ('Attempting to convert a value {} with an'
+           ' unsupported type {} to a Tensor.').format(value, type(value)))
+  return np.array(value, dtype=dtype)
 
 
 def _dimension_value(dimension):
   if dimension is None:
     return None
   return int(dimension)
-
 
 # --- Begin Public Functions --------------------------------------------------
 
@@ -212,7 +347,7 @@ bitcast = utils.copy_docstring(
         input, dtype_hint=type).view(type))
 
 broadcast_dynamic_shape = utils.copy_docstring(
-    'tf.broadcast_static_shape', _broadcast_dynamic_shape)
+    'tf.broadcast_dynamic_shape', _broadcast_dynamic_shape)
 
 broadcast_static_shape = utils.copy_docstring(
     'tf.broadcast_static_shape', _broadcast_static_shape)
@@ -364,6 +499,40 @@ def dimension_at_index(shape, index):
   return Dimension(int(shape[index]))
 
 
+def _convert_tensorshape_to_tensor(value, dtype=None):
+  """Copied from TF's TensorShape conversion."""
+  if not value.is_fully_defined():
+    raise ValueError(
+        'Cannot convert a partially known TensorShape to a Tensor: {}'.format(
+            value))
+  value_list = value.as_list()
+  int64_value = 0
+  for dim in value_list:
+    if dim >= 2**31:
+      int64_value = dim
+      break
+  if dtype is not None:
+    if dtype not in (np.int32, np.int64):
+      raise TypeConversionError(value, dtype)
+    if dtype == np.int32 and int64_value:
+      raise ValueError('Cannot convert a TensorShape to dtype int32; '
+                       'a dimension is too large ({})'.format(int64_value))
+  else:
+    dtype = np.int64 if int64_value else np.int32
+  return convert_to_tensor(value_list, dtype=dtype)
+register_tensor_conversion_function(TensorShape,
+                                    _convert_tensorshape_to_tensor)
+
+
+def _convert_dimension_to_tensor(value, dtype=None):
+  dtype = dtype or np.int32
+  if dtype not in (np.int32, np.int64):
+    raise TypeConversionError(value, dtype)
+  return convert_to_tensor(dimension_value(value), dtype=dtype)
+register_tensor_conversion_function(Dimension,
+                                    _convert_dimension_to_tensor)
+
+
 class NumpyVariable(wrapt.ObjectProxy):
   """Stand-in for tf.Variable."""
 
@@ -438,7 +607,6 @@ class _TensorMeta(type(np.ndarray)):
   def __instancecheck__(cls, instance):
     if JAX_MODE:
       return isinstance(instance, (jax.xla.DeviceArray,
-                                   jax.abstract_arrays.UnshapedArray,
                                    jax.core.Tracer))
     return isinstance(instance, np.ndarray)
 

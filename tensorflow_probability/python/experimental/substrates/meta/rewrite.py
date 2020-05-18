@@ -225,19 +225,6 @@ def main(argv):
     contents = contents.replace('SKIP_DTYPE_CHECKS = True',
                                 'SKIP_DTYPE_CHECKS = False')
     is_test = lambda x: x.endswith('_test.py') or x.endswith('_test_util.py')
-    if not is_test(argv[1]):  # We leave tests with original np.
-      contents = contents.replace(
-          '\nimport numpy as np',
-          '\nimport numpy as onp\nimport jax.numpy as np')
-      contents = contents.replace('np.bool', 'onp.bool')
-      contents = contents.replace('np.dtype', 'onp.dtype')
-      contents = contents.replace('np.euler_gamma', 'onp.euler_gamma')
-      contents = contents.replace('np.generic', 'onp.generic')
-      contents = contents.replace('np.nextafter', 'onp.nextafter')
-      contents = contents.replace('np.object', 'onp.object')
-      contents = contents.replace('np.unique', 'onp.unique')
-
-      contents = contents.replace('np.polynomial', 'onp.polynomial')
     if is_test(argv[1]):  # Test-only rewrites.
       contents = contents.replace(
           'tf.test.main()',
