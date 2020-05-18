@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
@@ -79,24 +77,21 @@ class _NullContext(object):
     return False  # False values do not suppress exceptions.
 
 
-def _base_broadcast_static_shape(
-    shape_x, shape_y, as_tensorshape=False, static_shape=False):
+def _base_broadcast_static_shape(shape_x, shape_y, as_tensorshape=False):
   shape_x = TensorShape(shape_x)
   shape_y = TensorShape(shape_y)
   shape_xy = tf.broadcast_static_shape(shape_x, shape_y)
   if as_tensorshape:
     return shape_xy
-  if static_shape:
-    return onp.array(shape_xy.as_list(), dtype=onp.int32)
   return np.array(shape_xy.as_list(), dtype=np.int32)
 
 
 def _broadcast_static_shape(shape_x, shape_y):
-  return _base_broadcast_static_shape(shape_x, shape_y, static_shape=True)
+  return _base_broadcast_static_shape(shape_x, shape_y, as_tensorshape=True)
 
 
 def _broadcast_dynamic_shape(shape_x, shape_y):
-  return _base_broadcast_static_shape(shape_x, shape_y, static_shape=False)
+  return _base_broadcast_static_shape(shape_x, shape_y)
 
 
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
@@ -130,7 +125,7 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   if isinstance(value, Dimension):
     value = _dimension_value(value)
   elif isinstance(value, TensorShape):
-    value = value.as_list()
+    value = np.array(value.as_list(), dtype=np.int32)
   # In JAX mode, onp.ndarray/onp.generic are not identified as Tensor's.
   # By default, use the dtype of the values passed in.
   elif hasattr(value, 'dtype'):
@@ -221,10 +216,6 @@ broadcast_dynamic_shape = utils.copy_docstring(
 
 broadcast_static_shape = utils.copy_docstring(
     'tf.broadcast_static_shape', _broadcast_static_shape)
-
-broadcast_static_shape_as_tensorshape = utils.copy_docstring(
-    'tf.broadcast_static_shape',
-    functools.partial(_base_broadcast_static_shape, as_tensorshape=True))
 
 broadcast_to = utils.copy_docstring(
     'tf.broadcast_to',

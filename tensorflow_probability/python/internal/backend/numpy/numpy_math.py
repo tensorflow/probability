@@ -802,7 +802,8 @@ reduce_min = utils.copy_docstring(
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',
     lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.prod(input_tensor, _astuple(axis), keepdims=keepdims)))
+        np.prod(_convert_to_tensor(input_tensor), _astuple(axis),
+                keepdims=keepdims)))
 
 reduce_std = utils.copy_docstring(
     'tf.math.reduce_std',

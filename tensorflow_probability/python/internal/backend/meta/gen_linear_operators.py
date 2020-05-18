@@ -117,7 +117,7 @@ def gen_module(module_name):
                 'np.issubdtype(\\1, np.integer)', code)
 
   code = code.replace('array_ops.broadcast_static_shape',
-                      '_ops.broadcast_static_shape_as_tensorshape')
+                      '_ops.broadcast_static_shape')
   code = code.replace('array_ops.broadcast_to', '_ops.broadcast_to')
   code = code.replace('array_ops.matrix_diag', '_linalg.diag')
   code = code.replace('array_ops.matrix_band_part', '_linalg.band_part')
