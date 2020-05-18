@@ -1808,7 +1808,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "categorical_test",
     srcs = ["categorical_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

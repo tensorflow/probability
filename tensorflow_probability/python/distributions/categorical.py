@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import six
 
 import tensorflow.compat.v2 as tf
 
@@ -28,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -231,8 +233,13 @@ class Categorical(distribution.Distribution):
     logits = self._logits_parameter_no_checks()
     logits_2d = tf.reshape(logits, [-1, self._num_categories(logits)])
     sample_dtype = tf.int64 if dtype_util.size(self.dtype) > 4 else tf.int32
-    draws = tf.random.categorical(
-        logits_2d, n, dtype=sample_dtype, seed=seed)
+    # TODO(b/147874898): Remove workaround for seed-sensitive tests.
+    if seed is None or isinstance(seed, six.integer_types):
+      draws = tf.random.categorical(
+          logits_2d, n, dtype=sample_dtype, seed=seed)
+    else:
+      draws = samplers.categorical(
+          logits_2d, n, dtype=sample_dtype, seed=seed)
     draws = tf.cast(draws, self.dtype)
     return tf.reshape(
         tf.transpose(draws),
