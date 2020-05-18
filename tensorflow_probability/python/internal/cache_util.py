@@ -452,7 +452,7 @@ class BijectorCache(object):
   ref = weakref.ref(x)
 
   for i in range(10):
-    assert len(cache.forward) == len(cache.inverse) == 0
+    assert len(cache.forward) == len(cache.inverse) == i
     x = cache.forward(x)
 
   for i in range(10):
