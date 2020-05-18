@@ -354,7 +354,13 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
 
 
 def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin,missing-docstring
+  # This currently ignores sorted=False. However, this should be safe since
+  # call sites that don't invoke sorted=True will assume results are unsorted
+  # (vs. never sorted), and so sorted results shouldn't impact results.
   input = _convert_to_tensor(input)
+  if JAX_MODE:
+    # JAX automatically returns values in sorted order.
+    return jax.lax.top_k(input, k)
   n = int(input.shape[-1] - 1)
   # For the values, we sort the negative entries and choose the smallest ones
   # and negate. This is equivalent to choosing the largest entries
