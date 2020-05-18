@@ -62,7 +62,6 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
                scale=1.,
                concentration=0,
                validate_args=False,
-               tol=1e-5,
                name='generalizedextremevalue_cdf'):
     """Instantiates the `GeneralizedExtremeValueCDF` bijector.
 
@@ -87,8 +86,6 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
           scale, dtype=dtype, name='scale')
       self._concentration = tensor_util.convert_nonref_to_tensor(
           concentration, dtype=dtype, name='concentration')
-      self._tol = tensor_util.convert_nonref_to_tensor(
-          tol, dtype=dtype, name='tolerance')
       super(GeneralizedExtremeValueCDF, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=0,
@@ -131,7 +128,18 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
       conc = tf.convert_to_tensor(self.concentration)
 
       z = (x - self.loc) / self.scale
-      t = tf.where(tf.math.less_equal(tf.math.abs(conc), self._tol),
+
+      # for the numerical stability, we set a threshold `tol` that
+      # when `abs(conc) < tol`, gev converges to the Gumbel dist.
+      # check the following link for the estimation
+      # of the threshold (also for _inverse and _forward_log_det_jacobian)
+      # https://github.com/tensorflow/probability/pull/901#issuecomment-629857187
+      tol_target = 1e-5
+      rtol_target = 2. * tol_target / tf.math.abs(z)
+      atol_target = 2. * tol_target / (tf.math.exp(-z) * tf.math.abs(z))
+      tol = tf.math.minimum(tf.math.minimum(rtol_target, atol_target),
+                            tf.constant(1., dtype=z.dtype))
+      t = tf.where(tf.math.less_equal(tf.math.abs(conc), tol),
                    tf.exp(-z),
                    tf.exp(-tf.math.log1p(z * conc) / conc))
       return tf.exp(-t)
@@ -140,8 +148,14 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
       t = -tf.math.log(y)
 
+      tol_target = 1e-5
+      rtol_target = 2. * tol_target / tf.math.abs(tf.math.log(t))
+      atol_target = 2. * tol_target / (tf.math.log(t) ** 2)
+      tol = tf.math.minimum(tf.math.minimum(rtol_target, atol_target),
+                            tf.constant(1., dtype=t.dtype))
+
       conc = tf.convert_to_tensor(self.concentration)
-      z = tf.where(tf.math.less_equal(tf.math.abs(conc), self._tol),
+      z = tf.where(tf.math.less_equal(tf.math.abs(conc), tol),
                    -tf.math.log(t),
                    tf.math.expm1(-tf.math.log(t) * conc) / conc)
 
@@ -161,8 +175,14 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
       scale = tf.convert_to_tensor(self.scale)
       z = (x - self.loc) / scale
 
+      tol_target = 1e-5
+      rtol_target = 2. * tol_target / tf.math.abs(z)
+      atol_target = 2. * tol_target / (z ** 2)
+      tol = tf.math.minimum(tf.math.minimum(rtol_target, atol_target),
+                            tf.constant(1., dtype=z.dtype))
+
       conc = tf.convert_to_tensor(self.concentration)
-      log_t = tf.where(tf.math.less_equal(tf.math.abs(conc), self._tol),
+      log_t = tf.where(tf.math.less_equal(tf.math.abs(conc), tol),
                        -z,
                        -tf.math.log1p(z * conc) / conc)
 
