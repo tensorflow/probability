@@ -771,15 +771,18 @@ reciprocal = utils.copy_docstring(
     'tf.math.reciprocal',
     lambda x, name=None: np.reciprocal(x))
 
+
+def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
+  return op(_convert_to_tensor(input_tensor),
+            axis=_astuple(axis), keepdims=keepdims)
+
 reduce_all = utils.copy_docstring(
     'tf.math.reduce_all',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.all(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.all))
 
 reduce_any = utils.copy_docstring(
     'tf.math.reduce_any',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.any(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.any))
 
 # reduce_euclidean_norm = utils.copy_docstring(
 #     'tf.math.reduce_euclidean_norm',
@@ -792,39 +795,31 @@ reduce_logsumexp = utils.copy_docstring(
 
 reduce_max = utils.copy_docstring(
     'tf.math.reduce_max',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.max(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.max))
 
 reduce_mean = utils.copy_docstring(
     'tf.math.reduce_mean',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.mean(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.mean))
 
 reduce_min = utils.copy_docstring(
     'tf.math.reduce_min',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.min(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.min))
 
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.prod(_convert_to_tensor(input_tensor), _astuple(axis),
-                keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.prod))
 
 reduce_std = utils.copy_docstring(
     'tf.math.reduce_std',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.std(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.std))
 
 reduce_sum = utils.copy_docstring(
     'tf.math.reduce_sum',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.sum(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.sum))
 
 reduce_variance = utils.copy_docstring(
     'tf.math.reduce_variance',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.var(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.var))
 
 rint = utils.copy_docstring(
     'tf.math.rint',

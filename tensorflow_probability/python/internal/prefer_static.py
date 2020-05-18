@@ -23,6 +23,7 @@ import decorator
 import numpy as np
 import numpy as onp  # Avoid jax rewrite  # pylint: disable=reimported
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
@@ -41,6 +42,14 @@ from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-t
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 JAX_MODE = False
+
+# Enable converting TF TensorShape and Dimension into np.array. This allows TF
+# code to pass TensorShapes into prefer_static functions. We can also re-use the
+# nptf methods.
+nptf.register_tensor_conversion_function(
+    tf1.Dimension, nptf.ops._convert_dimension_to_tensor)  # pylint: disable=protected-access
+nptf.register_tensor_conversion_function(
+    tf.TensorShape, nptf.ops._convert_tensorshape_to_tensor)  # pylint: disable=protected-access
 
 
 def _prefer_static(original_fn, static_fn):

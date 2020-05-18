@@ -41,6 +41,9 @@ TF_REPLACEMENTS = {
     'import tensorflow_probability as tfp':
         'import tensorflow_probability as tfp; '
         'tfp = tfp.experimental.substrates.numpy',
+    'from tensorflow.python.framework import tensor_shape':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import tensor_shape'),
     'from tensorflow.python.ops.linalg':
         'from tensorflow_probability.python.internal.backend.numpy',
     'from tensorflow.python.ops import parallel_for':
@@ -70,7 +73,8 @@ LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
              'dtype_util', 'hypothesis_testlib', 'implementation_selection',
              'nest_util', 'prefer_static', 'samplers', 'special_math',
-             'tensor_util', 'test_combinations', 'test_util')
+             'tensor_util', 'tensorshape_util', 'test_combinations',
+             'test_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')

@@ -38,7 +38,7 @@ MODULE_MAPPINGS = {
     'framework import dtypes': 'dtype as dtypes',
     'framework import errors': 'errors',
     'framework import ops': 'ops',
-    'framework import tensor_shape': 'ops as tensor_shape',
+    'framework import tensor_shape': 'tensor_shape',
     'module import module': 'ops as module',
     'ops import array_ops': 'numpy_array as array_ops',
     'ops import check_ops': 'debugging as check_ops',
@@ -110,7 +110,7 @@ def gen_module(module_name):
   code = code.replace('.base_dtype', '')
   code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
-                '_ops.TensorShape(\\1)\\2', code)
+                'tensor_shape.TensorShape(\\1)\\2', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_complex',
                 'np.issubdtype(\\1, np.complexfloating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_integer',
@@ -142,6 +142,8 @@ def gen_module(module_name):
         'linalg_impl as _linalg')
   print('from tensorflow_probability.python.internal.backend.numpy import '
         'ops as _ops')
+  print('from tensorflow_probability.python.internal.backend.numpy import '
+        'tensor_shape')
   print(DIST_UTIL_IMPORT)
 
 

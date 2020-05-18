@@ -42,6 +42,7 @@ from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylin
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.tensor_shape import TensorShape
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 

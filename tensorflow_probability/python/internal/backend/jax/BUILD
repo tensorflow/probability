@@ -60,6 +60,7 @@ FILENAMES = [
     "sparse_lib",
     "tensor_array_ops",
     "tensor_array_ops_test",
+    "tensor_shape",
     "test_lib",
     "v1",
     "v2",

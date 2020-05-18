@@ -23,11 +23,8 @@ import numpy as np
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six
 
-# TODO(b/151669121): Remove remaining TF imports
-import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import tensor_shape
 import wrapt
 from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
@@ -43,7 +40,6 @@ __all__ = [
     'convert_to_tensor',
     'custom_gradient',
     'device',
-    'dimension_value',
     'enable_v2_behavior',
     'executing_eagerly',
     'get_static_value',
@@ -57,7 +53,6 @@ __all__ = [
     'GradientTape',
     'Module',
     'Tensor',
-    'TensorShape',
     'Variable',
     # 'gradients',
 ]
@@ -78,21 +73,30 @@ class _NullContext(object):
     return False  # False values do not suppress exceptions.
 
 
-def _base_broadcast_static_shape(shape_x, shape_y, as_tensorshape=False):
-  shape_x = TensorShape(shape_x)
-  shape_y = TensorShape(shape_y)
-  shape_xy = tf.broadcast_static_shape(shape_x, shape_y)
-  if as_tensorshape:
-    return shape_xy
-  return np.array(shape_xy.as_list(), dtype=np.int32)
-
-
 def _broadcast_static_shape(shape_x, shape_y):
-  return _base_broadcast_static_shape(shape_x, shape_y, as_tensorshape=True)
+  """Reimplements `tf.broadcast_static_shape` in JAX/NumPy."""
+  shape_x = tuple(tensor_shape.TensorShape(shape_x).as_list())
+  shape_y = tuple(tensor_shape.TensorShape(shape_y).as_list())
+  try:
+    if JAX_MODE:
+      error_message = 'Incompatible shapes for broadcasting'
+      return tensor_shape.TensorShape(lax.broadcast_shapes(shape_x, shape_y))
+    error_message = ('shape mismatch: objects cannot be broadcast to'
+                     ' a single shape')
+    return tensor_shape.TensorShape(
+        np.broadcast(np.zeros(shape_x), np.zeros(shape_y)).shape)
+  except ValueError as e:
+    # Match TF error message
+    if error_message in str(e):
+      raise ValueError(
+          'Incompatible shapes for broadcasting: {} and {}'.format(
+              shape_x, shape_y))
+    raise
 
 
 def _broadcast_dynamic_shape(shape_x, shape_y):
-  return _base_broadcast_static_shape(shape_x, shape_y)
+  """Reimplements `tf.broadcast_dynamic_shape` in JAX/NumPy."""
+  return convert_to_tensor(_broadcast_static_shape(shape_x, shape_y))
 
 
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
@@ -304,17 +308,7 @@ def _default_convert_to_tensor_with_dtype(value, dtype,
            ' unsupported type {} to a Tensor.').format(value, type(value)))
   return np.array(value, dtype=dtype)
 
-
-def _dimension_value(dimension):
-  if dimension is None:
-    return None
-  return int(dimension)
-
 # --- Begin Public Functions --------------------------------------------------
-
-dimension_value = utils.copy_docstring(
-    'tf.compat.dimension_value',
-    _dimension_value)
 
 
 class GradientTape(object):
@@ -489,15 +483,6 @@ else:
       'tf.stop_gradient',
       lambda input, name=None: np.array(input))
 
-TensorShape = tf.TensorShape
-Dimension = tf1.Dimension
-
-
-def dimension_at_index(shape, index):
-  if isinstance(shape, TensorShape):
-    return shape.dims[index]
-  return Dimension(int(shape[index]))
-
 
 def _convert_tensorshape_to_tensor(value, dtype=None):
   """Copied from TF's TensorShape conversion."""
@@ -520,7 +505,7 @@ def _convert_tensorshape_to_tensor(value, dtype=None):
   else:
     dtype = np.int64 if int64_value else np.int32
   return convert_to_tensor(value_list, dtype=dtype)
-register_tensor_conversion_function(TensorShape,
+register_tensor_conversion_function(tensor_shape.TensorShape,
                                     _convert_tensorshape_to_tensor)
 
 
@@ -528,8 +513,8 @@ def _convert_dimension_to_tensor(value, dtype=None):
   dtype = dtype or np.int32
   if dtype not in (np.int32, np.int64):
     raise TypeConversionError(value, dtype)
-  return convert_to_tensor(dimension_value(value), dtype=dtype)
-register_tensor_conversion_function(Dimension,
+  return convert_to_tensor(tensor_shape.dimension_value(value), dtype=dtype)
+register_tensor_conversion_function(tensor_shape.Dimension,
                                     _convert_dimension_to_tensor)
 
 
