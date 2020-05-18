@@ -27,7 +27,7 @@ from tensorflow.python.framework.composite_tensor import CompositeTensor  # pyli
 from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
 
 
-__all__ = ['as_composite']
+__all__ = ['as_composite', 'register_composite']
 
 
 _registry = {}  # Mapping from (python pkg, class name) -> class.
@@ -70,9 +70,10 @@ class _DistributionTypeSpec(tf.TypeSpec):
       raise ValueError('Unexpected version')
     if _find_clsid(clsid) is None:
       raise ValueError(
-          'Unable to identify distribution type for {}. For non-builtin '
-          'distributions, you will need to call `as_composite` before '
-          '`tf.saved_model.load` to warm up a cache.'.format(clsid))
+          'Unable to identify distribution type for {}. For user-defined '
+          'distributions (not in TFP), make sure the distribution is decorated '
+          'with `@tfp.experimental.register_composite` and its module is '
+          'imported before calling `tf.saved_model.load`.'.format(clsid))
     return cls(clsid, param_specs, kwargs)
 
 
@@ -257,3 +258,52 @@ def as_composite(obj):
     raise NotImplementedError(
         mk_err_msg('(Unable to serialize: {})'.format(str(e))))
   return result
+
+
+def register_composite(cls):
+  """A decorator that registers a Distribution as composite-friendly.
+
+  This registration is not required to call `as_composite` on instances
+  of a given distribution, but it *is* required if a `SavedModel` with
+  functions accepting or returning composite wrappers of this distribution
+  will be loaded in python (without having called `as_composite` already).
+
+  Example:
+
+  ```python
+  class MyDistribution(tfp.distributions.Distribution):
+     ...
+
+  # This will fail to load.
+  model = tf.saved_model.load(
+      '/path/to/sm_with_funcs_returning_composite_tensor_MyDistribution')
+  ```
+
+  Instead:
+  ```python
+  @tfp.experimental.register_composite
+  class MyDistribution(tfp.distributions.Distribution):
+     ...
+
+  # This will load.
+  model = tf.saved_model.load(
+      '/path/to/sm_with_funcs_returning_composite_tensor_MyDistribution')
+  ```
+
+  Args:
+    cls: A subclass of `Distribution`.
+
+  Returns:
+    The input, with the side-effect of registering it as a composite-friendly
+    distribution.
+
+  Raises:
+    TypeError: If `cls` is not a subclass of Distribution, or if
+      registration fails (`cls` is not convertible).
+    NotImplementedError: If registration fails (`cls` is not convertible).
+  """
+  if not issubclass(cls, distributions.Distribution):
+    raise TypeError('Expected cls to be a subclass of Distribution but saw: {}'
+                    .format(cls))
+  _make_convertible(cls)
+  return cls

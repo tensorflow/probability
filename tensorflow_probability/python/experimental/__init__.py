@@ -42,6 +42,8 @@ from tensorflow_probability.python.experimental import sequential
 from tensorflow_probability.python.experimental import substrates
 from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.composite_tensor import as_composite
+from tensorflow_probability.python.experimental.composite_tensor import register_composite
+
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
@@ -54,6 +56,7 @@ _allowed_symbols = [
     'marginalize',
     'mcmc',
     'nn',
+    'register_composite',
     'sequential',
     'substrates',
     'vi',
