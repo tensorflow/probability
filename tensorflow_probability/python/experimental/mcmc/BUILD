@@ -39,6 +39,7 @@ py_library(
         ":nuts_autobatching",
         ":particle_filter",
         ":sample_sequential_monte_carlo",
+        ":weighted_resampling",
         # tensorflow dep,
     ],
 )
@@ -176,6 +177,7 @@ py_library(
     srcs = ["particle_filter.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":weighted_resampling",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:docstring_util",
@@ -204,6 +206,7 @@ py_library(
     srcs = ["sample_sequential_monte_carlo.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":weighted_resampling",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
@@ -224,6 +227,33 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "weighted_resampling",
+    srcs = ["weighted_resampling.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_test(
+    name = "weighted_resampling_test",
+    srcs = ["weighted_resampling_test.py"],
+    shard_count = 2,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],

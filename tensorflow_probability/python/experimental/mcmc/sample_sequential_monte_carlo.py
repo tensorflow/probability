@@ -23,8 +23,7 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import categorical
-from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
@@ -184,38 +183,6 @@ def gen_make_hmc_kernel_fn(num_leapfrog_steps=10):
 default_make_hmc_kernel_fn = gen_make_hmc_kernel_fn()
 
 
-# Generate a default function for resampling particle and their associated
-# properties according to some (log) weights
-# TODO(junpenglao): Unify it with the _resample function in particale_filter.py
-def resample_particle_and_info(particles, log_weights, seed=None):
-  """Resamples the current particles according to provided weights.
-
-  Args:
-    particles: Nested structure of `Tensor`s each of shape
-      `[num_particles, b1, ..., bN, ...]`, where
-      `b1, ..., bN` are optional batch dimensions.
-    log_weights: float `Tensor` of shape `[num_particles, b1, ..., bN]`, where
-      `b1, ..., bN` are optional batch dimensions.
-    seed: Python `int` random seed.
-  Returns:
-    resampled_particles: Nested structure of `Tensor`s, matching `particles`.
-    resample_indices: int `Tensor` of shape `[num_particles, b1, ..., bN]`.
-  """
-  with tf.name_scope('resample'):
-    num_particles = ps.size0(log_weights)
-
-    log_probs = tf.math.log_softmax(log_weights, axis=0)
-    # TODO(junpenglao): use an `axis` specifiable categorical sampler to avoid
-    # transpose below.
-    resample_indices = categorical.Categorical(
-        logits=dist_util.move_dimension(log_probs, 0, -1)
-        ).sample(num_particles, seed=seed)
-    resampled_particles = tf.nest.map_structure(
-        lambda x: mcmc_util.index_remapping_gather(x, resample_indices),
-        particles)
-  return resampled_particles, resample_indices
-
-
 def simple_heuristic_tuning(num_steps,
                             log_scalings,
                             log_accept_prob,
@@ -291,6 +258,7 @@ def sample_sequential_monte_carlo(
     make_kernel_fn=make_rwmh_kernel_fn,
     tuning_fn=simple_heuristic_tuning,
     make_tempered_target_log_prob_fn=default_make_tempered_target_log_prob_fn,
+    resample_fn=weighted_resampling.resample_systematic,
     ess_threshold_ratio=0.5,
     parallel_iterations=10,
     seed=None,
@@ -345,6 +313,12 @@ def sample_sequential_monte_carlo(
       `prior_log_prob_fn`, `likelihood_log_prob_fn`, and `inverse_temperatures`
       and creates a `target_log_prob_fn` `callable` that pass to
       `make_kernel_fn`.
+    resample_fn: Python `callable` to generate the indices of resampled
+      particles, given their weights. Generally, one of
+      `tfp.experimental.mcmc.resample_independent` or
+      `tfp.experimental.mcmc.resample_systematic`, or any function
+      with the same signature.
+      Default value: `tfp.experimental.mcmc.resample_systematic`.
     ess_threshold_ratio: Target ratio for effective sample size.
     parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
@@ -558,9 +532,10 @@ def sample_sequential_monte_carlo(
                 smc_kernel_result.particle_info.log_scalings, axis=0))
             )
       (resampled_state,
-       resampled_particle_info), _ = resample_particle_and_info(
-           (state, smc_kernel_result.particle_info),
-           log_weights,
+       resampled_particle_info), _ = weighted_resampling.resample(
+           particles=(state, smc_kernel_result.particle_info),
+           log_weights=log_weights,
+           resample_fn=resample_fn,
            seed=seed_stream)
       next_num_steps, next_log_scalings = tuning_fn(
           smc_kernel_result.num_steps,
