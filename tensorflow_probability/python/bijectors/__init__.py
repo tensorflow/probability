@@ -55,6 +55,7 @@ from tensorflow_probability.python.bijectors.masked_autoregressive import masked
 from tensorflow_probability.python.bijectors.masked_autoregressive import masked_dense
 from tensorflow_probability.python.bijectors.masked_autoregressive import MaskedAutoregressiveFlow
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
+from tensorflow_probability.python.bijectors.moyal_cdf import MoyalCDF
 from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.pad import Pad
@@ -123,6 +124,7 @@ __all__ = [
     "MaskedAutoregressiveFlow",
     "MatrixInverseTriL",
     "MatvecLU",
+    "MoyalCDF",
     "NormalCDF",
     "Ordered",
     "Pad",

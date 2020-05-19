@@ -71,6 +71,7 @@ multi_substrate_py_library(
         ":lambertw_transform",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
+        ":moyal_cdf",
         ":normal_cdf",
         ":ordered",
         ":pad",
@@ -130,17 +131,14 @@ py_test(
     shard_count = 20,
     tags = ["hypothesis"],
     deps = [
-        ":categorical_to_discrete",
+        ":bijectors",
         ":hypothesis_testlib",
-        # absl/logging dep,
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
-        # six dep,
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
@@ -516,6 +514,19 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "moyal_cdf",
+    srcs = ["moyal_cdf.py"],
+    deps = [
+        ":bijector",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1330,6 +1341,20 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_test(
+    name = "moyal_cdf_test",
+    size = "small",
+    srcs = ["moyal_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 py_test(
     name = "scale_matvec_lu_test",
     size = "small",
@@ -1741,6 +1766,8 @@ exports_files(
         "lambertw_transform_test.py",
         "matrix_inverse_tril.py",
         "matrix_inverse_tril_test.py",
+        "moyal_cdf.py",
+        "moyal_cdf_test.py",
         "normal_cdf.py",
         "normal_cdf_test.py",
         "ordered.py",

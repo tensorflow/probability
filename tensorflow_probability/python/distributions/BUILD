@@ -93,6 +93,7 @@ multi_substrate_py_library(
         ":lognormal",
         ":mixture",
         ":mixture_same_family",
+        ":moyal",
         ":multinomial",
         ":multivariate_student_t",
         ":mvn_diag",
@@ -1026,6 +1027,24 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "moyal",
+    srcs = ["moyal.py"],
+    deps = [
+        ":kullback_leibler",
+        ":transformed_distribution",
+        ":uniform",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:moyal_cdf",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -2438,6 +2457,21 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "moyal_test",
+    size = "medium",
+    srcs = ["moyal_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "multinomial_test",
     size = "medium",
     srcs = ["multinomial_test.py"],
@@ -2977,13 +3011,14 @@ py_test(
     shard_count = 40,
     tags = ["hypothesis"],
     deps = [
+        ":distributions",
         ":hypothesis_testlib",
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -3090,6 +3125,7 @@ exports_files(
         "lognormal_test.py",
         "mixture.py",
         "mixture_same_family.py",
+        "moyal.py",
         "multinomial.py",
         "multivariate_student_t.py",
         "mvn_diag.py",
