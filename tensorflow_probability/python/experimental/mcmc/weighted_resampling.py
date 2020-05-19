@@ -156,10 +156,12 @@ def resample_independent(log_probs, event_size, sample_shape,
   """Categorical resampler for sequential Monte Carlo.
 
   The return value from this function is similar to sampling with
+
   ```python
   expanded_sample_shape = tf.concat([[event_size], sample_shape]), axis=-1)
   tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
   ```
+
   but with values sorted along the first axis. It can be considered to be
   sampling events made up of a length-`event_size` vector of draws from
   the `Categorical` distribution. For large input values this function should

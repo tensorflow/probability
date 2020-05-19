@@ -38,6 +38,7 @@ py_library(
         ":elliptical_slice_sampler",
         ":nuts_autobatching",
         ":particle_filter",
+        ":particle_filter_augmentation",
         ":sample_sequential_monte_carlo",
         ":weighted_resampling",
         # tensorflow dep,
@@ -198,6 +199,29 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "particle_filter_augmentation",
+    srcs = ["particle_filter_augmentation.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "particle_filter_augmentation_test",
+    size = "medium",
+    srcs = ["particle_filter_augmentation_test.py"],
+    deps = [
+        ":particle_filter_augmentation",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

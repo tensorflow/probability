@@ -117,14 +117,6 @@ def _dummy_indices_like(indices):
       indices_shape)
 
 
-def _gather_history(structure, step, num_steps):
-  """Gather up to `num_steps` of history from a nested structure."""
-  initial_step = ps.maximum(0, step - num_steps)
-  return tf.nest.map_structure(
-      lambda x: tf.gather(x, ps.range(initial_step, step)),
-      structure)
-
-
 def ess_below_threshold(unnormalized_log_weights, threshold=0.5):
   """Determines if the effective sample size is much less than num_particles."""
   with tf.name_scope('ess_below_threshold'):
@@ -159,7 +151,6 @@ ParticleFilterLoopVariables = collections.namedtuple(
     ['step',
      'previous_step_results',
      'accumulated_traced_results',
-     'state_history',  # Set to `tf.zeros([0])` if not tracked.
      'num_steps_traced'
     ])
 
@@ -177,12 +168,6 @@ instance over the state at time `step + 1`.
 Similarly, the `observation_fn` has signature
 `observation_dist = observation_fn(step, state)`, where the return value
 is a distribution over the value(s) observed at time `step`.
-
-Each of these `fn`s may also, optionally, take
-additional keyword arguments `state_history` and `observation_history`, which
-will be passed if and only if the corresponding
-`num_steps_state_history_to_pass` or `num_steps_observation_history_to_pass`
-arguments are provided to this method. These are described further below.
 
 Args:
   observations: a (structure of) Tensors, each of shape
@@ -236,42 +221,7 @@ Args:
     approximate continuous-time dynamics. The initial and final steps
     (steps `0` and `num_timesteps - 1`) are always observed.
     Default value: `None`.
-  num_steps_state_history_to_pass: scalar Python `int` number of steps to
-    include in the optional `state_history` argument to `transition_fn`,
-    `observation_fn`, and `proposal_fn`. If `None`, this argument
-    will not be passed.
-    Default value: `None`.
-  num_steps_observation_history_to_pass: scalar Python `int` number of steps
-    to include in the optional `observation_history` argument to
-    `transition_fn`, `observation_fn`, and `proposal_fn`. If `None`, this
-    argument will not be passed.
-    Default value: `None`.
 """
-
-non_markovian_specification_str = """\
-#### Non-Markovian models (state and observation history).
-
-Models that do not follow the [Markov property](
-https://en.wikipedia.org/wiki/Markov_property), which requires that the
-current state contains all information relevent to the future of the system,
-are supported by specifying `num_steps_state_history_to_pass` and/or
-`num_steps_observation_history_to_pass`. If these are specified, additional
-keyword arguments `state_history` and/or `observation_history` (respectively)
-will be passed to each of `transition_fn`, `observation_fn`, and
-`proposal_fn`.
-
-The `state_history`, if requested, is a structure of `Tensor`s like
-the initial state, but with a batch dimension prefixed to every Tensor,
-of size `num_steps_state_history_to_pass` , so that
-`state_history[-1]` represents the previous state
-(for `transition_fn` and `proposal_fn`, this will equal the `state` arg),
-`state_history[-2]` the state before that, and so on.
-
-The `observation_history` is a structure like `observations`, but with leading
-dimension of `minimum(step, num_steps_observation_history_to_pass)`. At the
-initial step, `observation_history=None` will be passed and should be
-handled appropriately. At subsequent steps, `observation_history[-1]`
-refers to the observation at the previous timestep, and so on."""
 
 
 @docstring_util.expand_docstring(
@@ -287,8 +237,6 @@ def infer_trajectories(observations,
                        resample_criterion_fn=ess_below_threshold,
                        rejuvenation_kernel_fn=None,
                        num_transitions_per_observation=1,
-                       num_steps_state_history_to_pass=None,
-                       num_steps_observation_history_to_pass=None,
                        seed=None,
                        name=None):  # pylint: disable=g-doc-args
   """Use particle filtering to sample from the posterior over trajectories.
@@ -311,8 +259,6 @@ def infer_trajectories(observations,
       https://en.wikipedia.org/wiki/Jensen%27s_inequality))
       this is *smaller* in expectation than the true
       `log p(observations[t] | observations[:t])`.
-
-  ${non_markovian_specification_str}
 
   #### Examples
 
@@ -410,9 +356,6 @@ def infer_trajectories(observations,
          resample_criterion_fn=resample_criterion_fn,
          rejuvenation_kernel_fn=rejuvenation_kernel_fn,
          num_transitions_per_observation=num_transitions_per_observation,
-         num_steps_state_history_to_pass=num_steps_state_history_to_pass,
-         num_steps_observation_history_to_pass=(
-             num_steps_observation_history_to_pass),
          trace_fn=_default_trace_fn,
          seed=seed,
          name=name)
@@ -433,8 +376,7 @@ def infer_trajectories(observations,
 
 
 @docstring_util.expand_docstring(
-    particle_filter_arg_str=particle_filter_arg_str,
-    non_markovian_specification_str=non_markovian_specification_str)
+    particle_filter_arg_str=particle_filter_arg_str)
 def particle_filter(observations,
                     initial_state_prior,
                     transition_fn,
@@ -446,8 +388,6 @@ def particle_filter(observations,
                     resample_criterion_fn=ess_below_threshold,
                     rejuvenation_kernel_fn=None,  # TODO(davmre): not yet supported. pylint: disable=unused-argument
                     num_transitions_per_observation=1,
-                    num_steps_state_history_to_pass=None,
-                    num_steps_observation_history_to_pass=None,
                     trace_fn=_default_trace_fn,
                     step_indices_to_trace=None,
                     seed=None,
@@ -502,7 +442,6 @@ def particle_filter(observations,
       this is *smaller* in expectation than the true
       `log p(observations[t] | observations[:t])`.
 
-  ${non_markovian_specification_str}
   """
   seed = SeedStream(seed, 'particle_filter')
   with tf.name_scope(name or 'particle_filter'):
@@ -567,7 +506,6 @@ def particle_filter(observations,
     def _loop_body(step,
                    previous_step_results,
                    accumulated_traced_results,
-                   state_history,
                    num_steps_traced):
       """Take one step in dynamics and accumulate marginal likelihood."""
 
@@ -580,28 +518,15 @@ def particle_filter(observations,
       current_observation = tf.nest.map_structure(
           lambda x, step=step: tf.gather(x, observation_idx), observations)
 
-      history_to_pass_into_fns = {}
-      if num_steps_observation_history_to_pass:
-        history_to_pass_into_fns['observation_history'] = _gather_history(
-            observations,
-            observation_idx,
-            num_steps_observation_history_to_pass)
-      if num_steps_state_history_to_pass:
-        history_to_pass_into_fns['state_history'] = state_history
-
       new_step_results = _filter_one_step(
           step=step,
           previous_step_results=previous_step_results,
           observation=current_observation,
-          transition_fn=functools.partial(
-              transition_fn, **history_to_pass_into_fns),
-          observation_fn=functools.partial(
-              observation_fn, **history_to_pass_into_fns),
-          proposal_fn=(
-              None if proposal_fn is None else
-              functools.partial(proposal_fn, **history_to_pass_into_fns)),
-          resample_fn=resample_fn,
+          transition_fn=transition_fn,
+          observation_fn=observation_fn,
+          proposal_fn=proposal_fn,
           resample_criterion_fn=resample_criterion_fn,
+          resample_fn=resample_fn,
           has_observation=step_has_observation,
           seed=seed)
 
@@ -609,7 +534,6 @@ def particle_filter(observations,
           step=step,
           current_step_results=new_step_results,
           accumulated_traced_results=accumulated_traced_results,
-          state_history=state_history,
           trace_fn=trace_fn,
           step_indices_to_trace=step_indices_to_trace,
           num_steps_traced=num_steps_traced)
@@ -620,7 +544,6 @@ def particle_filter(observations,
         loop_vars=_initialize_loop_variables(
             initial_step_results=initial_step_results,
             num_timesteps=num_timesteps,
-            num_steps_state_history_to_pass=num_steps_state_history_to_pass,
             trace_fn=trace_fn,
             step_indices_to_trace=step_indices_to_trace))
 
@@ -654,7 +577,6 @@ def _canonicalize_steps_to_trace(step_indices_to_trace, num_timesteps):
 
 def _initialize_loop_variables(initial_step_results,
                                num_timesteps,
-                               num_steps_state_history_to_pass,
                                trace_fn,
                                step_indices_to_trace):
   """Initialize arrays and other quantities passed through the filter loop."""
@@ -678,33 +600,16 @@ def _initialize_loop_variables(initial_step_results,
                    traced_results)),
       lambda: (0, trace_arrays))
 
-  # Because `while_loop` requires Tensor values, we'll represent the lack of
-  # state history by a static-shape empty Tensor.
-  # This can be detected elsewhere by branching on
-  #  `tf.is_tensor(state_history) and state_history.shape[0] == 0`.
-  state_history = tf.zeros([0])
-  if num_steps_state_history_to_pass:
-    # Repeat the initial state, so that `state_history` always has length
-    # `num_steps_state_history_to_pass`.
-    state_history = tf.nest.map_structure(
-        lambda x: tf.broadcast_to(  # pylint: disable=g-long-lambda
-            x[tf.newaxis, ...],
-            ps.concat([[num_steps_state_history_to_pass],
-                       ps.shape(x)], axis=0)),
-        initial_step_results.particles)
-
   return ParticleFilterLoopVariables(
       step=1,
       previous_step_results=initial_step_results,
       accumulated_traced_results=trace_arrays,
-      state_history=state_history,
       num_steps_traced=num_steps_traced)
 
 
 def _update_loop_variables(step,
                            current_step_results,
                            accumulated_traced_results,
-                           state_history,
                            trace_fn,
                            step_indices_to_trace,
                            num_steps_traced):
@@ -727,30 +632,10 @@ def _update_loop_variables(step,
                    trace_fn(current_step_results))),
       lambda: (num_steps_traced, accumulated_traced_results))
 
-  history_is_empty = (tf.is_tensor(state_history) and
-                      state_history.shape[0] == 0)
-  if not history_is_empty:
-    # Permute the particles from previous steps to match the current resampled
-    # indices, so that the state history reflects coherent trajectories.
-    resampled_state_history = tf.nest.map_structure(
-        lambda x: mcmc_util.index_remapping_gather(  # pylint: disable=g-long-lambda
-            x[1:],
-            current_step_results.parent_indices,
-            axis=1),
-        state_history)
-
-    # Update the history by concat'ing the carried-forward elements with the
-    # most recent state.
-    state_history = tf.nest.map_structure(
-        lambda h, s: tf.concat([h, s[tf.newaxis, ...]], axis=0),
-        resampled_state_history,
-        current_step_results.particles)
-
   return ParticleFilterLoopVariables(
       step=step + 1,
       previous_step_results=current_step_results,
       accumulated_traced_results=accumulated_traced_results,
-      state_history=state_history,
       num_steps_traced=num_steps_traced)
 
 

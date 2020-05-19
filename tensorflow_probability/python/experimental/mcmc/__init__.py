@@ -24,6 +24,10 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter import ess_
 from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
 from tensorflow_probability.python.experimental.mcmc.particle_filter import reconstruct_trajectories
+from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_prior_with_state_history
+from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_observation_history
+from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_state_history
+from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
@@ -40,6 +44,10 @@ from tensorflow.python.util.all_util import remove_undocumented  # pylint: disab
 _allowed_symbols = [
     'EllipticalSliceSampler',
     'NoUTurnSampler',
+    'StateWithHistory',
+    'augment_prior_with_state_history',
+    'augment_with_observation_history',
+    'augment_with_state_history',
     'ess_below_threshold',
     'infer_trajectories',
     'default_make_hmc_kernel_fn',
