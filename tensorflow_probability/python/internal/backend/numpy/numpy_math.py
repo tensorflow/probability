@@ -772,9 +772,11 @@ reciprocal = utils.copy_docstring(
     lambda x, name=None: np.reciprocal(x))
 
 
-def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
-  return op(_convert_to_tensor(input_tensor),
-            axis=_astuple(axis), keepdims=keepdims)
+def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # pylint: disable=unused-argument
+                     include_dtype_kwarg=False):
+  input_tensor = _convert_to_tensor(input_tensor)
+  kwargs = dict(dtype=input_tensor.dtype) if include_dtype_kwarg else {}
+  return op(input_tensor, axis=_astuple(axis), keepdims=keepdims, **kwargs)
 
 reduce_all = utils.copy_docstring(
     'tf.math.reduce_all',
@@ -799,7 +801,7 @@ reduce_max = utils.copy_docstring(
 
 reduce_mean = utils.copy_docstring(
     'tf.math.reduce_mean',
-    functools.partial(_apply_reduction, np.mean))
+    functools.partial(_apply_reduction, np.mean, include_dtype_kwarg=True))
 
 reduce_min = utils.copy_docstring(
     'tf.math.reduce_min',
@@ -807,19 +809,19 @@ reduce_min = utils.copy_docstring(
 
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',
-    functools.partial(_apply_reduction, np.prod))
+    functools.partial(_apply_reduction, np.prod, include_dtype_kwarg=True))
 
 reduce_std = utils.copy_docstring(
     'tf.math.reduce_std',
-    functools.partial(_apply_reduction, np.std))
+    functools.partial(_apply_reduction, np.std, include_dtype_kwarg=True))
 
 reduce_sum = utils.copy_docstring(
     'tf.math.reduce_sum',
-    functools.partial(_apply_reduction, np.sum))
+    functools.partial(_apply_reduction, np.sum, include_dtype_kwarg=True))
 
 reduce_variance = utils.copy_docstring(
     'tf.math.reduce_variance',
-    functools.partial(_apply_reduction, np.var))
+    functools.partial(_apply_reduction, np.var, include_dtype_kwarg=True))
 
 rint = utils.copy_docstring(
     'tf.math.rint',
