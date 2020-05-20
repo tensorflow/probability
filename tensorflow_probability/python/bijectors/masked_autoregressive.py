@@ -913,14 +913,25 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
                          'shape. `event_shape: {!r}`'.format(event_shape))
 
     if self._conditional:
+      if self._event_shape is None:
+        raise ValueError('`event_shape` must be provided when '
+                         '`conditional` is True')
+      if self._conditional_shape is None:
+        raise ValueError('`conditional_shape` must be provided when '
+                         '`conditional` is True')
+      self._conditional_size = self._conditional_shape[-1]
+      self._conditional_ndims = len(self._conditional_shape)
+      if self._conditional_ndims != 1:
+        raise ValueError('Parameter `conditional_shape` must describe a '
+                         'rank-1 shape')
+      if not ((self._conditional_layers == "first_layer") or
+          (self._conditional_layers == "all_layers")):
+        raise ValueError('`conditional_input_layers` must be '
+                         '"first_layers" or "all_layers"')
+    else:
       if self._conditional_shape is not None:
-        self._conditional_size = self._conditional_shape[-1]
-        self._conditional_ndims = len(self._conditional_shape)
-
-        if self._conditional_ndims != 1:
-          raise ValueError('Parameter `conditional_shape` must describe a '
-                           'rank-1 shape. `conditional_shape: {!r}`'.format(
-                               conditional_shape))
+        raise ValueError('`conditional_shape` passed but `conditional` is '
+                         'set to False.')
 
     # To be built in `build`.
     self._input_order = None
@@ -929,24 +940,12 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
   def build(self, input_shape):
     """See tfkl.Layer.build."""
-    if self._conditional:
-      if self._event_shape is None:
-        raise ValueError('`event_shape` must be provided when using '
-                         'conditional autoregressive network')
-      if self._conditional_shape is None:
-        raise ValueError('`conditional_shape` must be provided when using '
-                         'conditional autoregressive network')
-      if input_shape[-1] != self._event_shape[-1]:
-        raise ValueError('Invalid final dimension of `input_shape`. '
-                         'Expected `{!r}`, but got `{!r}`'.format(
-                             self._event_shape[-1], input_shape[-1]))
-    else:
-      if self._event_shape is None:
-        # `event_shape` wasn't specied at __init__, so infer from `input_shape`
-        self._event_shape = [tf.compat.dimension_value(input_shape[-1])]
-        self._event_size = self._event_shape[-1]
-        self._event_ndims = len(self._event_shape)
-        # Should we throw if input_shape has rank > 2?
+    if self._event_shape is None:
+      # `event_shape` wasn't specied at __init__, so infer from `input_shape`
+      self._event_shape = [tf.compat.dimension_value(input_shape[-1])]
+      self._event_size = self._event_shape[-1]
+      self._event_ndims = len(self._event_shape)
+      # Should we throw if input_shape has rank > 2?
 
     if input_shape[-1] != self._event_shape[-1]:
       raise ValueError('Invalid final dimension of `input_shape`. '
@@ -1025,8 +1024,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     """See tfkl.Layer.call."""
     with tf.name_scope(self.name or 'AutoregressiveNetwork_call'):
       x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
-      input_shape = tf.shape(x)
       # TODO(b/67594795): Better support for dynamic shapes.
+      input_shape = tf.shape(x)
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
       if self._conditional:
