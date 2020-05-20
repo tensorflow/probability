@@ -130,17 +130,16 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
       return (tf.math.log(x) - self.loc) / self.scale
 
   def _log_prob(self, x):
-    return (-tf.math.log(self.scale) - self.loc
+    return (-tf.math.log(self.scale)
+            - self.loc
             + (1. - self.scale) * self._log_z(x)
-            - 2 * tf.math.log1p(
-              tf.math.exp(self._log_z(x)))
-            )
+            - 2 * tf.math.softplus(self._log_z(x)))
 
   def _log_cdf(self, x):
-    return -tf.math.log1p(tf.math.exp(-self._log_z(x)))
+    return -tf.math.softplus(-self._log_z(x))
 
   def _log_survival_function(self, x):
-    return - self._log_z(x) + self._log_cdf(x)
+    return self._log_cdf(x) - self._log_z(x)
 
   def _sample_control_dependencies(self, x):
     assertions = []
