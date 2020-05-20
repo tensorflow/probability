@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -32,8 +33,105 @@ from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     'Poisson',
-    'random_poisson_rejection_sampler',
 ]
+
+
+def _random_poisson_cpu(
+    shape,
+    rates=None,
+    log_rates=None,
+    output_dtype=tf.float32,
+    seed=None,
+    name=None):
+  """Sample using *fast* `tf.random.stateless_poisson`."""
+  with tf.name_scope(name or 'poisson_cpu'):
+    if rates is None:
+      rates = tf.math.exp(log_rates)
+    shape = tf.concat([shape, tf.shape(rates)], axis=0)
+    return tf.random.stateless_poisson(
+        shape=shape, seed=seed, lam=rates, dtype=output_dtype)
+
+
+def _random_poisson_noncpu(
+    shape,
+    rates=None,
+    log_rates=None,
+    output_dtype=tf.float32,
+    seed=None,
+    name=None):
+  """Sample using XLA-friendly python-based rejection sampler."""
+  with tf.name_scope(name or 'poisson_noncpu'):
+    if log_rates is None:
+      log_rates = tf.math.log(rates)
+    shape = tf.concat([shape, tf.shape(log_rates)], axis=0)
+    good_params_mask = ~tf.math.is_nan(log_rates)
+    internal_dtype = tf.float64
+
+    seed_lo, seed_hi = samplers.split_seed(seed)
+
+    # First, we sample the values for which rate >= 10.
+    # When replacing NaN or < 10 values, use 100 for log rate, since that leads
+    # to a high-likelihood of the rejection sampler accepting on the first pass.
+    high_params_mask = good_params_mask & (log_rates >= np.log(10.))
+    cast_log_rates = tf.cast(log_rates, internal_dtype)
+    safe_log_rates = tf.where(high_params_mask, cast_log_rates, 100.)
+    high_rate_samples = _random_poisson_high_rate(
+        shape,
+        log_rate=safe_log_rates,
+        internal_dtype=internal_dtype,
+        seed=seed_hi)
+    high_rate_samples = tf.cast(high_rate_samples, output_dtype)
+
+    # Next, we sample the values for which rate < 10. When replacing NaN or high
+    # values, use a small number so that the sum-of-exponentials sampler
+    # terminates on the first pass with high likelihood.
+    low_params_mask = good_params_mask & ~high_params_mask
+    safe_rate = tf.where(low_params_mask, tf.math.exp(cast_log_rates), 1e-5)
+    low_rate_samples = _random_poisson_low_rate(
+        shape, rate=safe_rate, internal_dtype=internal_dtype, seed=seed_lo)
+    low_rate_samples = tf.cast(low_rate_samples, output_dtype)
+
+    samples = tf.where(
+        good_params_mask,
+        tf.where(high_params_mask, high_rate_samples, low_rate_samples), np.nan)
+
+  return samples
+
+
+# tf.function required to access Grappler's implementation_selector.
+@tf.function(autograph=False)
+def _random_poisson(
+    shape,
+    rates=None,
+    log_rates=None,
+    output_dtype=tf.float32,
+    seed=None,
+    name=None):
+  """Sample a poisson, CPU specialized to stateless_poisson.
+
+  Args:
+    shape: Shape of the full sample output. Trailing dims should match the
+      broadcast shape of `counts` with `probs|logits`.
+    rates: Batch of rates for Poisson distribution.
+    log_rates: Batch of log rates for Poisson distribution.
+    output_dtype: DType of samples.
+    seed: int or Tensor seed.
+    name: Optional name for related ops.
+
+  Returns:
+    samples: Samples from poisson distributions.
+    runtime_used_for_sampling: One of `implementation_selection._RUNTIME_*`.
+  """
+  with tf.name_scope(name or 'random_poisson'):
+    seed = samplers.sanitize_seed(seed)
+    shape = tf.convert_to_tensor(shape, dtype_hint=tf.int32, name='shape')
+    params = dict(shape=shape, rates=rates, log_rates=log_rates,
+                  output_dtype=output_dtype, seed=seed, name=name)
+    sampler_impl = implementation_selection.implementation_selecting(
+        fn_name='poisson',
+        default_fn=_random_poisson_noncpu,
+        cpu_fn=_random_poisson_cpu)
+    return sampler_impl(**params)
 
 
 class Poisson(distribution.Distribution):
@@ -195,8 +293,15 @@ class Poisson(distribution.Distribution):
     return tf.floor(self._rate_parameter_no_checks())
 
   def _sample_n(self, n, seed=None):
-    lam = self._rate_parameter_no_checks()
-    return samplers.poisson(shape=[n], lam=lam, dtype=self.dtype, seed=seed)
+    seed = samplers.sanitize_seed(seed)
+    return _random_poisson(
+        shape=tf.convert_to_tensor([n]),
+        rates=(None if self._rate is None else
+               tf.convert_to_tensor(self._rate)),
+        log_rates=(None if self._log_rate is None else
+                   tf.convert_to_tensor(self._log_rate)),
+        output_dtype=self.dtype,
+        seed=seed)[0]
 
   def rate_parameter(self, name=None):
     """Rate vec computed from non-`None` input arg (`rate` or `log_rate`)."""
@@ -364,56 +469,4 @@ def _random_poisson_low_rate(sample_shape,
       # batch size, a poisson sample with rate < 10 would attain a value > 200.
       maximum_iterations=200,
   )
-  return samples
-
-
-def random_poisson_rejection_sampler(sample_shape,
-                                     log_rate,
-                                     internal_dtype=tf.float64,
-                                     seed=None):
-  """Samples from the Poisson distribution.
-
-  The sampling algorithm is rejection sampling.
-
-  Args:
-    sample_shape: The output sample shape. Must broadcast with `log_rate`.
-    log_rate: Floating point tensor, log rate.
-    internal_dtype: dtype to use for internal computations.
-    seed: (optional) The random seed.
-
-  Returns:
-    Samples from the poisson distribution.
-  """
-  output_dtype = dtype_util.common_dtype([log_rate], dtype_hint=tf.float32)
-  good_params_mask = ~tf.math.is_nan(log_rate)
-
-  seed_lo, seed_hi = samplers.split_seed(seed)
-
-  # First, we sample the values for which rate >= 10.
-  # When replacing NaN or < 10 values, use 100 for log rate, since that leads
-  # to a high-likelihood of the rejection sampler accepting on the first pass.
-  high_params_mask = good_params_mask & tf.math.greater_equal(
-      log_rate, np.log(10.))
-  cast_log_rate = tf.cast(log_rate, internal_dtype)
-  safe_log_rate = tf.where(high_params_mask, cast_log_rate, 100.)
-  high_rate_samples = _random_poisson_high_rate(
-      sample_shape,
-      log_rate=safe_log_rate,
-      internal_dtype=internal_dtype,
-      seed=seed_hi)
-  high_rate_samples = tf.cast(high_rate_samples, output_dtype)
-
-  # Next, we sample the values for which rate < 10. When replacing NaN or high
-  # values, use a small number so that the sum-of-exponentials sampler
-  # terminates on the first pass with high likelihood.
-  low_params_mask = good_params_mask & ~high_params_mask
-  safe_rate = tf.where(low_params_mask, tf.math.exp(cast_log_rate), 1e-5)
-  low_rate_samples = _random_poisson_low_rate(
-      sample_shape, rate=safe_rate, internal_dtype=internal_dtype, seed=seed_lo)
-  low_rate_samples = tf.cast(low_rate_samples, output_dtype)
-
-  samples = tf.where(
-      good_params_mask,
-      tf.where(high_params_mask, high_rate_samples, low_rate_samples), np.nan)
-
   return samples

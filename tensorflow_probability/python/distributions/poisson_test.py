@@ -22,9 +22,10 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions import poisson as poisson_dist
+from tensorflow_probability.python.distributions import poisson as poisson_lib
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 
@@ -385,8 +386,45 @@ class PoissonLogRateTest(PoissonTest):
     self.assertAllNotNone(grad)
 
 
-@test_util.test_all_tf_execution_regimes
-class PoissonSampleLogRateTest(test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class PoissonSamplingTest(test_util.TestCase):
+
+  @test_util.jax_disable_test_missing_functionality('tf stateless_poisson')
+  def testSampleCPU(self):
+    with tf.device('CPU'):
+      _, runtime = self.evaluate(
+          poisson_lib._random_poisson(
+              shape=tf.constant([], dtype=tf.int32),
+              rates=tf.constant(10.),
+              seed=test_util.test_seed()))
+    self.assertEqual(implementation_selection._RUNTIME_CPU, runtime)
+
+  def testSampleGPU(self):
+    if not tf.test.is_gpu_available():
+      self.skipTest('no GPU')
+    with tf.device('GPU'):
+      _, runtime = self.evaluate(poisson_lib._random_poisson(
+          shape=tf.constant([], dtype=tf.int32),
+          rates=tf.constant(10.),
+          seed=test_util.test_seed()))
+    self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
+
+  def testSampleXLA(self):
+    self.skip_if_no_xla()
+    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    log_rates = np.random.rand(4, 3).astype(np.float32)
+    dist = tfd.Poisson(log_rate=log_rates, validate_args=True)
+    # Verify the compile succeeds going all the way through the distribution.
+    self.evaluate(
+        tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
+                    experimental_compile=True)())
+    # Also test the low-level sampler and verify the XLA-friendly variant.
+    _, runtime = self.evaluate(
+        tf.function(poisson_lib._random_poisson, experimental_compile=True)(
+            shape=tf.constant([], dtype=tf.int32),
+            rates=tf.constant(10.),
+            seed=test_util.test_seed()))
+    self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
 
   def testSamplePoissonLowRates(self):
     # Low log rate (< log(10.)) samples would use Knuth's algorithm.
@@ -399,9 +437,11 @@ class PoissonSampleLogRateTest(test_util.TestCase):
                 discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
         num_samples)
 
-    samples = self.evaluate(
-        poisson_dist.random_poisson_rejection_sampler(
-            [num_samples, 10], log_rate, seed=test_util.test_seed()))
+    samples = poisson_lib._random_poisson_noncpu(
+        shape=[num_samples],
+        log_rates=log_rate,
+        output_dtype=tf.float64,
+        seed=test_util.test_seed())
 
     poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
     self.evaluate(
@@ -431,9 +471,11 @@ class PoissonSampleLogRateTest(test_util.TestCase):
                 discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
         num_samples)
 
-    samples = self.evaluate(
-        poisson_dist.random_poisson_rejection_sampler(
-            [num_samples, 10], log_rate, seed=test_util.test_seed()))
+    samples = poisson_lib._random_poisson_noncpu(
+        shape=[num_samples],
+        log_rates=log_rate,
+        output_dtype=tf.float64,
+        seed=test_util.test_seed())
 
     poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
     self.evaluate(
@@ -456,17 +498,19 @@ class PoissonSampleLogRateTest(test_util.TestCase):
     rate = [1., 3., 5., 6., 7., 10., 13.0, 14., 15., 18.]
     log_rate = np.log(rate)
     num_samples = int(1e5)
+    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
     self.assertLess(
         self.evaluate(
             st.min_num_samples_for_dkwm_cdf_test(
                 discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
         num_samples)
 
-    samples = self.evaluate(
-        poisson_dist.random_poisson_rejection_sampler(
-            [num_samples, 10], log_rate, seed=test_util.test_seed()))
+    samples = poisson_lib._random_poisson_noncpu(
+        shape=[num_samples],
+        log_rates=log_rate,
+        output_dtype=tf.float64,
+        seed=test_util.test_seed())
 
-    poisson = tfd.Poisson(log_rate=log_rate, validate_args=True)
     self.evaluate(
         st.assert_true_cdf_equal_by_dkwm(
             samples,
@@ -474,21 +518,15 @@ class PoissonSampleLogRateTest(test_util.TestCase):
             st.left_continuous_cdf_discrete_distribution(poisson),
             false_fail_rate=1e-9))
 
-    self.assertAllClose(
-        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
-        stats.poisson.mean(rate),
-        rtol=0.01)
-    self.assertAllClose(
-        self.evaluate(tf.math.reduce_variance(samples, axis=0)),
-        stats.poisson.var(rate),
-        rtol=0.05)
-
   def testSamplePoissonInvalidRates(self):
     rate = [np.nan, -1., 0., 5., 7., 10., 13.0, 14., 15., 18.]
     log_rate = np.log(rate)
     samples = self.evaluate(
-        poisson_dist.random_poisson_rejection_sampler(
-            [int(1e5), 10], log_rate, seed=test_util.test_seed()))
+        poisson_lib._random_poisson_noncpu(
+            shape=[int(1e5)],
+            log_rates=log_rate,
+            output_dtype=tf.float64,
+            seed=test_util.test_seed()))
     self.assertAllClose(
         self.evaluate(tf.math.reduce_mean(samples, axis=0)),
         stats.poisson.mean(rate),

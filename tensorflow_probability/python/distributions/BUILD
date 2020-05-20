@@ -1313,6 +1313,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:implementation_selection",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
@@ -2695,7 +2696,6 @@ multi_substrate_py_test(
     name = "poisson_test",
     size = "medium",
     srcs = ["poisson_test.py"],
-    jax_size = "medium",
     shard_count = 2,
     deps = [
         # numpy dep,
@@ -2705,6 +2705,24 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_test(
+    name = "poisson_test_gpu",
+    size = "medium",
+    srcs = ["poisson_test.py"],
+    main = "poisson_test.py",
+    tags = ["requires-gpu-nvidia"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
