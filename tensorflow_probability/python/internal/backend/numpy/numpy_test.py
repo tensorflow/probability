@@ -1306,6 +1306,56 @@ class NumpyTest(test_util.TestCase):
             lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init,
             reverse=True))
 
+  def test_foldl_no_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    fn = lambda x, y: x + y
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems)),
+        nptf.foldl(fn, elems))
+
+  def test_foldl_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    fn = lambda x, y: x + y
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems, initializer=7)),
+        nptf.foldl(fn, elems, initializer=7))
+
+  def test_foldl_struct(self):
+    elems = np.arange(5).astype(np.int32)
+    fn = lambda x, y: (x[0] + y, x[1] - y)
+    init = (0, 0)
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems, initializer=init)),
+        nptf.foldl(fn, elems, initializer=init))
+
+  def test_foldl_struct_mismatched(self):
+    elems = (np.arange(3).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = np.zeros_like(elems[1][0])
+    fn = lambda x, y_z: x + y_z[0] - y_z[1]
+    with self.assertRaisesRegexp(ValueError, r'.*size.*'):
+      nptf.foldl(fn, elems, initializer=init)
+
+  def test_foldl_struct_in_single_out(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = np.zeros_like(elems[1][0])
+    fn = lambda x, y_z: x + y_z[0] - y_z[1]
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems, initializer=init)),
+        nptf.foldl(fn, elems, initializer=init))
+
+  def test_foldl_struct_in_alt_out(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = dict(a=np.int32(0),
+                b=np.zeros_like(elems[1][0]),
+                c=np.zeros_like(elems[1][0]))
+    fn = lambda x, y_z: dict(a=x['a'] + y_z[0], b=x['b'] + y_z[1], c=y_z[1])
+    self.assertAllEqualNested(
+        self.evaluate(tf.foldl(fn, elems, initializer=init)),
+        nptf.foldl(fn, elems, initializer=init))
+
   def test_pfor(self):
     self.assertAllEqual(
         self.evaluate(tf_pfor.pfor(lambda x: tf.ones([]), 7)),

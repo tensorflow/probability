@@ -26,6 +26,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 
 __all__ = [
+    'foldl',
     'map_fn',
     'pfor',
     'vectorized_map',
@@ -34,6 +35,36 @@ __all__ = [
 
 
 JAX_MODE = False
+
+
+def _foldl_jax(fn, elems, initializer=None, parallel_iterations=10,  # pylint: disable=unused-argument
+               back_prop=True, swap_memory=False, name=None):  # pylint: disable=unused-argument
+  """tf.foldl, in JAX."""
+  if initializer is None:
+    initializer = nest.map_structure(lambda el: el[0], elems)
+    elems = nest.map_structure(lambda el: el[1:], elems)
+  if len(set(nest.flatten(nest.map_structure(len, elems)))) != 1:
+    raise ValueError(
+        'Mismatched element sizes: {}'.format(nest.map_structure(len, elems)))
+  from jax import lax  # pylint: disable=g-import-not-at-top
+  return lax.scan(
+      lambda carry, el: (fn(carry, el), None), initializer, elems)[0]
+
+
+def _foldl(fn, elems, initializer=None, parallel_iterations=10,  # pylint: disable=unused-argument
+           back_prop=True, swap_memory=False, name=None):  # pylint: disable=unused-argument
+  """tf.foldl, in numpy."""
+  elems_flat = nest.flatten(elems)
+  if initializer is None:
+    initializer = nest.map_structure(lambda el: el[0], elems)
+    elems_flat = [el[1:] for el in elems_flat]
+  if len({len(el) for el in elems_flat}) != 1:
+    raise ValueError(
+        'Mismatched element sizes: {}'.format(nest.map_structure(len, elems)))
+  carry = initializer
+  for el in zip(*elems_flat):
+    carry = fn(carry, nest.pack_sequence_as(elems, el))
+  return carry
 
 
 def _map_fn(  # pylint: disable=unused-argument
@@ -126,6 +157,10 @@ def _scan(  # pylint: disable=unused-argument
 
 # --- Begin Public Functions --------------------------------------------------
 
+
+foldl = utils.copy_docstring(
+    'tf.foldl',
+    _foldl_jax if JAX_MODE else _foldl)
 
 map_fn = utils.copy_docstring(
     'tf.map_fn',

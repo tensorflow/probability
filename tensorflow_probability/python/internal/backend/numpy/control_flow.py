@@ -31,8 +31,6 @@ __all__ = [
     # 'case',
     # 'dynamic_partition',
     # 'dynamic_stitch',
-    # 'map_fn',
-    # 'scan',
 ]
 
 
@@ -53,8 +51,7 @@ def _cond_jax(pred, true_fn=None, false_fn=None, name=None):  # pylint: disable=
   return lax.cond(pred, None, overridden_true_fn, None, overridden_false_fn)
 
 
-def _cond(pred, true_fn=None, false_fn=None, name=None):
-  del name
+def _cond(pred, true_fn=None, false_fn=None, name=None):  # pylint: disable=unused-argument
   return true_fn() if pred else false_fn()
 
 
