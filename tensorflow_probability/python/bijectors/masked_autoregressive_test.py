@@ -689,7 +689,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
       self.evaluate(
           tf1.initializers.variables(made.trainable_variables))
     self.assertIsAutoregressive(made, event_size=4, order="left-to-right")
-    
+
   def test_doc_string(self):
     # Generate data.
     n = 2000
@@ -822,60 +822,60 @@ class AutoregressiveNetworkTest(test_util.TestCase):
 @test_util.jax_disable_test_missing_functionality("Keras")
 @test_util.test_all_tf_execution_regimes
 class ConditionalTests(test_util.TestCase):
-    
+
   def test_conditional_missing_event_shape(self):
     with self.assertRaisesRegexp(
         ValueError,
         '`event_shape` must be provided when `conditional` is True'):
-   
+
       tfb.AutoregressiveNetwork(
           params=2, conditional=True, conditional_shape=[4])
-    
+
   def test_conditional_missing_conditional_shape(self):
     with self.assertRaisesRegexp(
         ValueError,
         '`conditional_shape` must be provided when `conditional` is True'):
-      
+
       tfb.AutoregressiveNetwork(
           params=2, conditional=True, event_shape=[4])
-    
+
   def test_conditional_incorrect_layers(self):
     with self.assertRaisesRegexp(
         ValueError,
         '`conditional_input_layers` must be "first_layers" or "all_layers"'):
-        
+
       tfb.AutoregressiveNetwork(
           params=2, conditional=True, 
           event_shape=[4], conditional_shape=[4], 
           conditional_input_layers="non-existent-option")
-    
+
   def test_conditional_false_with_shape(self):
     with self.assertRaisesRegexp(
         ValueError,
         '`conditional_shape` passed but `conditional` is set to False.'):
-        
+
       tfb.AutoregressiveNetwork(params=2, conditional_shape=[4])
-    
+
   def test_conditional_wrong_shape(self):
     with self.assertRaisesRegexp(
         ValueError,
         'Parameter `conditional_shape` must describe a rank-1 shape'):
-        
+
       tfb.AutoregressiveNetwork(
           params=2, conditional=True, event_shape=[4], 
           conditional_shape=[10, 4])
-    
+
   def test_conditional_missing_tensor(self):
     with self.assertRaisesRegexp(
         ValueError,
         '`conditional` must be passed as a named arguement'):
-        
+
       made = tfb.AutoregressiveNetwork(
           params=2, event_shape=[4], conditional=True, 
           conditional_shape=[6])
-    
+
       made(np.random.normal(0, 1, (1, 4)))
-        
+
   def test_conditional_broadcasting(self):
     made = tfb.AutoregressiveNetwork(
         params=2, event_shape=[3], conditional=True, 
@@ -902,15 +902,15 @@ class ConditionalTests(test_util.TestCase):
           conditional=tf.ones(cond_shape)))
       broadcast_shape = tf.concat(
           [tf.broadcast_dynamic_shape(
-               cond_shape[:-1],
-               input_shape[:-1]),
-           input_shape[-1:]], 
+              cond_shape[:-1],
+              input_shape[:-1]),
+           input_shape[-1:]],
           axis=0)
       self.assertAllEqual(
           tf.concat([broadcast_shape, [2]], axis=0),
           made_shape)
 
 del _MaskedAutoregressiveFlowTest
-    
+
 if __name__ == "__main__":
   tf.test.main()
