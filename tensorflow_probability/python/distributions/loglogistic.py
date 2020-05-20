@@ -91,27 +91,29 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     return self.distribution.scale
 
   def _mean(self):
+    scale = tf.convert_to_tensor(self.scale)
     with tf.control_dependencies(
         [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
           assert_util.assert_less(
-            self.scale,
+            scale,
             tf.ones([], dtype=self.dtype),
             message='Mean undefined for scale > 1.'),
         ]):
-      mean = tf.math.exp(self.loc) / sinc(self.scale)
-      return tf.where(self.scale > 1., np.nan, mean)
+      mean = tf.math.exp(self.loc) / sinc(scale)
+      return tf.where(scale > 1., np.nan, mean)
 
   def _variance(self):
+    scale = tf.convert_to_tensor(self.scale)
     with tf.control_dependencies(
-        [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
+    [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
           assert_util.assert_less(
-            self.scale,
+            scale,
             0.5 * tf.ones([], dtype=self.dtype),
             message='Variance undefined for scale > 1/2.'),
         ]):
       variance = tf.math.exp(2 * self.loc) * (
-          1. / sinc(2 * self.scale) - 1. / sinc(self.scale) ** 2)
-      return tf.where(self.scale > 0.5, np.nan, variance)
+          1. / sinc(2 * scale) - 1. / sinc(scale) ** 2)
+      return tf.where(scale > 0.5, np.nan, variance)
 
   def _mode(self):
     mode = tf.math.exp(
