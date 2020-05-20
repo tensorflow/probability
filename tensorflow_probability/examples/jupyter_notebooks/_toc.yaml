@@ -27,6 +27,12 @@ toc:
 - heading: "Tutorials"
 - title:  Probabilistic regression
   path: /probability/examples/Probabilistic_Layers_Regression
+- title: Modeling COVID-19 spread in Europe
+  path: /probability/examples/Estimating_COVID_19_in_11_European_countries
+  status: new
+- title: Estimation of undocumented SARS-CoV2 cases
+  path: /probability/examples/Undocumented_Infection_and_the_Dissemination_of_SARS-CoV2
+  status: new
 - title: Bayes GMM
   path: /probability/examples/Bayesian_Gaussian_Mixture_Model
 - title: Bayes switchpoint
