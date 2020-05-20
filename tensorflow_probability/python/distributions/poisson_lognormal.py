@@ -33,9 +33,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -346,7 +346,8 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
     # already specify a probs vector for each batch coordinate.
     # We only support this kind of reduced broadcasting, i.e., there is exactly
     # one probs vector for all batch dims or one for each.
-    stream = SeedStream(seed, salt='PoissonLogNormalQuadratureCompound')
+    mixture_seed, poisson_seed = samplers.split_seed(
+        seed, salt='PoissonLogNormalQuadratureCompound')
     ids = mixture_dist.sample(
         sample_shape=concat_vectors(
             [n],
@@ -354,7 +355,7 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
                 mixture_dist.is_scalar_batch(),
                 [batch_size],
                 np.int32([]))),
-        seed=stream())
+        seed=mixture_seed)
     # We need to flatten batch dims in case mixture_dist has its own
     # batch dims.
     ids = tf.reshape(
@@ -375,7 +376,8 @@ class PoissonLogNormalQuadratureCompound(distribution.Distribution):
     rate = tf.reshape(
         rate, shape=concat_vectors([n], self._batch_shape_tensor(
             distributions=distributions)))
-    return tf.random.poisson(lam=rate, shape=[], dtype=self.dtype, seed=seed)
+    return samplers.poisson(
+        shape=[], lam=rate, dtype=self.dtype, seed=poisson_seed)
 
   def _log_prob(self, x):
     dist, mixture_dist = self.poisson_and_mixture_distributions()

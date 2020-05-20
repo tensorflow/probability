@@ -47,7 +47,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
-    self.run_test_sample_consistent_mean_variance(self.evaluate, pln, rtol=0.02)
+    self.run_test_sample_consistent_mean_variance(self.evaluate, pln, rtol=0.03)
 
   def testSampleProbConsistentBroadcastScalar(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
