@@ -644,6 +644,10 @@ def test_seed(hardcoded_seed=None,
     logging.warning('Using seed %s', answer)
   elif hardcoded_seed is not None:
     answer = hardcoded_seed
+    if JAX_MODE and np.shape(answer) == (2,):
+      # Workaround for test_seed(hardcoded_seed=test_seed()), which can happen
+      # e.g. with the run_test_sample_consistent_log_prob methods above.
+      answer = answer[-1]
   else:
     answer = 17
   if sampler_type == 'stateless' or JAX_MODE:

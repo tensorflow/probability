@@ -63,14 +63,10 @@ class _HiddenMarkovModelTest(
         validate_args=True)
 
     seed = test_util.test_seed()
-    with tf.control_dependencies([tf.compat.v1.global_variables_initializer()]):
-      s = model.sample(5, seed=seed)
-    s1 = self.evaluate(s)
+    s1 = self.evaluate(model.sample(5, seed=seed))
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
-    with tf.control_dependencies([tf.compat.v1.global_variables_initializer()]):
-      s = model.sample(5, seed=seed)
-    s2 = self.evaluate(s)
+    s2 = self.evaluate(model.sample(5, seed=seed))
     self.assertAllEqual(s1, s2)
 
   def test_supports_dynamic_observation_size(self):
@@ -95,7 +91,7 @@ class _HiddenMarkovModelTest(
         num_steps=num_steps,
         validate_args=True)
 
-    self.evaluate(model.sample(5))
+    self.evaluate(model.sample(5, seed=test_util.test_seed()))
     observation_data = tf.constant(30 * [[0.5, 0.5]], dtype=self.dtype)
     self.evaluate(model.log_prob(observation_data))
     self.evaluate(model.posterior_marginals(observation_data).probs_parameter())
@@ -235,7 +231,7 @@ class _HiddenMarkovModelTest(
         num_steps=num_steps,
         validate_args=True)
 
-    x = model._sample_n(1)
+    x = model._sample_n(1, seed=test_util.test_seed())
     x_shape = self.evaluate(tf.shape(x))
 
     self.assertAllEqual(x_shape, [1, 1])
@@ -777,8 +773,7 @@ class _HiddenMarkovModelTest(
 
     # Permute both rows and columns of transition matrix
     transition_matrix_permuted = tf.transpose(
-        a=tf.gather(tf.transpose(a=transition_matrix),
-                    inverse_permutations),
+        tf.gather(tf.transpose(transition_matrix), inverse_permutations),
         perm=[0, 2, 1])
     transition_matrix_permuted = tf1.batch_gather(transition_matrix_permuted,
                                                   inverse_permutations)
@@ -796,9 +791,9 @@ class _HiddenMarkovModelTest(
     inferred_states = model.posterior_mode(observations)
     expected_states = [0, 1, 2, 0, 2, 1, 2, 0, 2, 0, 2, 0, 1, 2, 0, 1]
     expected_states_permuted = tf.transpose(
-        a=tf1.batch_gather(
-            tf.expand_dims(tf.transpose(
-                a=permutations), axis=-1), expected_states)[..., 0])
+        tf1.batch_gather(
+            tf.transpose(permutations)[..., tf.newaxis],
+            expected_states)[..., 0])
     self.assertAllEqual(inferred_states, expected_states_permuted)
 
   def test_posterior_mode_missing_continuous_observations(self):
