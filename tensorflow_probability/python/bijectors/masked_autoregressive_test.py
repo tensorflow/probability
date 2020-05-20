@@ -845,8 +845,8 @@ class ConditionalTests(test_util.TestCase):
         '`conditional_input_layers` must be "first_layers" or "all_layers"'):
 
       tfb.AutoregressiveNetwork(
-          params=2, conditional=True, 
-          event_shape=[4], conditional_shape=[4], 
+          params=2, conditional=True,
+          event_shape=[4], conditional_shape=[4],
           conditional_input_layers="non-existent-option")
 
   def test_conditional_false_with_shape(self):
@@ -862,7 +862,7 @@ class ConditionalTests(test_util.TestCase):
         'Parameter `conditional_shape` must describe a rank-1 shape'):
 
       tfb.AutoregressiveNetwork(
-          params=2, conditional=True, event_shape=[4], 
+          params=2, conditional=True, event_shape=[4],
           conditional_shape=[10, 4])
 
   def test_conditional_missing_tensor(self):
@@ -871,14 +871,14 @@ class ConditionalTests(test_util.TestCase):
         '`conditional` must be passed as a named arguement'):
 
       made = tfb.AutoregressiveNetwork(
-          params=2, event_shape=[4], conditional=True, 
+          params=2, event_shape=[4], conditional=True,
           conditional_shape=[6])
 
       made(np.random.normal(0, 1, (1, 4)))
 
   def test_conditional_broadcasting(self):
     made = tfb.AutoregressiveNetwork(
-        params=2, event_shape=[3], conditional=True, 
+        params=2, event_shape=[3], conditional=True,
         conditional_shape=[4])
 
     input_shapes = [
