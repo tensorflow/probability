@@ -925,7 +925,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         raise ValueError('Parameter `conditional_shape` must describe a '
                          'rank-1 shape')
       if not ((self._conditional_layers == "first_layer") or
-          (self._conditional_layers == "all_layers")):
+              (self._conditional_layers == "all_layers")):
         raise ValueError('`conditional_input_layers` must be '
                          '"first_layers" or "all_layers"')
     else:

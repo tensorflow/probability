@@ -828,7 +828,7 @@ class ConditionalTests(test_util.TestCase):
         ValueError,
         '`event_shape` must be provided when `conditional` is True'):
    
-      made = tfb.AutoregressiveNetwork(
+      tfb.AutoregressiveNetwork(
           params=2, conditional=True, conditional_shape=[4])
     
   def test_conditional_missing_conditional_shape(self):
@@ -836,7 +836,7 @@ class ConditionalTests(test_util.TestCase):
         ValueError,
         '`conditional_shape` must be provided when `conditional` is True'):
       
-      made = tfb.AutoregressiveNetwork(
+      tfb.AutoregressiveNetwork(
           params=2, conditional=True, event_shape=[4])
     
   def test_conditional_incorrect_layers(self):
@@ -844,24 +844,24 @@ class ConditionalTests(test_util.TestCase):
         ValueError,
         '`conditional_input_layers` must be "first_layers" or "all_layers"'):
         
-      made = tfb.AutoregressiveNetwork(
+      tfb.AutoregressiveNetwork(
           params=2, conditional=True, 
           event_shape=[4], conditional_shape=[4], 
           conditional_input_layers="non-existent-option")
     
-  def test_conditional_False_with_shape(self):
+  def test_conditional_false_with_shape(self):
     with self.assertRaisesRegexp(
         ValueError,
         '`conditional_shape` passed but `conditional` is set to False.'):
         
-      made = tfb.AutoregressiveNetwork(params=2, conditional_shape=[4])
+      tfb.AutoregressiveNetwork(params=2, conditional_shape=[4])
     
   def test_conditional_wrong_shape(self):
     with self.assertRaisesRegexp(
         ValueError,
         'Parameter `conditional_shape` must describe a rank-1 shape'):
         
-      made = tfb.AutoregressiveNetwork(
+      tfb.AutoregressiveNetwork(
           params=2, conditional=True, event_shape=[4], 
           conditional_shape=[10, 4])
     
@@ -882,34 +882,33 @@ class ConditionalTests(test_util.TestCase):
         conditional_shape=[4])
 
     input_shapes = [
-      [3],
-      [1, 3],
-      [2, 3],
-      [1, 2, 3],
-      [2, 1, 3],
-      [2, 2, 3]]
+        [3],
+        [1, 3],
+        [2, 3],
+        [1, 2, 3],
+        [2, 1, 3],
+        [2, 2, 3]]
     cond_shapes = [
-      [4],
-      [1, 4],
-      [2, 4],
-      [1, 2, 4],
-      [2, 1, 4],
-      [2, 2, 4]]
-    
+        [4],
+        [1, 4],
+        [2, 4],
+        [1, 2, 4],
+        [2, 1, 4],
+        [2, 2, 4]]
+
     for input_shape, cond_shape in itertools.product(input_shapes, cond_shapes):
-        made_shape = tf.shape(made(
-            tf.ones(input_shape),
-            conditional=tf.ones(cond_shape)))
-        broadcast_shape = tf.concat(
-            [tf.broadcast_dynamic_shape(
-                cond_shape[:-1],
-                input_shape[:-1]),
-             input_shape[-1:]], 
-            axis=0)
-        self.assertAllEqual(
-            tf.concat([broadcast_shape, [2]], axis=0),
-            made_shape)
-    
+      made_shape = tf.shape(made(
+          tf.ones(input_shape),
+          conditional=tf.ones(cond_shape)))
+      broadcast_shape = tf.concat(
+          [tf.broadcast_dynamic_shape(
+               cond_shape[:-1],
+               input_shape[:-1]),
+           input_shape[-1:]], 
+          axis=0)
+      self.assertAllEqual(
+          tf.concat([broadcast_shape, [2]], axis=0),
+          made_shape)
 
 del _MaskedAutoregressiveFlowTest
     
