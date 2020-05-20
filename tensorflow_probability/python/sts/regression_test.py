@@ -108,7 +108,7 @@ class _LinearRegressionTest(test_util.TestCase):
     self.assertAllClose(*self.evaluate((true_weights, learnable_weights)),
                         atol=0.2)
 
-  def test_scalar_priors_broadcast(self):
+  def test_custom_weights_prior(self):
 
     batch_shape = [4, 3]
     num_timesteps = 10
@@ -116,19 +116,19 @@ class _LinearRegressionTest(test_util.TestCase):
     design_matrix = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_timesteps, num_features])))
 
-    # Build a model with scalar Normal(0., 1.) prior.
+    # Build a model with scalar Exponential(1.) prior.
     linear_regression = LinearRegression(
         design_matrix=design_matrix,
-        weights_prior=tfd.Normal(loc=self._build_placeholder(0.),
-                                 scale=self._build_placeholder(1.)))
+        weights_prior=tfd.Exponential(rate=self._build_placeholder(1.)))
 
-    weights_prior = linear_regression.parameters[0].prior
+    # Check that the prior is broadcast to match the shape of the weights.
+    weights = linear_regression.parameters[0]
     self.assertAllEqual([num_features],
-                        self.evaluate(weights_prior.event_shape_tensor()))
+                        self.evaluate(weights.prior.event_shape_tensor()))
     self.assertAllEqual(batch_shape,
-                        self.evaluate(weights_prior.batch_shape_tensor()))
+                        self.evaluate(weights.prior.batch_shape_tensor()))
 
-    prior_sampled_weights = weights_prior.sample()
+    prior_sampled_weights = weights.prior.sample()
     ssm = linear_regression.make_state_space_model(
         num_timesteps=num_timesteps,
         param_vals={"weights": prior_sampled_weights})
@@ -136,6 +136,16 @@ class _LinearRegressionTest(test_util.TestCase):
     lp = ssm.log_prob(ssm.sample())
     self.assertAllEqual(batch_shape,
                         self.evaluate(lp).shape)
+
+    # Verify that the bijector enforces the prior constraint that
+    # weights must be nonnegative.
+    self.assertAllFinite(
+        self.evaluate(
+            weights.prior.log_prob(
+                weights.bijector(
+                    tf.random.normal([64],
+                                     seed=test_util.test_seed(),
+                                     dtype=self.dtype)))))
 
   def _build_placeholder(self, ndarray):
     """Convert a numpy array to a TF placeholder.

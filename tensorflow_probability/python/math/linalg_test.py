@@ -192,7 +192,9 @@ class _CholeskyUpdate(test_util.TestCase):
 
     rng_seed = data.draw(hps.integers(min_value=0, max_value=2**32 - 1))
     rng = np.random.RandomState(seed=rng_seed)
-    xs = push_apart(rng.uniform(size=chol_bs + (l, 1)), axis=-2)
+    xs = push_apart(
+        rng.uniform(size=tensorshape_util.concatenate(chol_bs, (l, 1))),
+        axis=-2)
     hp.note(xs)
     xs = xs.astype(self.dtype)
     xs = tf1.placeholder_with_default(
@@ -204,7 +206,7 @@ class _CholeskyUpdate(test_util.TestCase):
     mat = k.matrix(xs, xs) + jitter(l)
     chol = tf.linalg.cholesky(mat)
 
-    u = rng.uniform(size=u_bs + (l,))
+    u = rng.uniform(size=tensorshape_util.concatenate(u_bs, (l,)))
     hp.note(u)
     u = u.astype(self.dtype)
     u = tf1.placeholder_with_default(

@@ -41,6 +41,9 @@ TF_REPLACEMENTS = {
     'import tensorflow_probability as tfp':
         'import tensorflow_probability as tfp; '
         'tfp = tfp.experimental.substrates.numpy',
+    'from tensorflow.python.framework import tensor_shape':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import tensor_shape'),
     'from tensorflow.python.ops.linalg':
         'from tensorflow_probability.python.internal.backend.numpy',
     'from tensorflow.python.ops import parallel_for':
@@ -70,7 +73,8 @@ LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
              'dtype_util', 'hypothesis_testlib', 'implementation_selection',
              'nest_util', 'prefer_static', 'samplers', 'special_math',
-             'tensor_util', 'test_combinations', 'test_util')
+             'tensor_util', 'tensorshape_util', 'test_combinations',
+             'test_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')
@@ -225,19 +229,6 @@ def main(argv):
     contents = contents.replace('SKIP_DTYPE_CHECKS = True',
                                 'SKIP_DTYPE_CHECKS = False')
     is_test = lambda x: x.endswith('_test.py') or x.endswith('_test_util.py')
-    if not is_test(argv[1]):  # We leave tests with original np.
-      contents = contents.replace(
-          '\nimport numpy as np',
-          '\nimport numpy as onp\nimport jax.numpy as np')
-      contents = contents.replace('np.bool', 'onp.bool')
-      contents = contents.replace('np.dtype', 'onp.dtype')
-      contents = contents.replace('np.euler_gamma', 'onp.euler_gamma')
-      contents = contents.replace('np.generic', 'onp.generic')
-      contents = contents.replace('np.nextafter', 'onp.nextafter')
-      contents = contents.replace('np.object', 'onp.object')
-      contents = contents.replace('np.unique', 'onp.unique')
-
-      contents = contents.replace('np.polynomial', 'onp.polynomial')
     if is_test(argv[1]):  # Test-only rewrites.
       contents = contents.replace(
           'tf.test.main()',

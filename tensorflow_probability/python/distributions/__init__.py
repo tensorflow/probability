@@ -74,6 +74,7 @@ from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.logitnormal import LogitNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
+from tensorflow_probability.python.distributions.moyal import Moyal
 from tensorflow_probability.python.distributions.multinomial import Multinomial
 from tensorflow_probability.python.distributions.multivariate_student_t import MultivariateStudentTLinearOperator
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
@@ -195,6 +196,7 @@ __all__ = [
     'Logistic',
     'LogNormal',
     'LogitNormal',
+    'Moyal',
     'NegativeBinomial',
     'Normal',
     'PixelCNN',

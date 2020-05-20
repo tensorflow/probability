@@ -19,7 +19,7 @@ BFGS, conjugate gradient etc). Most of the sophisticated line search methods
 aim to find a step length in a given search direction so that the step length
 satisfies the
 [Wolfe conditions](https://en.wikipedia.org/wiki/Wolfe_conditions).
-[Hager-Zhang 2006](http://users.clas.ufl.edu/hager/papers/CG/cg_compare.pdf)
+[Hager-Zhang 2006](https://epubs.siam.org/doi/abs/10.1137/030601880)
 algorithm is a refinement of the commonly used
 [More-Thuente](https://dl.acm.org/citation.cfm?id=192132) algorithm.
 

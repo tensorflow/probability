@@ -57,6 +57,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'Log1p',
     'MatvecLU',
     'MatrixInverseTriL',
+    'MoyalCDF',
     'NormalCDF',
     'Ordered',
     'Permute',
@@ -90,6 +91,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'GumbelCDF': dict(loc=0, scale=0),
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
+    'MoyalCDF': dict(loc=0, scale=0),
     'Scale': dict(scale=0),
     'ScaleMatvecDiag': dict(scale_diag=1),
     'ScaleMatvecLU': dict(lower_upper=2, permutation=1),
@@ -116,6 +118,7 @@ NO_LDJ_GRADS_EXPECTED = {
     'BatchNormalization': dict(beta={FLDJ, ILDJ}),
     'FrechetCDF': dict(loc={ILDJ}),
     'GumbelCDF': dict(loc={ILDJ}),
+    'MoyalCDF': dict(loc={ILDJ}),
     'Shift': dict(shift={FLDJ, ILDJ}),
 }
 
@@ -129,6 +132,7 @@ TRANSFORM_DIAGONAL_WHITELIST = {
     'Identity',
     'Inline',
     'KumaraswamyCDF',
+    'MoyalCDF',
     'NormalCDF',
     'PowerTransform',
     'Reciprocal',

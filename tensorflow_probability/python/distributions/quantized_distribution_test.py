@@ -252,6 +252,29 @@ class QuantizedDistributionTest(test_util.TestCase):
     self.assertAllClose(
         sp_normal.sf(x), self.evaluate(qdist.survival_function(x)))
 
+  def testLogisticLogProbThatUsedToUnderflowNoLongerDoes(self):
+    # At integer values, the result should be the same as the standard normal.
+    logistic = tfd.Logistic(loc=0.06602609, scale=4.8474164)
+    low = -32768.0
+    high = 32768.0
+    y = -0.062469486 * 32768.0
+    qdist = tfd.QuantizedDistribution(logistic, low=low, high=high)
+    log_prob = qdist.log_prob(y)
+    self.assertTrue(np.isfinite(self.evaluate(log_prob)))
+
+  def testNormalProbFiniteEvenForHugeValues(self):
+    # At integer values, the result should be the same as the standard normal.
+    qdist = tfd.QuantizedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
+        # validate_args=False to allow us to use float x, which is more likely
+        # to result in rounding errors...and rounding errors caused the issue
+        # tested in testLogisticLogProbThatUsedToUnderflowNoLongerDoes.
+        validate_args=False)
+
+    x = tf.linspace(-10000., 10000., num=50)
+
+    self.assertAllFinite(self.evaluate(qdist.log_prob(x)))
+
   def testNormalLogCdfAndLogSurvivalFunction(self):
     # At integer values, the result should be the same as the standard normal.
     batch_shape = (3, 3)

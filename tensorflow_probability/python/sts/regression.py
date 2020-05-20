@@ -222,7 +222,19 @@ class LinearRegression(StructuralTimeSeries):
 
       super(LinearRegression, self).__init__(
           parameters=[
-              Parameter('weights', weights_prior, tfb.Identity()),
+              Parameter(
+                  name='weights',
+                  prior=weights_prior,
+                  # If the weights prior has constrained support, then we'd like
+                  # to avoid considering invalid weights at inference time. For
+                  # example, an Exponential prior should only see nonnegative
+                  # weights. For now, we enforce this using the prior's default
+                  # bijector. Given sufficient motivation we might consider
+                  # adding a `weights_constraining_bijector` argument
+                  # to customize the bijector choice, analogous to
+                  # `sts.Autoregressive.coef_constraining_bijector`.
+                  bijector=(weights_prior  # pylint: disable=protected-access
+                            ._experimental_default_event_space_bijector())),
           ],
           latent_size=0,
           name=name)

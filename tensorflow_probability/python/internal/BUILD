@@ -345,7 +345,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "tensorshape_util",
     srcs = ["tensorshape_util.py"],
     srcs_version = "PY2AND3",

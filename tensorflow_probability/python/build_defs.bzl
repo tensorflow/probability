@@ -21,7 +21,6 @@ NO_REWRITE_NEEDED = [
     "internal:docstring_util",
     "internal:name_util",
     "internal:reparameterization",
-    "internal:tensorshape_util",
     "layers",
     "math:minimize",
     "math:sparse",

@@ -354,7 +354,13 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
 
 
 def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin,missing-docstring
+  # This currently ignores sorted=False. However, this should be safe since
+  # call sites that don't invoke sorted=True will assume results are unsorted
+  # (vs. never sorted), and so sorted results shouldn't impact results.
   input = _convert_to_tensor(input)
+  if JAX_MODE:
+    # JAX automatically returns values in sorted order.
+    return jax.lax.top_k(input, k)
   n = int(input.shape[-1] - 1)
   # For the values, we sort the negative entries and choose the smallest ones
   # and negate. This is equivalent to choosing the largest entries
@@ -765,15 +771,20 @@ reciprocal = utils.copy_docstring(
     'tf.math.reciprocal',
     lambda x, name=None: np.reciprocal(x))
 
+
+def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # pylint: disable=unused-argument
+                     include_dtype_kwarg=False):
+  input_tensor = _convert_to_tensor(input_tensor)
+  kwargs = dict(dtype=input_tensor.dtype) if include_dtype_kwarg else {}
+  return op(input_tensor, axis=_astuple(axis), keepdims=keepdims, **kwargs)
+
 reduce_all = utils.copy_docstring(
     'tf.math.reduce_all',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.all(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.all))
 
 reduce_any = utils.copy_docstring(
     'tf.math.reduce_any',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.any(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.any))
 
 # reduce_euclidean_norm = utils.copy_docstring(
 #     'tf.math.reduce_euclidean_norm',
@@ -786,38 +797,31 @@ reduce_logsumexp = utils.copy_docstring(
 
 reduce_max = utils.copy_docstring(
     'tf.math.reduce_max',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.max(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.max))
 
 reduce_mean = utils.copy_docstring(
     'tf.math.reduce_mean',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.mean(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.mean, include_dtype_kwarg=True))
 
 reduce_min = utils.copy_docstring(
     'tf.math.reduce_min',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.min(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.min))
 
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.prod(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.prod, include_dtype_kwarg=True))
 
 reduce_std = utils.copy_docstring(
     'tf.math.reduce_std',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.std(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.std, include_dtype_kwarg=True))
 
 reduce_sum = utils.copy_docstring(
     'tf.math.reduce_sum',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.sum(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.sum, include_dtype_kwarg=True))
 
 reduce_variance = utils.copy_docstring(
     'tf.math.reduce_variance',
-    lambda input_tensor, axis=None, keepdims=False, name=None: (  # pylint: disable=g-long-lambda
-        np.var(input_tensor, _astuple(axis), keepdims=keepdims)))
+    functools.partial(_apply_reduction, np.var, include_dtype_kwarg=True))
 
 rint = utils.copy_docstring(
     'tf.math.rint',

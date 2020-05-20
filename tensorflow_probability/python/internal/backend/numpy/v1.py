@@ -32,9 +32,11 @@ from tensorflow_probability.python.internal.backend.numpy.ops import name_scope
 from tensorflow_probability.python.internal.backend.numpy.ops import Variable
 from tensorflow_probability.python.internal.backend.numpy.random_generators import set_seed
 from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
+from tensorflow_probability.python.internal.backend.numpy.tensor_shape import Dimension
 
 
 __all__ = [
+    'Dimension',
     'Module',
     'Session',
     'TensorArray',

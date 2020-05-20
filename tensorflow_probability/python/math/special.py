@@ -89,14 +89,26 @@ def _fritsch_iteration(unused_should_stop, z, w, tol):
   return should_stop_next, w * (1. + error), z, tol
 
 
-def _newton_iteration(unused_should_stop, w, z, tol):
-  """Newton iteration on root finding of w for the equation w * exp(w) = z."""
+def _halley_iteration(unused_should_stop, w, z, tol, iteration_count):
+  """Halley's method on root finding of w for the equation w * exp(w) = z."""
   w = tf.convert_to_tensor(w)
   z = tf.convert_to_tensor(z)
-  delta = (w - z * tf.exp(-w)) / (1. + w)
-  converged = tf.abs(delta) <= tol
-  should_stop_next = tf.reduce_all(converged)
-  return should_stop_next, w - delta, z, tol
+  f = w - z * tf.math.exp(-w)
+  delta = f / (w + 1. - 0.5 * (w + 2.) * f / (w + 1.))
+  w_next = w - delta
+  converged = tf.math.abs(delta) <= tol * tf.math.abs(w_next)
+  # We bound the number of iterations to be at most a 100.
+
+  # When x is close to the branch point, the derivatives tend to very large
+  # values, which causes the iteration to be slow. For x <= 0., 100 iterations
+  # seems to be enough to guarantee a relative error of at most 1e-6.
+
+  # The Winitzki approximation has a relative error of at most
+  # 0.01. When x >= 0., the first through third derivatives are bounded such
+  # that coupled with the initial approximation, we are in the realm of cubic
+  # convergence.
+  should_stop_next = tf.reduce_all(converged) | (iteration_count >= 100)
+  return should_stop_next, w_next, z, tol, iteration_count + 1
 
 
 def _lambertw_principal_branch(z, name=None):
@@ -123,8 +135,8 @@ def _lambertw_principal_branch(z, name=None):
     # convergence properties especially for large z (z > 5).
     z0 = tf.where(z > -np.exp(-1.), lambertw_winitzki_approx(z), z)
     z0 = tf.while_loop(cond=lambda stop, *_: ~stop,
-                       body=_newton_iteration,
-                       loop_vars=(False, z0, z, tolerance))[1]
+                       body=_halley_iteration,
+                       loop_vars=(False, z0, z, tolerance, 0))[1]
     return tf.cast(z0, dtype=z.dtype)
 
 

@@ -38,7 +38,9 @@ py_library(
         ":elliptical_slice_sampler",
         ":nuts_autobatching",
         ":particle_filter",
+        ":particle_filter_augmentation",
         ":sample_sequential_monte_carlo",
+        ":weighted_resampling",
         # tensorflow dep,
     ],
 )
@@ -176,6 +178,7 @@ py_library(
     srcs = ["particle_filter.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":weighted_resampling",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:docstring_util",
@@ -200,10 +203,34 @@ py_test(
 )
 
 py_library(
+    name = "particle_filter_augmentation",
+    srcs = ["particle_filter_augmentation.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "particle_filter_augmentation_test",
+    size = "medium",
+    srcs = ["particle_filter_augmentation_test.py"],
+    deps = [
+        ":particle_filter_augmentation",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
     name = "sample_sequential_monte_carlo",
     srcs = ["sample_sequential_monte_carlo.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":weighted_resampling",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
@@ -224,6 +251,33 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "weighted_resampling",
+    srcs = ["weighted_resampling.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+py_test(
+    name = "weighted_resampling_test",
+    srcs = ["weighted_resampling_test.py"],
+    shard_count = 2,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],

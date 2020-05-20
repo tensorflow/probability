@@ -43,6 +43,8 @@ __all__ = [
     'with_rank_at_least',
 ]
 
+JAX_MODE = False
+
 
 def as_list(x):
   """Returns a `list` of integers or `None` for each dimension.

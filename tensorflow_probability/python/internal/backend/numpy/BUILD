@@ -53,6 +53,7 @@ py_library(
         ":sets_lib",
         ":sparse_lib",
         ":tensor_array_ops",
+        ":tensor_shape",
         ":test_lib",
         # tensorflow dep,
     ],
@@ -93,6 +94,7 @@ py_library(
         ":_utils",
         ":v1",
         ":v2",
+        # six dep,
     ],
 )
 
@@ -228,6 +230,7 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         # wrapt dep,
     ],
@@ -304,6 +307,22 @@ py_library(
     ],
 )
 
+genrule(
+    name = "rewrite_tensor_shape",
+    srcs = [],
+    outs = ["tensor_shape.py"],
+    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@"),
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
+)
+
+py_library(
+    name = "tensor_shape",
+    srcs = ["tensor_shape.py"],
+    deps = [
+        # six dep,
+    ],
+)
+
 py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
@@ -323,6 +342,7 @@ py_test(
         ":numpy",
         # absl/testing:parameterized dep,
         # hypothesis dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
