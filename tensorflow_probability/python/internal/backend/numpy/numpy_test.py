@@ -47,6 +47,11 @@ ALLOW_INFINITY = False
 
 JAX_MODE = False
 
+# pylint is unable to handle @hps.composite (e.g. complains "No value for
+# argument 'batch_shape' in function call"), so disable this lint for the file.
+
+# pylint: disable=no-value-for-parameter
+
 
 class Kwargs(dict):
   """Sentinel to indicate a single item arg is actually a **kwargs."""
@@ -238,7 +243,7 @@ def pd_matrices(draw, eps=1.):
 
 @hps.composite
 def nonsingular_matrices(draw):
-  mat = draw(pd_matrices())  # pylint: disable=no-value-for-parameter
+  mat = draw(pd_matrices())
   signs = draw(
       hnp.arrays(
           mat.dtype,
@@ -312,10 +317,7 @@ def gamma_params():
             d['dtype'])  # dtype
   return hps.fixed_dictionaries(
       dict(shape=shapes(),
-           # hps.composite confuses pylint w/ the draw parameter...
-           # pylint: disable=no-value-for-parameter
            params=n_same_shape(n=2, elements=positive_floats()),
-           # pylint: enable=no-value-for-parameter
            include_beta=hps.booleans(),
            dtype=hps.sampled_from([np.float32, np.float64]))
       ).map(dict_to_params)  # dtype
@@ -475,7 +477,7 @@ def segment_params(draw, shape=shapes(min_dims=1), dtype=None, elements=None,
                    batch_shape=(), unique=False):
   a = draw(single_arrays(shape=shape, dtype=dtype, elements=elements,
                          batch_shape=batch_shape, unique=unique))
-  ids = draw(segment_ids(a.shape[0]))  # pylint: disable=no-value-for-parameter
+  ids = draw(segment_ids(a.shape[0]))
   return (a, ids)
 
 
@@ -508,6 +510,13 @@ def histogram_fixed_width_bins_params(draw):
 
 
 @hps.composite
+def histogram_fixed_width_params(draw):
+  values, [value_min, value_max], nbins = draw(
+      histogram_fixed_width_bins_params())
+  return values, [value_min, max(value_max, value_min+.1)], nbins
+
+
+@hps.composite
 def sparse_xent_params(draw):
   num_classes = draw(hps.integers(1, 6))
   batch_shape = draw(shapes(min_dims=1))
@@ -529,7 +538,7 @@ def sparse_xent_params(draw):
 def xent_params(draw):
   num_classes = draw(hps.integers(1, 6))
   batch_shape = draw(shapes(min_dims=1))
-  labels = batched_probabilities(  # pylint:disable=no-value-for-parameter
+  labels = batched_probabilities(
       batch_shape=batch_shape, num_classes=num_classes)
   logits = single_arrays(
       batch_shape=batch_shape,
@@ -571,8 +580,6 @@ def _svd_post_process(vals):
 
 
 # TODO(jamieas): add tests for these functions.
-
-# pylint: disable=no-value-for-parameter
 
 NUMPY_TEST_CASES = [
 
@@ -988,6 +995,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('slice', [sliceable_and_slices()]),
 
     # Misc
+    TestCase('histogram_fixed_width',
+             [histogram_fixed_width_params()]),
     TestCase('histogram_fixed_width_bins',
              [histogram_fixed_width_bins_params()]),
 ]

@@ -150,7 +150,8 @@ def quadrature_scheme_lognormal_quantiles(
     # important, because non-constant probs leads to non-reparameterizable
     # samples.
     probs = tf.fill(
-        dims=[quadrature_size], value=1. / tf.cast(quadrature_size, dist.dtype))
+        dims=[quadrature_size],
+        value=tf.math.reciprocal(tf.cast(quadrature_size, dist.dtype)))
 
     return grid, probs
 

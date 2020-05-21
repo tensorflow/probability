@@ -33,6 +33,7 @@ from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
 
 __all__ = [
     'argsort',
+    'histogram_fixed_width',
     'histogram_fixed_width_bins',
     'is_tensor',
     'print',
@@ -63,6 +64,14 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
   return np.argsort(values, axis, kind='stable' if stable else 'quicksort')
+
+
+def _histogram_fixed_width(values, value_range, nbins=100, dtype=np.int32,
+                           name=None):
+  """Numpy implementation of `tf.histogram_fixed_width`."""
+  del name
+  return np.histogram(values, bins=nbins, range=value_range)[0].astype(
+      utils.numpy_dtype(dtype))
 
 
 def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=np.int32,
@@ -159,13 +168,15 @@ argsort = utils.copy_docstring(
     'tf.argsort',
     _argsort)
 
+histogram_fixed_width = utils.copy_docstring(
+    'tf.histogram_fixed_width',
+    _histogram_fixed_width)
+
 histogram_fixed_width_bins = utils.copy_docstring(
     'tf.histogram_fixed_width_bins',
     _histogram_fixed_width_bins)
 
-
 builtin_print = print
-
 
 # pylint: disable=redefined-builtin
 print = utils.copy_docstring(
