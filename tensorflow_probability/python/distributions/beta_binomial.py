@@ -31,8 +31,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'BetaBinomial',
@@ -239,7 +239,7 @@ class BetaBinomial(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    seed_stream = SeedStream(seed, 'beta_binomial')
+    beta_seed, binomial_seed = samplers.split_seed(seed, salt='beta_binomial')
 
     params = self._params_list_as_tensors()
     batch_shape = self._batch_shape_tensor(params=params)
@@ -249,10 +249,10 @@ class BetaBinomial(distribution.Distribution):
         tf.broadcast_to(concentration1, batch_shape),
         concentration0,
         validate_args=self.validate_args).sample(
-            n, seed=seed_stream())
+            n, seed=beta_seed)
     return binomial.Binomial(
         total_count, probs=probs,
-        validate_args=self.validate_args).sample(seed=seed_stream())
+        validate_args=self.validate_args).sample(seed=binomial_seed)
 
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)
   def _log_prob(self, counts):
