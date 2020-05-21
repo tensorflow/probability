@@ -106,7 +106,6 @@ from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
-from tensorflow_probability.python.distributions.vector_diffeomixture import VectorDiffeomixture
 from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
@@ -123,8 +122,6 @@ from tensorflow_probability.python.distributions.normal_conjugate_posteriors imp
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_predictive
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_gauss_hermite
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_quantiles
-from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_gauss_hermite
-from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_quantiles
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import NOT_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
@@ -219,7 +216,6 @@ __all__ = [
     'Dirichlet',
     'DirichletMultinomial',
     'Multinomial',
-    'VectorDiffeomixture',
     'VonMises',
     'VonMisesFisher',
     'WishartLinearOperator',
@@ -243,8 +239,6 @@ __all__ = [
     'mvn_conjugate_linear_update',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',
-    'quadrature_scheme_softmaxnormal_gauss_hermite',
-    'quadrature_scheme_softmaxnormal_quantiles',
     'quadrature_scheme_lognormal_gauss_hermite',
     'quadrature_scheme_lognormal_quantiles',
 ]

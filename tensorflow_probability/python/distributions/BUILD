@@ -125,7 +125,6 @@ multi_substrate_py_library(
         ":truncated_normal",
         ":uniform",
         ":variational_gaussian_process",
-        ":vector_diffeomixture",
         ":vector_exponential_diag",
         ":von_mises",
         ":von_mises_fisher",
@@ -1581,26 +1580,6 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "vector_diffeomixture",
-    srcs = ["vector_diffeomixture.py"],
-    deps = [
-        ":categorical",
-        ":distribution",
-        ":normal",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:affine_linear_operator",
-        "//tensorflow_probability/python/bijectors:softmax_centered",
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/util:seed_stream",
-    ],
-)
-
-multi_substrate_py_library(
     name = "vector_exponential_diag",
     srcs = ["vector_exponential_diag.py"],
     deps = [
@@ -2938,18 +2917,6 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
-    name = "vector_diffeomixture_test",
-    size = "medium",
-    srcs = ["vector_diffeomixture_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
     name = "vector_exponential_diag_test",
     srcs = ["vector_exponential_diag_test.py"],
     deps = [
@@ -3175,7 +3142,6 @@ exports_files(
         "triangular.py",
         "truncated_normal.py",
         "uniform.py",
-        "vector_diffeomixture.py",
         "vector_exponential_diag.py",
         "vector_exponential_linear_operator.py",
         "vector_laplace_diag.py",
