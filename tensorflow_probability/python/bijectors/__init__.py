@@ -81,6 +81,7 @@ from tensorflow_probability.python.bijectors.softfloor import Softfloor
 from tensorflow_probability.python.bijectors.softmax_centered import SoftmaxCentered
 from tensorflow_probability.python.bijectors.softplus import Softplus
 from tensorflow_probability.python.bijectors.softsign import Softsign
+from tensorflow_probability.python.bijectors.split import Split
 from tensorflow_probability.python.bijectors.square import Square
 from tensorflow_probability.python.bijectors.tanh import Tanh
 from tensorflow_probability.python.bijectors.transform_diagonal import TransformDiagonal
@@ -149,6 +150,7 @@ __all__ = [
     "SoftmaxCentered",
     "Softplus",
     "Softsign",
+    "Split",
     "Square",
     "Tanh",
     "TransformDiagonal",

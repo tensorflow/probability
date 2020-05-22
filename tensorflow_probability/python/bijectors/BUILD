@@ -95,6 +95,7 @@ multi_substrate_py_library(
         ":softmax_centered",
         ":softplus",
         ":softsign",
+        ":split",
         ":square",
         ":tanh",
         ":transform_diagonal",
@@ -651,6 +652,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -768,6 +770,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "split",
+    srcs = ["split.py"],
+    deps = [
+        ":bijector",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -1637,6 +1653,21 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "split_test",
+    size = "small",
+    srcs = ["split_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "iterated_sigmoid_centered_test",
     size = "small",
     srcs = ["iterated_sigmoid_centered_test.py"],
@@ -1804,6 +1835,7 @@ exports_files(
         "softplus_test.py",
         "softsign.py",
         "softsign_test.py",
+        "split.py",
         "square.py",
         "square_test.py",
         "tanh.py",
