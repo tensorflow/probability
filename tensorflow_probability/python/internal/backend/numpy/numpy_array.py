@@ -135,7 +135,7 @@ def _args_to_matching_arrays(args_list, dtype_hint=None):
   """
   dtype = None
   for arg in args_list:
-    if hasattr(arg, 'dtype'):
+    if ops.is_tensor(arg):
       dtype = arg.dtype
       break
   if dtype is None:

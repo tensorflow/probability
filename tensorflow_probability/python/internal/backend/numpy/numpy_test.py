@@ -1256,6 +1256,12 @@ class NumpyTest(test_util.TestCase):
     self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)
     self.assertEqual(np.float32, nptf.concat([[], [1]], 0).dtype)
 
+  def test_concat_ignores_onp_dtype(self):
+    if not JAX_MODE:
+      self.skipTest('Test only applies to JAX backend.')
+    self.assertEqual(
+        nptf.float32, nptf.concat([onp.zeros(1), nptf.zeros(1)], 0).dtype)
+
   @test_util.numpy_disable_gradient_test
   def test_while_loop_gradients(self):
 
