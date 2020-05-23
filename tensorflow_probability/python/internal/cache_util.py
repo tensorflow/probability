@@ -27,6 +27,7 @@ import numpy as np
 import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+from copy import deepcopy
 
 
 __all__ = [
@@ -207,6 +208,19 @@ class WeakStructRef(object):
     return '{clazz}({referrent})'.format(
         clazz=self.__class__.__name__,
         referrent=self._struct)
+
+  def __deepcopy__(self, memo):
+    """Creates a deep copy of the weak structure reference."""
+    ref_id = id(self)
+    if ref_id in memo:
+      return memo[ref_id]
+    unwrap = lambda ref: deepcopy(ref(), memo)
+    struct_copy = nest.map_structure(unwrap, self._struct)
+    subkey_copy = deepcopy(self._subkey, memo)
+    callback_copy = deepcopy(self._callback, memo)
+    ref_copy = self.__class__(struct_copy, subkey_copy, callback_copy)
+    memo[id(ref_copy)] = ref_copy
+    return ref_copy
 
 
 # This only affects numpy/jax backends, where non-tensor values can be returned.
