@@ -23,7 +23,6 @@ import re
 
 # Dependency imports
 from absl import logging
-import numpy as np  # May be rewritten for JAX.
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 
 # TODO(b/151669121): Remove dependency of test_case on TF
@@ -74,11 +73,6 @@ class TestCase(tf.test.TestCase):
       first = tuple(first)
     if isinstance(first, tuple) and isinstance(second, list):
       second = tuple(second)
-
-    if isinstance(first, np.ndarray):
-      second = onp.array(second)
-    if isinstance(second, np.ndarray):
-      first = onp.array(first)
 
     return super(TestCase, self).assertEqual(first, second, msg)
 
