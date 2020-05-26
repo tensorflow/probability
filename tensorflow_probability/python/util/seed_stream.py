@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import hashlib
 
+import tensorflow.compat.v2 as tf
+
 
 __all__ = [
     'SeedStream',
@@ -27,6 +29,8 @@ __all__ = [
 
 
 JAX_MODE = False
+
+TENSOR_SEED_MSG_PREFIX = 'Unexpected Tensor/ndarray seed'
 
 
 class SeedStream(object):
@@ -168,9 +172,10 @@ class SeedStream(object):
     """Initializes a `SeedStream`.
 
     Args:
-      seed: Any Python object convertible to string, supplying the
-        initial entropy.  If `None`, operations seeded with seeds
-        drawn from this `SeedStream` will follow TensorFlow semantics
+      seed: Any Python object convertible to string, with the exception of
+        Tensor objects, which are reserved for stateless sampling semantics.
+        The seed supplies the initial entropy.  If `None`, operations seeded
+        with seeds drawn from this `SeedStream` will follow TensorFlow semantics
         for not being seeded.
       salt: Any Python object convertible to string, supplying
         auxiliary entropy.  Must be unique across the Distributions
@@ -181,6 +186,9 @@ class SeedStream(object):
     if JAX_MODE and isinstance(self._seed, int):
       import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
       self._seed = jaxrand.PRNGKey(self._seed)
+    if not JAX_MODE:
+      if tf.is_tensor(self._seed):
+        raise TypeError('{}: {}'.format(TENSOR_SEED_MSG_PREFIX, self._seed))
     self._salt = salt
     self._counter = 0
 
