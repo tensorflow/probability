@@ -249,6 +249,8 @@ CONSTRAINTS = {
         lambda d: dict(d, dtype=tf.float32),
     'FiniteDiscrete':
         fix_finite_discrete,
+    'GeneralizedNormal.power':
+        tfp_hps.softplus_plus_eps(),
 }
 
 

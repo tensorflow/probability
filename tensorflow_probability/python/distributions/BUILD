@@ -63,6 +63,7 @@ multi_substrate_py_library(
         ":gamma_gamma",
         ":gaussian_process",
         ":gaussian_process_regression_model",
+        ":generalized_normal",
         ":generalized_pareto",
         ":geometric",
         ":gumbel",
@@ -555,6 +556,25 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math/psd_kernels",
         "//tensorflow_probability/python/util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "generalized_normal",
+    srcs = ["generalized_normal.py"],
+    deps = [
+        ":distribution",
+        ":gamma",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:random_ops",
     ],
 )
 
@@ -2579,6 +2599,19 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "generalized_normal_test",
+    size = "medium",
+    srcs = ["generalized_normal_test.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "normal_conjugate_posteriors_test",
     srcs = ["normal_conjugate_posteriors_test.py"],
     deps = [
@@ -3074,6 +3107,7 @@ exports_files(
         "gamma.py",
         "gamma_gamma.py",
         "gamma_gamma_test.py",
+        "generalized_normal.py",
         "generalized_pareto.py",
         "geometric.py",
         "geometric_test.py",

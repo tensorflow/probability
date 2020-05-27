@@ -290,6 +290,40 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       if 'Could not find compiler' in str(e):
         self.skipTest('XLA not available')
 
+  def make_input(self, number):
+    """Create inputs with varied dtypes and static or dynamic shape.
+
+    Helper to run tests with different dtypes and both statically defined and
+    not statically defined shapes. This helper wraps the inputs to a
+    distribution, typically a python literal or numpy array. It will then
+    attach shapes and dtypes as specified by the test class's `dtype` and
+    `use_static_shape` attributes.
+
+    Note: `tf.Variables` are used to represent inputs which don't have
+    statically defined shapes, as well as fp64 inputs with statically defined
+    shapes. For fp32 with statically defined shapes, inputs are wrapped with
+    `tf.convert_to_tensor`.
+
+    Args:
+      number: Input value(s), typically python literal, list, or numpy array.
+
+    Returns:
+      output: Tensor or Variable with new dtype and shape.
+    """
+    try:
+      num_shape = number.shape
+    except AttributeError:
+      num_shape = None
+    target_shape = num_shape if self.use_static_shape else None
+    if self.dtype in [np.float64, tf.float64] or not self.use_static_shape:
+      output = tf.Variable(number, dtype=self.dtype, shape=target_shape,)
+      self.evaluate(output.initializer)
+    elif self.dtype in [np.float32, tf.float32] and self.use_static_shape:
+      output = tf.convert_to_tensor(number, dtype=self.dtype)
+    else:
+      raise TypeError('Only float32 and float64 supported, got',
+                      str(self.dtype))
+    return output
 
 if JAX_MODE:
   from jax import jacrev  # pylint: disable=g-import-not-at-top

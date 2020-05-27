@@ -56,6 +56,7 @@ TF2_FRIENDLY_DISTS = (
     'FiniteDiscrete',
     'Gamma',
     'GammaGamma',
+    'GeneralizedNormal',
     'GeneralizedPareto',
     'Geometric',
     'Gumbel',
@@ -126,6 +127,7 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'DirichletMultinomial',  # No converter for StatelessWhile
     'Gamma',  # "Incompatible shapes" error. (b/150712618).
+    'GeneralizedNormal',  # uses Gamma (above) internally
     'Multinomial',  # No converter for StatelessWhile
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
