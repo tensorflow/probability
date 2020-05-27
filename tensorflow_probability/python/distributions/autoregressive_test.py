@@ -72,6 +72,31 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
         rtol=0.01,
         seed=test_util.test_seed())
 
+  @test_util.jax_disable_test_missing_functionality('seedless sampling')
+  def testSampleIndependenceWithoutSeedBug(self):
+    # Under eager, there was a bug where subsequent samples for position 0 would
+    # be erroneously independent of the first sample when a seed was not
+    # provided.
+
+    # A pithy example: A simple 1-Markov autoregressive sequence for which the
+    # first frame is either 0 or 1 with equal probability and all subsequent
+    # frames copy the previous frame. Thus the overall sequence-level
+    # distribution is 0000 with probability 0.5 and 1111 with probability 0.5.
+    def distribution_fn(sample):
+      num_frames = sample.shape[-1]
+      mask = tf.one_hot(0, num_frames)[:, tf.newaxis]
+      probs = tf.roll(tf.one_hot(sample, 3), shift=1, axis=-2)
+      probs = probs * (1.0 - mask) + tf.convert_to_tensor([0.5, 0.5, 0]) * mask
+      return tfd.Independent(tfd.Categorical(probs=probs),
+                             reinterpreted_batch_ndims=1)
+
+    ar = tfd.Autoregressive(distribution_fn,
+                            sample0=tf.constant([2, 2, 2, 2]),
+                            num_steps=4)
+    samps = self.evaluate(ar.sample(10))
+    for s in samps:
+      self.assertIn(np.mean(s), (0., 1.), msg=str(s))
+
   def testCompareToBijector(self):
     """Demonstrates equivalence between TD, Bijector approach and AR dist."""
     sample_shape = np.int32([4, 5])
