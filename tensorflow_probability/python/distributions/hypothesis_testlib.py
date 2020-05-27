@@ -53,6 +53,7 @@ SPECIAL_DISTS = (
     'Distribution',
     'Empirical',
     'Independent',
+    'Mixture',
     'MixtureSameFamily',
     'TransformedDistribution',
 )
@@ -332,6 +333,7 @@ del _instantiable_base_dists
 INSTANTIABLE_META_DISTS = (
     'BatchReshape',
     'Independent',
+    'Mixture',
     'MixtureSameFamily',
     'TransformedDistribution',
     'QuantizedDistribution',
@@ -969,6 +971,81 @@ def mixtures_same_family(draw,
 
 
 @hps.composite
+def mixtures(draw,
+             batch_shape=None,
+             event_dim=None,
+             enable_vars=False,
+             depth=None,
+             eligibility_filter=lambda name: True,
+             validate_args=True):
+  """Strategy for drawing `Mixture` distributions.
+
+  The component distributions are drawn from the `distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `MixtureSameFamily` distribution.  The component distribution will have a
+      batch shape of 1 rank higher (for the components being mixed).  Hypothesis
+      will pick a batch shape if omitted.
+    event_dim: Optional Python int giving the size of each of the component
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `Mixture` distributions with the specified
+      `batch_shape` (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=2, max_value=6))
+
+  component_strategy = distributions(
+      batch_shape=batch_shape,
+      event_dim=event_dim,
+      enable_vars=enable_vars,
+      eligibility_filter=eligibility_filter,
+      depth=depth - 1)
+  # Must ensure matching event shapes and dtypes.
+  c0 = draw(component_strategy)
+  components = [c0] + draw(hps.lists(
+      component_strategy.filter(
+          lambda d: (d.event_shape, d.dtype) == (c0.event_shape, c0.dtype)),
+      min_size=1, max_size=5))
+  hp.note('Drawing Mixture with components {}; parameters {}'.format(
+      components, [params_used(c) for c in components]))
+  cat = draw(base_distributions(
+      dist_name='Categorical',
+      batch_shape=batch_shape,
+      event_dim=len(components),
+      enable_vars=enable_vars,
+      validate_args=validate_args))
+  hp.note('Forming Mixture with cat distribution {}; parameters {}'.format(
+      cat, params_used(cat)))
+  result_dist = tfd.Mixture(
+      cat=cat, components=components,
+      validate_args=validate_args, use_static_graph=draw(hps.booleans()))
+  if batch_shape != result_dist.batch_shape:
+    msg = ('Mixture strategy generated a bad batch shape for {}, should have'
+           ' been {}.').format(result_dist, batch_shape)
+    raise AssertionError(msg)
+  return result_dist
+
+
+@hps.composite
 def distributions(draw,
                   dist_name=None,
                   batch_shape=None,
@@ -1039,6 +1116,10 @@ def distributions(draw,
         eligibility_filter, validate_args))
   if dist_name == 'MixtureSameFamily':
     return draw(mixtures_same_family(
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
+  if dist_name == 'Mixture':
+    return draw(mixtures(
         batch_shape, event_dim, enable_vars, depth,
         eligibility_filter, validate_args))
   if dist_name == 'TransformedDistribution':
