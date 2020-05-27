@@ -266,7 +266,7 @@ class NegativeBinomialTest(test_util.TestCase):
     logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
     self.assertAllClose(
         *self.evaluate([-logit(d.prob(0.)), d.logits_parameter()]),
-        atol=0, rtol=1e-4)
+        atol=1e-5, rtol=1e-4)
     self.assertAllClose(
         *self.evaluate([1. - d.prob(0.), d.probs_parameter()]),
         atol=0, rtol=1e-4)

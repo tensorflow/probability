@@ -186,7 +186,8 @@ class _VonMisesTest(object):
         self.make_tensor(concentrations_v),
         validate_args=True)
     expected_entropy = sp_stats.vonmises.entropy(concentrations_v, loc=locs_v)
-    self.assertAllClose(expected_entropy, self.evaluate(von_mises.entropy()))
+    self.assertAllClose(expected_entropy, self.evaluate(von_mises.entropy()),
+                        rtol=1e-5)
 
   def testVonMisesEntropyUniform(self):
     von_mises = tfd.VonMises(-3., 0., validate_args=True)

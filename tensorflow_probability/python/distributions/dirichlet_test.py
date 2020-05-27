@@ -138,14 +138,14 @@ class DirichletTest(test_util.TestCase):
     alpha = [[1., 2], [2., 3]]
     x = [[.5, .5]]
     pdf = tfd.Dirichlet(alpha).prob(x)
-    self.assertAllClose([1., 3. / 2], self.evaluate(pdf))
+    self.assertAllClose([1., 3. / 2], self.evaluate(pdf), rtol=1e-5)
     self.assertAllEqual([2], pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenLowerRank(self):
     alpha = [[1., 2], [2., 3]]
     x = [.5, .5]
     pdf = tfd.Dirichlet(alpha).prob(x)
-    self.assertAllClose([1., 3. / 2], self.evaluate(pdf))
+    self.assertAllClose([1., 3. / 2], self.evaluate(pdf), rtol=1e-5)
     self.assertAllEqual([2], pdf.shape)
 
   def testMean(self):

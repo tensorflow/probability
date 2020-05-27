@@ -137,7 +137,8 @@ class BetaTest(test_util.TestCase):
     b = [[1., 2], [2., 3]]
     x = [[.5, .5]]
     pdf = tfd.Beta(a, b, validate_args=True).prob(x)
-    self.assertAllClose([[1., 3. / 2], [3. / 2, 15. / 8]], self.evaluate(pdf))
+    self.assertAllClose([[1., 3. / 2], [3. / 2, 15. / 8]], self.evaluate(pdf),
+                        rtol=1e-5)
     self.assertEqual((2, 2), pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenLowerRank(self):
@@ -145,7 +146,8 @@ class BetaTest(test_util.TestCase):
     b = [[1., 2], [2., 3]]
     x = [.5, .5]
     pdf = tfd.Beta(a, b, validate_args=True).prob(x)
-    self.assertAllClose([[1., 3. / 2], [3. / 2, 15. / 8]], self.evaluate(pdf))
+    self.assertAllClose([[1., 3. / 2], [3. / 2, 15. / 8]], self.evaluate(pdf),
+                        rtol=1e-5)
     self.assertEqual((2, 2), pdf.shape)
 
   def testLogPdfOnBoundaryIsFiniteWhenAlphaIsOne(self):
