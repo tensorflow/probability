@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 
 import tensorflow.compat.v2 as tf
 
@@ -29,10 +30,19 @@ from tensorflow_probability.python.internal import distribution_util as distribu
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 
 from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
+
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls won't trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*mixture_same_family',
+                        append=True)  # Don't override user-set filters.
 
 
 class MixtureSameFamily(distribution.Distribution):
@@ -237,8 +247,32 @@ class MixtureSameFamily(distribution.Distribution):
     return self.components_distribution.event_shape
 
   def _sample_n(self, n, seed):
-    seed = SeedStream(seed, salt='MixtureSameFamily')
-    x = self.components_distribution.sample(n, seed=seed())  # [n, B, k, E]
+    components_seed, mix_seed = samplers.split_seed(seed,
+                                                    salt='MixtureSameFamily')
+    try:
+      seed_stream = SeedStream(seed, salt='MixtureSameFamily')
+    except TypeError as e:  # Can happen for Tensor seeds.
+      seed_stream = None
+      seed_stream_err = e
+    try:
+      x = self.components_distribution.sample(  # [n, B, k, E]
+          n, seed=components_seed)
+      if seed_stream is not None:
+        seed_stream()  # Advance even if unused.
+    except TypeError as e:
+      if ('Expected int for argument' not in str(e) and
+          TENSOR_SEED_MSG_PREFIX not in str(e)):
+        raise
+      if seed_stream is None:
+        raise seed_stream_err
+      msg = ('Falling back to stateful sampling for `components_distribution` '
+             '{} of type `{}`. Please update to use `tf.random.stateless_*` '
+             'RNGs. This fallback may be removed after 20-Aug-2020. {}')
+      warnings.warn(msg.format(self.components_distribution.name,
+                               type(self.components_distribution),
+                               str(e)))
+      x = self.components_distribution.sample(  # [n, B, k, E]
+          n, seed=seed_stream())
 
     event_shape = None
     event_ndims = tensorshape_util.rank(self.event_shape)
@@ -258,9 +292,25 @@ class MixtureSameFamily(distribution.Distribution):
 
     # TODO(jvdillon): Consider using tf.gather (by way of index unrolling).
     npdt = dtype_util.as_numpy_dtype(x.dtype)
+    try:
+      mix_sample = self.mixture_distribution.sample(
+          n, seed=mix_seed)  # [n, B] or [n]
+    except TypeError as e:
+      if ('Expected int for argument' not in str(e) and
+          TENSOR_SEED_MSG_PREFIX not in str(e)):
+        raise
+      if seed_stream is None:
+        raise seed_stream_err
+      msg = ('Falling back to stateful sampling for `mixture_distribution` '
+             '{} of type `{}`. Please update to use `tf.random.stateless_*` '
+             'RNGs. This fallback may be removed after 20-Aug-2020. ({})')
+      warnings.warn(msg.format(self.mixture_distribution.name,
+                               type(self.mixture_distribution),
+                               str(e)))
+      mix_sample = self.mixture_distribution.sample(
+          n, seed=seed_stream())  # [n, B] or [n]
     mask = tf.one_hot(
-        indices=self.mixture_distribution.sample(
-            n, seed=seed()),  # [n, B] or [n]
+        indices=mix_sample,  # [n, B] or [n]
         depth=num_components,
         on_value=npdt(1),
         off_value=npdt(0))    # [n, B, k] or [n, k]
