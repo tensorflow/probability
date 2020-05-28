@@ -125,10 +125,8 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 # blacklisted by the autovectorization tests. Since not all distributions are
 # in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
-    'DirichletMultinomial',  # No converter for StatelessWhile
     'Gamma',  # "Incompatible shapes" error. (b/150712618).
     'GeneralizedNormal',  # uses Gamma (above) internally
-    'Multinomial',  # No converter for StatelessWhile
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
