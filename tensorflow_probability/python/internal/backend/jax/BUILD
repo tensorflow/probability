@@ -46,6 +46,7 @@ FILENAMES = [
     "linalg",
     "linalg_impl",
     "misc",
+    "nest",
     "nn",
     "numpy_array",
     "numpy_logging",

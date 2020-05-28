@@ -41,6 +41,7 @@ py_library(
         ":keras",
         ":linalg",
         ":misc",
+        ":nest",
         ":nn",
         ":numpy_array",
         ":numpy_logging",
@@ -55,7 +56,6 @@ py_library(
         ":tensor_array_ops",
         ":tensor_shape",
         ":test_lib",
-        # tensorflow dep,
     ],
 )
 
@@ -175,6 +175,14 @@ py_library(
 )
 
 py_library(
+    name = "nest",
+    srcs = ["nest.py"],
+    deps = [
+        # tree dep,
+    ],
+)
+
+py_library(
     name = "nn",
     srcs = ["nn.py"],
     deps = [
@@ -231,7 +239,6 @@ py_library(
         ":_utils",
         # numpy dep,
         # six dep,
-        # tensorflow dep,
         # wrapt dep,
     ],
 )
@@ -367,6 +374,7 @@ py_library(
     srcs = ["v2.py"],
     deps = [
         ":_utils",
+        ":nest",
         ":ops",
         ":tensor_array_ops",
         # tensorflow dep,
@@ -448,6 +456,7 @@ exports_files(
         "linalg.py",
         "linalg_impl.py",
         "misc.py",
+        "nest.py",
         "nn.py",
         "numpy_array.py",
         "numpy_logging.py",

@@ -84,7 +84,7 @@ install_python_packages() {
   pip install hypothesis==3.56.5 coverage==4.4.2 matplotlib mock scipy
 
   # Install additional TFP dependencies.
-  pip install decorator cloudpickle
+  pip install decorator cloudpickle dm-tree
 
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).

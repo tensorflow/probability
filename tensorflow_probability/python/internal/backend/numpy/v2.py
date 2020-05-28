@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
+from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy import nn
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math
@@ -45,8 +46,6 @@ from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  #
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
 from tensorflow_probability.python.internal.backend.numpy.tensor_shape import TensorShape
-# TODO(b/151669121): Remove dependency on TF
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 # pylint: enable=unused-import
 
 

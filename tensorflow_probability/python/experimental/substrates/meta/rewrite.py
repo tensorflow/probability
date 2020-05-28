@@ -44,6 +44,9 @@ TF_REPLACEMENTS = {
     'from tensorflow.python.framework import tensor_shape':
         ('from tensorflow_probability.python.internal.backend.numpy '
          'import tensor_shape'),
+    'from tensorflow.python.util import nest':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import nest'),
     'from tensorflow.python.ops.linalg':
         'from tensorflow_probability.python.internal.backend.numpy',
     'from tensorflow.python.ops import parallel_for':
