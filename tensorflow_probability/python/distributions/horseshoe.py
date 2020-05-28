@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import half_cauchy
 from tensorflow_probability.python.internal import assert_util
@@ -193,7 +194,9 @@ class Horseshoe(distribution.Distribution):
     q = 20. / 47. * xx**1.0919284281983377
     h = 1. / (1 + xx**(1.5)) + h_inf * q / (1 + q)
     c = -.5 * np.log(2 * np.pi**3) - tf.math.log(g * scale)
-    return -tf.math.log1p((1 - g) / g * tf.exp(-xx / (1 - g))) + tf.math.log(
+    z = np.log1p(-g) - np.log(g)
+    softplus_bij = softplus_bijector.Softplus()
+    return -softplus_bij.forward(z - xx / (1 - g)) + tf.math.log(
         tf.math.log1p(g / xx - (1 - g) / (h + b * xx)**2)) + c
 
   def _sample_n(self, n, seed=None):
