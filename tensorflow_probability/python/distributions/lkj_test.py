@@ -352,9 +352,42 @@ class LKJTest(test_util.TestCase):
         sample_shape=[num_samples], seed=test_util.test_seed())
     mean = testee_lkj.mean()
     self.assertEqual(mean.shape, [3, 3, 3])
-    check1 = st.assert_true_mean_equal_by_dkwm(
+    # tfd.LKJ has some small numerical issues, so we allow for some amount of
+    # numerical tolerance when testing means.
+    numerical_tolerance = 1e-6
+    check1 = st.assert_true_mean_in_interval_by_dkwm(
         samples=results, low=-1., high=1.,
-        expected=mean,
+        expected_low=mean - numerical_tolerance,
+        expected_high=mean + numerical_tolerance,
+        false_fail_rate=1e-6)
+    check2 = assert_util.assert_less(
+        st.min_discrepancy_of_true_means_detectable_by_dkwm(
+            num_samples,
+            low=-1.,
+            high=1.,
+            # Smaller false fail rate because of different batch sizes between
+            # these two checks.
+            false_fail_rate=1e-7,
+            false_pass_rate=1e-6),
+        # 4% relative error
+        0.08)
+    self.evaluate([check1, check2])
+
+  def testMeanHigherDimension(self, dtype):
+    testee_lkj = tfd.LKJ(
+        dimension=6, concentration=dtype([1., 3., 5.]), validate_args=True)
+    num_samples = 20000
+    results = testee_lkj.sample(
+        sample_shape=[num_samples], seed=test_util.test_seed())
+    mean = testee_lkj.mean()
+    self.assertEqual(mean.shape, [3, 6, 6])
+    # tfd.LKJ has some small numerical issues, so we allow for some amount of
+    # numerical tolerance when testing means.
+    numerical_tolerance = 1e-6
+    check1 = st.assert_true_mean_in_interval_by_dkwm(
+        samples=results, low=-1., high=1.,
+        expected_low=mean - numerical_tolerance,
+        expected_high=mean + numerical_tolerance,
         false_fail_rate=1e-6)
     check2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
