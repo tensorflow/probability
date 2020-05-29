@@ -42,13 +42,13 @@ TF_REPLACEMENTS = {
         'import tensorflow_probability as tfp; '
         'tfp = tfp.experimental.substrates.numpy',
     'from tensorflow.python.framework import tensor_shape':
-        ('from tensorflow_probability.python.internal.backend.numpy '
+        ('from tensorflow_probability.python.internal.backend.numpy.gen '
          'import tensor_shape'),
     'from tensorflow.python.util import nest':
         ('from tensorflow_probability.python.internal.backend.numpy '
          'import nest'),
     'from tensorflow.python.ops.linalg':
-        'from tensorflow_probability.python.internal.backend.numpy',
+        'from tensorflow_probability.python.internal.backend.numpy.gen',
     'from tensorflow.python.ops import parallel_for':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import functional_ops as parallel_for',

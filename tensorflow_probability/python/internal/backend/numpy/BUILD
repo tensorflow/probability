@@ -53,8 +53,8 @@ py_library(
         ":raw_ops",
         ":sets_lib",
         ":sparse_lib",
+        ":static_rewrites",
         ":tensor_array_ops",
-        ":tensor_shape",
         ":test_lib",
     ],
 )
@@ -159,7 +159,7 @@ py_library(
     ],
     deps = [
         ":_utils",
-        ":linear_operator",
+        ":static_rewrites",
         # numpy dep,
         # scipy dep,
     ],
@@ -317,14 +317,15 @@ py_library(
 genrule(
     name = "rewrite_tensor_shape",
     srcs = [],
-    outs = ["tensor_shape.py"],
+    outs = ["tensor_shape_gen.py"],
     cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@"),
     tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
 )
 
 py_library(
-    name = "tensor_shape",
-    srcs = ["tensor_shape.py"],
+    name = "tensor_shape_gen",
+    testonly = 1,
+    srcs = ["tensor_shape_gen.py"],
     deps = [
         # six dep,
     ],
@@ -419,8 +420,9 @@ LINOP_FILES = [
 
 [genrule(
     name = "rewrite_{}".format(filename),
+    testonly = 1,
     srcs = [],
-    outs = ["{}.py".format(filename)],
+    outs = ["{}_gen.py".format(filename)],
     cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
            "--module_name={} --whitelist={} > $@").format(
         filename,
@@ -430,8 +432,9 @@ LINOP_FILES = [
 ) for filename in LINOP_FILES]
 
 py_library(
-    name = "linear_operator",
-    srcs = [":{}.py".format(filename) for filename in LINOP_FILES],
+    name = "linear_operator_gen",
+    testonly = 1,
+    srcs = [":{}_gen.py".format(filename) for filename in LINOP_FILES],
     deps = [
         ":_utils",
         # numpy dep,
@@ -439,41 +442,36 @@ py_library(
     ],
 )
 
-exports_files(
-    [
-        "__init__.py",
-        "_utils.py",
-        "bitwise.py",
-        "compat.py",
-        "control_flow.py",
-        "debugging.py",
-        "dtype.py",
-        "errors.py",
-        "functional_ops.py",
-        "initializers.py",
-        "keras.py",
-        "keras_layers.py",
-        "linalg.py",
-        "linalg_impl.py",
-        "misc.py",
-        "nest.py",
-        "nn.py",
-        "numpy_array.py",
-        "numpy_logging.py",
-        "numpy_math.py",
-        "numpy_signal.py",
-        "numpy_test.py",
-        "ops.py",
-        "private.py",
-        "random_generators.py",
-        "raw_ops.py",
-        "sets_lib.py",
-        "sparse_lib.py",
-        "tensor_array_ops.py",
-        "tensor_array_ops_test.py",
-        "test_lib.py",
-        "v1.py",
-        "v2.py",
+py_test(
+    name = "rewrite_equivalence_test",
+    srcs = ["rewrite_equivalence_test.py"],
+    args = [
+        "--modules_to_check",
+        ",".join(LINOP_FILES + ["tensor_shape"]),
     ],
+    srcs_version = "PY2AND3",
+    tags = ["no-oss-ci"],
+    deps = [
+        ":linear_operator_gen",
+        ":static_rewrites",
+        ":tensor_shape_gen",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "static_rewrites",
+    srcs = glob(["gen/*.py"]),
+    deps = [
+        ":_utils",
+        # numpy dep,
+        # scipy dep,
+        # six dep,
+    ],
+)
+
+exports_files(
+    glob(["**/*.py"]),
     visibility = ["//tensorflow_probability:__subpackages__"],
 )

@@ -40,12 +40,12 @@ from tensorflow_probability.python.internal.backend.numpy import test_lib as tes
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.dtype import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.functional_ops import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import TensorShape
 from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
-from tensorflow_probability.python.internal.backend.numpy.tensor_shape import TensorShape
 # pylint: enable=unused-import
 
 

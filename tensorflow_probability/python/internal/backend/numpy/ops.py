@@ -24,7 +24,7 @@ import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
-from tensorflow_probability.python.internal.backend.numpy import tensor_shape
+from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 import wrapt
 from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
