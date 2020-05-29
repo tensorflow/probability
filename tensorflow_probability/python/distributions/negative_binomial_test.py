@@ -74,6 +74,15 @@ class NegativeBinomialTest(test_util.TestCase):
       negbinom = tfd.NegativeBinomial(5., probs=invalid_ps, validate_args=True)
       self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
+  def testZeroP(self):
+    prob = 0.
+    negbinom = tfd.NegativeBinomial(
+        total_count=3., probs=prob, validate_args=True)
+    self.assertAllClose(prob, self.evaluate(negbinom.probs))
+    self.assertAllClose(0., negbinom.prob(3))
+    self.assertAllClose(1., negbinom.prob(0))
+    self.assertAllClose(0., negbinom.log_prob(0))
+
   def testInvalidNegativeCount(self):
     invalid_rs = [-3., 0., -2.,]
     with self.assertRaisesOpError(

@@ -72,14 +72,14 @@ class NegativeBinomial(distribution.Distribution):
       logits: Floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents logits for the probability of success for
-        independent Negative Binomial distributions and must be in the open
-        interval `(-inf, inf)`. Only one of `logits` or `probs` should be
+        independent Negative Binomial distributions and must be in the half-open
+        interval `[-inf, inf)`. Only one of `logits` or `probs` should be
         specified.
       probs: Positive floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents the probability of success for independent
-        Negative Binomial distributions and must be in the open interval
-        `(0, 1)`. Only one of `logits` or `probs` should be specified.
+        Negative Binomial distributions and must be in the half-open interval
+        `[0, 1)`. Only one of `logits` or `probs` should be specified.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -178,8 +178,9 @@ class NegativeBinomial(distribution.Distribution):
   def _log_prob(self, x):
     total_count = tf.convert_to_tensor(self.total_count)
     logits = self._logits_parameter_no_checks()
-    log_unnormalized_prob = (total_count * tf.math.log_sigmoid(-logits) +
-                             x * tf.math.log_sigmoid(logits))
+    log_unnormalized_prob = (
+        total_count * tf.math.log_sigmoid(-logits) +
+        tf.math.multiply_no_nan(tf.math.log_sigmoid(logits), x))
     log_normalization = (tfp_math.lbeta(1. + x, total_count) +
                          tf.math.log(total_count + x))
     return log_unnormalized_prob - log_normalization
