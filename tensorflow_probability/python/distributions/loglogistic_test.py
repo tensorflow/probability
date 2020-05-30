@@ -29,7 +29,7 @@ from tensorflow_probability.python.internal import test_util
 
 
 @test_util.test_all_tf_execution_regimes
-class LogLogiticTest(test_util.TestCase):
+class LogLogisticTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
@@ -110,7 +110,7 @@ class LogLogiticTest(test_util.TestCase):
   def testLogLogisticSample(self):
     log_logistic_scale = 1.5
     loc = np.log(log_logistic_scale).astype(np.float32)
-    scale = 1./3
+    scale = 0.33
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
     samples = self.evaluate(dist.sample(6000, seed=test_util.test_seed()))
     self.assertAllClose(np.mean(samples),
@@ -120,13 +120,13 @@ class LogLogiticTest(test_util.TestCase):
                         self.evaluate(dist.stddev()),
                         atol=0.5)
 
-  def testLogLogisticPDF(self):
-    log_logistic_scale = 1.5
+  def testLogLogisticPDFLocBatch(self):
+    log_logistic_scale = [1.5, 2.]
     loc = np.log(log_logistic_scale)
-    scale = 1./0.4
+    scale = 2.5
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
-    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+    x = np.array([1.], dtype=np.float32)
 
     pdf = dist.prob(x)
 
@@ -135,13 +135,28 @@ class LogLogiticTest(test_util.TestCase):
       stats.fisk.pdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
-  def testLogLogisticLogPDF(self):
+  def testLogLogisticPDFScaleBatch(self):
     log_logistic_scale = 1.5
     loc = np.log(log_logistic_scale)
-    scale = 1./0.4
+    scale = np.array([2.5, 5.])
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
-    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+    x = np.array([[1e-4, 1.0], [1.5, 2.0]], dtype=np.float32)
+
+    pdf = dist.prob(x)
+
+    self.assertAllClose(
+      self.evaluate(pdf),
+      stats.fisk.pdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+    )
+
+  def testLogLogisticLogPDFLocBatch(self):
+    log_logistic_scale = [1.5, 2.]
+    loc = np.log(log_logistic_scale)
+    scale = 2.5
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+
+    x = np.array([[1e-4, 1.0], [3.0, 2.0]], dtype=np.float32)
 
     log_pdf = dist.log_prob(x)
 
@@ -150,13 +165,28 @@ class LogLogiticTest(test_util.TestCase):
       stats.fisk.logpdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
-  def testLogLogisticCDF(self):
-    log_logistic_scale = 1.5
+  def testLogLogisticLogPDFScaleBatch(self):
+    log_logistic_scale = [1.5, 2.]
     loc = np.log(log_logistic_scale)
-    scale = 1./0.4
+    scale = np.array([2.5, 5.])
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
-    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+    x = np.array([2.0], dtype=np.float32)
+
+    log_pdf = dist.log_prob(x)
+
+    self.assertAllClose(
+      self.evaluate(log_pdf),
+      stats.fisk.logpdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+    )
+
+  def testLogLogisticCDFLocBatch(self):
+    log_logistic_scale = [0.5, 1.5]
+    loc = np.log(log_logistic_scale)
+    scale = 2.5
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+
+    x = np.array([1e-4], dtype=np.float32)
 
     cdf = dist.cdf(x)
     self.assertAllClose(
@@ -164,13 +194,27 @@ class LogLogiticTest(test_util.TestCase):
       stats.fisk.cdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
-  def testLogLogisticLogCDF(self):
-    log_logistic_scale = 1.5
+  def testLogLogisticCDFScaleBatch(self):
+    log_logistic_scale = [0.5, 1.5]
     loc = np.log(log_logistic_scale)
-    scale = 1./0.4
+    scale = np.array([0.5, 2.])
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
-    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+    x = np.array([[1e-4, 2.0], [5.0, 2.0]], dtype=np.float32)
+
+    cdf = dist.cdf(x)
+    self.assertAllClose(
+      self.evaluate(cdf),
+      stats.fisk.cdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+    )
+
+  def testLogLogisticLogCDFLocBatch(self):
+    log_logistic_scale = [0.75, 2.5]
+    loc = np.log(log_logistic_scale)
+    scale = 2.5
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+
+    x = np.array([1e-4], dtype=np.float32)
 
     log_cdf = dist.log_cdf(x)
     self.assertAllClose(
@@ -178,13 +222,41 @@ class LogLogiticTest(test_util.TestCase):
       stats.fisk.logcdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
-  def testLogLogisticLogSurvival(self):
-    log_logistic_scale = 1.5
+  def testLogLogisticLogCDFScaleBatch(self):
+    log_logistic_scale = [0.75, 2.5]
     loc = np.log(log_logistic_scale)
-    scale = 1./0.4
+    scale = np.array([0.3, 2.1])
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
-    x = np.array([1e-4, 1.0, 2.0], dtype=np.float32)
+    x = np.array([[1e-4, 1.0], [5.0, 2.0]], dtype=np.float32)
+
+    log_cdf = dist.log_cdf(x)
+    self.assertAllClose(
+      self.evaluate(log_cdf),
+      stats.fisk.logcdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+    )
+
+  def testLogLogisticLogSurvivalLocBatch(self):
+    log_logistic_scale = [0.42, 1.3]
+    loc = np.log(log_logistic_scale)
+    scale = 2.5
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+
+    x = np.array([[1e-4, 1.0], [3., 2.0]], dtype=np.float32)
+
+    logsf = dist.log_survival_function(x)
+    self.assertAllClose(
+      self.evaluate(logsf),
+      stats.fisk.logsf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+    )
+
+  def testLogLogisticLogSurvivalScaleBatch(self):
+    log_logistic_scale = 1.5
+    loc = np.log(log_logistic_scale)
+    scale = np.array([1.2, 5.1])
+    dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
+
+    x = np.array([1.0], dtype=np.float32)
 
     logsf = dist.log_survival_function(x)
     self.assertAllClose(
@@ -194,7 +266,7 @@ class LogLogiticTest(test_util.TestCase):
 
   def testAssertValidSample(self):
     dist = tfd.LogLogistic(loc=np.log([1., 1., 4.]),
-                           scale=0.5,
+                           scale=2.,
                            validate_args=True)
     with self.assertRaisesOpError('Sample must be non-negative.'):
       self.evaluate(dist.cdf([3., -0.2, 1.]))
