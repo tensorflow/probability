@@ -168,8 +168,8 @@ def fit(
       model=tfp.glm.BernoulliNormalCDF())
   log_likelihood = tfp.glm.BernoulliNormalCDF().log_prob(Y, linear_response)
 
-  print('is_converged: ', is_converged)
-  print('    num_iter: ', num_iter)
+  print('is_converged: ', is_converged.numpy())
+  print('    num_iter: ', num_iter.numpy())
   print('    accuracy: ', np.mean((linear_response > 0.) == tf.cast(Y, bool)))
   print('    deviance: ', 2. * np.mean(log_likelihood))
   print('||w0-w1||_2 / (1+||w0||_2): ', (np.linalg.norm(w_true - w, ord=2) /
