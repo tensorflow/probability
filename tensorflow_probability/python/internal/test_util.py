@@ -46,6 +46,7 @@ __all__ = [
     'numpy_disable_gradient_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
+    'disable_test_for_backend',
     'test_all_tf_execution_regimes',
     'test_graph_and_eager_modes',
     'test_graph_mode_only',
@@ -59,7 +60,6 @@ __all__ = [
 
 
 JAX_MODE = False
-
 
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
@@ -527,6 +527,10 @@ def test_graph_mode_only(test_class_or_method=None):
   return decorator
 
 
+def is_numpy_not_jax_mode():
+  return tf.Variable == ops.NumpyVariable and not JAX_MODE
+
+
 def numpy_disable_gradient_test(test_fn):
   """Disable a gradient-using test when using the numpy backend."""
 
@@ -621,6 +625,24 @@ def tf_tape_safety_test(test_fn):
     return test_fn(self, *args, **kwargs)
 
   return new_test
+
+
+def disable_test_for_backend(disable_numpy=False,
+                             disable_jax=False,
+                             reason=None):
+  """Disable a test for backends with a specified reason."""
+  if not (disable_numpy or disable_jax):
+    raise ValueError('One of `disable_numpy` or `disable_jax` must be true.')
+  if not reason:
+    raise ValueError('`reason` must be specified.')
+
+  def decor(test_fn_or_class):
+    if not ((disable_numpy and is_numpy_not_jax_mode()) or
+            (disable_jax and JAX_MODE)):
+      return test_fn_or_class
+    return unittest.skip(reason)(test_fn_or_class)
+
+  return decor
 
 
 def test_seed(hardcoded_seed=None,

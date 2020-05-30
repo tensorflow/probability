@@ -144,6 +144,17 @@ def fix_wishart(d):
   return dict(d, df=tf.maximum(df, tf.cast(scale.shape[-1], df.dtype)))
 
 
+def fix_bates(d):
+  total_count = tf.math.maximum(
+      tf.math.minimum(
+          d['total_count'],
+          tfd.bates.BATES_TOTAL_COUNT_STABILITY_LIMITS[  # pylint: disable=protected-access
+              d['total_count'].dtype]),
+      1.)
+  high = ensure_high_gt_low(d['low'], d['high'])
+  return dict(d, total_count=total_count, high=high)
+
+
 CONSTRAINTS = {
     'atol':
         tf.math.softplus,
@@ -228,6 +239,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'total_count':
         lambda x: tf.floor(tf.sigmoid(x / 100) * 100) + 1,
+    'Bates':
+        fix_bates,
     'Bernoulli':
         lambda d: dict(d, dtype=tf.float32),
     'CholeskyLKJ':

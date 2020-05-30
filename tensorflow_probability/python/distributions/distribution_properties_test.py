@@ -37,6 +37,7 @@ from tensorflow_probability.python.internal import test_util
 
 
 TF2_FRIENDLY_DISTS = (
+    'Bates',
     'Bernoulli',
     'Beta',
     'BetaBinomial',
@@ -125,6 +126,7 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 # blacklisted by the autovectorization tests. Since not all distributions are
 # in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
+    'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'Gamma',  # "Incompatible shapes" error. (b/150712618).
     'GeneralizedNormal',  # uses Gamma (above) internally
     'PlackettLuce',  # No converter for TopKV2
@@ -132,6 +134,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
+    'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/150811273

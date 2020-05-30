@@ -22,6 +22,7 @@ from __future__ import print_function
 # Distributions:
 from tensorflow_probability.python.distributions.autoregressive import Autoregressive
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
+from tensorflow_probability.python.distributions.bates import Bates
 from tensorflow_probability.python.distributions.bernoulli import Bernoulli
 from tensorflow_probability.python.distributions.beta import Beta
 from tensorflow_probability.python.distributions.beta_binomial import BetaBinomial
@@ -147,6 +148,7 @@ __all__ = [
     'Distribution',
     'Autoregressive',
     'BatchReshape',
+    'Bates',
     'Bernoulli',
     'Beta',
     'BetaBinomial',
