@@ -25,8 +25,6 @@ from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     'LogLogistic',
@@ -78,7 +76,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
   @classmethod
   def _params_event_ndims(cls):
-    return dict(scale=0, concentration=0)
+    return dict(loc=0, scale=0)
 
   @property
   def loc(self):
@@ -100,7 +98,8 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
             message='Mean undefined for scale > 1.'),
         ]):
       mean = tf.math.exp(self.loc) / sinc(scale)
-      return tf.where(scale > 1., np.nan, mean)
+      nans = tf.ones_like(mean) * np.nan
+      return tf.where(scale > 1., nans, mean)
 
   def _variance(self):
     scale = tf.convert_to_tensor(self.scale)
@@ -113,13 +112,15 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
         ]):
       variance = tf.math.exp(2 * self.loc) * (
           1. / sinc(2 * scale) - 1. / sinc(scale) ** 2)
-      return tf.where(scale > 0.5, np.nan, variance)
+      nans = tf.ones_like(variance) * np.nan
+      return tf.where(scale > 0.5, nans, variance)
 
   def _mode(self):
     log_mode = self.loc + self.scale * (
         tf.math.log1p(- self.scale) - tf.math.log1p(self.scale)
     )
-    return tf.where(self.scale > 1., 0., tf.math.exp(log_mode))
+    zeros = tf.zeros_like(log_mode)
+    return tf.where(self.scale > 1., zeros, tf.math.exp(log_mode))
 
   def _entropy(self):
     return 2. + self.loc + tf.math.log(self.scale)
