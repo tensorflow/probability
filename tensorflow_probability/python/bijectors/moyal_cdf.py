@@ -100,6 +100,8 @@ class MoyalCDF(bijector.Bijector):
     z = (x - self.loc) / self.scale
     return tf.math.erfc(tf.exp(-z / 2) / np.sqrt(2.))
 
+  # TODO(b/157561663): Use `tf.math.special.erfcinv`.
+
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
       return (self.loc - self.scale *
