@@ -326,6 +326,8 @@ def trace_scan(loop_fn,
                initial_state,
                elems,
                trace_fn,
+               trace_criterion_fn=None,
+               static_trace_allocation_size=None,
                parallel_iterations=10,
                name=None):
   """A simplified version of `tf.scan` that has configurable tracing.
@@ -348,6 +350,17 @@ def trace_scan(loop_fn,
       of which is passed to `loop_fn`.
     trace_fn: A callable that takes in the return value of `loop_fn` and returns
       a `Tensor` or a nested collection of `Tensor`s.
+    trace_criterion_fn: Optional callable that takes in the return value of
+      `loop_fn` and returns a boolean `Tensor` indicating whether to trace it.
+      If `None`, all steps are traced.
+      Default value: `None`.
+    static_trace_allocation_size: Optional Python `int` size of trace to
+      allocate statically. This should be an upper bound on the number of steps
+      traced and is used only when the length cannot be
+      statically inferred (for example, if a `trace_criterion_fn` is specified).
+      It is primarily intended for contexts where static shapes are required,
+      such as in XLA-compiled code.
+      Default value: `None`.
     parallel_iterations: Passed to the internal `tf.while_loop`.
     name: Name scope used in this function. Default: 'trace_scan'.
 
@@ -376,29 +389,49 @@ def trace_scan(loop_fn,
         elems.dtype, size=length, element_shape=elems.shape[1:])
     elems_array = elems_array.unstack(elems)
 
+    # Initialize trace arrays.
+    dynamic_size, initial_size = True, 0
+    if trace_criterion_fn is None:
+      dynamic_size = prefer_static.logical_not(prefer_static.is_numpy(length))
+      initial_size = length
+    elif static_trace_allocation_size:
+      dynamic_size, initial_size = False, static_trace_allocation_size
     trace_arrays = tf.nest.map_structure(
-        lambda x: tf.TensorArray(x.dtype, size=length, element_shape=x.shape),
+        lambda x: tf.TensorArray(x.dtype,  # pylint: disable=g-long-lambda
+                                 size=initial_size,
+                                 dynamic_size=dynamic_size,
+                                 element_shape=x.shape),
         trace_fn(initial_state))
 
-    def _body(i, state, trace_arrays):
-      state = loop_fn(state, elems_array.read(i))
-      trace_arrays = tf.nest.pack_sequence_as(trace_arrays, [
-          a.write(i, v) for a, v in zip(
-              tf.nest.flatten(trace_arrays), tf.nest.flatten(trace_fn(state)))
-      ])
-      return i + 1, state, trace_arrays
+    # Helper for writing a (structured) state to (structured) arrays.
+    def trace_one_step(num_steps_traced, trace_arrays, state):
+      return tf.nest.map_structure(
+          lambda ta, x: ta.write(num_steps_traced, x),
+          trace_arrays,
+          trace_fn(state))
 
-    _, final_state, trace_arrays = tf.while_loop(
-        cond=lambda i, *args: i < length,
+    def _body(i, state, num_steps_traced, trace_arrays):
+      elem = elems_array.read(i)
+      state = loop_fn(state, elem)
+
+      trace_arrays, num_steps_traced = prefer_static.cond(
+          trace_criterion_fn(state) if trace_criterion_fn else True,
+          lambda: (trace_one_step(num_steps_traced, trace_arrays, state),  # pylint: disable=g-long-lambda
+                   num_steps_traced + 1),
+          lambda: (trace_arrays, num_steps_traced))
+
+      return i + 1, state, num_steps_traced, trace_arrays
+
+    _, final_state, _, trace_arrays = tf.while_loop(
+        cond=lambda i, *_: i < length,
         body=_body,
-        loop_vars=(0, initial_state, trace_arrays),
+        loop_vars=(0, initial_state, 0, trace_arrays),
         parallel_iterations=parallel_iterations)
 
     stacked_trace = tf.nest.map_structure(lambda x: x.stack(), trace_arrays)
 
     # Restore the static length if we know it.
-    static_length = tf.TensorShape(
-        length if prefer_static.is_numpy(length) else None)
+    static_length = tf.TensorShape(None if dynamic_size else initial_size)
     def _merge_static_length(x):
       tensorshape_util.set_shape(x, static_length.concatenate(x.shape[1:]))
       return x
