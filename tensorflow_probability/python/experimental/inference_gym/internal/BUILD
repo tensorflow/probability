@@ -24,6 +24,7 @@ load(
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
+        "//tools/inference_gym_ground_truth:__subpackages__",
     ],
 )
 
@@ -36,6 +37,24 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     deps = [
         ":data",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "array_to_source",
+    srcs = ["array_to_source.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "array_to_source_test",
+    srcs = ["array_to_source_test.py"],
+    deps = [
+        ":array_to_source",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

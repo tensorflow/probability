@@ -13,8 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   A package for target densities and benchmarking of inference algorithms
-#   against the same.
+#   Check in ground truth values.
 
 load(
     "//tensorflow_probability/python:build_defs.bzl",
@@ -32,10 +31,17 @@ licenses(["notice"])  # Apache 2.0
 exports_files(["LICENSE"])
 
 multi_substrate_py_library(
-    name = "inference_gym",
+    name = "ground_truth",
     srcs = ["__init__.py"],
     deps = [
-        "//tensorflow_probability/python/experimental/inference_gym/internal",  # buildcleaner: keep
-        "//tensorflow_probability/python/experimental/inference_gym/targets",
+        ":german_credit_numeric_logistic_regression",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "german_credit_numeric_logistic_regression",
+    srcs = ["german_credit_numeric_logistic_regression.py"],
+    deps = [
+        # numpy dep,
     ],
 )

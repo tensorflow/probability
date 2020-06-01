@@ -164,6 +164,10 @@ class InferenceGymTestCase(test_util.TestCase):
       self,
       model,
       sample_transformation_shapes,
+      check_ground_truth_mean=False,
+      check_ground_truth_mean_standard_error=False,
+      check_ground_truth_standard_deviation=False,
+      check_ground_truth_standard_deviation_standard_error=False,
       seed=None,
   ):
     """Validate that the model's log probability and sample transformations run.
@@ -176,6 +180,14 @@ class InferenceGymTestCase(test_util.TestCase):
     Args:
       model: The model to validate.
       sample_transformation_shapes: Shapes of the transformation outputs.
+      check_ground_truth_mean: Whether to check the shape of the ground truth
+        mean.
+      check_ground_truth_mean_standard_error: Whether to check the shape of the
+        ground truth standard error.
+      check_ground_truth_standard_deviation: Whether to check the shape of the
+        ground truth standard deviation.
+      check_ground_truth_standard_deviation_standard_error: Whether to check the
+        shape of the ground truth standard deviation standard error.
       seed: Optional seed to use. By default, `test_util.test_seed()` is used.
     """
     batch_size = 16
@@ -215,7 +227,46 @@ class InferenceGymTestCase(test_util.TestCase):
           sample_transformation_shapes[name],
           transformed_points,
           shallow=transformed_points,
-          msg='Comparing sample transformation: {}'.format(name))
+          msg='Checking outputs of: {}'.format(name))
+
+      def _ground_truth_shape_check_part(expected_shape, ground_truth):
+        self.assertEqual(
+            tuple(expected_shape),
+            tuple(ground_truth.shape))
+
+      if check_ground_truth_mean:
+        self.assertAllAssertsNested(
+            _ground_truth_shape_check_part,
+            sample_transformation_shapes[name],
+            sample_transformation.ground_truth_mean,
+            shallow=transformed_points,
+            msg='Checking ground truth mean of: {}'.format(name))
+
+      if check_ground_truth_mean_standard_error:
+        self.assertAllAssertsNested(
+            _ground_truth_shape_check_part,
+            sample_transformation_shapes[name],
+            sample_transformation.ground_truth_mean_standard_error,
+            shallow=transformed_points,
+            msg='Checking ground truth mean standard error: {}'.format(name))
+
+      if check_ground_truth_standard_deviation:
+        self.assertAllAssertsNested(
+            _ground_truth_shape_check_part,
+            sample_transformation_shapes[name],
+            sample_transformation.ground_truth_standard_deviation,
+            shallow=transformed_points,
+            msg='Checking ground truth standard deviation: {}'.format(name))
+
+      if check_ground_truth_standard_deviation_standard_error:
+        self.assertAllAssertsNested(
+            _ground_truth_shape_check_part,
+            sample_transformation_shapes[name],
+            sample_transformation
+            .ground_truth_standard_deviation_standard_error,
+            shallow=transformed_points,
+            msg='Checking ground truth standard deviation strandard error: {}'
+            .format(name))
 
   def validate_ground_truth_using_hmc(
       self,
@@ -341,7 +392,7 @@ class InferenceGymTestCase(test_util.TestCase):
     # choices on formal grounds.
     if sample_transformation.ground_truth_mean is not None:
 
-      def _mean_assertions_part(sample_mean, ground_truth_mean):
+      def _mean_assertions_part(ground_truth_mean, sample_mean):
         self.assertAllClose(
             ground_truth_mean,
             sample_mean,
@@ -351,8 +402,8 @@ class InferenceGymTestCase(test_util.TestCase):
 
       self.assertAllAssertsNested(
           _mean_assertions_part,
-          sample_mean,
           sample_transformation.ground_truth_mean,
+          sample_mean,
           msg='Comparing mean of "{}"'.format(name))
     if sample_transformation.ground_truth_standard_deviation is not None:
       # From https://math.stackexchange.com/q/72975
@@ -363,7 +414,7 @@ class InferenceGymTestCase(test_util.TestCase):
           transformed_samples,
           sample_mean)
 
-      def _var_assertions_part(sample_variance, ground_truth_standard_deviation,
+      def _var_assertions_part(ground_truth_standard_deviation, sample_variance,
                                fourth_moment):
         self.assertAllClose(
             np.square(ground_truth_standard_deviation),
@@ -377,8 +428,8 @@ class InferenceGymTestCase(test_util.TestCase):
 
       self.assertAllAssertsNested(
           _var_assertions_part,
-          sample_variance,
           sample_transformation.ground_truth_standard_deviation,
+          sample_variance,
           fourth_moment,
           msg='Comparing variance of "{}"'.format(name),
       )

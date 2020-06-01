@@ -40,6 +40,7 @@ multi_substrate_py_library(
         ":ill_conditioned_gaussian",
         ":logistic_regression",
         ":sparse_logistic_regression",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
     ],
 )
 
@@ -117,11 +118,13 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth:german_credit_numeric_logistic_regression",  # buildcleaner: keep
     ],
 )
 
 multi_substrate_py_test(
     name = "logistic_regression_test",
+    size = "large",
     srcs = ["logistic_regression_test.py"],
     deps = [
         ":logistic_regression",
@@ -129,6 +132,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

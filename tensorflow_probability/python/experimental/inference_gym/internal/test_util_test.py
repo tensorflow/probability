@@ -86,21 +86,34 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
     """A well formed model won't raise an error."""
     model = TestModel()
     self.validate_log_prob_and_transforms(
-        model, sample_transformation_shapes=dict(identity=[]))
+        model,
+        sample_transformation_shapes=dict(identity=[]),
+        check_ground_truth_mean=True)
 
   def testBadBijector(self):
     """Tests that an error is raised if bijector is incorrect."""
     model = TestModel(tfb.Identity())
-    with self.assertRaisesRegexp(AssertionError, 'Arrays are not equal'):
+    with self.assertRaisesRegex(AssertionError, 'Arrays are not equal'):
       self.validate_log_prob_and_transforms(
           model, sample_transformation_shapes=dict(identity=[]))
 
   def testBadShape(self):
     """Tests that an error is raised if expectations shapes are wrong."""
     model = TestModel()
-    with self.assertRaisesRegexp(AssertionError, 'Tuples differ'):
+    with self.assertRaisesRegex(AssertionError,
+                                r'Checking outputs(.|\n)*Tuples differ'):
       self.validate_log_prob_and_transforms(
           model, sample_transformation_shapes=dict(identity=[13]))
+
+  def testBadGroundTruth(self):
+    """Tests that an error is raised if ground truth shapes are wrong."""
+    model = TestModel(ground_truth_mean=np.array([1, 2]))
+    with self.assertRaisesRegex(
+        AssertionError, r'Checking ground truth mean(.|\n)*Tuples differ'):
+      self.validate_log_prob_and_transforms(
+          model,
+          sample_transformation_shapes=dict(identity=[]),
+          check_ground_truth_mean=True)
 
   @tfp_test_util.numpy_disable_gradient_test
   @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')

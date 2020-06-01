@@ -40,13 +40,15 @@ def _add_bias(features):
 class LogisticRegression(bayesian_model.BayesianModel):
   """Bayesian logistic regression with a Gaussian prior."""
 
-  def __init__(self,
-               train_features,
-               train_labels,
-               test_features=None,
-               test_labels=None,
-               name='logistic_regression',
-               pretty_name='Logistic Regression'):
+  def __init__(
+      self,
+      train_features,
+      train_labels,
+      test_features=None,
+      test_labels=None,
+      name='logistic_regression',
+      pretty_name='Logistic Regression',
+  ):
     """Construct the logistic regression model.
 
     Args:
@@ -162,7 +164,7 @@ class GermanCreditNumericLogisticRegression(LogisticRegression):
     del dataset['test_features']
     del dataset['test_labels']
     super(GermanCreditNumericLogisticRegression, self).__init__(
-        name='german_credit_logistic_regression',
+        name='german_credit_numeric_logistic_regression',
         pretty_name='German Credit Numeric Logistic Regression',
         **dataset
     )

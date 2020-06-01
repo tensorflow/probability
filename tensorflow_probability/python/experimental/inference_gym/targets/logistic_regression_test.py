@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.inference_gym.internal import test_util
 from tensorflow_probability.python.experimental.inference_gym.targets import logistic_regression
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 def _test_dataset(num_features, num_test_points=None):
@@ -82,7 +83,30 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
     """
     model = logistic_regression.GermanCreditNumericLogisticRegression()
     self.validate_log_prob_and_transforms(
-        model, sample_transformation_shapes=dict(identity=[25],))
+        model,
+        sample_transformation_shapes=dict(identity=[25],),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True,
+    )
+
+  @test_util.uses_tfds
+  @tfp_test_util.numpy_disable_gradient_test
+  @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
+  def testGermanCreditHMC(self):
+    """Checks approximate samples from the model against the ground truth."""
+    # Note the side-effect of setting the eager seed.
+    seed = tfp_test_util.test_seed_stream()
+    model = logistic_regression.GermanCreditNumericLogisticRegression()
+
+    self.validate_ground_truth_using_hmc(
+        model,
+        num_chains=4,
+        num_steps=4000,
+        num_leapfrog_steps=15,
+        step_size=0.03,
+        seed=seed(),
+    )
 
 
 if __name__ == '__main__':

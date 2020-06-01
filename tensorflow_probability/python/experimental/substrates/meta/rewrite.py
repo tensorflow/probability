@@ -115,6 +115,10 @@ def main(argv):
       for lib in LIBS
   })
   replacements.update({
+      '._numpy.inference_gym.targets.ground_truth':
+          '.inference_gym.targets.ground_truth._numpy',
+  })
+  replacements.update({
       '._numpy import inference_gym':
           '.inference_gym import _numpy as inference_gym',
       '._numpy import psd_kernels': '.psd_kernels import _numpy as psd_kernels',

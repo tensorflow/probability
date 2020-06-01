@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import importlib
 
 import tensorflow.compat.v2 as tf
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -27,6 +28,50 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'BayesianModel',
 ]
+
+
+_GROUND_TRUTH_MODULE_PATTERN = (
+    # This must be on a single line, for the NumPy/JAX rewrite script to work.
+    'tensorflow_probability.python.experimental.inference_gym.targets.ground_truth.{}'
+)
+
+
+def _maybe_populate_ground_truth(sample_transformations, module_name):
+  """Populates the ground truth values.
+
+  This tries to import a module from the `ground_truth` module with the
+  `module_name` name.
+
+  Args:
+    sample_transformations: A dictionary of Python strings to
+      `SampleTransformation`s.
+    module_name: Python string. Module name from which to load the ground truth.
+
+  Returns:
+    sample_transformations: Same as the input `sample_transformations`, but with
+      the ground truth values populated.
+  """
+  sample_transformations = sample_transformations.copy()
+  try:
+    module = importlib.import_module(
+        _GROUND_TRUTH_MODULE_PATTERN.format(module_name))
+  except ImportError:
+    return sample_transformations
+  for name, sample_transformation in sample_transformations.items():
+    upper_name = name.upper()
+    mean_name = '{}_MEAN'.format(upper_name)
+    sem_name = '{}_MEAN_STANDARD_ERROR'.format(upper_name)
+    sd_name = '{}_STANDARD_DEVIATION'.format(upper_name)
+    sesd_name = '{}_STANDARD_DEVIATION_STANDARD_ERROR'.format(upper_name)
+    new_transformation = sample_transformation._replace(
+        ground_truth_mean=getattr(module, mean_name, None),
+        ground_truth_mean_standard_error=getattr(module, sem_name, None),
+        ground_truth_standard_deviation=getattr(module, sd_name, None),
+        ground_truth_standard_deviation_standard_error=getattr(
+            module, sesd_name, None),
+    )
+    sample_transformations[name] = new_transformation
+  return sample_transformations
 
 
 class BayesianModel(object):
@@ -162,6 +207,8 @@ class BayesianModel(object):
     if not isinstance(sample_transformations, collections.OrderedDict):
       sample_transformations = collections.OrderedDict(
           sorted(sample_transformations.items()))
+    sample_transformations = _maybe_populate_ground_truth(
+        sample_transformations, module_name=name)
     self._sample_transformations = sample_transformations
 
   # PyLint is confused, this is a new-style class.

@@ -36,7 +36,11 @@ class IllConditionedGaussianTest(test_util.InferenceGymTestCase):
     """
     model = ill_conditioned_gaussian.IllConditionedGaussian()
     self.validate_log_prob_and_transforms(
-        model, sample_transformation_shapes=dict(identity=[100],))
+        model,
+        sample_transformation_shapes=dict(identity=[100],),
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True,
+    )
 
   @tfp_test_util.numpy_disable_gradient_test
   @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
