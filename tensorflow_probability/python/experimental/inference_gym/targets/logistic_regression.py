@@ -68,6 +68,7 @@ class LogisticRegression(bayesian_model.BayesianModel):
         `None` or not both specified.
     """
     with tf.name_scope(name):
+      train_features = tf.convert_to_tensor(train_features, tf.float32)
       train_features = _add_bias(train_features)
       train_labels = tf.convert_to_tensor(train_labels)
       num_features = int(train_features.shape[1])
@@ -97,6 +98,7 @@ class LogisticRegression(bayesian_model.BayesianModel):
                          'test_labels={}'.format(test_features, test_labels))
 
       if test_features is not None and test_labels is not None:
+        test_features = tf.convert_to_tensor(test_features, tf.float32)
         test_features = _add_bias(test_features)
         test_labels = tf.convert_to_tensor(test_labels)
         test_joint_dist = tfd.JointDistributionCoroutine(
