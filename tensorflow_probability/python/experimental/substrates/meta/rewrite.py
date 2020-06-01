@@ -117,6 +117,8 @@ def main(argv):
   replacements.update({
       '._numpy.inference_gym.targets.ground_truth':
           '.inference_gym.targets.ground_truth._numpy',
+      '._numpy.inference_gym.internal.datasets':
+          '.inference_gym.internal.datasets._numpy',
   })
   replacements.update({
       '._numpy import inference_gym':

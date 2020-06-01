@@ -24,8 +24,11 @@ from __future__ import print_function
 import numpy as onp
 import tensorflow.compat.v2 as otf
 
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_mod  # pylint: disable=g-import-not-at-top
+
 __all__ = [
     'german_credit_numeric',
+    'synthetic_item_response_theory',
 ]
 
 
@@ -126,3 +129,74 @@ def german_credit_numeric(
         test_features=test_features,
         test_labels=labels[num_train:].astype(onp.int32),
     )
+
+
+def synthetic_item_response_theory(
+    train_fraction=1.,
+    shuffle=True,
+    shuffle_seed=1337,
+):
+  """Synthetic dataset sampled from the ItemResponseTheory model.
+
+  This dataset is a simulation of 400 students each answering a subset of
+  100 unique questions, with a total of 30012 questions answered.
+
+  The dataset is split into train and test portions by randomly partitioning the
+  student-question-response triplets. This has two consequences. First, the
+  student and question ids are shared between test and train sets. Second, there
+  is a possibility of some students or questions not being present in both sets.
+
+  The train set will contain `num_train_points = int(train_fraction * 30012)`
+  triples and test set will contain
+  `num_test_points = 30012 - num_train_points` triplets.
+
+  The triples are encoded into three parallel arrays per set. I.e.
+  `*_correct[i]  == 1` means that student `*_student_ids[i]` answered question
+  `*_question_ids[i]` correctly; `*_correct[i] == 0` means they didn't.
+
+  Args:
+    train_fraction: What fraction of the data to put in the training set.
+    shuffle: Whether to shuffle the dataset.
+    shuffle_seed: Seed to use when shuffling.
+
+  Raises:
+    ValueError: If the dataset has an unexpected hash.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      `train_student_ids`: integer `tensor` with shape `[num_train_points]`.
+        training student ids, ranging from 0 to `num_students`.
+      `train_question_ids`: integer `tensor` with shape `[num_train_points]`.
+        training question ids, ranging from 0 to `num_questions`.
+      `train_correct`: integer `tensor` with shape `[num_train_points]`.
+        whether the student in the training set answered the question correctly,
+        either 0 or 1.
+      `test_student_ids`: Integer `Tensor` with shape `[num_test_points]`.
+        Testing student ids, ranging from 0 to `num_students`.
+      `test_question_ids`: Integer `Tensor` with shape `[num_test_points]`.
+        Testing question ids, ranging from 0 to `num_questions`.
+      `test_correct`: Integer `Tensor` with shape `[num_test_points]`.
+        Whether the student in the testing set answered the question correctly,
+        either 0 or 1.
+  """
+  student_ids = synthetic_item_response_theory_mod.STUDENT_IDS
+  question_ids = synthetic_item_response_theory_mod.QUESTION_IDS
+  correct = synthetic_item_response_theory_mod.CORRECT
+
+  if shuffle:
+    shuffle_idxs = onp.arange(student_ids.shape[0])
+    onp.random.RandomState(shuffle_seed).shuffle(shuffle_idxs)
+    student_ids = student_ids[shuffle_idxs]
+    question_ids = question_ids[shuffle_idxs]
+    correct = correct[shuffle_idxs]
+
+  num_train = int(student_ids.shape[0] * train_fraction)
+
+  return dict(
+      train_student_ids=student_ids[:num_train],
+      train_question_ids=question_ids[:num_train],
+      train_correct=correct[:num_train],
+      test_student_ids=student_ids[num_train:],
+      test_question_ids=question_ids[num_train:],
+      test_correct=correct[num_train:],
+  )

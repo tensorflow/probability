@@ -38,6 +38,7 @@ multi_substrate_py_library(
         ":banana",
         ":bayesian_model",
         ":ill_conditioned_gaussian",
+        ":item_response_theory",
         ":logistic_regression",
         ":sparse_logistic_regression",
         "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
@@ -103,6 +104,29 @@ multi_substrate_py_test(
     srcs = ["ill_conditioned_gaussian_test.py"],
     deps = [
         ":ill_conditioned_gaussian",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "item_response_theory",
+    srcs = ["item_response_theory.py"],
+    deps = [
+        ":bayesian_model",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "item_response_theory_test",
+    srcs = ["item_response_theory_test.py"],
+    deps = [
+        ":item_response_theory",
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
         "//tensorflow_probability/python/internal:test_util",

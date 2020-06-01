@@ -36,6 +36,7 @@ multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     deps = [
+        ":array_to_source",
         ":data",
     ],
 )
@@ -64,6 +65,7 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal/datasets",
     ],
 )
 

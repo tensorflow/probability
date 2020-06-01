@@ -44,6 +44,19 @@ class DataTest(test_util.InferenceGymTestCase):
     self.assertAllClose(
         np.ones([24]), dataset['test_features'].std(0), atol=0.3)
 
+  def testSyntheticItemResponseTheory(self):
+    num_train_points = int(0.75 * 30012)
+    num_test_points = 30012 - num_train_points
+
+    dataset = data.synthetic_item_response_theory(train_fraction=0.75)
+
+    self.assertEqual((num_train_points,), dataset['train_student_ids'].shape)
+    self.assertEqual((num_train_points,), dataset['train_question_ids'].shape)
+    self.assertEqual((num_train_points,), dataset['train_correct'].shape)
+    self.assertEqual((num_test_points,), dataset['test_student_ids'].shape)
+    self.assertEqual((num_test_points,), dataset['test_question_ids'].shape)
+    self.assertEqual((num_test_points,), dataset['test_correct'].shape)
+
 
 if __name__ == '__main__':
   tf.test.main()
