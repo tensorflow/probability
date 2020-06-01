@@ -254,6 +254,13 @@ def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument
   return tensor
 
 
+if JAX_MODE:
+  _searchsorted_vmap_sides = {
+      side: jax.vmap(functools.partial(jax.numpy.searchsorted, side=side))
+      for side in ('left', 'right')
+  }
+
+
 def _searchsorted(  # pylint: disable=unused-argument
     sorted_sequence,
     values,
@@ -261,9 +268,20 @@ def _searchsorted(  # pylint: disable=unused-argument
     out_type=np.int32,
     name=None):
   """Find indices for insertion for list to remain sorted."""
-  # JAX doesn't support searchsorted at the moment, so we do a very naive way
-  # of search sorting. We also don't use np.searchsorted in the numpy backend
-  # because it doesn't support batching.
+  if JAX_MODE:
+    try:
+      func = _searchsorted_vmap_sides[side]
+    except KeyError:
+      raise ValueError("'%s' is an invalid value for keyword 'side'" % side)
+    sorted_sequence_2d = np.reshape(sorted_sequence,
+                                    (-1, sorted_sequence.shape[-1]))
+    values_2d = np.reshape(values, (-1, values.shape[-1]))
+    if sorted_sequence_2d.shape[0] != values_2d.shape[0]:
+      raise ValueError('Leading dim_size of both tensors must match.')
+    return np.reshape(func(sorted_sequence_2d, values_2d).astype(out_type),
+                      values.shape)
+  # We don't use np.searchsorted in the numpy backend because it doesn't support
+  # batching.
   sorted_sequence = sorted_sequence[..., np.newaxis, :]
   values = values[..., :, np.newaxis]
   if side == 'left':
