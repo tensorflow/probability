@@ -1122,8 +1122,9 @@ class MultipartBijectorsTest(test_util.TestCase):
     component_dists = tf.nest.map_structure(
         lambda size, batch_shape: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
             loc=tf.random.normal(batch_shape + [size], seed=seed()),
-            scale_diag=tf.exp(
-                tf.random.normal(batch_shape + [size], seed=seed()))),
+            scale_diag=tf.random.uniform(
+                minval=1., maxval=2.,
+                shape=batch_shape + [size], seed=seed())),
         split_sizes, dist_batch_shape)
     if isinstance(split_sizes, dict):
       base_dist = tfd.JointDistributionNamed(component_dists)
@@ -1132,7 +1133,10 @@ class MultipartBijectorsTest(test_util.TestCase):
 
     # Transform the distribution by applying a separate bijector to each part.
     bijectors = [tfb.Exp(),
-                 tfb.Scale(tf.random.normal(bijector_batch_shape, seed=seed())),
+                 tfb.Scale(
+                     tf.random.uniform(
+                         minval=1., maxval=2.,
+                         shape=bijector_batch_shape, seed=seed())),
                  tfb.Reshape([2, 1])]
     bijector = ToyZipMap(tf.nest.pack_sequence_as(split_sizes, bijectors))
 

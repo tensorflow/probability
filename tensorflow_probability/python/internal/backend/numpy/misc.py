@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import floor
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import truediv
+from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import clip_by_value
 from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
 
@@ -114,6 +115,9 @@ def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable
 # TODO(b/140685491): Add unit-test.
 def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_add`."""
+  indices = _convert_to_tensor(indices)
+  tensor = _convert_to_tensor(tensor)
+  updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
     import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
@@ -125,6 +129,9 @@ def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disa
 # TODO(b/140685491): Add unit-test.
 def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_sub`."""
+  indices = _convert_to_tensor(indices)
+  tensor = _convert_to_tensor(tensor)
+  updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
     import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
@@ -136,6 +143,9 @@ def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disa
 # TODO(b/140685491): Add unit-test.
 def _tensor_scatter_nd_update(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_update`."""
+  indices = _convert_to_tensor(indices)
+  tensor = _convert_to_tensor(tensor)
+  updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
     import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
