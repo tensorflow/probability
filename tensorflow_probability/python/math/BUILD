@@ -366,7 +366,6 @@ multi_substrate_py_test(
     name = "scan_associative_test",
     size = "medium",
     srcs = ["scan_associative_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 4,
     srcs_version = "PY2AND3",
