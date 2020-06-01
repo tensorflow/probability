@@ -25,7 +25,27 @@ py_binary(
     deps = [
         ":targets",
         "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/inference_gym/internal:array_to_source",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:ground_truth_encoding",
+    ],
+)
+
+py_library(
+    name = "item_response_theory",
+    srcs = ["item_response_theory.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+    ],
+)
+
+py_library(
+    name = "logistic_regression",
+    srcs = ["logistic_regression.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
     ],
 )
 
@@ -46,17 +66,8 @@ py_library(
     srcs = ["targets.py"],
     srcs_version = "PY3",
     deps = [
+        ":item_response_theory",
         ":logistic_regression",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",
-    ],
-)
-
-py_library(
-    name = "logistic_regression",
-    srcs = ["logistic_regression.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":stan_model",
-        ":util",
     ],
 )

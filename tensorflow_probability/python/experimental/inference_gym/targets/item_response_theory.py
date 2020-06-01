@@ -156,12 +156,14 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
 
       train_joint_dist = tfd.JointDistributionCoroutine(
           functools.partial(model_fn, train_dense_y, train_y_mask))
+      dtype = self._tuple_to_dict(train_joint_dist.dtype[:-1])
 
       sample_transformations = {
           'identity':
               bayesian_model.BayesianModel.SampleTransformation(
                   fn=lambda params: params,
                   pretty_name='Identity',
+                  dtype=dtype,
               )
       }
       if self._have_test:
@@ -219,7 +221,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
         default_event_space_bijector=self._tuple_to_dict(
             (tfb.Identity(), tfb.Identity(), tfb.Identity())),
         event_shape=self._tuple_to_dict(train_joint_dist.event_shape[:-1]),
-        dtype=self._tuple_to_dict(train_joint_dist.dtype[:-1]),
+        dtype=dtype,
         name=name,
         pretty_name=pretty_name,
         sample_transformations=sample_transformations,

@@ -73,6 +73,7 @@ multi_substrate_py_library(
     srcs = ["bayesian_model.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:ground_truth_encoding",
     ],
 )
 
@@ -124,6 +125,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "item_response_theory_test",
+    size = "large",
     srcs = ["item_response_theory_test.py"],
     deps = [
         ":item_response_theory",

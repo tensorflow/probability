@@ -23,6 +23,8 @@ import collections
 import importlib
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.experimental.inference_gym.internal import ground_truth_encoding
+# Direct import for flatten_with_tuple_paths.
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -58,17 +60,31 @@ def _maybe_populate_ground_truth(sample_transformations, module_name):
   except ImportError:
     return sample_transformations
   for name, sample_transformation in sample_transformations.items():
-    upper_name = name.upper()
-    mean_name = '{}_MEAN'.format(upper_name)
-    sem_name = '{}_MEAN_STANDARD_ERROR'.format(upper_name)
-    sd_name = '{}_STANDARD_DEVIATION'.format(upper_name)
-    sesd_name = '{}_STANDARD_DEVIATION_STANDARD_ERROR'.format(upper_name)
+    flat_mean = []
+    flat_sem = []
+    flat_std = []
+    flat_sestd = []
+    for tuple_path, _ in nest.flatten_with_tuple_paths(
+        sample_transformation.dtype):
+      mean, sem, std, sestd = ground_truth_encoding.load_ground_truth_part(
+          module, name, tuple_path)
+      flat_mean.append(mean)
+      flat_sem.append(sem)
+      flat_std.append(std)
+      flat_sestd.append(sestd)
+
+    def _pack_or_none(flat_parts):
+      if any(part is None for part in flat_parts):
+        return None
+      else:
+        return tf.nest.pack_sequence_as(sample_transformation.dtype, flat_parts)  # pylint: disable=cell-var-from-loop
+
     new_transformation = sample_transformation._replace(
-        ground_truth_mean=getattr(module, mean_name, None),
-        ground_truth_mean_standard_error=getattr(module, sem_name, None),
-        ground_truth_standard_deviation=getattr(module, sd_name, None),
-        ground_truth_standard_deviation_standard_error=getattr(
-            module, sesd_name, None),
+        ground_truth_mean=_pack_or_none(flat_mean),
+        ground_truth_mean_standard_error=_pack_or_none(flat_sem),
+        ground_truth_standard_deviation=_pack_or_none(flat_std),
+        ground_truth_standard_deviation_standard_error=_pack_or_none(
+            flat_sestd),
     )
     sample_transformations[name] = new_transformation
   return sample_transformations
@@ -220,6 +236,7 @@ class BayesianModel(object):
           'ground_truth_mean_standard_error',
           'ground_truth_standard_deviation',
           'ground_truth_standard_deviation_standard_error',
+          'dtype',
       ])):
     """A transformation of samples of the outer `BayesianModel`.
 
@@ -255,6 +272,7 @@ class BayesianModel(object):
       ground_truth_standard_deviation_standard_error: Standard error of the
         ground truth standard deviation. Can be `None` if not available.
         Default: `None`.
+      dtype: Possibly nested dtype of the output of `fn`. Default: `tf.float32`.
 
     #### Examples
 
@@ -351,4 +369,4 @@ class BayesianModel(object):
 
 
 BayesianModel.SampleTransformation.__new__.__defaults__ = (None, None, None,
-                                                           None)
+                                                           None, tf.float32)

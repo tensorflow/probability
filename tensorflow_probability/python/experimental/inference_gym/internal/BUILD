@@ -82,6 +82,26 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "ground_truth_encoding",
+    srcs = ["ground_truth_encoding.py"],
+    deps = [
+        ":array_to_source",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "ground_truth_encoding_test",
+    srcs = ["ground_truth_encoding_test.py"],
+    deps = [
+        ":ground_truth_encoding",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "test_util",
     testonly = True,
     srcs = ["test_util.py"],

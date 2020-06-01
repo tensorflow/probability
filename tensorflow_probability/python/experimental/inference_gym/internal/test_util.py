@@ -121,8 +121,8 @@ def run_hmc_on_model(
       num_leapfrog_steps=num_leapfrog_steps,
       step_size=[tf.fill(s.shape, step_size) for s in current_state],
       seed=seed)
-  hmc = tfp.mcmc.TransformedTransitionKernel(hmc,
-                                             model.default_event_space_bijector)
+  hmc = tfp.mcmc.TransformedTransitionKernel(
+      hmc, tf.nest.flatten(model.default_event_space_bijector))
   hmc = tfp.mcmc.DualAveragingStepSizeAdaptation(
       hmc,
       num_adaptation_steps=int(num_steps // 2 * 0.8),
@@ -309,19 +309,22 @@ class InferenceGymTestCase(test_util.TestCase):
 
     for name, sample_transformation in model.sample_transformations.items():
       transformed_chain = self.evaluate(
-          tf.identity(sample_transformation(mcmc_results.chain)))
+          tf.nest.map_structure(tf.identity,
+                                sample_transformation(mcmc_results.chain)))
 
-      cross_chain_dims = tf.nest.map_structure(lambda _: 1, transformed_chain)
-      ess = self.evaluate(
+      # tfp.mcmc.effective_sample_size only works well with lists.
+      flat_transformed_chain = tf.nest.flatten(transformed_chain)
+      cross_chain_dims = [1] * len(flat_transformed_chain)
+      flat_ess = self.evaluate(
           tfp.mcmc.effective_sample_size(
-              transformed_chain,
+              flat_transformed_chain,
               cross_chain_dims=cross_chain_dims,
               filter_beyond_positive_pairs=True))
       self._z_test(
           name=name,
           sample_transformation=sample_transformation,
           transformed_samples=transformed_chain,
-          num_samples=ess,
+          num_samples=tf.nest.pack_sequence_as(transformed_chain, flat_ess),
           sample_dims=(0, 1),
       )
 
@@ -392,7 +395,8 @@ class InferenceGymTestCase(test_util.TestCase):
     # choices on formal grounds.
     if sample_transformation.ground_truth_mean is not None:
 
-      def _mean_assertions_part(ground_truth_mean, sample_mean):
+      def _mean_assertions_part(ground_truth_mean, sample_mean, sample_variance,
+                                num_samples):
         self.assertAllClose(
             ground_truth_mean,
             sample_mean,
@@ -404,6 +408,8 @@ class InferenceGymTestCase(test_util.TestCase):
           _mean_assertions_part,
           sample_transformation.ground_truth_mean,
           sample_mean,
+          sample_variance,
+          num_samples,
           msg='Comparing mean of "{}"'.format(name))
     if sample_transformation.ground_truth_standard_deviation is not None:
       # From https://math.stackexchange.com/q/72975
@@ -415,7 +421,7 @@ class InferenceGymTestCase(test_util.TestCase):
           sample_mean)
 
       def _var_assertions_part(ground_truth_standard_deviation, sample_variance,
-                               fourth_moment):
+                               fourth_moment, num_samples):
         self.assertAllClose(
             np.square(ground_truth_standard_deviation),
             sample_variance,
@@ -431,5 +437,6 @@ class InferenceGymTestCase(test_util.TestCase):
           sample_transformation.ground_truth_standard_deviation,
           sample_variance,
           fourth_moment,
+          num_samples,
           msg='Comparing variance of "{}"'.format(name),
       )

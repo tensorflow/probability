@@ -47,6 +47,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import os
 import sys
 
@@ -57,7 +58,9 @@ import pandas as pd
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tools.inference_gym_ground_truth import targets
-from tensorflow_probability.python.experimental.inference_gym.internal import array_to_source
+from tensorflow_probability.python.experimental.inference_gym.internal import ground_truth_encoding
+# Direct import for flatten_with_tuple_paths.
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 flags.DEFINE_enum('target', None, targets.__all__, 'Which Stan model to '
                   'sample from.')
@@ -74,12 +77,13 @@ flags.DEFINE_string('output_directory', None,
 FLAGS = flags.FLAGS
 
 
-@tf.function(autograph=False)
 def get_ess(samples):
-  return tfp.mcmc.effective_sample_size(
-      samples,
-      filter_beyond_positive_pairs=True,
-  )
+  return tf.function(
+      functools.partial(
+          tfp.mcmc.effective_sample_size,
+          filter_beyond_positive_pairs=True,
+      ),
+      autograph=False)(samples).numpy()
 
 
 def main(argv):
@@ -105,65 +109,56 @@ def main(argv):
     for name, fn in sorted(stan_model.extract_fns.items()):
       transformed_samples = []
 
-      mean = 0
-      std = 0
-      ess = 0
+      # We handle one chain at a time to reduce memory usage.
+      chain_means = []
+      chain_stds = []
+      chain_esss = []
       for chain_id in range(FLAGS.stan_chains):
         # TODO(https://github.com/stan-dev/cmdstanpy/issues/218): This step is
         # very slow and wastes memory. Consider reading the CSV files ourselves.
+
+        # sample shape is [num_samples, num_chains, num_columns]
         chain = mcmc_output.sample[:, chain_id, :]
         dataframe = pd.DataFrame(chain, columns=mcmc_output.column_names)
 
         transformed_samples = fn(dataframe)
 
-        mean += transformed_samples.mean(0)
-        std += transformed_samples.std(0)
-        ess += get_ess(tf.convert_to_tensor(transformed_samples)).numpy()
-      mean /= FLAGS.stan_chains
-      std /= FLAGS.stan_chains
-      sem = std / np.sqrt(ess)
+        # We reduce over the samples dimension. Transformations can return
+        # nested outputs.
+        mean = tf.nest.map_structure(lambda s: s.mean(0), transformed_samples)
+        std = tf.nest.map_structure(lambda s: s.std(0), transformed_samples)
+        ess = tf.nest.map_structure(get_ess, transformed_samples)
 
-      upper_name = name.upper()
-      mean_name = '{}_MEAN'.format(upper_name)
-      sem_name = '{}_MEAN_STANDARD_ERROR'.format(upper_name)
-      std_name = '{}_STANDARD_DEVIATION'.format(upper_name)
+        chain_means.append(mean)
+        chain_stds.append(std)
+        chain_esss.append(ess)
 
-      array_strs.append(array_to_source.array_to_source(mean_name, mean))
-      array_strs.append(array_to_source.array_to_source(sem_name, sem))
-      array_strs.append(array_to_source.array_to_source(std_name, std))
+      # Now we reduce across chains.
+      ess = tf.nest.map_structure(lambda *s: np.sum(s, 0), *chain_esss)
+      mean = tf.nest.map_structure(lambda *s: np.mean(s, 0), *chain_means)
+      sem = tf.nest.map_structure(lambda std, ess: std / np.sqrt(ess), std, ess)
+      std = tf.nest.map_structure(lambda *s: np.mean(s, 0), *chain_stds)
 
-  array_str = '\n'.join(array_strs)
+      for (tuple_path, mean_part), sem_part, std_part in zip(
+          nest.flatten_with_tuple_paths(mean), tf.nest.flatten(sem),
+          tf.nest.flatten(std)):
+        array_strs.extend(
+            ground_truth_encoding.save_ground_truth_part(
+                name=name,
+                tuple_path=tuple_path,
+                mean=mean_part,
+                sem=sem_part,
+                std=std_part,
+                sestd=None,
+            ))
+
   argv_str = '\n'.join(['  {} \\'.format(arg) for arg in sys.argv[1:]])
+  command_str = (
+      """bazel run //tools/inference_gym_ground_truth:get_ground_truth -- \
+{argv_str}""".format(argv_str=argv_str))
 
-  file_str = r'''# Lint as: python2, python3
-# Copyright 2020 The TensorFlow Probability Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ============================================================================
-r"""Ground truth values for `{target}`.
-
-Automatically generated using the command:
-
-```
-bazel run //tools/inference_gym_ground_truth:get_ground_truth -- \
-{argv_str}
-```
-"""
-
-import numpy as onp
-
-{array_str}'''.format(
-    target=FLAGS.target, array_str=array_str, argv_str=argv_str)
+  file_str = ground_truth_encoding.get_ground_truth_module_source(
+      target_name=FLAGS.target, command_str=command_str, array_strs=array_strs)
 
   if FLAGS.output_directory is None:
     file_basedir = os.path.dirname(os.path.realpath(__file__))

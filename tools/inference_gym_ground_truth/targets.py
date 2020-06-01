@@ -19,11 +19,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tools.inference_gym_ground_truth import item_response_theory
 from tools.inference_gym_ground_truth import logistic_regression
 from tensorflow_probability.python.experimental.inference_gym.internal import data
 
 __all__ = [
     'german_credit_numeric_logistic_regression',
+    'synthetic_item_response_theory',
 ]
 
 
@@ -37,3 +39,20 @@ def german_credit_numeric_logistic_regression():
   del dataset['test_features']
   del dataset['test_labels']
   return logistic_regression.logistic_regression(**dataset)
+
+
+def synthetic_item_response_theory():
+  """One-parameter logistic item-response theory (IRT) model.
+
+  This uses a dataset sampled from the prior. This dataset is a simulation of
+  400 students each answering a subset of 100 unique questions, with a total of
+  30012 questions answered.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.synthetic_item_response_theory()
+  del dataset['test_student_ids']
+  del dataset['test_question_ids']
+  del dataset['test_correct']
+  return item_response_theory.item_response_theory(**dataset)
