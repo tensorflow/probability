@@ -84,8 +84,9 @@ class GeneralizedParetoTest(test_util.TestCase):
 
     expected_logp = sp_stats.genpareto(conc, loc=loc, scale=scale).logpdf(xs)
     actual_logp = self.evaluate(logp)
-    self.assertAllClose(expected_logp, actual_logp, rtol=1e-5)
-    self.assertAllClose(np.exp(expected_logp), self.evaluate(p), rtol=1e-5)
+    self.assertAllClose(expected_logp, actual_logp, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(np.exp(expected_logp), self.evaluate(p),
+                        rtol=1e-5, atol=1e-5)
 
   def testLogPDFBoundary(self):
     # When loc = concentration = 0, we have an exponential distribution. Check
