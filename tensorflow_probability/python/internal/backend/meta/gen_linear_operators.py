@@ -59,18 +59,22 @@ COMMENT_OUT = [
     'self._check_input_dtype',
 ]
 
-DIST_UTIL_IMPORT = """
+UTIL_IMPORTS = """
 from tensorflow.python.util import lazy_loader
 distribution_util = lazy_loader.LazyLoader(
     "distribution_util", globals(),
     "tensorflow_probability.python.internal._numpy.distribution_util")
+tensorshape_util = lazy_loader.LazyLoader(
+   "tensorshape_util", globals(),
+    "tensorflow_probability.python.internal._numpy.tensorshape_util")
 """
 
 DISABLED_LINTS = ('g-import-not-at-top', 'g-direct-tensorflow-import',
                   'g-bad-import-order', 'unused-import', 'line-too-long',
                   'reimported', 'g-bool-id-comparison',
                   'g-statement-before-imports', 'bad-continuation',
-                  'useless-import-alias', 'property-with-parameters')
+                  'useless-import-alias', 'property-with-parameters',
+                  'expression-not-assigned', 'trailing-whitespace')
 
 
 def gen_module(module_name):
@@ -112,7 +116,7 @@ def gen_module(module_name):
   code = code.replace('tensor_util.is_tensor(', 'ops.is_tensor(')
   code = code.replace(
       'from tensorflow.python.ops.distributions import '
-      'util as distribution_util', DIST_UTIL_IMPORT)
+      'util as distribution_util', UTIL_IMPORTS)
   code = code.replace(
       'control_flow_ops.with_dependencies',
       'distribution_util.with_dependencies')
@@ -145,6 +149,10 @@ def gen_module(module_name):
   code = code.replace('dtype.real_dtype', 'dtypes.real_dtype(dtype)')
   code = code.replace('.as_numpy_dtype', '')
 
+  # Replace `x.set_shape(...)` with `tensorshape_util.set_shape(x, ...)`.
+  code = re.sub(r' (\w*)\.set_shape\(',
+                ' tensorshape_util.set_shape(\\1, ', code)
+
   for lint in DISABLED_LINTS:
     code = code.replace('pylint: enable={}'.format(lint),
                         'pylint: disable={}'.format(lint))
@@ -166,7 +174,7 @@ def gen_module(module_name):
         'ops as _ops')
   print('from tensorflow_probability.python.internal.backend.numpy.gen import '
         'tensor_shape')
-  print(DIST_UTIL_IMPORT)
+  print(UTIL_IMPORTS)
 
 
 def main(_):

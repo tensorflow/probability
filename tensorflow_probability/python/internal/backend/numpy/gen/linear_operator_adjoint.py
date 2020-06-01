@@ -14,6 +14,8 @@
 # pylint: disable=bad-continuation
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
+# pylint: disable=expression-not-assigned
+# pylint: disable=trailing-whitespace
 
 # Copyright 2018 The TensorFlow Authors. All Rights Reserved.
 #
@@ -249,4 +251,7 @@ from tensorflow.python.util import lazy_loader
 distribution_util = lazy_loader.LazyLoader(
     "distribution_util", globals(),
     "tensorflow_probability.python.internal._numpy.distribution_util")
+tensorshape_util = lazy_loader.LazyLoader(
+   "tensorshape_util", globals(),
+    "tensorflow_probability.python.internal._numpy.tensorshape_util")
 

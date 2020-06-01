@@ -14,6 +14,8 @@
 # pylint: disable=bad-continuation
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
+# pylint: disable=expression-not-assigned
+# pylint: disable=trailing-whitespace
 
 # Copyright 2018 The TensorFlow Authors. All Rights Reserved.
 #
@@ -398,7 +400,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       else:
         matrix_dimensions = [self.range_dimension, column_dim]
 
-      output.set_shape(broadcast_batch_shape.concatenate(
+      tensorshape_util.set_shape(output, broadcast_batch_shape.concatenate(
           matrix_dimensions))
 
     return output
@@ -515,7 +517,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       else:
         matrix_dimensions = [self.range_dimension, column_dim]
 
-      output.set_shape(broadcast_batch_shape.concatenate(
+      tensorshape_util.set_shape(output, broadcast_batch_shape.concatenate(
           matrix_dimensions))
 
     return output
@@ -534,7 +536,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       diag_dimension = self.domain_dimension
     else:
       diag_dimension = self.range_dimension
-    diag_part.set_shape(
+    tensorshape_util.set_shape(diag_part, 
         self.batch_shape.concatenate(diag_dimension))
     return diag_part
 
@@ -557,7 +559,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
                [array_ops.shape(product)[-4] * array_ops.shape(product)[-3],
                 array_ops.shape(product)[-2] * array_ops.shape(product)[-1]]
               ], axis=0))
-    product.set_shape(tensor_shape.TensorShape(self.shape))
+    tensorshape_util.set_shape(product, tensor_shape.TensorShape(self.shape))
     return product
 
   def _eigvals(self):
@@ -576,7 +578,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       product = array_ops.reshape(
           product,
           shape=array_ops.concat([array_ops.shape(product)[:-2], [-1]], axis=0))
-    product.set_shape(tensor_shape.TensorShape(self.shape)[:-1])
+    tensorshape_util.set_shape(product, tensor_shape.TensorShape(self.shape)[:-1])
     return product
 
   def _assert_non_singular(self):
@@ -606,4 +608,7 @@ from tensorflow.python.util import lazy_loader
 distribution_util = lazy_loader.LazyLoader(
     "distribution_util", globals(),
     "tensorflow_probability.python.internal._numpy.distribution_util")
+tensorshape_util = lazy_loader.LazyLoader(
+   "tensorshape_util", globals(),
+    "tensorflow_probability.python.internal._numpy.tensorshape_util")
 
