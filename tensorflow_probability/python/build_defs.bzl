@@ -109,11 +109,11 @@ def multi_substrate_py_library(
         "//third_party/py/tensorflow:tensorflow",
     ]
 
-    trimmed_deps = [dep for dep in deps if dep not in substrates_omit_deps]
+    trimmed_deps = [dep for dep in deps if (dep not in substrates_omit_deps and
+                                            dep not in remove_deps)]
     resolved_omit_deps = [
         _resolve_omit_dep(dep)
         for dep in substrates_omit_deps
-        if dep not in remove_deps
     ]
     for src in srcs:
         native.genrule(
