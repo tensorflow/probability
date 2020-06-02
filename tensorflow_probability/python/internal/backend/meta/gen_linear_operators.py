@@ -74,7 +74,7 @@ DISABLED_LINTS = ('g-import-not-at-top', 'g-direct-tensorflow-import',
                   'reimported', 'g-bool-id-comparison',
                   'g-statement-before-imports', 'bad-continuation',
                   'useless-import-alias', 'property-with-parameters',
-                  'expression-not-assigned', 'trailing-whitespace')
+                  'trailing-whitespace')
 
 
 def gen_module(module_name):
