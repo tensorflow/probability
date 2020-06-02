@@ -1883,6 +1883,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "chi_test",
     srcs = ["chi_test.py"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # scipy dep,
