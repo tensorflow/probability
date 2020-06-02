@@ -272,6 +272,7 @@ py_library(
 
 py_test(
     name = "weighted_resampling_test",
+    size = "medium",
     srcs = ["weighted_resampling_test.py"],
     shard_count = 2,
     deps = [

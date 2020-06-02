@@ -454,7 +454,7 @@ class HalfStudentTTest(test_util.TestCase):
     expected_var = _true_variance(df, sigma)
     expected_var[0] = np.nan
     expected_var[1] = np.inf
-    self.assertAllClose(expected_var, var, atol=2e-6)
+    self.assertAllClose(expected_var, var, atol=1e-5)
 
   def testVarianceAllowNanStatsFalseGivesCorrectValueForDefinedBatchMembers(
       self):
@@ -468,7 +468,7 @@ class HalfStudentTTest(test_util.TestCase):
 
     expected_var = _true_variance(df, sigma)
     expected_var[0] = np.inf
-    self.assertAllClose(expected_var, var, atol=2e-6)
+    self.assertAllClose(expected_var, var, atol=1e-5)
 
   def testVarianceAllowNanStatsFalseRaisesForUndefinedBatchMembers(self):
     # df <= 1 ==> variance not defined
