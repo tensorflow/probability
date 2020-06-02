@@ -1845,6 +1845,7 @@ py_test(
 multi_substrate_py_test(
     name = "blockwise_test",
     srcs = ["blockwise_test.py"],
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # tensorflow dep,
