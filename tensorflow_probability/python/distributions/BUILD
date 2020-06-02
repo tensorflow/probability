@@ -37,6 +37,9 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "distributions",
     srcs = ["__init__.py"],
+    substrates_omit_deps = [
+        ":pixel_cnn",
+    ],
     deps = [
         ":autoregressive",
         ":batch_reshape",

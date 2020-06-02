@@ -55,8 +55,8 @@ from tensorflow_probability.python.internal.backend.numpy import linalg_impl as 
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_algebra
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
 from absl import logging as logging
-from tensorflow.python.util import deprecation
-# from tensorflow.python.util import dispatch
+from tensorflow_probability.python.internal.backend.numpy import deprecation
+# from tensorflow_probability.python.internal.backend.numpy import dispatch
 # from tensorflow.python.util.tf_export import tf_export
 
 __all__ = ["LinearOperator"]
@@ -1242,11 +1242,11 @@ from tensorflow_probability.python.internal.backend.numpy import linalg_impl as 
 from tensorflow_probability.python.internal.backend.numpy import ops as _ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 
-from tensorflow.python.util import lazy_loader
-distribution_util = lazy_loader.LazyLoader(
+from tensorflow_probability.python.internal.backend.numpy import private
+distribution_util = private.LazyLoader(
     "distribution_util", globals(),
     "tensorflow_probability.python.internal._numpy.distribution_util")
-tensorshape_util = lazy_loader.LazyLoader(
+tensorshape_util = private.LazyLoader(
    "tensorshape_util", globals(),
     "tensorflow_probability.python.internal._numpy.tensorshape_util")
 

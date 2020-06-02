@@ -35,6 +35,7 @@ py_library(
         ":compat",
         ":control_flow",
         ":debugging",
+        ":deprecation",
         ":dtype",
         ":errors",
         ":functional_ops",
@@ -56,6 +57,7 @@ py_library(
         ":static_rewrites",
         ":tensor_array_ops",
         ":test_lib",
+        ":tf_inspect",
     ],
 )
 
@@ -82,6 +84,7 @@ py_library(
     srcs = ["control_flow.py"],
     deps = [
         ":_utils",
+        ":dtype",
         ":ops",
         # numpy dep,
     ],
@@ -96,6 +99,12 @@ py_library(
         ":v2",
         # six dep,
     ],
+)
+
+py_library(
+    name = "deprecation",
+    srcs = ["deprecation.py"],
+    deps = [],
 )
 
 py_library(
@@ -335,9 +344,16 @@ py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
     deps = [
-        ":_utils",
-        # tensorflow dep,
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # numpy dep,
     ],
+)
+
+py_library(
+    name = "tf_inspect",
+    srcs = ["tf_inspect.py"],
+    deps = [],
 )
 
 py_test(
@@ -378,7 +394,6 @@ py_library(
         ":nest",
         ":ops",
         ":tensor_array_ops",
-        # tensorflow dep,
     ],
 )
 
@@ -386,6 +401,7 @@ py_library(
     name = "_utils",
     srcs = ["_utils.py"],
     deps = [
+        ":nest",
         # wrapt dep,
     ],
 )
@@ -430,6 +446,26 @@ LINOP_FILES = [
     ),
     tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
+
+# Rules helpful for generating new rewritten files.
+[genrule(
+    name = "generate_{}".format(filename),
+    testonly = 1,
+    srcs = [],
+    outs = ["gen_new/{}.py".format(filename)],
+    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
+           "--module_name={} --whitelist={} > $@").format(
+        filename,
+        ",".join(LINOP_FILES),
+    ),
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+) for filename in LINOP_FILES]
+
+py_library(
+    name = "generated_files",
+    testonly = 1,
+    srcs = ["gen_new/{}.py".format(filename) for filename in LINOP_FILES],
+)
 
 py_library(
     name = "linear_operator_gen",

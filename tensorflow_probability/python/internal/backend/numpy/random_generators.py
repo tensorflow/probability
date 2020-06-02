@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import softmax as _softmax
 
 
@@ -251,7 +252,7 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
     return jaxrand.randint(key=seed, shape=shape, minval=minval, maxval=maxval,
                            dtype=dtype)
   else:
-    maxval = dtype(1) if maxval is None else maxval
+    maxval = ops.convert_to_tensor(1, dtype) if maxval is None else maxval
     shape = _bcast_shape(shape, [minval, maxval])
     # We must match ranks, as lax.max refuses to broadcast different-rank args.
     minval = minval + np.zeros([1] * final_rank, dtype=dtype)

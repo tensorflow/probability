@@ -21,8 +21,7 @@ from __future__ import print_function
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
-# TODO(b/151669121): Remove dependency on TF
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal.backend.numpy import nest
 
 
 __all__ = [

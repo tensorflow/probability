@@ -38,6 +38,7 @@ MODULE_MAPPINGS = {
     'framework import dtypes': 'dtype as dtypes',
     'framework import errors': 'errors',
     'framework import ops': 'ops',
+    'framework import common_shapes': 'ops as common_shapes',
     'framework import tensor_shape': 'tensor_shape',
     'module import module': 'ops as module',
     'ops import array_ops': 'numpy_array as array_ops',
@@ -60,11 +61,11 @@ COMMENT_OUT = [
 ]
 
 UTIL_IMPORTS = """
-from tensorflow.python.util import lazy_loader
-distribution_util = lazy_loader.LazyLoader(
+from tensorflow_probability.python.internal.backend.numpy import private
+distribution_util = private.LazyLoader(
     "distribution_util", globals(),
     "tensorflow_probability.python.internal._numpy.distribution_util")
-tensorshape_util = lazy_loader.LazyLoader(
+tensorshape_util = private.LazyLoader(
    "tensorshape_util", globals(),
     "tensorflow_probability.python.internal._numpy.tensorshape_util")
 """
@@ -109,9 +110,11 @@ def gen_module(module_name):
         'from tensorflow.python.ops.linalg '
         'import {}'.format(f))
   code = code.replace(
-      'tensorflow.python.ops.linalg import ',
-      'tensorflow_probability.python.internal.backend.numpy.gen import ')
-
+      'tensorflow.python.ops.linalg import',
+      'tensorflow_probability.python.internal.backend.numpy.gen import')
+  code = code.replace(
+      'tensorflow.python.util import',
+      'tensorflow_probability.python.internal.backend.numpy import')
   code = code.replace('tensor_util.constant_value(', '(')
   code = code.replace('tensor_util.is_tensor(', 'ops.is_tensor(')
   code = code.replace(

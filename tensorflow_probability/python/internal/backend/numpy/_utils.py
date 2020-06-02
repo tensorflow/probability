@@ -18,16 +18,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import importlib
 import types
 
 import numpy as np
+from tensorflow_probability.python.internal.backend.numpy import nest
 
 try:
   from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top,unused-import
   from tensorflow.python.ops import random_ops  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top,unused-import
   import tensorflow.compat.v1 as tf1  # pylint: disable=g-import-not-at-top,unused-import
-  import tensorflow.compat.v2 as tf  # pylint: disable=g-import-not-at-top
+  import tensorflow.compat.v2 as tf  # pylint: disable=g-import-not-at-top,unused-import
   import wrapt  # pylint: disable=g-import-not-at-top
   can_copy_docstring = True
 except ImportError:
@@ -76,10 +78,9 @@ def numpy_dtype(dtype):
 def common_dtype(args_list, dtype_hint=None):
   """Returns explict dtype from `args_list` if exists, else dtype_hint."""
   dtype = None
-  dtype_hint = None if dtype_hint is None else tf.as_dtype(dtype_hint)
-  for a in tf.nest.flatten(args_list):
+  for a in nest.flatten(args_list):
     if hasattr(a, 'dtype'):
-      dt = tf.as_dtype(a.dtype)
+      dt = a.dtype
     else:
       continue
     if dtype is None:
@@ -88,7 +89,7 @@ def common_dtype(args_list, dtype_hint=None):
       raise TypeError('Found incompatible dtypes, {} and {}'.format(dtype, dt))
   if dtype is None and dtype_hint is None:
     return None
-  return (dtype_hint if dtype is None else dtype).as_numpy_dtype
+  return dtype_hint if dtype is None else dtype
 
 
 def is_complex(dtype):
@@ -116,3 +117,10 @@ def try_import(name):  # pylint: disable=invalid-name
     return importlib.import_module(name)
   except ImportError:
     return _FakeModule(name, 'Error loading module "{}".'.format(name))
+
+
+def partial(f, *args, **kwargs):
+  """Wraps `functools.partial` to return a function rather than an object."""
+  wrapped_f = functools.partial(f, *args, **kwargs)
+  # `wrapt` and `decorator` do not work on `functools.partial` objects.
+  return lambda *args, **kwargs: wrapped_f(*args, **kwargs)  # pylint: disable=unnecessary-lambda

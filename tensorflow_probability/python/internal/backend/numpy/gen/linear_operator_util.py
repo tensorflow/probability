@@ -47,7 +47,7 @@ from tensorflow_probability.python.internal.backend.numpy import control_flow as
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg_ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
 from tensorflow_probability.python.internal.backend.numpy import ops as variables_module
-from tensorflow.python.util import nest
+from tensorflow_probability.python.internal.backend.numpy import nest
 
 
 ################################################################################
@@ -607,11 +607,11 @@ from tensorflow_probability.python.internal.backend.numpy import linalg_impl as 
 from tensorflow_probability.python.internal.backend.numpy import ops as _ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 
-from tensorflow.python.util import lazy_loader
-distribution_util = lazy_loader.LazyLoader(
+from tensorflow_probability.python.internal.backend.numpy import private
+distribution_util = private.LazyLoader(
     "distribution_util", globals(),
     "tensorflow_probability.python.internal._numpy.distribution_util")
-tensorshape_util = lazy_loader.LazyLoader(
+tensorshape_util = private.LazyLoader(
    "tensorshape_util", globals(),
     "tensorflow_probability.python.internal._numpy.tensorshape_util")
 

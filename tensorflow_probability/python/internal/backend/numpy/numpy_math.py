@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
@@ -247,8 +245,8 @@ def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
     result = result[tuple(slices)]
   return result
 
-_cumprod = functools.partial(_cumop, np.cumprod, initial_value=1.)
-_cumsum = functools.partial(_cumop, np.cumsum, initial_value=0.)
+_cumprod = utils.partial(_cumop, np.cumprod, initial_value=1.)
+_cumsum = utils.partial(_cumop, np.cumsum, initial_value=0.)
 
 
 def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=unused-argument
@@ -780,11 +778,11 @@ def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # 
 
 reduce_all = utils.copy_docstring(
     'tf.math.reduce_all',
-    functools.partial(_apply_reduction, np.all))
+    utils.partial(_apply_reduction, np.all))
 
 reduce_any = utils.copy_docstring(
     'tf.math.reduce_any',
-    functools.partial(_apply_reduction, np.any))
+    utils.partial(_apply_reduction, np.any))
 
 # reduce_euclidean_norm = utils.copy_docstring(
 #     'tf.math.reduce_euclidean_norm',
@@ -797,31 +795,31 @@ reduce_logsumexp = utils.copy_docstring(
 
 reduce_max = utils.copy_docstring(
     'tf.math.reduce_max',
-    functools.partial(_apply_reduction, np.max))
+    utils.partial(_apply_reduction, np.max))
 
 reduce_mean = utils.copy_docstring(
     'tf.math.reduce_mean',
-    functools.partial(_apply_reduction, np.mean, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.mean, include_dtype_kwarg=True))
 
 reduce_min = utils.copy_docstring(
     'tf.math.reduce_min',
-    functools.partial(_apply_reduction, np.min))
+    utils.partial(_apply_reduction, np.min))
 
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',
-    functools.partial(_apply_reduction, np.prod, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.prod, include_dtype_kwarg=True))
 
 reduce_std = utils.copy_docstring(
     'tf.math.reduce_std',
-    functools.partial(_apply_reduction, np.std, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.std, include_dtype_kwarg=True))
 
 reduce_sum = utils.copy_docstring(
     'tf.math.reduce_sum',
-    functools.partial(_apply_reduction, np.sum, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.sum, include_dtype_kwarg=True))
 
 reduce_variance = utils.copy_docstring(
     'tf.math.reduce_variance',
-    functools.partial(_apply_reduction, np.var, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.var, include_dtype_kwarg=True))
 
 rint = utils.copy_docstring(
     'tf.math.rint',

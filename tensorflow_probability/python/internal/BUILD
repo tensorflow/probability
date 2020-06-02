@@ -102,8 +102,6 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -187,6 +185,7 @@ multi_substrate_py_test(
     srcs = ["implementation_selection_test.py"],
     deps = [
         ":implementation_selection",
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
     ],
@@ -213,7 +212,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "name_util",
     srcs = ["name_util.py"],
     srcs_version = "PY2AND3",

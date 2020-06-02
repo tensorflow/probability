@@ -45,19 +45,36 @@ TF_REPLACEMENTS = {
     'from tensorflow.python.framework import tensor_shape':
         ('from tensorflow_probability.python.internal.backend.numpy.gen '
          'import tensor_shape'),
-    'from tensorflow.python.util import nest':
+    'from tensorflow.python.framework import ops':
         ('from tensorflow_probability.python.internal.backend.numpy '
-         'import nest'),
+         'import ops'),
+    'from tensorflow.python.framework import tensor_util':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import ops'),
+    'from tensorflow.python.util import':
+        'from tensorflow_probability.python.internal.backend.numpy import',
+    'from tensorflow.python.util.all_util':
+        'from tensorflow_probability.python.internal.backend.numpy.private',
     'from tensorflow.python.ops.linalg':
         'from tensorflow_probability.python.internal.backend.numpy.gen',
     'from tensorflow.python.ops import parallel_for':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import functional_ops as parallel_for',
+    'from tensorflow.python.ops import control_flow_ops':
+        'from tensorflow_probability.python.internal.backend.numpy '
+        'import control_flow as control_flow_ops',
+    'from tensorflow.python.eager import context':
+        'from tensorflow_probability.python.internal.backend.numpy '
+        'import private',
+    ('from tensorflow.python.client '
+     'import pywrap_tf_session as c_api'):
+        'pass',
+    ('from tensorflow.python '
+     'import pywrap_tensorflow as c_api'):
+        'pass'
 }
 
 DISABLED_BY_PKG = {
-    'distributions':
-        ('internal.moving_stats',),
     'mcmc':
         ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
          'slice_sampler_kernel'),
@@ -67,16 +84,30 @@ DISABLED_BY_PKG = {
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'stats', 'util')
-INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
-             'dtype_util', 'hypothesis_testlib', 'implementation_selection',
-             'nest_util', 'prefer_static', 'samplers', 'special_math',
-             'tensor_util', 'tensorshape_util', 'test_combinations',
-             'test_util')
+INTERNALS = (
+    'assert_util',
+    'batched_rejection_sampler',
+    'cache_util',
+    'distribution_util',
+    'dtype_util',
+    'hypothesis_testlib',
+    'implementation_selection',
+    'name_util',
+    'nest_util',
+    'prefer_static',
+    'samplers',
+    'special_math',
+    'tensor_util',
+    'tensorshape_util',
+    'test_combinations',
+    'test_util'
+)
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')
 
-PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
+PRIVATE_TF_PKGS = ('array_ops', 'control_flow_util', 'gradient_checker_v2',
+                   'numpy_text', 'random_ops')
 
 
 def main(argv):
@@ -186,6 +217,13 @@ def main(argv):
   # pylint: disable=g-complex-comprehension
   replacements.update({
       'tensorflow.python.ops import {}'.format(private):
+      'tensorflow_probability.python.internal.backend.numpy import private'
+      ' as {}'.format(private)
+      for private in PRIVATE_TF_PKGS
+  })
+  replacements.update({
+      'tensorflow.python.framework.ops import {}'.format(
+          private):
       'tensorflow_probability.python.internal.backend.numpy import private'
       ' as {}'.format(private)
       for private in PRIVATE_TF_PKGS

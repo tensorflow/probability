@@ -17,14 +17,9 @@
 # [internal] load python3.bzl
 
 NO_REWRITE_NEEDED = [
-    "internal:cache_util",
     "internal:docstring_util",
-    "internal:name_util",
     "internal:reparameterization",
     "layers",
-    "optimizer/convergence_criteria",
-    "optimizer:sgld",
-    "optimizer:variational_sgld",
     "platform_google",
 ]
 
@@ -109,9 +104,17 @@ def multi_substrate_py_library(
         srcs_version = srcs_version,
         testonly = testonly,
     )
+    remove_deps = [
+        "//third_party/py/tensorflow",
+        "//third_party/py/tensorflow:tensorflow",
+    ]
 
     trimmed_deps = [dep for dep in deps if dep not in substrates_omit_deps]
-    resolved_omit_deps = [_resolve_omit_dep(dep) for dep in substrates_omit_deps]
+    resolved_omit_deps = [
+        _resolve_omit_dep(dep)
+        for dep in substrates_omit_deps
+        if dep not in remove_deps
+    ]
     for src in srcs:
         native.genrule(
             name = "rewrite_{}_numpy".format(src.replace(".", "_")),
