@@ -36,6 +36,11 @@ multi_substrate_py_library(
     name = "math",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":minimize",
+        ":sparse",
+        "//tensorflow_probability/python/math/ode",
+    ],
     deps = [
         ":custom_gradient",
         ":diag_jacobian",

@@ -26,6 +26,7 @@ from absl import flags
 
 flags.DEFINE_boolean('numpy_to_jax', False,
                      'Whether or not to rewrite numpy imports to jax.numpy')
+flags.DEFINE_list('omit_deps', [], 'List of build deps being omitted.')
 
 FLAGS = flags.FLAGS
 
@@ -55,18 +56,11 @@ TF_REPLACEMENTS = {
 }
 
 DISABLED_BY_PKG = {
-    'bijectors':
-        ('scale_matvec_lu', 'real_nvp'),
     'distributions':
         ('internal.moving_stats',),
-    'math':
-        ('ode', 'minimize', 'sparse'),
     'mcmc':
         ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
          'slice_sampler_kernel'),
-    'optimizer': ('bfgs', 'bfgs_utils', 'differential_evolution', 'lbfgs',
-                  'nelder_mead', 'proximal_hessian_sparse', 'sgld',
-                  'variational_sgd', 'convergence_criteria'),
     'experimental':
         ('auto_batching', 'composite_tensor', 'edward2', 'linalg',
          'marginalize', 'mcmc', 'nn', 'sequential', 'substrates', 'vi'),
@@ -87,8 +81,20 @@ PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
 
 def main(argv):
 
+  disabled_by_pkg = dict(DISABLED_BY_PKG)
+  for dep in FLAGS.omit_deps:
+    pkg = dep.split('/python/')[1].split(':')[0].replace('/', '.')
+    lib = dep.split(':')[1]
+    if pkg.endswith('.{}'.format(lib)):
+      pkg = pkg.replace('.{}'.format(lib), '')
+      disabled_by_pkg.setdefault(pkg, ())
+      disabled_by_pkg[pkg] += (lib,)
+    else:
+      disabled_by_pkg.setdefault(pkg, ())
+      disabled_by_pkg[pkg] += (lib,)
+
   replacements = collections.OrderedDict(TF_REPLACEMENTS)
-  for pkg, disabled in DISABLED_BY_PKG.items():
+  for pkg, disabled in disabled_by_pkg.items():
     replacements.update({
         'from tensorflow_probability.python.{}.{}'.format(pkg, item):
         '# from tensorflow_probability.python.{}.{}'.format(pkg, item)
@@ -206,19 +212,24 @@ def main(argv):
           '# @six.add_metaclass(TensorMetaClass)',
   })
 
-  contents = open(argv[1]).read()
-  if '__init__.py' in argv[1]:
+  filename = argv[1]
+  contents = open(filename).read()
+  if '__init__.py' in filename:
     # Comment out items from __all__.
-    for pkg, disabled in DISABLED_BY_PKG.items():
+    for pkg, disabled in disabled_by_pkg.items():
       for item in disabled:
+        def disable_all(name):
+          replacements.update({
+              '"{}"'.format(name): '# "{}"'.format(name),
+              '\'{}\''.format(name): '# \'{}\''.format(name),
+          })
+        if 'from tensorflow_probability.python.{} import {}'.format(
+            pkg, item) in contents:
+          disable_all(item)
         for segment in contents.split(
             'from tensorflow_probability.python.{}.{} import '.format(
                 pkg, item)):
-          disabled_name = segment.split('\n')[0]
-          replacements.update({
-              '"{}"'.format(disabled_name): '# "{}"'.format(disabled_name),
-              '\'{}\''.format(disabled_name): '# \'{}\''.format(disabled_name),
-          })
+          disable_all(segment.split('\n')[0])
 
   for find, replace in replacements.items():
     contents = contents.replace(find, replace)

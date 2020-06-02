@@ -22,9 +22,6 @@ NO_REWRITE_NEEDED = [
     "internal:name_util",
     "internal:reparameterization",
     "layers",
-    "math:minimize",
-    "math:sparse",
-    "math/ode",
     "optimizer/convergence_criteria",
     "optimizer:sgld",
     "optimizer:variational_sgld",
@@ -75,6 +72,14 @@ def _substrate_deps(deps, substrate):
 def py3_test(*args, **kwargs):
     native.py_test(*args, **kwargs)
 
+def _resolve_omit_dep(dep):
+    """Resolves a `substrates_omit_deps` item to full target."""
+    if ":" not in dep:
+        dep = "{}:{}".format(dep, dep.split("/")[-1])
+    if dep.startswith(":"):
+        dep = "{}{}".format(native.package_name(), dep)
+    return dep
+
 def multi_substrate_py_library(
         name,
         srcs = [],
@@ -106,12 +111,16 @@ def multi_substrate_py_library(
     )
 
     trimmed_deps = [dep for dep in deps if dep not in substrates_omit_deps]
+    resolved_omit_deps = [_resolve_omit_dep(dep) for dep in substrates_omit_deps]
     for src in srcs:
         native.genrule(
             name = "rewrite_{}_numpy".format(src.replace(".", "_")),
             srcs = [src],
             outs = [_substrate_src(src, "numpy")],
-            cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
+            cmd = "$(location {}) $(SRCS) --omit_deps={} > $@".format(
+                REWRITER_TARGET,
+                ",".join(resolved_omit_deps),
+            ),
             tools = [REWRITER_TARGET],
         )
     native.py_library(
@@ -128,7 +137,10 @@ def multi_substrate_py_library(
             name = "rewrite_{}_jax".format(src.replace(".", "_")),
             srcs = [src],
             outs = [_substrate_src(src, "jax")],
-            cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
+            cmd = "$(location {}) $(SRCS) --omit_deps={} --numpy_to_jax > $@".format(
+                REWRITER_TARGET,
+                ",".join(resolved_omit_deps),
+            ),
             tools = [REWRITER_TARGET],
         )
     native.py_library(

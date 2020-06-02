@@ -37,6 +37,9 @@ multi_substrate_py_library(
     name = "bijectors",
     srcs = ["__init__.py"],
     substrates_omit_deps = [
+        ":batch_normalization",
+        ":discrete_cosine_transform",
+        ":ffjord",
         ":real_nvp",
         ":scale_matvec_lu",
     ],
