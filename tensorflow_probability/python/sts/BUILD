@@ -61,7 +61,7 @@ py_library(
 
 py_test(
     name = "autoregressive_test",
-    size = "small",
+    size = "medium",
     srcs = ["autoregressive_test.py"],
     deps = [
         # numpy dep,
