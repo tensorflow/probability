@@ -39,6 +39,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     substrates_omit_deps = [
         ":pixel_cnn",
+        ":mixture",
     ],
     deps = [
         ":autoregressive",

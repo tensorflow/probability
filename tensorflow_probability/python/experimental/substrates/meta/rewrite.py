@@ -127,8 +127,8 @@ def main(argv):
   replacements = collections.OrderedDict(TF_REPLACEMENTS)
   for pkg, disabled in disabled_by_pkg.items():
     replacements.update({
-        'from tensorflow_probability.python.{}.{}'.format(pkg, item):
-        '# from tensorflow_probability.python.{}.{}'.format(pkg, item)
+        'from tensorflow_probability.python.{}.{} '.format(pkg, item):
+        '# from tensorflow_probability.python.{}.{} '.format(pkg, item)
         for item in disabled
     })
     replacements.update({
