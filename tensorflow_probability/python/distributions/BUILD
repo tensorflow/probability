@@ -40,6 +40,7 @@ multi_substrate_py_library(
     substrates_omit_deps = [
         ":pixel_cnn",
         ":mixture",
+        ":zipf",
     ],
     deps = [
         ":autoregressive",
