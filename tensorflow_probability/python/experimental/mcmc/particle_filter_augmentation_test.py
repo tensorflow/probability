@@ -79,7 +79,7 @@ class _ParticleFilterUtilTest(test_util.TestCase):
 
     # Ratios should get closer to golden as the series progresses, so
     # likelihoods will increase.
-    self.assertAllGreater(lps[2:] - lps[:-2], 0.0)
+    self.assertAllGreaterEqual(lps[2:] - lps[:-2], 0.0)
 
     # Any particles that sampled initial values of 0. should have been
     # discarded, since those lead to degenerate series that do not approach

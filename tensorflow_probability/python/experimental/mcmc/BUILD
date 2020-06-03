@@ -40,6 +40,7 @@ py_library(
         ":particle_filter",
         ":particle_filter_augmentation",
         ":sample_sequential_monte_carlo",
+        ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
         # tensorflow dep,
     ],
@@ -178,6 +179,7 @@ py_library(
     srcs = ["particle_filter.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
         # numpy dep,
         # tensorflow dep,
@@ -246,6 +248,35 @@ py_test(
     timeout = "long",
     srcs = ["sample_sequential_monte_carlo_test.py"],
     shard_count = 2,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "sequential_monte_carlo_kernel",
+    srcs = ["sequential_monte_carlo_kernel.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":weighted_resampling",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+py_test(
+    name = "sequential_monte_carlo_kernel_test",
+    size = "medium",
+    srcs = ["sequential_monte_carlo_kernel_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

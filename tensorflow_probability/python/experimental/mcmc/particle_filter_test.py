@@ -21,88 +21,12 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.mcmc.particle_filter import SampleParticles
-from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-
-
-def do_not_compile(f):
-  """The identity function decorator."""
-  return f
-
-
-def xla_compile(f):
-  """Decorator for XLA compilation."""
-  return tf.function(f, autograph=False, experimental_compile=True)
-
-
-@test_util.test_all_tf_execution_regimes
-class SampleParticlesTest(test_util.TestCase):
-
-  def test_sample_particles_works_with_joint_distributions(self):
-    num_particles = 3
-    jd = tfd.JointDistributionNamed({'x': tfd.Normal(0., 1.)})
-    sp = SampleParticles(jd, num_particles=num_particles)
-
-    # Check that SampleParticles has the correct shapes.
-    self.assertAllEqualNested(jd.event_shape, sp.event_shape)
-    self.assertAllEqualNested(
-        *self.evaluate((jd.event_shape_tensor(), sp.event_shape_tensor())))
-    self.assertAllEqualNested(
-        tf.nest.map_structure(
-            lambda x: np.concatenate([[num_particles], x], axis=0),
-            jd.batch_shape),
-        tf.nest.map_structure(tensorshape_util.as_list, sp.batch_shape))
-    self.assertAllEqualNested(
-        *self.evaluate(
-            (tf.nest.map_structure(
-                lambda x: tf.concat([[num_particles], x], axis=0),
-                jd.batch_shape_tensor()),
-             sp.batch_shape_tensor())))
-
-    # Check that sample and log-prob work, and that we can take the log-prob
-    # of a sample.
-    x = self.evaluate(sp.sample())
-    lp = self.evaluate(sp.log_prob(x))
-    self.assertAllEqual(
-        [part.shape for part in tf.nest.flatten(x)], [[num_particles]])
-    self.assertAllEqual(
-        [part.shape for part in tf.nest.flatten(lp)], [[num_particles]])
-
-  def test_sample_particles_works_with_batch_and_event_shape(self):
-    num_particles = 3
-    d = tfd.MultivariateNormalDiag(loc=tf.zeros([2, 4]),
-                                   scale_diag=tf.ones([2, 4]))
-    sp = SampleParticles(d, num_particles=num_particles)
-
-    # Check that SampleParticles has the correct shapes.
-    self.assertAllEqual(sp.event_shape, d.event_shape)
-    self.assertAllEqual(sp.batch_shape,
-                        np.concatenate([[num_particles],
-                                        d.batch_shape], axis=0))
-
-    # Draw a sample, combining sample shape, batch shape, num_particles, *and*
-    # event_shape, and check that it has the correct shape, and that we can
-    # compute a log_prob with the correct shape.
-    sample_shape = [5, 1]
-    x = self.evaluate(sp.sample(sample_shape, seed=test_util.test_seed()))
-    self.assertAllEqual(x.shape,  # [5, 3, 1, 2, 4]
-                        np.concatenate([sample_shape,
-                                        [num_particles],
-                                        d.batch_shape,
-                                        d.event_shape],
-                                       axis=0))
-    lp = self.evaluate(sp.log_prob(x))
-    self.assertAllEqual(lp.shape,
-                        np.concatenate([sample_shape,
-                                        [num_particles],
-                                        d.batch_shape],
-                                       axis=0))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -280,12 +204,12 @@ class _ParticleFilterTest(test_util.TestCase):
 
       def susceptible(new_infections):
         return tfd.Deterministic(
-            prefer_static.maximum(
+            ps.maximum(
                 0., previous_state['susceptible'] - new_infections))
 
       def infected(new_infections, new_recoveries):
         return tfd.Deterministic(
-            prefer_static.maximum(
+            ps.maximum(
                 0.,
                 previous_state['infected'] + new_infections - new_recoveries))
 
@@ -415,7 +339,7 @@ class _ParticleFilterTest(test_util.TestCase):
         observation_fn=lambda _, x: tfd.Normal(loc=x, scale=1.),
         initial_state_proposal=tfd.Normal(loc=0., scale=5.),
         proposal_fn=lambda _, x: tfd.Normal(loc=x, scale=5.),
-        num_particles=1024,
+        num_particles=2048,
         seed=test_util.test_seed()))
 
     # Compare marginal likelihood against that
@@ -470,18 +394,18 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_custom_trace_fn(self):
 
-    def trace_fn(step_results):
+    def trace_fn(state, _):
       # Traces the mean and stddev of the particle population at each step.
-      weights = tf.exp(step_results.log_weights)
-      mean = tf.reduce_sum(weights * step_results.particles, axis=0)
+      weights = tf.exp(state.log_weights)
+      mean = tf.reduce_sum(weights * state.particles, axis=0)
       variance = tf.reduce_sum(
-          weights * (step_results.particles - mean[tf.newaxis, ...])**2)
+          weights * (state.particles - mean[tf.newaxis, ...])**2)
       return {'mean': mean,
               'stddev': tf.sqrt(variance),
               # In real usage we would likely not track the particles and
               # weights. We keep them here just so we can double-check the
               # stats, below.
-              'particles': step_results.particles,
+              'particles': state.particles,
               'weights': weights}
 
     results = self.evaluate(
@@ -521,7 +445,9 @@ class _ParticleFilterTest(test_util.TestCase):
              transition_fn=lambda _, state: tfd.Normal(state, 10.),
              observation_fn=lambda _, state: tfd.Normal(state, 0.1),
              num_particles=num_particles,
-             step_indices_to_trace=[1, 3],
+             trace_criterion_fn=lambda s, r: ps.logical_or(  # pylint: disable=g-long-lambda
+                 ps.equal(r.steps, 2),
+                 ps.equal(r.steps, 4)),
              seed=test_util.test_seed()))
     self.assertLen(particles_1_3, 2)
     self.assertLen(log_weights_1_3, 2)
@@ -539,10 +465,10 @@ class _ParticleFilterTest(test_util.TestCase):
              transition_fn=lambda _, state: tfd.Normal(state, 10.),
              observation_fn=lambda _, state: tfd.Normal(state, 0.1),
              num_particles=num_particles,
-             trace_fn=lambda r: (r.particles,  # pylint: disable=g-long-lambda
-                                 r.log_weights,
-                                 r.accumulated_log_marginal_likelihood),
-             step_indices_to_trace=-1,
+             trace_fn=lambda s, r: (s.particles,  # pylint: disable=g-long-lambda
+                                    s.log_weights,
+                                    r.accumulated_log_marginal_likelihood),
+             trace_criterion_fn=None,
              seed=test_util.test_seed()))
     self.assertLen(final_particles, num_particles)
     self.assertLen(final_log_weights, num_particles)

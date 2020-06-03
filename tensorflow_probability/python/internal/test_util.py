@@ -175,6 +175,28 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         check_types=check_types,
         msg='AllEqualNested failed')
 
+  def assertAllCloseNested(
+      self, a, b, rtol=1e-06, atol=1e-06, check_types=False):
+    """Assert that analogous entries in two nested structures have near values.
+
+    Args:
+      a: A nested structure.
+      b: A nested structure.
+      rtol: scalar relative tolerance.
+        Default value: `1e-6`.
+      atol: scalar absolute tolerance.
+        Default value: `1e-6`.
+      check_types: If `True`, types of sequences are checked as well, including
+        the keys of dictionaries. If `False`, for example a list and a tuple of
+        objects may be equivalent.
+    """
+    self.assertAllAssertsNested(
+        lambda x, y: self.assertAllClose(x, y, rtol=rtol, atol=atol),
+        a,
+        b,
+        check_types=check_types,
+        msg='AllCloseNested failed')
+
   def assertAllFinite(self, a):
     """Assert that all entries in a `Tensor` are finite.
 
