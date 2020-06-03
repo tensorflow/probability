@@ -2300,8 +2300,8 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "joint_distribution_named_test",
+    size = "medium",
     srcs = ["joint_distribution_named_test.py"],
-    jax_size = "medium",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,

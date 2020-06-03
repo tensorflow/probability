@@ -130,7 +130,7 @@ multi_substrate_py_library(
 
 py_test(
     name = "bijector_properties_test",
-    size = "medium",
+    size = "large",
     srcs = ["bijector_properties_test.py"],
     shard_count = 25,
     tags = ["hypothesis"],
