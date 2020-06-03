@@ -165,6 +165,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
           b.inverse_event_shape_tensor(tensorshape_util.as_list(y_shape_bad)))
 
   @test_util.test_graph_mode_only
+  @test_util.substrate_disable_stateful_random_test
   def testSampleMarginals(self):
     # Verify that the marginals of the LKJ distribution are distributed
     # according to a (scaled) Beta distribution. The LKJ distributed samples are
