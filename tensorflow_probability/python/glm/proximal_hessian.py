@@ -477,7 +477,7 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
     tolerance,
     l1_regularizer,
     l2_regularizer=None,
-    maximum_iterations=None,
+    maximum_iterations=1,
     maximum_full_sweeps_per_iteration=1,
     learning_rate=None,
     name=None):
