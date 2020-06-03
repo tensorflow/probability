@@ -79,6 +79,7 @@ LBfgsOptimizerResults = collections.namedtuple(
 
 def minimize(value_and_gradients_function,
              initial_position,
+             previous_optimizer_results=None,
              num_correction_pairs=10,
              tolerance=1e-8,
              x_tolerance=0,
@@ -143,6 +144,13 @@ def minimize(value_and_gradients_function,
     initial_position: Real `Tensor` of shape `[..., n]`. The starting point, or
       points when using batching dimensions, of the search procedure. At these
       points the function value and the gradient norm should be finite.
+      Exactly one of `initial_position` and `previous_optimizer_results` can be
+      non-None.
+    previous_optimizer_results: An `LBfgsOptimizerResults` namedtuple to
+      intialize the optimizer state from, instead of an `initial_position`.
+      This can be passed in from a previous return value to resume optimization
+      with a different `stopping_condition`. Exactly one of `initial_position`
+      and `previous_optimizer_results` can be non-None.
     num_correction_pairs: Positive integer. Specifies the maximum number of
       (position_delta, gradient_delta) correction pairs to keep as implicit
       approximation of the Hessian matrix.
@@ -209,9 +217,19 @@ def minimize(value_and_gradients_function,
     stopping_condition = bfgs_utils.converged_all
 
   with tf.name_scope(name or 'minimize'):
-    initial_position = tf.convert_to_tensor(
-        initial_position, name='initial_position')
-    dtype = initial_position.dtype.base_dtype
+    if (initial_position is None) == (previous_optimizer_results is None):
+      raise ValueError(
+          'Exactly one of `initial_position` or '
+          '`previous_optimizer_results` may be specified.')
+
+    if initial_position is not None:
+      initial_position = tf.convert_to_tensor(
+          initial_position, name='initial_position')
+      dtype = initial_position.dtype.base_dtype
+
+    if previous_optimizer_results is not None:
+      dtype = previous_optimizer_results.position.dtype.base_dtype
+
     tolerance = tf.convert_to_tensor(
         tolerance, dtype=dtype, name='grad_tolerance')
     f_relative_tolerance = tf.convert_to_tensor(
@@ -253,10 +271,15 @@ def minimize(value_and_gradients_function,
               next_state.objective_gradient - current_state.objective_gradient))
       return [state_after_inv_hessian_update]
 
-    initial_state = _get_initial_state(value_and_gradients_function,
-                                       initial_position,
-                                       num_correction_pairs,
-                                       tolerance)
+    if previous_optimizer_results is None:
+      assert initial_position is not None
+      initial_state = _get_initial_state(value_and_gradients_function,
+                                         initial_position,
+                                         num_correction_pairs,
+                                         tolerance)
+    else:
+      initial_state = previous_optimizer_results
+
     return tf.while_loop(
         cond=_cond,
         body=_body,

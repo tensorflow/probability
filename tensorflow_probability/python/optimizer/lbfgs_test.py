@@ -270,6 +270,72 @@ class LBfgsTest(test_util.TestCase):
       self.assertArrayNear(actual, expected, 1e-5)
     self.assertEqual(batch_results.num_objective_evaluations, 28)
 
+  def test_himmelblau_batch_any_resume_then_all(self):
+    @_make_val_and_grad_fn
+    def himmelblau(coord):
+      x, y = coord[..., 0], coord[..., 1]
+      return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
+
+    dtype = 'float64'
+    starts = tf.constant([[1, 1],
+                          [-2, 2],
+                          [-1, -1],
+                          [1, -2]], dtype=dtype)
+    expected_minima = np.array([[3, 2],
+                                [-2.805118, 3.131312],
+                                [-3.779310, -3.283186],
+                                [3.584428, -1.848126]], dtype=dtype)
+
+    # Run with `converged_any` stopping condition, to stop as soon as any of
+    # the batch members have converged.
+    raw_batch_results = tfp.optimizer.lbfgs_minimize(
+        himmelblau, initial_position=starts,
+        stopping_condition=tfp.optimizer.converged_any, tolerance=1e-8)
+    batch_results = self.evaluate(raw_batch_results)
+
+    self.assertFalse(np.any(batch_results.failed))  # None have failed.
+    self.assertTrue(np.any(batch_results.converged))  # At least one converged.
+    self.assertFalse(np.all(batch_results.converged))  # But not all did.
+
+    # Converged points are near expected minima.
+    for actual, expected in zip(batch_results.position[batch_results.converged],
+                                expected_minima[batch_results.converged]):
+      self.assertArrayNear(actual, expected, 1e-5)
+    self.assertEqual(batch_results.num_objective_evaluations, 28)
+
+    # Run with `converged_all`, starting from previous state.
+    batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
+        himmelblau, initial_position=None,
+        previous_optimizer_results=raw_batch_results,
+        stopping_condition=tfp.optimizer.converged_all, tolerance=1e-8))
+
+    # All converged points are near expected minima and the nunmber of
+    # evaluaitons is as if we never stopped.
+    for actual, expected in zip(batch_results.position, expected_minima):
+      self.assertArrayNear(actual, expected, 1e-5)
+    self.assertEqual(batch_results.num_objective_evaluations, 36)
+
+  def test_initial_position_and_previous_optimizer_results_are_exclusive(self):
+    minimum = np.array([1.0, 1.0])
+    scales = np.array([2.0, 3.0])
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
+
+    start = tf.constant([0.6, 0.8])
+
+    def run(position, state):
+      raw_results = tfp.optimizer.lbfgs_minimize(
+          quadratic, initial_position=position,
+          previous_optimizer_results=state, tolerance=1e-8)
+      self.evaluate(raw_results)
+      return raw_results
+
+    self.assertRaises(ValueError, run, None, None)
+    results = run(start, None)
+    self.assertRaises(ValueError, run, start, results)
+
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
     n, dim = 100, 30
