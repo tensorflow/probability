@@ -132,7 +132,7 @@ py_test(
     name = "bijector_properties_test",
     size = "medium",
     srcs = ["bijector_properties_test.py"],
-    shard_count = 20,
+    shard_count = 25,
     tags = ["hypothesis"],
     deps = [
         ":bijectors",
