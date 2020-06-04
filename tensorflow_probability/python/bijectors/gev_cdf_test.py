@@ -35,11 +35,11 @@ class GeneralizedExtremeValueCDFTest(test_util.TestCase):
   def testBijector(self):
     loc = 0.3
     scale = 5.
-    concentration = np.array([[[-5e-5], [0.], [1.]]], dtype=np.float32)
+    concentration = np.array([[[-5.5], [-5e-5], [0.], [1.]]], dtype=np.float32)
     bijector = tfb.GeneralizedExtremeValueCDF(
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
     self.assertStartsWith(bijector.name, "generalizedextremevalue")
-    x = np.array([[[-3.], [0.], [4.2]]], dtype=np.float32)
+    x = np.array([[[0.], [-3.], [0.], [4.2]]], dtype=np.float32)
     # GeneralizedExtremeValue distribution
     gev_dist = stats.genextreme(-concentration, loc=loc, scale=scale)
     y = gev_dist.cdf(x).astype(np.float32)
