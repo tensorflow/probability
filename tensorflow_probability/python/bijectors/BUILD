@@ -1117,7 +1117,6 @@ multi_substrate_py_test(
     name = "correlation_cholesky_test",
     size = "medium",
     srcs = ["correlation_cholesky_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
