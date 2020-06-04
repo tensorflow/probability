@@ -332,7 +332,7 @@ multi_substrate_py_test(
     srcs = ["replica_exchange_mc_test.py"],
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
-    shard_count = 6,
+    shard_count = 11,
     deps = [
         # absl/logging dep,
         # numpy dep,

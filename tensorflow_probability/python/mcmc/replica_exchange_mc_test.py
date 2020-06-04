@@ -160,10 +160,13 @@ class REMCTest(test_util.TestCase):
 
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
-          testcase_name=testcase_name + kernel_name,
+          testcase_name=(testcase_name + kernel_name +
+                         ['_fast_execute_only', '_slow_asserts'][asserts]),
           tfp_transition_kernel=tfp_transition_kernel,
           inverse_temperatures=inverse_temperatures,
-          store_parameters_in_results=store_param)
+          store_parameters_in_results=store_param,
+          asserts=asserts)
+      for asserts in [True, False]
       for kernel_name, tfp_transition_kernel, store_param in [
           ('HMC', tfp.mcmc.HamiltonianMonteCarlo, True),
           ('RWMH', init_tfp_randomwalkmetropolis, False),
@@ -179,10 +182,10 @@ class REMCTest(test_util.TestCase):
                  tfp_transition_kernel,
                  inverse_temperatures,
                  store_parameters_in_results,
+                 asserts,
                  prob_swap=1.0,
                  dtype=np.float32):
     """Sampling from standard normal with REMC."""
-    num_results = 500 if tf.executing_eagerly() else 2000
 
     target = tfd.Normal(dtype(0.), dtype(1.))
     inverse_temperatures = dtype(inverse_temperatures)
@@ -200,12 +203,17 @@ class REMCTest(test_util.TestCase):
           num_leapfrog_steps=num_leapfrog_steps)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=tf.function(target.log_prob, autograph=False),
+        target_log_prob_fn=target.log_prob,
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
         swap_proposal_fn=tfp.mcmc.default_swap_proposal_fn(
             prob_swap),
         seed=_set_seed())
+
+    num_results = 17
+    if asserts:
+      num_results = 2000
+      remc.one_step = tf.function(remc.one_step, autograph=False)
 
     states, kernel_results = tfp.mcmc.sample_chain(
         num_results=num_results,
@@ -244,13 +252,16 @@ class REMCTest(test_util.TestCase):
 
       err_msg = 'replica_idx={}'.format(replica_idx)
 
-      mean_atol = 5 * 1.0 / np.sqrt(ess)
+      mean_atol = 6 * 1.0 / np.sqrt(ess)
       self.assertAllClose(x.mean(), 0.0, atol=mean_atol, msg=err_msg)
 
       # For a tempered Normal, Variance = T.
       expected_var = 1 / inverse_temperatures[replica_idx]
-      var_atol = 5 * expected_var * np.sqrt(2) / np.sqrt(ess)
+      var_atol = 6 * expected_var * np.sqrt(2) / np.sqrt(ess)
       self.assertAllClose(np.var(x), expected_var, atol=var_atol, msg=err_msg)
+
+    if not asserts:
+      return
 
     for replica_idx in range(num_replica):
       _check_sample_stats(replica_idx)
@@ -281,7 +292,7 @@ class REMCTest(test_util.TestCase):
     def _check_swap_matrix(matrix):
       self.assertAllEqual((num_results, num_replica, num_replica),
                           matrix.shape)
-      # Matrix is stochastic (since you either get swapd with another
+      # Matrix is stochastic (since you either get swapped with another
       # replica, or yourself), and symmetric, since we do once-only swaps.
       self.assertAllEqual(np.ones((num_results, num_replica)),
                           matrix.sum(axis=-1))
@@ -312,7 +323,7 @@ class REMCTest(test_util.TestCase):
       ('HMC', tfp.mcmc.HamiltonianMonteCarlo),
       ('RWMH', init_tfp_randomwalkmetropolis),
   ])
-  def testRWM2DMixNormal(self, tfp_transition_kernel):
+  def test2DMixNormal(self, tfp_transition_kernel):
     """Sampling from a 2-D Mixture Normal Distribution."""
     dtype = np.float32
 
@@ -341,16 +352,17 @@ class REMCTest(test_util.TestCase):
           num_leapfrog_steps=5)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=tf.function(target.log_prob, autograph=False),
+        target_log_prob_fn=target.log_prob,
         # Verified that test fails if inverse_temperatures = [1.]
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
         seed=_set_seed())
+    remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return results.post_swap_replica_results.log_accept_ratio
 
-    num_results = 500 if tf.executing_eagerly() else 2000
+    num_results = 2000
     states, replica_log_accept_ratio = tfp.mcmc.sample_chain(
         num_results=num_results,
         # Start at one of the modes, in order to make mode jumping necessary
@@ -388,18 +400,23 @@ class REMCTest(test_util.TestCase):
             'eager' if tf.executing_eagerly() else 'graph',
             replica_accept_ratio_, sample_mean_))
 
-    self.assertAllClose(
-        expected_mean_,
-        sample_mean_,
-        atol=5 * expected_stddev_ / np.sqrt(np.min(ess_)))
-    self.assertAllClose(
-        expected_variance_,
-        sample_variance_,
-        atol=5 * expected_variance_ / np.sqrt(np.min(ess_)))
+    mean_atol = 6 * expected_stddev_ / np.sqrt(np.min(ess_))
+    var_atol = 6 * expected_variance_ / np.sqrt(np.min(ess_))
+    for i in range(mean_atol.shape[0]):
+      self.assertAllClose(
+          expected_mean_[i],
+          sample_mean_[i],
+          atol=mean_atol[i],
+          msg='position {}'.format(i))
+      self.assertAllClose(
+          expected_variance_[i],
+          sample_variance_[i],
+          atol=var_atol[i],
+          msg=i)
 
   def testMultipleCorrelatedStatesWithNoBatchDims(self):
     dtype = np.float32
-    num_results = 500 if tf.executing_eagerly() else 2000
+    num_results = 2000
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     # Use LinearOperatorLowerTriangular to get broadcasting ability.
@@ -407,7 +424,6 @@ class REMCTest(test_util.TestCase):
         tf.linalg.cholesky(true_cov))
 
     # Its ok to decorate this since we only need to stress the TransitionKernel.
-    @tf.function(autograph=False)
     def target_log_prob(x, y):
       # Corresponds to unnormalized MVN.
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
@@ -434,6 +450,7 @@ class REMCTest(test_util.TestCase):
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
         seed=_set_seed())
+    remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return results.post_swap_replica_results.log_accept_ratio
@@ -476,9 +493,9 @@ class REMCTest(test_util.TestCase):
     max_scale = np.sqrt(np.max(true_cov))
 
     self.assertAllClose(
-        true_mean, sample_mean_, atol=5 * max_scale / np.sqrt(np.min(ess_)))
+        true_mean, sample_mean_, atol=6 * max_scale / np.sqrt(np.min(ess_)))
     self.assertAllClose(
-        true_cov, sample_cov_, atol=5 * max_scale**2 / np.sqrt(np.min(ess_)))
+        true_cov, sample_cov_, atol=6 * max_scale**2 / np.sqrt(np.min(ess_)))
 
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
@@ -489,25 +506,24 @@ class REMCTest(test_util.TestCase):
           ess_scaling=ess_scaling)
       for kernel_name, tfp_transition_kernel, ess_scaling in [
           ('HMC', tfp.mcmc.HamiltonianMonteCarlo, .1),
-          ('RWMH', init_tfp_randomwalkmetropolis, .02),
+          ('RWMH', init_tfp_randomwalkmetropolis, .009),
       ]
       for testcase_name, inverse_temperatures, step_size_fn in [
-          ('1DTemperatureScalarStep', np.float32([1.0, 0.5, 0.25]),
+          ('1DTemperatureScalarStep',
+           np.float32([1.0, 0.5, 0.25]),
            lambda x: 0.5),
-          ('1DTemperature1DStep', np.float32([1.0, 0.5, 0.25]),
+          ('1DTemperature1DStep',
+           np.float32([1.0, 0.5, 0.25]),
            lambda x: 0.5 / np.sqrt(x).reshape(3, 1, 1)),
-          (
-              '1DTemperature2DStep',
-              np.float32([1.0, 0.5, 0.25]),
-              lambda x: np.stack(  # pylint: disable=g-long-lambda
-                  [0.5 / np.sqrt(x), 0.5 / np.sqrt(x)],
-                  axis=-1).reshape(3, 2, 1)),
-          (
-              '2DTemperature1DStep',
-              np.float32(
-                  np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1)),
-              lambda x: 0.5 / np.sqrt(  # pylint: disable=g-long-lambda
-                  x.mean(axis=-1).reshape(3, 1, 1))),
+          ('1DTemperature2DStep',
+           np.float32([1.0, 0.5, 0.25]),
+           lambda x: np.stack(  # pylint: disable=g-long-lambda
+               [0.5 / np.sqrt(x), 0.5 / np.sqrt(x)],
+               axis=-1).reshape(3, 2, 1)),
+          ('2DTemperature1DStep',
+           np.float32(np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1)),
+           lambda x: 0.5 / np.sqrt(  # pylint: disable=g-long-lambda
+               x.mean(axis=-1).reshape(3, 1, 1))),
           ('2DTemperature2DStep',
            np.float32(np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1)),
            lambda x: 0.5 / np.sqrt(x).reshape(3, 2, 1))
@@ -543,11 +559,11 @@ class REMCTest(test_util.TestCase):
           num_leapfrog_steps=3)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=tf.function(
-            lambda x: target.copy().log_prob(x), autograph=False),
+        target_log_prob_fn=tf.function(target.log_prob, autograph=False),
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
         seed=_set_seed())
+    remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return [
@@ -555,7 +571,7 @@ class REMCTest(test_util.TestCase):
           results.post_swap_replica_states
       ]
 
-    num_results = 500 if tf.executing_eagerly() else 2000
+    num_results = 2000
     states, (log_accept_ratio, replica_states) = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=loc[::-1],  # Batch members far from their mode!
@@ -613,28 +629,31 @@ class REMCTest(test_util.TestCase):
       self.assertAllClose(
           replica_mean_[replica_idx, batch_idx],
           loc[batch_idx],
-          # 5 standard errors of a mean estimate.
-          atol=5 * expected_scale / np.sqrt(ess),
+          # 6 standard errors of a mean estimate.
+          atol=6 * expected_scale / np.sqrt(ess),
           msg=err_msg)
       self.assertAllClose(
           expected_scale**2 * np.eye(loc.shape[1]),
           replica_cov_[replica_idx, batch_idx],
-          # 10 standard errors of a variance estimate.
-          atol=10 * np.sqrt(2) * expected_scale**2 / np.sqrt(ess),
+          # 12 standard errors of a variance estimate.
+          atol=12 * np.sqrt(2) * expected_scale**2 / np.sqrt(ess),
           msg=err_msg)
 
     for replica_idx in range(num_replica):
       for batch_idx in range(loc.shape[0]):
         _check_stats(replica_idx, batch_idx, ess_scaling)
 
-  def testMultipleCorrelatedStatesWithOneBatchDim(self):
+  @parameterized.named_parameters([dict(testcase_name='_slow_asserts',
+                                        asserts=True),
+                                   dict(testcase_name='_fast_execute_only',
+                                        asserts=False)])
+  def testMultipleCorrelatedStatesWithOneBatchDim(self, asserts):
     dtype = np.float32
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5], [0.5, 1]])
     # Use LinearOperatorLowerTriangular to get broadcasting ability.
     linop = tf.linalg.LinearOperatorLowerTriangular(
         tf.linalg.cholesky(true_cov))
-    num_results = 250 if tf.executing_eagerly() else 2000
 
     def target_log_prob(x, y):
       # Corresponds to unnormalized MVN.
@@ -651,10 +670,15 @@ class REMCTest(test_util.TestCase):
           num_leapfrog_steps=3)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=tf.function(target_log_prob, autograph=False),
+        target_log_prob_fn=target_log_prob,
         inverse_temperatures=[1., 0.9, 0.8],
         make_kernel_fn=make_kernel_fn,
         seed=_set_seed())
+
+    num_results = 13
+    if asserts:
+      num_results = 2000
+      remc.one_step = tf.function(remc.one_step, autograph=False)
 
     states = tfp.mcmc.sample_chain(
         num_results=num_results,
@@ -674,11 +698,14 @@ class REMCTest(test_util.TestCase):
         tfp.stats.covariance(states)
     ])
 
+    if not asserts:
+      return
+
     self.assertGreater(np.min(ess_), num_results / 10, 'Bad sampling found!')
 
-    # 5 standard errors for mean/variance estimates.
-    mean_atol = 5 / np.sqrt(np.min(ess_))
-    cov_atol = 5 * np.sqrt(2) / np.sqrt(np.min(ess_))
+    # 6 standard errors for mean/variance estimates.
+    mean_atol = 6 / np.sqrt(np.min(ess_))
+    cov_atol = 6 * np.sqrt(2) / np.sqrt(np.min(ess_))
 
     self.assertAllClose(
         true_mean, states_[:, 0, :].mean(axis=0), atol=mean_atol)
@@ -729,7 +756,7 @@ class REMCTest(test_util.TestCase):
 
     inverse_temperatures = [1., 0.5, 0.25, 0.1]
     remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=tf.function(target_log_prob, autograph=False),
+        target_log_prob_fn=target_log_prob,
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
         seed=_set_seed())
