@@ -96,7 +96,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
                 scale,
                 tf.ones([], dtype=self.dtype),
                 message='Mean undefined for scale > 1.'),
-          ]):
+        ]):
       mean = tf.math.exp(self.loc) / sinc(scale)
       nans = tf.ones_like(mean) * np.nan
       return tf.where(scale > 1., nans, mean)
