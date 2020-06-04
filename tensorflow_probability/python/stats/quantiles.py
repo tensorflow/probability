@@ -111,6 +111,8 @@ def count_integers(arr,
     # Thus, flat_arr is not totally flat, it just has the dims in ~axis
     # flattened.
     flat_arr = _move_dims_to_flat_end(arr, not_axis, arr_ndims, right_end=False)
+    minlength = minlength if minlength is not None else tf.reduce_max(arr) + 1
+    maxlength = maxlength if maxlength is not None else tf.reduce_max(arr) + 1
 
     # tf.map_fn over dim 0.
     if weights is None:

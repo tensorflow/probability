@@ -88,6 +88,16 @@ class BincountTest(test_util.TestCase):
     self.assertAllClose(counts_0_, counts_[:, 0])
     self.assertAllClose(counts_1_, counts_[:, 1])
 
+  def test_2d_array_unequal_rows(self):
+    # test concatenating row-wise bincount results of are unequal length
+    arr = tf.constant([[0, 1],
+                       [1, 2]])
+    target = tf.constant([[1, 0],
+                          [1, 1],
+                          [0, 1]])
+    result = tfp.stats.count_integers(arr, axis=1)
+    self.assertAllEqual(self.evaluate(target), self.evaluate(result))
+
 
 @test_util.test_all_tf_execution_regimes
 class FindBinsTest(test_util.TestCase):
