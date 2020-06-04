@@ -25,9 +25,12 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import affine_scalar
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import shift as shift_lib
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 
@@ -312,8 +315,12 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
             shift, log_scale = tf.unstack(params, num=2, axis=-1)
           else:
             shift, log_scale = params
-          return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
-
+          bijectors = []
+          if shift is not None:
+            bijectors.append(shift_lib.Shift(shift))
+          if log_scale is not None:
+            bijectors.append(scale_lib.Scale(tf.exp(log_scale)))
+          return chain.Chain(bijectors)
         bijector_fn = _bijector_fn
 
       if validate_args:
@@ -806,6 +813,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   def __init__(self,
                params,
                event_shape=None,
+               conditional=False,
+               conditional_event_shape=None,
+               conditional_input_layers='all_layers',
                hidden_units=None,
                input_order='left-to-right',
                hidden_degrees='equal',
@@ -830,6 +840,17 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         only rank-1 shapes are supported.  That is, event_shape must be a single
         integer.  If not specified, the event shape is inferred when this layer
         is first called or built.
+      conditional: Python boolean describing whether to add conditional inputs.
+      conditional_event_shape: Python `list`-like of positive integers (or a
+        single int), specifying the shape of the conditional input to this layer
+        (without the batch dimensions). This must be specified if `conditional`
+        is `True`.
+      conditional_input_layers: Python `str` describing how to add conditional
+        parameters to the autoregressive network. When "all_layers" the
+        conditional input will be combined with the network at every layer,
+        whilst "first_layer" combines the conditional input only at the first
+        layer which is then passed through the network
+        autoregressively. Default: 'all_layers'.
       hidden_units: Python `list`-like of non-negative integers, specifying
         the number of units in each hidden layer.
       input_order: Order of degrees to the input units: 'random',
@@ -866,6 +887,11 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
     self._params = params
     self._event_shape = _list(event_shape) if event_shape is not None else None
+    self._conditional = conditional
+    self._conditional_event_shape = (
+        _list(conditional_event_shape)
+        if conditional_event_shape is not None else None)
+    self._conditional_layers = conditional_input_layers
     self._hidden_units = hidden_units if hidden_units is not None else []
     self._input_order_param = input_order
     self._hidden_degrees = hidden_degrees
@@ -885,8 +911,29 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       self._event_ndims = len(self._event_shape)
 
       if self._event_ndims != 1:
-        raise ValueError('Parameter `event_shape` must describe a rank-1 shape.'
-                         ' `event_shape: {!r}`'.format(event_shape))
+        raise ValueError('Parameter `event_shape` must describe a rank-1 '
+                         'shape. `event_shape: {!r}`'.format(event_shape))
+
+    if self._conditional:
+      if self._event_shape is None:
+        raise ValueError('`event_shape` must be provided when '
+                         '`conditional` is True')
+      if self._conditional_event_shape is None:
+        raise ValueError('`conditional_event_shape` must be provided when '
+                         '`conditional` is True')
+      self._conditional_size = self._conditional_event_shape[-1]
+      self._conditional_ndims = len(self._conditional_event_shape)
+      if self._conditional_ndims != 1:
+        raise ValueError('Parameter `conditional_event_shape` must describe a '
+                         'rank-1 shape')
+      if not ((self._conditional_layers == 'first_layer') or
+              (self._conditional_layers == 'all_layers')):
+        raise ValueError('`conditional_input_layers` must be '
+                         '"first_layers" or "all_layers"')
+    else:
+      if self._conditional_event_shape is not None:
+        raise ValueError('`conditional_event_shape` passed but `conditional` '
+                         'is set to False.')
 
     # To be built in `build`.
     self._input_order = None
@@ -920,9 +967,12 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         hidden_degrees=self._hidden_degrees,
     )
 
-    self._network = tf.keras.Sequential([
-        tf.keras.layers.InputLayer((self._event_size,), dtype=self.dtype)
-    ])
+    outputs = [tf.keras.Input((self._event_size,), dtype=self.dtype)]
+    inputs = outputs[0]
+    if self._conditional:
+      conditional_input = tf.keras.Input((self._conditional_size,),
+                                         dtype=self.dtype)
+      inputs = [inputs, conditional_input]
 
     # Input-to-hidden, hidden-to-hidden, and hidden-to-output layers:
     #  [..., self._event_size] -> [..., self._hidden_units[0]].
@@ -930,9 +980,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     #  [..., self._hidden_units[-1]] -> [..., event_size * self._params].
     layer_output_sizes = self._hidden_units + [self._event_size * self._params]
     for k in range(len(self._masks)):
-      self._network.add(tf.keras.layers.Dense(
+      autoregressive_output = tf.keras.layers.Dense(
           layer_output_sizes[k],
-          activation=self._activation if k + 1 < len(self._masks) else None,
+          activation=None,
           use_bias=self._use_bias,
           kernel_initializer=_make_masked_initializer(
               self._masks[k], self._kernel_initializer),
@@ -942,21 +992,79 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           kernel_constraint=_make_masked_constraint(
               self._masks[k], self._kernel_constraint),
           bias_constraint=self._bias_constraint,
-          dtype=self.dtype))
-
+          dtype=self.dtype)(outputs[-1])
+      if (self._conditional and
+          ((self._conditional_layers == 'all_layers') or
+           ((self._conditional_layers == 'first_layer') and (k == 0)))):
+        conditional_output = tf.keras.layers.Dense(
+            layer_output_sizes[k],
+            activation=None,
+            use_bias=False,
+            kernel_initializer=self._kernel_initializer,
+            bias_initializer=None,
+            kernel_regularizer=self._kernel_regularizer,
+            bias_regularizer=None,
+            kernel_constraint=self._kernel_constraint,
+            bias_constraint=None,
+            dtype=self.dtype)(conditional_input)
+        outputs.append(tf.keras.layers.Add()([
+            autoregressive_output,
+            conditional_output]))
+      else:
+        outputs.append(autoregressive_output)
+      if k + 1 < len(self._masks):
+        outputs.append(
+            tf.keras.layers.Activation(self._activation)
+            (outputs[-1]))
+    self._network = tf.keras.models.Model(
+        inputs=inputs,
+        outputs=outputs[-1])
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
 
-  def call(self, x):
-    """See tfkl.Layer.call."""
+  def call(self, x, conditional_input=None):
+    """Transforms the inputs and returns the outputs.
+
+    Suppose `x` has shape `batch_shape + event_shape` and `conditional_input`
+    has shape `conditional_batch_shape + conditional_event_shape`. Then, the
+    output shape is:
+    `broadcast(batch_shape, conditional_batch_shape) + event_shape + [params]`.
+
+    Also see `tfkl.Layer.call` for some generic discussion about Layer calling.
+
+    Args:
+      x: A `Tensor`. Primary input to the layer.
+      conditional_input: A `Tensor. Conditional input to the layer. This is
+        required iff the layer is conditional.
+
+    Returns:
+      y: A `Tensor`. The output of the layer. Note that the leading dimensions
+         follow broadcasting rules described above.
+    """
     with tf.name_scope(self.name or 'AutoregressiveNetwork_call'):
       x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
-      input_shape = tf.shape(x)
       # TODO(b/67594795): Better support for dynamic shapes.
+      input_shape = ps.shape(x)
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
+      if self._conditional:
+        if conditional_input is None:
+          raise ValueError('`conditional_input` must be passed as a named '
+                           'argument')
+        conditional_input = tf.convert_to_tensor(
+            conditional_input, dtype=self.dtype, name='conditional_input')
+        conditional_batch_shape = ps.shape(conditional_input)[:-1]
+        if tensorshape_util.rank(conditional_input.shape) == 1:
+          conditional_input = conditional_input[tf.newaxis, ...]
+        x = [x, conditional_input]
+        output_shape = ps.concat(
+            [ps.broadcast_shape(conditional_batch_shape,
+                                input_shape[:-1]),
+             input_shape[-1:]], axis=0)
+      else:
+        output_shape = input_shape
       return tf.reshape(self._network(x),
-                        tf.concat([input_shape, [self._params]], axis=0))
+                        tf.concat([output_shape, [self._params]], axis=0))
 
   def compute_output_shape(self, input_shape):
     """See tfkl.Layer.compute_output_shape."""

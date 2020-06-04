@@ -499,8 +499,10 @@ multi_substrate_py_library(
     name = "masked_autoregressive",
     srcs = ["masked_autoregressive.py"],
     deps = [
-        ":affine_scalar",
         ":bijector",
+        ":chain",
+        ":scale",
+        ":shift",
         # numpy dep,
         # six dep,
         # tensorflow dep,
@@ -1336,6 +1338,7 @@ multi_substrate_py_test(
     deps = [
         ":bijectors",
         ":masked_autoregressive",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # six dep,
         # tensorflow dep,
