@@ -33,28 +33,27 @@ class LangevinTest(test_util.TestCase):
   def testLangevin1DNormal(self):
     """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
+    nchains = 32
 
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
     samples, _ = tfp.mcmc.sample_chain(
-        num_results=1000,
-        current_state=dtype(1),
+        num_results=500,
+        current_state=np.ones([nchains], dtype=dtype),
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=target.log_prob,
             step_size=0.75,
+            volatility_fn=lambda *args: .5,
             seed=test_util.test_seed()),
-        num_burnin_steps=500,
+        num_burnin_steps=200,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.reduce_mean(samples, axis=0)
-    sample_std = tf.sqrt(
-        tf.reduce_mean(
-            tf.math.squared_difference(samples, sample_mean),
-            axis=0))
+    sample_mean = tf.reduce_mean(samples, axis=(0, 1))
+    sample_std = tf.math.reduce_std(samples, axis=(0, 1))
 
     sample_mean_, sample_std_ = self.evaluate([sample_mean, sample_std])
 
-    self.assertAllClose(sample_mean_, 0., atol=0.1, rtol=0.1)
-    self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_mean_, 0., atol=0.12)
+    self.assertAllClose(sample_std_, 1., atol=0.1)
 
   def testLangevin3DNormal(self):
     """Sampling from a 3-D Multivariate Normal distribution."""
