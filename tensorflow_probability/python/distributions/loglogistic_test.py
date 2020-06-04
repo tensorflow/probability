@@ -41,8 +41,8 @@ class LogLogisticTest(test_util.TestCase):
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
-      self.evaluate(dist.mean()),
-      stats.fisk.mean(loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(dist.mean()),
+        stats.fisk.mean(loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticMeanNoNanAllowed(self):
@@ -62,12 +62,12 @@ class LogLogisticTest(test_util.TestCase):
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
-      self.evaluate(dist.variance()),
-      stats.fisk.var(loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(dist.variance()),
+        stats.fisk.var(loc=0., scale=log_logistic_scale, c=1./scale)
     )
     self.assertAllClose(
-      self.evaluate(dist.stddev()),
-      stats.fisk.std(loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(dist.stddev()),
+        stats.fisk.std(loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticVarianceNoNanAllowed(self):
@@ -92,8 +92,8 @@ class LogLogisticTest(test_util.TestCase):
     mode = log_logistic_scale * ((1. - scale) / (1. + scale)) ** scale
     mode[2] = 0.
     self.assertAllClose(
-      self.evaluate(dist.mode()),
-      mode
+        self.evaluate(dist.mode()),
+        mode
     )
 
   def testLogLogisticEntropy(self):
@@ -103,8 +103,8 @@ class LogLogisticTest(test_util.TestCase):
     dist = tfd.LogLogistic(loc=loc, scale=scale, validate_args=True)
 
     self.assertAllClose(
-      self.evaluate(dist.entropy()),
-      stats.fisk.entropy(loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(dist.entropy()),
+        stats.fisk.entropy(loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticSample(self):
@@ -131,8 +131,8 @@ class LogLogisticTest(test_util.TestCase):
     pdf = dist.prob(x)
 
     self.assertAllClose(
-      self.evaluate(pdf),
-      stats.fisk.pdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(pdf),
+        stats.fisk.pdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticPDFScaleBatch(self):
@@ -146,8 +146,8 @@ class LogLogisticTest(test_util.TestCase):
     pdf = dist.prob(x)
 
     self.assertAllClose(
-      self.evaluate(pdf),
-      stats.fisk.pdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(pdf),
+        stats.fisk.pdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogPDFLocBatch(self):
@@ -161,8 +161,8 @@ class LogLogisticTest(test_util.TestCase):
     log_pdf = dist.log_prob(x)
 
     self.assertAllClose(
-      self.evaluate(log_pdf),
-      stats.fisk.logpdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(log_pdf),
+        stats.fisk.logpdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogPDFScaleBatch(self):
@@ -176,8 +176,8 @@ class LogLogisticTest(test_util.TestCase):
     log_pdf = dist.log_prob(x)
 
     self.assertAllClose(
-      self.evaluate(log_pdf),
-      stats.fisk.logpdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(log_pdf),
+        stats.fisk.logpdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticCDFLocBatch(self):
@@ -190,8 +190,8 @@ class LogLogisticTest(test_util.TestCase):
 
     cdf = dist.cdf(x)
     self.assertAllClose(
-      self.evaluate(cdf),
-      stats.fisk.cdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(cdf),
+        stats.fisk.cdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticCDFScaleBatch(self):
@@ -204,8 +204,8 @@ class LogLogisticTest(test_util.TestCase):
 
     cdf = dist.cdf(x)
     self.assertAllClose(
-      self.evaluate(cdf),
-      stats.fisk.cdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(cdf),
+        stats.fisk.cdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogCDFLocBatch(self):
@@ -218,8 +218,8 @@ class LogLogisticTest(test_util.TestCase):
 
     log_cdf = dist.log_cdf(x)
     self.assertAllClose(
-      self.evaluate(log_cdf),
-      stats.fisk.logcdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(log_cdf),
+        stats.fisk.logcdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogCDFScaleBatch(self):
@@ -232,8 +232,8 @@ class LogLogisticTest(test_util.TestCase):
 
     log_cdf = dist.log_cdf(x)
     self.assertAllClose(
-      self.evaluate(log_cdf),
-      stats.fisk.logcdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(log_cdf),
+        stats.fisk.logcdf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogSurvivalLocBatch(self):
@@ -246,8 +246,8 @@ class LogLogisticTest(test_util.TestCase):
 
     logsf = dist.log_survival_function(x)
     self.assertAllClose(
-      self.evaluate(logsf),
-      stats.fisk.logsf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(logsf),
+        stats.fisk.logsf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testLogLogisticLogSurvivalScaleBatch(self):
@@ -260,8 +260,8 @@ class LogLogisticTest(test_util.TestCase):
 
     logsf = dist.log_survival_function(x)
     self.assertAllClose(
-      self.evaluate(logsf),
-      stats.fisk.logsf(x, loc=0., scale=log_logistic_scale, c=1./scale)
+        self.evaluate(logsf),
+        stats.fisk.logsf(x, loc=0., scale=log_logistic_scale, c=1./scale)
     )
 
   def testAssertValidSample(self):

@@ -65,9 +65,9 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     with tf.name_scope(name) as name:
       super(LogLogistic, self).__init__(
           distribution=logistic.Logistic(
-            loc=loc,
-            scale=scale,
-            allow_nan_stats=allow_nan_stats
+              loc=loc,
+              scale=scale,
+              allow_nan_stats=allow_nan_stats
           ),
           bijector=exp_bijector.Exp(),
           validate_args=validate_args,
@@ -92,11 +92,11 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     scale = tf.convert_to_tensor(self.scale)
     with tf.control_dependencies(
         [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
-          assert_util.assert_less(
-            scale,
-            tf.ones([], dtype=self.dtype),
-            message='Mean undefined for scale > 1.'),
-        ]):
+            assert_util.assert_less(
+                scale,
+                tf.ones([], dtype=self.dtype),
+                message='Mean undefined for scale > 1.'),
+          ]):
       mean = tf.math.exp(self.loc) / sinc(scale)
       nans = tf.ones_like(mean) * np.nan
       return tf.where(scale > 1., nans, mean)
@@ -104,11 +104,11 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
   def _variance(self):
     scale = tf.convert_to_tensor(self.scale)
     with tf.control_dependencies(
-    [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
-          assert_util.assert_less(
-            scale,
-            0.5 * tf.ones([], dtype=self.dtype),
-            message='Variance undefined for scale > 1/2.'),
+        [] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
+            assert_util.assert_less(
+                scale,
+                0.5 * tf.ones([], dtype=self.dtype),
+                message='Variance undefined for scale > 1/2.'),
         ]):
       variance = tf.math.exp(2 * self.loc) * (
           1. / sinc(2 * scale) - 1. / sinc(scale) ** 2)
