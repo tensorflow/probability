@@ -160,8 +160,18 @@ def _assert_integer(*_, **__):  # pylint: disable=unused-argument
 
 
 @skip_assert_for_tracers
-def _assert_near(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _assert_near(x, y, rtol=None, atol=None,
+                 message=None, summarize=None, name=None):  # pylint: disable=unused-argument
+  """Raises an error if abs(x - y) > atol + rtol * abs(y)."""
+  del summarize
+  del name
+  x = convert_to_tensor(x)
+  y = convert_to_tensor(y)
+  rtol = rtol if rtol else 10 * np.finfo(x.dtype).eps
+  atol = atol if atol else 10 * np.finfo(x.dtype).eps
+  if np.any(np.abs(x - y) > atol + rtol * np.abs(y)):
+    raise ValueError('x = {} and y = {} are not equal to tolerance rtol = {}, '
+                     'atol = {} {}'.format(x, y, rtol, atol, message or ''))
 
 
 @skip_assert_for_tracers

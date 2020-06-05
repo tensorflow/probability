@@ -64,6 +64,9 @@ def rq_splines(draw, batch_shape=None, dtype=tf.float32):
 @test_util.test_all_tf_execution_regimes
 class RationalQuadraticSplineTest(test_util.TestCase):
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='tfb.RealNVP not exposed in JAX and Numpy backend.')
   def testDocExample(self):
 
     nsplits = 3
@@ -203,6 +206,9 @@ class RationalQuadraticSplineTest(test_util.TestCase):
                                 'non-scalar `knot_slopes` must broadcast'):
       tfb.RationalQuadraticSpline([2, 1, .5], [.5, 2, 1], [.3, 2, .5])
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Shapes are static in JAX and numpy backend.')
   def testVerifiesBroadcastingDynamic(self):
 
     @tf.function
