@@ -165,8 +165,6 @@ class _GeneralizedNormalTest(object):
     expected_cdf = sp_stats.gennorm(power, loc=mu, scale=sigma).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-3)
 
-  @test_util.jax_disable_test_missing_functionality(
-      'Igamma(c) gradient with respect to `a` not supported.')
   def testFiniteGradientAtDifficultPoints(self):
     def make_fn(dtype, attr):
       x = np.array([-100., -20., -5., 5., 20., 100.]).astype(dtype)
@@ -180,7 +178,7 @@ class _GeneralizedNormalTest(object):
           make_fn(self.dtype, attr),
           [tf.constant(0, self.dtype),  # mu
            tf.constant(1, self.dtype),  # scale
-           tf.constant(2, self.dtype)]))  # power
+           tf.constant(2.1, self.dtype)]))  # power
       self.assertAllFinite(value)
       self.assertAllFinite(grads[0])  # d/d mu
       self.assertAllFinite(grads[1])  # d/d scale

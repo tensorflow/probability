@@ -2638,6 +2638,7 @@ multi_substrate_py_test(
     name = "generalized_normal_test",
     size = "medium",
     srcs = ["generalized_normal_test.py"],
+    shard_count = 3,
     deps = [
         # numpy dep,
         # scipy dep,

@@ -207,10 +207,25 @@ class GeneralizedNormal(distribution.Distribution):
     power = tf.convert_to_tensor(self.power)
     ipower = tf.math.reciprocal(power)
     half = tf.constant(0.5, dtype=self.dtype)  # 0.5 is fp64 in numpy
+
+    # For the CDF computation, we need to use a double-where a la:
+    # https://github.com/tensorflow/probability/blob/master/discussion/where-nan.pdf
+    # to avoid NaN gradients. This comes from computing (loc - x) ** power when
+    # x > loc. If power is a not an even integer, then this value is not defined
+    # or is negative, both of which are not valid values for `igamma`.
+
+    loc_stop_grad = tf.stop_gradient(loc)
+    # Use values that are right below loc and above loc. At loc, this will
+    # result in `gamma|igamma(c)(1. / power, 0.)`. This has an undefined
+    # gradient at 0.
+    safe_x_lt_loc = tf.where(x > loc_stop_grad, loc_stop_grad - half, x)
+    safe_x_gt_loc = tf.where(x < loc_stop_grad, loc_stop_grad + half, x)
     cdf = tf.where(
         x < loc,
-        half * tf.math.igammac(ipower, tf.pow((loc - x) / scale, power)),
-        half + half * tf.math.igamma(ipower, tf.pow((x - loc) / scale, power)))
+        half * tf.math.igammac(
+            ipower, tf.pow((loc - safe_x_lt_loc) / scale, power)),
+        half + half * tf.math.igamma(
+            ipower, tf.pow((safe_x_gt_loc - loc) / scale, power)))
     return cdf
 
   def _entropy(self):
