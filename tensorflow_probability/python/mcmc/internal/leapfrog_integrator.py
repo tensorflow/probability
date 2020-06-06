@@ -54,7 +54,7 @@ class LeapfrogIntegrator(object):
     """Computes the integration.
 
     Args:
-      momentum_parts: Python `list` of `Tensor`s representing momentume for each
+      momentum_parts: Python `list` of `Tensor`s representing momentum for each
         state part.
       state_parts: Python `list` of `Tensor`s which collectively representing
         the state.
