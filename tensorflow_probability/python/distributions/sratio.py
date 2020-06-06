@@ -92,25 +92,22 @@ class StoppingRatioLogistic(distribution.Distribution):
   dist = tfd.StoppingRatioLogistic(cutpoints=[-2., 0., 2.], loc=0.)
 
   dist.categorical_probs()
-  # ==> array([0.11920293, 0.38079706, 0.3807971 , 0.11920291], dtype=float32)
+  # ==> array([0.11920291, 0.44039854, 0.38790172, 0.05249681], dtype=float32)
   ```
 
-  Some further functionallity:
+  Some further functionality:
 
   ```python
   dist = tfd.StoppingRatioLogistic(cutpoints=[-2., 0., 2.], loc=0.)
 
   dist.prob([0, 3])
-  # ==> array([0.2689414 , 0.11920291], dtype=float32)
+  # ==> array([0.11920291, 0.05249681], dtype=float32)
 
   dist.log_prob(1)
-  # ==> -1.4650838
+  # ==> -0.82007515
 
   dist.sample(3)
-  # ==> array([0, 1, 1], dtype=int32)
-
-  dist.entropy()
-  # ==> 1.312902
+  # ==> array([2, 1, 2], dtype=int32)
   ```
 
   """
@@ -127,17 +124,11 @@ class StoppingRatioLogistic(distribution.Distribution):
     """Initialize Stopping Ratio Logistic distributions.
 
     Args:
-      cutpoints: A floating-point `Tensor` with shape `[B1, ..., Bb, K]` where
-        `b >= 0` indicates the number of batch dimensions. Each entry is then a
-        `K`-length vector of cutpoints. The vector of cutpoints should be
+      cutpoints: A floating-point `Tensor` with shape `(K,)` where
+        `K` is the number of cutpoints. The vector of cutpoints should be
         non-decreasing, which is only checked if `validate_args=True`.
-      loc: A floating-point `Tensor` with shape `[B1, ..., Bb]` where `b >=
-        0` indicates the number of batch dimensions. The entries represent the
-        mean(s) of the latent logistic distribution(s). Different batch shapes
-        for `cutpoints` and `loc` are permitted, with the distribution
-        `batch_shape` being `tf.shape(loc[..., tf.newaxis] -
-        cutpoints)[:-1]` assuming the subtraction is a valid broadcasting
-        operation.
+      loc: A floating-point `Tensor` with shape `()` . The entry represents the
+        mean of the latent logistic distribution.
       dtype: The type of the event samples (default: int32).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
