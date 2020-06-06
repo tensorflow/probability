@@ -203,7 +203,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "monte_carlo",
     srcs = ["monte_carlo.py"],
     srcs_version = "PY2AND3",
