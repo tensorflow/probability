@@ -46,6 +46,8 @@ SEED_DTYPE = np.uint32 if JAX_MODE else np.int32
 
 def sanitize_seed(seed, salt=None):
   """Map various types to a seed `Tensor`."""
+  if callable(seed):  # e.g. SeedStream.
+    seed = seed()
   if salt is not None and not isinstance(salt, str):
     raise TypeError('`salt` must be a python `str`, got {}'.format(repr(salt)))
   if seed is None or isinstance(seed, six.integer_types):
