@@ -104,6 +104,7 @@ from tensorflow_probability.python.distributions.relaxed_onehot_categorical impo
 from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
+from tensorflow_probability.python.distributions.sratio import StoppingRatioLogistic
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
@@ -253,4 +254,5 @@ __all__ = [
     'normal_conjugates_known_scale_predictive',
     'quadrature_scheme_lognormal_gauss_hermite',
     'quadrature_scheme_lognormal_quantiles',
+    'StoppingRatioLogistic'
 ]
