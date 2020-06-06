@@ -18,10 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -77,7 +75,7 @@ class StoppingRatioLogistic(distribution.Distribution):
   ```none
   pmf(x; cutpoints, loc) =
                     sigmoid(cutpoints[x] - loc) *
-                    \prod_{s=0}^{x = 1} (1 - sigmoid(cutpoints[s] - loc))
+                    prod_{s=0}^{x = 1} (1 - sigmoid(cutpoints[s] - loc))
   ```
 
   where `loc` is the location of a latent logistic distribution and
@@ -199,22 +197,22 @@ class StoppingRatioLogistic(distribution.Distribution):
 
   def categorical_probs(self):
     """Probabilities for the `K+1` sequential categories."""
-    K = self._num_categories()
+    num_cat = self._num_categories()
     cutpoints = self.cutpoints
     loc = self.loc
     one = tf.ones(1, dtype=cutpoints.dtype)
     q = one - tf.math.sigmoid(cutpoints - loc)
-    p = tf.zeros(K, dtype=cutpoints.dtype)
+    p = tf.zeros(num_cat, dtype=cutpoints.dtype)
 
-    idx = [[i] for i in range(K - 1)]
+    idx = [[i] for i in range(num_cat - 1)]
     p = tf.tensor_scatter_nd_update(p, tf.constant(idx), one - q)
     p = tf.tensor_scatter_nd_update(
-      p,
-      tf.constant([[K - 1]]),
-      [tf.reduce_prod(q[..., :K])]
+        p,
+        tf.constant([[num_cat - 1]]),
+        [tf.reduce_prod(q[..., :num_cat])]
     )
 
-    for i in range(1, K - 1):
+    for i in range(1, num_cat - 1):
       p = tf.tensor_scatter_nd_update(
           p,
           tf.constant([[i]]),
@@ -316,11 +314,12 @@ class StoppingRatioLogistic(distribution.Distribution):
 
 @kullback_leibler.RegisterKL(StoppingRatioLogistic, StoppingRatioLogistic)
 def _kl_stopping_ratio_logistic_stopping_ratio_logistic(a, b, name=None):
-  """Calculate the batched KL divergence KL(a || b), a and b StoppingRatioLogistic.
+  """Calculate the batched KL divergence KL(a || b), a and b
+  StoppingRatioLogistic.
 
-  This function utilises the `StoppingRatioLogistic` `categorical_log_probs` member
-  function to implement KL divergence for discrete probability distributions as
-  described in
+  This function utilises the `StoppingRatioLogistic` `categorical_log_probs`
+  member function to implement KL divergence for discrete probability
+  distributions as described in
   e.g. [Wikipedia](https://en.wikipedia.org/wiki/Kullback-Leibler_divergence).
 
   Args:
@@ -332,7 +331,8 @@ def _kl_stopping_ratio_logistic_stopping_ratio_logistic(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or 'kl_stopping_ratio_logistic_stopping_ratio_logistic'):
+  with tf.name_scope(name or
+                     'kl_stopping_ratio_logistic_stopping_ratio_logistic'):
     a_log_probs = a.categorical_log_probs()
     b_log_probs = b.categorical_log_probs()
     return tf.reduce_sum(
