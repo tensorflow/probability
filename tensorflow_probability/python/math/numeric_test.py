@@ -28,6 +28,9 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
 
+NUMPY_MODE = False
+
+
 @test_util.test_all_tf_execution_regimes
 class Log1pSquareTest32(test_util.TestCase):
 
@@ -50,10 +53,13 @@ class Log1pSquareTest32(test_util.TestCase):
   )
   # pylint: enable=bad-whitespace
   # pyformat: enable
-  @test_util.numpy_disable_gradient_test
   def test_log1psquare(self, x, expected_y, expected_dydx):
     x = tf.convert_to_tensor(x, dtype=self.dtype)
-    y, dydx = tfp.math.value_and_gradient(tfp.math.log1psquare, x)
+    if NUMPY_MODE:
+      y = tfp.math.log1psquare(x)
+      dydx, expected_dydx = np.zeros([]), np.zeros([])
+    else:
+      y, dydx = tfp.math.value_and_gradient(tfp.math.log1psquare, x)
     y_, dydx_ = self.evaluate([y, dydx])
     self.assertAllClose(expected_y, y_)
     self.assertAllClose(expected_dydx, dydx_)
