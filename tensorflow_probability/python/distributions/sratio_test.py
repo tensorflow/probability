@@ -84,8 +84,8 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     categorical_probs = self.evaluate(dist.categorical_probs())
     self.assertAllClose(expected_probs, categorical_probs, atol=1e-4)
 
-    probs = np.flip(self.evaluate(dist.prob([0, 1, 2, 3])))
-    self.assertAllClose(expected_probs, probs, atol=1e-6)
+    probs = self.evaluate(dist.prob([0, 1, 2, 3]))
+    self.assertAllClose(expected_probs, probs, atol=1e-4)
 
   def testMode(self):
     dist = tfd.StoppingRatioLogistic(cutpoints=[-10., 10.], loc=[-20., 0., 20.])
