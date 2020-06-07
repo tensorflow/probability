@@ -188,27 +188,28 @@ class StoppingRatioLogistic(distribution.Distribution):
 
   def categorical_probs(self):
     """Probabilities for the `K+1` sequential categories."""
-    num_cat = self._num_categories()
     cutpoints = self.cutpoints
     loc = self.loc
+    if len(self.loc.shape) == 0:
+        loc = loc[..., tf.newaxis]
+    num_cat = len(cutpoints) + 1
     one = tf.ones(1, dtype=cutpoints.dtype)
-    q = one - tf.math.sigmoid(cutpoints - loc)
-    p = tf.zeros(num_cat, dtype=cutpoints.dtype)
 
-    idx = [[i] for i in range(num_cat - 1)]
-    p = tf.tensor_scatter_nd_update(p, tf.constant(idx), one - q)
-    p = tf.tensor_scatter_nd_update(
-        p,
-        tf.constant([[num_cat - 1]]),
-        [tf.reduce_prod(q[..., :num_cat])]
-    )
+    q = one - tf.math.sigmoid(cutpoints - loc[..., tf.newaxis])
+    p = one - q
+    p = tf.transpose(p)
 
     for i in range(1, num_cat - 1):
-      p = tf.tensor_scatter_nd_update(
-          p,
-          tf.constant([[i]]),
-          [p[i] * tf.math.reduce_prod(q[..., :i])]
-      )
+        qs = tf.math.reduce_prod(q[..., :i], axis=1)
+        p = tf.tensor_scatter_nd_update(
+            p,
+            tf.constant([[i]]),
+            [p[i, ...] * qs]
+        )
+    p = tf.transpose(p)
+
+    qs = tf.math.reduce_prod(q[..., :num_cat], axis=1)
+    p = tf.squeeze(tf.concat([p, qs[..., tf.newaxis]], axis=1))
 
     return p
 
