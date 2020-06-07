@@ -160,6 +160,10 @@ def bijector_supports():
           BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
       'GumbelCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
+      'GeneralizedExtremeValueCDF':
+          # The domain is dependent on the parameters,
+          # hence is handled in the test harness.
+          BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
       'Identity':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
@@ -397,4 +401,20 @@ def frechet_constraint(loc):
   """Maps `s` to [loc, inf)."""
   def constrain(x):
     return loc + tf.math.softplus(x)
+  return constrain
+
+def gev_constraint(loc, scale, conc):
+  """
+  Maps `s` to:
+    1. [loc - scale / conc, inf) if conc > 0;
+    2. (-inf, inf) if conc = 0;
+    3. (-inf, loc - scale / conc] if conc < 0.
+  """
+  def constrain(x):
+    if conc == 0:
+      return x
+    elif conc > 0:
+      return tf.math.softplus(x) + loc - scale / conc
+    else:
+      return loc - scale / conc - tf.math.softplus(x)
   return constrain
