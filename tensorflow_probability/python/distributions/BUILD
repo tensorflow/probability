@@ -125,6 +125,7 @@ multi_substrate_py_library(
         ":relaxed_onehot_categorical",
         ":sample",
         ":sinh_arcsinh",
+        ":sratio",
         ":student_t",
         ":student_t_process",
         ":transformed_distribution",
@@ -1485,6 +1486,23 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sratio",
+    srcs = ["sratio.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -2862,6 +2880,18 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "sratio_test",
+    srcs = ["sratio_test.py"],
+    jax_size = "medium",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "half_student_t_test",
     size = "medium",
     srcs = ["half_student_t_test.py"],
@@ -3202,6 +3232,7 @@ exports_files(
         "sample_test.py",
         "sinh_arcsinh.py",
         "sinh_arcsinh_test.py",
+        "sratio.py",
         "student_t.py",
         "transformed_distribution.py",
         "triangular.py",
