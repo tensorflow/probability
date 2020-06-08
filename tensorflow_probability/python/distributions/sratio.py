@@ -190,26 +190,17 @@ class StoppingRatioLogistic(distribution.Distribution):
     """Probabilities for the `K+1` sequential categories."""
     cutpoints = self.cutpoints
     loc = self.loc
-    if len(self.loc.shape) == 0:
-        loc = loc[..., tf.newaxis]
-    num_cat = len(cutpoints) + 1
+
+    num_cat = self._num_categories()
     one = tf.ones(1, dtype=cutpoints.dtype)
 
     q = one - tf.math.sigmoid(cutpoints - loc[..., tf.newaxis])
     p = one - q
-    p = tf.transpose(p)
 
-    for i in range(1, num_cat - 1):
-        qs = tf.math.reduce_prod(q[..., :i], axis=1)
-        p = tf.tensor_scatter_nd_update(
-            p,
-            tf.constant([[i]]),
-            [p[i, ...] * qs]
-        )
-    p = tf.transpose(p)
-
-    qs = tf.math.reduce_prod(q[..., :num_cat], axis=1)
-    p = tf.squeeze(tf.concat([p, qs[..., tf.newaxis]], axis=1))
+    qs = tf.math.cumprod(q[..., :(num_cat - 2)], axis=-1)
+    p = tf.concat([p[..., :1], p[..., 1:num_cat] * qs], axis=-1)
+    qs = tf.math.reduce_prod(q[..., :num_cat], axis=-1)
+    p = tf.concat([p, qs[..., tf.newaxis]], axis=-1)
 
     return p
 
