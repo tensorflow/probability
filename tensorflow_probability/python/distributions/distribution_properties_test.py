@@ -101,6 +101,7 @@ TF2_FRIENDLY_DISTS = (
     'Weibull',
     'WishartTriL',
     'Zipf',
+    'StoppingRatioLogistic',
 )
 
 NO_SAMPLE_PARAM_GRADS = {
