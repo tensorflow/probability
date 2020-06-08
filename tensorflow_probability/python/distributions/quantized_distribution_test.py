@@ -368,6 +368,24 @@ class QuantizedDistributionTest(test_util.TestCase):
       self.assertAllFinite(value)
       self.assertAllFinite(grads)
 
+  def testExponentialLogProbAndGradGivesFiniteResults(self):
+    def quantized_log_prob(dtype):
+      x = np.arange(2, 100, 2).astype(dtype)
+
+      def inner_func(rate):
+        qdist = tfd.QuantizedDistribution(
+            distribution=tfd.Exponential(rate=rate), validate_args=True)
+        return qdist.log_prob(x)
+
+      return inner_func
+
+    for dtype in [np.float32, np.float64]:
+      rate = tf.constant(2., dtype=dtype, name='rate')
+      value, grads = self.evaluate(tfp.math.value_and_gradient(
+          quantized_log_prob(dtype), rate))
+      self.assertAllFinite(value)
+      self.assertAllFinite(grads)
+
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     def quantized_log_prob(mu, sigma):
       x = tf.math.ceil(4 * rng.rand(100).astype(np.float32) - 2)

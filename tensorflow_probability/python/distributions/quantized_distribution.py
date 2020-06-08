@@ -320,7 +320,8 @@ class QuantizedDistribution(distributions.Distribution):
     # tf.floor(y) - 1 can't.
     y = tf.floor(y)
 
-    if not hasattr(self.distribution, '_log_cdf'):
+    if not (hasattr(self.distribution, '_log_cdf') or
+            hasattr(self.distribution, '_cdf')):
       raise NotImplementedError(
           '`log_prob` not implemented unless the base distribution implements '
           '`log_cdf`')
