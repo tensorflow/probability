@@ -69,7 +69,7 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     categorical_probs = dist.categorical_probs()
     categorical_probs_shape = tf.shape(categorical_probs)
     self.assertAllEqual(
-      self.evaluate(categorical_probs_shape), batch_shape + [3])
+        self.evaluate(categorical_probs_shape), batch_shape + [3])
 
     sample_shape = tf.shape(dist.sample(seed=test_util.test_seed()))
     self.assertAllEqual(self.evaluate(sample_shape), batch_shape)
