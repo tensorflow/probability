@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
+import functools
 import os
 import unittest
 
@@ -60,6 +61,7 @@ __all__ = [
 
 
 JAX_MODE = False
+NUMPY_MODE = False
 
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
@@ -537,7 +539,7 @@ def test_graph_mode_only(test_class_or_method=None):
   Raises:
     SkipTest: Raised when not running in the TF backend.
   """
-  if JAX_MODE or (tf.Variable == ops.NumpyVariable):
+  if JAX_MODE or NUMPY_MODE:
     raise unittest.SkipTest('Ignoring TF Graph Mode tests in non-TF backends.')
 
   decorator = test_combinations.generate(
@@ -550,19 +552,24 @@ def test_graph_mode_only(test_class_or_method=None):
 
 
 def is_numpy_not_jax_mode():
-  return tf.Variable == ops.NumpyVariable and not JAX_MODE
+  return NUMPY_MODE and not JAX_MODE
 
 
-def numpy_disable_gradient_test(test_fn):
+def numpy_disable_gradient_test(test_fn_or_reason, reason=None):
   """Disable a gradient-using test when using the numpy backend."""
 
-  if JAX_MODE:
-    return test_fn
+  if not callable(test_fn_or_reason):
+    if reason is not None:
+      raise ValueError('Unexpected test_fn: {}'.format(test_fn_or_reason))
+    return functools.partial(numpy_disable_gradient_test,
+                             reason=test_fn_or_reason)
 
-  def new_test(self, *args, **kwargs):
-    if tf.Variable == ops.NumpyVariable:
-      self.skipTest('gradient-using test disabled for numpy')
-    return test_fn(self, *args, **kwargs)
+  if not NUMPY_MODE:
+    return test_fn_or_reason
+
+  def new_test(self, *args, **kwargs):  # pylint: disable=unused-argument
+    self.skipTest('gradient-using test disabled for numpy{}'.format(
+        ': {}'.format(reason) if reason else ''))
 
   return new_test
 
