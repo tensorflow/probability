@@ -23,7 +23,8 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import samplers
 
 
 __all__ = [
@@ -144,9 +145,8 @@ def sample_halton_sequence(dim,
       Halton sequence. If True, applies the randomization described in
       [Owen (2017)][1].
       Default value: `True`.
-    seed: (Optional) Python integer to seed the random number generator. Only
-      used if `randomized` is True. If not supplied and `randomized` is True,
-      no seed is set.
+    seed: (Optional) Seed for reproducible sampling. Only used if `randomized`
+      is True. If not supplied and `randomized` is True, no seed is set.
       Default value: `None`.
     name:  (Optional) Python `str` describing ops managed by this function. If
       not supplied the name of this function is used.
@@ -175,7 +175,7 @@ def sample_halton_sequence(dim,
     raise ValueError('Either `num_results` or `sequence_indices` must be'
                      ' specified but not both.')
 
-  if not dtype.is_floating:
+  if not dtype_util.is_floating(dtype):
     raise ValueError('dtype must be of `float`-type')
 
   with tf.name_scope(name or 'sample'):
@@ -227,8 +227,11 @@ def sample_halton_sequence(dim,
     if not randomized:
       coeffs /= radixes
       return tf.reduce_sum(coeffs / weights, axis=-1)
-    stream = SeedStream(seed, salt='MCMCSampleHaltonSequence')
-    coeffs = _randomize(coeffs, radixes, seed=stream())
+
+    shuffle_seed, zero_correction_seed = samplers.split_seed(
+        seed, salt='MCMCSampleHaltonSequence')
+
+    coeffs = _randomize(coeffs, radixes, seed=shuffle_seed)
     # Remove the contribution from randomizing the trailing zero for the
     # axes where max_size_by_axes < max_size. This will be accounted
     # for separately below (using zero_correction).
@@ -242,7 +245,9 @@ def sample_halton_sequence(dim,
     # this is equivalent to adding a uniform random value scaled so the first
     # `max_size_by_axes` coefficients are zero. The following statements perform
     # this correction.
-    zero_correction = tf.random.uniform([dim, 1], seed=stream(), dtype=dtype)
+    zero_correction = samplers.uniform([dim, 1],
+                                       seed=zero_correction_seed,
+                                       dtype=dtype)
     zero_correction /= radixes ** max_sizes_by_axes
     return base_values + tf.reshape(zero_correction, [-1])
 
@@ -253,8 +258,7 @@ def _randomize(coeffs, radixes, seed=None):
   coeffs = tf.cast(coeffs, dtype=tf.int32)
   num_coeffs = tf.shape(coeffs)[-1]
   radixes = tf.reshape(tf.cast(radixes, dtype=tf.int32), shape=[-1])
-  stream = SeedStream(seed, salt='MCMCSampleHaltonSequence2')
-  perms = _get_permutations(num_coeffs, radixes, seed=stream())
+  perms = _get_permutations(num_coeffs, radixes, seed=seed)
   perms = tf.reshape(perms, shape=[-1])
   radix_sum = tf.reduce_sum(radixes)
   radix_offsets = tf.reshape(tf.cumsum(radixes, exclusive=True),
@@ -280,23 +284,19 @@ def _get_permutations(num_results, dims, seed=None):
       draws from the discrete uniform distribution over the permutation groups.
     dims: A 1D `Tensor` of the same dtype as `num_results`. The degree of the
       permutation groups from which to sample.
-    seed: (Optional) Python integer to seed the random number generator.
+    seed: (Optional) Seed for reproducible sampling.
 
   Returns:
     permutations: A `Tensor` of shape `[num_results, sum(dims)]` and the same
     dtype as `dims`.
   """
-  sample_range = tf.range(num_results)
-  stream = SeedStream(seed, salt='MCMCSampleHaltonSequence3')
+  seeds = samplers.split_seed(seed, n=tf.size(dims))
 
-  def generate_one(d):
-    seed = stream()
-    fn = lambda _: tf.random.shuffle(tf.range(d), seed=seed)
-    return tf.map_fn(
-        fn,
-        sample_range,
-        parallel_iterations=1 if seed is not None else 10)
-  return tf.concat([generate_one(d) for d in tf.unstack(dims)],
+  def generate_one(dim, seed):
+    return tf.argsort(samplers.uniform([num_results, dim], seed=seed), axis=-1)
+
+  return tf.concat([generate_one(dim, seed)
+                    for dim, seed in zip(tf.unstack(dims), tf.unstack(seeds))],
                    axis=-1)
 
 
