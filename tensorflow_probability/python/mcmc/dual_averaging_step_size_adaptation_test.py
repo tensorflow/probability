@@ -29,6 +29,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_like_step_size_getter_fn
 
 
 _INITIAL_T = 10.0
@@ -313,7 +314,12 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
         step_size=target_dist.stddev(),
         seed=_set_seed(test_util.test_seed()))
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-        inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
+        inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8),
+        # Cast to int32.  Not necessary for operation since we cast internally
+        # to a float type.  This is done to check that we are able to pass in
+        # integer types (since they are the natural type for this).
+        step_count_smoothing=tf.cast(10, tf.int32)
+    )
 
     _, log_accept_ratio = tfp.mcmc.sample_chain(
         num_results=num_results,
@@ -322,10 +328,133 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
         kernel=kernel,
         trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
 
-    p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
-        tf.minimum(log_accept_ratio, 0.)))
+    p_accept = tf.reduce_mean(tf.math.exp(tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
+
+  def testShrinkageTargetDefaultsTo10xStepSize(self):
+    tf.random.set_seed(test_util.test_seed())
+    target_dist = tfd.Normal(0., 1.)
+
+    # Choose an initial_step_size that is too big.  We will make it even bigger
+    # during the initial adaptation steps by using carefully selected
+    # shrinkage parameters.
+    initial_step_size = 2.5
+    expected_final_step_size = 1.5
+
+    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_dist.log_prob,
+        # Small num_leapfrog_steps, to ensure stability even though we're doing
+        # extreme stuff with the step size.
+        num_leapfrog_steps=3,
+        step_size=initial_step_size,
+        seed=_set_seed(test_util.test_seed()))
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        inner_kernel=hmc_kernel,
+        num_adaptation_steps=500,
+        step_count_smoothing=5.,
+        target_accept_prob=0.75,
+        shrinkage_target=None,  # Default
+        # Huge exploration_shrinkage moves us close to the shrinkage_target.
+        exploration_shrinkage=1.,   # Default is 0.05, so this is huge.
+    )
+
+    def trace_fn(_, pkr):
+      return (pkr.log_shrinkage_target,
+              pkr.inner_results.log_accept_ratio,
+              hmc_like_step_size_getter_fn(pkr))
+
+    _, (log_shrinkage_target, log_accept_ratio,
+        step_size) = (tfp.mcmc.sample_chain(
+            num_results=500,
+            num_burnin_steps=0,
+            current_state=target_dist.sample(64),
+            kernel=kernel,
+            trace_fn=trace_fn,
+        ))
+
+    log_shrinkage_target, log_accept_ratio, step_size = self.evaluate((
+        log_shrinkage_target, log_accept_ratio, step_size))
+
+    self.assertAllClose(
+        10 * initial_step_size * np.ones_like(log_shrinkage_target),
+        np.exp(log_shrinkage_target))
+
+    # Verify that we adapted as desired.
+    p_accept = np.mean(np.exp(np.minimum(log_accept_ratio[-250:], 0.)))
+    self.assertAllClose(0.75, p_accept, atol=0.15)
+
+    self.assertAllClose(expected_final_step_size, step_size[-1], atol=0.5)
+
+    # We start out at the initial_step_size.
+    self.assertAllClose(initial_step_size, step_size[0])
+
+    # The default shrinkage_target = 10 x initial_step_size, so our
+    # first few step sizes will be large.
+    self.assertAllGreater(step_size[1], 8 * initial_step_size)
+    self.assertAllGreater(step_size[2], 5 * initial_step_size)
+    self.assertAllGreater(step_size[3], 3 * initial_step_size)
+
+  def testShrinkageTargetSetVeryLowMeansIntialStepSizeIsSmall(self):
+    tf.random.set_seed(test_util.test_seed())
+    target_dist = tfd.Normal(0., 1.)
+
+    expected_final_step_size = 1.5
+    initial_step_size = expected_final_step_size
+    shrinkage_target_kwarg = 0.1
+
+    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_dist.log_prob,
+        # Small num_leapfrog_steps, to ensure stability even though we're doing
+        # extreme stuff with the step size.
+        num_leapfrog_steps=3,
+        step_size=initial_step_size,
+        seed=_set_seed(test_util.test_seed()))
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        inner_kernel=hmc_kernel,
+        num_adaptation_steps=500,
+        step_count_smoothing=15.,
+        target_accept_prob=0.75,
+        shrinkage_target=shrinkage_target_kwarg,
+        # Huge exploration_shrinkage moves us close to the shrinkage_target.
+        exploration_shrinkage=1.,
+    )
+
+    def trace_fn(_, pkr):
+      return (pkr.log_shrinkage_target,
+              pkr.inner_results.log_accept_ratio,
+              hmc_like_step_size_getter_fn(pkr))
+
+    _, (log_shrinkage_target, log_accept_ratio, step_size) = (
+        tfp.mcmc.sample_chain(
+            num_results=500,
+            num_burnin_steps=0,
+            current_state=target_dist.sample(64),
+            kernel=kernel,
+            trace_fn=trace_fn,
+        ))
+
+    log_shrinkage_target, log_accept_ratio, step_size = self.evaluate((
+        log_shrinkage_target, log_accept_ratio, step_size))
+
+    self.assertAllClose(
+        shrinkage_target_kwarg * np.ones_like(log_shrinkage_target),
+        np.exp(log_shrinkage_target))
+
+    # Verify that we adapted as desired.
+    p_accept = np.mean(np.exp(np.minimum(log_accept_ratio[-250:], 0.)))
+    self.assertAllClose(0.75, p_accept, atol=0.15)
+
+    self.assertAllClose(expected_final_step_size, step_size[-1], atol=0.5)
+
+    # We start out at the initial_step_size.
+    self.assertAllClose(initial_step_size, step_size[0])
+
+    # step_size stays close to shrinkage_target for a bit, even though we
+    # eventually drift away to expected_final_step_size.
+    self.assertAllClose(step_size[1], shrinkage_target_kwarg, rtol=0.15)
+    self.assertAllClose(step_size[2], shrinkage_target_kwarg, rtol=0.15)
+    self.assertAllClose(step_size[3], shrinkage_target_kwarg, rtol=0.15)
 
   def testIsCalibrated(self):
     test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
