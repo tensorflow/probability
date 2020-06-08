@@ -613,8 +613,8 @@ def index_remapping_gather(params,
     params = tf.convert_to_tensor(params, name='params')
     indices = tf.convert_to_tensor(indices, name='indices')
 
-    params_ndims = params.shape.ndims
-    indices_ndims = indices.shape.ndims
+    params_ndims = tensorshape_util.rank(params.shape)
+    indices_ndims = tensorshape_util.rank(indices.shape)
     # `axis` dtype must match ndims, which are 64-bit Python ints.
     axis = tf.get_static_value(tf.convert_to_tensor(axis, dtype=tf.int64))
     indices_axis = tf.get_static_value(

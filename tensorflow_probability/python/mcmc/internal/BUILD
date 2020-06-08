@@ -35,9 +35,6 @@ multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    substrates_omit_deps = [
-        ":slice_sampler_utils",
-    ],
     deps = [
         ":leapfrog_integrator",
         ":slice_sampler_utils",
@@ -45,7 +42,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "slice_sampler_utils",
     srcs = ["slice_sampler_utils.py"],
     srcs_version = "PY2AND3",
@@ -72,8 +69,6 @@ multi_substrate_py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         ":util",
         # absl/testing:parameterized dep,
@@ -98,7 +93,7 @@ multi_substrate_py_test(
     name = "leapfrog_integrator_test",
     size = "small",
     srcs = ["leapfrog_integrator_test.py"],
-    numpy_tags = ["notap"],
+    disabled_substrates = ["numpy"],
     deps = [
         ":leapfrog_integrator",
         # numpy dep,
