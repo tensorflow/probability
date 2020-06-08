@@ -245,8 +245,18 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
         ds.append(actual_distribution)
         if (value is not None and len(value) > index and
             value[index] is not None):
-          seed()
-          next_value = value[index]
+          seed()  # Ensure reproducibility even when xs are (partially) set.
+
+          def convert_tree_to_tensor(x, dtype_hint):
+            return tf.convert_to_tensor(x, dtype_hint=dtype_hint)
+
+          # This signature does not allow kwarg names. Applies
+          # `convert_to_tensor` on the next value.
+          next_value = nest.map_structure_up_to(
+              ds[-1].dtype,  # shallow_tree
+              convert_tree_to_tensor,  # func
+              value[index],  # x
+              ds[-1].dtype)  # dtype_hint
         else:
           next_value = actual_distribution.sample(
               sample_shape=sample_shape if isinstance(d, self.Root) else (),

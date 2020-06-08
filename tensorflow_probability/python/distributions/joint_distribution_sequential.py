@@ -265,11 +265,13 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
             () if args and not self._always_use_specified_sample_shape
             else sample_shape, seed=seed())
       else:
+        # This signature does not allow kwarg names. Applies
+        # `convert_to_tensor` on the next value.
         xs[i] = nest.map_structure_up_to(
-            ds[-1].dtype,
-            lambda x, dtype: tf.convert_to_tensor(x, dtype_hint=dtype),
-            xs[i],
-            ds[-1].dtype)
+            ds[-1].dtype,  # shallow_tree
+            lambda x, dtype: tf.convert_to_tensor(x, dtype_hint=dtype),  # func
+            xs[i],  # x
+            ds[-1].dtype)  # dtype
         seed()  # Ensure reproducibility even when xs are (partially) set.
     # Note: we could also resolve distributions up to the first non-`None` in
     # `self._model_flatten(value)`, however we omit this feature for simplicity,
