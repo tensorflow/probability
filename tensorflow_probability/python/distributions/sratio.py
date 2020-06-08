@@ -31,6 +31,29 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
+def _broadcast_cat_event_and_params(event, params, base_dtype):
+  """Broadcasts the event or distribution parameters."""
+  if dtype_util.is_floating(event.dtype):
+    # When `validate_args=True` we've already ensured int/float casting
+    # is closed.
+    event = tf.cast(event, dtype=tf.int32)
+  elif not dtype_util.is_integer(event.dtype):
+    raise TypeError('`value` should have integer `dtype` or '
+                    '`self.dtype` ({})'.format(base_dtype))
+  shape_known_statically = (
+      tensorshape_util.rank(params.shape) is not None and
+      tensorshape_util.is_fully_defined(params.shape[:-1]) and
+      tensorshape_util.is_fully_defined(event.shape))
+  if not shape_known_statically or params.shape[:-1] != event.shape:
+    params = params * tf.ones_like(event[..., tf.newaxis],
+                                   dtype=params.dtype)
+    params_shape = tf.shape(params)[:-1]
+    event = event * tf.ones(params_shape, dtype=event.dtype)
+    if tensorshape_util.rank(params.shape) is not None:
+      tensorshape_util.set_shape(event, params.shape[:-1])
+
+  return event, params
+
 class StoppingRatioLogistic(distribution.Distribution):
   """Stopping ratio logistic distribution.
 
@@ -233,8 +256,20 @@ class StoppingRatioLogistic(distribution.Distribution):
     return tf.TensorShape([])
 
   def _log_prob(self, x):
-    log_prob = self.categorical_log_probs()
-    return tf.gather(log_prob, x)
+    num_categories = self._num_categories()
+    x, cat_log_probs = _broadcast_cat_event_and_params(
+        event=x,
+        params=self.categorical_log_probs(),
+        base_dtype=dtype_util.base_dtype(self.dtype))
+    cat_log_probs_flat = tf.reshape(
+        cat_log_probs, [-1, num_categories])
+    x_flat = tf.reshape(x, [-1, 1])
+    log_probs_flat = tf.gather(
+        params=cat_log_probs_flat,
+        indices=x_flat,
+        batch_dims=1)
+
+    return tf.reshape(log_probs_flat, shape=tf.shape(x))
 
   def _log_cdf(self, x):
     cdf = tf.cumsum(self.categorical_probs())

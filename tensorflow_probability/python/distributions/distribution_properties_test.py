@@ -97,6 +97,7 @@ TF2_FRIENDLY_DISTS = (
     'VonMisesFisher',
     'WishartTriL',
     'Zipf',
+    'StoppingRatioLogistic',
 )
 
 NO_SAMPLE_PARAM_GRADS = {
