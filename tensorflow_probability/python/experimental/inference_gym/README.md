@@ -34,7 +34,7 @@ Each model can additionally provide:
 import matplotlib.pyplot as plt
 from tensorflow_probability.experimental import inference_gym
 
-model = inference_gym.GermanCreditNumericLogisticRegression()
+model = inference_gym.targets.GermanCreditNumericLogisticRegression()
 
 samples = inference_method(
   model.unnormalized_log_prob,
