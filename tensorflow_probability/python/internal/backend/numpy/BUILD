@@ -465,6 +465,7 @@ py_library(
     name = "generated_files",
     testonly = 1,
     srcs = ["gen_new/{}.py".format(filename) for filename in LINOP_FILES],
+    srcs_version = "PY2AND3",
 )
 
 py_library(
