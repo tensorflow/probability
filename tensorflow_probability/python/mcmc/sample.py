@@ -239,7 +239,7 @@ def sample_chain(
   num_chains = 100
 
   weights = make_prior(num_weights).sample(1)
-  factors = tf.random_normal([num_factors, num_weights])
+  factors = tf.random.normal([num_factors, num_weights])
   x = make_likelihood(weights, factors).sample()
 
   # Sample from Hamiltonian Monte Carlo Markov Chain.

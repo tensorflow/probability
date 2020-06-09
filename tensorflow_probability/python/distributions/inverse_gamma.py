@@ -199,7 +199,7 @@ class InverseGamma(distribution.Distribution):
     return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(
-      """Note: See `tf.random_gamma` docstring for sampling details and
+      """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
     return 1. / samplers.gamma(

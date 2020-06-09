@@ -85,7 +85,7 @@ class Gamma(distribution.Distribution):
   the samples that are smaller than `np.finfo(dtype).tiny` are rounded
   to this value, so it appears more often than it should.
   This should only be noticeable when the `concentration` is very small, or the
-  `rate` is very large. See note in `tf.random_gamma` docstring.
+  `rate` is very large. See note in `tf.random.gamma` docstring.
 
   Samples of this distribution are reparameterized (pathwise differentiable).
   The derivatives are computed using the approach described in the paper
@@ -201,7 +201,7 @@ class Gamma(distribution.Distribution):
     return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(
-      """Note: See `tf.random_gamma` docstring for sampling details and
+      """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
     """Gamma sampler.

@@ -577,7 +577,7 @@ def batch_interp_regular_nd_grid(x,
 
   y_ref = func(x0s, x1s)
 
-  x = np.pi * tf.random_uniform(shape=(10, 2))
+  x = np.pi * tf.random.uniform(shape=(10, 2))
 
   tfp.math.batch_interp_regular_nd_grid(x, x_ref_min, x_ref_max, y_ref, axis=-2)
   ==> tf.sin(x[:, 0]) * tf.cos(x[:, 1])

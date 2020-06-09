@@ -614,7 +614,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
         Default value: `None` (i.e., 'hmc_kernel').
     """
     if seed is not None and tf.executing_eagerly():
-      # TODO(b/68017812): Re-enable once TFE supports `tf.random_shuffle` seed.
+      # TODO(b/68017812): Re-enable once TFE supports `tf.random.shuffle` seed.
       raise NotImplementedError('Specifying a `seed` when running eagerly is '
                                 'not currently supported. To run in Eager '
                                 'mode with a seed, use `tf.random.set_seed`.')

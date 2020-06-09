@@ -170,7 +170,7 @@ def benchmark_tf_function(
       def f():
         total = tf.constant(0.0)
         for _ in np.arange(inner_iters):
-          m = tf.random_uniform((size, size))
+          m = tf.random.uniform((size, size))
           total += tf.reduce_sum(tf.matmul(m, m))
           return total
 
