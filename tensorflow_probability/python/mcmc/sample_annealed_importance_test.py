@@ -80,6 +80,7 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
 
     num_steps = 200
 
+    stream = test_util.test_seed_stream()
     if use_transformed_kernel:
       def make_kernel(tlp_fn):
         return tfp.mcmc.TransformedTransitionKernel(
@@ -87,7 +88,7 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
                 target_log_prob_fn=tlp_fn,
                 step_size=0.5,
                 num_leapfrog_steps=2,
-                seed=_maybe_seed(make_kernel.seed())),
+                seed=_maybe_seed(stream())),
             bijector=tfb.Identity())
     else:
       def make_kernel(tlp_fn):
@@ -95,9 +96,7 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
             target_log_prob_fn=tlp_fn,
             step_size=0.5,
             num_leapfrog_steps=2,
-            seed=_maybe_seed(make_kernel.seed()))
-
-    make_kernel.seed = tfp.util.SeedStream('make_kernel', 45)
+            seed=_maybe_seed(stream()))
 
     _, ais_weights, _ = tfp.mcmc.sample_annealed_importance_chain(
         num_steps=num_steps,
@@ -189,12 +188,13 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
       event_dims = tf.range(independent_chain_ndims, tf.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
+    seed = test_util.test_seed()
     def make_kernel(tlp_fn):
       return tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=tlp_fn,
           step_size=0.5,
           num_leapfrog_steps=2,
-          seed=_maybe_seed(53))
+          seed=_maybe_seed(seed))
 
     ais_kwargs = dict(
         num_steps=200,
