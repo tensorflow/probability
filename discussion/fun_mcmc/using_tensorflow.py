@@ -12,24 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Functional MCMC API."""
+"""FunMCMC API using the TensorFlow backend."""
 
-from discussion.fun_mcmc import api
-from discussion.fun_mcmc import using_jax
-from discussion.fun_mcmc import using_tensorflow
-from discussion.fun_mcmc.api import *
-from discussion.fun_mcmc.backend import get_backend
-from discussion.fun_mcmc.backend import JAX
-from discussion.fun_mcmc.backend import MANUAL_TRANSFORMS
-from discussion.fun_mcmc.backend import set_backend
-from discussion.fun_mcmc.backend import TENSORFLOW
+# Need to register the rewrite hooks.
+from discussion.fun_mcmc import rewrite
+from discussion.fun_mcmc.dynamic.backend_tf import api  # pytype: disable=import-error
+# pylint: disable=wildcard-import
+from discussion.fun_mcmc.dynamic.backend_tf.api import *  # pytype: disable=import-error
+del rewrite
 
-__all__ = api.__all__ + [
-    'get_backend',
-    'JAX',
-    'MANUAL_TRANSFORMS',
-    'set_backend',
-    'TENSORFLOW',
-    'using_jax',
-    'using_tensorflow',
-]
+__all__ = api.__all__

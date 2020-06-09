@@ -12,24 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Functional MCMC API."""
+"""TensorFlow backend."""
 
-from discussion.fun_mcmc import api
-from discussion.fun_mcmc import using_jax
-from discussion.fun_mcmc import using_tensorflow
-from discussion.fun_mcmc.api import *
-from discussion.fun_mcmc.backend import get_backend
-from discussion.fun_mcmc.backend import JAX
-from discussion.fun_mcmc.backend import MANUAL_TRANSFORMS
-from discussion.fun_mcmc.backend import set_backend
-from discussion.fun_mcmc.backend import TENSORFLOW
+import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
+from discussion.fun_mcmc import util_tf as util
 
-__all__ = api.__all__ + [
-    'get_backend',
-    'JAX',
-    'MANUAL_TRANSFORMS',
-    'set_backend',
-    'TENSORFLOW',
-    'using_jax',
-    'using_tensorflow',
+__all__ = [
+    'tf',
+    'tfp',
+    'util',
 ]

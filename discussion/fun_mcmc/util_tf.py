@@ -26,6 +26,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'assert_same_shallow_tree',
     'flatten_tree',
+    'inverse_fn',
     'map_tree',
     'map_tree_up_to',
     'random_categorical',
@@ -33,6 +34,7 @@ __all__ = [
     'random_uniform',
     'split_seed',
     'trace',
+    'value_and_ldj',
 ]
 
 
@@ -180,3 +182,79 @@ def trace(state, fn, num_steps, unroll, parallel_iterations=10):
   traced = tf.nest.map_structure(_merge_static_length, traced)
 
   return state, untraced, traced
+
+
+def value_and_ldj(fn, args):
+  """Compute the value and log-det jacobian of function evaluated at args.
+
+  This assumes that `fn`'s `extra` output is a 2-tuple, where the first element
+  is arbitrary and the the last element is the log determinant of the jacobian
+  of the transformation.
+
+  Args:
+    fn: Function to evaluate.
+    args: Arguments to `fn`.
+
+  Returns:
+    ret: First output of `fn`.
+    extra: Second output of `fn`.
+    ldj: Log-det jacobian of `fn`.
+
+  #### Example
+
+  ```python
+  def scale_by_two(x):
+    # Return x unchanged as the extra output for illustrative purposes.
+    return 2 * x, (x, np.log(2))
+
+  y, y_extra, y_ldj = value_and_ldj(scale_by_2, 3.)
+  assert y == 6
+  assert y_extra == 3
+  assert y_ldj == np.log(2)
+  ```
+
+  """
+  value, (extra, ldj) = fn(args)
+  return value, (extra, ldj), ldj
+
+
+def inverse_fn(fn):
+  """Compute the inverse of a function.
+
+  This assumes that `fn` has a field called `inverse` which contains the inverse
+  of the function.
+
+  Args:
+    fn: Function to invert.
+
+  Returns:
+    inverse: Inverse of `fn`.
+
+  #### Example
+
+  ```python
+  def scale_by_two(x):
+    # Return x unchanged as the extra output for illustrative purposes.
+    return 2 * x, (x, np.log(2))
+
+  def scale_by_half(x):
+    return x / 2, (x, -np.log(2))
+
+  scale_by_two.inverse = scale_by_half
+  scale_by_half.inverse = scale_by_two
+
+  y, y_extra, y_ldj = value_and_ldj(scale_by_2, 3.)
+  assert y == 6
+  assert y_extra == 3
+  assert y_ldj == np.log(2)
+
+  inv_scale_by_2 = inverse_fn(scale_by_2)
+  assert inv_scale_by_2 == scale_by_half
+
+  x, x_extra, x_ldj = value_and_ldj(inv_scale_by_2, 4.)
+  assert x == 2
+  assert x_extra == 4
+  assert x_ldj == -np.log(2)
+  ```
+  """
+  return fn.inverse

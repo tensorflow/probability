@@ -24,13 +24,16 @@ from jax import random as jax_random
 from jax.config import config as jax_config
 import tensorflow.compat.v2 as real_tf
 
-from discussion import fun_mcmc
-from discussion.fun_mcmc import backend
+from discussion.fun_mcmc import backend_jax
+from discussion.fun_mcmc import backend_tf
+from discussion.fun_mcmc import using_jax as fun_mcmc_jax
+from discussion.fun_mcmc import using_tensorflow as fun_mcmc_tf
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tf = backend.tf
-util = backend.util
-tfp = backend.tfp
+tf = backend_tf.tf
+tfp = backend_tf.tfp
+util = backend_tf.util
+fun_mcmc = fun_mcmc_tf
 
 real_tf.enable_v2_behavior()
 jax_config.update('jax_enable_x64', True)
@@ -46,7 +49,14 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
 
   def setUp(self):
     super(PrefabTestTensorFlow32, self).setUp()
-    backend.set_backend(backend.TENSORFLOW, backend.MANUAL_TRANSFORMS)
+    global tf
+    global tfp
+    global util
+    global fun_mcmc
+    tf = backend_tf.tf
+    tfp = backend_tf.tfp
+    util = backend_tf.util
+    fun_mcmc = fun_mcmc_tf
 
   def _make_seed(self, seed):
     return seed
@@ -141,7 +151,14 @@ class PrefabTestJAX32(PrefabTestTensorFlow32):
 
   def setUp(self):
     super(PrefabTestJAX32, self).setUp()
-    backend.set_backend(backend.JAX, backend.MANUAL_TRANSFORMS)
+    global tf
+    global tfp
+    global util
+    global fun_mcmc
+    tf = backend_jax.tf
+    tfp = backend_jax.tfp
+    util = backend_jax.util
+    fun_mcmc = fun_mcmc_jax
 
   def _make_seed(self, seed):
     return jax_random.PRNGKey(seed)

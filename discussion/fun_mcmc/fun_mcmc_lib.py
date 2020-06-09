@@ -42,7 +42,6 @@ import functools
 import numpy as np
 
 from discussion.fun_mcmc import backend
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 tf = backend.tf
@@ -92,6 +91,7 @@ __all__ = [
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
     'RandomWalkMetropolisState',
+    'recover_state_from_args',
     'reparameterize_potential_fn',
     'running_approximate_auto_covariance_init',
     'running_approximate_auto_covariance_step',
@@ -276,6 +276,16 @@ def _tree_repr(tree: 'Any') -> 'Text':
   return str(util.map_tree(lambda _: _LeafSentinel(), tree))
 
 
+def _is_namedtuple_like(x):
+  """Helper which returns `True` if input is `collections.namedtuple`-like."""
+  try:
+    for fn in getattr(x, '_fields'):
+      _ = getattr(x, fn)
+    return True
+  except AttributeError:
+    return False
+
+
 def call_fn(
     fn: 'TransitionOperator',
     args: 'Union[Tuple[Any], Mapping[Text, Any], Any]',
@@ -293,7 +303,7 @@ def call_fn(
     ret: Return value of `fn`.
   """
   if isinstance(
-      args, collections.Sequence) and not mcmc_util.is_namedtuple_like(args):
+      args, collections.Sequence) and not _is_namedtuple_like(args):
     args = args  # type: Tuple[Any]
     return fn(*args)
   elif isinstance(args, collections.Mapping):
@@ -329,7 +339,7 @@ def recover_state_from_args(args: 'Sequence[Any]',
         state[k] = kwargs[k]
     return state
   elif (isinstance(state_structure, collections.Sequence) and
-        not mcmc_util.is_namedtuple_like(state_structure)):
+        not _is_namedtuple_like(state_structure)):
     # Sadly, we have no way of inferring the state index from kwargs, so we
     # disallow them.
     # TODO(siege): We could support length-1 sequences in principle.

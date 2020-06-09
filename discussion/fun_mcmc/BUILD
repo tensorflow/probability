@@ -40,6 +40,19 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":api",
+        ":backend",
+        ":using_jax",
+        ":using_tensorflow",
+    ],
+)
+
+# pytype
+py_library(
+    name = "api",
+    srcs = ["api.py"],
+    srcs_version = "PY2AND3",
+    deps = [
         ":fun_mcmc_lib",
         ":prefab",
         ":util_tfp",
@@ -85,12 +98,11 @@ py_library(
     srcs = ["backend.py"],
     srcs_version = "PY3",
     deps = [
-        # TODO(siege): Add a target that doesn't link everything.
         ":tf_on_jax",
-        ":util_tf",
         ":util_jax",
+        ":util_tf",
         "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/substrates/jax",
     ],
 )
 
@@ -102,9 +114,76 @@ py_library(
     deps = [
         ":backend",
         # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/mcmc/internal:util",
     ],
+)
+
+# pytype
+py_library(
+    name = "using_jax",
+    srcs = ["using_jax.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":api",
+        ":backend_jax",
+        ":dynamic_backend_jax",
+        ":rewrite",
+    ],
+)
+
+# pytype
+py_library(
+    name = "using_tensorflow",
+    srcs = ["using_tensorflow.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":api",
+        ":backend_tf",
+        ":dynamic_backend_tf",
+        ":rewrite",
+    ],
+)
+
+# pytype
+py_library(
+    name = "backend_jax",
+    srcs = ["backend_jax.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":tf_on_jax",
+        ":util_jax",
+        "//tensorflow_probability/python/experimental/substrates/jax",
+    ],
+)
+
+# pytype
+py_library(
+    name = "backend_tf",
+    srcs = ["backend_tf.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":util_tf",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+# pytype
+py_library(
+    name = "dynamic_backend_jax",
+    srcs = ["dynamic/backend_jax/__init__.py"],
+)
+
+# pytype
+py_library(
+    name = "dynamic_backend_tf",
+    srcs = ["dynamic/backend_tf/__init__.py"],
+)
+
+# pytype
+py_library(
+    name = "rewrite",
+    srcs = ["rewrite.py"],
+    srcs_version = "PY3",
 )
 
 py3_test(
