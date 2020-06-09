@@ -68,6 +68,7 @@ class SampleChainTest(test_util.TestCase):
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5],
                       [0.5, 1]])
+    true_cov_chol = np.linalg.cholesky(true_cov)
     num_results = 3000
     counter = collections.Counter()
     def target_log_prob(x, y):
@@ -75,15 +76,10 @@ class SampleChainTest(test_util.TestCase):
       # Corresponds to unnormalized MVN.
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
       z = tf.stack([x, y], axis=-1) - true_mean
-      z = tf.squeeze(
-          tf.linalg.triangular_solve(
-              np.linalg.cholesky(true_cov),
-              z[..., tf.newaxis]),
-          axis=-1)
+      z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    if tf.executing_eagerly():
-      tf.random.set_seed(54)
+    seed = test_util.test_seed()
     states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
@@ -91,7 +87,7 @@ class SampleChainTest(test_util.TestCase):
             target_log_prob_fn=target_log_prob,
             step_size=[0.5, 0.5],
             num_leapfrog_steps=2,
-            seed=None if tf.executing_eagerly() else 54),
+            seed=None if tf.executing_eagerly() else seed),
         num_burnin_steps=200,
         num_steps_between_results=1,
         parallel_iterations=1)
@@ -104,9 +100,9 @@ class SampleChainTest(test_util.TestCase):
     sample_cov = tf.matmul(x, x, transpose_a=True) / dtype(num_results)
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
     self.assertAllClose(true_mean, sample_mean_,
-                        atol=0.05, rtol=0.)
+                        atol=0.1, rtol=0.)
     self.assertAllClose(true_cov, sample_cov_,
-                        atol=0., rtol=0.1)
+                        atol=0., rtol=0.175)
 
   def testBasicOperation(self):
     kernel = TestTransitionKernel()
