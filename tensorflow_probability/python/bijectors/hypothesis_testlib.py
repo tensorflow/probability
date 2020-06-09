@@ -403,7 +403,7 @@ def frechet_constraint(loc):
     return loc + tf.math.softplus(x)
   return constrain
 
-def gev_constraint(loc, scale, conc):
+def gev_constraint(loc, conc):
   """
   Maps `s` to:
     1. [loc - scale / conc, inf) if conc > 0;
@@ -412,8 +412,8 @@ def gev_constraint(loc, scale, conc):
   """
   def constrain(x):
     return tf.where(conc > 0.,
-                    tf.math.softplus(x) + loc - scale / conc,
+                    tf.math.softplus(x) + loc,
                     tf.where(tf.equal(0., conc), x,
-                             loc - scale / conc - tf.math.softplus(x)))
+                             loc - tf.math.softplus(x)))
 
   return constrain

@@ -412,7 +412,7 @@ def domain_tensors(draw, bijector, shape=None):
   elif isinstance(bijector, tfb.FrechetCDF):
     constraint_fn = bijector_hps.frechet_constraint(bijector.loc)
   elif isinstance(bijector, tfb.GeneralizedExtremeValueCDF):
-    constraint_fn = bijector_hps.gev_constraint(bijector.loc, bijector.scale,
+    constraint_fn = bijector_hps.gev_constraint(bijector.loc,
                                                 bijector.concentration)
   else:
     constraint_fn = tfp_hps.constrainer(support)
