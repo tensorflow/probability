@@ -50,12 +50,24 @@ __all__ = [
     'make_name',
     'maybe_call_fn_and_grads',
     'prepare_state_parts',
+    'PrettyNamedTupleMixin',
     'safe_sum',
     'set_doc',
     'smart_for_loop',
     'trace_scan',
     'warn_if_parameters_are_not_simple_tensors',
 ]
+
+
+class PrettyNamedTupleMixin(object):
+  """Mixin adding a nicer `__repr__` for `namedtuple`s."""
+  __slots__ = ()
+
+  def __repr__(self):
+    return '{}(\n{}\n)'.format(
+        type(self).__name__,
+        ',\n'.join('  {}={}'.format(k, repr(v).replace('\n', '\n    '))
+                   for (k, v) in self._asdict().items()))
 
 
 def left_justified_expand_dims_like(x, reference, name=None):

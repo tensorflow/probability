@@ -37,15 +37,18 @@ __all__ = [
 ]
 
 
-SliceSamplerKernelResults = collections.namedtuple(
-    'SliceSamplerKernelResults',
-    [
-        'target_log_prob',  # For "next_state".
-        'bounds_satisfied',  # Were the slice bounds chosen outside the slice.
-        'direction',  # The direction in which the slice was sampled.
-        'upper_bounds',  # Upper bound of the slice in the sampling direction.
-        'lower_bounds',  # Lower bound of the slice in the sampling direction.
-    ])
+class SliceSamplerKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'SliceSamplerKernelResults',
+        ['target_log_prob',  # For "next_state".
+         'bounds_satisfied',  # Were the slice bounds chosen outside the slice.
+         'direction',  # The direction in which the slice was sampled.
+         'upper_bounds',  # Upper bound of the slice in the sampling direction.
+         'lower_bounds',  # Lower bound of the slice in the sampling direction.
+         ])):
+  """Internal state and diagnostics for Slice sampler."""
+  __slots__ = ()
 
 
 class SliceSampler(kernel_base.TransitionKernel):

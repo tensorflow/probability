@@ -41,58 +41,64 @@ __all__ = [
     'default_swap_proposal_fn',
 ]
 
-ReplicaExchangeMCKernelResults = collections.namedtuple(
-    # All tensors `x` with shape [num_replica, ...] are "ordered", meaning
-    # x[k,...] holds values for replica `k`.
-    'ReplicaExchangeMCKernelResults',
-    [
-        # List-like of [num_replica] + batch_shape Tensor (or list thereof)
-        # holding state parts for all replicas, after swaps.
-        # This will be state parts, *even* if the chain is working with states.
-        'post_swap_replica_states',
 
-        # Kernel results for replicas, before any swaps.
-        'pre_swap_replica_results',
+class ReplicaExchangeMCKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        # All tensors `x` with shape [num_replica, ...] are "ordered", meaning
+        # x[k,...] holds values for replica `k`.
+        'ReplicaExchangeMCKernelResults',
+        [
+            # List-like of [num_replica] + batch_shape Tensor (or list thereof)
+            # holding state parts for all replicas, after swaps.
+            # This will be state parts, *even* if the chain is working with
+            # states.
+            'post_swap_replica_states',
 
-        # Kernel results for replicas, after swaps.
-        # Some fields are updated, and some removed!
-        # The theme is to update whatever is necessary to to obtain correct
-        # state swaps, and remove fields that are ambiguous (e.g.
-        # proposed_results inside Metropolis KR).
-        'post_swap_replica_results',
+            # Kernel results for replicas, before any swaps.
+            'pre_swap_replica_results',
 
-        # Shape [num_replica, num_replica] + batch_shape boolean Tensor where
-        # is_swap_proposed[i, j, ...] == True indicates a swap between
-        # replicas `i` and `j` has been proposed.
-        # Note is_swap_proposed[i, i, ...] == True indicates no move is
-        # proposed for replica `i`.
-        # TODO(b/144166689) Consider whether it may be better to make the user
-        # compute this post-sampling rather than in kernel results.
-        'is_swap_proposed',
+            # Kernel results for replicas, after swaps.
+            # Some fields are updated, and some removed!
+            # The theme is to update whatever is necessary to to obtain correct
+            # state swaps, and remove fields that are ambiguous (e.g.
+            # proposed_results inside Metropolis KR).
+            'post_swap_replica_results',
 
-        # Similar to is_swap_proposed.
-        # is_swap_accepted[i, j, ...] indicates a swap between replicas
-        # `i` and `j` was accepted.
-        'is_swap_accepted',
+            # Shape [num_replica, num_replica] + batch_shape boolean Tensor
+            # where is_swap_proposed[i, j, ...] == True indicates a swap between
+            # replicas `i` and `j` has been proposed.
+            # Note is_swap_proposed[i, i, ...] == True indicates no move is
+            # proposed for replica `i`.
+            # TODO(b/144166689) Consider whether it may be better to make the
+            # user compute this post-sampling rather than in kernel results.
+            'is_swap_proposed',
 
-        # Shape [num_replica - 1] + batch_shape boolean vectors equal to the
-        # first lower sub-diagonal of is_swap_proposed.
-        # is_swap_proposed_adjacent[k, ...] == True just when an swap is
-        # proposed between replicas `k` and `k+1`.
-        # This is sufficient to track swaps in the common (and default)
-        # case where swaps are between adjacent replicas only.
-        'is_swap_proposed_adjacent',
-        'is_swap_accepted_adjacent',
+            # Similar to is_swap_proposed.
+            # is_swap_accepted[i, j, ...] indicates a swap between replicas
+            # `i` and `j` was accepted.
+            'is_swap_accepted',
 
-        # The inverse_temperatures used to calculate these results. (Other
-        # TransitionKernels which want to intercept the inverse_temperatures
-        # should rewrite this field.)  Shape [num_replica].
-        'inverse_temperatures',
+            # Shape [num_replica - 1] + batch_shape boolean vectors equal to the
+            # first lower sub-diagonal of is_swap_proposed.
+            # is_swap_proposed_adjacent[k, ...] == True just when an swap is
+            # proposed between replicas `k` and `k+1`.
+            # This is sufficient to track swaps in the common (and default)
+            # case where swaps are between adjacent replicas only.
+            'is_swap_proposed_adjacent',
+            'is_swap_accepted_adjacent',
 
-        # Shape [num_replica] + batch_shape permutation used to propose
-        # swaps.
-        'swaps',
-    ])
+            # The inverse_temperatures used to calculate these results. (Other
+            # TransitionKernels which want to intercept the inverse_temperatures
+            # should rewrite this field.)  Shape [num_replica].
+            'inverse_temperatures',
+
+            # Shape [num_replica] + batch_shape permutation used to propose
+            # swaps.
+            'swaps',
+        ])):
+  """Internal state and diagnostics for Replica Exchange MC."""
+  __slots__ = ()
 
 
 def default_swap_proposal_fn(prob_swap, name=None):

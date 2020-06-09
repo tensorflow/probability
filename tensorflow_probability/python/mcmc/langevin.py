@@ -38,17 +38,21 @@ __all__ = [
 ]
 
 
-UncalibratedLangevinKernelResults = collections.namedtuple(
-    'UncalibratedLangevinKernelResults',
-    [
-        'grads_target_log_prob',
-        # Results are for "next_state".
-        'log_acceptance_correction',
-        'target_log_prob',
-        'volatility',
-        'grads_volatility',
-        'diffusion_drift',
-    ])
+class UncalibratedLangevinKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'UncalibratedLangevinKernelResults',
+        [
+            'grads_target_log_prob',
+            # Results are for "next_state".
+            'log_acceptance_correction',
+            'target_log_prob',
+            'volatility',
+            'grads_volatility',
+            'diffusion_drift',
+        ])):
+  """Internal state and diagnostics for Uncalibrated Langevin."""
+  __slots__ = ()
 
 
 class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):

@@ -36,6 +36,7 @@ from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_l
 
 
 class DualAveragingStepSizeAdaptationResults(
+    mcmc_util.PrettyNamedTupleMixin,
     collections.namedtuple(
         'DualAveragingStepSizeAdaptationResults',
         'inner_results, target_accept_prob, log_shrinkage_target, '

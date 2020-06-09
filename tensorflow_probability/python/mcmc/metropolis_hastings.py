@@ -41,16 +41,22 @@ warnings.filterwarnings('always',
                         module='tensorflow_probability.*metropolis_hastings',
                         append=True)  # Don't override user-set filters.
 
-MetropolisHastingsKernelResults = collections.namedtuple(
-    'MetropolisHastingsKernelResults',
-    [
-        'accepted_results',
-        'is_accepted',
-        'log_accept_ratio',
-        'proposed_state',
-        'proposed_results',
-        'extra',
-    ])
+
+class MetropolisHastingsKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'MetropolisHastingsKernelResults',
+        [
+            'accepted_results',
+            'is_accepted',
+            'log_accept_ratio',
+            'proposed_state',
+            'proposed_results',
+            'extra',
+        ])
+    ):
+  """Internal state and diagnostics for MH."""
+  __slots__ = ()
 
 
 class MetropolisHastings(kernel_base.TransitionKernel):

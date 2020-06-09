@@ -42,7 +42,8 @@ warnings.filterwarnings("always",
 
 
 class StatesAndTrace(
-    collections.namedtuple("StatesAndTrace", "all_states, trace")):
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple("StatesAndTrace", ["all_states", "trace"])):
   """States and auxiliary trace of an MCMC chain.
 
   The first dimension of all the `Tensor`s in this structure is the same and
@@ -58,8 +59,9 @@ class StatesAndTrace(
 
 
 class CheckpointableStatesAndTrace(
+    mcmc_util.PrettyNamedTupleMixin,
     collections.namedtuple("CheckpointableStatesAndTrace",
-                           "all_states, trace, final_kernel_results")):
+                           ["all_states", "trace", "final_kernel_results"])):
   """States and auxiliary trace of an MCMC chain.
 
   The first dimension of all the `Tensor`s in the `all_states` and `trace`

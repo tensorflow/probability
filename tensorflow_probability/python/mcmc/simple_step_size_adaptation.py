@@ -84,6 +84,7 @@ def get_differing_dims(a, b):
 
 
 class SimpleStepSizeAdaptationResults(
+    mcmc_util.PrettyNamedTupleMixin,
     collections.namedtuple(
         'SimpleStepSizeAdaptationResults',
         [

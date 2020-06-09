@@ -33,13 +33,16 @@ __all__ = [
 ]
 
 
-AISResults = collections.namedtuple(
-    'AISResults',
-    [
-        'proposal_log_prob',
-        'target_log_prob',
-        'inner_results',
-    ])
+class AISResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'AISResults',
+        [
+            'proposal_log_prob',
+            'target_log_prob',
+            'inner_results',
+        ])):
+  __slots__ = ()
 
 
 def _find_inner_mh_results(results):

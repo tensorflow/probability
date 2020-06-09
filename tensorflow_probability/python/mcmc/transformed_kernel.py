@@ -33,11 +33,15 @@ __all__ = [
     'TransformedTransitionKernel',
 ]
 
-TransformedTransitionKernelResults = collections.namedtuple(
-    'TransformedTransitionKernelResults', [
-        'transformed_state',
-        'inner_results',
-    ])
+
+class TransformedTransitionKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('TransformedTransitionKernelResults',
+                           ['transformed_state',
+                            'inner_results',
+                            ])):
+  """Internal state and diagnostics for Transformed kernel."""
+  __slots__ = ()
 
 
 def make_log_det_jacobian_fn(bijector, direction):

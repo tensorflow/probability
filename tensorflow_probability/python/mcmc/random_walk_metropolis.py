@@ -38,12 +38,16 @@ __all__ = [
 ]
 
 
-UncalibratedRandomWalkResults = collections.namedtuple(
-    'UncalibratedRandomWalkResults',
-    [
-        'log_acceptance_correction',
-        'target_log_prob',        # For "next_state".
-    ])
+class UncalibratedRandomWalkResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'UncalibratedRandomWalkResults',
+        [
+            'log_acceptance_correction',
+            'target_log_prob',        # For "next_state".
+        ])
+    ):
+  __slots__ = ()
 
 
 def random_walk_normal_fn(scale=1., name=None):

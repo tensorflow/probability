@@ -40,23 +40,30 @@ __all__ = [
 ]
 
 
-UncalibratedHamiltonianMonteCarloKernelResults = collections.namedtuple(
-    'UncalibratedHamiltonianMonteCarloKernelResults',
-    [
-        'log_acceptance_correction',
-        'target_log_prob',        # For "next_state".
-        'grads_target_log_prob',  # For "next_state".
-        'initial_momentum',
-        'final_momentum',
-        'step_size',
-        'num_leapfrog_steps',
-    ])
+class UncalibratedHamiltonianMonteCarloKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'UncalibratedHamiltonianMonteCarloKernelResults',
+        [
+            'log_acceptance_correction',
+            'target_log_prob',        # For "next_state".
+            'grads_target_log_prob',  # For "next_state".
+            'initial_momentum',
+            'final_momentum',
+            'step_size',
+            'num_leapfrog_steps',
+        ])
+    ):
+  """Internal state and diagnostics for Uncalibrated HMC."""
+  __slots__ = ()
 
-HamiltonianMonteCarloExtraKernelResults = collections.namedtuple(
-    'HamiltonianMonteCarloExtraKernelResults',
-    [
-        'step_size_assign',
-    ])
+
+class HamiltonianMonteCarloExtraKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('HamiltonianMonteCarloExtraKernelResults',
+                           ['step_size_assign',
+                            ])):
+  __slots__ = ()
 
 
 @deprecation.deprecated('2019-05-22',

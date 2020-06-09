@@ -70,64 +70,96 @@ __all__ = [
     'NoUTurnSampler',
 ]
 
-NUTSKernelResults = collections.namedtuple('NUTSKernelResults', [
-    'target_log_prob',
-    'grads_target_log_prob',
-    'momentum_state_memory',
-    'step_size',
-    'log_accept_ratio',
-    'leapfrogs_taken',  # How many leapfrogs each chain has taken this step
-    'is_accepted',
-    'reach_max_depth',
-    'has_divergence',
-    'energy',
-])
 
-MomentumStateSwap = collections.namedtuple('MomentumStateSwap', [
-    'momentum_swap',
-    'state_swap',
-])
+class NUTSKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'NUTSKernelResults',
+        [
+            'target_log_prob',
+            'grads_target_log_prob',
+            'momentum_state_memory',
+            'step_size',
+            'log_accept_ratio',
+            'leapfrogs_taken',  # How many leapfrogs each chain took this step.
+            'is_accepted',
+            'reach_max_depth',
+            'has_divergence',
+            'energy',
+        ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
 
-OneStepMetaInfo = collections.namedtuple('OneStepMetaInfo', [
-    'log_slice_sample',
-    'init_energy',
-    'write_instruction',
-    'read_instruction',
-])
 
-TreeDoublingState = collections.namedtuple('TreeDoublingState', [
-    'momentum',
-    'state',
-    'target',
-    'target_grad_parts',
-])
+class MomentumStateSwap(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('MomentumStateSwap',
+                           ['momentum_swap', 'state_swap'])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
 
-TreeDoublingStateCandidate = collections.namedtuple(
-    'TreeDoublingStateCandidate', [
-        'state',
-        'target',
-        'target_grad_parts',
-        'energy',
-        'weight',
-    ])
 
-TreeDoublingMetaState = collections.namedtuple(
-    'TreeDoublingMetaState',
-    [
-        'candidate_state',  # A namedtuple of TreeDoublingStateCandidate
-        'is_accepted',
-        'momentum_sum',     # Sum of momentum of the current tree for
-                            # generalized U turn criteria
-        'energy_diff_sum',  # Sum over all states explored within the subtree of
-                            # Metropolis acceptance probabilities
-                            # exp(min(0, H' - H0)), where H0 is the negative
-                            # energy of the initial state and H' is the negative
-                            # energy of a state explored in the subtree.
-                            # TODO(b/150152798): Do sum in log-space.
-        'leapfrog_count',   # How many leapfrogs each chain has taken
-        'continue_tree',
-        'not_divergence',
-    ])
+class OneStepMetaInfo(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('OneStepMetaInfo',
+                           ['log_slice_sample',
+                            'init_energy',
+                            'write_instruction',
+                            'read_instruction',
+                           ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
+
+
+class TreeDoublingState(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('TreeDoublingState',
+                           ['momentum',
+                            'state',
+                            'target',
+                            'target_grad_parts',
+                            ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
+
+
+class TreeDoublingStateCandidate(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'TreeDoublingStateCandidate',
+        [
+            'state',
+            'target',
+            'target_grad_parts',
+            'energy',
+            'weight',
+        ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
+
+
+class TreeDoublingMetaState(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'TreeDoublingMetaState',
+        [
+            'candidate_state',  # A namedtuple of TreeDoublingStateCandidate.
+            'is_accepted',
+            'momentum_sum',     # Sum of momentum of the current tree for
+                                # generalized U turn criteria.
+            'energy_diff_sum',  # Sum over all states explored within the
+                                # subtree of Metropolis acceptance probabilities
+                                # exp(min(0, H' - H0)), where H0 is the negative
+                                # energy of the initial state and H' is the
+                                # negative energy of a state explored in the
+                                # subtree.
+                                # TODO(b/150152798): Do sum in log-space.
+            'leapfrog_count',   # How many leapfrogs each chain has taken.
+            'continue_tree',
+            'not_divergence',
+        ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
 
 
 class NoUTurnSampler(TransitionKernel):
