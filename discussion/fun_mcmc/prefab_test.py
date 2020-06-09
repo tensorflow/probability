@@ -45,8 +45,6 @@ def _test_seed():
 
 class PrefabTestTensorFlow32(tfp_test_util.TestCase):
 
-  _is_on_jax = False
-
   def setUp(self):
     super(PrefabTestTensorFlow32, self).setUp()
     global tf
@@ -59,7 +57,7 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
     fun_mcmc = fun_mcmc_tf
 
   def _make_seed(self, seed):
-    return seed
+    return util.make_tensor_seed(seed)
 
   @property
   def _dtype(self):
@@ -99,10 +97,7 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
 
     # Define the kernel.
     def kernel(adaptive_hmc_state, seed):
-      if not self._is_on_jax:
-        hmc_seed = _test_seed()
-      else:
-        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_seed, seed = util.split_seed(seed, 2)
 
       adaptive_hmc_state, adaptive_hmc_extra = (
           fun_mcmc.prefab.adaptive_hamiltonian_monte_carlo_step(
@@ -115,10 +110,7 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
               seed), (adaptive_hmc_extra.state, adaptive_hmc_extra.is_accepted,
                       adaptive_hmc_extra.step_size)
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -146,8 +138,6 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
 
 
 class PrefabTestJAX32(PrefabTestTensorFlow32):
-
-  _is_on_jax = True
 
   def setUp(self):
     super(PrefabTestJAX32, self).setUp()

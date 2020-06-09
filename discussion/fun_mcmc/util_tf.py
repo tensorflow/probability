@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import six
 import tensorflow.compat.v2 as tf
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -27,6 +28,7 @@ __all__ = [
     'assert_same_shallow_tree',
     'flatten_tree',
     'inverse_fn',
+    'make_tensor_seed',
     'map_tree',
     'map_tree_up_to',
     'random_categorical',
@@ -73,34 +75,67 @@ def value_and_grad(fn, args):
   return ret, extra, grads
 
 
+def _is_stateful_seed(seed):
+  return seed is None or isinstance(seed, six.integer_types)
+
+
+def make_tensor_seed(seed):
+  """Converts a seed to a `Tensor` seed."""
+  if _is_stateful_seed(seed):
+    iinfo = np.iinfo(np.int32)
+    return tf.random.uniform([2],
+                             minval=iinfo.min,
+                             maxval=iinfo.max,
+                             dtype=tf.int32,
+                             name='seed')
+  else:
+    return tf.convert_to_tensor(seed, dtype=tf.int32, name='seed')
+
+
 def split_seed(seed, count):
   """Splits a seed into `count` seeds."""
-  # TODO(siege): Switch to stateless RNG ops.
-  if seed is None:
-    return count * [None]
-  return [
-      np.random.RandomState(seed + i).randint(0, 2**31)
-      for i, seed in enumerate([seed] * count)
-  ]
+  if _is_stateful_seed(seed):
+    if seed is None:
+      return count * [None]
+    return [
+        np.random.RandomState(seed + i).randint(0, 2**31)
+        for i, seed in enumerate([seed] * count)
+    ]
+  else:
+    seeds = tf.random.stateless_uniform(
+        [count, 2],
+        seed=make_tensor_seed(seed),
+        minval=None,
+        maxval=None,
+        dtype=tf.int32,
+    )
+    return tf.unstack(seeds)
 
 
 def random_uniform(shape, dtype, seed):
   """Generates a sample from uniform distribution over [0., 1)."""
-  # TODO(siege): Switch to stateless RNG ops.
-  return tf.random.uniform(shape=shape, dtype=dtype, seed=seed)
+  if _is_stateful_seed(seed):
+    return tf.random.uniform(shape=shape, dtype=dtype, seed=seed)
+  else:
+    return tf.random.stateless_uniform(shape=shape, dtype=dtype, seed=seed)
 
 
 def random_normal(shape, dtype, seed):
   """Generates a sample from a standard normal distribution."""
-  # TODO(siege): Switch to stateless RNG ops.
-  return tf.random.normal(shape=shape, dtype=dtype, seed=seed)
+  if _is_stateful_seed(seed):
+    return tf.random.normal(shape=shape, dtype=dtype, seed=seed)
+  else:
+    return tf.random.stateless_normal(shape=shape, dtype=dtype, seed=seed)
 
 
 def random_categorical(logits, num_samples, seed):
   """Returns a sample from a categorical distribution. `logits` must be 2D."""
-  # TODO(siege): Switch to stateless RNG ops.
-  return tf.random.categorical(
-      logits=logits, num_samples=num_samples, seed=seed)
+  if _is_stateful_seed(seed):
+    return tf.random.categorical(
+        logits=logits, num_samples=num_samples, seed=seed)
+  else:
+    return tf.random.stateless_categorical(
+        logits=logits, num_samples=num_samples, seed=seed)
 
 
 def _eval_shape(fn, input_spec):

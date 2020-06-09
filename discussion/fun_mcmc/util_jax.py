@@ -30,6 +30,7 @@ __all__ = [
     'assert_same_shallow_tree',
     'flatten_tree',
     'inverse_fn',
+    'make_tensor_seed',
     'map_tree',
     'map_tree_up_to',
     'random_categorical',
@@ -80,19 +81,28 @@ def value_and_grad(fn, args):
   return output, extra, grad
 
 
+def make_tensor_seed(seed):
+  """Converts a seed to a `Tensor` seed."""
+  if seed is None:
+    raise ValueError('seed must not be None when using JAX')
+  return np.asarray(seed, np.uint32)
+
+
 def split_seed(seed, count):
   """Splits a seed into `count` seeds."""
-  return random.split(seed, count)
+  return random.split(make_tensor_seed(seed), count)
 
 
 def random_uniform(shape, dtype, seed):
   """Generates a sample from uniform distribution over [0., 1)."""
-  return random.uniform(shape=tuple(shape), dtype=dtype, key=seed)
+  return random.uniform(
+      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed))
 
 
 def random_normal(shape, dtype, seed):
   """Generates a sample from a standard normal distribution."""
-  return random.normal(shape=tuple(shape), dtype=dtype, key=seed)
+  return random.normal(
+      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed))
 
 
 def _searchsorted(a, v):
@@ -119,7 +129,8 @@ def random_categorical(logits, num_samples, seed):
   probs = stax.softmax(logits)
   cum_sum = np.cumsum(probs, axis=-1)
 
-  eta = random.uniform(seed, (num_samples,) + cum_sum.shape[:-1])
+  eta = random.uniform(
+      make_tensor_seed(seed), (num_samples,) + cum_sum.shape[:-1])
   cum_sum = np.broadcast_to(cum_sum, (num_samples,) + cum_sum.shape)
 
   flat_cum_sum = cum_sum.reshape([-1, cum_sum.shape[-1]])

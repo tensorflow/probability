@@ -149,7 +149,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     fun_mcmc = fun_mcmc_tf
 
   def _make_seed(self, seed):
-    return seed
+    return util.make_tensor_seed(seed)
 
   @property
   def _dtype(self):
@@ -652,10 +652,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           (x - base_mean) / base_scale), -1), ()
 
     def kernel(hmc_state, seed):
-      if not self._is_on_jax:
-        hmc_seed = _test_seed()
-      else:
-        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_seed, seed = util.split_seed(seed, 2)
       hmc_state, _ = fun_mcmc.hamiltonian_monte_carlo(
           hmc_state,
           step_size=step_size,
@@ -665,10 +662,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           seed=hmc_seed)
       return (hmc_state, seed), hmc_state.state
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -714,10 +708,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
 
     # pylint: disable=g-long-lambda
     def kernel(hmc_state, seed):
-      if not self._is_on_jax:
-        hmc_seed = _test_seed()
-      else:
-        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_seed, seed = util.split_seed(seed, 2)
       hmc_state, _ = fun_mcmc.hamiltonian_monte_carlo(
           hmc_state,
           step_size=step_size,
@@ -726,10 +717,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           seed=hmc_seed)
       return (hmc_state, seed), hmc_state.state_extra[0]
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -839,10 +827,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           orig_target_log_prob_fn, bijector, state)
 
       def kernel(hmc_state, step_size_state, step, seed):
-        if not self._is_on_jax:
-          hmc_seed = _test_seed()
-        else:
-          hmc_seed, seed = util.split_seed(seed, 2)
+        hmc_seed, seed = util.split_seed(seed, 2)
         hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
             hmc_state,
             step_size=tf.exp(step_size_state.state),
@@ -878,10 +863,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           4096, seed=self._make_seed(_test_seed()))
       return chain, log_accept_ratio_trace, true_samples
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
     chain, log_accept_ratio_trace, true_samples = computation(state, seed)
 
     log_accept_ratio_trace = log_accept_ratio_trace[num_adapt_steps:]
@@ -1047,10 +1029,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
       return tf.cast(proposal, x.dtype), ((), proposed_logits - current_logits)
 
     def kernel(rwm_state, seed):
-      if not self._is_on_jax:
-        rwm_seed = _test_seed()
-      else:
-        rwm_seed, seed = util.split_seed(seed, 2)
+      rwm_seed, seed = util.split_seed(seed, 2)
       rwm_state, rwm_extra = fun_mcmc.random_walk_metropolis(
           rwm_state,
           target_log_prob_fn=target_log_prob_fn,
@@ -1058,10 +1037,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           seed=rwm_seed)
       return (rwm_state, seed), rwm_extra
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -1305,10 +1281,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
         return tf.reduce_sum(lp, -1), ()
 
     def kernel(hmc_state, raac_state, seed):
-      if not self._is_on_jax:
-        hmc_seed = _test_seed()
-      else:
-        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_seed, seed = util.split_seed(seed, 2)
       hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
           hmc_state,
           step_size=step_size,
@@ -1319,10 +1292,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           raac_state, hmc_state.state, axis=aggregation)
       return (hmc_state, raac_state, seed), hmc_extra
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
