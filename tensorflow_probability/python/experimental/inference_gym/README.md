@@ -32,6 +32,7 @@ Each model can additionally provide:
 
 ```python
 import matplotlib.pyplot as plt
+import numpy as np
 from tensorflow_probability.experimental import inference_gym
 
 model = inference_gym.targets.GermanCreditNumericLogisticRegression()
@@ -55,10 +56,10 @@ for i, (name, sample_transformation) in enumerate(
       tf.square(sample_transformation.ground_truth_standard_deviation))
   plt.subplot(len(model.sample_transformations), 2, 2 * i + 1)
   plt.title('{} bias^2'.format(sample_transformation))  # e.g. 'Identity bias^2'
-  plt.bar(bias_sq)
+  plt.bar(np.arange(bias_sq.shape[-1]), bias_sq)
   plt.subplot(len(model.sample_transformations), 2, 2 * i + 2)
   plt.title('{} ess'.format(sample_transformation))
-  plt.bar(ess)
+  plt.bar(np.arange(ess.shape[-1]), ess)
 ```
 
 ## What makes for a good Inference Gym Model?
