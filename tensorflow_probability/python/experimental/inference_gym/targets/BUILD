@@ -40,6 +40,7 @@ multi_substrate_py_library(
         ":ill_conditioned_gaussian",
         ":item_response_theory",
         ":logistic_regression",
+        ":model",
         ":sparse_logistic_regression",
         "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
     ],
@@ -49,7 +50,7 @@ multi_substrate_py_library(
     name = "banana",
     srcs = ["banana.py"],
     deps = [
-        ":bayesian_model",
+        ":model",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
@@ -92,7 +93,7 @@ multi_substrate_py_library(
     name = "ill_conditioned_gaussian",
     srcs = ["ill_conditioned_gaussian.py"],
     deps = [
-        ":bayesian_model",
+        ":model",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
@@ -116,6 +117,7 @@ multi_substrate_py_library(
     srcs = ["item_response_theory.py"],
     deps = [
         ":bayesian_model",
+        ":model",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
@@ -140,6 +142,7 @@ multi_substrate_py_library(
     srcs = ["logistic_regression.py"],
     deps = [
         ":bayesian_model",
+        ":model",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
@@ -163,10 +166,31 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "model",
+    srcs = ["model.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:ground_truth_encoding",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "model_test",
+    srcs = ["model_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "sparse_logistic_regression",
     srcs = ["sparse_logistic_regression.py"],
     deps = [
         ":bayesian_model",
+        ":model",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",

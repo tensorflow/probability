@@ -26,6 +26,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.experimental.inference_gym.internal import data
 from tensorflow_probability.python.experimental.inference_gym.targets import bayesian_model
+from tensorflow_probability.python.experimental.inference_gym.targets import model
 from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
@@ -62,23 +63,23 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
     `*_question_ids[i]` correctly; `*_correct[i] == 0` means they didn't.
 
     Args:
-      train_student_ids: integer `tensor` with shape `[num_train_points]`.
+      train_student_ids: Integer `Tensor` with shape `[num_train_points]`.
         training student ids, ranging from 0 to `num_students`.
-      train_question_ids: integer `tensor` with shape `[num_train_points]`.
+      train_question_ids: Integer `Tensor` with shape `[num_train_points]`.
         training question ids, ranging from 0 to `num_questions`.
-      train_correct: integer `tensor` with shape `[num_train_points]`.
-        whether the student in the training set answered the question correctly,
-        either 0 or 1.
-      test_student_ids: Integer `Tensor` with shape `[num_test_points]`.
-        Testing student ids, ranging from 0 to `num_students`. Can be `None`, in
-        which case test-related sample transformations are not computed.
+      train_correct: Integer `Tensor` with shape `[num_train_points]`. Whether
+        the student in the training set answered the question correctly, either
+        0 or 1.
+      test_student_ids: Integer `Tensor` with shape `[num_test_points]`. Testing
+        student ids, ranging from 0 to `num_students`. Can be `None`, in which
+        case test-related sample transformations are not computed.
       test_question_ids: Integer `Tensor` with shape `[num_test_points]`.
         Testing question ids, ranging from 0 to `num_questions`. Can be `None`,
         in which case test-related sample transformations are not computed.
-      test_correct: Integer `Tensor` with shape `[num_test_points]`.
-        Whether the student in the testing set answered the question correctly,
-        either 0 or 1. Can be `None`, in which case test-related sample
-        transformations are not computed.
+      test_correct: Integer `Tensor` with shape `[num_test_points]`. Whether the
+        student in the testing set answered the question correctly, either 0 or
+        1. Can be `None`, in which case test-related sample transformations are
+        not computed.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -128,39 +129,51 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
           train_correct,
       )
 
-      root = tfd.JointDistributionCoroutine.Root
+      self._prior_dist = tfd.JointDistributionNamed(
+          dict(
+              mean_student_ability=tfd.Normal(0.75, 1.),
+              student_ability=tfd.Sample(
+                  tfd.Normal(0., 1.),
+                  self._num_students,
+              ),
+              question_difficulty=tfd.Sample(
+                  tfd.Normal(0., 1.),
+                  self._num_questions,
+              ),
+          ))
 
-      def model_fn(dense_y, y_mask):
-        """Model definition."""
-        mean_student_ability = yield root(
-            tfd.Normal(0.75, 1., name='mean_student_ability'))
-        student_ability = yield root(
-            tfd.Sample(
-                tfd.Normal(0., 1.),
-                dense_y.shape[0],
-                name='student_ability',
-            ))
-        question_difficulty = yield root(
-            tfd.Sample(
-                tfd.Normal(0., 1.),
-                dense_y.shape[1],
-                name='question_difficulty',
-            ))
+      def observation_noise_fn(mean_student_ability, student_ability,
+                               question_difficulty):
+        """Creates the observation noise distribution."""
         logits = (
             mean_student_ability[..., tf.newaxis, tf.newaxis] +
             student_ability[..., tf.newaxis] -
             question_difficulty[..., tf.newaxis, :])
-        # TODO(b/150949917): Use a more dedicated masking functionality.
-        masked_logits = logits * y_mask - 1e10 * (1 - y_mask)
-        yield tfd.Independent(tfd.Bernoulli(masked_logits), 2, name='correct')
+        return tfd.Bernoulli(logits)
 
-      train_joint_dist = tfd.JointDistributionCoroutine(
-          functools.partial(model_fn, train_dense_y, train_y_mask))
-      dtype = self._tuple_to_dict(train_joint_dist.dtype[:-1])
+      self._observation_noise_fn = observation_noise_fn
+
+      def log_likelihood_fn(dense_y, y_mask, reduce_sum=True, **params):
+        """The log_likelihood function."""
+        log_likelihood = observation_noise_fn(**params).log_prob(dense_y)
+        log_likelihood = tf.where(y_mask, log_likelihood,
+                                  tf.zeros_like(log_likelihood))
+        if reduce_sum:
+          return tf.reduce_sum(log_likelihood, [-1, -2])
+        else:
+          return log_likelihood
+
+      self._train_log_likelihood_fn = functools.partial(
+          log_likelihood_fn,
+          dense_y=train_dense_y,
+          y_mask=train_y_mask,
+      )
+
+      dtype = self._prior_dist.dtype
 
       sample_transformations = {
           'identity':
-              bayesian_model.BayesianModel.SampleTransformation(
+              model.Model.SampleTransformation(
                   fn=lambda params: params,
                   pretty_name='Identity',
                   dtype=dtype,
@@ -179,74 +192,53 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
             test_question_ids,
             test_correct,
         )
-        test_joint_dist = tfd.JointDistributionCoroutine(
-            functools.partial(model_fn, test_dense_y, test_y_mask))
-
-        def _get_label_dist(params):
-          # TODO(b/150897904): The seed does nothing since the model is fully
-          # conditioned.
-          distributions, _ = test_joint_dist.sample_distributions(
-              value=self._dict_to_tuple(params) + (test_dense_y,), seed=42)
-          return distributions[-1]
+        test_log_likelihood_fn = functools.partial(
+            log_likelihood_fn,
+            dense_y=test_dense_y,
+            y_mask=test_y_mask,
+        )
 
         sample_transformations['test_nll'] = (
-            bayesian_model.BayesianModel.SampleTransformation(
-                fn=lambda params: -(  # pylint: disable=g-long-lambda
-                    _get_label_dist(params).log_prob(test_dense_y)),
+            model.Model.SampleTransformation(
+                fn=lambda params: test_log_likelihood_fn(**params),
                 pretty_name='Test NLL',
             ))
 
         def _per_example_test_nll(params):
           """Computes per-example test NLL."""
-          dense_nll = _get_label_dist(params).distribution.log_prob(
-              test_dense_y)
+          dense_nll = test_log_likelihood_fn(reduce_sum=False, **params)
           return self._dense_to_sparse(test_student_ids, test_question_ids,
                                        dense_nll)
 
         sample_transformations['per_example_test_nll'] = (
-            bayesian_model.BayesianModel.SampleTransformation(
+            model.Model.SampleTransformation(
                 fn=_per_example_test_nll,
                 pretty_name='Per-example Test NLL',
             ))
 
-    self._train_joint_dist = train_joint_dist
-    self._train_correct = train_correct
     self._train_student_ids = train_student_ids
     self._train_question_ids = train_question_ids
     self._test_student_ids = test_student_ids
     self._test_question_ids = test_question_ids
-    self._evidence_val = train_dense_y
 
     super(ItemResponseTheory, self).__init__(
-        default_event_space_bijector=self._tuple_to_dict(
-            (tfb.Identity(), tfb.Identity(), tfb.Identity())),
-        event_shape=self._tuple_to_dict(train_joint_dist.event_shape[:-1]),
+        default_event_space_bijector=tf.nest.map_structure(
+            lambda _: tfb.Identity(), self._prior_dist.dtype),
+        event_shape=self._prior_dist.event_shape,
         dtype=dtype,
         name=name,
         pretty_name=pretty_name,
         sample_transformations=sample_transformations,
     )
 
-  def _tuple_to_dict(self, params):
-    return {
-        'mean_student_ability': params[0],
-        'student_ability': params[1],
-        'question_difficulty': params[2],
-    }
-
-  def _dict_to_tuple(self, params):
-    return (
-        params['mean_student_ability'],
-        params['student_ability'],
-        params['question_difficulty'],
-    )
-
   def _sparse_to_dense(self, student_ids, question_ids, correct):
     # TODO(siege): This probably should support batching, for completeness.
+    # TODO(siege): This should be rewritten via scatter_nd to support
+    # tensor-valued datasets. Blocked by JAX/Numpy not implementing scatter_nd.
     dense_y = onp.zeros([self._num_students, self._num_questions], onp.float32)
-    y_mask = onp.zeros_like(dense_y)
     dense_y[student_ids, question_ids] = correct
-    y_mask[student_ids, question_ids] = 1.
+    y_mask = onp.zeros(dense_y.shape, onp.bool)
+    y_mask[student_ids, question_ids] = True
     return dense_y, y_mask
 
   def _dense_to_sparse(self, student_ids, question_ids, dense_correct):
@@ -267,28 +259,25 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
         test_question_ids=self._test_question_ids,
         test_student_ids=self._test_student_ids,
     )
-    train_samples = self._train_joint_dist.sample(seed=seed)
+    prior_samples = self.prior_distribution().sample(seed=seed)
+    observation_noise_dist = self._observation_noise_fn(**prior_samples)
+    # This assumes that train and test student/question pairs don't overlap.
+    all_correct = observation_noise_dist.sample(seed=seed)
+
     train_correct = self._dense_to_sparse(self._train_student_ids,
-                                          self._train_question_ids,
-                                          train_samples[-1])
-    dataset['train_correct'] = train_correct
+                                          self._train_question_ids, all_correct)
+    dataset['train_correct'] = onp.array(train_correct)
     if self._have_test:
-      test_samples = self._test_joint_dist.sample(value=train_samples[:-1])
       test_correct = self._dense_to_sparse(self._test_student_ids,
-                                           self._test_question_ids,
-                                           test_samples[-1])
-      dataset['test_correct'] = test_correct
+                                           self._test_question_ids, all_correct)
+      dataset['test_correct'] = onp.array(test_correct)
     return dataset
 
-  def _joint_distribution(self):
-    return self._train_joint_dist
+  def _log_likelihood(self, value):
+    return self._train_log_likelihood_fn(**value)
 
-  def _evidence(self):
-    return self._evidence_val
-
-  def _unnormalized_log_prob(self, value):
-    return self.joint_distribution().log_prob(
-        self._dict_to_tuple(value) + (self.evidence(),))
+  def _prior_distribution(self):
+    return self._prior_dist
 
 
 class SyntheticItemResponseTheory(ItemResponseTheory):

@@ -164,12 +164,12 @@ def synthetic_item_response_theory(
 
   Returns:
     dataset: A Dict with the following keys:
-      `train_student_ids`: integer `tensor` with shape `[num_train_points]`.
+      `train_student_ids`: Integer `Tensor` with shape `[num_train_points]`.
         training student ids, ranging from 0 to `num_students`.
-      `train_question_ids`: integer `tensor` with shape `[num_train_points]`.
+      `train_question_ids`: Integer `Tensor` with shape `[num_train_points]`.
         training question ids, ranging from 0 to `num_questions`.
-      `train_correct`: integer `tensor` with shape `[num_train_points]`.
-        whether the student in the training set answered the question correctly,
+      `train_correct`: Integer `Tensor` with shape `[num_train_points]`.
+        Whether the student in the training set answered the question correctly,
         either 0 or 1.
       `test_student_ids`: Integer `Tensor` with shape `[num_test_points]`.
         Testing student ids, ranging from 0 to `num_students`.

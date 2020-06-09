@@ -24,6 +24,7 @@ from tensorflow_probability.python.experimental.inference_gym.targets.item_respo
 from tensorflow_probability.python.experimental.inference_gym.targets.item_response_theory import SyntheticItemResponseTheory
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import GermanCreditNumericLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import LogisticRegression
+from tensorflow_probability.python.experimental.inference_gym.targets.model import Model
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
 
@@ -35,6 +36,7 @@ __all__ = [
     'IllConditionedGaussian',
     'ItemResponseTheory',
     'LogisticRegression',
+    'Model',
     'SparseLogisticRegression',
     'SyntheticItemResponseTheory',
 ]

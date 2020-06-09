@@ -23,14 +23,14 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
-from tensorflow_probability.python.experimental.inference_gym.targets import bayesian_model
+from tensorflow_probability.python.experimental.inference_gym.targets import model
 
 __all__ = [
     'Banana',
 ]
 
 
-class Banana(bayesian_model.BayesianModel):
+class Banana(model.Model):
   """Creates a banana-shaped distribution.
 
   This distribution was first described in [1]. The distribution is constructed
@@ -96,7 +96,7 @@ class Banana(bayesian_model.BayesianModel):
 
       sample_transformations = {
           'identity':
-              bayesian_model.BayesianModel.SampleTransformation(
+              model.Model.SampleTransformation(
                   fn=lambda params: params,
                   pretty_name='Identity',
                   # The second dimension is a sum of scaled Chi2 and normal
@@ -123,14 +123,8 @@ class Banana(bayesian_model.BayesianModel):
         sample_transformations=sample_transformations,
     )
 
-  def _joint_distribution(self):
-    return self._banana
-
-  def _evidence(self):
-    return
-
   def _unnormalized_log_prob(self, value):
-    return self.joint_distribution().log_prob(value)
+    return self._banana.log_prob(value)
 
   def sample(self, sample_shape=(), seed=None, name='sample'):
     """Generate samples of the specified shape from the target distribution.
@@ -146,4 +140,4 @@ class Banana(bayesian_model.BayesianModel):
     Returns:
       samples: a `Tensor` with prepended dimensions `sample_shape`.
     """
-    return self.joint_distribution().sample(sample_shape, seed=seed, name=name)
+    return self._banana.sample(sample_shape, seed=seed, name=name)

@@ -31,7 +31,7 @@ tfd = tfp.distributions
 tfb = tfp.bijectors
 
 
-class TestModel(gym.targets.BayesianModel):
+class TestModel(gym.targets.Model):
 
   def __init__(self, bijector=None, ground_truth_mean=np.exp(1.5)):
     """Creates a test model.
@@ -67,17 +67,11 @@ class TestModel(gym.targets.BayesianModel):
             ),),
     )
 
-  def _joint_distribution(self):
-    return self._distribution
-
-  def _evidence(self):
-    return
-
   def _unnormalized_log_prob(self, x):
-    return self.joint_distribution().log_prob(x)
+    return self._distribution.log_prob(x)
 
   def sample(self, n, seed=None):
-    return self.joint_distribution().sample(n, seed=seed)
+    return self._distribution.sample(n, seed=seed)
 
 
 class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
