@@ -411,10 +411,9 @@ def gev_constraint(loc, scale, conc):
     3. (-inf, loc - scale / conc] if conc < 0.
   """
   def constrain(x):
-    if conc == 0:
-      return x
-    elif conc > 0:
-      return tf.math.softplus(x) + loc - scale / conc
-    else:
-      return loc - scale / conc - tf.math.softplus(x)
+    return tf.where(conc > 0.,
+                    tf.math.softplus(x) + loc - scale / conc,
+                    tf.where(tf.equal(0., conc), x,
+                             loc - scale / conc - tf.math.softplus(x)))
+
   return constrain
