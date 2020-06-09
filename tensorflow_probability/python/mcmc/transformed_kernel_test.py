@@ -81,7 +81,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
             target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.64,
             num_leapfrog_steps=2,
-            seed=_maybe_seed(55)),
+            seed=_maybe_seed(test_util.test_seed())),
         bijector=tfb.Sigmoid())
     # Recall, tfp.mcmc.sample_chain calls
     # transformed_hmc.bootstrap_results too.
@@ -111,11 +111,9 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         target.mean(),
         target.variance(),
     ])
-    self.assertAllClose(true_mean_, sample_mean_,
-                        atol=0.06, rtol=0.)
-    self.assertAllClose(true_var_, sample_var_,
-                        atol=0.01, rtol=0.1)
-    self.assertNear(0.6, is_accepted_.mean(), err=0.05)
+    self.assertAllClose(true_mean_, sample_mean_, atol=0.06, rtol=0.)
+    self.assertAllClose(true_var_, sample_var_, atol=0.01, rtol=0.1)
+    self.assertAllClose(0.6, is_accepted_.mean(), atol=0.07, rtol=0.)
 
   def test_support_works_correctly_with_MALA(self):
     num_results = 2000
@@ -126,7 +124,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         inner_kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.,
-            seed=_maybe_seed(55)),
+            seed=_maybe_seed(test_util.test_seed())),
         bijector=tfb.Sigmoid())
     # Recall, tfp.mcmc.sample_chain calls
     # transformed_hmc.bootstrap_results too.
@@ -168,7 +166,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         inner_kernel=tfp.mcmc.RandomWalkMetropolis(
             target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=1.5),
-            seed=_maybe_seed(55)),
+            seed=_maybe_seed(test_util.test_seed())),
         bijector=tfb.Sigmoid())
     # Recall, tfp.mcmc.sample_chain calls
     # transformed_hmc.bootstrap_results too.
@@ -224,7 +222,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
             # in order to get 60% acceptance, as was done in mcmc/hmc_test.py.
             step_size=[1.23 / 0.75, 1.23 / 0.5],
             num_leapfrog_steps=2,
-            seed=_maybe_seed(54)),
+            seed=_maybe_seed(test_util.test_seed())),
         bijector=[
             tfb.AffineScalar(scale=0.75),
             tfb.AffineScalar(scale=0.5),
@@ -247,11 +245,9 @@ class TransformedTransitionKernelTest(test_util.TestCase):
     sample_cov = tf.matmul(x, x, transpose_a=True) / self.dtype(num_results)
     [sample_mean_, sample_cov_, is_accepted_] = self.evaluate([
         sample_mean, sample_cov, kernel_results.inner_results.is_accepted])
-    self.assertNear(0.6, is_accepted_.mean(), err=0.05)
-    self.assertAllClose(true_mean, sample_mean_,
-                        atol=0.06, rtol=0.)
-    self.assertAllClose(true_cov, sample_cov_,
-                        atol=0., rtol=0.16)
+    self.assertAllClose(0.6, is_accepted_.mean(), atol=0.05, rtol=0.)
+    self.assertAllClose(sample_mean_, true_mean, atol=0.082, rtol=0.)
+    self.assertAllClose(sample_cov_, true_cov, atol=0., rtol=0.2)
 
   def test_bootstrap_requires_xor_args(self):
     def fake_target_log_prob(x):
