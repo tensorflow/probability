@@ -1262,6 +1262,10 @@ class NumpyTest(test_util.TestCase):
     self.assertEqual(
         nptf.float32, nptf.concat([onp.zeros(1), nptf.zeros(1)], 0).dtype)
 
+  def test_reduce_logsumexp_errors_on_int_dtype(self):
+    with self.assertRaises(TypeError):
+      nptf.reduce_logsumexp(nptf.convert_to_tensor([1, 2, 3], dtype=nptf.int32))
+
   @test_util.numpy_disable_gradient_test
   def test_while_loop_gradients(self):
 

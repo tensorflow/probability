@@ -339,6 +339,11 @@ def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
 def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
   """Computes `log(sum(exp(input_tensor))) along the specified axis."""
   input_tensor = _convert_to_tensor(input_tensor)
+  dtype = input_tensor.dtype
+  if not (np.issubdtype(dtype, np.floating)
+          or np.issubdtype(dtype, np.complexfloating)):
+    # Match TF error
+    raise TypeError('Input must be either real or complex')
   try:
     return scipy_special.logsumexp(
         input_tensor, axis=_astuple(axis), keepdims=keepdims)
