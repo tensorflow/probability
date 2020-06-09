@@ -42,19 +42,16 @@ class RWMTest(test_util.TestCase):
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target.log_prob,
             new_state_fn=tfp.mcmc.random_walk_uniform_fn(scale=dtype(2.)),
-            seed=421),
+            seed=test_util.test_seed()),
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
     sample_mean = tf.math.reduce_mean(samples, axis=0)
-    sample_std = tf.math.sqrt(
-        tf.math.reduce_mean(
-            tf.math.squared_difference(samples, sample_mean),
-            axis=0))
+    sample_std = tf.math.reduce_std(samples, axis=0)
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
-    self.assertAllClose(sample_mean_, 0., atol=0.1, rtol=0.1)
-    self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
+    self.assertAllClose(0., sample_mean_, atol=0.17, rtol=0.)
+    self.assertAllClose(1., sample_std_, atol=0.2, rtol=0.)
 
   def testRWM1DNormal(self):
     """Sampling from the Standard Normal Distribution with adaptation."""
@@ -62,30 +59,27 @@ class RWMTest(test_util.TestCase):
 
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
     samples, _ = tfp.mcmc.sample_chain(
-        num_results=1000,
-        current_state=dtype(1),
+        num_results=500,
+        current_state=dtype([1] * 8),  # 8 parallel chains
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target.log_prob,
-            seed=42),
+            seed=test_util.test_seed()),
         num_burnin_steps=500,
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(samples, axis=0)
-    sample_std = tf.math.sqrt(
-        tf.math.reduce_mean(
-            tf.math.squared_difference(samples, sample_mean),
-            axis=0))
+    sample_mean = tf.math.reduce_mean(samples, axis=(0, 1))
+    sample_std = tf.math.reduce_std(samples, axis=(0, 1))
 
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
-    self.assertAllClose(sample_mean_, 0., atol=0.2, rtol=0.2)
-    self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
+    self.assertAllClose(0., sample_mean_, atol=0.2, rtol=0.)
+    self.assertAllClose(1., sample_std_, atol=0.2, rtol=0.)
 
   def testRWM1DCauchy(self):
     """Sampling from the Standard Normal Distribution using Cauchy proposal."""
     dtype = np.float32
-    num_burnin_steps = 1000
-    num_chain_results = 500
+    num_burnin_steps = 750
+    num_chain_results = 400
 
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
@@ -95,8 +89,7 @@ class RWMTest(test_util.TestCase):
         seed_stream = tfp.util.SeedStream(
             seed, salt='RandomWalkCauchyIncrement')
         next_state_parts = [
-            state + cauchy.sample(
-                sample_shape=state.shape, seed=seed_stream())
+            state + cauchy.sample(state.shape, seed=seed_stream())
             for state in state_parts]
         return next_state_parts
       return _fn
@@ -104,22 +97,19 @@ class RWMTest(test_util.TestCase):
     samples, _ = tfp.mcmc.sample_chain(
         num_results=num_chain_results,
         num_burnin_steps=num_burnin_steps,
-        current_state=dtype(1),
+        current_state=dtype([1] * 8),  # 8 parallel chains
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target.log_prob,
             new_state_fn=cauchy_new_state_fn(scale=0.5, dtype=dtype),
-            seed=42),
+            seed=test_util.test_seed()),
         parallel_iterations=1)  # For determinism.
 
-    sample_mean = tf.math.reduce_mean(samples, axis=0)
-    sample_std = tf.math.sqrt(
-        tf.math.reduce_mean(
-            tf.math.squared_difference(samples, sample_mean),
-            axis=0))
+    sample_mean = tf.math.reduce_mean(samples, axis=(0, 1))
+    sample_std = tf.math.reduce_std(samples, axis=(0, 1))
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
 
-    self.assertAllClose(sample_mean_, 0., atol=0.2, rtol=0.2)
-    self.assertAllClose(sample_std_, 1., atol=0.1, rtol=0.1)
+    self.assertAllClose(0., sample_mean_, atol=0.2, rtol=0.)
+    self.assertAllClose(1., sample_std_, atol=0.2, rtol=0.)
 
   def testRWM2DNormal(self):
     """Sampling from a 2-D Multivariate Normal distribution."""
@@ -150,7 +140,7 @@ class RWMTest(test_util.TestCase):
         current_state=init_state,
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target_log_prob_fn=target_log_prob,
-            seed=54),
+            seed=test_util.test_seed()),
         num_burnin_steps=200,
         num_steps_between_results=1,
         parallel_iterations=1)
