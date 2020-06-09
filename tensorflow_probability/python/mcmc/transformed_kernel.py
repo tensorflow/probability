@@ -33,15 +33,11 @@ __all__ = [
     'TransformedTransitionKernel',
 ]
 
-
-class TransformedTransitionKernelResults(
-    mcmc_util.PrettyNamedTupleMixin,
-    collections.namedtuple('TransformedTransitionKernelResults',
-                           ['transformed_state',
-                            'inner_results',
-                            ])):
-  """Internal state and diagnostics for Transformed kernel."""
-  __slots__ = ()
+TransformedTransitionKernelResults = collections.namedtuple(
+    'TransformedTransitionKernelResults', [
+        'transformed_state',
+        'inner_results',
+    ])
 
 
 def make_log_det_jacobian_fn(bijector, direction):
@@ -109,6 +105,26 @@ def make_transformed_log_prob(
     return tlp + sum(ldj_fn(state_parts, event_ndims))
   return transformed_log_prob_fn
 
+
+def target_log_prob_getter(inner_kernel):
+  kernel_stack = [inner_kernel]
+  while 'target_log_prob_fn' not in inner_kernel._parameters:
+    inner_kernel = inner_kernel.inner_kernel
+    kernel_stack.append(inner_kernel)
+  return inner_kernel._parameters['target_log_prob_fn'], kernel_stack
+
+def target_log_prob_setter(kernel_stack, new_log_prob_fn):
+  # assign the target kernel with the new log_prob_fn
+  last_kernel = kernel_stack.pop()
+  last_kernel_kwargs = last_kernel._parameters.copy()
+  last_kernel_kwargs.update(target_log_prob_fn=new_log_prob_fn)
+
+  # propogate upwards
+  while kernel_stack:
+    curr_kernel = kernel_stack.pop()
+    curr_kernel._inner_kernel = type(last_kernel)(**last_kernel_kwargs)
+    last_kernel = curr_kernel
+  return last_kernel
 
 class TransformedTransitionKernel(kernel_base.TransitionKernel):
   """TransformedTransitionKernel applies a bijector to the MCMC's state space.
@@ -254,8 +270,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         bijector=bijector,
         name=name or 'transformed_kernel')
-    inner_kernel_kwargs = inner_kernel.parameters.copy()
-    target_log_prob_fn = inner_kernel_kwargs['target_log_prob_fn']
+    # target_log_prob_fn = inner_kernel_kwargs['target_log_prob_fn']
+    target_log_prob_fn, kernel_stack = target_log_prob_getter(inner_kernel)
     new_target_log_prob = make_transformed_log_prob(
         target_log_prob_fn,
         bijector,
@@ -263,9 +279,10 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         # TODO(b/72831017): Disable caching until gradient linkage
         # generally works.
         enable_bijector_caching=False)
-    inner_kernel_kwargs.update(target_log_prob_fn=new_target_log_prob)
+    inner_kernel = target_log_prob_setter(kernel_stack, new_target_log_prob)
+    inner_kernel_kwargs = inner_kernel.parameters.copy()
     with deprecation.silence():
-      self._inner_kernel = type(inner_kernel)(**inner_kernel_kwargs)
+        self._inner_kernel = type(inner_kernel)(**inner_kernel_kwargs)
     # Prebuild `_forward_transform` which is used by `one_step`.
     self._transform_unconstrained_to_target_support = make_transform_fn(
         bijector, direction='forward')
