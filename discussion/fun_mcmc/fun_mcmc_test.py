@@ -148,34 +148,55 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
   def _constant(self, value):
     return tf.constant(value, self._dtype)
 
-  def testTraceSingle(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceSingle(self, unroll):
 
     def fun(x):
       return x + 1., 2 * x
 
     x, e_trace = fun_mcmc.trace(
-        state=0., fn=fun, num_steps=5, trace_fn=lambda _, xp1: xp1)
+        state=0.,
+        fn=fun,
+        num_steps=5,
+        trace_fn=lambda _, xp1: xp1,
+        unroll=unroll)
 
     self.assertAllEqual(5., x)
     self.assertAllEqual([0., 2., 4., 6., 8.], e_trace)
 
-  def testTraceNested(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceNested(self, unroll):
 
     def fun(x, y):
       return (x + 1., y + 2.), ()
 
     (x, y), (x_trace, y_trace) = fun_mcmc.trace(
-        state=(0., 0.), fn=fun, num_steps=5, trace_fn=lambda xy, _: xy)
+        state=(0., 0.),
+        fn=fun,
+        num_steps=5,
+        trace_fn=lambda xy, _: xy,
+        unroll=unroll)
 
     self.assertAllEqual(5., x)
     self.assertAllEqual(10., y)
     self.assertAllEqual([1., 2., 3., 4., 5.], x_trace)
     self.assertAllEqual([2., 4., 6., 8., 10.], y_trace)
 
-  def testTraceTrace(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceTrace(self, unroll):
 
     def fun(x):
-      return fun_mcmc.trace(x, lambda x: (x + 1., x + 1.), 2, trace_mask=False)
+      return fun_mcmc.trace(
+          x, lambda x: (x + 1., x + 1.), 2, trace_mask=False, unroll=unroll)
 
     x, trace = fun_mcmc.trace(0., fun, 2)
     self.assertAllEqual(4., x)
@@ -190,20 +211,24 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     x = trace_n(5)
     self.assertAllEqual(5, x)
 
-  def testTraceMask(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceMask(self, unroll):
 
     def fun(x):
       return x + 1, (2 * x, 3 * x)
 
     x, (trace_1, trace_2) = fun_mcmc.trace(
-        state=0, fn=fun, num_steps=3, trace_mask=(True, False))
+        state=0, fn=fun, num_steps=3, trace_mask=(True, False), unroll=unroll)
 
     self.assertAllEqual(3, x)
     self.assertAllEqual([0, 2, 4], trace_1)
     self.assertAllEqual(6, trace_2)
 
     x, (trace_1, trace_2) = fun_mcmc.trace(
-        state=0, fn=fun, num_steps=3, trace_mask=False)
+        state=0, fn=fun, num_steps=3, trace_mask=False, unroll=unroll)
 
     self.assertAllEqual(3, x)
     self.assertAllEqual(4, trace_1)
@@ -595,7 +620,11 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(
         util.flatten_tree(proposed), util.flatten_tree(accepted))
 
-  def testBasicHMC(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testBasicHMC(self, unroll):
     step_size = self._constant(0.2)
     num_steps = 2000
     num_leapfrog_steps = 10
@@ -618,6 +647,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           step_size=step_size,
           num_integrator_steps=num_leapfrog_steps,
           target_log_prob_fn=target_log_prob_fn,
+          unroll_integrator=unroll,
           seed=hmc_seed)
       return (hmc_state, seed), hmc_state.state
 

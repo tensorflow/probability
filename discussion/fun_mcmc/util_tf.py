@@ -115,7 +115,7 @@ def _eval_shape(fn, input_spec):
   return compiled_fn, output_spec
 
 
-def trace(state, fn, num_steps, parallel_iterations=10):
+def trace(state, fn, num_steps, unroll, parallel_iterations=10):
   """TF implementation of `trace` operator, without the calling convention."""
   if tf.config.experimental_functions_run_eagerly() or tf.executing_eagerly():
     state, first_untraced, first_traced = fn(state)
@@ -146,20 +146,35 @@ def trace(state, fn, num_steps, parallel_iterations=10):
   def cond(i, *_):
     return i < num_steps
 
-  static_length = tf.get_static_value(num_steps)
+  static_num_steps = tf.get_static_value(num_steps)
+  loop_vars = (start_idx, state, first_untraced, arrays)
 
-  _, state, untraced, arrays = tf.while_loop(
-      cond=cond,
-      body=body,
-      loop_vars=(start_idx, state, first_untraced, arrays),
-      parallel_iterations=parallel_iterations,
-      maximum_iterations=static_length,
-  )
+  if unroll:
+    if static_num_steps is None:
+      raise ValueError(
+          'Cannot unroll when `num_steps` is not statically known.')
+    # TODO(siege): Investigate if using lists instead of TensorArray's is faster
+    # (like is done in the JAX backend).
+    for _ in range(start_idx, static_num_steps):
+      loop_vars = body(*loop_vars)
+    _, state, untraced, arrays = loop_vars
+  else:
+    if static_num_steps is None:
+      maximum_iterations = None
+    else:
+      maximum_iterations = static_num_steps - start_idx
+    _, state, untraced, arrays = tf.while_loop(
+        cond=cond,
+        body=body,
+        loop_vars=loop_vars,
+        parallel_iterations=parallel_iterations,
+        maximum_iterations=maximum_iterations,
+    )
 
   traced = tf.nest.map_structure(lambda a: a.stack(), arrays)
 
   def _merge_static_length(x):
-    x.set_shape(tf.TensorShape(static_length).concatenate(x.shape[1:]))
+    x.set_shape(tf.TensorShape(static_num_steps).concatenate(x.shape[1:]))
     return x
 
   traced = tf.nest.map_structure(_merge_static_length, traced)

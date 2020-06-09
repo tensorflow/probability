@@ -155,6 +155,7 @@ def trace(
     num_steps: 'IntTensor',
     trace_fn: 'Callable[[State, TensorNest], TensorNest]' = _trace_extra,
     trace_mask: 'BooleanNest' = True,
+    unroll: 'bool' = False,
     parallel_iterations: 'int' = 10,
 ) -> 'Tuple[State, TensorNest]':
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
@@ -175,6 +176,9 @@ def trace(
       `trace_fn` where the mask leaf is `False`, those subtrees are merely
       propagated, and their corresponding subtrees in `traces` correspond to
       their final value.
+    unroll: Whether to unroll the loop. This can occasionally lead to improved
+      performance at the cost of increasing the XLA optimization time. Only
+      works if `num_steps` is statically known.
     parallel_iterations: Number of iterations of the while loop to run in
       parallel.
 
@@ -254,6 +258,7 @@ def trace(
       state=state,
       fn=wrapper,
       num_steps=num_steps,
+      unroll=unroll,
       parallel_iterations=parallel_iterations,
   )
 
@@ -1154,6 +1159,7 @@ def hamiltonian_monte_carlo(
     'TensorNest]' = lambda *args: (),
     log_uniform: 'FloatTensor' = None,
     integrator_fn=None,
+    unroll_integrator: 'bool' = False,
     seed=None,
 ) -> 'Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]':
   """Hamiltonian Monte Carlo `TransitionOperator`.
@@ -1209,6 +1215,9 @@ def hamiltonian_monte_carlo(
       [0, 1], used for the MH accept/reject step.
     integrator_fn: Integrator to use for the HMC dynamics. Uses a
       `hamiltonian_integrator` with `leapfrog_step` by default.
+    unroll_integrator: Whether to unroll the loop in the integrator. Only works
+      if `num_integrator_steps` is statically known. Ignored if
+      `integrator_fn` is specified.
     seed: For reproducibility.
 
   Returns:
@@ -1239,6 +1248,7 @@ def hamiltonian_monte_carlo(
             target_log_prob_fn=target_log_prob_fn,
             kinetic_energy_fn=kinetic_energy_fn),
         kinetic_energy_fn=kinetic_energy_fn,
+        unroll=unroll_integrator,
         integrator_trace_fn=integrator_trace_fn)
 
   if momentum is None:
@@ -1293,6 +1303,7 @@ def hamiltonian_integrator(
     kinetic_energy_fn: 'PotentialFn',
     integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
     'TensorNest]' = lambda *args: (),
+    unroll: 'bool' = False,
 ) -> 'Tuple[IntegratorState, IntegratorExtras]':
   """Intergrates a discretized set of Hamiltonian equations.
 
@@ -1309,6 +1320,9 @@ def hamiltonian_integrator(
     integrator_step_fn: Instance of `IntegratorStep`.
     kinetic_energy_fn: Function to compute the kinetic energy from momentums.
     integrator_trace_fn: Trace function for the integrator.
+    unroll: Whether to unroll the loop in the integrator. Only works if
+      `num_integrator_steps` is statically known. Ignored if `integrator_fn` is
+      specified.
 
   Returns:
     integrator_state: `IntegratorState`
@@ -1367,7 +1381,9 @@ def hamiltonian_integrator(
       integrator_wrapper_state,
       integrator_wrapper,
       max_num_steps,
-      trace_fn=integrator_trace_wrapper_fn)
+      trace_fn=integrator_trace_wrapper_fn,
+      unroll=unroll,
+  )
 
   proposed_energy = (-integrator_step_extra.target_log_prob +
                      integrator_step_extra.kinetic_energy)

@@ -125,7 +125,7 @@ def random_categorical(logits, num_samples, seed):
   return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T
 
 
-def trace(state, fn, num_steps, **_):
+def trace(state, fn, num_steps, unroll, **_):
   """Implementation of `trace` operator, without the calling convention."""
   # We need the shapes and dtypes of the outputs of `fn`.
   _, untraced_spec, traced_spec = jax.eval_shape(
@@ -143,8 +143,22 @@ def trace(state, fn, num_steps, **_):
           'Cannot trace values when `num_steps` is not statically known. Pass '
           'False to `trace_mask` or return an empty structure (e.g. `()`) as '
           'the extra output.')
+    if unroll:
+      raise ValueError(
+          'Cannot unroll when `num_steps` is not statically known.')
 
-  if use_scan:
+  if unroll:
+    traced_lists = map_tree(lambda _: [], traced_spec)
+    untraced = untraced_init
+    for _ in range(num_steps):
+      state, untraced, traced_element = fn(state)
+      map_tree_up_to(traced_spec, lambda l, e: l.append(e), traced_lists,
+                     traced_element)
+    # Using asarray instead of stack to handle empty arrays correctly.
+    traced = map_tree_up_to(traced_spec,
+                            lambda l, s: np.asarray(l, dtype=s.dtype),
+                            traced_lists, traced_spec)
+  elif use_scan:
 
     def wrapper(state_untraced, _):
       state, _ = state_untraced
