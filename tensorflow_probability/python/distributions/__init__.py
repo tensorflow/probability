@@ -72,6 +72,7 @@ from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.lkj import LKJ
 from tensorflow_probability.python.distributions.logistic import Logistic
+from tensorflow_probability.python.distributions.loglogistic import LogLogistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.logitnormal import LogitNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
@@ -195,6 +196,7 @@ __all__ = [
     'Laplace',
     'LKJ',
     'Logistic',
+    'LogLogistic',
     'LogNormal',
     'LogitNormal',
     'Moyal',

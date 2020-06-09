@@ -97,6 +97,7 @@ multi_substrate_py_library(
         ":lkj",
         ":logistic",
         ":logitnormal",
+        ":loglogistic",
         ":lognormal",
         ":mixture",
         ":mixture_same_family",
@@ -1009,6 +1010,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "loglogistic",
+    srcs = ["loglogistic.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -2432,6 +2447,19 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "loglogistic_test",
+    srcs = ["loglogistic_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "lognormal_test",
     srcs = ["lognormal_test.py"],
     deps = [
@@ -3171,6 +3199,7 @@ exports_files(
         "linear_gaussian_ssm.py",
         "lkj.py",
         "logistic.py",
+        "loglogistic.py",
         "logitnormal.py",
         "lognormal.py",
         "lognormal_test.py",
