@@ -168,18 +168,12 @@ def fit(
       model=tfp.glm.BernoulliNormalCDF())
   log_likelihood = tfp.glm.BernoulliNormalCDF().log_prob(Y, linear_response)
 
-  with tf.Session() as sess:
-    [w_, linear_response_, is_converged_, num_iter_, Y_, w_true_,
-     log_likelihood_] = sess.run([
-        w, linear_response, is_converged, num_iter, Y, w_true,
-        log_likelihood])
-
-  print('is_converged: ', is_converged_)
-  print('    num_iter: ', num_iter_)
-  print('    accuracy: ', np.mean((linear_response_ > 0.) == Y_))
-  print('    deviance: ', 2. * np.mean(log_likelihood_))
-  print('||w0-w1||_2 / (1+||w0||_2): ', (np.linalg.norm(w_true_ - w_, ord=2) /
-                                         (1. + np.linalg.norm(w_true_, ord=2))))
+  print('is_converged: ', is_converged.numpy())
+  print('    num_iter: ', num_iter.numpy())
+  print('    accuracy: ', np.mean((linear_response > 0.) == tf.cast(Y, bool)))
+  print('    deviance: ', 2. * np.mean(log_likelihood))
+  print('||w0-w1||_2 / (1+||w0||_2): ', (np.linalg.norm(w_true - w, ord=2) /
+                                         (1. + np.linalg.norm(w_true, ord=2))))
 
   # ==>
   # is_converged:  True
