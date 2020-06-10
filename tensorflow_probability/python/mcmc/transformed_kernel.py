@@ -110,8 +110,8 @@ def target_log_prob_getter(kernel):
   kernel_stack = [kernel]
   while 'target_log_prob_fn' not in kernel.parameters:
     if 'inner_kernel' not in kernel.parameters:
-      raise ValueError("None of the nested `inner_kernel`s contains '
-                      '`target_log_prob_fn`")
+      raise ValueError('"None of the nested `inner_kernel`s contains a '
+                      '`target_log_prob_fn`."')
     kernel = kernel.inner_kernel
     kernel_stack.append(kernel)
   return kernel.parameters['target_log_prob_fn'], kernel_stack
