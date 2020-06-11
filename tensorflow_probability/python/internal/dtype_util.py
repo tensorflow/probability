@@ -69,10 +69,13 @@ def base_equal(a, b):
 def common_dtype(args_list, dtype_hint=None):
   """Returns explict dtype from `args_list` if there is one."""
   dtype = None
+  seen = []
   for a in tf.nest.flatten(args_list):
     if hasattr(a, 'dtype') and a.dtype:
       dt = as_numpy_dtype(a.dtype)
+      seen.append(dt)
     else:
+      seen.append(None)
       continue
     if dtype is None:
       dtype = dt
@@ -81,7 +84,8 @@ def common_dtype(args_list, dtype_hint=None):
         dtype = (np.ones([2], dtype) + np.ones([2], dt)).dtype
       else:
         raise TypeError(
-            'Found incompatible dtypes, {} and {}.'.format(dtype, dt))
+            'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
+                dtype, dt, seen))
   return dtype_hint if dtype is None else base_dtype(dtype)
 
 

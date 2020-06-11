@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
@@ -356,6 +357,10 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
     return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
 
 
+# Match the TF return type for top_k.
+TopK = collections.namedtuple('TopKV2', ['values', 'indices'])
+
+
 def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin,missing-docstring
   # This currently ignores sorted=False. However, this should be safe since
   # call sites that don't invoke sorted=True will assume results are unsorted
@@ -363,18 +368,20 @@ def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argume
   input = _convert_to_tensor(input)
   if JAX_MODE:
     # JAX automatically returns values in sorted order.
-    return jax.lax.top_k(input, k)
+    return TopK(*jax.lax.top_k(input, k))
   n = int(input.shape[-1] - 1)
   # For the values, we sort the negative entries and choose the smallest ones
   # and negate. This is equivalent to choosing the largest entries
+  values = -np.sort(-input, axis=-1)[..., :k]
   # For the indices, we could argsort and reverse the entries and choose the
   # first k entries. However, this does not work in the case of ties, since the
   # first index a value occurs at is preferred. Thus we also reverse the input
   # to ensure the last tied value becomes first, and subtract this off from the
   # last index since the list is reversed.
-  return (-np.sort(-input, axis=-1)[..., :k],
-          (n - (np.argsort(input[..., ::-1],
-                           kind='stable', axis=-1)[..., ::-1]))[..., :k])
+  indices = (
+      n - (np.argsort(input[..., ::-1], kind='stable', axis=-1)[..., ::-1])
+      )[..., :k].astype(np.int32)
+  return TopK(values, indices)
 
 
 def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
@@ -629,15 +636,15 @@ lgamma = utils.copy_docstring(
 
 log = utils.copy_docstring(
     'tf.math.log',
-    lambda x, name=None: np.log(x))
+    lambda x, name=None: np.log(_convert_to_tensor(x)))
 
 log1p = utils.copy_docstring(
     'tf.math.log1p',
-    lambda x, name=None: np.log1p(x))
+    lambda x, name=None: np.log1p(_convert_to_tensor(x)))
 
 log_sigmoid = utils.copy_docstring(
     'tf.math.log_sigmoid',
-    lambda x, name=None: -_softplus(-x))
+    lambda x, name=None: -_softplus(-_convert_to_tensor(x)))
 
 log_softmax = utils.copy_docstring(
     'tf.math.log_softmax',
@@ -756,7 +763,8 @@ not_equal = utils.copy_docstring(
 
 polygamma = utils.copy_docstring(
     'tf.math.polygamma',
-    lambda a, x, name=None: scipy_special.polygamma(a, x))
+    lambda a, x, name=None: scipy_special.polygamma(a, x).astype(  # pylint: disable=unused-argument,g-long-lambda
+        utils.common_dtype([a, x], dtype_hint=np.float32)))
 
 polyval = utils.copy_docstring(
     'tf.math.polyval',

@@ -625,7 +625,7 @@ class PercentileTestWithLinearInterpolation(
     # Since `x` is evenly distributed between 0 and 100, the percentiles are as
     # well.
     self.assertAllClose(50.1234, sample_pct)
-    self.assertAllClose(1, d_sample_pct_dq)
+    self.assertAllClose(1, d_sample_pct_dq, atol=5e-6)
 
   def test_grads_at_sample_pts_with_yes_preserve_gradients(self):
     dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
@@ -685,7 +685,7 @@ class PercentileTestWithLinearInterpolation(
     # Since `x` is evenly distributed between 0 and 100, the percentiles are as
     # well.
     self.assertAllClose(50.1234, sample_pct)
-    self.assertAllClose(1, d_sample_pct_dq)
+    self.assertAllClose(1, d_sample_pct_dq, atol=5e-6)
 
 
 @test_util.test_all_tf_execution_regimes

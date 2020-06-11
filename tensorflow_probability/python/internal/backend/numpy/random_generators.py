@@ -221,7 +221,10 @@ def _uniform(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   """Numpy uniform random sampler."""
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  if minval is not None:
+    minval = ops.convert_to_tensor(minval, dtype=dtype)
+  if maxval is not None:
+    maxval = ops.convert_to_tensor(maxval, dtype=dtype)
   if np.issubdtype(dtype, np.integer):
     if maxval is None:
       if minval is None:
