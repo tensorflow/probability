@@ -1877,6 +1877,8 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "categorical_test",
     srcs = ["categorical_test.py"],
+    # TODO(b/158762488): figure out why this test is timing out on JAX.
+    jax_size = "medium",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -2689,6 +2691,8 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "onehot_categorical_test",
     srcs = ["onehot_categorical_test.py"],
+    # TODO(b/158762488): figure out why this test is timing out on JAX.
+    jax_size = "medium",
     deps = [
         # numpy dep,
         # tensorflow dep,
