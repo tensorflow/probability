@@ -111,7 +111,7 @@ def target_log_prob_getter(kernel):
   while 'target_log_prob_fn' not in kernel.parameters:
     if 'inner_kernel' not in kernel.parameters:
       raise ValueError('"None of the nested `inner_kernel`s contains a '
-                      '`target_log_prob_fn`."')
+                       '`target_log_prob_fn`."')
     kernel = kernel.inner_kernel
     kernel_stack.append(kernel)
   return kernel.parameters['target_log_prob_fn'], kernel_stack
@@ -153,9 +153,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   of arbitrary `TransitionKernel`s, e.g., one could use bijectors
   `tfp.bijectors.Affine`, `tfp.bijectors.RealNVP`, etc. with transition kernels
   `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
-  etc. 
-  
-  If the provided `inner_kernel` doesn't have a `target_log_prob_fn`, 
+  etc.
+
+  If the provided `inner_kernel` doesn't have a `target_log_prob_fn`,
   `TransformedTransitionKernel` will iteratively look through deeper layers of
   kernels to find one that does. It will then apply the transformation to that
   `target_log_prob_fn` and propogate those changes if necessary.
@@ -169,7 +169,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     inner_kernel=tfp.mcmc.SimpleStepSizeAdaptation(
       inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
         ... # doesn't matter
-      ), 
+      ),
       num_adaptation_steps=9)
     bijector=tfb.Identity()))
   ```
