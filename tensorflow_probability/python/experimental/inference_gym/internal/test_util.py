@@ -104,8 +104,8 @@ def run_hmc_on_model(
   if seed is None:
     seed = test_util.test_seed()
   if tf.executing_eagerly():
-    # TODO(b/141368747): HMC doesn't like you passing the seed in when in
-    # eager mode.
+    # TODO(b/68017812,b/141368747): remove once eager correctly supports seed.
+    tf.random.set_seed(seed)
     seed = None
   current_state = tf.nest.map_structure(
       lambda b, e: b(  # pylint: disable=g-long-lambda
@@ -135,7 +135,8 @@ def run_hmc_on_model(
           num_results=num_steps // 2,
           num_burnin_steps=num_steps // 2,
           trace_fn=lambda _, pkr:  # pylint: disable=g-long-lambda
-          (pkr.inner_results.inner_results.is_accepted)),
+          (pkr.inner_results.inner_results.is_accepted),
+          parallel_iterations=1),
       autograph=False,
       experimental_compile=use_xla)()
 
