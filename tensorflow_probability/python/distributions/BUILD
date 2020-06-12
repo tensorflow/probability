@@ -2126,7 +2126,8 @@ multi_substrate_py_test(
     name = "generalized_pareto_test",
     size = "medium",
     srcs = ["generalized_pareto_test.py"],
-    tags = ["hypothesis"],
+    # TODO(b/158588844): re-enable once JAX log1p issues are resolved.
+    #tags = ["hypothesis"],
     deps = [
         # hypothesis dep,
         # numpy dep,
