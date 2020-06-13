@@ -105,8 +105,7 @@ def make_transformed_log_prob(
     return tlp + sum(ldj_fn(state_parts, event_ndims))
   return transformed_log_prob_fn
 
-
-def target_log_prob_getter(kernel):
+def _make_kernel_stack(kernel):
   kernel_stack = [kernel]
   while 'target_log_prob_fn' not in kernel.parameters:
     if 'inner_kernel' not in kernel.parameters:
@@ -114,14 +113,18 @@ def target_log_prob_getter(kernel):
                        '`target_log_prob_fn`."')
     kernel = kernel.inner_kernel
     kernel_stack.append(kernel)
-  return kernel.parameters['target_log_prob_fn'], kernel_stack
+  return kernel_stack
 
+def get_target_log_prob(kernel):
+  kernel_stack = _make_kernel_stack(kernel)
+  last_kernel = kernel_stack[len(kernel_stack) - 1]
+  return last_kernel.parameters['target_log_prob_fn']
 
-def target_log_prob_setter(kernel_stack, new_target_log_prob):
-  # edit the appropriate kernel with the new log_prob_fn
-  last_kernel = kernel_stack.pop()
-  last_kernel_kwargs = last_kernel.parameters.copy()
-  last_kernel_kwargs.update(target_log_prob_fn=new_target_log_prob)
+def update_target_log_prob(kernel, new_target_log_prob):
+  kernel_stack = _make_kernel_stack(kernel)
+  # get the last kernel and update to the new_target_log_prob
+  last_kernel = kernel_stack.pop().copy(target_log_prob_fn=new_target_log_prob)
+  last_kernel_kwargs = last_kernel.parameters
 
   # propogate upwards
   while kernel_stack:
@@ -130,8 +133,7 @@ def target_log_prob_setter(kernel_stack, new_target_log_prob):
       curr_kernel._inner_kernel = type(last_kernel)(**last_kernel_kwargs)
     last_kernel = curr_kernel
     last_kernel_kwargs = last_kernel.parameters
-
-  return last_kernel, last_kernel_kwargs
+  return last_kernel
 
 class TransformedTransitionKernel(kernel_base.TransitionKernel):
   """TransformedTransitionKernel applies a bijector to the MCMC's state space.
@@ -154,26 +156,6 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   `tfp.bijectors.Affine`, `tfp.bijectors.RealNVP`, etc. with transition kernels
   `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
   etc.
-
-  If the provided `inner_kernel` doesn't have a `target_log_prob_fn`,
-  `TransformedTransitionKernel` will iteratively look through deeper layers of
-  kernels to find one that does. It will then apply the transformation to that
-  `target_log_prob_fn` and propogate those changes if necessary.
-
-  For example, in the following example, since the `SimpleStepSizeAdaptation`
-  object has no `target_log_prob_fn`, that of the `HamiltonianMonteCarlo` would
-  be used.
-
-  ```python
-  tfp.mcmc.TransformedTransitionKernel(
-    inner_kernel=tfp.mcmc.SimpleStepSizeAdaptation(
-      inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
-        ... # doesn't matter
-      ),
-      num_adaptation_steps=9)
-    bijector=tfb.Identity()))
-  ```
-
 
   #### Mathematical Details
 
@@ -264,6 +246,32 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       axis=0)
   ```
 
+  #### Detailed API Contract
+
+  `TransformedTransitionKernel` operates on a `target_log_prob_fn` field, which
+  is expected to be an attribute of some `inner_kernel` (which may or may not
+  be the most immediate). If the provided `inner_kernel` doesn't have a
+  `target_log_prob_fn`, `TransformedTransitionKernel` will iteratively look
+  through deeper layers of kernels to find one that does, stopping at the first
+  one it finds (not the deepest). It will then apply the transformation to
+  that `target_log_prob_fn` and propogate those changes upwards, such that all
+  kernels that wrap around the updated one reflect that change. If it turns out
+  that no `inner_kernel` satisfies that condition, a `ValueError` will be
+  raised.
+
+  In the following example, since the `SimpleStepSizeAdaptation` object has no
+  `target_log_prob_fn`, that of the `HamiltonianMonteCarlo` would be used.
+
+  ```python
+  tfp.mcmc.TransformedTransitionKernel(
+    inner_kernel=tfp.mcmc.SimpleStepSizeAdaptation(
+      inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        ... # doesn't matter
+      ),
+      num_adaptation_steps=9)
+    bijector=tfb.Identity()))
+  ```
+
   #### References
 
   [1]: Matthew Parno and Youssef Marzouk. Transport map accelerated Markov chain
@@ -297,7 +305,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         bijector=bijector,
         name=name or 'transformed_kernel')
-    target_log_prob_fn, kernel_stack = target_log_prob_getter(self)
+    target_log_prob_fn = get_target_log_prob(self)
     new_target_log_prob = make_transformed_log_prob(
         target_log_prob_fn,
         bijector,
@@ -305,7 +313,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         # TODO(b/72831017): Disable caching until gradient linkage
         # generally works.
         enable_bijector_caching=False)
-    target_log_prob_setter(kernel_stack, new_target_log_prob)
+    self._inner_kernel = update_target_log_prob(inner_kernel,
+                                                new_target_log_prob)
     # Prebuild `_forward_transform` which is used by `one_step`.
     self._transform_unconstrained_to_target_support = make_transform_fn(
         bijector, direction='forward')
