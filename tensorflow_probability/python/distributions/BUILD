@@ -136,6 +136,7 @@ multi_substrate_py_library(
         ":vector_exponential_diag",
         ":von_mises",
         ":von_mises_fisher",
+        ":weibull",
         ":wishart",
         ":zipf",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -1715,6 +1716,23 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "weibull",
+    srcs = ["weibull.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:weibull_cdf",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "wishart",
     srcs = ["wishart.py"],
     deps = [
@@ -3059,6 +3077,19 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "weibull_test",
+    size = "medium",
+    srcs = ["weibull_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "wishart_test",
     srcs = ["wishart_test.py"],
     jax_size = "large",
@@ -3247,6 +3278,7 @@ exports_files(
         "vector_sinh_arcsinh_diag.py",
         "von_mises.py",
         "von_mises_fisher.py",
+        "weibull.py",
         "wishart.py",
         "zipf.py",
     ],

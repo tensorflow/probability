@@ -96,6 +96,7 @@ TF2_FRIENDLY_DISTS = (
     'Uniform',
     'VonMises',
     'VonMisesFisher',
+    'Weibull',
     'WishartTriL',
     'Zipf',
 )
