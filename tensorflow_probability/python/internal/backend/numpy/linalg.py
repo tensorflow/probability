@@ -41,6 +41,7 @@ try:
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_composition import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_diag import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_full_matrix import *
+  from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_householder import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_identity import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_kronecker import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_low_rank_update import *
