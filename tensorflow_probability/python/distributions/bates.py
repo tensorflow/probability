@@ -283,6 +283,11 @@ class Bates(distribution.Distribution):
 
     return assertions
 
+  def _sample_control_dependencies(self, x):
+    if not self.validate_args:
+      return []
+    return [assert_util.assert_not_nan(x, message='`value` must not be NaN')]
+
 
 # TODO(b/157665707): Investigate alternative PDF formulas / computations.
 def _bates_pdf(total_count, low, high, dtype, value):

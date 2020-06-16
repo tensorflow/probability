@@ -252,6 +252,24 @@ class BatesTest(test_util.TestCase):
     self.assertAllClose(scipy.integrate.simps(y=y, dx=dx), 1.,
                         atol=5e-05, rtol=5e-05)
 
+  def testBatesNaNs(self):
+    b = tfd.Bates(1., 0., 1., validate_args=True)
+    values_with_nans = [-1., 0., .5, 1., np.nan, 2.]
+    with self.assertRaisesRegex(ValueError, '`value` must not be NaN'):
+      self.evaluate(b.prob(values_with_nans))
+    with self.assertRaisesRegex(ValueError, '`value` must not be NaN'):
+      self.evaluate(b.cdf(values_with_nans))
+
+  def testBatesInfs(self):
+    b = tfd.Bates(1., 0., 1., validate_args=True)
+    values_with_infs = [-np.inf, 0.5, np.inf]
+    self.assertAllClose(
+        [0., 1., 0.],
+        self.evaluate(b.prob(values_with_infs)))
+    self.assertAllClose(
+        [0., .5, 1.],
+        self.evaluate(b.cdf(values_with_infs)))
+
   def testBatesCDFLowTotalCount(self):
     ns = np.array([1., 2.])
     ls = np.array([0., 1.])
