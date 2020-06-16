@@ -124,7 +124,7 @@ See [`tools/inference_gym_ground_truth/get_ground_truth.py`][get_ground_truth].
 [model]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/model.py
 [get_ground_truth]: https://github.com/tensorflow/probability/tree/master/tools/inference_gym_ground_truth/get_ground_truth.py
 [ground_truth_dir]: https://github.com/tensorflow/probability/tree/master/tools/inference_gym_ground_truth
-[bayesian_model]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/bayesian_model.py)
+[bayesian_model]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/bayesian_model.py
 [sparse_logistic_regression]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/sparse_logistic_regression.py
 [logistic_regression]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/logistic_regression.py
 [irt]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/item_response_theory.py
