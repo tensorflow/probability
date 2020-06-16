@@ -90,6 +90,7 @@ TF2_FRIENDLY_DISTS = (
     'RelaxedBernoulli',
     'ExpRelaxedOneHotCategorical',
     # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
+    'SphericalUniform',
     'StudentT',
     'Triangular',
     'TruncatedNormal',

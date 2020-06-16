@@ -126,6 +126,7 @@ multi_substrate_py_library(
         ":relaxed_onehot_categorical",
         ":sample",
         ":sinh_arcsinh",
+        ":spherical_uniform",
         ":student_t",
         ":student_t_process",
         ":transformed_distribution",
@@ -1626,6 +1627,22 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "spherical_uniform",
+    srcs = ["spherical_uniform.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "variational_gaussian_process",
     srcs = ["variational_gaussian_process.py"],
     deps = [
@@ -3015,6 +3032,20 @@ multi_substrate_py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "spherical_uniform_test",
+    srcs = ["spherical_uniform_test.py"],
+    jax_size = "medium",
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

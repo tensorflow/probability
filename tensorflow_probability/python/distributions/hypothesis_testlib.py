@@ -124,6 +124,10 @@ def fix_lkj(d):
   return dict(d, concentration=d['concentration'] + 1, dimension=3)
 
 
+def fix_spherical_uniform(d):
+  return dict(d, dimension=5, batch_shape=[])
+
+
 def fix_pert(d):
   peak = ensure_high_gt_low(d['low'], d['peak'])
   high = ensure_high_gt_low(peak, d['high'])
@@ -255,6 +259,8 @@ CONSTRAINTS = {
         lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
     'Uniform':
         lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
+    'SphericalUniform':
+        fix_spherical_uniform,
     'Wishart':
         fix_wishart,
     'WishartTriL':
@@ -526,6 +532,11 @@ def base_distributions(draw,
                 if eligibility_filter(k) and 'Empirical' in k]
     dist_name = draw(hps.sampled_from(sorted(variants)))
 
+  if dist_name == 'SphericalUniform':
+    return draw(spherical_uniforms(
+        batch_shape=batch_shape, event_dim=event_dim,
+        validate_args=validate_args))
+
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
 
@@ -587,6 +598,35 @@ def depths():
 
 def params_used(dist):
   return [k for k, v in six.iteritems(dist.parameters) if v is not None]
+
+
+@hps.composite
+def spherical_uniforms(
+    draw, batch_shape=None, event_dim=None, validate_args=True):
+  """Strategy for drawing `SphericalUniform` distributions.
+
+  The underlying distribution is drawn from the `distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `SphericalUniform` distribution.
+    event_dim: Optional Python int giving the size of the
+      distribution's event dimension.
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `UniformSphere` distributions with the
+      specified `batch_shape` (or an arbitrary one if omitted).
+  """
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes(min_ndims=0, max_side=4))
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=1, max_value=10))
+
+  result_dist = tfd.SphericalUniform(
+      dimension=event_dim, batch_shape=batch_shape, validate_args=validate_args)
+  return result_dist
 
 
 @hps.composite

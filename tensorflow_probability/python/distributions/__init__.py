@@ -102,6 +102,7 @@ from tensorflow_probability.python.distributions.relaxed_onehot_categorical impo
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
@@ -209,6 +210,7 @@ __all__ = [
     'ProbitBernoulli',
     'Sample',
     'SinhArcsinh',
+    'SphericalUniform',
     'StudentT',
     'StudentTProcess',
     'Triangular',
