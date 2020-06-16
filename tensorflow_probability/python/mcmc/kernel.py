@@ -90,16 +90,16 @@ class TransitionKernel(object):
 
     Args:
       override_parameter_kwargs: Python String/value `dictionary` of
-      initialization arguments to override with new values.
+        initialization arguments to override with new values.
 
     Returns:
-      new_kernel: A `TransitionKernel` object of same type as `self`,
-      initialized with override_parameter_kwargs
+      new_kernel: `TransitionKernel` object of same type as `self`,
+        initialized with the union of self.parameters and
+        override_parameter_kwargs, with any shared keys overridden by the
+        value of override_parameter_kwargs, i.e.,
+        `dict(self.parameters, **override_parameters_kwargs)`.
     """
     parameters = dict(self.parameters, **override_parameter_kwargs)
     new_kernel = type(self)(**parameters)
-    # pylint: disable=protected-access
-    new_kernel._parameters = parameters
-    # pylint: enable=protected-access
-    new_kernel = type(self)(**parameters)
+    new_kernel._parameters = parameters # pylint: disable=protected-access
     return new_kernel

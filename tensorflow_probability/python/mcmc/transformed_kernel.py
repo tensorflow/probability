@@ -33,11 +33,14 @@ __all__ = [
     'TransformedTransitionKernel',
 ]
 
-TransformedTransitionKernelResults = collections.namedtuple(
-    'TransformedTransitionKernelResults', [
-        'transformed_state',
-        'inner_results',
-    ])
+class TransformedTransitionKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('TransformedTransitionKernelResults',
+                           ['transformed_state',
+                            'inner_results',
+                            ])):
+  """Internal state and diagnostics for Transformed kernel."""
+  __slots__ = ()
 
 
 def make_log_det_jacobian_fn(bijector, direction):
@@ -116,24 +119,56 @@ def _make_kernel_stack(kernel):
   return kernel_stack
 
 def get_target_log_prob(kernel):
+  """Fetches the to-be-updated `target_log_prob_fn`.
+
+  Args:
+    kernel: outermost `TransitionKernel` object. The iterative search
+      will go through all nested kernels, including this one, until it
+      finds a `target_log_prob_fn`.
+
+  Returns:
+    target_log_prob_fn: The first `target_log_prob_fn` attribute found.
+      This will be both the `target_log_prob_fn` of the shallowest kernel
+      that contains one, and the one that will be updated by the
+      transformation.
+
+  Raises:
+    ValueError: if none of the `inner_kernel`s contains a "target_log_prob".
+  """
   kernel_stack = _make_kernel_stack(kernel)
-  last_kernel = kernel_stack[len(kernel_stack) - 1]
-  return last_kernel.parameters['target_log_prob_fn']
+  target_log_prob_fn = kernel_stack[-1].parameters['target_log_prob_fn']
+  return target_log_prob_fn
 
 def update_target_log_prob(kernel, new_target_log_prob):
-  kernel_stack = _make_kernel_stack(kernel)
-  # get the last kernel and update to the new_target_log_prob
-  last_kernel = kernel_stack.pop().copy(target_log_prob_fn=new_target_log_prob)
-  last_kernel_kwargs = last_kernel.parameters
+  """Updates a (potentially nested) `TransitionKernel`'s `target_log_prob_fn`.
 
-  # propogate upwards
+  Args:
+    kernel: outermost `TransitionKernel` object. The iterative search
+      will go through all nested kernels, including this one, until it
+      finds a `target_log_prob_fn` to update.
+    new_target_log_prob: Python callable that represents the intended
+      new `target_log_prob_fn`.
+
+  Returns:
+    prev_kernel: updated `TransitionKernel` object. If nested, the
+    `target_log_prob_fn` was updated in the shallowest kernel with such a
+    field. All kernels that wrap around it were appropriately reinstantiated
+    to reflect the change.
+
+  Raises:
+    ValueError: if none of the `inner_kernel`s contains a "target_log_prob".
+  """
+  kernel_stack = _make_kernel_stack(kernel)
+  # update to the new_target_log_prob
+  prev_kernel = kernel_stack.pop().copy(target_log_prob_fn=new_target_log_prob)
+
+  # propagate upwards
   while kernel_stack:
     curr_kernel = kernel_stack.pop()
     with deprecation.silence():
-      curr_kernel._inner_kernel = type(last_kernel)(**last_kernel_kwargs)
-    last_kernel = curr_kernel
-    last_kernel_kwargs = last_kernel.parameters
-  return last_kernel
+      curr_kernel._inner_kernel = type(prev_kernel)(**prev_kernel.parameters)
+    prev_kernel = curr_kernel
+  return prev_kernel
 
 class TransformedTransitionKernel(kernel_base.TransitionKernel):
   """TransformedTransitionKernel applies a bijector to the MCMC's state space.
@@ -252,15 +287,14 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   is expected to be an attribute of some `inner_kernel` (which may or may not
   be the most immediate). If the provided `inner_kernel` doesn't have a
   `target_log_prob_fn`, `TransformedTransitionKernel` will iteratively look
-  through deeper layers of kernels to find one that does, stopping at the first
-  one it finds (not the deepest). It will then apply the transformation to
-  that `target_log_prob_fn` and propogate those changes upwards, such that all
-  kernels that wrap around the updated one reflect that change. If it turns out
-  that no `inner_kernel` satisfies that condition, a `ValueError` will be
-  raised.
+  through deeper layers of `inner_kernel`s. It will ultimately apply the
+  transformation to the first `target_log_prob_fn` that it finds (not the
+  deepest) and propagate those changes upwards, such that all kernels that wrap
+  around it reflect that change. In the case that no `inner_kernel` satisfies
+  that condition, a `ValueError` will be raised.
 
   In the following example, since the `SimpleStepSizeAdaptation` object has no
-  `target_log_prob_fn`, that of the `HamiltonianMonteCarlo` would be used.
+  `target_log_prob_fn`, that of the `HamiltonianMonteCarlo` would be updated.
 
   ```python
   tfp.mcmc.TransformedTransitionKernel(
@@ -305,7 +339,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         bijector=bijector,
         name=name or 'transformed_kernel')
-    target_log_prob_fn = get_target_log_prob(self)
+    target_log_prob_fn = get_target_log_prob(inner_kernel)
     new_target_log_prob = make_transformed_log_prob(
         target_log_prob_fn,
         bijector,
@@ -412,8 +446,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         `Tensor`s representing internal calculations made within this function.
 
     Raises:
-      ValueError: if `inner_kernel` results doesn't contain the member
-        "target_log_prob".
+      ValueError: if none of the nested `inner_kernel` results contain
+        the member "target_log_prob".
 
     #### Examples
 

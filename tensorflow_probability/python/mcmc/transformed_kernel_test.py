@@ -41,7 +41,7 @@ def _maybe_seed(seed):
   return seed
 
 
-def transform_then_step(bijector):
+def make_transform_then_adapt_kernel(bijector):
   trans_kernel = tfp.mcmc.TransformedTransitionKernel(
       inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
       bijector=bijector)
@@ -50,7 +50,7 @@ def transform_then_step(bijector):
       num_adaptation_steps=9)
 
 
-def step_then_transform(bijector):
+def make_adapt_then_transform_kernel(bijector):
   step_adaptation_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
       inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
       num_adaptation_steps=9)
@@ -326,8 +326,8 @@ class TransformedTransitionKernelTest(test_util.TestCase):
             FakeInnerKernel(lambda x: -x**2 / 2, False),
             tfb.Identity()).is_calibrated)
 
-  def test_bijector_valid_transform_then_step(self):
-    new_kernel = transform_then_step(tfb.Exp())
+  def test_bijector_valid_transform_then_adapt(self):
+    new_kernel = make_transform_then_adapt_kernel(tfb.Exp())
     pkr_one, pkr_two = self.evaluate([
         new_kernel.bootstrap_results(2.),
         new_kernel.bootstrap_results(9.),
@@ -339,8 +339,8 @@ class TransformedTransitionKernelTest(test_util.TestCase):
                     pkr_two.inner_results.transformed_state,
                     err=1e-6)
 
-  def test_bijector_valid_step_then_transform(self):
-    new_kernel = step_then_transform(tfb.Exp())
+  def test_bijector_valid_adapt_then_transform(self):
+    new_kernel = make_adapt_then_transform_kernel(tfb.Exp())
     pkr_one, pkr_two = self.evaluate([
         new_kernel.bootstrap_results(2.),
         new_kernel.bootstrap_results(9.),
@@ -370,28 +370,27 @@ class TransformedTransitionKernelTest(test_util.TestCase):
                                                              kernel_results)
     adapted_step_size = self.evaluate(
         kernel_results.inner_results.accepted_results.step_size)
-    print(adapted_step_size)
     self.assertLess(adapted_step_size, 7)
 
   def test_deeply_nested(self):
-    trans_kernel = tfp.mcmc.TransformedTransitionKernel(
-        inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
-        bijector=tfb.Exp())
     step_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
-        inner_kernel=trans_kernel,
+        inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
         num_adaptation_steps=9)
     double_step_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         inner_kernel=step_kernel,
         num_adaptation_steps=9)
+    trans_kernel = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=double_step_kernel,
+        bijector=tfb.Exp())
     pkr_one, pkr_two = self.evaluate([
-        double_step_kernel.bootstrap_results(2.),
-        double_step_kernel.bootstrap_results(9.),
+        trans_kernel.bootstrap_results(2.),
+        trans_kernel.bootstrap_results(9.),
     ])
     self.assertNear(np.log(2.),
-                    pkr_one.inner_results.inner_results.transformed_state,
+                    pkr_one.transformed_state,
                     err=1e-6)
     self.assertNear(np.log(9.),
-                    pkr_two.inner_results.inner_results.transformed_state,
+                    pkr_two.transformed_state,
                     err=1e-6)
 
   def test_nested_transform(self):
