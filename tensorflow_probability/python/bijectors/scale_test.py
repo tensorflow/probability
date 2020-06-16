@@ -39,6 +39,24 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
     self.assertStartsWith(bijector.name, 'scale')
 
   @parameterized.named_parameters(
+      dict(testcase_name='float32', dtype=np.float32),
+      dict(testcase_name='float64', dtype=np.float64),
+  )
+  def testTinyScale(self, dtype):
+    log_scale = tf.cast(-2000., dtype)
+    x = tf.cast(1., dtype)
+    scale = tf.math.exp(log_scale)
+    fldj_linear = tfb.Scale(scale=scale).forward_log_det_jacobian(
+        x, event_ndims=0)
+    fldj_log = tfb.Scale(log_scale=log_scale).forward_log_det_jacobian(
+        x, event_ndims=0)
+    fldj_linear_, fldj_log_ = self.evaluate([fldj_linear, fldj_log])
+    # Using the linear scale will saturate to 0, and produce bad log-det
+    # Jacobians.
+    self.assertNotEqual(fldj_linear_, fldj_log_)
+    self.assertAllClose(-2000., fldj_log_)
+
+  @parameterized.named_parameters(
       dict(testcase_name='static_float32', is_static=True, dtype=np.float32),
       dict(testcase_name='static_float64', is_static=True, dtype=np.float64),
       dict(testcase_name='dynamic_float32', is_static=False, dtype=np.float32),
@@ -75,6 +93,18 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
   )
   def testScalarCongruency(self, dtype):
     bijector = tfb.Scale(scale=dtype(0.42))
+    bijector_test_util.assert_scalar_congruency(
+        bijector,
+        lower_x=dtype(-2.),
+        upper_x=dtype(2.),
+        eval_func=self.evaluate)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='float32', dtype=np.float32),
+      dict(testcase_name='float64', dtype=np.float64),
+  )
+  def testScalarCongruencyLogScale(self, dtype):
+    bijector = tfb.Scale(log_scale=dtype(np.log(0.42)))
     bijector_test_util.assert_scalar_congruency(
         bijector,
         lower_x=dtype(-2.),
