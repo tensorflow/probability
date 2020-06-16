@@ -1798,6 +1798,7 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "bates_test",
     srcs = ["bates_test.py"],
+    jax_size = "medium",
     shard_count = 4,
     deps = [
         # numpy dep,
