@@ -71,7 +71,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import sts
-from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
@@ -93,14 +92,9 @@ GibbsSamplerState = collections.namedtuple('GibbsSamplerState', [
 class XLACompilableInverseGamma(tfd.InverseGamma):
 
   def _sample_n(self, n, seed=None):
-    broadcast_shape = prefer_static.broadcast_shape(
-        prefer_static.shape(self.concentration),
-        prefer_static.shape(self.scale))
-    return 1. / gamma.random_gamma(
-        sample_shape=tf.concat([[n], broadcast_shape], axis=0),
-        alpha=self.concentration,
-        beta=self.scale,
-        seed=seed)
+    return 1. / tfd.Gamma(
+        concentration=self.concentration,
+        rate=self.scale).sample(n, seed=seed)
 
 
 def build_model_for_gibbs_fitting(observed_time_series,
