@@ -118,46 +118,12 @@ def _make_kernel_stack(kernel):
     kernel_stack.append(kernel)
   return kernel_stack
 
-def get_target_log_prob(kernel):
-  """Fetches the to-be-updated `target_log_prob_fn`.
-
-  Args:
-    kernel: outermost `TransitionKernel` object. The iterative search
-      will go through all nested kernels, including this one, until it
-      finds a `target_log_prob_fn`.
-
-  Returns:
-    target_log_prob_fn: The first `target_log_prob_fn` attribute found.
-      This will be both the `target_log_prob_fn` of the shallowest kernel
-      that contains one, and the one that will be updated by the
-      transformation.
-
-  Raises:
-    ValueError: if none of the `inner_kernel`s contains a "target_log_prob".
-  """
+def _find_nested_target_log_prob_recursively(kernel):
   kernel_stack = _make_kernel_stack(kernel)
   target_log_prob_fn = kernel_stack[-1].parameters['target_log_prob_fn']
   return target_log_prob_fn
 
-def update_target_log_prob(kernel, new_target_log_prob):
-  """Updates a (potentially nested) `TransitionKernel`'s `target_log_prob_fn`.
-
-  Args:
-    kernel: outermost `TransitionKernel` object. The iterative search
-      will go through all nested kernels, including this one, until it
-      finds a `target_log_prob_fn` to update.
-    new_target_log_prob: Python callable that represents the intended
-      new `target_log_prob_fn`.
-
-  Returns:
-    prev_kernel: updated `TransitionKernel` object. If nested, the
-    `target_log_prob_fn` was updated in the shallowest kernel with such a
-    field. All kernels that wrap around it were appropriately reinstantiated
-    to reflect the change.
-
-  Raises:
-    ValueError: if none of the `inner_kernel`s contains a "target_log_prob".
-  """
+def _update_target_log_prob(kernel, new_target_log_prob):
   kernel_stack = _make_kernel_stack(kernel)
   # update to the new_target_log_prob
   prev_kernel = kernel_stack.pop().copy(target_log_prob_fn=new_target_log_prob)
@@ -166,7 +132,8 @@ def update_target_log_prob(kernel, new_target_log_prob):
   while kernel_stack:
     curr_kernel = kernel_stack.pop()
     with deprecation.silence():
-      curr_kernel._inner_kernel = type(prev_kernel)(**prev_kernel.parameters)
+      updated_kernel = type(prev_kernel)(**prev_kernel.parameters)
+      curr_kernel = curr_kernel.copy(inner_kernel=updated_kernel)
     prev_kernel = curr_kernel
   return prev_kernel
 
@@ -339,7 +306,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         bijector=bijector,
         name=name or 'transformed_kernel')
-    target_log_prob_fn = get_target_log_prob(inner_kernel)
+    target_log_prob_fn = _find_nested_target_log_prob_recursively(inner_kernel)
     new_target_log_prob = make_transformed_log_prob(
         target_log_prob_fn,
         bijector,
@@ -347,8 +314,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         # TODO(b/72831017): Disable caching until gradient linkage
         # generally works.
         enable_bijector_caching=False)
-    self._inner_kernel = update_target_log_prob(inner_kernel,
-                                                new_target_log_prob)
+    self._inner_kernel = _update_target_log_prob(inner_kernel,
+                                                 new_target_log_prob)
     # Prebuild `_forward_transform` which is used by `one_step`.
     self._transform_unconstrained_to_target_support = make_transform_fn(
         bijector, direction='forward')
