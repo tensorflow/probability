@@ -28,6 +28,41 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
+
+# TODO(b/159050264): Use `tf.TensorSpec` once there's a np equivalent.
+class TensorSpec(object):
+  """Stub for tf.TensorSpec to simplify tests in np/jax backends."""
+
+  def __init__(self, shape, dtype=tf.float32, name=None):
+    self.shape = tuple(shape)
+    self.dtype = dtype
+    self._name = name
+
+  @classmethod
+  def from_tensor(cls, tensor):
+    try:
+      name = tensor.op.name
+    except AttributeError:
+      name = None
+    return cls(tensor.shape, tensor.dtype, name)
+
+  @property
+  def name(self):
+    # Name is meaningless in Eager mode.
+    if not tf.executing_eagerly():
+      return self._name
+
+  def __eq__(self, other):
+    return (
+        self.shape == other.shape
+        and self.dtype == other.dtype
+        and self.name == other.name)
+
+  def __repr__(self):
+    return 'TensorSpec(shape={}, dtype={}, name={})'.format(
+        self.shape, self.dtype, self.name)
 
 
 class LeafList(list):
@@ -177,6 +212,134 @@ class NestUtilTest(test_util.TestCase):
 
     self.assertEqual(3, nest_util.call_fn(fn, arg))
 
+  @parameterized.named_parameters({
+      'testcase_name': '_dtype_atom',
+      'value': [1, 2],
+      'dtype': tf.float32,
+      'expected': TensorSpec([2], tf.float32, name='c2t')
+  },{
+      'testcase_name': '_dtype_seq',
+      'value': [1, 2],
+      'dtype': [tf.float32, None],
+      'expected': [TensorSpec([], tf.float32, name='c2t/0'),
+                   TensorSpec([], tf.int32, name='c2t/1')]
+  },{
+      'testcase_name': '_matching_dtype_and_hint',
+      'value': [1, 2],
+      'dtype': [tf.float32, None],
+      'dtype_hint': [tf.int32, tf.int64],
+      'expected': [TensorSpec([], tf.float32, name='c2t/0'),
+                   TensorSpec([], tf.int64, name='c2t/1')]
+  },{
+      'testcase_name': '_broadcast_hint_to_dtype',
+      'value': [1, 2],
+      'dtype': [tf.float32, None],
+      'dtype_hint': tf.int64,
+      'expected': [TensorSpec([], tf.float32, name='c2t/0'),
+                   TensorSpec([], tf.int64, name='c2t/1')]
+  },{
+      'testcase_name': '_broadcast_dtype_to_hint',
+      'value': [1, 2],
+      'dtype': tf.float32,
+      'dtype_hint': [tf.int32, tf.int64],
+      'expected': [TensorSpec([], tf.float32, name='c2t/0'),
+                   TensorSpec([], tf.float32, name='c2t/1')]
+  },{
+      'testcase_name': '_dtype_dict',
+      'value': {'a': 1, 'b': 2},
+      'dtype': {'a': tf.float32, 'b': None},
+      'expected': {'a': TensorSpec([], tf.float32, name='c2t/a'),
+                   'b': TensorSpec([], tf.int32, name='c2t/b')}
+  },{
+      'testcase_name': '_dtype_dict_with_hint',
+      'value': {'a': 1, 'b': 2},
+      'dtype': {'a': tf.float32, 'b': None},
+      'dtype_hint': tf.int64,
+      'expected': {'a': TensorSpec([], tf.float32, name='c2t/a'),
+                   'b': TensorSpec([], tf.int64, name='c2t/b')}
+  },{
+      'testcase_name': '_tensor_with_hint',
+      'value': [TensorSpec([], tf.int32)],
+      'dtype_hint': [tf.float32],
+      'expected': [TensorSpec([], tf.int32, name='tensor')]
+  },{
+      'testcase_name': '_tensor_struct',
+      'value': [TensorSpec([], tf.int32), TensorSpec([], tf.float32)],
+      'dtype_hint': [tf.float32, tf.float32],
+      'expected': [TensorSpec([], tf.int32, name='tensor'),
+                   TensorSpec([], tf.float32, name='tensor_1')]
+  },{
+      'testcase_name': '_deep_structure',
+      'value': {'a': [{'b': 0}]},
+      'dtype_hint': {'a': [{'b': tf.float32}]},
+      'expected': {'a': [{'b': TensorSpec([], tf.float32, name='c2t/a.0.b')}]}
+  },{
+      'testcase_name': '_without_name',
+      'value': [0., 1.],
+      'dtype_hint': [None, None],
+      'name': None,
+      'expected': [TensorSpec([], tf.float32, name='Const'),
+                   TensorSpec([], tf.float32, name='Const_1')]
+  })
+  def testConvertToNestedTensor(
+      self, value, dtype=None, dtype_hint=None, name='c2t', expected=None):
+    # Convert specs to tensors
+    def maybe_spec_to_tensor(x):
+      if isinstance(x, TensorSpec):
+        return tf.zeros(x.shape, x.dtype, name='tensor')
+      return x
+    value = nest.map_structure(maybe_spec_to_tensor, value)
+
+    # Grab shape/dtype from convert_to_nested_tensor for comparison.
+    observed = nest.map_structure(
+        TensorSpec.from_tensor,
+        nest_util.convert_to_nested_tensor(value, dtype, dtype_hint, name=name))
+    self.assertAllEqualNested(observed, expected)
+
+  @parameterized.named_parameters({
+      'testcase_name': '_seq_length',
+      'value': [1, 2],
+      'dtype': [tf.float32, tf.int32, tf.int64],
+      'error': (ValueError, "The two structures don't have the same")
+  },{
+      'testcase_name': '_incompatible_dtype_and_hint',
+      'value': [[1,2],[3,4]],
+      'dtype': [[tf.float32, tf.int32], None],
+      'dtype_hint': [None, [tf.float64, tf.int64]],
+      'error': (ValueError, "The two structures don't have the same")
+  },{
+      'testcase_name': '_struct_of_tensors',
+      'value': [TensorSpec([])],
+      'dtype_hint': tf.float32,
+      'error': (NotImplementedError, 'Cannot convert a structure of tensors')
+  })
+  def testConvertToNestedTensorRaises(
+      self, value, dtype=None, dtype_hint=None, error=None):
+    # Convert specs to tensors
+    def maybe_spec_to_tensor(x):
+      if isinstance(x, TensorSpec):
+        return tf.zeros(x.shape, x.dtype, name='tensor')
+      return x
+    value = nest.map_structure(maybe_spec_to_tensor, value)
+
+    # Structure must be exact.
+    with self.assertRaisesRegex(*error):
+      nest_util.convert_to_nested_tensor(
+          value=value,
+          dtype=dtype,
+          dtype_hint=dtype_hint)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      disable_jax=True,
+      reason='`convert_to_tensor` happily coerces `np.ndarray`.')
+  def testConvertToNestedTensorRaises_incompatible_dtype(self):
+    # Dtype checks are strict if TF backend
+    with self.assertRaisesRegex(ValueError,
+                                'Tensor conversion requested dtype float64'):
+      nest_util.convert_to_nested_tensor(
+          value=tf.constant(1, tf.float32),
+          dtype=tf.float64)
 
 if __name__ == '__main__':
   tf.test.main()

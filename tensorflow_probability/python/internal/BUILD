@@ -227,6 +227,7 @@ multi_substrate_py_library(
     srcs = ["nest_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
     ],
 )
