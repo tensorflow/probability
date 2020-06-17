@@ -84,6 +84,7 @@ TF2_FRIENDLY_DISTS = (
     'PERT',
     'PlackettLuce',
     'Poisson',
+    'PowerSpherical',
     # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
     # for hypothesis testing
     'ProbitBernoulli',

@@ -95,6 +95,7 @@ from tensorflow_probability.python.distributions.pixel_cnn import PixelCNN
 from tensorflow_probability.python.distributions.plackett_luce import PlackettLuce
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
+from tensorflow_probability.python.distributions.power_spherical import PowerSpherical
 from tensorflow_probability.python.distributions.probit_bernoulli import ProbitBernoulli
 from tensorflow_probability.python.distributions.quantized_distribution import QuantizedDistribution
 from tensorflow_probability.python.distributions.relaxed_bernoulli import RelaxedBernoulli
@@ -240,6 +241,7 @@ __all__ = [
     'Pareto',
     'PERT',
     'PlackettLuce',
+    'PowerSpherical',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
     'Zipf',

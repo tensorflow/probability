@@ -120,6 +120,7 @@ multi_substrate_py_library(
         ":plackett_luce",
         ":poisson",
         ":poisson_lognormal",
+        ":power_spherical",
         ":probit_bernoulli",
         ":quantized_distribution",
         ":relaxed_bernoulli",
@@ -1401,6 +1402,31 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "power_spherical",
+    srcs = ["power_spherical.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        ":normal",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/math:random_ops",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -2851,6 +2877,23 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "power_spherical_test",
+    size = "medium",
+    srcs = ["power_spherical_test.py"],
+    tags = ["tf1-broken"],
+    deps = [
+        ":power_spherical",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
