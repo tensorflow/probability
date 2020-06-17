@@ -350,7 +350,7 @@ class _ParticleFilterTest(test_util.TestCase):
     true_lps = [y1_marginal_dist.log_prob(observation[0]),
                 y2_conditional_dist(observation[0]).log_prob(observation[1])]
     # The following line passes at atol = 0.01 if num_particles = 32768.
-    self.assertAllClose(true_lps, lps, atol=0.1)
+    self.assertAllClose(true_lps, lps, atol=0.2)
 
   def test_can_step_dynamics_faster_than_observations(self):
     initial_state_prior = tfd.JointDistributionNamed({
