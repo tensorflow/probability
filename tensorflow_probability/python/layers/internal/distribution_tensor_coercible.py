@@ -24,6 +24,7 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as tfd
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.util.deferred_tensor import TensorMetaClass
 from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
 
@@ -124,7 +125,7 @@ class _TensorCoercible(tfd.Distribution):
         if (not tf.is_tensor(self._concrete_value) and
             not isinstance(self._concrete_value,
                            composite_tensor.CompositeTensor)):
-          self._concrete_value = tfd._convert_to_tensor(  # pylint: disable=protected-access
+          self._concrete_value = nest_util.convert_to_nested_tensor(  # pylint: disable=protected-access
               self._concrete_value,
               name=name or 'concrete_value',
               dtype=dtype,
