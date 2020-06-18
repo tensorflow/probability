@@ -50,13 +50,13 @@ multi_substrate_py_library(
         ":linalg",
         ":minimize",
         ":numeric",
-        ":random_ops",
         ":root_search",
         ":scan_associative",
         ":sparse",
         ":special",
         "//tensorflow_probability/python/math/ode",
         "//tensorflow_probability/python/math/psd_kernels",
+        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -254,18 +254,6 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "random_ops",
-    srcs = [
-        "random_ops.py",
-    ],
-    srcs_version = "PY2AND3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:samplers",
     ],
 )
 

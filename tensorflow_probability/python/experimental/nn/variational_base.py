@@ -21,6 +21,7 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
@@ -29,7 +30,6 @@ from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.experimental.nn import layers as layers_lib
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
-from tensorflow_probability.python.math.random_ops import random_rademacher
 from tensorflow_probability.python.monte_carlo import expectation
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
@@ -254,16 +254,16 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
       # sign_input_shape = ([batch_size] +
       #                     [1] * self._rank +
       #                     [self._input_channels])
-      y *= random_rademacher(prefer_static.shape(y),
-                             dtype=y.dtype,
-                             seed=self._seed())
+      y *= tfp_random.rademacher(prefer_static.shape(y),
+                                 dtype=y.dtype,
+                                 seed=self._seed())
       kernel_perturb = normal_lib.Normal(loc=0., scale=kernel_scale)
       y = self._apply_kernel_fn(   # E.g., tf.matmul.
           y,
           kernel_perturb.sample(seed=self._seed()))
-      y *= random_rademacher(prefer_static.shape(y),
-                             dtype=y.dtype,
-                             seed=self._seed())
+      y *= tfp_random.rademacher(prefer_static.shape(y),
+                                 dtype=y.dtype,
+                                 seed=self._seed())
       y += self._apply_kernel_fn(x, kernel_loc)
 
     if bias is not None:

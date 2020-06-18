@@ -23,7 +23,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -222,7 +222,7 @@ class DoublesidedMaxwell(distribution.Distribution):
     maxwell_rvs = tf.norm(norm_rvs, axis=-1)
 
     # Generate random signs for the symmetric variates.
-    random_sign = tfp_math.random_rademacher(shape, seed=rademacher_seed)
+    random_sign = tfp_random.rademacher(shape, seed=rademacher_seed)
     sampled = random_sign * maxwell_rvs * scale + loc
     return sampled
 

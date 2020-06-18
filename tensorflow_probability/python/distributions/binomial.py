@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.internal import assert_util
@@ -136,7 +137,7 @@ def _log_concave_rejection_sampler(
     (top_lobe_fractions_seed,
      exponential_samples_seed,
      top_selector_seed,
-     random_rademacher_seed) = samplers.split_seed(
+     rademacher_seed) = samplers.split_seed(
          seed, n=4, salt='log_concave_rejection_sampler_proposal')
 
     top_lobe_fractions = samplers.uniform(
@@ -155,8 +156,8 @@ def _log_concave_rejection_sampler(
 
     unsigned_offsets = tf.where(on_top_mask, top_offsets, exponential_offsets)
     offsets = tf.round(
-        tfp_math.random_rademacher(
-            mode_shape, seed=random_rademacher_seed, dtype=dtype) *
+        tfp_random.rademacher(
+            mode_shape, seed=rademacher_seed, dtype=dtype) *
         unsigned_offsets)
 
     potential_samples = mode + offsets

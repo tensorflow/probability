@@ -49,6 +49,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import mcmc
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.experimental import auto_batching as ab
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
@@ -752,7 +753,7 @@ def _choose_direction_batched(point, seed_stream):
   with tf1.name_scope("choose_direction_batched"):
     batch_size = tf.shape(input=point.state[0])[0]
     dtype = point.state[0].dtype
-    return tfp_math.random_rademacher(
+    return tfp_random.rademacher(
         [batch_size], dtype=dtype, seed=seed_stream())
 
 

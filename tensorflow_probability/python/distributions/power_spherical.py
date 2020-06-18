@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
@@ -48,7 +49,7 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
   # raw shape: shape + [dimension]
   static_dimension = tf.get_static_value(dimension)
   if static_dimension is not None and static_dimension == 1:
-    return tfp_math.random_rademacher(
+    return tfp_random.rademacher(
         tf.concat([shape, [1]], axis=0), dtype=dtype, seed=seed)
 
   raw = samplers.normal(

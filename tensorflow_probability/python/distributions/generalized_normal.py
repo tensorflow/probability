@@ -24,7 +24,7 @@ import functools
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma
@@ -185,8 +185,8 @@ class GeneralizedNormal(distribution.Distribution):
     gamma_dist = gamma.Gamma(ipower, 1.)
     rademacher_seed, gamma_seed = samplers.split_seed(seed, salt='GenNormal')
     gamma_sample = gamma_dist.sample(n, seed=gamma_seed)
-    binary_sample = tfp_math.random_rademacher(result_shape, dtype=self.dtype,
-                                               seed=rademacher_seed)
+    binary_sample = tfp_random.rademacher(result_shape, dtype=self.dtype,
+                                          seed=rademacher_seed)
     sampled = (binary_sample * tf.math.pow(tf.abs(gamma_sample), ipower))
     return loc + scale * sampled
 

@@ -265,6 +265,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -468,6 +469,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -603,7 +605,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/math:random_ops",
+        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -1426,7 +1428,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:gradient",
-        "//tensorflow_probability/python/math:random_ops",
+        "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )

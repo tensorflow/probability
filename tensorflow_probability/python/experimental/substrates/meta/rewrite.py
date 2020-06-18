@@ -83,7 +83,7 @@ DISABLED_BY_PKG = {
          'marginalize', 'mcmc', 'nn', 'sequential', 'substrates', 'vi'),
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
-        'optimizer', 'stats', 'util')
+        'optimizer', 'random', 'stats', 'util')
 INTERNALS = (
     'assert_util',
     'batched_rejection_sampler',

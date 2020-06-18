@@ -36,7 +36,9 @@ py_library(
         "//tensorflow_probability/python/experimental/substrates/jax/stats",
         "//tensorflow_probability/python/experimental/substrates/jax/util",
         "//tensorflow_probability/python/internal/backend",
+        "//tensorflow_probability/python/math:math.jax",
         "//tensorflow_probability/python/mcmc:mcmc.jax",
         "//tensorflow_probability/python/optimizer:optimizer.jax",
+        "//tensorflow_probability/python/random:random.jax",
     ],
 )

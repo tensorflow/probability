@@ -65,6 +65,11 @@ def sanitize_seed(seed, salt=None):
     seed = tf.random.uniform([2], seed=seed, minval=np.iinfo(SEED_DTYPE).min,
                              maxval=np.iinfo(SEED_DTYPE).max, dtype=SEED_DTYPE,
                              name='seed')
+
+  # TODO(b/159209541): Consider ignoring salts for stateless seeds, for
+  # performance and because using stateless seeds already requires the
+  # discipline of splitting.
+
   if salt is not None:
     salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
     if JAX_MODE:
@@ -73,11 +78,27 @@ def sanitize_seed(seed, salt=None):
     else:
       seed = tf.bitwise.bitwise_xor(
           seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
+
   return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
 
 
 def split_seed(seed, n=2, salt=None, name=None):
-  """Splits a seed deterministically into derived seeds."""
+  """Splits a seed into `n` derived seeds.
+
+  Args:
+    seed: The seed to split; may be an `int`, an `(int, int) tuple`, or a
+      `Tensor`. `int` seeds are converted to `Tensor` seeds using
+      `tf.random.uniform` stateful sampling. Tuples are converted to `Tensor`.
+    n: The number of splits to return.
+    salt: Optional `str` salt to mix with the seed.
+    name: Optional name to scope related ops.
+
+  Returns:
+    seeds: If `n` is a Python `int`, a `tuple` of seed values is returned. If
+      `n` is an int `Tensor`, a single `Tensor` of shape `[n, 2]` is returned. A
+      single such seed is suitable to pass as the `seed` argument of the
+      `tf.random.stateless_*` ops.
+  """
   if not (isinstance(n, int) or tf.is_tensor(n)):  # avoid confusion with salt.
     raise TypeError(
         '`n` must be a python `int` or an int Tensor, got {}'.format(repr(n)))
