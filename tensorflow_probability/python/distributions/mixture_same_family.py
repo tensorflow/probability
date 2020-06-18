@@ -329,7 +329,12 @@ class MixtureSameFamily(distribution.Distribution):
             prefer_static.ones([event_ndims], dtype=tf.int32),
         ], axis=0))
 
-    ret = tf.reduce_sum(x * mask, axis=-1 - event_ndims)  # [n, B, E]
+    if x.dtype in [tf.bfloat16, tf.float16, tf.float32, tf.float64,
+                   tf.complex64, tf.complex128]:
+      masked = tf.math.multiply_no_nan(x, mask)
+    else:
+      masked = x * mask
+    ret = tf.reduce_sum(masked, axis=-1 - event_ndims)  # [n, B, E]
 
     if self._reparameterize:
       if event_shape is None:
