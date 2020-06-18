@@ -398,13 +398,12 @@ def _tf_function_mode_context(tf_function_mode):
     raise ValueError(
         'Only allowable values for tf_function_mode_context are "" '
         'and "no_tf_function"; but got "{}"'.format(tf_function_mode))
-  original_mode = tf.config.experimental_functions_run_eagerly()
+  original_mode = tf.config.functions_run_eagerly()
   try:
-    tf.config.experimental_run_functions_eagerly(tf_function_mode ==
-                                                 'no_tf_function')
+    tf.config.run_functions_eagerly(tf_function_mode == 'no_tf_function')
     yield
   finally:
-    tf.config.experimental_run_functions_eagerly(original_mode)
+    tf.config.run_functions_eagerly(original_mode)
 
 
 class EagerGraphCombination(test_combinations.TestCombination):
