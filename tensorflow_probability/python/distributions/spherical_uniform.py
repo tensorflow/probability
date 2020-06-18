@@ -65,13 +65,13 @@ class SphericalUniform(distribution.Distribution):
   ```python
   tfd = tfp.distributions
 
-  # Initialize a single 3-dimension Power Spherical distribution.
+  # Initialize a single 3-dimension SphericalUniform distribution.
   su = tfd.SphericalUniform(dimension=3, batch_shape=[])
 
   # Evaluate this on an observation in S^2 (in R^3), returning a scalar.
   su.prob([1., 0, 0])
 
-  # Initialize a batch of 3, 4-dimensional SphericalUniform distributions.
+  # Initialize a batch of 3 4-dimensional SphericalUniform distributions.
   su = tfd.SphericalUniform(dimension=4, batch_shape=[3])
   su.sample(5)  # Shape [5, 3, 4]
   ```
@@ -134,6 +134,12 @@ class SphericalUniform(distribution.Distribution):
   def dimension(self):
     """Dimension of returned unit vectors."""
     return self._dimension
+
+  def __getitem__(self, slices):
+    # The generic slicing machinery doesn't work, because the batch shape is not
+    # determined by the shape of a parameter.
+    new_batch_shape = tf.shape(tf.zeros(self.parameters['batch_shape'])[slices])
+    return self.copy(batch_shape=new_batch_shape)
 
   def _batch_shape_tensor(self):
     return self._batch_shape_parameter
