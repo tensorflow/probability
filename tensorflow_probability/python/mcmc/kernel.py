@@ -101,5 +101,4 @@ class TransitionKernel(object):
     """
     parameters = dict(self.parameters, **override_parameter_kwargs)
     new_kernel = type(self)(**parameters)
-    new_kernel._parameters = parameters # pylint: disable=protected-access
     return new_kernel

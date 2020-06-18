@@ -33,6 +33,7 @@ __all__ = [
     'TransformedTransitionKernel',
 ]
 
+
 class TransformedTransitionKernelResults(
     mcmc_util.PrettyNamedTupleMixin,
     collections.namedtuple('TransformedTransitionKernelResults',
@@ -159,6 +160,25 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
   etc.
 
+  ### Transforming nested kernels
+ 
+ `TransformedTransitionKernel` can operate on multiply nested kernels, as in the following example:
+ 
+ ```python
+ tfp.mcmc.TransformedTransitionKernel(
+   inner_kernel=tfp.mcmc.SimpleStepSizeAdaptation(
+     inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
+       ... # doesn't matter
+     ),
+     num_adaptation_steps=9)
+   bijector=tfb.Identity()))
+ ```
+ 
+ Upon construction, `TransformedTransitionKernel` searches through the "stack" of
+ nested `inner_kernel`s until it finds one with a field called
+ `target_log_prob_fn`, and replaces this with the transformed function. If no
+ `inner_kernel` has such a target log prob a `ValueError` is raised.
+
   #### Mathematical Details
 
   `TransformedTransitionKernel` enables Markov chains which operate in
@@ -248,31 +268,6 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       axis=0)
   ```
 
-  #### Detailed API Contract
-
-  `TransformedTransitionKernel` operates on a `target_log_prob_fn` field, which
-  is expected to be an attribute of some `inner_kernel` (which may or may not
-  be the most immediate). If the provided `inner_kernel` doesn't have a
-  `target_log_prob_fn`, `TransformedTransitionKernel` will iteratively look
-  through deeper layers of `inner_kernel`s. It will ultimately apply the
-  transformation to the first `target_log_prob_fn` that it finds (not the
-  deepest) and propagate those changes upwards, such that all kernels that wrap
-  around it reflect that change. In the case that no `inner_kernel` satisfies
-  that condition, a `ValueError` will be raised.
-
-  In the following example, since the `SimpleStepSizeAdaptation` object has no
-  `target_log_prob_fn`, that of the `HamiltonianMonteCarlo` would be updated.
-
-  ```python
-  tfp.mcmc.TransformedTransitionKernel(
-    inner_kernel=tfp.mcmc.SimpleStepSizeAdaptation(
-      inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
-        ... # doesn't matter
-      ),
-      num_adaptation_steps=9)
-    bijector=tfb.Identity()))
-  ```
-
   #### References
 
   [1]: Matthew Parno and Youssef Marzouk. Transport map accelerated Markov chain
@@ -288,8 +283,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     """Instantiates this object.
 
     Args:
-      inner_kernel: `TransitionKernel`-like object which has a
-        `target_log_prob_fn` argument.
+      inner_kernel: `TransitionKernel`-like object that either has a
+        `target_log_prob_fn` argument, or wraps around another `inner_kernel`
+        with said argument.
       bijector: `tfp.distributions.Bijector` or list of
         `tfp.distributions.Bijector`s. These bijectors use `forward` to map the
         `inner_kernel` state space to the state expected by
