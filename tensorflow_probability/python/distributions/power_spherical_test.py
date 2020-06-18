@@ -253,6 +253,45 @@ class _PowerSphericalTest(object):
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical, atol=2e-4)
 
+  def VerifyEntropy(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        shape=[5, dim],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    concentration = tf.math.log(
+        tf.random.uniform(
+            shape=[2, 1],
+            minval=self.dtype(1.),
+            maxval=self.dtype(100.),
+            dtype=self.dtype,
+            seed=seed_stream()))
+    uniform = tfp.distributions.PowerSpherical(
+        mean_direction=mean_direction,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
+    samples = uniform.sample(int(3e4), seed=test_util.test_seed())
+    sample_entropy = -tf.reduce_mean(uniform.log_prob(samples), axis=0)
+    true_entropy, sample_entropy = self.evaluate([
+        uniform.entropy(), sample_entropy])
+    self.assertAllClose(sample_entropy, true_entropy, rtol=3e-2)
+
+  def testEntropyDim2(self):
+    self.VerifyEntropy(dim=2)
+
+  def testEntropyDim3(self):
+    self.VerifyEntropy(dim=3)
+
+  def testEntropyDim5(self):
+    self.VerifyEntropy(dim=5)
+
+  def testEntropyDim10(self):
+    self.VerifyEntropy(dim=10)
+
   def testAssertsValidImmutableParams(self):
     with self.assertRaisesOpError('`concentration` must be non-negative'):
       pspherical = tfp.distributions.PowerSpherical(
@@ -354,6 +393,77 @@ class _PowerSphericalTest(object):
     with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(
           dist._experimental_default_event_space_bijector().inverse(x[1]))
+
+  def VerifyPowerSphericaUniformZeroKL(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        shape=[5, dim],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    # Zero concentration is the same as a uniform distribution on the sphere.
+    # Check that the KL divergence is zero.
+    concentration = self.dtype(0.)
+
+    ps = tfp.distributions.PowerSpherical(
+        mean_direction=mean_direction,
+        concentration=concentration)
+    su = tfp.distributions.SphericalUniform(dimension=dim, dtype=self.dtype)
+
+    x = ps.sample(int(5e4), seed=test_util.test_seed())
+
+    kl_sample = tf.reduce_mean(ps.log_prob(x) - su.log_prob(x), axis=0)
+    true_kl = tfp.distributions.kl_divergence(ps, su)
+    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
+    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=1e-1)
+    self.assertAllClose(true_kl_, np.zeros_like(true_kl_), atol=1e-4)
+
+  def VerifyPowerSphericaUniformKL(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        shape=[5, dim],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    concentration = tf.math.log(
+        tf.random.uniform(
+            shape=[2, 1],
+            minval=self.dtype(1.),
+            maxval=self.dtype(100.),
+            dtype=self.dtype,
+            seed=seed_stream()))
+
+    ps = tfp.distributions.PowerSpherical(
+        mean_direction=mean_direction,
+        concentration=concentration)
+    su = tfp.distributions.SphericalUniform(dimension=dim, dtype=self.dtype)
+
+    x = ps.sample(int(5e4), seed=test_util.test_seed())
+
+    kl_sample = tf.reduce_mean(ps.log_prob(x) - su.log_prob(x), axis=0)
+    true_kl = tfp.distributions.kl_divergence(ps, su)
+    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
+    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=7e-2)
+
+  def testKLPowerSphericalSphericalUniformDim2(self):
+    self.VerifyPowerSphericaUniformZeroKL(dim=2)
+    self.VerifyPowerSphericaUniformKL(dim=2)
+
+  def testKLPowerSphericalSphericalUniformDim3(self):
+    self.VerifyPowerSphericaUniformZeroKL(dim=3)
+    self.VerifyPowerSphericaUniformKL(dim=3)
+
+  def testKLPowerSphericalSphericalUniformDim5(self):
+    self.VerifyPowerSphericaUniformZeroKL(dim=5)
+    self.VerifyPowerSphericaUniformKL(dim=5)
+
+  def testKLPowerSphericalSphericalUniformDim10(self):
+    self.VerifyPowerSphericaUniformZeroKL(dim=10)
+    self.VerifyPowerSphericaUniformKL(dim=10)
 
 
 @test_util.test_all_tf_execution_regimes

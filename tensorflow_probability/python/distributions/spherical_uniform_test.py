@@ -101,6 +101,31 @@ class _SphericalUniformTest(object):
         validate_args=True, allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(uniform)
 
+  def VerifyEntropy(self, dim):
+    uniform = tfp.distributions.SphericalUniform(
+        dimension=dim,
+        batch_shape=tuple(),
+        dtype=self.dtype,
+        validate_args=True,
+        allow_nan_stats=False)
+    samples = uniform.sample(int(1e4), seed=test_util.test_seed())
+    sample_entropy = -tf.reduce_mean(uniform.log_prob(samples), axis=0)
+    true_entropy, sample_entropy = self.evaluate([
+        uniform.entropy(), sample_entropy])
+    self.assertAllClose(sample_entropy, true_entropy, rtol=1e-5)
+
+  def testEntropyDim1(self):
+    self.VerifyEntropy(dim=1)
+
+  def testEntropyDim2(self):
+    self.VerifyEntropy(dim=2)
+
+  def testEntropyDim5(self):
+    self.VerifyEntropy(dim=5)
+
+  def testEntropyDim10(self):
+    self.VerifyEntropy(dim=10)
+
   def testAssertValidSample(self):
     uniform = tfp.distributions.SphericalUniform(
         dimension=4,

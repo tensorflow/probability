@@ -162,6 +162,12 @@ class SphericalUniform(distribution.Distribution):
     unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
     return unit_norm
 
+  def _entropy(self):
+    log_nsphere_surface_area = (
+        np.log(2.) + (self.dimension / 2) * np.log(np.pi) -
+        tf.math.lgamma(tf.cast(self.dimension / 2., self.dtype)))
+    return tf.fill(self.batch_shape_tensor(), log_nsphere_surface_area)
+
   def _default_event_space_bijector(self):
     # TODO(b/145620027) Finalize choice of bijector.
     return chain_bijector.Chain([

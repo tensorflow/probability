@@ -29,6 +29,8 @@ from tensorflow_probability.python.bijectors import softmax_centered as softmax_
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import spherical_uniform
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -220,11 +222,12 @@ class PowerSpherical(distribution.Distribution):
     inner_product = tf.clip_by_value(inner_product, -1., 1.)
     return tf.math.xlog1py(concentration, inner_product)
 
-  def _log_normalization(self, concentration=None):
+  def _log_normalization(self, concentration=None, mean_direction=None):
     """Computes the log-normalizer of the distribution."""
     if concentration is None:
       concentration = tf.convert_to_tensor(self.concentration)
-    event_size = tf.cast(self.event_shape_tensor()[-1], self.dtype)
+    event_size = tf.cast(self._event_shape_tensor(
+        mean_direction=mean_direction)[-1], self.dtype)
 
     concentration1 = concentration + (event_size - 1.) / 2.
     concentration0 = (event_size - 1.) / 2.
@@ -303,6 +306,22 @@ class PowerSpherical(distribution.Distribution):
         modified_mean)
     return householder_transform.matvec(y)
 
+  def _entropy(self):
+    concentration = tf.convert_to_tensor(self.concentration)
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+    event_size = tf.cast(self._event_shape_tensor(
+        mean_direction=mean_direction)[-1], self.dtype)
+    concentration1 = concentration + (event_size - 1.) / 2.
+    concentration0 = (event_size - 1.) / 2.
+    entropy = (self._log_normalization(
+        concentration=concentration, mean_direction=mean_direction) -
+               concentration * (
+                   np.log(2.) + tf.math.digamma(concentration1) -
+                   tf.math.digamma(concentration1 + concentration0)))
+    return tf.broadcast_to(
+        entropy, self._batch_shape_tensor(
+            mean_direction=mean_direction, concentration=concentration))
+
   def _default_event_space_bijector(self):
     # TODO(b/145620027) Finalize choice of bijector.
     return chain_bijector.Chain([
@@ -336,3 +355,42 @@ class PowerSpherical(distribution.Distribution):
           assert_util.assert_non_negative(
               concentration, message='`concentration` must be non-negative'))
     return assertions
+
+
+@kullback_leibler.RegisterKL(PowerSpherical, spherical_uniform.SphericalUniform)
+def _kl_power_uniform_spherical(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b).
+
+  Args:
+    a: instance of a PowerSpherical distribution object.
+    b: instance of a SphericalUniform distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_power_uniform_spherical".
+
+  Returns:
+    Batchwise KL(a || b)
+
+  Raises:
+    ValueError: If the two distributions are over spheres of different
+      dimensions.
+
+  #### References
+
+  [1] Nicola de Cao, Wilker Aziz. The Power Spherical distribution.
+      https://arxiv.org/abs/2006.04437.
+  """
+  with tf.name_scope(name or 'kl_power_uniform_spherical'):
+    msg = (
+        'Can not compute the KL divergence between a `PowerSpherical` and '
+        '`SphericalUniform` of different dimensions.')
+    deps = []
+    if a.event_shape[-1] is not None:
+      if a.event_shape[-1] != b.dimension:
+        raise ValueError(
+            (msg + 'Got {} vs. {}').format(a.event_shape[-1], b.dimension))
+    elif a.validate_args or b.validate_args:
+      deps += [assert_util.assert_equal(
+          a.event_shape_tensor()[-1], b.dimension, message=msg)]
+
+    with tf.control_dependencies(deps):
+      return b.entropy() - a.entropy()
