@@ -33,7 +33,7 @@ Each model can additionally provide:
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
-from tensorflow_probability.experimental import inference_gym
+from tensorflow_probability.python.experimental import inference_gym
 
 model = inference_gym.targets.GermanCreditNumericLogisticRegression()
 
