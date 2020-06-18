@@ -161,9 +161,10 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   etc.
 
   ### Transforming nested kernels
- 
- `TransformedTransitionKernel` can operate on multiply nested kernels, as in the following example:
- 
+
+ `TransformedTransitionKernel` can operate on multiply nested kernels, as in
+ the following example:
+
  ```python
  tfp.mcmc.TransformedTransitionKernel(
    inner_kernel=tfp.mcmc.SimpleStepSizeAdaptation(
@@ -173,9 +174,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
      num_adaptation_steps=9)
    bijector=tfb.Identity()))
  ```
- 
- Upon construction, `TransformedTransitionKernel` searches through the "stack" of
- nested `inner_kernel`s until it finds one with a field called
+
+ Upon construction, `TransformedTransitionKernel` searches through the "stack"
+ of nested `inner_kernel`s until it finds one with a field called
  `target_log_prob_fn`, and replaces this with the transformed function. If no
  `inner_kernel` has such a target log prob a `ValueError` is raised.
 
