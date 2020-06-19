@@ -440,7 +440,7 @@ LINOP_FILES = [
     srcs = [],
     outs = ["{}_gen.py".format(filename)],
     cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
-           "--module_name={} --whitelist={} > $@").format(
+           "--module_name={} --allowlist={} > $@").format(
         filename,
         ",".join(LINOP_FILES),
     ),
@@ -454,7 +454,7 @@ LINOP_FILES = [
     srcs = [],
     outs = ["gen_new/{}.py".format(filename)],
     cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
-           "--module_name={} --whitelist={} > $@").format(
+           "--module_name={} --allowlist={} > $@").format(
         filename,
         ",".join(LINOP_FILES),
     ),

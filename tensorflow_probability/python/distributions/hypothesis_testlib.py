@@ -69,7 +69,7 @@ MUTEX_PARAMS = (
 )
 
 
-# Whitelist of underlying distributions for QuantizedDistribution (must have
+# Allowlist of underlying distributions for QuantizedDistribution (must have
 # continuous, infinite support -- QuantizedDistribution also works for finite-
 # support distributions for which the length of the support along each dimension
 # is at least 1, though it is difficult to construct draws of these
@@ -308,7 +308,7 @@ def _instantiable_base_dists():
   - The class appears as a symbol binding in `tfp.distributions`;
   - The class defines a `_params_event_ndims` method (necessary
     to generate parameter Tensors with predictable batch shapes); and
-  - The name is not blacklisted in `SPECIAL_DISTS`.
+  - The name is not blocklisted in `SPECIAL_DISTS`.
 
   Additionally, the Empricial distribution is hardcoded with special
   instantiation rules for each choice of event_ndims among 0, 1, and 2.
@@ -517,7 +517,7 @@ def base_distributions(draw,
       initialization in slicing_test.  If `False`, the returned parameters are
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn at the top level.
     validate_args: Python `bool`; whether to enable runtime assertions.
 
@@ -655,7 +655,7 @@ def batch_reshapes(
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
 
@@ -717,7 +717,7 @@ def independents(
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
 
@@ -796,7 +796,7 @@ def transformed_distributions(draw,
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
 
@@ -865,7 +865,7 @@ def quantized_distributions(draw,
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
       initialization in slicing_test.  If `False`, the returned parameters are
       all Tensors, never Variables or DeferredTensor.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
 
@@ -974,7 +974,7 @@ def mixtures_same_family(draw,
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
 
@@ -1052,7 +1052,7 @@ def mixtures(draw,
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
 
@@ -1132,7 +1132,7 @@ def distributions(draw,
     depth: Python `int` giving maximum nesting depth of compound Distributions.
       If `None`, Hypothesis will bias choose one, with a bias towards shallow
       nests.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
 

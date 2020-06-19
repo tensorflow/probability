@@ -26,11 +26,11 @@ from tensorflow_probability.python.experimental.substrates.jax import tf2jax as 
 from tensorflow_probability.python.internal._jax import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal._jax import test_util
 
-JIT_SAMPLE_BLACKLIST = set()
-JIT_LOGPROB_BLACKLIST = set()
+JIT_SAMPLE_BLOCKLIST = set()
+JIT_LOGPROB_BLOCKLIST = set()
 
-VMAP_SAMPLE_BLACKLIST = set()
-VMAP_LOGPROB_BLACKLIST = set()
+VMAP_SAMPLE_BLOCKLIST = set()
+VMAP_LOGPROB_BLOCKLIST = set()
 
 test_all_distributions = parameterized.named_parameters(
     {'testcase_name': dname, 'dist_name': dname} for dname in
@@ -43,7 +43,7 @@ class JitTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testSample(self, dist_name, data):
-    if dist_name in JIT_SAMPLE_BLACKLIST:
+    if dist_name in JIT_SAMPLE_BLOCKLIST:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
@@ -57,7 +57,7 @@ class JitTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testLogProb(self, dist_name, data):
-    if dist_name in JIT_LOGPROB_BLACKLIST:
+    if dist_name in JIT_LOGPROB_BLOCKLIST:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
@@ -72,7 +72,7 @@ class VmapTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testSample(self, dist_name, data):
-    if dist_name in VMAP_SAMPLE_BLACKLIST:
+    if dist_name in VMAP_SAMPLE_BLOCKLIST:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
@@ -85,7 +85,7 @@ class VmapTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testLogProb(self, dist_name, data):
-    if dist_name in VMAP_LOGPROB_BLACKLIST:
+    if dist_name in VMAP_LOGPROB_BLOCKLIST:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))

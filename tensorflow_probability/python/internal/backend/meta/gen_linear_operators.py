@@ -31,8 +31,8 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('module_name', '', 'TF linalg module to transform')
 flags.DEFINE_list(
-    'whitelist', '',
-    'TF linalg module whitelist (other imports will be commented-out)')
+    'allowlist', '',
+    'TF linalg module allowlist (other imports will be commented-out)')
 
 MODULE_MAPPINGS = {
     'framework import dtypes': 'dtype as dtypes',
@@ -103,7 +103,7 @@ def gen_module(module_name):
   code = code.replace(
       'from tensorflow.python.ops.linalg import ',
       '# from tensorflow.python.ops.linalg import ')
-  for f in FLAGS.whitelist:
+  for f in FLAGS.allowlist:
     code = code.replace(
         '# from tensorflow.python.ops.linalg '
         'import {}'.format(f),

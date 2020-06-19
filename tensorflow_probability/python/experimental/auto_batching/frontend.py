@@ -319,7 +319,7 @@ class _AutoBatchingTransformer(transformer.Base):
     # We want the root names of any attribute accesses; the accesses will happen
     # inside the expression.
     used_vars = set().union(*[qn.support_set for qn in scope.read])
-    # Exclude names from the blacklist.
+    # Exclude names from the blocklist.
     used_vars = list(used_vars - set(non_autobatch_names))
     # Exclude names that will be available from the enclosing scope.
     used_vars = [v for v in used_vars if str(v) not in self.enclosing_names]

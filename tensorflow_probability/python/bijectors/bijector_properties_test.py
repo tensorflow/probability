@@ -122,7 +122,7 @@ NO_LDJ_GRADS_EXPECTED = {
     'Shift': dict(shift={FLDJ, ILDJ}),
 }
 
-TRANSFORM_DIAGONAL_WHITELIST = {
+TRANSFORM_DIAGONAL_ALLOWLIST = {
     'AffineScalar',
     'BatchNormalization',
     'DiscreteCosineTransform',
@@ -226,7 +226,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     bijector_name: Optional Python `str`.  If given, the produced bijectors
       will all have this type.  If omitted, Hypothesis chooses one from
-      the whitelist `TF2_FRIENDLY_BIJECTORS`.
+      the allowlist `TF2_FRIENDLY_BIJECTORS`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
       bijector.  Hypothesis will pick one if omitted.
     event_dim: Optional Python int giving the size of each of the underlying
@@ -272,7 +272,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   elif bijector_name == 'TransformDiagonal':
     underlying_name = draw(
         hps.sampled_from(sorted(
-            set(allowed_bijectors) & set(TRANSFORM_DIAGONAL_WHITELIST))))
+            set(allowed_bijectors) & set(TRANSFORM_DIAGONAL_ALLOWLIST))))
     underlying = draw(
         bijectors(
             bijector_name=underlying_name,
