@@ -40,6 +40,135 @@ def _w0(z):
   return scipy_special.lambertw(z, k=0)
 
 
+class RoundExponentialBumpFunctionTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testValueOnSupportInterior(self, dtype):
+    # round_exponential_bump_function(x) = 0 for x right at the edge of the
+    # support, e.g. x = -0.999.  This is expected, due to the exponential and
+    # division.
+    x = tf.convert_to_tensor([
+        -0.9925,
+        -0.5,
+        0.,
+        0.5,
+        0.9925
+    ], dtype=dtype)
+    y = tfp_math.round_exponential_bump_function(x)
+
+    self.assertDTypeEqual(y, dtype)
+
+    y_ = self.evaluate(y)
+
+    self.assertAllFinite(y_)
+
+    # round_exponential_bump_function(0) = 1.
+    self.assertAllClose(1., y_[2])
+
+    # round_exponential_bump_function(x) > 0 for |x| < 1.
+    self.assertAllGreater(y_, 0)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testGradientOnSupportInterior(self, dtype):
+    # round_exponential_bump_function(x) = 0 for x right at the edge of the
+    # support, e.g. x = -0.999.  This is expected, due to the exponential and
+    # division.
+    x = tf.convert_to_tensor([
+        -0.9925,
+        -0.5,
+        0.,
+        0.5,
+        0.9925
+    ], dtype=dtype)
+
+    _, dy_dx = tfp_math.value_and_gradient(
+        tfp_math.round_exponential_bump_function, x)
+
+    self.assertDTypeEqual(dy_dx, dtype)
+
+    dy_dx_ = self.evaluate(dy_dx)
+
+    # grad[round_exponential_bump_function](0) = 0
+    self.assertEqual(0., dy_dx_[2])
+    self.assertAllFinite(dy_dx_)
+
+    # Increasing on (-1, 0), decreasing on (0, 1).
+    self.assertAllGreater(dy_dx_[:2], 0)
+    self.assertAllLess(dy_dx_[-2:], 0)
+
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testValueOutsideAndOnEdgeOfSupport(self, dtype):
+    finfo = np.finfo(dtype)
+    x = tf.convert_to_tensor([
+        # Sqrt(finfo.max)**2 = finfo.max < Inf, so
+        # round_exponential_bump_function == 0 here.
+        -np.sqrt(finfo.max),
+        # -2 is just outside the support, so round_exponential_bump_function
+        # should == 0.
+        -2.,
+        # -1 is on boundary of support, so round_exponential_bump_function
+        # should == 0.
+        # The gradient should also equal 0.
+        -1.,
+        1.,
+        2.0,
+        np.sqrt(finfo.max),
+    ],
+                             dtype=dtype)
+    y = tfp_math.round_exponential_bump_function(x)
+
+    self.assertDTypeEqual(y, dtype)
+
+    y_ = self.evaluate(y)
+
+    # We hard-set y to 0 outside support.
+    self.assertAllFinite(y_)
+    self.assertAllEqual(y_, np.zeros((6,)))
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testGradientOutsideAndOnEdgeOfSupport(self, dtype):
+    finfo = np.finfo(dtype)
+    x = tf.convert_to_tensor([
+        # Sqrt(finfo.max)**2 = finfo.max < Inf, so
+        # round_exponential_bump_function == 0 here.
+        -np.sqrt(finfo.max),
+        # -2 is just outside the support, so round_exponential_bump_function
+        # should == 0.
+        -2.,
+        # -1 is on boundary of support, so round_exponential_bump_function
+        # should == 0.
+        # The gradient should also equal 0.
+        -1.,
+        1.,
+        2.0,
+        np.sqrt(finfo.max),
+    ],
+                             dtype=dtype)
+    _, dy_dx = tfp_math.value_and_gradient(
+        tfp_math.round_exponential_bump_function, x)
+
+    self.assertDTypeEqual(dy_dx, dtype)
+
+    dy_dx_ = self.evaluate(dy_dx)
+
+    # Since x is outside the support, the gradient is zero.
+    self.assertAllEqual(dy_dx_, np.zeros((6,)))
+
+
 class SpecialTest(test_util.TestCase):
 
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
@@ -126,7 +255,9 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(naive_64, sophisticated_64, atol=1e-6, rtol=4e-4)
     # Check that we don't lose accuracy in single precision, at least relative
     # to ourselves.
-    self.assertAllClose(sophisticated, sophisticated_64, atol=1e-8, rtol=1e-6)
+    atol = 1e-8
+    rtol = 1e-6
+    self.assertAllClose(sophisticated, sophisticated_64, atol=atol, rtol=rtol)
 
   def testLogGammaDifferenceGradient(self):
     def simple_difference(x, y):
@@ -169,10 +300,11 @@ class SpecialTest(test_util.TestCase):
     #   by DiDonato and Morris 1988
     # - Could be that tf.math.lgamma is less accurate than scipy
     # - Could be that scipy evaluates in 64 bits internally
+    atol = 1e-7
     rtol = 1e-5
     self.assertAllClose(
         scipy_special.betaln(x, y), tfp_math.lbeta(x, y),
-        atol=1e-7, rtol=rtol)
+        atol=atol, rtol=rtol)
 
   def testLogBetaGradient(self):
     def simple_lbeta(x, y):
@@ -207,6 +339,7 @@ class SpecialTest(test_util.TestCase):
     y = tf.constant([3., 4.], dtype=dtype)
     result = tfp_math.lbeta(x, y)
     self.assertEqual(result.dtype, dtype)
+
 
 if __name__ == "__main__":
   tf.test.main()

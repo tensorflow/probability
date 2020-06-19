@@ -60,6 +60,7 @@ from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
 from tensorflow_probability.python.math.special import log_gamma_correction
 from tensorflow_probability.python.math.special import log_gamma_difference
+from tensorflow_probability.python.math.special import round_exponential_bump_function
 from tensorflow_probability.python.random import rademacher as random_rademacher
 from tensorflow_probability.python.random import rayleigh as random_rayleigh
 
@@ -72,6 +73,7 @@ random_rayleigh = deprecation.deprecated(
     '2020-09-20', 'Use tfp.random.rayleigh')(random_rayleigh)
 
 _allowed_symbols = [
+    'round_exponential_bump_function',
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
     'cholesky_concat',

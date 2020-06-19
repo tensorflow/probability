@@ -29,12 +29,48 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
+    'round_exponential_bump_function',
     'lambertw',
     'lambertw_winitzki_approx',
     'log_gamma_correction',
     'log_gamma_difference',
     'lbeta',
 ]
+
+
+def round_exponential_bump_function(x, name=None):
+  r"""Function supported on [-1, 1], smooth on the real line, with a round top.
+
+  Define
+
+  ```
+  f(x) := exp(-1 / (1 - x**2)) * exp(1), for x in (-1, 1)
+  f(x) := 0, for |x| >= 1.
+  ```
+
+  One can show that f(x)...
+
+  * is C^\infty on the real line.
+  * is supported on [-1, 1].
+  * is equal to 1 at x = 0.
+  * is strictly increasing on (-1, 0).
+  * is strictly decreasing on (0, 1).
+  * has gradient = 0 at 0.
+
+  See [Bump Function](https://en.wikipedia.org/wiki/Bump_function)
+
+  Args:
+    x: Floating-point Tensor.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    y: Tensor of same shape and dtype as `x`.
+  """
+  with tf.name_scope(name or 'round_exponential_bump_function'):
+    x = tf.convert_to_tensor(x, name='x')
+    one_m_x2 = 1 - x**2
+    y = tf.math.exp(1. - tf.math.reciprocal_no_nan(one_m_x2))
+    return tf.where(one_m_x2 > 0., y, 0.)
 
 
 def lambertw_winitzki_approx(z, name=None):

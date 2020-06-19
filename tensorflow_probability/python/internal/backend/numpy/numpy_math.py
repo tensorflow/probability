@@ -115,6 +115,7 @@ __all__ = [
     'pow',
     'real',
     'reciprocal',
+    'reciprocal_no_nan',
     'reduce_all',
     'reduce_any',
     # 'reduce_euclidean_norm',
@@ -781,6 +782,16 @@ real = utils.copy_docstring(
 reciprocal = utils.copy_docstring(
     'tf.math.reciprocal',
     lambda x, name=None: np.reciprocal(x))
+
+
+def _reciprocal_no_nan(x, name=None):  # pylint: disable=unused-argument
+  x_is_zero = np.equal(x, 0.)
+  safe_x = np.where(x_is_zero, 1., x)
+  return np.where(x_is_zero, 0., np.reciprocal(safe_x))
+
+
+reciprocal_no_nan = utils.copy_docstring(
+    'tf.math.reciprocal_no_nan', _reciprocal_no_nan)
 
 
 def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # pylint: disable=unused-argument
