@@ -114,7 +114,6 @@ from tensorflow_probability.python.distributions.variational_gaussian_process im
 from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
-from tensorflow_probability.python.distributions.weibull import Weibull
 from tensorflow_probability.python.distributions.wishart import WishartLinearOperator
 from tensorflow_probability.python.distributions.wishart import WishartTriL
 from tensorflow_probability.python.distributions.zipf import Zipf
@@ -228,7 +227,6 @@ __all__ = [
     'Multinomial',
     'VonMises',
     'VonMisesFisher',
-    'Weibull',
     'WishartLinearOperator',
     'WishartTriL',
     'TransformedDistribution',

@@ -79,8 +79,7 @@ class WeibullCDF(bijector.Bijector):
           forward_min_event_ndims=0,
           validate_args=validate_args,
           parameters=parameters,
-          name=name,
-          dtype=dtype)
+          name=name)
 
   @property
   def scale(self):
@@ -116,10 +115,10 @@ class WeibullCDF(bijector.Bijector):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       scale = tf.convert_to_tensor(self.scale)
       concentration = tf.convert_to_tensor(self.concentration)
-      one = tf.constant(1., dtype=self.dtype)
-      return (-(x / scale)**concentration +
-              tf.math.xlogy(concentration - one, x) +
-              tf.math.log(concentration) - concentration * tf.math.log(scale))
+      return (-(x / scale) ** concentration +
+              tf.math.xlogy(concentration - 1, x) +
+              tf.math.log(concentration) -
+              concentration * tf.math.log(scale))
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args:
