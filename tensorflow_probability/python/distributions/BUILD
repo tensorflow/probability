@@ -1830,6 +1830,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "batch_reshape_test",
+    size = "medium",
     srcs = ["batch_reshape_test.py"],
     numpy_tags = ["notap"],
     deps = [
@@ -2178,6 +2179,7 @@ multi_substrate_py_test(
     srcs = ["gaussian_process_regression_model_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         ":distributions",
         # absl/testing:parameterized dep,
@@ -2362,6 +2364,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["joint_distribution_auto_batched_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2797,6 +2800,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "pert_test",
+    size = "medium",
     srcs = ["pert_test.py"],
     deps = [
         # numpy dep,
