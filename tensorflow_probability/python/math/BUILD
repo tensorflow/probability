@@ -92,6 +92,7 @@ multi_substrate_py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
+        ":scan_associative",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",

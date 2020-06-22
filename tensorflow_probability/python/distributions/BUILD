@@ -456,6 +456,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:generic",
     ],
 )
 
