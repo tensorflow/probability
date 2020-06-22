@@ -81,10 +81,10 @@ def left_justified_expand_dims_to(x, rank, name=None):
   with tf.name_scope(name or 'left_justified_expand_dims_to'):
     rank = tf.convert_to_tensor(rank, dtype=tf.int32)
     expand_ndims = prefer_static.maximum(rank - prefer_static.rank(x), 0)
-    expand_shape = prefer_static.pad(
-        prefer_static.shape(x),
-        paddings=[[0, expand_ndims]],
-        constant_values=1)
+    expand_shape = prefer_static.concat(
+        [prefer_static.shape(x),
+         prefer_static.ones(shape=[expand_ndims], dtype=tf.int32)],
+        axis=0)
     return prefer_static.reshape(x, expand_shape)
 
 

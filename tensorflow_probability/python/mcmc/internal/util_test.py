@@ -96,6 +96,33 @@ class ChooseTest(test_util.TestCase):
     expected = [expected_array]
     self.assertAllEqual(expected, chosen_)
 
+  @test_util.jax_disable_test_missing_functionality('no tf.TensorSpec')
+  @test_util.numpy_disable_test_missing_functionality('no tf.TensorSpec')
+  def test_conserves_partial_shapes(self):
+    # Testing that `choose` correctly propagates shape information about the
+    # arms, even when those shapes are partial and when the shape of the
+    # condition is partial as well.
+    input_signature = [tf.TensorSpec([], tf.int32)]
+    @tf.function(input_signature=input_signature)
+    def try_me(batch_size):
+      # The while loop is necessary for this test, because it affects TF's shape
+      # inference behavior somehow (maybe another appearance of b/139013403?).
+      init = tf.zeros([batch_size, 1])
+      def body_fn(state):
+        arm_1 = state
+        arm_2 = tf.ones([batch_size, 1])
+        condition = tf.ones([batch_size], dtype=tf.bool)
+        result = util.choose(condition, arm_1, arm_2)
+        # The test is the automatic check inside `tf.while_loop` that the static
+        # shape returned here is the same as the static shape of the input
+        # `state`.
+        return result
+      tf.while_loop(
+          cond=lambda *_: False,
+          body=body_fn,
+          loop_vars=(init,))
+    try_me(5)
+
 
 class IsNamedTupleLikeTest(test_util.TestCase):
 

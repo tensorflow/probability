@@ -255,6 +255,31 @@ class SampleChainTest(test_util.TestCase):
         any('supplied `TransitionKernel` is not calibrated.' in str(
             warning.message) for warning in triggered))
 
+  @test_util.jax_disable_test_missing_functionality('no tf.TensorSpec')
+  @test_util.numpy_disable_test_missing_functionality('no tf.TensorSpec')
+  def testReproduceBug159550941(self):
+    # Reproduction for b/159550941.
+    input_signature = [tf.TensorSpec([], tf.int32)]
+
+    @tf.function(input_signature=input_signature)
+    def sample(chains):
+      initial_state = tf.zeros([chains, 1])
+      def log_prob(x):
+        return tf.reduce_sum(tfp.distributions.Normal(0, 1).log_prob(x), -1)
+      kernel = tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=log_prob,
+          num_leapfrog_steps=3,
+          step_size=1e-3)
+      return tfp.mcmc.sample_chain(
+          num_results=5,
+          num_burnin_steps=4,
+          current_state=initial_state,
+          kernel=kernel,
+          trace_fn=None)
+
+    # Checking that shape inference doesn't fail.
+    sample(2)
+
 
 if __name__ == '__main__':
   tf.test.main()
