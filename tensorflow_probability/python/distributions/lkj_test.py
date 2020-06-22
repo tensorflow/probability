@@ -354,7 +354,7 @@ class LKJTest(test_util.TestCase):
     self.assertEqual(mean.shape, [3, 3, 3])
     # tfd.LKJ has some small numerical issues, so we allow for some amount of
     # numerical tolerance when testing means.
-    numerical_tolerance = 1e-6
+    numerical_tolerance = 1e-5
     check1 = st.assert_true_mean_in_interval_by_dkwm(
         samples=results, low=-1., high=1.,
         expected_low=mean - numerical_tolerance,
@@ -383,7 +383,7 @@ class LKJTest(test_util.TestCase):
     self.assertEqual(mean.shape, [3, 6, 6])
     # tfd.LKJ has some small numerical issues, so we allow for some amount of
     # numerical tolerance when testing means.
-    numerical_tolerance = 1e-6
+    numerical_tolerance = 1e-5
     check1 = st.assert_true_mean_in_interval_by_dkwm(
         samples=results, low=-1., high=1.,
         expected_low=mean - numerical_tolerance,
