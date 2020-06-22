@@ -1709,7 +1709,10 @@ def running_variance_init(shape: 'IntTensor',
   return RunningVarianceState(
       num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
       mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
-      variance=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
+      # The initial value of variance is discarded upon the first update, but
+      # setting it to something reasonable (ones) is convenient in case the
+      # state is read before an update.
+      variance=util.map_tree_up_to(dtype, tf.ones, shape, dtype),
   )
 
 
@@ -1719,6 +1722,7 @@ def running_variance_step(
     axis: 'Union[int, List[int]]' = None,
     window_size: 'IntNest' = None,
 ) -> 'Tuple[RunningVarianceState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningVarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1733,6 +1737,8 @@ def running_variance_step(
   Note that this produces a biased estimate of variance, for simplicity. If the
   unbiased estimate is required, compute it as follows: `state.variance *
   state.num_points / (state.num_points - 1)`.
+
+  The algorithm is adapted from [1].
 
   Args:
     state: `RunningVarianceState`.
@@ -1750,41 +1756,35 @@ def running_variance_step(
   Returns:
     state: `RunningVarianceState`.
     extra: Empty tuple.
+
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
   """
 
   def _one_part(vec, mean, variance, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
-    # pyformat: disable
-    # These are derived by using the definition of variance for N and N + 1
-    # points, and then identifying the previous terms/simplifying.
+
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
-      new_variance = (
-          num_points_f * (num_points_f + additional_points_f) * variance +
-          num_points_f * tf.square(centered_vec)) / (
-              tf.square(num_points_f + additional_points_f))
+      vec_mean = vec
+      vec_variance = tf.zeros_like(variance)
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.cast(
-          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      new_variance = (
-          num_points_f * (num_points_f + additional_points_f) * variance +
-          num_points_f * tf.reduce_sum(tf.square(centered_vec), axis) -
-          tf.square(tf.reduce_sum(vec, axis)) + additional_points_f *
-          tf.reduce_sum(tf.square(vec), axis)) / (
-              tf.square(num_points_f + additional_points_f))
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    # pyformat: enable
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+      vec_variance = tf.math.reduce_variance(vec, axis)
+    mean_diff = vec_mean - mean
+    mean_diff_sq = tf.square(mean_diff)
+    variance_diff = vec_variance - variance
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
+    new_variance = (
+        variance + variance_diff * weight + weight *
+        (1. - weight) * mean_diff_sq)
     return new_mean, new_variance, num_points + additional_points
 
   new_mean_variance_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1822,16 +1822,15 @@ def running_covariance_init(shape: 'IntTensor',
       num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
       mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
       covariance=util.map_tree_up_to(
+          # The initial value of covariance is discarded upon the first update,
+          # but setting it to something reasonable (the identity matrix) is
+          # convenient in case the state is read before an update.
           dtype,
-          lambda shape, dtype: tf.zeros(  # pylint: disable=g-long-lambda
-              tf.concat(
-                  [
-                      tf.convert_to_tensor(shape),
-                      tf.convert_to_tensor(shape[-1:]),
-                  ],
-                  axis=0,
-              ),
-              dtype=dtype),
+          lambda shape, dtype: tf.eye(  # pylint: disable=g-long-lambda
+              shape[-1],
+              batch_shape=shape[:-1],
+              dtype=dtype,
+          ),
           shape,
           dtype),
   )
@@ -1843,6 +1842,7 @@ def running_covariance_step(
     axis: 'Union[int, List[int]]' = None,
     window_size: 'IntNest' = None,
 ) -> 'Tuple[RunningCovarianceState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningCovarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1862,6 +1862,8 @@ def running_covariance_step(
   the unbiased estimate is required, compute it as follows: `state.covariance *
   state.num_points / (state.num_points - 1)`.
 
+  The algorithm is adapted from [1].
+
   Args:
     state: `RunningCovarianceState`.
     vec: A Tensor to incorporate into the variance estimate.
@@ -1878,46 +1880,35 @@ def running_covariance_step(
   Returns:
     state: `RunningCovarianceState`.
     extra: Empty tuple.
-  """
 
-  def _outer(x):
-    res = tf.einsum('...i,...j->...ij', x, x)
-    return res
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
+  """
 
   def _one_part(vec, mean, covariance, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
-
-    # pyformat: disable
-    # These are derived by using the definition of covariance for N and N + 1
-    # points, and then identifying the previous terms/simplifying.
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
-      new_covariance = (
-          num_points_f * (num_points_f + additional_points_f) * covariance +
-          num_points_f * _outer(centered_vec)) / (
-              tf.square(num_points_f + additional_points_f))
+      vec_mean = vec
+      vec_covariance = tf.zeros_like(covariance)
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.cast(
-          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      new_covariance = (
-          num_points_f * (num_points_f + additional_points_f) * covariance +
-          num_points_f * tf.reduce_sum(_outer(centered_vec), axis) -
-          _outer(tf.reduce_sum(vec, axis)) + additional_points_f *
-          tf.reduce_sum(_outer(vec), axis)) / (
-              tf.square(num_points_f + additional_points_f))
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    # pyformat: enable
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+      vec_covariance = tfp.stats.covariance(vec, sample_axis=axis)
+    mean_diff = vec_mean - mean
+    mean_diff_sq = (
+        mean_diff[..., :, tf.newaxis] * mean_diff[..., tf.newaxis, :])
+    covariance_diff = vec_covariance - covariance
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
+    new_covariance = (
+        covariance + covariance_diff * weight + weight *
+        (1. - weight) * mean_diff_sq)
     return new_mean, new_covariance, num_points + additional_points
 
   new_mean_covariance_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1964,6 +1955,7 @@ def running_mean_step(
     axis: 'Union[int, List[int]]' = None,
     window_size: 'IntNest' = None,
 ) -> 'Tuple[RunningMeanState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningMeanState`.
 
   As a computational convenience, this allows computing both independent
@@ -1973,6 +1965,8 @@ def running_mean_step(
   - vec shape: [3, 4], axis=0 -> mean shape: [4]
   - vec shape: [3, 4], axis=1 -> mean shape: [3]
   - vec shape: [3, 4], axis=[0, 1] -> mean shape: []
+
+  The algorithm is adapted from [1].
 
   Args:
     state: `RunningMeanState`.
@@ -1990,27 +1984,27 @@ def running_mean_step(
   Returns:
     state: `RunningMeanState`.
     extra: Empty tuple.
+
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
   """
 
   def _one_part(vec, mean, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
+      vec_mean = vec
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.cast(
-          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+    mean_diff = vec_mean - mean
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
     return new_mean, num_points + additional_points
 
   new_mean_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -2242,6 +2236,7 @@ def running_approximate_auto_covariance_step(
       )
     num_steps = tf.reshape(num_steps, steps_shape)
 
+    # TODO(siege): Simplify this to look like running_variance_step.
     # pyformat: disable
     if axis is None:
       additional_points = 1

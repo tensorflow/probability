@@ -37,9 +37,7 @@ from discussion.fun_mcmc import fun_mcmc_lib as fun_mc
 from typing import Any, Optional, Tuple
 
 tf = backend.tf
-tfp = backend.tfp
 util = backend.util
-tfb = tfp.bijectors
 
 __all__ = [
     'AdaptiveHamiltonianMonteCarloState',
