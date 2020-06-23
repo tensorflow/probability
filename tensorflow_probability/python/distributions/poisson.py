@@ -276,7 +276,7 @@ class Poisson(distribution.Distribution):
     # The log-probability at negative points is always -inf.
     # Catch such x's and set the output value accordingly.
     safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
-    y = safe_x * log_rate - tf.math.lgamma(1. + safe_x)
+    y = tf.math.multiply_no_nan(log_rate, safe_x) - tf.math.lgamma(1. + safe_x)
     return tf.where(
         tf.equal(x, safe_x), y, dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
 
@@ -332,9 +332,9 @@ class Poisson(distribution.Distribution):
     assertions = []
     if self._rate is not None:
       if is_init != tensor_util.is_ref(self._rate):
-        assertions.append(assert_util.assert_positive(
+        assertions.append(assert_util.assert_non_negative(
             self._rate,
-            message='Argument `rate` must be positive.'))
+            message='Argument `rate` must be non-negative.'))
     return assertions
 
   def _sample_control_dependencies(self, x):
