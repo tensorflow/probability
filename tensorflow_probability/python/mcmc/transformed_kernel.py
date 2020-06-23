@@ -110,6 +110,39 @@ def make_transformed_log_prob(
   return transformed_log_prob_fn
 
 
+def _make_kernel_stack(kernel):
+  kernel_stack = [kernel]
+  while 'target_log_prob_fn' not in kernel.parameters:
+    if 'inner_kernel' not in kernel.parameters:
+      raise ValueError('"None of the nested `inner_kernel`s contains a '
+                       '`target_log_prob_fn`."')
+    kernel = kernel.inner_kernel
+    kernel_stack.append(kernel)
+  return kernel_stack
+
+
+def _find_nested_target_log_prob_recursively(kernel):
+  kernel_stack = _make_kernel_stack(kernel)
+  target_log_prob_fn = kernel_stack[-1].parameters['target_log_prob_fn']
+  return target_log_prob_fn
+
+
+def _update_target_log_prob(kernel, new_target_log_prob):
+  """Replaces `target_log_prob_fn` of outermost `inner_kernel` of `kernel`."""
+  kernel_stack = _make_kernel_stack(kernel)
+  # Update to target_log_prob to `new_target_log_prob`.
+  prev_kernel = kernel_stack.pop().copy(target_log_prob_fn=new_target_log_prob)
+
+  # Propagate the change upwards by reconstructing wrapper kernels.
+  while kernel_stack:
+    curr_kernel = kernel_stack.pop()
+    with deprecation.silence():
+      updated_kernel = type(prev_kernel)(**prev_kernel.parameters)
+      curr_kernel = curr_kernel.copy(inner_kernel=updated_kernel)
+    prev_kernel = curr_kernel
+  return prev_kernel
+
+
 class TransformedTransitionKernel(kernel_base.TransitionKernel):
   """TransformedTransitionKernel applies a bijector to the MCMC's state space.
 
@@ -131,6 +164,27 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   `tfp.bijectors.Affine`, `tfp.bijectors.RealNVP`, etc. with transition kernels
   `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
   etc.
+
+  ### Transforming nested kernels
+
+  `TransformedTransitionKernel` can operate on multiply nested kernels, as in
+  the following example:
+
+  ```python
+  tfp.mcmc.TransformedTransitionKernel(
+    inner_kernel=tfp.mcmc.SimpleStepSizeAdaptation(
+      inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        ... # doesn't matter
+      ),
+      num_adaptation_steps=9)
+    bijector=tfb.Identity()))
+  ```
+
+  Upon construction, `TransformedTransitionKernel` searches the given
+  `inner_kernel` and the "stack" of nested kernels in any `inner_kernel`
+  fields thereof until it finds one with a field called `target_log_prob_fn`,
+  and replaces this with the transformed function. If no
+  `inner_kernel` has such a target log prob a `ValueError` is raised.
 
   #### Mathematical Details
 
@@ -236,8 +290,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     """Instantiates this object.
 
     Args:
-      inner_kernel: `TransitionKernel`-like object which has a
-        `target_log_prob_fn` argument.
+      inner_kernel: `TransitionKernel`-like object that either has a
+        `target_log_prob_fn` argument, or wraps around another `inner_kernel`
+        with said argument.
       bijector: `tfp.distributions.Bijector` or list of
         `tfp.distributions.Bijector`s. These bijectors use `forward` to map the
         `inner_kernel` state space to the state expected by
@@ -254,8 +309,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         bijector=bijector,
         name=name or 'transformed_kernel')
-    inner_kernel_kwargs = inner_kernel.parameters.copy()
-    target_log_prob_fn = inner_kernel_kwargs['target_log_prob_fn']
+    target_log_prob_fn = _find_nested_target_log_prob_recursively(inner_kernel)
     new_target_log_prob = make_transformed_log_prob(
         target_log_prob_fn,
         bijector,
@@ -263,9 +317,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         # TODO(b/72831017): Disable caching until gradient linkage
         # generally works.
         enable_bijector_caching=False)
-    inner_kernel_kwargs.update(target_log_prob_fn=new_target_log_prob)
-    with deprecation.silence():
-      self._inner_kernel = type(inner_kernel)(**inner_kernel_kwargs)
+    self._inner_kernel = _update_target_log_prob(inner_kernel,
+                                                 new_target_log_prob)
     # Prebuild `_forward_transform` which is used by `one_step`.
     self._transform_unconstrained_to_target_support = make_transform_fn(
         bijector, direction='forward')
@@ -363,8 +416,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         `Tensor`s representing internal calculations made within this function.
 
     Raises:
-      ValueError: if `inner_kernel` results doesn't contain the member
-        "target_log_prob".
+      ValueError: if none of the nested `inner_kernel` results contain
+        the member "target_log_prob".
 
     #### Examples
 

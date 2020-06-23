@@ -31,7 +31,7 @@ from tensorflow_probability.python.internal import test_util
 
 
 FakeInnerKernelResults = collections.namedtuple(
-    'FakeInnerKernelResults', ['target_log_prob'])
+    'FakeInnerKernelResults', ['target_log_prob', 'step_size'])
 
 
 def _maybe_seed(seed):
@@ -41,12 +41,35 @@ def _maybe_seed(seed):
   return seed
 
 
+def make_transform_then_adapt_kernel(bijector):
+  trans_kernel = tfp.mcmc.TransformedTransitionKernel(
+      inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
+      bijector=bijector)
+  return tfp.mcmc.SimpleStepSizeAdaptation(
+      inner_kernel=trans_kernel,
+      num_adaptation_steps=9)
+
+
+def make_adapt_then_transform_kernel(bijector):
+  step_adaptation_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+      inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
+      num_adaptation_steps=9)
+  return tfp.mcmc.TransformedTransitionKernel(
+      inner_kernel=step_adaptation_kernel,
+      bijector=bijector)
+
+
+def fake_target_log_prob(x):
+  return -x**2 / 2.
+
+
 class FakeInnerKernel(tfp.mcmc.TransitionKernel):
   """Fake Transition Kernel."""
 
-  def __init__(self, target_log_prob_fn, is_calibrated=True):
+  def __init__(self, target_log_prob_fn, is_calibrated=True, step_size=10):
     self._parameters = dict(
-        target_log_prob_fn=target_log_prob_fn, is_calibrated=is_calibrated)
+        target_log_prob_fn=target_log_prob_fn, is_calibrated=is_calibrated,
+        step_size=step_size)
 
   @property
   def parameters(self):
@@ -61,7 +84,9 @@ class FakeInnerKernel(tfp.mcmc.TransitionKernel):
 
   def bootstrap_results(self, init_state):
     return FakeInnerKernelResults(
-        target_log_prob=self._parameters['target_log_prob_fn'](init_state))
+        target_log_prob=self._parameters['target_log_prob_fn'](init_state),
+        step_size=tf.nest.map_structure(tf.convert_to_tensor,
+                                        self.parameters['step_size']))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -71,7 +96,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
     super(TransformedTransitionKernelTest, self).setUp()
     self.dtype = np.float32
 
-  def test_support_works_correctly_with_HMC(self):
+  def test_support_works_correctly_with_hmc(self):
     num_results = 2000
     target = tfd.Beta(
         concentration1=self.dtype(1.),
@@ -111,11 +136,13 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         target.mean(),
         target.variance(),
     ])
-    self.assertAllClose(true_mean_, sample_mean_, atol=0.06, rtol=0.)
-    self.assertAllClose(true_var_, sample_var_, atol=0.01, rtol=0.1)
-    self.assertAllClose(0.6, is_accepted_.mean(), atol=0.07, rtol=0.)
+    self.assertAllClose(true_mean_, sample_mean_,
+                        atol=0.06, rtol=0.)
+    self.assertAllClose(true_var_, sample_var_,
+                        atol=0.01, rtol=0.1)
+    self.assertNear(0.6, is_accepted_.mean(), err=0.05)
 
-  def test_support_works_correctly_with_MALA(self):
+  def test_support_works_correctly_with_mala(self):
     num_results = 2000
     target = tfd.Beta(
         concentration1=self.dtype(1.),
@@ -157,7 +184,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
     self.assertAllClose(true_var_, sample_var_,
                         atol=0.01, rtol=0.1)
 
-  def test_support_works_correctly_with_RWM(self):
+  def test_support_works_correctly_with_rwm(self):
     num_results = 2000
     target = tfd.Beta(
         concentration1=self.dtype(1.),
@@ -250,9 +277,6 @@ class TransformedTransitionKernelTest(test_util.TestCase):
     self.assertAllClose(sample_cov_, true_cov, atol=0., rtol=0.2)
 
   def test_bootstrap_requires_xor_args(self):
-    def fake_target_log_prob(x):
-      return -x**2 / 2.
-
     transformed_fake = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
         bijector=tfb.Exp())
@@ -265,9 +289,6 @@ class TransformedTransitionKernelTest(test_util.TestCase):
           init_state=2., transformed_init_state=np.log(2.))
 
   def test_bootstrap_correctly_untransforms(self):
-    def fake_target_log_prob(x):
-      return -x**2 / 2.
-
     transformed_fake = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
         bijector=tfb.Exp())
@@ -280,9 +301,6 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         [4., 5.], manual_pkr.transformed_state, atol=0., rtol=1e-6)
 
   def test_copy_works(self):
-    def fake_target_log_prob(x):
-      return -x**2 / 2.
-
     transformed = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
         bijector=tfb.AffineScalar(2.))
@@ -308,6 +326,136 @@ class TransformedTransitionKernelTest(test_util.TestCase):
             FakeInnerKernel(lambda x: -x**2 / 2, False),
             tfb.Identity()).is_calibrated)
 
+  def test_bijector_valid_transform_then_adapt(self):
+    new_kernel = make_transform_then_adapt_kernel(tfb.Exp())
+    pkr_one, pkr_two = self.evaluate([
+        new_kernel.bootstrap_results(2.),
+        new_kernel.bootstrap_results(9.),
+    ])
+    self.assertNear(np.log(2.),
+                    pkr_one.inner_results.transformed_state,
+                    err=1e-6)
+    self.assertNear(np.log(9.),
+                    pkr_two.inner_results.transformed_state,
+                    err=1e-6)
+
+  def test_bijector_valid_adapt_then_transform(self):
+    new_kernel = make_adapt_then_transform_kernel(tfb.Exp())
+    pkr_one, pkr_two = self.evaluate([
+        new_kernel.bootstrap_results(2.),
+        new_kernel.bootstrap_results(9.),
+    ])
+    self.assertNear(np.log(2.), pkr_one.transformed_state, err=1e-6)
+    self.assertNear(np.log(9.), pkr_two.transformed_state, err=1e-6)
+
+  def test_step_size_changed(self):
+    target_dist = tfd.MultivariateNormalDiag(loc=[0., 0.], scale_diag=[1., 10.])
+    # `hmc_kernel`'s step size is far from optimal
+    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_dist.log_prob,
+        num_leapfrog_steps=27,
+        step_size=10,
+        seed=_maybe_seed(test_util.test_seed()))
+    step_adaptation_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+        inner_kernel=hmc_kernel,
+        adaptation_rate=0.8,
+        num_adaptation_steps=9)
+    trans_kernel = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=step_adaptation_kernel,
+        bijector=tfb.Exp()
+    )
+    kernel_results = trans_kernel.inner_kernel.bootstrap_results(tf.zeros(2))
+    for _ in range(2):
+      _, kernel_results = trans_kernel.inner_kernel.one_step(tf.zeros(2),
+                                                             kernel_results)
+    adapted_step_size = self.evaluate(
+        kernel_results.inner_results.accepted_results.step_size)
+    self.assertLess(adapted_step_size, 7)
+
+  def test_deeply_nested(self):
+    step_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+        inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
+        num_adaptation_steps=9)
+    double_step_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+        inner_kernel=step_kernel,
+        num_adaptation_steps=9)
+    trans_kernel = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=double_step_kernel,
+        bijector=tfb.Exp())
+    pkr_one, pkr_two = self.evaluate([
+        trans_kernel.bootstrap_results(2.),
+        trans_kernel.bootstrap_results(9.),
+    ])
+    self.assertNear(np.log(2.),
+                    pkr_one.transformed_state,
+                    err=1e-6)
+    self.assertNear(np.log(9.),
+                    pkr_two.transformed_state,
+                    err=1e-6)
+
+  def test_nested_transform(self):
+    target_dist = tfd.Normal(loc=0., scale=1.)
+    b1 = tfb.Scale(0.5)
+    b2 = tfb.Exp()
+    chain = tfb.Chain([b2, b1])  # applies bijectors right to left (b1 then b2).
+    inner_kernel = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_dist.log_prob,
+            num_leapfrog_steps=27,
+            step_size=10,
+            seed=_maybe_seed(test_util.test_seed())),
+        bijector=b1)
+    outer_kernel = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=inner_kernel,
+        bijector=b2)
+    chain_kernel = tfp.mcmc.TransformedTransitionKernel(
+        inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_dist.log_prob,
+            num_leapfrog_steps=27,
+            step_size=10,
+            seed=_maybe_seed(test_util.test_seed())),
+        bijector=chain)
+    outer_pkr_one, outer_pkr_two = self.evaluate([
+        outer_kernel.bootstrap_results(2.),
+        outer_kernel.bootstrap_results(9.),
+    ])
+
+    # the outermost kernel only applies the outermost bijector
+    self.assertNear(np.log(2.), outer_pkr_one.transformed_state, err=1e-6)
+    self.assertNear(np.log(9.), outer_pkr_two.transformed_state, err=1e-6)
+
+    chain_pkr_one, chain_pkr_two = self.evaluate([
+        chain_kernel.bootstrap_results(2.),
+        chain_kernel.bootstrap_results(9.),
+    ])
+
+    # all bijectors are applied to the inner kernel, from innermost to outermost
+    # this behavior is completely analogous to a bijector Chain
+    self.assertNear(chain_pkr_one.transformed_state,
+                    outer_pkr_one.inner_results.transformed_state,
+                    err=1e-6)
+    self.assertEqual(chain_pkr_one.inner_results.accepted_results,
+                     outer_pkr_one.inner_results.inner_results.accepted_results)
+    self.assertNear(chain_pkr_two.transformed_state,
+                    outer_pkr_two.inner_results.transformed_state,
+                    err=1e-6)
+    self.assertEqual(chain_pkr_two.inner_results.accepted_results,
+                     outer_pkr_two.inner_results.inner_results.accepted_results)
+
+    outer_results_one, outer_results_two = self.evaluate([
+        outer_kernel.one_step(2., outer_pkr_one),
+        outer_kernel.one_step(9., outer_pkr_two)
+    ])
+    chain_results_one, chain_results_two = self.evaluate([
+        chain_kernel.one_step(2., chain_pkr_one),
+        chain_kernel.one_step(9., chain_pkr_two)
+    ])
+    self.assertNear(chain_results_one[0],
+                    outer_results_one[0],
+                    err=1e-6)
+    self.assertNear(chain_results_two[0],
+                    outer_results_two[0],
+                    err=1e-6)
 
 if __name__ == '__main__':
   tf.test.main()
