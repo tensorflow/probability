@@ -77,6 +77,12 @@ def _map_fn(  # pylint: disable=unused-argument
     name=None,
     fn_output_signature=None):
   """Numpy implementation of tf.map_fn."""
+  if fn_output_signature is not None and nest.is_nested(fn_output_signature):
+    # If fn returns a tuple, then map_fn returns a tuple as well; and similarly
+    # for lists and more complex nestings.  We do not support this behavior at
+    # this time, so we raise an error explicitly instead of silently doing the
+    # wrong thing.
+    raise NotImplementedError
   if JAX_MODE:
     from jax import tree_util  # pylint: disable=g-import-not-at-top
     elems_flat, in_tree = tree_util.tree_flatten(elems)
