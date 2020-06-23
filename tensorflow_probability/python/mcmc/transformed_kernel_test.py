@@ -155,7 +155,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         bijector=tfb.Sigmoid())
     # Recall, tfp.mcmc.sample_chain calls
     # transformed_hmc.bootstrap_results too.
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         # The initial state is used by inner_kernel.bootstrap_results.
         # Note the input is *after* bijector.forward.
@@ -163,6 +163,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         kernel=transformed_mala,
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(states, axis=0)
@@ -197,7 +198,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         bijector=tfb.Sigmoid())
     # Recall, tfp.mcmc.sample_chain calls
     # transformed_hmc.bootstrap_results too.
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         # The initial state is used by inner_kernel.bootstrap_results.
         # Note the input is *after* bijector.forward.
@@ -205,6 +206,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         kernel=transformed_rwm,
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         parallel_iterations=1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(states, axis=0)

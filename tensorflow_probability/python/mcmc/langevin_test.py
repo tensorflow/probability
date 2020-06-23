@@ -36,7 +36,7 @@ class LangevinTest(test_util.TestCase):
     nchains = 32
 
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=500,
         current_state=np.ones([nchains], dtype=dtype),
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
@@ -45,6 +45,7 @@ class LangevinTest(test_util.TestCase):
             volatility_fn=lambda *args: .5,
             seed=test_util.test_seed()),
         num_burnin_steps=200,
+        trace_fn=None,
         parallel_iterations=1)  # For determinism.
 
     sample_mean = tf.reduce_mean(samples, axis=(0, 1))
@@ -80,7 +81,7 @@ class LangevinTest(test_util.TestCase):
 
     # Run MALA with normal proposal for `num_results` iterations for
     # `num_chains` independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
@@ -89,6 +90,7 @@ class LangevinTest(test_util.TestCase):
             seed=test_util.test_seed()),
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         parallel_iterations=1)
 
     states = tf.concat(states, axis=-1)
@@ -134,7 +136,7 @@ class LangevinTest(test_util.TestCase):
 
     # Run Random Walk Metropolis with normal proposal for `num_results`
     # iterations for `num_chains` independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
@@ -144,6 +146,7 @@ class LangevinTest(test_util.TestCase):
             seed=test_util.test_seed()),
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         parallel_iterations=1)
 
     states = tf.concat(states, axis=-1)

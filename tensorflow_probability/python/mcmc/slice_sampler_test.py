@@ -59,11 +59,12 @@ class SliceSamplerTest(test_util.TestCase):
         seed=test_util.test_seed_stream())
     if asserts:
       kernel.one_step = tf.function(kernel.one_step, autograph=False)
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=dtype(1),
         kernel=kernel,
         num_burnin_steps=100,
+        trace_fn=None,
         parallel_iterations=1)  # For determinism.
 
     sample_mean = tf.reduce_mean(samples, axis=0)
@@ -103,7 +104,7 @@ class SliceSamplerTest(test_util.TestCase):
 
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -112,6 +113,7 @@ class SliceSamplerTest(test_util.TestCase):
             max_doublings=5,
             seed=test_util.test_seed_stream()),
         num_burnin_steps=100,
+        trace_fn=None,
         parallel_iterations=1)
 
     states = tf.reshape(states, [-1, 2])
@@ -136,7 +138,7 @@ class SliceSamplerTest(test_util.TestCase):
 
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -145,6 +147,7 @@ class SliceSamplerTest(test_util.TestCase):
             max_doublings=5,
             seed=test_util.test_seed_stream()),
         num_burnin_steps=100,
+        trace_fn=None,
         parallel_iterations=1)
 
     result = tf.reshape(states, [-1, 4])
@@ -174,7 +177,7 @@ class SliceSamplerTest(test_util.TestCase):
 
     target_fn = tf.function(
         lambda *states: target.log_prob(states), autograph=False)
-    [states1, states2], _ = tfp.mcmc.sample_chain(
+    [states1, states2] = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -183,6 +186,7 @@ class SliceSamplerTest(test_util.TestCase):
             max_doublings=5,
             seed=test_util.test_seed_stream()),
         num_burnin_steps=100,
+        trace_fn=None,
         parallel_iterations=1)
 
     states1 = tf.reshape(states1, [-1])

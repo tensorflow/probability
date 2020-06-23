@@ -80,7 +80,7 @@ class SampleChainTest(test_util.TestCase):
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
     seed = test_util.test_seed()
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
@@ -90,6 +90,7 @@ class SampleChainTest(test_util.TestCase):
             seed=None if tf.executing_eagerly() else seed),
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         parallel_iterations=1)
     if not tf.executing_eagerly():
       self.assertAllEqual(dict(target_calls=4), counter)
