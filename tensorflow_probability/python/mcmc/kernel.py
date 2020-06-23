@@ -84,21 +84,3 @@ class TransitionKernel(object):
         `Tensor`s representing internal calculations made within this function.
     """
     return []
-
-  def copy(self, **override_parameter_kwargs):
-    """Non-destructively creates a deep copy of the kernel.
-
-    Args:
-      **override_parameter_kwargs: Python String/value `dictionary` of
-        initialization arguments to override with new values.
-
-    Returns:
-      new_kernel: `TransitionKernel` object of same type as `self`,
-        initialized with the union of self.parameters and
-        override_parameter_kwargs, with any shared keys overridden by the
-        value of override_parameter_kwargs, i.e.,
-        `dict(self.parameters, **override_parameters_kwargs)`.
-    """
-    parameters = dict(self.parameters, **override_parameter_kwargs)
-    new_kernel = type(self)(**parameters)
-    return new_kernel
