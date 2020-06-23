@@ -24,6 +24,7 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
@@ -439,7 +440,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         new_log_averaging_step)
     return new_step_size, new_log_averaging_step, new_error_sum
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'dual_averaging_step_size_adaptation',
                             'one_step')):
@@ -450,8 +451,9 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       )
 
       # Step the inner kernel.
+      inner_kwargs = {} if seed is None else dict(seed=seed)
       new_state, new_inner_results = self.inner_kernel.one_step(
-          current_state, inner_results)
+          current_state, inner_results, **inner_kwargs)
 
       # Get the new step size.
       log_accept_prob = self.log_accept_prob_getter_fn(new_inner_results)
@@ -525,10 +527,11 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         log_averaging_step.append(tf.zeros_like(step_size_part, dtype=dtype))
 
         if self._parameters['shrinkage_target'] is None:
-          log_shrinkage_target.append(np.log(10.) + tf.math.log(step_size_part))
+          log_shrinkage_target.append(
+              float(np.log(10.)) + tf.math.log(step_size_part))
         else:
           log_shrinkage_target.append(
-              tf.math.log(self._parameters['shrinkage_target']))
+              tf.math.log(tf.cast(self._parameters['shrinkage_target'], dtype)))
 
       return DualAveragingStepSizeAdaptationResults(
           inner_results=inner_results,
@@ -555,11 +558,11 @@ def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
   if not validate_args:
     return target_accept_prob
   assertions = [
-      tf.assert_greater(
+      assert_util.assert_greater(
           target_accept_prob,
           tf.zeros([], dtype=target_accept_prob.dtype),
           message='`target_accept_prob` must be > 0.'),
-      tf.assert_less(
+      assert_util.assert_less(
           target_accept_prob,
           tf.ones([], dtype=target_accept_prob.dtype),
           message='`target_accept_prob` must be < 1.')

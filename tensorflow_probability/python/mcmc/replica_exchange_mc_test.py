@@ -26,17 +26,19 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
 
+JAX_MODE = False
+
 
 def init_tfp_randomwalkmetropolis(
     target_log_prob_fn,
-    seed,
     step_size,
-    store_parameters_in_results=False, num_leapfrog_steps=None):  # pylint: disable=unused-argument
+    seed=None, store_parameters_in_results=False, num_leapfrog_steps=None):  # pylint: disable=unused-argument
   return tfp.mcmc.RandomWalkMetropolis(
       target_log_prob_fn,
       new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=step_size),
@@ -57,11 +59,11 @@ def effective_sample_size(x, **kwargs):
 def _set_seed():
   """Helper which uses graph seed if using TFE."""
   # TODO(b/68017812): Deprecate once TFE supports seed.
-  seed_stream = test_util.test_seed_stream()
-  if tf.executing_eagerly():
-    tf.random.set_seed(seed_stream())
+  seed = test_util.test_seed()
+  if tf.executing_eagerly() and not JAX_MODE:
+    tf.random.set_seed(seed)
     return None
-  return seed_stream()
+  return seed
 
 
 @test_util.test_graph_and_eager_modes
@@ -82,8 +84,9 @@ class DefaultSwapProposedFnTest(test_util.TestCase):
   def testProbSwapNumReplicaNoBatch(self, prob_swap, num_replica):
     fn = tfp.mcmc.default_swap_proposal_fn(prob_swap)
     num_results = 100
+    seeds = samplers.split_seed(test_util.test_seed(), n=num_results)
     swaps = tf.stack(
-        [fn(num_replica, seed=i) for i in range(num_results)],
+        [fn(num_replica, seed=seeds[i]) for i in range(num_results)],
         axis=0)
 
     self.assertAllEqual((num_results, num_replica), swaps.shape)
@@ -103,8 +106,10 @@ class DefaultSwapProposedFnTest(test_util.TestCase):
   def testProbSwapNumReplicaWithBatch(self, prob_swap, num_replica):
     fn = tfp.mcmc.default_swap_proposal_fn(prob_swap)
     num_results = 100
+    seeds = samplers.split_seed(test_util.test_seed(), n=num_results)
     swaps = tf.stack(
-        [fn(num_replica, batch_shape=[2], seed=i) for i in range(num_results)],
+        [fn(num_replica, batch_shape=[2], seed=seeds[i])
+         for i in range(num_results)],
         axis=0)
 
     self.assertAllEqual((num_results, num_replica, 2), swaps.shape)
@@ -168,7 +173,7 @@ class REMCTest(test_util.TestCase):
           asserts=asserts)
       for asserts in [True, False]
       for kernel_name, tfp_transition_kernel, store_param in [
-          ('HMC', tfp.mcmc.HamiltonianMonteCarlo, True),
+          ('HMC', tfp.mcmc.HamiltonianMonteCarlo, True),  # NUMPY_DISABLE
           ('RWMH', init_tfp_randomwalkmetropolis, False),
       ]
       for testcase_name, inverse_temperatures in [
@@ -194,10 +199,9 @@ class REMCTest(test_util.TestCase):
     step_size = 0.51234 / np.sqrt(inverse_temperatures)
     num_leapfrog_steps = 3
 
-    def make_kernel_fn(target_log_prob_fn, seed):
+    def make_kernel_fn(target_log_prob_fn):
       return tfp_transition_kernel(
           target_log_prob_fn=target_log_prob_fn,
-          seed=seed,
           step_size=step_size,
           store_parameters_in_results=store_parameters_in_results,
           num_leapfrog_steps=num_leapfrog_steps)
@@ -206,9 +210,7 @@ class REMCTest(test_util.TestCase):
         target_log_prob_fn=target.log_prob,
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn,
-        swap_proposal_fn=tfp.mcmc.default_swap_proposal_fn(
-            prob_swap),
-        seed=_set_seed())
+        swap_proposal_fn=tfp.mcmc.default_swap_proposal_fn(prob_swap))
 
     num_results = 17
     if asserts:
@@ -221,7 +223,7 @@ class REMCTest(test_util.TestCase):
         kernel=remc,
         num_burnin_steps=50,
         trace_fn=lambda _, results: results,
-        parallel_iterations=1)  # For determinism.
+        seed=_set_seed())
 
     self.assertAllEqual((num_results,), states.shape)
 
@@ -320,7 +322,7 @@ class REMCTest(test_util.TestCase):
           kr_.post_swap_replica_results.accepted_results.num_leapfrog_steps)
 
   @parameterized.named_parameters([
-      ('HMC', tfp.mcmc.HamiltonianMonteCarlo),
+      ('HMC', tfp.mcmc.HamiltonianMonteCarlo),  # NUMPY_DISABLE
       ('RWMH', init_tfp_randomwalkmetropolis),
   ])
   def test2DMixNormal(self, tfp_transition_kernel):
@@ -344,10 +346,9 @@ class REMCTest(test_util.TestCase):
     # this case we have 1 replica dim, 0 batch dims, and 1 event dim hence need
     # to right pad the step_size by one dim (for the event).
     step_size = 0.2 / tf.math.sqrt(inverse_temperatures[:, tf.newaxis])
-    def make_kernel_fn(target_log_prob_fn, seed):
+    def make_kernel_fn(target_log_prob_fn):
       return tfp_transition_kernel(
           target_log_prob_fn=target_log_prob_fn,
-          seed=seed,
           step_size=step_size,
           num_leapfrog_steps=5)
 
@@ -355,8 +356,7 @@ class REMCTest(test_util.TestCase):
         target_log_prob_fn=target.log_prob,
         # Verified that test fails if inverse_temperatures = [1.]
         inverse_temperatures=inverse_temperatures,
-        make_kernel_fn=make_kernel_fn,
-        seed=_set_seed())
+        make_kernel_fn=make_kernel_fn)
     remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
@@ -371,7 +371,7 @@ class REMCTest(test_util.TestCase):
         kernel=remc,
         num_burnin_steps=50,
         trace_fn=trace_fn,
-        parallel_iterations=1)  # For determinism.
+        seed=test_util.test_seed())
     self.assertAllEqual((num_results, 2), states.shape)
     replica_accept_ratio = tf.reduce_mean(
         tf.math.exp(tf.minimum(0., replica_log_accept_ratio)),
@@ -414,6 +414,7 @@ class REMCTest(test_util.TestCase):
           atol=var_atol[i],
           msg=i)
 
+  @test_util.numpy_disable_gradient_test('HMC')
   def testMultipleCorrelatedStatesWithNoBatchDims(self):
     dtype = np.float32
     num_results = 2000
@@ -438,31 +439,28 @@ class REMCTest(test_util.TestCase):
     # We do however supply a step size for each state part.
     step_sizes = [0.9 / tf.math.sqrt(inverse_temperatures)]*2
 
-    def make_kernel_fn(target_log_prob_fn, seed):
+    def make_kernel_fn(target_log_prob_fn):
       return tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target_log_prob_fn,
-          seed=seed,
           step_size=step_sizes,
           num_leapfrog_steps=3)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=target_log_prob,
         inverse_temperatures=inverse_temperatures,
-        make_kernel_fn=make_kernel_fn,
-        seed=_set_seed())
+        make_kernel_fn=make_kernel_fn)
     remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return results.post_swap_replica_results.log_accept_ratio
 
-    [samples_x,
-     samples_y], replica_log_accept_ratio = (tfp.mcmc.sample_chain(
-         num_results=num_results,
-         num_burnin_steps=200,
-         current_state=[1., 1.],
-         kernel=remc,
-         trace_fn=trace_fn,
-         parallel_iterations=1))  # For determinism.
+    [samples_x, samples_y], replica_log_accept_ratio = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        num_burnin_steps=200,
+        current_state=[1., 1.],
+        kernel=remc,
+        trace_fn=trace_fn,
+        seed=test_util.test_seed())
     samples = tf.stack([samples_x, samples_y], axis=-1)
     sample_mean = tf.reduce_mean(samples, axis=0)
     sample_cov = tfp.stats.covariance(samples, sample_axis=0)
@@ -505,7 +503,7 @@ class REMCTest(test_util.TestCase):
           step_size_fn=step_size_fn,
           ess_scaling=ess_scaling)
       for kernel_name, tfp_transition_kernel, ess_scaling in [
-          ('HMC', tfp.mcmc.HamiltonianMonteCarlo, .1),
+          ('HMC', tfp.mcmc.HamiltonianMonteCarlo, .1),  # NUMPY_DISABLE
           ('RWMH', init_tfp_randomwalkmetropolis, .009),
       ]
       for testcase_name, inverse_temperatures, step_size_fn in [
@@ -535,8 +533,8 @@ class REMCTest(test_util.TestCase):
                                      step_size_fn,
                                      ess_scaling):
     """Sampling from two batch diagonal multivariate normal."""
-    step_size = step_size_fn(inverse_temperatures) + np.exp(
-        np.pi) / 100  # Prevent resonances.
+    step_size = (step_size_fn(inverse_temperatures) +
+                 np.exp(np.pi) / 100).astype(np.float32)  # Prevent resonances.
 
     # Small scale and well-separated modes mean we need replica swap to
     # work or else tests fail.
@@ -551,18 +549,16 @@ class REMCTest(test_util.TestCase):
     target = tfd.MultivariateNormalDiag(
         loc=loc, scale_identity_multiplier=scale_identity_multiplier)
 
-    def make_kernel_fn(target_log_prob_fn, seed):
+    def make_kernel_fn(target_log_prob_fn):
       return tfp_transition_kernel(
           target_log_prob_fn=target_log_prob_fn,
-          seed=seed,
           step_size=step_size,
           num_leapfrog_steps=3)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=tf.function(target.log_prob, autograph=False),
         inverse_temperatures=inverse_temperatures,
-        make_kernel_fn=make_kernel_fn,
-        seed=_set_seed())
+        make_kernel_fn=make_kernel_fn)
     remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
@@ -578,7 +574,7 @@ class REMCTest(test_util.TestCase):
         kernel=remc,
         num_burnin_steps=100,
         trace_fn=trace_fn,
-        parallel_iterations=1)  # For determinism.
+        seed=test_util.test_seed())
 
     num_replica = inverse_temperatures.shape[0]
 
@@ -647,6 +643,7 @@ class REMCTest(test_util.TestCase):
                                         asserts=True),
                                    dict(testcase_name='_fast_execute_only',
                                         asserts=False)])
+  @test_util.numpy_disable_gradient_test('HMC')
   def testMultipleCorrelatedStatesWithOneBatchDim(self, asserts):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -662,18 +659,16 @@ class REMCTest(test_util.TestCase):
       z = linop.solvevec(xy)
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    def make_kernel_fn(target_log_prob_fn, seed):
+    def make_kernel_fn(target_log_prob_fn):
       return tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target_log_prob_fn,
-          seed=seed,
           step_size=[0.75, 0.75],
           num_leapfrog_steps=3)
 
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=target_log_prob,
         inverse_temperatures=[1., 0.9, 0.8],
-        make_kernel_fn=make_kernel_fn,
-        seed=_set_seed())
+        make_kernel_fn=make_kernel_fn)
 
     num_results = 13
     if asserts:
@@ -687,7 +682,7 @@ class REMCTest(test_util.TestCase):
         kernel=remc,
         num_burnin_steps=400,
         trace_fn=None,
-        parallel_iterations=1)  # For determinism.
+        seed=test_util.test_seed())
 
     states = tf.stack(states, axis=-1)
     self.assertAllEqual((num_results, 4, 2), states.shape)
@@ -722,44 +717,37 @@ class REMCTest(test_util.TestCase):
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=tfd.Normal(loc=dtype(0), scale=dtype(1)).log_prob,
         inverse_temperatures=dtype([1., 0.5, 0.25]),
-        make_kernel_fn=lambda tlp, seed: tfp.mcmc.HamiltonianMonteCarlo(  # pylint: disable=g-long-lambda
+        make_kernel_fn=lambda tlp: tfp.mcmc.RandomWalkMetropolis(  # pylint: disable=g-long-lambda
             target_log_prob_fn=tlp,
-            seed=seed,
-            step_size=1.,
-            num_leapfrog_steps=3),
+            new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=1.)),
         # Fun fact: of the six length-3 permutations, only two are not
         # "one-time swap" permutations: [1, 2, 0], [2, 0, 1]
         swap_proposal_fn=bad_swap_fn,
-        validate_args=True,
-        seed=_set_seed())
-    with self.assertRaisesRegexp(
-        tf.errors.OpError, 'must be.*self-inverse permutation'):
+        validate_args=True)
+    with self.assertRaisesOpError('must be.*self-inverse permutation'):
       self.evaluate(tfp.mcmc.sample_chain(
           num_results=10,
           num_burnin_steps=2,
           current_state=[dtype(1)],
           kernel=remc,
           trace_fn=None,
-          parallel_iterations=1))  # For determinism.
+          seed=test_util.test_seed()))
 
   def testKernelResultsHaveCorrectShapeWhenMultipleStatesAndBatchDims(self):
     def target_log_prob(x, y):
       xy = tf.concat([x, y], axis=-1)
       return -0.5 * tf.reduce_sum(xy**2, axis=-1)
 
-    def make_kernel_fn(target_log_prob_fn, seed):
-      return tfp.mcmc.HamiltonianMonteCarlo(
+    def make_kernel_fn(target_log_prob_fn):
+      return tfp.mcmc.RandomWalkMetropolis(
           target_log_prob_fn=target_log_prob_fn,
-          seed=seed,
-          step_size=[0.3, 0.1],
-          num_leapfrog_steps=3)
+          new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=[0.3, 0.1]))
 
     inverse_temperatures = [1., 0.5, 0.25, 0.1]
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=target_log_prob,
         inverse_temperatures=inverse_temperatures,
-        make_kernel_fn=make_kernel_fn,
-        seed=_set_seed())
+        make_kernel_fn=make_kernel_fn)
 
     num_results = 6
     n_batch = 5
@@ -772,7 +760,8 @@ class REMCTest(test_util.TestCase):
         current_state=[tf.zeros((n_batch, n_events))] * n_states,
         kernel=remc,
         num_burnin_steps=2,
-        trace_fn=lambda _, results: results)
+        trace_fn=lambda _, results: results,
+        seed=test_util.test_seed())
 
     self.assertLen(samples, n_states)
     self.assertAllEqual((num_results, n_batch, n_events), samples[0].shape)

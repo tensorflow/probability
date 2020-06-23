@@ -42,10 +42,9 @@ class LangevinTest(test_util.TestCase):
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=target.log_prob,
             step_size=0.75,
-            volatility_fn=lambda *args: .5,
-            seed=test_util.test_seed()),
+            volatility_fn=lambda *args: .5),
         num_burnin_steps=200,
-        parallel_iterations=1)  # For determinism.
+        seed=test_util.test_seed())
 
     sample_mean = tf.reduce_mean(samples, axis=(0, 1))
     sample_std = tf.math.reduce_std(samples, axis=(0, 1))
@@ -85,11 +84,10 @@ class LangevinTest(test_util.TestCase):
         current_state=init_state,
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=target_log_prob,
-            step_size=.1,
-            seed=test_util.test_seed()),
+            step_size=.1),
         num_burnin_steps=200,
         num_steps_between_results=1,
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
     states = tf.concat(states, axis=-1)
     sample_mean = tf.reduce_mean(states, axis=[0, 1])
@@ -100,8 +98,8 @@ class LangevinTest(test_util.TestCase):
 
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
 
-    self.assertAllClose(np.squeeze(sample_mean_), true_mean, atol=0.1, rtol=0.1)
-    self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
+    self.assertAllClose(true_mean, np.squeeze(sample_mean_), atol=0.1, rtol=0.1)
+    self.assertAllClose(true_cov, np.squeeze(sample_cov_), atol=0.1, rtol=0.1)
 
   def testLangevin3DNormalDynamicVolatility(self):
     """Sampling from a 3-D Multivariate Normal distribution."""
@@ -140,11 +138,10 @@ class LangevinTest(test_util.TestCase):
         kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
             target_log_prob_fn=target_log_prob,
             volatility_fn=volatility_fn,
-            step_size=.1,
-            seed=test_util.test_seed()),
+            step_size=.1),
         num_burnin_steps=200,
         num_steps_between_results=1,
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
     states = tf.concat(states, axis=-1)
     sample_mean = tf.reduce_mean(states, axis=[0, 1])
@@ -153,8 +150,8 @@ class LangevinTest(test_util.TestCase):
 
     sample_mean_, sample_cov_ = self.evaluate([sample_mean, sample_cov])
 
-    self.assertAllClose(np.squeeze(sample_mean_), true_mean, atol=0.1, rtol=0.1)
-    self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
+    self.assertAllClose(true_mean, np.squeeze(sample_mean_), atol=0.1, rtol=0.1)
+    self.assertAllClose(true_cov, np.squeeze(sample_cov_), atol=0.1, rtol=0.1)
 
   def testLangevinCorrectVolatilityGradient(self):
     """Check that the gradient of the volatility is computed correctly."""
@@ -181,18 +178,15 @@ class LangevinTest(test_util.TestCase):
     init_state = [np.ones([num_chains, 2], dtype=dtype),
                   np.ones([num_chains, 1], dtype=dtype)]
 
-    strm = test_util.test_seed_stream()
     # Define MALA with constant volatility
     langevin_unit = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
         target_log_prob_fn=target_log_prob,
-        step_size=0.1,
-        seed=strm())
+        step_size=0.1)
     # Define MALA with volatility being `volatility_fn`
     langevin_general = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
         target_log_prob_fn=target_log_prob,
         step_size=0.1,
-        volatility_fn=volatility_fn,
-        seed=strm())
+        volatility_fn=volatility_fn)
 
     # Initialize the samplers
     kernel_unit_volatility = langevin_unit.bootstrap_results(init_state)

@@ -347,7 +347,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return self._inner_kernel.is_calibrated
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Runs one iteration of the Transformed Kernel.
 
     Args:
@@ -365,6 +365,7 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
+      seed: Optional, a seed for reproducible sampling.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)
@@ -375,9 +376,11 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     """
     with tf.name_scope(mcmc_util.make_name(
         self.name, 'transformed_kernel', 'one_step')):
+      inner_kwargs = {} if seed is None else dict(seed=seed)
       transformed_next_state, kernel_results = self._inner_kernel.one_step(
           previous_kernel_results.transformed_state,
-          previous_kernel_results.inner_results)
+          previous_kernel_results.inner_results,
+          **inner_kwargs)
       transformed_next_state_parts = (
           transformed_next_state
           if mcmc_util.is_list_like(transformed_next_state) else

@@ -23,6 +23,7 @@ import warnings
 
 # Dependency imports
 
+from absl import logging
 from absl.testing import parameterized
 import numpy as np
 from scipy import stats
@@ -37,11 +38,13 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
 
+JAX_MODE = False
 
-def _set_seed(seed):
+
+def _set_seed(seed, sampler_type='stateful'):
   """Helper which uses graph seed if using eager."""
   # TODO(b/68017812): Deprecate once eager correctly supports seed.
-  if tf.executing_eagerly():
+  if tf.executing_eagerly() and not JAX_MODE and sampler_type == 'stateful':
     tf.random.set_seed(seed)
     return None
   return seed
@@ -55,8 +58,6 @@ class HMCTest(test_util.TestCase):
     self._rate_param = 10.
 
     super(HMCTest, self).setUp()
-    tf.random.set_seed(10003)
-    np.random.seed(10003)
 
   def assertAllFinite(self, x):
     self.assertAllEqual(np.ones_like(x).astype(bool), np.isfinite(x))
@@ -75,7 +76,10 @@ class HMCTest(test_util.TestCase):
         self._shape_param * x - self._rate_param * tf.math.exp(x),
         axis=event_dims)
 
-  def testSampleChainSeedReproducibleWorksCorrectly(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='_stateless', sampler_type='stateless'),
+      dict(testcase_name='_stateful', sampler_type='stateful'))
+  def testSampleChainSeedReproducibleWorksCorrectly(self, sampler_type):
     num_results = 10
     independent_chain_ndims = 1
 
@@ -85,7 +89,7 @@ class HMCTest(test_util.TestCase):
 
     current_state = np.random.rand(4, 3, 2)
 
-    seed = test_util.test_seed()
+    seed = test_util.test_seed(sampler_type=sampler_type)
     samples0, kernel_results0 = tfp.mcmc.sample_chain(
         num_results=2 * num_results,
         num_steps_between_results=0,
@@ -94,10 +98,9 @@ class HMCTest(test_util.TestCase):
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.1,
-            num_leapfrog_steps=2,
-            seed=_set_seed(seed)),
+            num_leapfrog_steps=2),
         num_burnin_steps=150,
-        parallel_iterations=1)
+        seed=_set_seed(seed, sampler_type=sampler_type))
 
     samples1, kernel_results1 = tfp.mcmc.sample_chain(
         num_results=num_results,
@@ -107,10 +110,9 @@ class HMCTest(test_util.TestCase):
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.1,
-            num_leapfrog_steps=2,
-            seed=_set_seed(seed)),
+            num_leapfrog_steps=2),
         num_burnin_steps=150,
-        parallel_iterations=1)
+        seed=_set_seed(seed, sampler_type=sampler_type))
 
     [
         samples0_,
@@ -141,12 +143,11 @@ class HMCTest(test_util.TestCase):
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.05,
-            num_leapfrog_steps=2,
-            seed=_set_seed(test_util.test_seed())),
+            num_leapfrog_steps=2),
         num_burnin_steps=150,
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
-    if tf.executing_eagerly():
+    if tf.executing_eagerly() and not JAX_MODE:  # JAX always traces loops
       # TODO(b/79991421): Figure out why this is approx twice as many as it
       # should be. I.e., `expected_calls = (150 + 150) * 2 + 1`.
       expected_calls = 1202
@@ -165,9 +166,9 @@ class HMCTest(test_util.TestCase):
     actual_exp_x = np.exp(samples_).mean()
     acceptance_probs = np.exp(np.minimum(log_accept_ratio_, 0.))
 
-    tf1.logging.vlog(
+    logging.vlog(
         1, 'True      E[x, exp(x)]: {}\t{}'.format(expected_x_, expected_exp_x))
-    tf1.logging.vlog(
+    logging.vlog(
         1, 'Estimated E[x, exp(x)]: {}\t{}'.format(actual_x, actual_exp_x))
     self.assertAllClose(actual_x, expected_x_, atol=.045, rtol=0.)
     self.assertAllClose(actual_exp_x, expected_exp_x, atol=.02, rtol=0.)
@@ -217,9 +218,8 @@ class HMCTest(test_util.TestCase):
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_prob,
             step_size=step_size,
-            num_leapfrog_steps=num_leapfrog_steps,
-            seed=_set_seed(test_util.test_seed())),
-        parallel_iterations=1)
+            num_leapfrog_steps=num_leapfrog_steps),
+        seed=test_util.test_seed())
 
     states_, kernel_results_ = self.evaluate([states, kernel_results])
     pstates_ = kernel_results_.proposed_state
@@ -294,23 +294,24 @@ class HMCTest(test_util.TestCase):
       """Cooled version of the target distribution."""
       return 1.1 * log_gamma_log_prob(x)
 
+    seed_stream = test_util.test_seed_stream()
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=log_gamma_log_prob,
         step_size=0.4,
-        num_leapfrog_steps=5,
-        seed=_set_seed(test_util.test_seed()))
+        num_leapfrog_steps=5)
     sample, kernel_results = hmc.one_step(
         current_state=initial_draws,
-        previous_kernel_results=hmc.bootstrap_results(initial_draws))
+        previous_kernel_results=hmc.bootstrap_results(initial_draws),
+        seed=seed_stream())
 
     bad_hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=fake_log_prob,
         step_size=0.4,
-        num_leapfrog_steps=5,
-        seed=_set_seed(test_util.test_seed()))
+        num_leapfrog_steps=5)
     bad_sample, bad_kernel_results = bad_hmc.one_step(
         current_state=initial_draws,
-        previous_kernel_results=bad_hmc.bootstrap_results(initial_draws))
+        previous_kernel_results=bad_hmc.bootstrap_results(initial_draws),
+        seed=seed_stream())
 
     [
         log_accept_ratio_,
@@ -341,15 +342,15 @@ class HMCTest(test_util.TestCase):
     _, ks_p_value_fake = stats.ks_2samp(initial_draws_.flatten(),
                                         fake_draws_.flatten())
 
-    tf1.logging.vlog(
+    logging.vlog(
         1,
         'acceptance rate for true target: {}'.format(acceptance_probs.mean()))
-    tf1.logging.vlog(
+    logging.vlog(
         1, 'acceptance rate for fake target: {}'.format(
             bad_acceptance_probs.mean()))
-    tf1.logging.vlog(
+    logging.vlog(
         1, 'K-S p-value for true target: {}'.format(ks_p_value_true))
-    tf1.logging.vlog(
+    logging.vlog(
         1, 'K-S p-value for fake target: {}'.format(ks_p_value_fake))
     # Make sure that the MCMC update hasn't changed the empirical CDF much.
     self.assertGreater(ks_p_value_true, 1e-3)
@@ -406,18 +407,18 @@ class HMCTest(test_util.TestCase):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=_unbounded_exponential_log_prob,
         step_size=2.,
-        num_leapfrog_steps=5,
-        seed=_set_seed(test_util.test_seed()))
+        num_leapfrog_steps=5)
     updated_x, kernel_results = hmc.one_step(
         current_state=initial_x,
-        previous_kernel_results=hmc.bootstrap_results(initial_x))
+        previous_kernel_results=hmc.bootstrap_results(initial_x),
+        seed=test_util.test_seed())
     initial_x_, updated_x_, log_accept_ratio_ = self.evaluate(
         [initial_x, updated_x, kernel_results.log_accept_ratio])
     acceptance_probs = np.exp(np.minimum(log_accept_ratio_, 0.))
 
-    tf1.logging.vlog(1, 'initial_x = {}'.format(initial_x_))
-    tf1.logging.vlog(1, 'updated_x = {}'.format(updated_x_))
-    tf1.logging.vlog(1, 'log_accept_ratio = {}'.format(log_accept_ratio_))
+    logging.vlog(1, 'initial_x = {}'.format(initial_x_))
+    logging.vlog(1, 'updated_x = {}'.format(updated_x_))
+    logging.vlog(1, 'log_accept_ratio = {}'.format(log_accept_ratio_))
 
     self.assertAllEqual(initial_x_, updated_x_)
     self.assertEqual(acceptance_probs, 0.)
@@ -434,18 +435,18 @@ class HMCTest(test_util.TestCase):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=_nan_log_prob_with_nan_gradient,
         step_size=2.,
-        num_leapfrog_steps=5,
-        seed=_set_seed(test_util.test_seed()))
+        num_leapfrog_steps=5)
     updated_x, kernel_results = hmc.one_step(
         current_state=initial_x,
-        previous_kernel_results=hmc.bootstrap_results(initial_x))
+        previous_kernel_results=hmc.bootstrap_results(initial_x),
+        seed=test_util.test_seed())
     initial_x_, updated_x_, log_accept_ratio_ = self.evaluate(
         [initial_x, updated_x, kernel_results.log_accept_ratio])
     acceptance_probs = np.exp(np.minimum(log_accept_ratio_, 0.))
 
-    tf1.logging.vlog(1, 'initial_x = {}'.format(initial_x_))
-    tf1.logging.vlog(1, 'updated_x = {}'.format(updated_x_))
-    tf1.logging.vlog(1, 'log_accept_ratio = {}'.format(log_accept_ratio_))
+    logging.vlog(1, 'initial_x = {}'.format(initial_x_))
+    logging.vlog(1, 'updated_x = {}'.format(updated_x_))
+    logging.vlog(1, 'log_accept_ratio = {}'.format(log_accept_ratio_))
 
     self.assertAllEqual(initial_x_, updated_x_)
     self.assertEqual(acceptance_probs, 0.)
@@ -468,15 +469,16 @@ class HMCTest(test_util.TestCase):
       dict(testcase_name='_f64', dtype=np.float64),
       dict(testcase_name='_f16', dtype=np.float16))
   def testChainWorks(self, dtype):
+    if JAX_MODE and dtype == np.float16:
+      self.skipTest('No float16 in JAX')
     states, kernel_results = tfp.mcmc.sample_chain(
         num_results=10,
         current_state=np.zeros(5).astype(dtype),
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=lambda x: -tf.reduce_sum(x**2., axis=-1),
             step_size=0.01,
-            num_leapfrog_steps=10,
-            seed=_set_seed(test_util.test_seed())),
-        parallel_iterations=1)
+            num_leapfrog_steps=10),
+        seed=test_util.test_seed())
     states_, log_accept_ratio_ = self.evaluate(
         [states, kernel_results.log_accept_ratio])
     self.assertEqual(dtype, states_.dtype)
@@ -507,12 +509,11 @@ class HMCTest(test_util.TestCase):
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob,
             step_size=[1.23, 1.23],
-            num_leapfrog_steps=2,
-            seed=_set_seed(test_util.test_seed())),
+            num_leapfrog_steps=2),
         num_burnin_steps=200,
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
-    if tf.executing_eagerly():
+    if tf.executing_eagerly() and not JAX_MODE:  # JAX always traces loops
       # TODO(b/79991421): Figure out why this is approx twice as many as it
       # should be. I.e., `expected_calls = (num_results + 200) * 2 * 2 + 1`.
       expected_calls = 6802
@@ -537,13 +538,12 @@ class HMCTest(test_util.TestCase):
     uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -tf.reduce_sum(x**2., axis=-1),
         step_size=0.5,
-        num_leapfrog_steps=2,
-        seed=_set_seed(test_util.test_seed()))
+        num_leapfrog_steps=2)
     x0 = tf.constant([[-1., 0.5],
                       [0., 0.],
                       [1., 1.25]])
     r0 = uncal_hmc.bootstrap_results(x0)
-    x1, r1 = uncal_hmc.one_step(x0, r0)
+    x1, r1 = uncal_hmc.one_step(x0, r0, seed=test_util.test_seed())
     self.assertAllEqual([3, 2], x0.shape)
     self.assertAllEqual([3], r0.target_log_prob.shape)
     self.assertAllEqual([3, 2], x1.shape)
@@ -553,13 +553,12 @@ class HMCTest(test_util.TestCase):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -tf.reduce_sum(x**2., axis=-1),
         step_size=0.5,
-        num_leapfrog_steps=2,
-        seed=_set_seed(test_util.test_seed()))
+        num_leapfrog_steps=2)
     x0 = tf.constant([[-1., 0.5],
                       [0., 0.],
                       [1., 1.25]])
     r0 = hmc.bootstrap_results(x0)
-    x1, r1 = hmc.one_step(x0, r0)
+    x1, r1 = hmc.one_step(x0, r0, seed=test_util.test_seed())
     self.assertAllEqual([3, 2], x0.shape)
     self.assertAllEqual([3], r0.accepted_results.target_log_prob.shape)
     self.assertAllEqual([3, 2], x1.shape)
@@ -586,15 +585,15 @@ class HMCTest(test_util.TestCase):
         target_log_prob_fn=lambda x: -x**2.,
         step_size=0.5,
         num_leapfrog_steps=2,
-        seed=_set_seed(test_util.test_seed()),
         store_parameters_in_results=True)
     x0 = tf.zeros(2)
+    seed_stream = test_util.test_seed_stream()
     r0 = hmc.bootstrap_results(x0)
-    x1, r1 = hmc.one_step(x0, r0)
+    x1, r1 = hmc.one_step(x0, r0, seed=seed_stream())
     r1_zero = r1._replace(
         accepted_results=r1.accepted_results._replace(
             step_size=tf.constant(0.)))
-    x2, r2 = hmc.one_step(x1, r1_zero)
+    x2, r2 = hmc.one_step(x1, r1_zero, seed=seed_stream())
 
     r0_, r1_, r2_, x1_, x2_ = self.evaluate([r0, r1, r2, x1, x2])
 
@@ -608,6 +607,7 @@ class HMCTest(test_util.TestCase):
     self.assertAllEqual(x2_, x1_)
     self.assertAllEqual([True, True], r2_.is_accepted)
 
+  @test_util.jax_disable_variable_test
   def testWarnMutableParameters(self):
     warnings.simplefilter('always')
     with warnings.catch_warnings(record=True) as triggered:
@@ -629,8 +629,7 @@ class HMCTest(test_util.TestCase):
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         step_size=0.5,
-        num_leapfrog_steps=2,
-        seed=_set_seed(test_util.test_seed()))
+        num_leapfrog_steps=2)
     x0 = tf.constant([[-1., 0.5], [0., 0.], [1., 1.25]])
     # Simply calling hmc.bootstrap_results(x0) used to fail with
     #   ValueError: Encountered `None` gradient.
@@ -642,9 +641,9 @@ class HMCTest(test_util.TestCase):
 class _LogCorrectionTest(object):
 
   def testHandlesNanFromPotential(self):
-    tlp = [1, np.inf, -np.inf, np.nan]
+    tlp = self.dtype([1, np.inf, -np.inf, np.nan])
     target_log_prob, proposed_target_log_prob = [
-        self.dtype(x.flatten()) for x in np.meshgrid(tlp, tlp)]
+        x.flatten() for x in np.meshgrid(tlp, tlp)]
     num_chains = len(target_log_prob)
     x0 = np.zeros(num_chains, dtype=self.dtype)
 
@@ -666,7 +665,7 @@ class _LogCorrectionTest(object):
     _, results = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=make_trick_fun(proposed_target_log_prob),
         step_size=1.,
-        num_leapfrog_steps=1).one_step(x0, pkr)
+        num_leapfrog_steps=1).one_step(x0, pkr, seed=test_util.test_seed())
 
     [actual_log_accept_ratio_, actual_grads_target_log_prob_] = self.evaluate([
         results.log_accept_ratio,
@@ -679,15 +678,14 @@ class _LogCorrectionTest(object):
 
     # Ensure gradient is finite.
     self.assertAllEqual(
-        np.ones_like(actual_grads_target_log_prob_).astype(np.bool),
+        np.ones_like(actual_grads_target_log_prob_, dtype=np.bool),
         np.isfinite(actual_grads_target_log_prob_))
 
   def testHandlesNanFromKinetic(self):
     if tf.executing_eagerly(): return
-    x = [1, np.inf, -np.inf, np.nan]
+    x = self.dtype([1, np.inf, -np.inf, np.nan])
     momentums, proposed_momentums = [
-        [np.reshape(self.dtype(x), [-1, 1])]
-        for x in np.meshgrid(x, x)]
+        [np.reshape(x, [-1, 1])] for x in np.meshgrid(x, x)]
     num_chains = len(momentums[0])
 
     momentums = [tf.convert_to_tensor(momentums[0])]
@@ -711,17 +709,21 @@ class _LogCorrectionTest(object):
 
     # Ensure gradient is finite.
     g = grads_[0].reshape([len(x), len(x)])[:, 0]
-    self.assertAllEqual(np.ones_like(g).astype(np.bool), np.isfinite(g))
+    self.assertAllEqual(np.ones_like(g, dtype=np.bool), np.isfinite(g))
 
     # The remaining gradients are nan because the momentum was itself nan or
     # inf.
     g = grads_[0].reshape([len(x), len(x)])[:, 1:]
-    self.assertAllEqual(np.ones_like(g).astype(np.bool), np.isnan(g))
+    self.assertAllEqual(np.ones_like(g, dtype=np.bool), np.isnan(g))
 
 
 @test_util.test_all_tf_execution_regimes
 class LogCorrectionTest16(test_util.TestCase, _LogCorrectionTest):
   dtype = np.float16
+
+
+if JAX_MODE:
+  del LogCorrectionTest16  # Jax does not support `float16`.
 
 
 @test_util.test_all_tf_execution_regimes
@@ -755,8 +757,7 @@ class HMCHandlesLists(test_util.TestCase):
     kernel = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob,
         step_size=1.,
-        num_leapfrog_steps=1,
-        seed=_set_seed(stream()))
+        num_leapfrog_steps=1)
     # We are using bijectors to sample from a transformed density defined on
     # an unbounded domain. The samples returned are from the original bounded
     # domain.
@@ -771,7 +772,7 @@ class HMCHandlesLists(test_util.TestCase):
         current_state=x0,
         kernel=transformed_kernel,
         num_burnin_steps=500,
-        parallel_iterations=1)
+        seed=stream())
     actual_means = [tf.reduce_mean(s, axis=(0, 1)) for s in samples]
     actual_vars = [tf.math.reduce_variance(s, axis=(0, 1)) for s in samples]
     expected_means = [dist_x.mean(), dist_y.mean()]
@@ -817,12 +818,8 @@ class HMCAdaptiveStepSize(test_util.TestCase):
             target_log_prob_fn=target_log_prob_fn,
             num_leapfrog_steps=2,
             step_size=initial_step_sizes,
-            state_gradients_are_stopped=True,
-            seed=_set_seed(test_util.test_seed())),
-        parallel_iterations=1)
-
-    init_op = tf1.global_variables_initializer()
-    self.evaluate(init_op)
+            state_gradients_are_stopped=True),
+        seed=test_util.test_seed())
 
     _ = self.evaluate(samples)
 
@@ -851,10 +848,9 @@ class HMCAdaptiveStepSize(test_util.TestCase):
                 target_log_prob_fn=target_log_prob_fn,
                 num_leapfrog_steps=2,
                 step_size=step_size,
-                state_gradients_are_stopped=True,
-                seed=_set_seed(test_util.test_seed())),
+                state_gradients_are_stopped=True),
             num_adaptation_steps=2),
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
     step_size_ = self.evaluate(kernel_results.new_step_size)
 
@@ -882,11 +878,10 @@ class HMCAdaptiveStepSize(test_util.TestCase):
                 target_log_prob_fn=lambda x: tfd.Normal(0., 1.).log_prob(x),
                 num_leapfrog_steps=2,
                 step_size=initial_step_size,
-                state_gradients_are_stopped=True,
-                seed=_set_seed(test_util.test_seed())),
+                state_gradients_are_stopped=True),
             num_adaptation_steps=num_adaptation_steps,
             adaptation_rate=1.),
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
     [_, step_size_] = self.evaluate([
         kernel_results, kernel_results.new_step_size])
@@ -931,6 +926,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
       y_bar = tf.matmul(w, x)
     return tfd.Normal(loc=y_bar, scale=tf.ones_like(y_bar))  # [n]
 
+  @test_util.jax_disable_variable_test
   def test_mcem_converges(self):
     # Setup assumptions.
     dtype = np.float32
@@ -940,7 +936,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
     weights_prior_true_scale = np.array(0.3, dtype)
     y, x, w0 = self.make_training_data(num_samples, dims,
                                        weights_prior_true_scale)
-    tf1.logging.vlog(1, 'w0: %s', w0)
+    logging.vlog(1, 'w0: %s', w0)
 
     sigma = tfp.util.TransformedVariable(
         name='sigma', initial_value=np.array(1, dtype), bijector=tfb.Exp())
@@ -987,7 +983,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
               # Adapt for the entirety of the trajectory.
               num_adaptation_steps=2),
           trace_fn=trace_fn,
-          parallel_iterations=1)
+          seed=test_util.test_seed())
 
       # We do an optimization step to propagate `sigma` after two HMC
       # steps to propagate `weights`.
@@ -1033,7 +1029,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
       # bazel test --test_output=streamed -c opt :hmc_test \
       # --test_filter=HMCEMAdaptiveStepSize \
       # --test_arg="--logtostderr" --test_arg="--vmodule=hmc_test=2"
-      tf1.logging.vlog(
+      logging.vlog(
           1, ('iter:{:>2}  loss:{: 9.3f}  scale:{:.3f}  '
               'step_size:{:.4f}  avg_acceptance_ratio:{:.4f}').format(
                   iter_, loss_[iter_], weights_prior_estimated_scale_[iter_],
@@ -1065,11 +1061,10 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
             tfp.mcmc.HamiltonianMonteCarlo(
                 target_log_prob_fn=unnormalized_log_prob,
                 num_leapfrog_steps=2,
-                step_size=0.05,
-                seed=_set_seed(test_util.test_seed())),
+                step_size=0.05),
             num_adaptation_steps=num_results + num_burnin_steps),
         trace_fn=trace_fn,
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
     is_accepted_, step_size_ = self.evaluate([is_accepted, step_size])
 
@@ -1080,6 +1075,39 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
     self.assertAllClose(0., step_size_[-100:].std(), atol=0.085, rtol=0.)
     # Anything in [0.6, 0.9] is sufficient. https://arxiv.org/abs/1411.6669
     self.assertAllClose(0.75, is_accepted_.mean(), atol=0.1, rtol=0.)
+
+
+@test_util.test_all_tf_execution_regimes
+class ReproducibleFromSeedTest(test_util.TestCase):
+  """This test verifies kernel debugging."""
+
+  def testReproducibleSingleStepStatelessSeed(self):
+    k = tfp.mcmc.HamiltonianMonteCarlo(tfd.Normal(0, 1).log_prob,
+                                       step_size=1.9,
+                                       num_leapfrog_steps=2)
+    states, trace = tfp.mcmc.sample_chain(
+        100,
+        current_state=tf.zeros([]),
+        kernel=k,
+        seed=test_util.test_seed(sampler_type='stateless'))
+    accepted_or_first = trace.is_accepted | tf.one_hot(
+        0, 100, on_value=True, off_value=False, dtype=tf.bool)
+    n = self.evaluate(tf.argmax(~accepted_or_first))  # Find a rejection.
+    self.assertGreater(n, 0)  # Expect some rejections.
+    tr_nm1 = tf.nest.map_structure(lambda x: x[n - 1], trace)
+    tr_n = tf.nest.map_structure(lambda x: x[n], trace)
+
+    # Double check the logprob of the previous state is consistent with the one
+    # we sliced out of the accepted results.
+    self.assertAllClose(
+        k.target_log_prob_fn(states[n - 1]),
+        tr_nm1.accepted_results.target_log_prob)
+
+    # Rerun the kernel with the seed that it reported it used
+    state, kr = k.one_step(states[n - 1], tr_nm1, seed=tr_n.seed)
+    # Check that the results are the same
+    self.assertAllClose(state, states[n])
+    self.assertAllAssertsNested(self.assertAllClose, kr, tr_n)
 
 
 if __name__ == '__main__':

@@ -360,10 +360,10 @@ class MetropolisHastingsTest(test_util.TestCase):
       _, _ = mh.one_step(current_state, init_kernel_results)
     w = sorted(w, key=lambda w: str(w.message))
     self.assertRegexpMatches(
-        str(w[0].message),
+        str(w[1].message),
         r'`TransitionKernel` is already calibrated')
     self.assertRegexpMatches(
-        str(w[1].message),
+        str(w[2].message),
         r'`TransitionKernel` does not have a `log_acceptance_correction`')
 
 

@@ -36,12 +36,17 @@ __all__ = [
     'split_seed',
     'shuffle',
     'uniform',
+    'zeros_seed',
 ]
 
 
 JAX_MODE = False
 
 SEED_DTYPE = np.uint32 if JAX_MODE else np.int32
+
+
+def zeros_seed():
+  return tf.constant([0, 0], dtype=SEED_DTYPE)
 
 
 def sanitize_seed(seed, salt=None):

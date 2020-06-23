@@ -37,10 +37,13 @@ TestTransitionKernelResults = collections.namedtuple(
 @test_util.test_all_tf_execution_regimes
 class TestTransitionKernel(tfp.mcmc.TransitionKernel):
 
-  def __init__(self, is_calibrated=True):
+  def __init__(self, is_calibrated=True, accepts_seed=True):
     self._is_calibrated = is_calibrated
+    self._accepts_seed = accepts_seed
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    if seed is not None and not self._accepts_seed:
+      raise TypeError('seed arg not accepted')
     return current_state + 1, TestTransitionKernelResults(
         counter_1=previous_kernel_results.counter_1 + 1,
         counter_2=previous_kernel_results.counter_2 + 2)
@@ -60,9 +63,8 @@ class SampleChainTest(test_util.TestCase):
     self._rate_param = 10.
 
     super(SampleChainTest, self).setUp()
-    tf.random.set_seed(10003)
-    np.random.seed(10003)
 
+  @test_util.numpy_disable_gradient_test('HMC')
   def testChainWorksCorrelatedMultivariate(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -79,18 +81,16 @@ class SampleChainTest(test_util.TestCase):
       z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    seed = test_util.test_seed()
     states, _ = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob,
             step_size=[0.5, 0.5],
-            num_leapfrog_steps=2,
-            seed=None if tf.executing_eagerly() else seed),
+            num_leapfrog_steps=2),
         num_burnin_steps=200,
         num_steps_between_results=1,
-        parallel_iterations=1)
+        seed=test_util.test_seed())
     if not tf.executing_eagerly():
       self.assertAllEqual(dict(target_calls=4), counter)
     states = tf.stack(states, axis=-1)
@@ -106,6 +106,25 @@ class SampleChainTest(test_util.TestCase):
 
   def testBasicOperation(self):
     kernel = TestTransitionKernel()
+    samples, kernel_results = tfp.mcmc.sample_chain(
+        num_results=2, current_state=0, kernel=kernel,
+        seed=test_util.test_seed())
+
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(samples.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
+    self.assertAllClose(
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
+
+    samples, kernel_results = self.evaluate([samples, kernel_results])
+    self.assertAllClose([1, 2], samples)
+    self.assertAllClose([1, 2], kernel_results.counter_1)
+    self.assertAllClose([2, 4], kernel_results.counter_2)
+
+  @test_util.jax_disable_test_missing_functionality('implicit seeds')
+  def testBasicOperationLegacy(self):
+    kernel = TestTransitionKernel(accepts_seed=False)
     samples, kernel_results = tfp.mcmc.sample_chain(
         num_results=2, current_state=0, kernel=kernel)
 
@@ -124,7 +143,8 @@ class SampleChainTest(test_util.TestCase):
   def testBurnin(self):
     kernel = TestTransitionKernel()
     samples, kernel_results = tfp.mcmc.sample_chain(
-        num_results=2, current_state=0, kernel=kernel, num_burnin_steps=1)
+        num_results=2, current_state=0, kernel=kernel, num_burnin_steps=1,
+        seed=test_util.test_seed())
 
     self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
     self.assertAllClose(
@@ -143,7 +163,8 @@ class SampleChainTest(test_util.TestCase):
         num_results=2,
         current_state=0,
         kernel=kernel,
-        num_steps_between_results=2)
+        num_steps_between_results=2,
+        seed=test_util.test_seed())
 
     self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
     self.assertAllClose(
@@ -158,7 +179,8 @@ class SampleChainTest(test_util.TestCase):
 
   def testDefaultTraceNamedTuple(self):
     kernel = TestTransitionKernel()
-    res = tfp.mcmc.sample_chain(num_results=2, current_state=0, kernel=kernel)
+    res = tfp.mcmc.sample_chain(num_results=2, current_state=0, kernel=kernel,
+                                seed=test_util.test_seed())
 
     self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertAllClose(
@@ -174,7 +196,8 @@ class SampleChainTest(test_util.TestCase):
   def testNoTraceFn(self):
     kernel = TestTransitionKernel()
     samples = tfp.mcmc.sample_chain(
-        num_results=2, current_state=0, kernel=kernel, trace_fn=None)
+        num_results=2, current_state=0, kernel=kernel, trace_fn=None,
+        seed=test_util.test_seed())
 
     self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
 
@@ -187,7 +210,8 @@ class SampleChainTest(test_util.TestCase):
         num_results=2,
         current_state=0,
         kernel=kernel,
-        trace_fn=lambda *args: args)
+        trace_fn=lambda *args: args,
+        seed=test_util.test_seed())
 
     self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertAllClose([2], tensorshape_util.as_list(res.trace[0].shape))
@@ -209,7 +233,8 @@ class SampleChainTest(test_util.TestCase):
         current_state=0,
         kernel=kernel,
         trace_fn=None,
-        return_final_kernel_results=True)
+        return_final_kernel_results=True,
+        seed=test_util.test_seed())
 
     self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertEqual((), res.trace)
@@ -226,7 +251,8 @@ class SampleChainTest(test_util.TestCase):
   def testWarningsDefault(self):
     with warnings.catch_warnings(record=True) as triggered:
       kernel = TestTransitionKernel()
-      tfp.mcmc.sample_chain(num_results=2, current_state=0, kernel=kernel)
+      tfp.mcmc.sample_chain(num_results=2, current_state=0, kernel=kernel,
+                            seed=test_util.test_seed())
     self.assertTrue(
         any('Tracing all kernel results by default is deprecated' in str(
             warning.message) for warning in triggered))
@@ -238,7 +264,8 @@ class SampleChainTest(test_util.TestCase):
           num_results=2,
           current_state=0,
           kernel=kernel,
-          trace_fn=lambda current_state, kernel_results: kernel_results)
+          trace_fn=lambda current_state, kernel_results: kernel_results,
+          seed=test_util.test_seed())
     self.assertFalse(
         any('Tracing all kernel results by default is deprecated' in str(
             warning.message) for warning in triggered))
@@ -250,7 +277,8 @@ class SampleChainTest(test_util.TestCase):
           num_results=2,
           current_state=0,
           kernel=kernel,
-          trace_fn=lambda current_state, kernel_results: kernel_results)
+          trace_fn=lambda current_state, kernel_results: kernel_results,
+          seed=test_util.test_seed())
     self.assertTrue(
         any('supplied `TransitionKernel` is not calibrated.' in str(
             warning.message) for warning in triggered))
