@@ -201,7 +201,6 @@ multi_substrate_py_test(
     name = "calibration_test",
     size = "large",
     srcs = ["calibration_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # absl/logging dep,
