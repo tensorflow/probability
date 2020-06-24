@@ -240,14 +240,17 @@ class BetaTest(test_util.TestCase):
     self.assertAllClose(
         np.cov(sample_values, rowvar=0), sp_stats.beta.var(a, b), atol=1e-1)
 
+  @test_util.numpy_disable_gradient_test
   def testBetaFullyReparameterized(self):
     a = tf.constant(1.0)
     b = tf.constant(2.0)
     _, [grad_a, grad_b] = tfp.math.value_and_gradient(
-        lambda a_, b_: tfd.Beta(a, b, validate_args=True).sample(  # pylint: disable=g-long-lambda
+        lambda a_, b_: tfd.Beta(a_, b_, validate_args=True).sample(  # pylint: disable=g-long-lambda
             100, seed=test_util.test_seed()), [a, b])
     self.assertIsNotNone(grad_a)
     self.assertIsNotNone(grad_b)
+    self.assertNotAllZero(grad_a)
+    self.assertNotAllZero(grad_b)
 
   # Test that sampling with the same seed twice gives the same results.
   def testBetaSampleMultipleTimes(self):
@@ -422,6 +425,7 @@ class BetaTest(test_util.TestCase):
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
+  @test_util.numpy_disable_gradient_test
   def testGradientOfLogProbEvalutates(self):
     def f(a):
       return tfd.Beta(a, 10).log_prob(.5)

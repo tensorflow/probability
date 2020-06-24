@@ -71,20 +71,20 @@ class ReduceWeightedLogSumExp(test_util.TestCase):
       m = np.squeeze(m, axis=axis)
     return m + np.log(sgn * sum_), sgn
 
+  @test_util.numpy_disable_gradient_test
   def testNoWeights(self):
     logx_ = np.array([[0., -1, 1000.],
                       [0, 1, -1000.],
                       [-5, 0, 5]])
     logx = tf.constant(logx_)
-    with tf.GradientTape() as tape:
-      tape.watch(logx)
-      expected = tf.reduce_logsumexp(logx, axis=-1)
-    grad_expected = tape.gradient(expected, logx)
-    with tf.GradientTape() as tape:
-      tape.watch(logx)
-      actual, actual_sgn = tfp.math.reduce_weighted_logsumexp(
-          logx, axis=-1, return_sign=True)
-    grad_actual = tape.gradient(actual, logx)
+    expected = tf.reduce_logsumexp(logx, axis=-1)
+    grad_expected, _ = tfp.math.value_and_gradient(
+        lambda logx: tf.reduce_logsumexp(logx, axis=-1), logx)
+    actual, actual_sgn = tfp.math.reduce_weighted_logsumexp(
+        logx, axis=-1, return_sign=True)
+    grad_actual, _ = tfp.math.value_and_gradient(
+        lambda logx: tfp.math.reduce_weighted_logsumexp(logx, axis=-1),
+        logx)
     [
         actual_,
         actual_sgn_,

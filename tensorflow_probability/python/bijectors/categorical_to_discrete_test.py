@@ -22,6 +22,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import categorical_to_discrete
 from tensorflow_probability.python.internal import test_util
@@ -99,6 +100,8 @@ class CategoricalToDiscreteTest(test_util.TestCase):
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0)
 
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_gradient_test
   def testVariableGradients(self):
     map_values = tf.Variable([0.3, 0.5])
     b = categorical_to_discrete.CategoricalToDiscrete(map_values=map_values,
@@ -108,14 +111,14 @@ class CategoricalToDiscreteTest(test_util.TestCase):
     grads = tape.gradient(y, [map_values])
     self.assertAllNotNone(grads)
 
+  @test_util.numpy_disable_gradient_test
   def testNonVariableGradients(self):
     map_values = tf.convert_to_tensor([0.3, 0.5])
-    b = categorical_to_discrete.CategoricalToDiscrete(map_values=map_values,
-                                                      validate_args=True)
-    with tf.GradientTape() as tape:
-      tape.watch(map_values)
-      y = tf.reduce_sum(b.forward([0, 1]))
-    grads = tape.gradient(y, [map_values])
+    def _func(map_values):
+      b = categorical_to_discrete.CategoricalToDiscrete(map_values=map_values,
+                                                        validate_args=True)
+      return tf.reduce_sum(b.forward([0, 1]))
+    grads = tfp.math.value_and_gradient(_func, [map_values])
     self.assertAllNotNone(grads)
 
   def testModifiedMapValuesIncreasingAssertion(self):

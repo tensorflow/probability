@@ -146,6 +146,7 @@ class AffineLinearOperatorTest(test_util.TestCase):
         self.evaluate(affine.forward_log_det_jacobian(x, event_ndims=2)))
 
   @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_gradient_test
   def testVariableGradient(self):
     b = tfb.AffineLinearOperator(shift=tf.Variable(-1.))
 

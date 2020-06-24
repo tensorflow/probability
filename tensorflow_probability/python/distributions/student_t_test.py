@@ -461,6 +461,7 @@ class StudentTTest(test_util.TestCase):
     self.assertNear(
         sp_stats.t.pdf(np.pi, 3., loc=np.pi), mean_pdf_val, err=1e-6)
 
+  @test_util.numpy_disable_gradient_test
   def testFullyReparameterized(self):
     df = tf.constant(2.0)
     mu = tf.constant(1.0)

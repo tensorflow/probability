@@ -24,6 +24,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_util
@@ -112,12 +113,23 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
         eval_func=self.evaluate)
 
   @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_gradient_test
   def testVariableGradients(self):
     b = tfb.Scale(scale=tf.Variable(2.))
 
     with tf.GradientTape() as tape:
       y = b.forward(.1)
     self.assertAllNotNone(tape.gradient(y, b.trainable_variables))
+
+  @test_util.numpy_disable_gradient_test
+  def testNonVariableGradients(self):
+    def _func(scale):
+      b = tfb.Scale(scale=scale)
+      return b.forward(.1)
+
+    value, grad = tfp.math.value_and_gradient(_func, [2.])
+    self.assertAllNotNone([value, grad])
+    self.assertNotAllZero(grad)
 
   def testImmutableScaleAssertion(self):
     with self.assertRaisesOpError('Argument `scale` must be non-zero'):

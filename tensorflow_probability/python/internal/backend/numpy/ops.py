@@ -316,7 +316,8 @@ class GradientTape(object):
   """tf.GradientTape stub."""
 
   def __init__(self, persistent=False, watch_accessed_variables=True):  # pylint: disable=unused-argument
-    pass
+    raise NotImplementedError('GradientTape not currently supported in JAX and '
+                              'NumPy backends.')
 
   def __enter__(self):
     return self
@@ -329,12 +330,12 @@ class GradientTape(object):
 
   def gradient(self, target, sources, output_gradients=None,  # pylint: disable=unused-argument
                unconnected_gradients=None):  # pylint: disable=unused-argument
-    return sources
+    raise NotImplementedError
 
   def batch_jacobian(self, target, source,  # pylint: disable=unused-argument
                      unconnected_gradients=None,  # pylint: disable=unused-argument
                      parallel_iterations=None, experimental_use_pfor=True):  # pylint: disable=unused-argument
-    return source
+    raise NotImplementedError
 
 bitcast = utils.copy_docstring(
     'tf.bitcast',
