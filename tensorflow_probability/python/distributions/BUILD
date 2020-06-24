@@ -89,6 +89,7 @@ multi_substrate_py_library(
         ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
         ":joint_distribution_util",
+        ":joint_distribution_vmap_mixin",
         ":kullback_leibler",
         ":kumaraswamy",
         ":lambertw_f",
@@ -840,6 +841,7 @@ multi_substrate_py_library(
         ":joint_distribution_named",
         ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
+        ":joint_distribution_vmap_mixin",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -900,6 +902,19 @@ multi_substrate_py_library(
         ":joint_distribution_sequential",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_distribution_vmap_mixin",
+    srcs = ["joint_distribution_vmap_mixin.py"],
+    deps = [
+        ":joint_distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:vectorization_util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -2361,8 +2376,9 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "joint_distribution_auto_batched_test",
-    size = "medium",
+    size = "large",
     srcs = ["joint_distribution_auto_batched_test.py"],
+    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 2,
     deps = [

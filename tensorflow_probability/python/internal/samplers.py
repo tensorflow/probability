@@ -104,7 +104,9 @@ def split_seed(seed, n=2, salt=None, name=None):
       single such seed is suitable to pass as the `seed` argument of the
       `tf.random.stateless_*` ops.
   """
-  if not (isinstance(n, int) or tf.is_tensor(n)):  # avoid confusion with salt.
+  if not (isinstance(n, int)
+          or isinstance(n, np.ndarray)
+          or tf.is_tensor(n)):  # avoid confusion with salt.
     raise TypeError(
         '`n` must be a python `int` or an int Tensor, got {}'.format(repr(n)))
   with tf.name_scope(name or 'split'):

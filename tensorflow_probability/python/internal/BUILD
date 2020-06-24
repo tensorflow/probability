@@ -373,6 +373,7 @@ multi_substrate_py_library(
     srcs = ["vectorization_util.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":samplers",
         # tensorflow dep,
     ],
 )
@@ -466,7 +467,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "vectorization_util_test",
-    size = "small",
+    size = "medium",
     srcs = ["vectorization_util_test.py"],
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
@@ -495,6 +496,7 @@ exports_files(
         "test_combinations.py",
         "test_util.py",
         "test_util_test.py",
+        "vectorization_util.py",
     ],
     visibility = [
         "//tensorflow_probability:__subpackages__",

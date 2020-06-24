@@ -21,20 +21,66 @@ from tensorflow_probability.python.distributions import joint_distribution_corou
 from tensorflow_probability.python.distributions import joint_distribution_named
 from tensorflow_probability.python.distributions import joint_distribution_sample_path_mixin
 from tensorflow_probability.python.distributions import joint_distribution_sequential
+from tensorflow_probability.python.distributions import joint_distribution_vmap_mixin
 
 
+# TODO(b/159723894): Reduce complexity by eliminating use of mixins.
 class JointDistributionCoroutineAutoBatched(
     joint_distribution_sample_path_mixin.JointDistributionSamplePathMixin,
+    joint_distribution_vmap_mixin.JointDistributionVmapMixin,
     joint_distribution_coroutine.JointDistributionCoroutine):
   """Joint distribution parameterized by a distribution-making generator.
 
-  This class provides alternate vectorization semantics for
-  `tfd.JointDistributionCoroutine`, which in many cases eliminate the need to
-  explicitly account for batch shapes in the model specification.
+  This class provides automatic vectorization and alternative semantics for
+  `tfd.JointDistributionCoroutine`, which in many cases allows for
+  simplifications in the model specification.
+
+  #### Automatic vectorization
+
+  Auto-vectorized variants of JointDistribution allow the user to avoid
+  explicitly annotating a model's vectorization semantics.
+  When using manually-vectorized joint distributions, each operation in the
+  model must account for the possibility of batch dimensions in Distributions
+  and their samples. By contrast, auto-vectorized models need only describe
+  a *single* sample from the joint distribution; any batch evaluation is
+  automated using `tf.vectorized_map` as required. In many cases this
+  allows for significant simplications. For example, the following
+  manually-vectorized `tfd.JointDistributionCoroutine` model:
+
+  ```python
+  def model_fn():
+    x = yield tfd.JointDistributionCoroutine.Root(
+      tfd.Normal(0., tf.ones([3])))
+    y = yield tfd.JointDistributionCoroutine.Root(
+      tfd.Normal(0., 1.)))
+    z = yield tfd.Normal(x[..., :2] + y[..., tf.newaxis], 1.)
+
+  can be written in auto-vectorized form as
+
+  ```python
+  def model_fn():
+    x = yield tfd.Normal(0., tf.ones([3]))
+    y = yield tfd.Normal(0., 1.))
+    z = yield tfd.Normal(x[:2] + y, 1.)
+  ```
+
+  in which we were able to drop the specification of `Root` nodes and to
+  avoid explicitly accounting for batch dimensions when indexing and slicing
+  computed quantities in the third line.
+
+  Note: auto-vectorization is still experimental and some TensorFlow ops may
+  be unsupported. It can be disabled by setting `use_vectorized_map=False`.
+
+  #### Alternative batch semantics
+
+  This class also provides alternative semantics for specifying a batch of
+  independent (non-identical) joint distributions.
+
   Instead of simply summing the `log_prob`s of component distributions
   (which may have different shapes), it first reduces the component `log_prob`s
   to ensure that `jd.log_prob(jd.sample())` always returns a scalar, unless
-  otherwise specified.
+  `batch_ndims` is explicitly set to a nonzero value (in which case the result
+  will have the corresponding tensor rank).
 
   The essential changes are:
 
@@ -58,12 +104,11 @@ class JointDistributionCoroutineAutoBatched(
 
   ```python
   tfd = tfp.distributions
-  Root = tfd.JointDistributionCoroutineAutoBatched.Root  # Convenient alias.
   def model():
-    global_log_rate = yield Root(tfd.Normal(loc=0., scale=1.))
-    local_log_rates = yield Root(tfd.Normal(loc=0., scale=tf.ones([20])))
-    observed_counts = yield Root(tfd.Poisson(
-      rate=tf.exp(global_log_rate + local_log_rates)))
+    global_log_rate = yield tfd.Normal(loc=0., scale=1.)
+    local_log_rates = yield tfd.Normal(loc=0., scale=tf.ones([20]))
+    observed_counts = yield tfd.Poisson(
+      rate=tf.exp(global_log_rate + local_log_rates))
   joint = tfd.JointDistributionCoroutineAutoBatched(model)
 
   print(joint.event_shape)
@@ -122,7 +167,7 @@ class JointDistributionCoroutineAutoBatched(
 
   ```python
   def model():
-    x = yield Root(tfd.Normal(0., scale=tf.ones([5])))
+    x = yield tfd.Normal(0., scale=tf.ones([5]))
     y = yield tfd.Normal(x, scale=[3., 2., 5., 1., 6.])
   batch_joint = tfd.JointDistributionCoroutineAutoBatched(model, batch_ndims=1)
 
@@ -150,23 +195,101 @@ class JointDistributionCoroutineAutoBatched(
 
   """
 
-  def __init__(self, *args, **kwargs):
-    kwargs['name'] = kwargs.get('name', 'JointDistributionCoroutineAutoBatched')
-    super(JointDistributionCoroutineAutoBatched, self).__init__(*args, **kwargs)
+  def __init__(self, model, sample_dtype=None, batch_ndims=0,
+               use_vectorized_map=True, validate_args=False, name=None):
+    """Construct the `JointDistributionCoroutineAutoBatched` distribution.
+
+    Args:
+      model: A generator that yields a sequence of `tfd.Distribution`-like
+        instances.
+      sample_dtype: Samples from this distribution will be structured like
+        `tf.nest.pack_sequence_as(sample_dtype, list_)`. `sample_dtype` is only
+        used for `tf.nest.pack_sequence_as` structuring of outputs, never
+        casting (which is the responsibility of the component distributions).
+        Default value: `None` (i.e., `tuple`).
+      batch_ndims: `int` `Tensor` number of batch dimensions. The `batch_shape`s
+        of all component distributions must be such that the prefixes of
+        length `batch_ndims` broadcast to a consistent joint batch shape.
+        Default value: `0`.
+      use_vectorized_map: Python `bool`. Whether to use `tf.vectorized_map`
+        to automatically vectorize evaluation of the model. This allows the
+        model specification to focus on drawing a single sample, which is often
+        simpler, but some ops may not be supported.
+        Default value: `True`.
+      validate_args: Python `bool`.  Whether to validate input with asserts.
+        If `validate_args` is `False`, and the inputs are invalid,
+        correct behavior is not guaranteed.
+        Default value: `False`.
+      name: The name for ops managed by the distribution.
+        Default value: `None` (i.e., `JointDistributionCoroutine`).
+    """
+    super(JointDistributionCoroutineAutoBatched, self).__init__(
+        model, sample_dtype=sample_dtype, batch_ndims=batch_ndims,
+        use_vectorized_map=use_vectorized_map, validate_args=validate_args,
+        name=name or 'JointDistributionCoroutineAutoBatched')
+
+  @property
+  def _require_root(self):
+    return not self._use_vectorized_map
 
 
+# TODO(b/159723894): Reduce complexity by eliminating use of mixins.
 class JointDistributionNamedAutoBatched(
     joint_distribution_sample_path_mixin.JointDistributionSamplePathMixin,
+    joint_distribution_vmap_mixin.JointDistributionVmapMixin,
     joint_distribution_named.JointDistributionNamed):
   """Joint distribution parameterized by named distribution-making functions.
 
-  This class provides alternate vectorization semantics for
-  `tfd.JointDistributionNamed`, which in many cases eliminate the need to
-  explicitly account for batch shapes in the model specification.
+  This class provides automatic vectorization and alternative semantics for
+  `tfd.JointDistributionNamed`, which in many cases allows for
+  simplifications in the model specification.
+
+  #### Automatic vectorization
+
+  Auto-vectorized variants of JointDistribution allow the user to avoid
+  explicitly annotating a model's vectorization semantics.
+  When using manually-vectorized joint distributions, each operation in the
+  model must account for the possibility of batch dimensions in Distributions
+  and their samples. By contrast, auto-vectorized models need only describe
+  a *single* sample from the joint distribution; any batch evaluation is
+  automated using `tf.vectorized_map` as required. In many cases this
+  allows for significant simplications. For example, the following
+  manually-vectorized `tfd.JointDistributionNamed` model:
+
+  ```python
+  model = tfd.JointDistributionNamed({
+    'x': tfd.Normal(0., tf.ones([3])),
+    'y': tfd.Normal(0., 1.),
+    'z': lambda x, y: tfd.Normal(x[..., :2] + y[..., tf.newaxis], 1.)
+  })
+  ```
+
+  can be written in auto-vectorized form as
+
+  ```python
+  model = tfd.JointDistributionNamedAutoBatched({
+    'x': tfd.Normal(0., tf.ones([3])),
+    'y': tfd.Normal(0., 1.),
+    'z': lambda x, y: tfd.Normal(x[:2] + y, 1.)
+  })
+  ```
+
+  in which we were able to avoid explicitly accounting for batch dimensions
+  when indexing and slicing computed quantities in the third line.
+
+  Note: auto-vectorization is still experimental and some TensorFlow ops may
+  be unsupported. It can be disabled by setting `use_vectorized_map=False`.
+
+  #### Alternative batch semantics
+
+  This class also provides alternative semantics for specifying a batch of
+  independent (non-identical) joint distributions.
+
   Instead of simply summing the `log_prob`s of component distributions
   (which may have different shapes), it first reduces the component `log_prob`s
   to ensure that `jd.log_prob(jd.sample())` always returns a scalar, unless
-  otherwise specified.
+  `batch_ndims` is explicitly set to a nonzero value (in which case the result
+  will have the corresponding tensor rank).
 
   The essential changes are:
 
@@ -202,7 +325,7 @@ class JointDistributionNamedAutoBatched(
   tfd = tfp.distributions
   joint = tfd.JointDistributionNamedAutoBatched(dict(
       e=             tfd.Exponential(rate=[100, 120]),
-      g=lambda    e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+      g=lambda    e: tfd.Gamma(concentration=e[0], rate=e[1]),
       n=             tfd.Normal(loc=0, scale=2.),
       m=lambda n, g: tfd.Normal(loc=n, scale=g),
       x=lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
@@ -213,28 +336,99 @@ class JointDistributionNamedAutoBatched(
   `JointDistributionNamed`, we would have wrapped the first variable as
   `e = tfd.Independent(tfd.Exponential(rate=[100, 120]),
    reinterpreted_batch_ndims=1)` to specify that `log_prob` of the `Exponential`
-  should be a scalar, summing over both dimensions. This behavior is implicit
+  should be a scalar, summing over both dimensions. We would also have had to
+  extend indices as `tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])` to
+  account for possible batch dimensions. Both of these behaviors are implicit
   in `JointDistributionNamedAutoBatched`.
 
   """
 
-  def __init__(self, *args, **kwargs):
-    kwargs['name'] = kwargs.get('name', 'JointDistributionNamedAuto')
-    super(JointDistributionNamedAutoBatched, self).__init__(*args, **kwargs)
+  def __init__(self, model, batch_ndims=0, use_vectorized_map=True,
+               validate_args=False, name=None):
+    """Construct the `JointDistributionNamedAutoBatched` distribution.
+
+    Args:
+      model: A generator that yields a sequence of `tfd.Distribution`-like
+        instances.
+      batch_ndims: `int` `Tensor` number of batch dimensions. The `batch_shape`s
+        of all component distributions must be such that the prefixes of
+        length `batch_ndims` broadcast to a consistent joint batch shape.
+        Default value: `0`.
+      use_vectorized_map: Python `bool`. Whether to use `tf.vectorized_map`
+        to automatically vectorize evaluation of the model. This allows the
+        model specification to focus on drawing a single sample, which is often
+        simpler, but some ops may not be supported.
+        Default value: `True`.
+      validate_args: Python `bool`.  Whether to validate input with asserts.
+        If `validate_args` is `False`, and the inputs are invalid,
+        correct behavior is not guaranteed.
+        Default value: `False`.
+      name: The name for ops managed by the distribution.
+        Default value: `None` (i.e., `JointDistributionNamed`).
+    """
+    super(JointDistributionNamedAutoBatched, self).__init__(
+        model, batch_ndims=batch_ndims, use_vectorized_map=use_vectorized_map,
+        validate_args=validate_args,
+        name=name or 'JointDistributionNamedAutoBatched')
 
 
+# TODO(b/159723894): Reduce complexity by eliminating use of mixins.
 class JointDistributionSequentialAutoBatched(
     joint_distribution_sample_path_mixin.JointDistributionSamplePathMixin,
+    joint_distribution_vmap_mixin.JointDistributionVmapMixin,
     joint_distribution_sequential.JointDistributionSequential):
   """Joint distribution parameterized by distribution-making functions.
 
-  This class provides alternate vectorization semantics for
-  `tfd.JointDistributionSequential`, which in many cases eliminate the need to
-  explicitly account for batch shapes in the model specification.
+  This class provides automatic vectorization and alternative semantics for
+  `tfd.JointDistributionNamed`, which in many cases allows for
+  simplifications in the model specification.
+
+  #### Automatic vectorization
+
+  Auto-vectorized variants of JointDistribution allow the user to avoid
+  explicitly annotating a model's vectorization semantics.
+  When using manually-vectorized joint distributions, each operation in the
+  model must account for the possibility of batch dimensions in Distributions
+  and their samples. By contrast, auto-vectorized models need only describe
+  a *single* sample from the joint distribution; any batch evaluation is
+  automated using `tf.vectorized_map` as required. In many cases this
+  allows for significant simplications. For example, the following
+  manually-vectorized `tfd.JointDistributionSequential` model:
+
+  ```python
+  model = tfd.JointDistributionSequential([
+      tfd.Normal(0., tf.ones([3])),
+      tfd.Normal(0., 1.),
+      lambda y, x: tfd.Normal(x[..., :2] + y[..., tf.newaxis], 1.)
+    ])
+  ```
+
+  can be written in auto-vectorized form as
+
+  ```python
+  model = tfd.JointDistributionAutoBatchedSequential([
+      tfd.Normal(0., tf.ones([3])),
+      tfd.Normal(0., 1.),
+      lambda y, x: tfd.Normal(x[:2] + y, 1.)
+    ])
+  ```
+
+  in which we were able to avoid explicitly accounting for batch dimensions
+  when indexing and slicing computed quantities in the third line.
+
+  Note: auto-vectorization is still experimental and some TensorFlow ops may
+  be unsupported. It can be disabled by setting `use_vectorized_map=False`.
+
+  #### Alternative batch semantics
+
+  This class also provides alternative semantics for specifying a batch of
+  independent (non-identical) joint distributions.
+
   Instead of simply summing the `log_prob`s of component distributions
   (which may have different shapes), it first reduces the component `log_prob`s
   to ensure that `jd.log_prob(jd.sample())` always returns a scalar, unless
-  otherwise specified.
+  `batch_ndims` is explicitly set to a nonzero value (in which case the result
+  will have the corresponding tensor rank).
 
   The essential changes are:
 
@@ -269,11 +463,11 @@ class JointDistributionSequentialAutoBatched(
   ```python
   tfd = tfp.distributions
   joint = tfd.JointDistributionSequentialAutoBatched([
-                   tfd.Exponential(rate=[100, 120]), 1,                   # e
-      lambda    e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),    # g
-                   tfd.Normal(loc=0, scale=2.),                           # n
-      lambda n, g: tfd.Normal(loc=n, scale=g)                             # m
-      lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12)                # x
+                   tfd.Exponential(rate=[100, 120]), 1,         # e
+      lambda    e: tfd.Gamma(concentration=e[0], rate=e[1]),    # g
+                   tfd.Normal(loc=0, scale=2.),                 # n
+      lambda n, g: tfd.Normal(loc=n, scale=g)                   # m
+      lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12)      # x
   ])
   ```
 
@@ -281,7 +475,37 @@ class JointDistributionSequentialAutoBatched(
   `JointDistributionSequential`, we would have wrapped the first variable as
   `e = tfd.Independent(tfd.Exponential(rate=[100, 120]),
    reinterpreted_batch_ndims=1)` to specify that `log_prob` of the `Exponential`
-  should be a scalar, summing over both dimensions. This behavior is implicit
+  should be a scalar, summing over both dimensions. We would also have had to
+  extend indices as `tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])` to
+  account for possible batch dimensions. Both of these behaviors are implicit
   in `JointDistributionSequentialAutoBatched`.
 
   """
+
+  def __init__(self, model, batch_ndims=0, use_vectorized_map=True,
+               validate_args=False, name=None):
+    """Construct the `JointDistributionSequentialAutoBatched` distribution.
+
+    Args:
+      model: A generator that yields a sequence of `tfd.Distribution`-like
+        instances.
+      batch_ndims: `int` `Tensor` number of batch dimensions. The `batch_shape`s
+        of all component distributions must be such that the prefixes of
+        length `batch_ndims` broadcast to a consistent joint batch shape.
+        Default value: `0`.
+      use_vectorized_map: Python `bool`. Whether to use `tf.vectorized_map`
+        to automatically vectorize evaluation of the model. This allows the
+        model specification to focus on drawing a single sample, which is often
+        simpler, but some ops may not be supported.
+        Default value: `True`.
+      validate_args: Python `bool`.  Whether to validate input with asserts.
+        If `validate_args` is `False`, and the inputs are invalid,
+        correct behavior is not guaranteed.
+        Default value: `False`.
+      name: The name for ops managed by the distribution.
+        Default value: `None` (i.e., `JointDistributionSequential`).
+    """
+    super(JointDistributionSequentialAutoBatched, self).__init__(
+        model, batch_ndims=batch_ndims, use_vectorized_map=use_vectorized_map,
+        validate_args=validate_args,
+        name=name or 'JointDistributionSequentialAutoBatched')

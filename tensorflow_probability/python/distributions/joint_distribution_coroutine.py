@@ -174,6 +174,10 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           name=name)
 
   @property
+  def _require_root(self):
+    return True
+
+  @property
   def model(self):
     return self._model_coroutine
 
@@ -236,7 +240,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     gen = self._model_coroutine()
     index = 0
     d = next(gen)
-    if not isinstance(d, self.Root):
+    if self._require_root and not isinstance(d, self.Root):
       raise ValueError('First distribution yielded by coroutine must '
                        'be wrapped in `Root`.')
     try:

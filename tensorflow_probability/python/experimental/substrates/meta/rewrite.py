@@ -98,7 +98,8 @@ INTERNALS = (
     'tensor_util',
     'tensorshape_util',
     'test_combinations',
-    'test_util'
+    'test_util',
+    'vectorization_util'
 )
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
