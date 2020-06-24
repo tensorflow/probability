@@ -280,7 +280,8 @@ class NegativeBinomialTest(test_util.TestCase):
         *self.evaluate([1. - d.prob(0.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
 
-  def testGradientOfLogProbEvalutates(self):
+  @test_util.numpy_disable_gradient_test
+  def testGradientOfLogProbEvaluates(self):
     self.evaluate(tfp.math.value_and_gradient(
         tfd.NegativeBinomial(0.1, 0.).log_prob, [0.1]))
 

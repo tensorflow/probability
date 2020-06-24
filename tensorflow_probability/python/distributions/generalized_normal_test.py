@@ -165,6 +165,7 @@ class _GeneralizedNormalTest(object):
     expected_cdf = sp_stats.gennorm(power, loc=mu, scale=sigma).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-3)
 
+  @test_util.numpy_disable_gradient_test
   def testFiniteGradientAtDifficultPoints(self):
     def make_fn(dtype, attr):
       x = np.array([-100., -20., -5., 5., 20., 100.]).astype(dtype)
@@ -318,6 +319,7 @@ class _GeneralizedNormalTest(object):
 
   @test_util.jax_disable_test_missing_functionality(
       '`jax.raw_ops` has no attribute `RandomGammaGrad`')
+  @test_util.numpy_disable_gradient_test
   def testGeneralizedNormalFullyReparameterized(self):
     loc = tf.constant(4., self.dtype)
     scale = tf.constant(3., self.dtype)

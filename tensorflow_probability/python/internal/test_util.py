@@ -229,6 +229,14 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     all_true = np.ones_like(is_negative_inf, dtype=np.bool)
     self.assertAllEqual(all_true, is_negative_inf)
 
+  def assertNotAllZero(self, a):
+    """Assert that all entries in a `Tensor` are nonzero.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as nonzero.
+    """
+    self.assertNotAllEqual(a, tf.nest.map_structure(tf.zeros_like, a))
+
   def assertAllNan(self, a):
     """Assert that every entry in a `Tensor` is NaN.
 

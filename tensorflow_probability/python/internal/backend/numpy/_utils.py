@@ -78,15 +78,20 @@ def numpy_dtype(dtype):
 def common_dtype(args_list, dtype_hint=None):
   """Returns explict dtype from `args_list` if exists, else dtype_hint."""
   dtype = None
+  seen = []
   for a in nest.flatten(args_list):
     if hasattr(a, 'dtype'):
       dt = a.dtype
+      seen.append(dt)
     else:
+      seen.append(None)
       continue
     if dtype is None:
       dtype = dt
     elif dtype != dt:
-      raise TypeError('Found incompatible dtypes, {} and {}'.format(dtype, dt))
+      raise TypeError(
+          'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
+              dtype, dt, seen))
   if dtype is None and dtype_hint is None:
     return None
   return dtype_hint if dtype is None else dtype

@@ -38,6 +38,16 @@ class RandomTest(test_util.TestCase):
       self.assertAllEqual(seed1, seed2)
 
   @test_util.substrate_disable_stateful_random_test
+  def test_sanitize_then_split_equivalent_split_int(self):
+    seed = test_util.test_seed()
+    sanitized = samplers.sanitize_seed(seed, salt='please pass the')
+    s1 = samplers.split_seed(sanitized, n=3)
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
+    s2 = samplers.split_seed(seed, n=3, salt='please pass the')
+    self.assertAllAssertsNested(self.assertAllEqual, s1, s2)
+
+  @test_util.substrate_disable_stateful_random_test
   def test_sanitize_none(self):
     seed1 = samplers.sanitize_seed(seed=None)
     seed2 = samplers.sanitize_seed(seed=None)

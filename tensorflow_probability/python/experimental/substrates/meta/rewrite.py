@@ -75,9 +75,6 @@ TF_REPLACEMENTS = {
 }
 
 DISABLED_BY_PKG = {
-    'mcmc':
-        ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
-         'slice_sampler_kernel'),
     'experimental':
         ('auto_batching', 'composite_tensor', 'edward2', 'linalg',
          'marginalize', 'mcmc', 'nn', 'sequential', 'substrates', 'vi'),
@@ -92,6 +89,7 @@ INTERNALS = (
     'dtype_util',
     'hypothesis_testlib',
     'implementation_selection',
+    'monte_carlo',
     'name_util',
     'nest_util',
     'prefer_static',
@@ -271,6 +269,13 @@ def main(argv):
 
   for find, replace in replacements.items():
     contents = contents.replace(find, replace)
+
+  disabler = 'JAX_DISABLE' if FLAGS.numpy_to_jax else 'NUMPY_DISABLE'
+  lines = contents.split('\n')
+  for i, l in enumerate(lines):
+    if disabler in l:
+      lines[i] = '# {}'.format(l)
+  contents = '\n'.join(lines)
 
   if not FLAGS.numpy_to_jax:
     contents = contents.replace('NUMPY_MODE = False', 'NUMPY_MODE = True')

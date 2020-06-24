@@ -52,6 +52,7 @@ import importlib.machinery
 import importlib.util
 import re
 import sys
+from typing import cast
 
 # For debugging, you can turn this on which prints a large number of messages to
 # stdout. We don't use regular absl.logging because most of this happens before
@@ -155,8 +156,8 @@ class Finder(importlib.abc.MetaPathFinder):
     if DEBUG:
       print('backend: ', backend)
       print('orig_module_name: ', orig_module_name)
-    orig_spec = importlib.util.find_spec(
-        orig_module_name)  # type: importlib.machinery.ModuleSpec
+    orig_spec = cast(importlib.machinery.ModuleSpec, importlib.util.find_spec(
+        orig_module_name))
     orig_loader = orig_spec.loader  # type: importlib.machinery.SourceFileLoader
 
     spec = importlib.machinery.ModuleSpec(

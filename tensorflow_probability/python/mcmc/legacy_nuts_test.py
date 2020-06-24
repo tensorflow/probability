@@ -36,7 +36,7 @@ from tensorflow_probability.python.internal import test_util
 def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None,
                    seed=None):
   if seed is None:
-    seed = test_util.test_seed()
+    seed = 1
   def target_log_prob_fn(event):
     with tf.name_scope('nuts_test_target_log_prob'):
       return tfd.MultivariateNormalDiag(
@@ -50,7 +50,9 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None,
       target_log_prob_fn,
       step_size=[0.3],
       unrolled_leapfrog_steps=2,
-      max_tree_depth=4)
+      max_tree_depth=4,
+      parallel_iterations=1,
+      seed=seed)
 
   chain_state, leapfrogs_taken = tfp.mcmc.sample_chain(
       num_results=num_steps,
@@ -61,7 +63,7 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None,
       current_state=[initial_state],
       kernel=kernel,
       trace_fn=lambda _, pkr: pkr.leapfrogs_taken,
-      seed=seed)
+      parallel_iterations=1)
 
   return chain_state, leapfrogs_taken
 
@@ -82,14 +84,16 @@ def assert_univariate_target_conservation(test, target_d, step_size):
         target_d.log_prob,
         step_size=step_size,
         max_tree_depth=3,
-        unrolled_leapfrog_steps=2)
+        unrolled_leapfrog_steps=2,
+        parallel_iterations=1,
+        seed=strm())
     result = tfp.mcmc.sample_chain(
         num_results=num_steps,
         num_burnin_steps=0,
         current_state=initialization,
         trace_fn=None,
-        kernel=nuts,
-        seed=strm())
+        parallel_iterations=1,
+        kernel=nuts)
     return result
 
   result = run_chain()
@@ -153,13 +157,15 @@ class NutsTest(test_util.TestCase):
         _ = yield tfd.Normal(0.03 * (tf.square(x0) - 100.), 1.)
       banana = tfd.JointDistributionCoroutine(banana_model)
       kernel = tfp.mcmc.NoUTurnSampler(banana.log_prob,
-                                       step_size=0.35)
+                                       step_size=0.35,
+                                       seed=seed,
+                                       parallel_iterations=1)
       trace_fn = lambda _, pkr: pkr.log_accept_ratio
       return tfp.mcmc.sample_chain(50,
                                    [0., 0.],
                                    kernel=kernel,
                                    trace_fn=trace_fn,
-                                   seed=seed)[1]
+                                   parallel_iterations=1)[1]
     log_accept_ratio_trace = self.evaluate(sample_from_banana())
     self.assertAllGreater(log_accept_ratio_trace, -0.35)
 
@@ -251,14 +257,16 @@ class NutsTest(test_util.TestCase):
             reinterpreted_batch_ndims=1).log_prob(x))
       kernel0 = tfp.mcmc.NoUTurnSampler(
           log_prob0,
-          step_size=0.3)
+          step_size=0.3,
+          parallel_iterations=1,
+          seed=strm())
       [results0] = tfp.mcmc.sample_chain(
           num_results=num_steps,
           num_burnin_steps=10,
           current_state=init0,
           kernel=kernel0,
           trace_fn=None,
-          seed=strm())
+          parallel_iterations=1)
 
       def log_prob1(state0, state1, state2):
         return tf.squeeze(
@@ -272,14 +280,16 @@ class NutsTest(test_util.TestCase):
         )
       kernel1 = tfp.mcmc.NoUTurnSampler(
           log_prob1,
-          step_size=0.3)
+          step_size=0.3,
+          parallel_iterations=1,
+          seed=strm())
       results1_ = tfp.mcmc.sample_chain(
           num_results=num_steps,
           num_burnin_steps=10,
           current_state=init1,
           kernel=kernel1,
           trace_fn=None,
-          seed=strm())
+          parallel_iterations=1)
       results1 = tf.concat(
           [tf.reshape(x, [num_steps] + batch_shape + [-1]) for x in results1_],
           axis=-1)
@@ -314,7 +324,9 @@ class NutsTest(test_util.TestCase):
       nuts = tfp.mcmc.NoUTurnSampler(
           target_log_prob_fn,
           step_size=[step_size],
-          max_tree_depth=5)
+          max_tree_depth=5,
+          parallel_iterations=1,
+          seed=strm())
 
       def trace_fn(_, pkr):
         return (pkr.is_accepted, pkr.leapfrogs_taken)
@@ -325,7 +337,7 @@ class NutsTest(test_util.TestCase):
           current_state=[tf.cast(state, dtype=tf.float64)],
           kernel=nuts,
           trace_fn=trace_fn,
-          seed=strm())
+          parallel_iterations=1)
 
       return (
           tf.shape(x),
@@ -370,15 +382,16 @@ class NutsTest(test_util.TestCase):
           loc=mu, scale_tril=scale_tril).log_prob
       nuts_kernel = tfp.mcmc.NoUTurnSampler(
           target_log_prob,
-          step_size=tf.constant([sigma1, sigma2], dtype))
+          step_size=tf.constant([sigma1, sigma2], dtype),
+          parallel_iterations=1,
+          seed=strm())
       chain_state = tfp.mcmc.sample_chain(
           num_results=num_steps,
           num_burnin_steps=20,
           current_state=initial_state,
           kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
               nuts_kernel, 20, .8),
-
-          seed=strm(),
+          parallel_iterations=1,
           trace_fn=None)
       variance_est = tf.square(chain_state - mu)
       correlation_est = tf.reduce_prod(
@@ -422,6 +435,7 @@ class NutsTest(test_util.TestCase):
     kernel = tfp.mcmc.NoUTurnSampler(
         target_log_prob_fn=tfd.Independent(
             tfd.Normal(tf.zeros(nd, dtype=dtype), 1.), 1).log_prob,
+        parallel_iterations=1,
         step_size=.1)
     x_ = np.zeros([batch_size, nd], dtype=dtype)
     x = tf1.placeholder_with_default(x_, shape=dynamic_shape)
@@ -429,8 +443,8 @@ class NutsTest(test_util.TestCase):
         num_results=nsample,
         current_state=x,
         kernel=kernel,
-        trace_fn=None,
-        seed=test_util.test_seed())
+        parallel_iterations=1,
+        trace_fn=None)
     mcmc_trace = self.evaluate(mcmc_trace_)
     self.assertAllEqual(mcmc_trace.shape, [nsample, batch_size, nd])
 
@@ -455,10 +469,12 @@ class NutsTest(test_util.TestCase):
           num_results=100,
           kernel=tfp.mcmc.NoUTurnSampler(
               target_log_prob_fn=lambda *args: neals_funnel.log_prob(args),
-              step_size=[1., 1.]),
+              step_size=[1., 1.],
+              parallel_iterations=1,
+              seed=strm()),
           current_state=init_states,
           trace_fn=lambda _, pkr: pkr.has_divergence,
-          seed=strm())
+          parallel_iterations=1)
       return tf.reduce_sum(tf.cast(has_divergence, dtype=tf.int32))
 
     divergence_count = self.evaluate(run_chain_and_get_divergence())
@@ -529,7 +545,9 @@ class NutsTest(test_util.TestCase):
           tfp.mcmc.TransformedTransitionKernel(
               inner_kernel=tfp.mcmc.NoUTurnSampler(
                   target_log_prob_fn=log_prob,
-                  step_size=step_size0),
+                  step_size=step_size0,
+                  parallel_iterations=1,
+                  seed=strm()),
               bijector=unconstraining_bijectors),
           target_accept_prob=.8,
           num_adaptation_steps=burnin,
@@ -542,7 +560,7 @@ class NutsTest(test_util.TestCase):
           current_state=[b0, b1, df],
           kernel=kernel,
           trace_fn=trace_fn,
-          seed=strm())
+          parallel_iterations=1)
       rhat = tfp.mcmc.potential_scale_reduction(mcmc_trace)
       return (
           [s[-1] for s in step_size],  # final step size

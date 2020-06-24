@@ -44,7 +44,6 @@ class AurocAuprcTest(test_util.TestCase):
 
     num_positive_trials = 4001
     num_negative_trials = 5156
-    total_trials = num_positive_trials + num_negative_trials
     num_positive_quantiles = 445
     num_negative_quantiles = 393
 
@@ -67,11 +66,20 @@ class AurocAuprcTest(test_util.TestCase):
     y_pred = np.concatenate([positive_trials_, negative_trials_])
 
     def auc_fn(y_pred):
-      m = tf.keras.metrics.AUC(num_thresholds=total_trials, curve=curve)
-      self.evaluate([v.initializer for v in m.variables])
-      self.evaluate(m.update_state(y_true, y_pred))
-      out = self.evaluate(m.result())
-      return out
+      if curve == 'PR':
+        sort_indices = np.argsort(-y_pred)
+        sorted_y_true = y_true[sort_indices]
+        true_positives = np.cumsum(sorted_y_true)
+        precision = true_positives / np.arange(1, len(sorted_y_true)+1)
+        recall = true_positives / true_positives[-1]
+        return np.sum(np.diff(recall) * precision[1:])
+      else:
+        # 'ROC'
+        sort_indices = np.argsort(y_pred)
+        sorted_y_true = y_true[sort_indices]
+        false_count = np.cumsum(1 - sorted_y_true)
+        area = np.sum(sorted_y_true * false_count)
+        return area / (false_count[-1] * (len(sorted_y_true) - false_count[-1]))
 
     batch_shape = np.array(positive_means).shape
     batch_rank = len(batch_shape)

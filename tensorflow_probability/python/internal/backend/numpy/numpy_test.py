@@ -1285,8 +1285,9 @@ class NumpyTest(test_util.TestCase):
     with self.assertRaises(TypeError):
       nptf.reduce_logsumexp(nptf.convert_to_tensor([1, 2, 3], dtype=nptf.int32))
 
-  @test_util.numpy_disable_gradient_test
   def test_while_loop_gradients(self):
+    if not JAX_MODE:
+      self.skipTest('Cannot take gradients in NumPy.')
 
     def _fn(x):
 

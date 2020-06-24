@@ -349,6 +349,7 @@ class QuantizedDistributionTest(test_util.TestCase):
         self.evaluate(qdist.log_prob(2.)),
         atol=0)
 
+  @test_util.numpy_disable_gradient_test
   def testLogProbAndGradGivesFiniteResults(self):
     def quantized_log_prob(dtype):
       x = np.arange(-100, 100, 2).astype(dtype)
@@ -368,6 +369,7 @@ class QuantizedDistributionTest(test_util.TestCase):
       self.assertAllFinite(value)
       self.assertAllFinite(grads)
 
+  @test_util.numpy_disable_gradient_test
   def testExponentialLogProbAndGradGivesFiniteResults(self):
     def quantized_log_prob(dtype):
       x = np.arange(2, 100, 2).astype(dtype)
@@ -386,6 +388,7 @@ class QuantizedDistributionTest(test_util.TestCase):
       self.assertAllFinite(value)
       self.assertAllFinite(grads)
 
+  @test_util.numpy_disable_gradient_test
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     def quantized_log_prob(mu, sigma):
       x = tf.math.ceil(4 * rng.rand(100).astype(np.float32) - 2)

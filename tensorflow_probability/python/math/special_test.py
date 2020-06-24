@@ -259,6 +259,7 @@ class SpecialTest(test_util.TestCase):
     rtol = 1e-6
     self.assertAllClose(sophisticated, sophisticated_64, atol=atol, rtol=rtol)
 
+  @test_util.numpy_disable_gradient_test
   def testLogGammaDifferenceGradient(self):
     def simple_difference(x, y):
       return tf.math.lgamma(y) - tf.math.lgamma(x + y)
@@ -275,6 +276,7 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(gx, simple_gx)
     self.assertAllClose(gy, simple_gy)
 
+  @test_util.numpy_disable_gradient_test
   def testLogGammaDifferenceGradientBroadcasting(self):
     def simple_difference(x, y):
       return tf.math.lgamma(y) - tf.math.lgamma(x + y)
@@ -306,6 +308,7 @@ class SpecialTest(test_util.TestCase):
         scipy_special.betaln(x, y), tfp_math.lbeta(x, y),
         atol=atol, rtol=rtol)
 
+  @test_util.numpy_disable_gradient_test
   def testLogBetaGradient(self):
     def simple_lbeta(x, y):
       return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
@@ -320,6 +323,7 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(gx, simple_gx)
     self.assertAllClose(gy, simple_gy)
 
+  @test_util.numpy_disable_gradient_test
   def testLogBetaGradientBroadcasting(self):
     def simple_lbeta(x, y):
       return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)

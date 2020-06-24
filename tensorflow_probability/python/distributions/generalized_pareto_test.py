@@ -218,6 +218,7 @@ class GeneralizedParetoTest(test_util.TestCase):
         sample_values.var(),
         rtol=.08)
 
+  @test_util.numpy_disable_gradient_test
   def testFullyReparameterized(self):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)

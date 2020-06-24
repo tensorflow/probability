@@ -43,7 +43,7 @@ class TransitionKernel(object):
   """
 
   @abc.abstractmethod
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Takes one step of the TransitionKernel.
 
     Must be overridden by subclasses.
@@ -54,6 +54,7 @@ class TransitionKernel(object):
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made within the
         previous call to this function (or as returned by `bootstrap_results`).
+      seed: Optional, a seed for reproducible sampling.
 
     Returns:
       next_state: `Tensor` or Python `list` of `Tensor`s representing the
