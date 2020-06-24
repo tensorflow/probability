@@ -524,7 +524,10 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["sample_halton_sequence_test.py"],
     numpy_size = "large",
-    numpy_tags = ["requires-mem:16g"],
+    numpy_tags = [
+        "requires-mem:16g",
+        "no-oss-ci",
+    ],
     deps = [
         # numpy dep,
         # tensorflow dep,
