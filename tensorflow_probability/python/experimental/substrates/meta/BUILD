@@ -29,6 +29,7 @@ package(
     ],
 )
 
+# py_test
 py3_test(
     name = "numpy_integration_test",
     size = "small",
@@ -40,6 +41,7 @@ py3_test(
     ],
 )
 
+# py_test
 py3_test(
     name = "jax_integration_test",
     srcs = ["jax_integration_test.py"],

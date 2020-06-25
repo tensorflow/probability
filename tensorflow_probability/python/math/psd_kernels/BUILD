@@ -315,6 +315,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "psd_kernel_properties_test",
     size = "medium",

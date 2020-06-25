@@ -84,6 +84,7 @@ multi_substrate_py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "cache_util_test",
     size = "small",
@@ -106,6 +107,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "docstring_util_test",
     size = "small",
@@ -157,6 +159,7 @@ multi_substrate_py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "distribution_util_test",
     size = "small",
@@ -192,6 +195,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "implementation_selection_test_gpu",
     srcs = ["implementation_selection_test.py"],
@@ -333,6 +337,7 @@ multi_substrate_py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "tensor_util_test",
     size = "small",
@@ -355,6 +360,7 @@ multi_substrate_py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "tensorshape_util_test",
     size = "small",
@@ -393,6 +399,7 @@ multi_substrate_py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "hypothesis_testlib_test",
     size = "small",

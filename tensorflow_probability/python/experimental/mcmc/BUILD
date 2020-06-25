@@ -59,6 +59,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "elliptical_slice_sampler_test",
     size = "large",
@@ -104,6 +105,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "nuts_test",
     size = "medium",
@@ -117,6 +119,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "nuts_test_gpu",
     srcs = ["nuts_test.py"],
@@ -134,6 +137,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "nuts_xla_test_cpu",
     size = "large",
@@ -154,6 +158,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "nuts_xla_test_gpu",
     size = "large",
@@ -191,6 +196,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "particle_filter_test",
     size = "large",
@@ -215,6 +221,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "particle_filter_augmentation_test",
     size = "medium",
@@ -243,6 +250,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "sample_sequential_monte_carlo_test",
     size = "medium",
@@ -274,6 +282,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "sequential_monte_carlo_kernel_test",
     size = "medium",
@@ -302,6 +311,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "weighted_resampling_test",
     size = "medium",

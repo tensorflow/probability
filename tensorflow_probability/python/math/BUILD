@@ -217,6 +217,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "minimize_test",
     size = "small",
@@ -333,6 +334,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "sparse_test",
     size = "small",

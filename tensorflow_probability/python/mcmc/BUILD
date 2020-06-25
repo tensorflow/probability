@@ -116,6 +116,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_dual_averaging_step_size_adaptation_test",
     size = "medium",
@@ -162,6 +163,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_hmc_test",
     size = "medium",
@@ -226,6 +228,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_nuts_test",
     size = "large",
@@ -239,6 +242,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "nuts_test_gpu",
     size = "large",
@@ -287,6 +291,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_langevin_test",
     size = "medium",
@@ -334,6 +339,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_metropolis_hastings_test",
     srcs = ["legacy_metropolis_hastings_test.py"],
@@ -371,6 +377,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_random_walk_metropolis_test",
     size = "medium",
@@ -415,6 +422,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_replica_exchange_mc_test",
     size = "medium",
@@ -456,6 +464,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_sample_test",
     size = "medium",
@@ -495,6 +504,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_sample_annealed_importance_test",
     size = "medium",
@@ -569,6 +579,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_slice_sampler_test",
     size = "medium",
@@ -611,6 +622,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_transformed_kernel_test",
     size = "medium",
@@ -636,6 +648,7 @@ py_library(
 )
 
 # bazel run -c opt :eight_schools_hmc_eager_test -- --benchmarks=.
+# py2and3
 py_test(
     name = "eight_schools_hmc_eager_test",
     size = "medium",  # Might run > 1 minute.
@@ -648,6 +661,7 @@ py_test(
 )
 
 # bazel run -c opt :eight_schools_hmc_graph_test -- --benchmarks=.
+# py2and3
 py_test(
     name = "eight_schools_hmc_graph_test",
     size = "medium",  # Might run > 1 minute.
@@ -688,6 +702,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "legacy_simple_step_size_adaptation_test",
     srcs = ["legacy_simple_step_size_adaptation_test.py"],
@@ -710,6 +725,7 @@ py_library(
 )
 
 # bazel run -c opt :text_messages_hmc_eager_test -- --benchmarks=.
+# py2and3
 py_test(
     name = "text_messages_hmc_eager_test",
     size = "medium",  # Might run > 1 minute.
@@ -722,6 +738,7 @@ py_test(
 )
 
 # bazel run -c opt :text_messages_hmc_graph_test -- --benchmarks=.
+# py2and3
 py_test(
     name = "text_messages_hmc_graph_test",
     size = "medium",  # Might run > 1 minute.

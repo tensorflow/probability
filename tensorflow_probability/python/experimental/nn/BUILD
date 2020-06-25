@@ -58,6 +58,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "affine_layers_test",
     size = "small",
@@ -86,6 +87,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "convolutional_layers_test",
     size = "small",
@@ -113,6 +115,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "convolutional_transpose_layers_test",
     size = "small",
@@ -135,6 +138,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "layers_test",
     size = "small",

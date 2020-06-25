@@ -51,6 +51,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "window_tune_nuts_sampling_test",
     size = "enormous",
@@ -69,6 +70,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "window_tune_nuts_sampling_test_gpu",
     size = "enormous",

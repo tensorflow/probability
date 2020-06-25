@@ -15,7 +15,7 @@
 # Description:
 #   Functional MCMC API.
 
-# [internal] load pytype.bzl
+# [internal] load pytype.bzl (pytype_library)
 
 # py_test rules are rewritten to py3_test on export to OSS, for reasons of
 # reversibility of import<->export transforms. This is only necessary until we
@@ -186,6 +186,7 @@ py_library(
     srcs_version = "PY3",
 )
 
+# py_test
 py3_test(
     name = "fun_mcmc_test",
     srcs = ["fun_mcmc_test.py"],
@@ -213,6 +214,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "prefab_test",
     srcs = ["prefab_test.py"],
@@ -238,6 +240,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "util_tfp_test",
     srcs = ["util_tfp_test.py"],

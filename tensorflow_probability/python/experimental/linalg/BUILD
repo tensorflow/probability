@@ -49,6 +49,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "linear_operator_psd_kernel_test",
     size = "small",

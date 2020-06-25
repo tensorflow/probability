@@ -1928,6 +1928,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "binomial_test_gpu",
     size = "medium",
@@ -2873,6 +2874,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "poisson_test_gpu",
     size = "medium",
@@ -3217,6 +3219,7 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "distribution_properties_test",
     size = "large",
@@ -3239,6 +3242,7 @@ py_test(
     ],
 )
 
+# py_test
 py3_test(
     name = "jax_transformation_test",
     size = "large",
@@ -3264,6 +3268,7 @@ py3_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "stochastic_process_properties_test",
     size = "large",

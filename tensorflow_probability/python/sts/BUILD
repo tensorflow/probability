@@ -59,6 +59,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "autoregressive_test",
     size = "medium",
@@ -82,6 +83,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "decomposition_test",
     size = "medium",
@@ -107,6 +109,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "dynamic_regression_test",
     size = "small",
@@ -136,6 +139,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "fitting_test",
     size = "large",
@@ -161,6 +165,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "forecast_test",
     size = "medium",
@@ -185,6 +190,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "local_level_test",
     size = "small",
@@ -208,6 +214,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "local_linear_trend_test",
     size = "small",
@@ -231,6 +238,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "regression_test",
     size = "medium",
@@ -255,6 +263,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "seasonal_test",
     size = "medium",
@@ -279,6 +288,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "semilocal_linear_trend_test",
     size = "small",
@@ -302,6 +312,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "smooth_seasonal_test",
     size = "small",
@@ -326,6 +337,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "structural_time_series_test",
     size = "medium",
@@ -349,6 +361,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "sum_test",
     size = "medium",

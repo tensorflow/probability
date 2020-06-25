@@ -51,6 +51,7 @@ multi_substrate_py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "deferred_tensor_test",
     size = "small",

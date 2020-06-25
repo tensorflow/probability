@@ -54,6 +54,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "csiszar_divergence_test",
     size = "small",
@@ -80,6 +81,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "mutual_information_test",
     size = "small",
@@ -107,6 +109,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "optimization_test",
     size = "medium",

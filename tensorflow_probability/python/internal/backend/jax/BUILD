@@ -123,6 +123,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "tensor_array_ops_test",
     srcs = ["tensor_array_ops_test.py"],
@@ -141,6 +142,7 @@ py3_test(
     ],
 )
 
+# py_test
 py3_test(
     name = "jax_test",
     srcs = ["numpy_test.py"],

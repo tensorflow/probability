@@ -49,6 +49,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "distribution_tensor_coercible_test",
     size = "small",
@@ -72,6 +73,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "tensor_tuple_test",
     size = "small",

@@ -74,6 +74,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "composite_tensor_test",
     srcs = ["composite_tensor_test.py"],

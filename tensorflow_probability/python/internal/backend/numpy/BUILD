@@ -270,6 +270,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "tensor_array_ops_test",
     size = "small",
@@ -356,6 +357,7 @@ py_library(
     deps = [],
 )
 
+# py2and3
 py_test(
     name = "numpy_test",
     size = "small",
@@ -479,6 +481,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "rewrite_equivalence_test",
     srcs = ["rewrite_equivalence_test.py"],
