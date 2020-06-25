@@ -69,6 +69,11 @@ def _bcast_shape(base_shape, args):
 
 def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
+  invalid_count = (np.int64(counts) < 0) != (counts < 0)
+  if np.any(invalid_count):
+    raise ValueError('int64 overflow: {} -> {}'.format(
+        counts[np.where(invalid_count)],
+        np.int64(counts)[np.where(invalid_count)]))
   probs = np.where(counts > 0, probs, 0)
   samps = rng.binomial(np.int64(counts), np.float64(probs), shape)
   return samps.astype(utils.numpy_dtype(output_dtype))
@@ -228,8 +233,9 @@ def _uniform(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
   if np.issubdtype(dtype, np.integer):
     if maxval is None:
       if minval is None:
-        return rng.random_integers(
-            np.iinfo(dtype).min, np.iinfo(dtype).max, size=shape).astype(dtype)
+        return rng.randint(
+            np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape
+            ).astype(dtype)
       raise ValueError('Must provide maxval for integer sampling')
     return rng.randint(low=minval, high=maxval, size=shape, dtype=dtype)
   maxval = 1 if maxval is None else maxval
