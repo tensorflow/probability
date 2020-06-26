@@ -80,6 +80,7 @@ def multi_substrate_py_library(
         srcs = [],
         deps = [],
         substrates_omit_deps = [],
+        jax_omit_deps = [],
         numpy_omit_deps = [],
         testonly = 0,
         srcs_version = "PY2AND3"):
@@ -94,6 +95,7 @@ def multi_substrate_py_library(
             substrate-specific libraries for substrate variants.
         substrates_omit_deps: List of deps to omit if those libraries are not
             rewritten for the substrates.
+        jax_omit_deps: List of deps to omit for the JAX substrate.
         numpy_omit_deps: List of deps to omit for the NumPy substrate.
         testonly: As with `py_library`.
         srcs_version: As with `py_library`.
@@ -138,7 +140,7 @@ def multi_substrate_py_library(
 
     resolved_omit_deps_jax = [
         _resolve_omit_dep(dep)
-        for dep in substrates_omit_deps
+        for dep in substrates_omit_deps + jax_omit_deps
     ]
     jax_srcs = _substrate_srcs(srcs, "jax")
     for src in srcs:

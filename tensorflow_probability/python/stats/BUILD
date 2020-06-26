@@ -34,6 +34,9 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
+    jax_omit_deps = [
+        ":ranking",
+    ],
     srcs_version = "PY2AND3",
     deps = [
         ":calibration",
