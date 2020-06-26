@@ -19,7 +19,7 @@ from setuptools import find_packages
 from setuptools import setup
 
 REQUIRED_PACKAGES = [
-    'jax',
+    'jax==0.1.71',
     'jaxlib',
 ]
 
@@ -36,8 +36,7 @@ with open('README.md', 'r') as fh:
 setup(
     name='oryx',
     version=__version__,
-    description='Library for probabilistic programming and deep learning '
-                'in JAX.',
+    description='Probabilistic programming and deep learning in JAX',
     long_description=oryx_long_description,
     long_description_content_type='text/markdown',
     author='Google LLC',
