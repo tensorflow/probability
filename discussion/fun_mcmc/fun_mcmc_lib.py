@@ -38,11 +38,12 @@ from __future__ import print_function
 
 import collections
 import functools
+import typing
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 import numpy as np
 
 from discussion.fun_mcmc import backend
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 tf = backend.tf
 tfp = backend.tfp
@@ -304,10 +305,8 @@ def call_fn(
   """
   if isinstance(
       args, collections.Sequence) and not _is_namedtuple_like(args):
-    args = args  # type: Tuple[Any]
     return fn(*args)
   elif isinstance(args, collections.Mapping):
-    args = args  # type: Mapping[str, Any]
     return fn(**args)
   else:
     return fn(args)
@@ -1288,7 +1287,7 @@ def hamiltonian_monte_carlo(
       log_uniform=log_uniform,
       seed=seed)
 
-  hmc_state = hmc_state  # type: HamiltonianMonteCarloState
+  hmc_state = typing.cast(HamiltonianMonteCarloState, hmc_state)
   return hmc_state, HamiltonianMonteCarloExtra(
       is_accepted=mh_extra.is_accepted,
       proposed_hmc_state=proposed_state,
@@ -1687,7 +1686,7 @@ def random_walk_metropolis(
       is_accepted=mh_extra.is_accepted,
   )
 
-  rwm_state = rwm_state  # type: RandomWalkMetropolisState
+  rwm_state = typing.cast(RandomWalkMetropolisState, rwm_state)
   return rwm_state, rwm_extra
 
 

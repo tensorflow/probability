@@ -52,7 +52,6 @@ import importlib.machinery
 import importlib.util
 import re
 import sys
-from typing import cast
 
 # For debugging, you can turn this on which prints a large number of messages to
 # stdout. We don't use regular absl.logging because most of this happens before
@@ -156,9 +155,16 @@ class Finder(importlib.abc.MetaPathFinder):
     if DEBUG:
       print('backend: ', backend)
       print('orig_module_name: ', orig_module_name)
-    orig_spec = cast(importlib.machinery.ModuleSpec, importlib.util.find_spec(
-        orig_module_name))
-    orig_loader = orig_spec.loader  # type: importlib.machinery.SourceFileLoader
+    orig_spec = importlib.util.find_spec(orig_module_name)
+    if orig_spec is None:
+      raise ImportError('Cannot import ' + orig_module_name)
+    orig_loader = orig_spec.loader
+    # We use duck-typing here because we don't necesarily need this to be a
+    # SourceFileLoader, just that it has these methods.
+    if not (hasattr(orig_loader, 'get_filename') and hasattr(
+        orig_loader, 'is_package') and hasattr(orig_loader, 'get_data')):
+      raise TypeError('{} has an abnormal loader: {}'.format(
+          orig_module_name, orig_loader))
 
     spec = importlib.machinery.ModuleSpec(
         fullname,
