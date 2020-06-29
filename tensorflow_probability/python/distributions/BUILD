@@ -2279,6 +2279,7 @@ multi_substrate_py_test(
     name = "hidden_markov_model_test",
     size = "medium",
     srcs = ["hidden_markov_model_test.py"],
+    jax_tags = ["notap"],
     shard_count = 4,
     deps = [
         # absl/testing:parameterized dep,
