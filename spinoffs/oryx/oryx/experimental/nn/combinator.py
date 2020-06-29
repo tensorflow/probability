@@ -19,6 +19,10 @@ from jax import random
 from oryx.core import state
 from oryx.experimental.nn import base
 
+__all__ = [
+    'Serial',
+]
+
 
 class Serial(base.Layer):
   """Layer that executes a sequence of child layers."""

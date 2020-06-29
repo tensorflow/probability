@@ -14,11 +14,6 @@
 # ============================================================================
 # Lint as: python3
 """Module for higher order primitives."""
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -29,6 +24,15 @@ from jax.interpreters import batching
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 from jax.lib.xla_bridge import xla_client as xc
+
+__all__ = [
+    'HigherOrderPrimitive',
+    'FlatPrimitive',
+    'call_bind',
+    'tie_all',
+    'tie_in'
+]
+
 
 safe_map = jax_core.safe_map
 
@@ -170,6 +174,7 @@ batching.primitive_batchers[tie_all_p] = _tie_all_batch_rule
 
 
 def tie_all(*args):
+  """An identity function that ties arguments together in a JAX trace."""
   flat_args, in_tree = tree_util.tree_flatten(args)
   if len(flat_args) <= 1:
     return args
@@ -178,4 +183,5 @@ def tie_all(*args):
 
 
 def tie_in(x, y):
+  """A reimplementation of `jax.tie_in` that handles pytrees."""
   return tie_all(x, y)[1]

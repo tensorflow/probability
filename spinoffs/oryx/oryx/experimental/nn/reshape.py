@@ -19,6 +19,11 @@ import jax.numpy as np
 from oryx.core import state
 from oryx.experimental.nn import base
 
+__all__ = [
+    'Flatten',
+    'Reshape',
+]
+
 
 class Flatten(base.Layer):
   """Flattens the inputs collapsing all ending dimensions."""

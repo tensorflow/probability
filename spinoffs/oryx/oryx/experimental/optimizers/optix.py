@@ -36,6 +36,27 @@ tree_leaves = tree_util.tree_leaves
 tree_structure = tree_util.tree_structure
 tree_unflatten = tree_util.tree_unflatten
 
+__all__ = [
+    'clip',
+    'global_norm',
+    'clip_by_global_norm',
+    'trace',
+    'scale_by_rms',
+    'scale_by_stddev',
+    'scale_by_adam',
+    'scale',
+    'scale_by_schedule',
+    'add_noise',
+    'apply_every',
+    'chain',
+    'sgd',
+    'noisy_sgd',
+    'adam',
+    'rmsprop',
+    'gradient_descent',
+    'optimize'
+]
+
 
 def clip(max_delta):
 

@@ -34,6 +34,16 @@ from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import propagate
 
+__all__ = [
+    'InverseAndILDJ',
+    'inverse_and_ildj',
+    'inverse',
+    'ildj',
+    'register_elementwise',
+    'ildj_registry',
+    'custom_rules',
+]
+
 safe_map = jax_core.safe_map
 safe_zip = jax_core.safe_zip
 unknown = propagate.unknown
@@ -89,12 +99,14 @@ def inverse_and_ildj(f, *trace_args):
 
 
 def inverse(f, *trace_args):
+  """Returns the inverse of a function."""
   def wrapped(*args, **kwargs):
     return inverse_and_ildj(f, *trace_args)(*args, **kwargs)[0]
   return wrapped
 
 
 def ildj(f, *trace_args):
+  """Computes the log determininant of a function's Jacobian."""
   def wrapped(*args, **kwargs):
     return inverse_and_ildj(f, *trace_args)(*args, **kwargs)[1]
   return wrapped

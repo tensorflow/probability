@@ -132,6 +132,13 @@ from oryx.core import primitive
 from oryx.core import state
 from oryx.core.interpreters import unzip
 
+__all__ = [
+    'LayerParams',
+    'Layer',
+    'Template',
+    'create_parameter',
+]
+
 
 class LayerParams(collections.namedtuple(
     'LayerParams',

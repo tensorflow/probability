@@ -18,6 +18,10 @@ import inspect
 from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx.distributions import distribution_extensions
 
+__all__ = [
+    'distribution_extensions'
+]
+
 tfd = tfp.distributions
 
 _distributions = {}

@@ -23,6 +23,10 @@ import jax.numpy as np
 from oryx.core import kwargs_util
 from oryx.experimental.nn import base
 
+__all__ = [
+    'BatchNorm',
+]
+
 
 class BatchNormParams(collections.namedtuple(
     'BatchNormParams', ('beta', 'gamma'))):

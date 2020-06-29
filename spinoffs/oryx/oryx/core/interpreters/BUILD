@@ -21,6 +21,20 @@ package(default_visibility = ["//visibility:public"])
 
 # pytype_strict
 py_library(
+    name = "interpreters",
+    srcs = ["__init__.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":harvest",
+        ":inverse",
+        ":log_prob",
+        ":propagate",
+        ":unzip",
+    ],
+)
+
+# pytype_strict
+py_library(
     name = "unzip",
     srcs = ["unzip.py"],
     srcs_version = "PY3",

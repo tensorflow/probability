@@ -25,16 +25,27 @@ from jax import tree_util
 from jax import util as jax_util
 from jax.interpreters import partial_eval as pe
 
+__all__ = [
+    'get_shaped_aval',
+    'pv_like',
+    'stage',
+    'trees',
+    'new_dynamic_context',
+    'get_dynamic_context'
+]
+
 safe_map = jax_util.safe_map
 
 
 def get_shaped_aval(x):
+  """Converts a JAX value type into a shaped abstract value."""
   if hasattr(x, 'dtype') and hasattr(x, 'shape'):
     return abstract_arrays.ShapedArray(x.shape, x.dtype)
   return abstract_arrays.raise_to_shaped(jax_core.get_aval(x))
 
 
 def pv_like(x, abstract=True):
+  """Converts a JAX value type into a JAX `PartialVal`."""
   if abstract:
     return pe.PartialVal((get_shaped_aval(x), jax_core.unit))
   else:
@@ -64,6 +75,7 @@ def stage(f):
 
 
 def trees(f):
+  """Returns a function that determines input and output pytrees from inputs."""
 
   def wrapped(*args, **kwargs):
     return stage(f)(*args, **kwargs)[1]

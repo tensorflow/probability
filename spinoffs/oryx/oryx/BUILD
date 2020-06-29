@@ -27,13 +27,8 @@ py_library(
         ":version",
         "//oryx/bijectors",
         "//oryx/core",
-        "//oryx/core:pytree",
-        "//oryx/core:serialize",
-        "//oryx/core/state:api",
-        "//oryx/core/state:module",
         "//oryx/distributions",
         "//oryx/experimental",
-        "//oryx/util",
     ],
 )
 

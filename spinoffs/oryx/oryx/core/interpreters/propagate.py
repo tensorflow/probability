@@ -38,6 +38,14 @@ from jax import tree_util
 from jax import util as jax_util
 from jax.interpreters import partial_eval as pe
 
+__all__ = [
+    'Cell',
+    'Unknown',
+    'Equation',
+    'Environment',
+    'propagate'
+]
+
 safe_map = jax_core.safe_map
 
 

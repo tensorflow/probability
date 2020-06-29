@@ -18,6 +18,10 @@ import inspect
 from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx.bijectors import bijector_extensions
 
+__all__ = [
+    'bijector_extensions'
+]
+
 tfb = tfp.bijectors
 
 _bijectors = {}

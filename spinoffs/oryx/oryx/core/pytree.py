@@ -17,6 +17,10 @@
 import abc
 from jax import tree_util
 
+__all__ = [
+    'Pytree',
+]
+
 
 class Pytree(metaclass=abc.ABCMeta):
   """Class that registers objects as Jax pytree_nodes."""

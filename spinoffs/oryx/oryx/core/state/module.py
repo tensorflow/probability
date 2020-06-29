@@ -21,6 +21,15 @@ from oryx.core import primitive
 from oryx.core import pytree
 from oryx.core.interpreters import harvest
 
+__all__ = [
+    'VARIABLE',
+    'ASSIGN',
+    'variable',
+    'assign',
+    'Module',
+]
+
+
 VARIABLE = 'variable'
 ASSIGN = 'assign'
 

@@ -24,6 +24,12 @@ import jax.numpy as np
 from oryx.core import state
 from oryx.experimental.nn import base
 
+__all__ = [
+    'conv_info',
+    'Conv',
+    'Deconv',
+]
+
 
 DIMENSION_NUMBERS = ('NHWC', 'HWIO', 'NHWC')
 ConvParams = collections.namedtuple('ConvParams', ['kernel', 'bias'])

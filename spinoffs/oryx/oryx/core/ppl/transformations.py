@@ -204,6 +204,16 @@ from oryx.core import primitive
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import log_prob as lp
 
+__all__ = [
+    'random_variable',
+    'log_prob',
+    'joint_sample',
+    'joint_log_prob',
+    'intervene',
+    'conditional',
+    'graph_replace',
+]
+
 Program = Callable[..., Any]
 Scalar = Any
 LogProbFunction = Callable[..., Scalar]

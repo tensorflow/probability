@@ -16,6 +16,13 @@
 """Contains logic for serializing and deserializing PytreeTypes."""
 import pickle
 
+__all__ = [
+    'to_tuple',
+    'from_tuple',
+    'serialize',
+    'deserialize',
+]
+
 
 def to_tuple(obj):
   return (obj.__class__, obj.flatten())
@@ -27,9 +34,11 @@ def from_tuple(obj_tuple):
 
 
 def serialize(obj):
+  """Serializes an object using pickle."""
   return pickle.dumps(to_tuple(obj))
 
 
 def deserialize(serialized_obj):
+  """Deserializes an object using pickle."""
   obj_tuple = pickle.loads(serialized_obj)
   return from_tuple(obj_tuple)

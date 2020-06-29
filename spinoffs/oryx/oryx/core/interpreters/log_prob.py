@@ -23,6 +23,11 @@ from oryx.core import trace_util
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters import propagate
 
+__all__ = [
+    'LogProbRules',
+    'log_prob'
+]
+
 safe_map = jax_core.safe_map
 
 InverseAndILDJ = inverse.InverseAndILDJ

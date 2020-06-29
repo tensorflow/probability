@@ -14,11 +14,6 @@
 # ============================================================================
 # Lint as: python3
 """Wraps TFP bijectors for use with Jax."""
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 from jax import tree_util
 from jax import util as jax_util
 import jax.numpy as np
@@ -27,6 +22,10 @@ from six.moves import zip
 from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx import core
 from oryx.core.interpreters import inverse
+
+__all__ = [
+    'make_type',
+]
 
 safe_map = jax_util.safe_map
 tf = tfp.tf2jax

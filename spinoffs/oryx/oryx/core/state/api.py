@@ -70,6 +70,16 @@ import jax.numpy as np
 
 from oryx.core.state import module
 
+__all__ = [
+    'init',
+    'ArraySpec',
+    'call_and_update',
+    'call',
+    'update',
+    'make_array_spec',
+    'spec'
+]
+
 NestedSpec = Any
 
 

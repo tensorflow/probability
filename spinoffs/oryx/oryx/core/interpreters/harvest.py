@@ -141,6 +141,19 @@ import jax.numpy as np
 from oryx.core import primitive as prim
 from oryx.core import trace_util
 
+__all__ = [
+    'HarvestSettings',
+    'HarvestContext',
+    'HarvestList',
+    'HarvestTrace',
+    'HarvestTracer',
+    'sow',
+    'harvest',
+    'reap',
+    'plant',
+    'nest',
+]
+
 safe_map = jax_util.safe_map
 safe_zip = jax_util.safe_zip
 

@@ -28,10 +28,13 @@ py_library(
         ":primitive",
         ":pytree",
         ":serialize",
+        "//oryx/core/interpreters",
+        "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:inverse",
         "//oryx/core/interpreters:log_prob",
         "//oryx/core/interpreters:unzip",
         "//oryx/core/ppl",
+        "//oryx/core/state",
     ],
 )
 

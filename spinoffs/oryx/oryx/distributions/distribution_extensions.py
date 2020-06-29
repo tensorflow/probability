@@ -23,6 +23,12 @@ from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx import core
 from oryx.core import ppl
 from oryx.core.interpreters import inverse
+
+__all__ = [
+    'make_type',
+]
+
+
 tf = tfp.tf2jax
 tfd = tfp.distributions
 

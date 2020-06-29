@@ -16,6 +16,7 @@
 
 import abc
 import collections
+import jax
 from jax import lax
 from jax import random
 from jax.experimental import stax
@@ -23,7 +24,17 @@ import jax.numpy as np
 
 from oryx.core import state
 from oryx.experimental.nn import base
-from oryx.util import math
+
+__all__ = [
+    'Dense',
+    'Dropout',
+    'Activation',
+    'Relu',
+    'Tanh',
+    'Softplus',
+    'LogSoftmax',
+    'Softmax',
+]
 
 
 DenseParams = collections.namedtuple('DenseParams', ['kernel', 'bias'])
@@ -141,7 +152,7 @@ class Activation(base.Layer, metaclass=abc.ABCMeta):
 class Relu(Activation):
 
   def _activate(self, x):
-    return math.relu(x)
+    return jax.nn.relu(x)
 
 
 class Tanh(Activation):
@@ -153,16 +164,16 @@ class Tanh(Activation):
 class Softplus(Activation):
 
   def _activate(self, x):
-    return math.softplus(x)
+    return jax.nn.softplus(x)
 
 
 class LogSoftmax(Activation):
 
   def _activate(self, x):
-    return math.logsoftmax(x, axis=-1)
+    return jax.nn.log_softmax(x, axis=-1)
 
 
 class Softmax(Activation):
 
   def _activate(self, x):
-    return math.softmax(x, axis=-1)
+    return jax.nn.softmax(x, axis=-1)

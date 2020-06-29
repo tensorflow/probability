@@ -57,6 +57,10 @@ from oryx.core.interpreters import unzip
 from oryx.core.state import api
 from oryx.core.state import module
 
+__all__ = [
+    'FunctionModule',
+]
+
 safe_map = jax_util.safe_map
 safe_zip = jax_util.safe_zip
 Key = Any

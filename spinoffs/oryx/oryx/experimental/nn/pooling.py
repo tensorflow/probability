@@ -24,6 +24,13 @@ from jax import numpy as np
 from oryx.core import state
 from oryx.experimental.nn import base
 
+__all__ = [
+    'Pooling',
+    'MaxPooling',
+    'SumPooling',
+    'AvgPooling'
+]
+
 
 PoolingInfo = collections.namedtuple(
     'PoolingInfo', ['window_shape', 'dims', 'strides', 'padding'])

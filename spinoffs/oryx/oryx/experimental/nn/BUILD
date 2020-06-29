@@ -46,7 +46,6 @@ py_library(
         # jax dep,
         # jax:stax dep,
         "//oryx/core/state",
-        "//oryx/util:math",
     ],
 )
 

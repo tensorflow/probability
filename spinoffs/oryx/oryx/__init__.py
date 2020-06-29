@@ -17,13 +17,4 @@ from oryx import bijectors
 from oryx import core
 from oryx import distributions
 from oryx import experimental
-from oryx import util
-from oryx.core.pytree import Pytree
-from oryx.core.serialize import deserialize
-from oryx.core.serialize import serialize
-from oryx.core.state.api import init
-from oryx.core.state.api import Shape
-from oryx.core.state.api import spec
-from oryx.core.state.module import assign
-from oryx.core.state.module import Module
-from oryx.core.state.module import variable
+from oryx.version import __version__

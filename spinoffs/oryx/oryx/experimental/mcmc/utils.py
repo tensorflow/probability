@@ -21,6 +21,10 @@ import jax.numpy as np
 from oryx.core import ppl
 from oryx.core.interpreters import inverse
 
+__all__ = [
+    'constrain'
+]
+
 LogProbFunction = ppl.LogProbFunction
 
 

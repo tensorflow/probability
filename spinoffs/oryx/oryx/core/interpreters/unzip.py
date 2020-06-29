@@ -44,12 +44,17 @@ from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 
 __all__ = [
+    'VariableError',
+    'UnzipCustomRules',
+    'VariableRecipe',
+    'UnzipSettings',
+    'UnzipContext',
+    'UnzipTrace',
+    'UnzipTracer',
     'flatten_args_into_keys',
     'unzip',
     'unzip_registry',
     'unzip_to_init_apply_subjaxprs',
-    'UnzipTrace',
-    'UnzipTracer',
 ]
 
 safe_map = jax_core.safe_map

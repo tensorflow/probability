@@ -27,6 +27,16 @@ from oryx.core import primitive
 from oryx.core import state as st
 from oryx.core.interpreters import harvest
 
+__all__ = [
+    'random_walk',
+    'metropolis',
+    'metropolis_hastings',
+    'hmc',
+    'mala',
+    'sample_chain',
+]
+
+
 LogProbFunction = ppl.LogProbFunction
 Program = ppl.Program
 MCMC_METRICS = 'mcmc_metrics'
