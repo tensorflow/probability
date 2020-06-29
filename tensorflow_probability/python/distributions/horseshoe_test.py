@@ -146,7 +146,7 @@ class _HorseshoeTest(object):
 
     """
     scale_np = np.array([.5, .8, 1.0, 2.0, 3.0])
-    x_np = np.logspace(-6, 8, 9).reshape((-1, 1))
+    x_np = np.logspace(-8, 8, 9).reshape((-1, 1))
     scale = self._test_param(scale_np)
     x = self._test_param(x_np)
     horseshoe = tfd.Horseshoe(scale=scale, validate_args=True)

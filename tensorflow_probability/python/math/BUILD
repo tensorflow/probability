@@ -392,7 +392,6 @@ multi_substrate_py_test(
     name = "special_test",
     size = "small",
     srcs = ["special_test.py"],
-    jax_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
