@@ -1479,7 +1479,6 @@ multi_substrate_py_test(
     name = "rational_quadratic_spline_test",
     size = "medium",
     srcs = ["rational_quadratic_spline_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     tags = ["hypothesis"],
     deps = [
