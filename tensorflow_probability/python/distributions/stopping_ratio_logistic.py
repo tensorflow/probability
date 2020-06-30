@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+import tensorflow_probability.python.math as tfm
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
@@ -115,17 +116,23 @@ class StoppingRatioLogistic(distribution.Distribution):
 
   #### Examples
 
-  Create a symmetric 4-class distribution:
+  To expand on the `[Bachelor, Master, PhD]` from above, create a distribution
+  of three ordered categories:
 
   ```python
   import tensorflow_probability as tfp
   tfd = tfp.distributions
 
-  dist = tfd.StoppingRatioLogistic(cutpoints=[-2., 0., 2.], loc=0.)
+  dist = tfd.StoppingRatioLogistic(cutpoints=[-1.0, 1.0], loc=0.)
 
   dist.categorical_probs()
-  # ==> array([0.11920291, 0.44039854, 0.38790172, 0.05249681], dtype=float32)
+  # ==> array([0.2689414  0.53444666 0.19661193], dtype=float32)
   ```
+
+  Hence, the probability of finishing one's education with a Bachelor would be
+  approx. 26% in this example, while the probability of continuing to pursue
+  a Master's would be approx. 53% and the probability of even attaining a PhD
+  would be 20%.
 
   Some further functionality:
 
@@ -216,24 +223,24 @@ class StoppingRatioLogistic(distribution.Distribution):
 
   def categorical_log_probs(self):
     """Log probabilities for the `K+1` sequential categories."""
-    return tf.math.log(self.categorical_probs())
 
-  def categorical_probs(self):
-    """Probabilities for the `K+1` sequential categories."""
     cutpoints = self.cutpoints
     loc = self.loc
-
     num_cat = self._num_categories()
 
-    q = 1.0 - tf.math.sigmoid(cutpoints - loc[..., tf.newaxis])
-    p = 1.0 - q
+    p = tf.math.log(tf.math.sigmoid(cutpoints - loc[..., tf.newaxis]))
+    q = tfm.log1mexp(p)
 
-    qs = tf.math.cumprod(q[..., :(num_cat - 2)], axis=-1)
-    p = tf.concat([p[..., :1], p[..., 1:num_cat] * qs], axis=-1)
-    qs = tf.math.reduce_prod(q[..., :num_cat], axis=-1)
+    qs = tf.math.cumsum(q[..., :(num_cat - 2)], axis=-1)
+    p = tf.concat([p[..., :1], p[..., 1:num_cat] + qs], axis=-1)
+    qs = tf.math.reduce_sum(q[..., :num_cat], axis=-1)
     p = tf.concat([p, qs[..., tf.newaxis]], axis=-1)
 
     return p
+
+  def categorical_probs(self):
+    """Probabilities for the `K+1` sequential categories."""
+    return tf.math.exp(self.categorical_log_probs())
 
   def _num_categories(self):
     return prefer_static.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
