@@ -117,9 +117,8 @@ class _LinearRegressionTest(test_util.TestCase):
     # Build a model with scalar Exponential(1.) prior.
     linear_regression = LinearRegression(
         design_matrix=design_matrix,
-        weights_prior=tfd.Sample(
-            tfd.Exponential(rate=self._build_placeholder(np.ones(batch_shape))),
-            [num_features]))
+        weights_prior=tfd.Exponential(
+            rate=self._build_placeholder(np.ones(batch_shape))))
 
     # Check that the prior is broadcast to match the shape of the weights.
     weights = linear_regression.parameters[0]
