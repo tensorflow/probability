@@ -107,6 +107,7 @@ multi_substrate_py_test(
     name = "dual_averaging_step_size_adaptation_test",
     size = "medium",
     srcs = ["dual_averaging_step_size_adaptation_test.py"],
+    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
@@ -152,6 +153,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["hmc_test.py"],
     disabled_substrates = ["numpy"],
+    jax_tags = ["omni_fail"],
     shard_count = 6,
     deps = [
         # numpy dep,
@@ -282,6 +284,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["langevin_test.py"],
     disabled_substrates = ["numpy"],
+    jax_tags = ["omni_fail"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -368,6 +371,7 @@ multi_substrate_py_test(
     name = "random_walk_metropolis_test",
     size = "medium",
     srcs = ["random_walk_metropolis_test.py"],
+    jax_tags = ["omni_fail"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -409,6 +413,7 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["replica_exchange_mc_test.py"],
+    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     shard_count = 11,
     deps = [
@@ -454,6 +459,7 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["sample_test.py"],
+    jax_tags = ["omni_fail"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -494,6 +500,7 @@ multi_substrate_py_test(
     name = "sample_annealed_importance_test",
     size = "medium",
     srcs = ["sample_annealed_importance_test.py"],
+    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -532,6 +539,7 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["sample_halton_sequence_test.py"],
+    jax_tags = ["omni_fail"],
     numpy_size = "large",
     numpy_tags = [
         "requires-mem:16g",
@@ -567,6 +575,7 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["slice_sampler_test.py"],
+    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],  # too slow.
     shard_count = 6,
     deps = [
@@ -612,6 +621,7 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["transformed_kernel_test.py"],
+    jax_tags = ["omni_fail"],
     shard_count = 4,
     deps = [
         # numpy dep,
@@ -693,6 +703,7 @@ multi_substrate_py_test(
     name = "simple_step_size_adaptation_test",
     size = "medium",
     srcs = ["simple_step_size_adaptation_test.py"],
+    jax_tags = ["omni_fail"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,

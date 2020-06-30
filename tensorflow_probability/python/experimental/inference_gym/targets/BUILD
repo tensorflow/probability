@@ -61,6 +61,7 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "banana_test",
     srcs = ["banana_test.py"],
+    jax_tags = ["omni_fail"],
     deps = [
         ":banana",
         # tensorflow dep,
