@@ -73,6 +73,7 @@ class StoppingRatioLogistic(distribution.Distribution):
                        = sigmoid(loc - concat([-inf, cutpoints, inf])[c]) -
                          sigmoid(loc - concat([-inf, cutpoints, inf])[c+1])
   ```
+
   the StoppingRatioLogistic distribution models the probability of an ordinal
   random variable `X` to be in category `c` given `X >= c` as
 
@@ -108,7 +109,7 @@ class StoppingRatioLogistic(distribution.Distribution):
   ```none
   pmf(x; cutpoints, loc) =
                     sigmoid(cutpoints[x] - loc) *
-                    prod_{s=0}^{x = 1} (1 - sigmoid(cutpoints[s] - loc))
+                    prod_{s=0}^{x-1} (1 - sigmoid(cutpoints[s] - loc))
   ```
 
   where `loc` is the location of a latent logistic distribution and
@@ -166,7 +167,7 @@ class StoppingRatioLogistic(distribution.Distribution):
       cutpoints: A floating-point `Tensor` with shape `(K,)` where
         `K` is the number of cutpoints. The vector of cutpoints should be
         non-decreasing, which is only checked if `validate_args=True`.
-      loc: A floating-point `Tensor` with shape `()` . The entry represents the
+      loc: A floating-point `Tensor` with shape `()`. The entry represents the
         mean of the latent logistic distribution.
       dtype: The type of the event samples (default: int32).
       validate_args: Python `bool`, default `False`. When `True` distribution
@@ -213,12 +214,13 @@ class StoppingRatioLogistic(distribution.Distribution):
 
   @property
   def cutpoints(self):
-    """Input argument `cutpoints`."""
+    """Cutpoints parameter that separates the latent logistic distribution into
+    K + 1 categories."""
     return self._cutpoints
 
   @property
   def loc(self):
-    """Input argument `loc`."""
+    """Mean parameter of the latent logistic distribution."""
     return self._loc
 
   def categorical_log_probs(self):
@@ -230,7 +232,6 @@ class StoppingRatioLogistic(distribution.Distribution):
 
     p = tf.math.log(tf.math.sigmoid(cutpoints - loc[..., tf.newaxis]))
     q = tfm.log1mexp(p)
-
     qs = tf.math.cumsum(q[..., :(num_cat - 2)], axis=-1)
     p = tf.concat([p[..., :1], p[..., 1:num_cat] + qs], axis=-1)
     qs = tf.math.reduce_sum(q[..., :num_cat], axis=-1)
@@ -271,24 +272,25 @@ class StoppingRatioLogistic(distribution.Distribution):
     return tf.TensorShape([])
 
   def _log_prob(self, x):
-    num_categories = self._num_categories()
-    x, cat_log_probs = _broadcast_cat_event_and_params(
-        event=x,
-        params=self.categorical_log_probs(),
-        base_dtype=dtype_util.base_dtype(self.dtype))
-    cat_log_probs_flat = tf.reshape(
-        cat_log_probs, [-1, num_categories])
-    x_flat = tf.reshape(x, [-1, 1])
-    log_probs_flat = tf.gather(
-        params=cat_log_probs_flat,
-        indices=x_flat,
-        batch_dims=1)
-
-    return tf.reshape(log_probs_flat, shape=tf.shape(x))
+    return self._get_broad_casted(x, self.categorical_log_probs())
 
   def _cdf(self, x):
-    cdf = tf.cumsum(self.categorical_probs())
-    return tf.gather(cdf, x)
+    return self._get_broad_casted(
+        x, tf.cumsum(self.categorical_probs(), axis=-1))
+
+  def _get_broad_casted(self, x, probs):
+    x, probs = _broadcast_cat_event_and_params(
+        event=x,
+        params=probs,
+        base_dtype=dtype_util.base_dtype(self.dtype))
+    probs_flat = tf.reshape(
+        probs, [-1, self._num_categories()])
+    x_flat = tf.reshape(x, [-1, 1])
+    gathered = tf.gather(
+        params=probs_flat,
+        indices=x_flat,
+        batch_dims=1)
+    return tf.reshape(gathered, shape=tf.shape(x))
 
   def _mode(self):
     log_probs = self.categorical_log_probs()
