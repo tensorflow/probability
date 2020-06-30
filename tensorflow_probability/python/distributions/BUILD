@@ -129,7 +129,7 @@ multi_substrate_py_library(
         ":sample",
         ":sinh_arcsinh",
         ":spherical_uniform",
-        ":sratio",
+        ":stopping_ratio_logistic",
         ":student_t",
         ":student_t_process",
         ":transformed_distribution",
@@ -1552,8 +1552,8 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "sratio",
-    srcs = ["sratio.py"],
+    name = "stopping_ratio_logistic",
+    srcs = ["stopping_ratio_logistic.py"],
     deps = [
         ":distribution",
         ":kullback_leibler",
@@ -3018,8 +3018,8 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
-    name = "sratio_test",
-    srcs = ["sratio_test.py"],
+    name = "stopping_ratio_logistic_test",
+    srcs = ["stopping_ratio_logistic_test.py"],
     jax_size = "medium",
     deps = [
         # numpy dep,
@@ -3401,7 +3401,7 @@ exports_files(
         "sample_test.py",
         "sinh_arcsinh.py",
         "sinh_arcsinh_test.py",
-        "sratio.py",
+        "stopping_ratio_logistic.py",
         "student_t.py",
         "transformed_distribution.py",
         "triangular.py",

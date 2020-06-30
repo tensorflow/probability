@@ -54,17 +54,26 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
 
   return event, params
 
+
 class StoppingRatioLogistic(distribution.Distribution):
   """Stopping ratio logistic distribution.
 
   The StoppingRatioLogistic distribution is parameterized by a location and a
-  set of non-decreasing cutpoints.  t is defined over the integers
+  set of non-decreasing cutpoints. It is defined over the integers
  `{0, 1, ..., K}` for `K` non-decreasing cutpoints.
 
   The difference to the OrderedLogistic is that categories can only be reached
-  one after another, i.e., sequentially. Specifically, the StoppingRatioLogistic
-  distribution models the probability of an ordinal random variable `X` to be in
-  category `c` given `X >= c` as
+  one after another, i.e., sequentially. Specifically, while the probability
+  of an ordinal random variable `X` to be in category `c`
+  for the OrderedLogistic reads as
+
+  ```none
+  P(X = c; cutpoints, loc) = P(X > c-1) - P(X > c)
+                       = sigmoid(loc - concat([-inf, cutpoints, inf])[c]) -
+                         sigmoid(loc - concat([-inf, cutpoints, inf])[c+1])
+  ```
+  the StoppingRatioLogistic distribution models the probability of an ordinal
+  random variable `X` to be in category `c` given `X >= c` as
 
   ```none
   P(X = c; X >= c, cutpoints, loc) = sigmoid(cutpoints[c] - loc)
@@ -215,10 +224,9 @@ class StoppingRatioLogistic(distribution.Distribution):
     loc = self.loc
 
     num_cat = self._num_categories()
-    one = tf.ones(1, dtype=cutpoints.dtype)
 
-    q = one - tf.math.sigmoid(cutpoints - loc[..., tf.newaxis])
-    p = one - q
+    q = 1.0 - tf.math.sigmoid(cutpoints - loc[..., tf.newaxis])
+    p = 1.0 - q
 
     qs = tf.math.cumprod(q[..., :(num_cat - 2)], axis=-1)
     p = tf.concat([p[..., :1], p[..., 1:num_cat] * qs], axis=-1)
@@ -271,9 +279,9 @@ class StoppingRatioLogistic(distribution.Distribution):
 
     return tf.reshape(log_probs_flat, shape=tf.shape(x))
 
-  def _log_cdf(self, x):
+  def _cdf(self, x):
     cdf = tf.cumsum(self.categorical_probs())
-    return tf.math.log(tf.gather(cdf, x))
+    return tf.gather(cdf, x)
 
   def _mode(self):
     log_probs = self.categorical_log_probs()
