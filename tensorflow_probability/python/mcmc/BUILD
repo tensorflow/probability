@@ -218,7 +218,6 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["nuts_test.py"],
     disabled_substrates = ["numpy"],
-    jax_tags = ["notap"],
     shard_count = 7,
     srcs_version = "PY2AND3",
     tags = ["nozapfhahn"],

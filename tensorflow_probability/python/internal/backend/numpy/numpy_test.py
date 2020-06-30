@@ -139,12 +139,16 @@ def fft_shapes(fft_dim):
 
 @hps.composite
 def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
-                 as_tuple=True, batch_shape=(), unique=False):
+                 as_tuple=True, batch_shape=(), unique=False,
+                 allow_nan=ALLOW_NAN):
   if dtype is None:
     dtype = np.float64
   if elements is None:
     if dtype in (np.float32, np.float64):
-      elements = floats()
+      if allow_nan:
+        elements = floats(min_value=None, max_value=None, allow_nan=allow_nan)
+      else:
+        elements = floats()
     elif dtype in (np.int32, np.int64):
       elements = integers()
     elif dtype in (np.complex64, np.complex128):
@@ -171,10 +175,12 @@ single_arrays = functools.partial(n_same_shape, n=1, as_tuple=False)
 
 
 @hps.composite
-def array_axis_tuples(draw, strategy=None, elements=None, dtype=None):
+def array_axis_tuples(draw, strategy=None, elements=None, dtype=None,
+                      allow_nan=ALLOW_NAN):
   x = draw(strategy or single_arrays(shape=shapes(min_dims=1),
                                      elements=elements,
-                                     dtype=dtype))
+                                     dtype=dtype,
+                                     allow_nan=allow_nan))
   rank = len(x.shape)
   axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
@@ -780,9 +786,9 @@ NUMPY_TEST_CASES = [
                 elements=hps.booleans()))
     ]),
     TestCase('math.reduce_logsumexp', [array_axis_tuples()]),
-    TestCase('math.reduce_max', [array_axis_tuples()]),
+    TestCase('math.reduce_max', [array_axis_tuples(allow_nan=True)]),
     TestCase('math.reduce_mean', [array_axis_tuples()]),
-    TestCase('math.reduce_min', [array_axis_tuples()]),
+    TestCase('math.reduce_min', [array_axis_tuples(allow_nan=True)]),
     TestCase('math.reduce_prod', [array_axis_tuples(),
                                   array_axis_tuples(dtype=np.int32)]),
     TestCase('math.reduce_std',
