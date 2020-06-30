@@ -22,7 +22,6 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import Autoregressive
@@ -363,7 +362,7 @@ class LinearRegressionTest(test_util.TestCase, _StsTestHarness):
     max_timesteps = 100
     num_features = 3
 
-    prior = tfd.Laplace(0., 1.)
+    prior = tfd.Sample(tfd.Laplace(0., 1.), sample_shape=[num_features])
 
     # LinearRegression components don't currently take an `observed_time_series`
     # argument, so they can't infer a prior batch shape. This means we have to
@@ -373,9 +372,8 @@ class LinearRegressionTest(test_util.TestCase, _StsTestHarness):
           sts_util.canonicalize_observed_time_series_with_mask(
               observed_time_series))
       batch_shape = tf.shape(observed_time_series_tensor)[:-2]
-      prior = tfd.TransformedDistribution(prior, tfb.Identity(),
-                                          event_shape=[num_features],
-                                          batch_shape=batch_shape)
+      prior = tfd.Sample(tfd.Laplace(tf.zeros(batch_shape), 1.),
+                         sample_shape=[num_features])
 
     regression = LinearRegression(
         design_matrix=np.random.randn(

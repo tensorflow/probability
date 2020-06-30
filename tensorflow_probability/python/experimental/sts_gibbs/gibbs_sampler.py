@@ -535,7 +535,7 @@ def _build_sampler_loop_body(model,
         design_matrix=design_matrix,
         target_residuals=(observed_time_series - previous_sample.level),
         observation_noise_scale=previous_sample.observation_noise_scale,
-        weights_prior_scale=weights_param.prior.distribution.scale,
+        weights_prior_scale=weights_param.prior.scale,
         is_missing=is_missing,
         seed=weights_seed)
 
