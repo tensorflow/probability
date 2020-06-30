@@ -106,6 +106,7 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
               model.Model.SampleTransformation(
                   fn=lambda params: params,
                   pretty_name='Identity',
+                  dtype=self._prior_dist.dtype,
               )
       }
       if (test_features is not None) != (test_labels is not None):
@@ -167,6 +168,6 @@ class GermanCreditNumericSparseLogisticRegression(SparseLogisticRegression):
     del dataset['test_features']
     del dataset['test_labels']
     super(GermanCreditNumericSparseLogisticRegression, self).__init__(
-        name='german_credit_sparse_logistic_regression',
-        pretty_name='German Credit Numeric Logistic Regression',
+        name='german_credit_numeric_sparse_logistic_regression',
+        pretty_name='German Credit Numeric Sparse Logistic Regression',
         **dataset)

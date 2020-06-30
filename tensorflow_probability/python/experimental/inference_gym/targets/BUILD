@@ -196,18 +196,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth:german_credit_numeric_sparse_logistic_regression",  # buildcleaner: keep
     ],
 )
 
 multi_substrate_py_test(
     name = "sparse_logistic_regression_test",
+    size = "large",
     srcs = ["sparse_logistic_regression_test.py"],
-    jax_size = "medium",
     deps = [
         ":sparse_logistic_regression",
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

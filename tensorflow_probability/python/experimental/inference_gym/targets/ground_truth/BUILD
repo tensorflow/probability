@@ -35,6 +35,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     deps = [
         ":german_credit_numeric_logistic_regression",
+        ":german_credit_numeric_sparse_logistic_regression",
         ":synthetic_item_response_theory",
     ],
 )
@@ -42,6 +43,14 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "german_credit_numeric_logistic_regression",
     srcs = ["german_credit_numeric_logistic_regression.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "german_credit_numeric_sparse_logistic_regression",
+    srcs = ["german_credit_numeric_sparse_logistic_regression.py"],
     deps = [
         # numpy dep,
     ],
