@@ -55,7 +55,7 @@ class Cell:
   Transformations that use propagate need to pass in objects that are Cell-like.
   A Cell needs to specify how to create a new default cell from a literal value,
   using the `new` class method. A Cell also needs to indicate if it is a known
-  value wih the `is_unknown` method, but by default, Cells are known.
+  value with the `is_unknown` method, but by default, Cells are known.
   """
 
   def is_unknown(self):

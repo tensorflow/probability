@@ -192,6 +192,7 @@ def f(key):
 graph_replace(f, 'z', 'y') # returns a program p(y | z) with a latent variable x
 graph_replace(f, 'z', 'x') # returns a program p(x | z)
 graph_replace(f, 'x', 'y') # returns a program p(y | x)
+```
 """
 import functools
 import types

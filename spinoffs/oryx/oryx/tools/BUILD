@@ -27,8 +27,8 @@ py_binary(
     deps = [
         # absl:app dep,
         # absl/flags dep,
-        # oryx dep,
         # tensorflow_docs/api_generator:doc_controls dep,
         # tensorflow_docs/api_generator:generate_lib dep,
+        "//oryx",
     ],
 )

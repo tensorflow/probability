@@ -142,9 +142,6 @@ from oryx.core import primitive as prim
 from oryx.core import trace_util
 
 __all__ = [
-    'HarvestSettings',
-    'HarvestContext',
-    'HarvestList',
     'HarvestTrace',
     'HarvestTracer',
     'sow',
@@ -537,7 +534,7 @@ def harvest(f,
 
   Args:
     f: a function to be transformed.
-    tag (str): the harvest tag that will be reaped/planted.
+    tag: `str`, the harvest tag that will be reaped/planted.
     allowlist: an iterable of strings of names that will be planted/reaped where
       other names will be ignored.
     blocklist: an iterable of strings of names that will be ignored while
@@ -577,7 +574,7 @@ def reap(f, *, tag, **harvest_kwargs):
 
   Args:
     f: a function to be transformed
-    tag (str): the harvest tag that will be reaped.
+    tag: `str`, the harvest tag that will be reaped.
     **harvest_kwargs: additional keyword arguments that will be passed to
       `harvest`.
 
@@ -601,7 +598,7 @@ def plant(f, *, tag, **harvest_kwargs):
 
   Args:
     f: a function to be transformed
-    tag (str): the harvest tag that will be planted.
+    tag: `str`, the harvest tag that will be planted.
     **harvest_kwargs: additional keyword arguments that will be passed to
       `harvest`.
 

@@ -17,8 +17,8 @@ import os
 
 from absl import app
 from absl import flags
-import oryx
 from tensorflow_docs.api_generator import generate_lib
+import oryx
 
 
 flags.DEFINE_string("output_dir", "/tmp/oryx_api",
@@ -45,7 +45,8 @@ def main(unused_argv):
       base_dir=os.path.dirname(oryx.__file__),
       code_url_prefix=FLAGS.code_url_prefix,
       search_hints=FLAGS.search_hints,
-      site_path=FLAGS.site_path)
+      site_path=FLAGS.site_path,
+      private_map={"oryx.core": ["kwargs_util"]})
 
   doc_generator.build(output_dir=FLAGS.output_dir)
 

@@ -19,6 +19,7 @@ from setuptools import find_packages
 from setuptools import setup
 
 REQUIRED_PACKAGES = [
+    'dataclasses;python_version<"3.7"',
     'jax==0.1.71',
     'jaxlib',
     # Pin a TF version while TFP-on-JAX still depends on TF
@@ -39,6 +40,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='oryx',
+    python_requires='>=3.6',
     version=__version__,
     description='Probabilistic programming and deep learning in JAX',
     long_description=oryx_long_description,
