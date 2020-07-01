@@ -47,6 +47,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'FillScaleTriL',
     'FillTriangular',
     'FrechetCDF',
+    'GompertzCDF',
     'GumbelCDF',
     'GeneralizedExtremeValueCDF',
     'Identity',
@@ -71,6 +72,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'ScaleMatvecLU',
     'ScaleMatvecTriL',
     'Shift',
+    'ShiftedGompertzCDF',
     'ScaleTriL',
     'Sigmoid',
     'Sinh',
@@ -89,6 +91,7 @@ TF2_FRIENDLY_BIJECTORS = (
 BIJECTOR_PARAMS_NDIMS = {
     'AffineScalar': dict(shift=0, scale=0, log_scale=0),
     'FrechetCDF': dict(loc=0, scale=0, concentration=0),
+    'GompertzCDF': dict(concentration=0, rate=0),
     'GumbelCDF': dict(loc=0, scale=0),
     'GeneralizedExtremeValueCDF': dict(loc=0, scale=0, concentration=0),
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
@@ -99,6 +102,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'ScaleMatvecLU': dict(lower_upper=2, permutation=1),
     'ScaleMatvecTriL': dict(scale_tril=2),
     'Shift': dict(shift=0),
+    'ShiftedGompertzCDF': dict(concentration=0, rate=0),
     'SinhArcsinh': dict(skewness=0, tailweight=0),
     'Softfloor': dict(temperature=0),
     'Softplus': dict(hinge_softness=0),
@@ -131,6 +135,7 @@ TRANSFORM_DIAGONAL_ALLOWLIST = {
     'DiscreteCosineTransform',
     'Exp',
     'Expm1',
+    'GompertzCDF',
     'GumbelCDF',
     'GeneralizedExtremeValueCDF',
     'Identity',
@@ -145,6 +150,7 @@ TRANSFORM_DIAGONAL_ALLOWLIST = {
     'ScaleMatvecLU',
     'ScaleMatvecTriL',
     'Shift',
+    'ShiftedGompertzCDF',
     'Sigmoid',
     'Sinh',
     'SinhArcsinh',
@@ -717,6 +723,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'hinge_softness':
         tfp_hps.softplus_plus_eps(),
+    'rate':
+        tfp_hps.softplus_plus_eps(),
     'scale':
         tfp_hps.softplus_plus_eps(),
     'tailweight':
@@ -731,6 +739,10 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'ScaleMatvecTriL.scale_tril':
         tfp_hps.lower_tril_positive_definite,
+    # Lower bound concentration to 1e-1 to avoid
+    # overflow for the inverse.
+    'ShiftedGompertzCDF.concentration':
+        lambda x: tf.math.softplus(x) + 1e-1,
     'bin_widths':
         bijector_hps.spline_bin_size_constraint,
     'bin_heights':

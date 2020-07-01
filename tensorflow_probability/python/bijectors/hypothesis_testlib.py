@@ -158,6 +158,8 @@ def bijector_supports():
           BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
       'GeneralizedExtremeValueCDF':  # The domain is parameter dependent.
           BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
+      'GompertzCDF':
+          BijectorSupport(Support.SCALAR_POSITIVE, Support.SCALAR_IN_0_1),
       'GumbelCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
@@ -222,6 +224,8 @@ def bijector_supports():
       'Shift':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'ShiftedGompertzCDF':
+          BijectorSupport(Support.SCALAR_POSITIVE, Support.SCALAR_IN_0_1),
       'Sigmoid':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Sinh':

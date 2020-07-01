@@ -44,6 +44,7 @@ from tensorflow_probability.python.bijectors.fill_triangular import FillTriangul
 from tensorflow_probability.python.bijectors.frechet_cdf import FrechetCDF
 from tensorflow_probability.python.bijectors.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.bijectors.gev_cdf import GeneralizedExtremeValueCDF
+from tensorflow_probability.python.bijectors.gompertz_cdf import GompertzCDF
 from tensorflow_probability.python.bijectors.gumbel_cdf import GumbelCDF
 from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
@@ -74,6 +75,7 @@ from tensorflow_probability.python.bijectors.scale_matvec_lu import MatvecLU
 from tensorflow_probability.python.bijectors.scale_matvec_lu import ScaleMatvecLU
 from tensorflow_probability.python.bijectors.scale_matvec_tril import ScaleMatvecTriL
 from tensorflow_probability.python.bijectors.shift import Shift
+from tensorflow_probability.python.bijectors.shifted_gompertz_cdf import ShiftedGompertzCDF
 from tensorflow_probability.python.bijectors.sigmoid import Sigmoid
 from tensorflow_probability.python.bijectors.sinh import Sinh
 from tensorflow_probability.python.bijectors.sinh_arcsinh import SinhArcsinh
@@ -114,6 +116,7 @@ __all__ = [
     "FillTriangular",
     "FrechetCDF",
     "GeneralizedPareto",
+    "GompertzCDF",
     "GumbelCDF",
     "GeneralizedExtremeValueCDF",
     "Identity",
@@ -144,6 +147,7 @@ __all__ = [
     "ScaleMatvecTriL",
     "ScaleTriL",
     "Shift",
+    "ShiftedGompertzCDF",
     "Sigmoid",
     "Sinh",
     "SinhArcsinh",
