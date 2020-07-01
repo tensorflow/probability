@@ -229,11 +229,12 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-  samples, _ = tfp.mcmc.sample_chain(
+  samples = tfp.mcmc.sample_chain(
     num_results=1000,
     current_state=dtype(1),
     kernel=tfp.mcmc.RandomWalkMetropolis(target.log_prob),
     num_burnin_steps=500,
+    trace_fn=None,
     seed=42)
 
   sample_mean = tf.math.reduce_mean(samples, axis=0)
@@ -272,12 +273,13 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   # Run Random Walk Metropolis with normal proposal for `num_results`
   # iterations for `num_chains` independent chains:
-  samples, _ = tfp.mcmc.sample_chain(
+  samples = tfp.mcmc.sample_chain(
       num_results=num_results,
       current_state=init_state,
       kernel=tfp.mcmc.RandomWalkMetropolis(target_log_prob_fn=target.log_prob),
       num_burnin_steps=200,
       num_steps_between_results=1,  # Thinning.
+      trace_fn=None,
       seed=54)
 
   sample_mean = tf.math.reduce_mean(samples, axis=0)
@@ -324,13 +326,14 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-  samples, _ = tfp.mcmc.sample_chain(
+  samples = tfp.mcmc.sample_chain(
       num_results=num_chain_results,
       num_burnin_steps=num_burnin_steps,
       current_state=dtype(1),
       kernel=tfp.mcmc.RandomWalkMetropolis(
           target.log_prob,
           new_state_fn=cauchy_new_state_fn(scale=0.5, dtype=dtype)),
+      trace_fn=None,
       seed=42)
 
   sample_mean = tf.math.reduce_mean(samples, axis=0)

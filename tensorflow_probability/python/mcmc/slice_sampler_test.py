@@ -61,11 +61,12 @@ class SliceSamplerTest(test_util.TestCase):
         max_doublings=5)
     if asserts:
       kernel.one_step = tf.function(kernel.one_step, autograph=False)
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=dtype(1),
         kernel=kernel,
         num_burnin_steps=100,
+        trace_fn=None,
         seed=test_util.test_seed_stream())
 
     sample_mean = tf.reduce_mean(samples, axis=0)
@@ -176,7 +177,7 @@ class SliceSamplerTest(test_util.TestCase):
 
     target_fn = tf.function(
         lambda *states: target.log_prob(states), autograph=False)
-    [states1, states2], _ = tfp.mcmc.sample_chain(
+    [states1, states2] = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
@@ -184,6 +185,7 @@ class SliceSamplerTest(test_util.TestCase):
             step_size=1.0,
             max_doublings=5),
         num_burnin_steps=100,
+        trace_fn=None,
         seed=test_util.test_seed_stream())
 
     states1 = tf.reshape(states1, [-1])

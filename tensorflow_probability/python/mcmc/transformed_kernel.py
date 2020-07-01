@@ -432,11 +432,12 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     transformed_kernel = tfp.mcmc.TransformedTransitionKernel(...)
     init_state = ...        # Doesnt matter.
     transformed_init_state = ... # Does matter.
-    results, _ = tfp.mcmc.sample_chain(
+    results = tfp.mcmc.sample_chain(
         num_results=...,
         current_state=init_state,
         previous_kernel_results=transformed_kernel.bootstrap_results(
             transformed_init_state=transformed_init_state),
+        trace_fn=None,
         kernel=transformed_kernel)
     ```
     """

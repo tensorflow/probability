@@ -767,11 +767,12 @@ class HMCHandlesLists(test_util.TestCase):
     ]
     transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=kernel, bijector=unconstraining_bijectors)
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=1000,
         current_state=x0,
         kernel=transformed_kernel,
         num_burnin_steps=500,
+        trace_fn=None,
         seed=stream())
     actual_means = [tf.reduce_mean(s, axis=(0, 1)) for s in samples]
     actual_vars = [tf.math.reduce_variance(s, axis=(0, 1)) for s in samples]

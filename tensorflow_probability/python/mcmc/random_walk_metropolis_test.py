@@ -36,13 +36,14 @@ class RWMTest(test_util.TestCase):
 
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=2000,
         current_state=dtype(1),
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target.log_prob,
             new_state_fn=tfp.mcmc.random_walk_uniform_fn(scale=dtype(2.))),
         num_burnin_steps=500,
+        trace_fn=None,
         seed=test_util.test_seed())
 
     sample_mean = tf.math.reduce_mean(samples, axis=0)
@@ -57,12 +58,13 @@ class RWMTest(test_util.TestCase):
     dtype = np.float32
 
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=500,
         current_state=dtype([1] * 8),  # 8 parallel chains
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target.log_prob),
         num_burnin_steps=500,
+        trace_fn=None,
         seed=test_util.test_seed())
 
     sample_mean = tf.math.reduce_mean(samples, axis=(0, 1))
@@ -92,13 +94,14 @@ class RWMTest(test_util.TestCase):
         return next_state_parts
       return _fn
 
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=num_chain_results,
         num_burnin_steps=num_burnin_steps,
         current_state=dtype([1] * 8),  # 8 parallel chains
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target.log_prob,
             new_state_fn=cauchy_new_state_fn(scale=0.5, dtype=dtype)),
+        trace_fn=None,
         seed=test_util.test_seed())
 
     sample_mean = tf.math.reduce_mean(samples, axis=(0, 1))
@@ -132,13 +135,14 @@ class RWMTest(test_util.TestCase):
 
     # Run Random Walk Metropolis with normal proposal for `num_results`
     # iterations for `num_chains` independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.RandomWalkMetropolis(
             target_log_prob_fn=target_log_prob),
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         seed=test_util.test_seed())
 
     states = tf.stack(states, axis=-1)

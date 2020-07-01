@@ -147,11 +147,12 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
         log_likelihood_fn=log_likelihood_fn,
         seed=1234)
 
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=int(3e5),
         current_state=dtype(1),
         kernel=kernel,
         num_burnin_steps=1000,
+        trace_fn=None,
         parallel_iterations=1)  # For determinism.
 
     sample_mean = tf.reduce_mean(samples, axis=0)

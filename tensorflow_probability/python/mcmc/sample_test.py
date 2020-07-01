@@ -81,7 +81,7 @@ class SampleChainTest(test_util.TestCase):
       z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
@@ -90,6 +90,7 @@ class SampleChainTest(test_util.TestCase):
             num_leapfrog_steps=2),
         num_burnin_steps=200,
         num_steps_between_results=1,
+        trace_fn=None,
         seed=test_util.test_seed())
     if not tf.executing_eagerly():
       self.assertAllEqual(dict(target_calls=4), counter)
