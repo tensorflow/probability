@@ -65,6 +65,7 @@ multi_substrate_py_library(
         ":fill_triangular",
         ":frechet_cdf",
         ":generalized_pareto",
+        ":gev_cdf",
         ":gumbel_cdf",
         ":identity",
         ":inline",
@@ -433,6 +434,18 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "gumbel_cdf",
     srcs = ["gumbel_cdf.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gev_cdf",
+    srcs = ["gev_cdf.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -1265,6 +1278,20 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "gev_cdf_test",
+    size = "small",
+    srcs = ["gev_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "identity_test",
     size = "small",
     srcs = ["identity_test.py"],
@@ -1789,6 +1816,7 @@ exports_files(
         "gumbel.py",
         "gumbel_cdf.py",
         "gumbel_cdf_test.py",
+        "gev_cdf.py",
         "hypothesis_testlib.py",
         "identity.py",
         "identity_test.py",

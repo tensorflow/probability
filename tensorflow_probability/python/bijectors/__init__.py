@@ -43,6 +43,7 @@ from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.frechet_cdf import FrechetCDF
 from tensorflow_probability.python.bijectors.generalized_pareto import GeneralizedPareto
+from tensorflow_probability.python.bijectors.gev_cdf import GeneralizedExtremeValueCDF
 from tensorflow_probability.python.bijectors.gumbel_cdf import GumbelCDF
 from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
@@ -114,6 +115,7 @@ __all__ = [
     "FrechetCDF",
     "GeneralizedPareto",
     "GumbelCDF",
+    "GeneralizedExtremeValueCDF",
     "Identity",
     "Inline",
     "Invert",
