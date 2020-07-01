@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+# pylint: disable=line-too-long
 r"""Synthetic dataset generated from the ItemResponseTheory model.
 
 This was generated using the following snippet:
@@ -22,6 +23,7 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.inference_gym.internal import array_to_source
 import numpy as np
 
 rng = np.random.RandomState(seed=1)
@@ -41,6 +43,20 @@ model = tfp.experimental.inference_gym.targets.ItemResponseTheory(
     train_question_ids=question_ids,
     train_correct=dummy_correct)
 dataset = model._sample_dataset(seed=2)
+
+sources = []
+sources.append(
+    array_to_source.array_to_source(
+        'STUDENT_IDS', dataset['train_student_ids']))
+sources.append(
+    array_to_source.array_to_source(
+        'QUESTION_IDS', dataset['train_question_ids']))
+sources.append(
+    array_to_source.array_to_source(
+        'CORRECT', dataset['train_correct']))
+
+with open('/tmp/synthetic_item_response_theory.py', 'w') as f:
+  f.write("\n\n".join(sources))
 ```
 
 Note that the final `_sample_dataset` is not reproducible, hence the output is

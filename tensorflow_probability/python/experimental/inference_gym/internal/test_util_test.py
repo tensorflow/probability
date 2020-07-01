@@ -110,7 +110,6 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
           check_ground_truth_mean=True)
 
   @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
   def testCorrectGroundTruthWithHMC(self):
     """Tests the ground truth with HMC for a well formed model."""
     model = TestModel()
@@ -123,7 +122,6 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
     )
 
   @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
   def testBadGroundTruthWithHMC(self):
     """Tests that an error is raised if the ground truth is wrong."""
     model = TestModel(ground_truth_mean=-10.)

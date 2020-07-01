@@ -103,11 +103,8 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
 
   @test_util.uses_tfds
   @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
   def testGermanCreditHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    # Note the side-effect of setting the eager seed.
-    seed = tfp_test_util.test_seed_stream()
     model = (
         sparse_logistic_regression.GermanCreditNumericSparseLogisticRegression(
         ))
@@ -116,9 +113,8 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
         model,
         num_chains=4,
         num_steps=4000,
-        num_leapfrog_steps=80,
+        num_leapfrog_steps=40,
         step_size=0.015,
-        seed=seed(),
     )
 
 

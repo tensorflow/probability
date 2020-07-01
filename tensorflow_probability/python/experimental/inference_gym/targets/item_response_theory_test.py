@@ -130,11 +130,8 @@ class ItemResponseTheoryTest(test_util.InferenceGymTestCase,
     )
 
   @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
   def testSyntheticItemResponseTheoryHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    # Note the side-effect of setting the eager seed.
-    seed = tfp_test_util.test_seed_stream()
     model = item_response_theory.SyntheticItemResponseTheory()
 
     self.validate_ground_truth_using_hmc(
@@ -143,7 +140,6 @@ class ItemResponseTheoryTest(test_util.InferenceGymTestCase,
         num_steps=5000,
         num_leapfrog_steps=10,
         step_size=0.025,
-        seed=seed(),
     )
 
 

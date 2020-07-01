@@ -92,11 +92,8 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
 
   @test_util.uses_tfds
   @tfp_test_util.numpy_disable_gradient_test
-  @tfp_test_util.jax_disable_test_missing_functionality('tfp.mcmc')
   def testGermanCreditHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    # Note the side-effect of setting the eager seed.
-    seed = tfp_test_util.test_seed_stream()
     model = logistic_regression.GermanCreditNumericLogisticRegression()
 
     self.validate_ground_truth_using_hmc(
@@ -105,7 +102,6 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
         num_steps=4000,
         num_leapfrog_steps=15,
         step_size=0.03,
-        seed=seed(),
     )
 
 

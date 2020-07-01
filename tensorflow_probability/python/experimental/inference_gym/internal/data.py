@@ -24,7 +24,7 @@ from __future__ import print_function
 import numpy as onp
 import tensorflow.compat.v2 as otf
 
-from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_mod  # pylint: disable=g-import-not-at-top
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib  # pylint: disable=g-import-not-at-top
 
 __all__ = [
     'german_credit_numeric',
@@ -179,9 +179,9 @@ def synthetic_item_response_theory(
         Whether the student in the testing set answered the question correctly,
         either 0 or 1.
   """
-  student_ids = synthetic_item_response_theory_mod.STUDENT_IDS
-  question_ids = synthetic_item_response_theory_mod.QUESTION_IDS
-  correct = synthetic_item_response_theory_mod.CORRECT
+  student_ids = synthetic_item_response_theory_lib.STUDENT_IDS
+  question_ids = synthetic_item_response_theory_lib.QUESTION_IDS
+  correct = synthetic_item_response_theory_lib.CORRECT
 
   if shuffle:
     shuffle_idxs = onp.arange(student_ids.shape[0])
