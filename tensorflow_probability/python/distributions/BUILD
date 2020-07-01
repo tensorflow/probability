@@ -3278,6 +3278,35 @@ py3_test(
     ],
 )
 
+# py_test
+py3_test(
+    name = "jax_transformation_test_tap",
+    size = "large",
+    srcs = ["jax_transformation_test.py"],
+    args = ["--execute_only"],
+    main = "jax_transformation_test.py",
+    python_version = "PY3",
+    shard_count = 47,
+    srcs_version = "PY3",
+    tags = [
+        "hypothesis",
+        "no-oss-ci",
+        "omni_fail",
+    ],
+    deps = [
+        ":hypothesis_testlib.jax",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # jax dep,
+        # numpy dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib.jax",
+        "//tensorflow_probability/python/internal:tensor_util.jax",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util.jax",
+    ],
+)
+
 # py2and3
 py_test(
     name = "stochastic_process_properties_test",

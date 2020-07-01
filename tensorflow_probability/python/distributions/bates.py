@@ -44,9 +44,17 @@ __all__ = [
 
 BATES_TOTAL_COUNT_STABILITY_LIMITS = {
     tf.float64: 75.,
+    np.float64: 75.,
+    np.finfo(np.float64).dtype: 75.,
+
     tf.float32: 25.,
+    np.float32: 25.,
+    np.finfo(np.float32).dtype: 25.,
+
     # Not an allowed type but we keep this here for the record.
     tf.float16: 7.,
+    np.float16: 7.,
+    np.finfo(np.float16).dtype: 7.,
 }
 
 
