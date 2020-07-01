@@ -55,6 +55,7 @@ from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
+from tensorflow_probability.python.math.special import bessel_iv_ratio
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
@@ -76,6 +77,7 @@ _allowed_symbols = [
     'round_exponential_bump_function',
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
+    'bessel_iv_ratio',
     'cholesky_concat',
     'cholesky_update',
     'clip_by_value_preserve_gradient',

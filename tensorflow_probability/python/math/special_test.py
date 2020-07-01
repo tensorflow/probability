@@ -18,14 +18,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 from absl.testing import parameterized
 import numpy as np
+from scipy import constants as scipy_constants
 from scipy import special as scipy_special
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.special import _compute_general_continued_fraction
 
 
 def _w0(z):
@@ -167,6 +171,114 @@ class RoundExponentialBumpFunctionTest(test_util.TestCase):
 
     # Since x is outside the support, the gradient is zero.
     self.assertAllEqual(dy_dx_, np.zeros((6,)))
+
+
+class BesselTest(test_util.TestCase):
+
+  def testContinuedFraction(self):
+    # Check that the simplest continued fraction returns the golden ratio.
+    self.assertAllClose(
+        self.evaluate(
+            _compute_general_continued_fraction(
+                100, [], partial_numerator_fn=lambda _: 1.)),
+        scipy_constants.golden - 1.)
+
+    # Check the continued fraction constant is returned.
+    cf_constant_denominators = scipy_special.i1(2.) / scipy_special.i0(2.)
+
+    self.assertAllClose(
+        self.evaluate(
+            _compute_general_continued_fraction(
+                100,
+                [],
+                partial_denominator_fn=lambda i: i,
+                tolerance=1e-5)),
+        cf_constant_denominators, rtol=1e-5)
+
+    cf_constant_numerators = np.sqrt(2 / (np.e * np.pi)) / (
+        scipy_special.erfc(np.sqrt(0.5))) - 1.
+
+    # Check that we can specify dtype and tolerance.
+    self.assertAllClose(
+        self.evaluate(
+            _compute_general_continued_fraction(
+                100, [], partial_numerator_fn=lambda i: i,
+                tolerance=1e-5,
+                dtype=tf.float64)),
+        cf_constant_numerators, rtol=1e-5)
+
+  def VerifyBesselIvRatio(self, v, z, rtol):
+    bessel_iv_ratio, v, z = self.evaluate([
+        tfp.math.bessel_iv_ratio(v, z), v, z])
+    # Use ive to avoid nans.
+    scipy_ratio = scipy_special.ive(v, z) / scipy_special.ive(v - 1., z)
+    self.assertAllClose(bessel_iv_ratio, scipy_ratio, rtol=rtol)
+
+  def testBesselIvRatioVAndZSmall(self):
+    seed_stream = test_util.test_seed_stream()
+    z = tf.random.uniform([int(1e5)], seed=seed_stream())
+    v = tf.random.uniform([int(1e5)], seed=seed_stream())
+    # When both values are small, both the scipy ratio and
+    # the computation become numerically unstable.
+    # Anecdotally (when comparing to mpmath) the computation is more often
+    # 'right' compared to the naive ratio.
+    self.VerifyBesselIvRatio(v, z, rtol=2e-4)
+
+  def testBesselIvRatioVAndZMedium(self):
+    seed_stream = test_util.test_seed_stream()
+    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    self.VerifyBesselIvRatio(v, z, rtol=1e-6)
+
+  def testBesselIvRatioVAndZLarge(self):
+    seed_stream = test_util.test_seed_stream()
+    # Use 50 as a cap. It's been observed that for v > 50, that
+    # the scipy ratio can be quite wrong compared to mpmath.
+    z = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream())
+    v = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream())
+
+    # For large v, z, scipy can return NaN values. Filter those out.
+    bessel_iv_ratio, v, z = self.evaluate([
+        tfp.math.bessel_iv_ratio(v, z), v, z])
+    # Use ive to avoid nans.
+    scipy_ratio = scipy_special.ive(v, z) / scipy_special.ive(v - 1., z)
+    # Exclude zeros and NaN's from scipy. This can happen because the
+    # individual function computations may zero out, and thus cause issues
+    # in the ratio.
+    safe_scipy_values = np.where(
+        ~np.isnan(scipy_ratio) & (scipy_ratio != 0.))
+
+    self.assertAllClose(
+        bessel_iv_ratio[safe_scipy_values],
+        scipy_ratio[safe_scipy_values],
+        # We need to set a high rtol as the scipy computation is numerically
+        # unstable.
+        rtol=1e-5)
+
+  def testBesselIvRatioVLessThanZ(self):
+    seed_stream = test_util.test_seed_stream()
+    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    # Make v randomly less than z
+    v = z * tf.random.uniform([int(1e5)], 0.1, 0.5, seed=seed_stream())
+    self.VerifyBesselIvRatio(v, z, rtol=1e-6)
+
+  def testBesselIvRatioVGreaterThanZ(self):
+    seed_stream = test_util.test_seed_stream()
+    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    # Make z randomly less than v
+    z = v * tf.random.uniform([int(1e5)], 0.1, 0.5, seed=seed_stream())
+    self.VerifyBesselIvRatio(v, z, rtol=1e-6)
+
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      "Relies on Tensorflow gradient_checker")
+  def testBesselIvRatioGradient(self):
+    v = tf.constant([0.5, 1., 10., 20.])[..., tf.newaxis]
+    x = tf.constant([0.1, 0.5, 0.9, 1., 12., 14., 22.])
+
+    err = self.compute_max_gradient_error(
+        functools.partial(tfp_math.bessel_iv_ratio, v), [x])
+    self.assertLess(err, 2e-4)
 
 
 class SpecialTest(test_util.TestCase):

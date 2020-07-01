@@ -392,7 +392,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "special_test",
-    size = "small",
+    size = "medium",
     srcs = ["special_test.py"],
     deps = [
         # absl/testing:parameterized dep,
