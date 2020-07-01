@@ -85,7 +85,7 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     samples = dist.sample([4, 5], seed=test_util.test_seed())
     sample_shape_n = tf.shape(samples)
     self.assertAllEqual(self.evaluate(sample_shape_n), [4, 5] + batch_shape)
-    
+
     probs = dist.prob(samples)
     probs_shape = tf.shape(probs)
     self.assertAllEqual(self.evaluate(probs_shape), [4, 5] + batch_shape)
