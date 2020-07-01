@@ -38,6 +38,9 @@ class StoppingRatioLogisticTest(test_util.TestCase):
   def _random_location(self, shape):
     return self._rng.randn(*shape)
 
+  def _random_rvs(self, shape):
+    return self._rng.multinomial(1, *shape)
+
   def setUp(self):
     self._ordered = tfb.Ordered()
     self._rng = np.random.RandomState(test_util.test_seed())
@@ -71,12 +74,25 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     self.assertAllEqual(
         self.evaluate(categorical_probs_shape), batch_shape + [3])
 
-    sample_shape = tf.shape(dist.sample(seed=test_util.test_seed()))
+    samples = dist.sample(seed=test_util.test_seed())
+    sample_shape = tf.shape(samples)
     self.assertAllEqual(self.evaluate(sample_shape), batch_shape)
 
-    sample_shape_n = tf.shape(
-        dist.sample([4, 5], seed=test_util.test_seed()))
+    probs = dist.prob(samples)
+    probs_shape = tf.shape(probs)
+    self.assertAllEqual(self.evaluate(probs_shape), batch_shape)
+
+    samples = dist.sample([4, 5], seed=test_util.test_seed())
+    sample_shape_n = tf.shape(samples)
     self.assertAllEqual(self.evaluate(sample_shape_n), [4, 5] + batch_shape)
+    
+    probs = dist.prob(samples)
+    probs_shape = tf.shape(probs)
+    self.assertAllEqual(self.evaluate(probs_shape), [4, 5] + batch_shape)
+
+    mode = dist.mode()
+    mode_shape = tf.shape(mode)
+    self.assertAllEqual(self.evaluate(mode_shape), batch_shape)
 
   def testProbs(self):
     expected_probs = [0.11920291, 0.44039854, 0.38790172, 0.05249681]
