@@ -26,6 +26,7 @@ from tensorflow_probability.python.experimental.inference_gym.targets.log_gaussi
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import GermanCreditNumericLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import LogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.model import Model
+from tensorflow_probability.python.experimental.inference_gym.targets.neals_funnel import NealsFunnel
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
 
@@ -39,6 +40,7 @@ __all__ = [
     'LogGaussianCoxProcess',
     'LogisticRegression',
     'Model',
+    'NealsFunnel',
     'SparseLogisticRegression',
     'SyntheticItemResponseTheory',
 ]

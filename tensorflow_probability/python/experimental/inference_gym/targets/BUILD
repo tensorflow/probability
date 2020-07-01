@@ -42,6 +42,7 @@ multi_substrate_py_library(
         ":log_gaussian_cox_process",
         ":logistic_regression",
         ":model",
+        ":neals_funnel",
         ":sparse_logistic_regression",
         "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
     ],
@@ -210,6 +211,29 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "neals_funnel",
+    srcs = ["neals_funnel.py"],
+    deps = [
+        ":model",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "neals_funnel_test",
+    srcs = ["neals_funnel_test.py"],
+    deps = [
+        ":neals_funnel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
