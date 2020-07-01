@@ -40,6 +40,16 @@ py_library(
 )
 
 py_library(
+    name = "log_gaussian_cox_process",
+    srcs = ["log_gaussian_cox_process.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+    ],
+)
+
+py_library(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
     srcs_version = "PY3",
@@ -77,6 +87,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":item_response_theory",
+        ":log_gaussian_cox_process",
         ":logistic_regression",
         ":sparse_logistic_regression",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",

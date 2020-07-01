@@ -236,7 +236,7 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
           length_scale, ndims=example_ndims)
-      norm /= length_scale
+      norm = norm / length_scale
     series_term = np.sqrt(3) * norm
     log_result = tf.math.log1p(series_term) - series_term
 
@@ -323,7 +323,7 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
           length_scale, ndims=example_ndims)
-      norm /= length_scale
+      norm = norm / length_scale
     series_term = np.sqrt(5) * norm
     log_result = tf.math.log1p(series_term + series_term**2 / 3.) - series_term
 

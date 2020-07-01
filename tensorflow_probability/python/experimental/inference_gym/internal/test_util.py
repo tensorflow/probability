@@ -282,6 +282,7 @@ class InferenceGymTestCase(test_util.TestCase):
       target_accept_prob=0.9,
       seed=None,
       dtype=tf.float32,
+      use_xla=True,
   ):
     """Validates the ground truth of a model using HMC.
 
@@ -295,6 +296,7 @@ class InferenceGymTestCase(test_util.TestCase):
       target_accept_prob: Target acceptance probability.
       seed: Optional seed to use. By default, `test_util.test_seed()` is used.
       dtype: DType to use for the algorithm.
+      use_xla: Whether to use XLA.
     """
     mcmc_results = self.evaluate(
         run_hmc_on_model(
@@ -305,7 +307,8 @@ class InferenceGymTestCase(test_util.TestCase):
             step_size=step_size,
             target_accept_prob=target_accept_prob,
             seed=seed,
-            dtype=dtype))
+            dtype=dtype,
+            use_xla=use_xla))
 
     logging.info('Acceptance rate: %s', mcmc_results.accept_rate)
     logging.info('ESS: %s', mcmc_results.ess)

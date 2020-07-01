@@ -57,6 +57,15 @@ class DataTest(test_util.InferenceGymTestCase):
     self.assertEqual((num_test_points,), dataset['test_question_ids'].shape)
     self.assertEqual((num_test_points,), dataset['test_correct'].shape)
 
+  def testSyntheticLogGaussianCoxModel(self):
+    num_train_points = 100
+
+    dataset = data.synthetic_log_gaussian_cox_process()
+
+    self.assertEqual((num_train_points, 2), dataset['train_locations'].shape)
+    self.assertEqual((num_train_points,), dataset['train_extents'].shape)
+    self.assertEqual((num_train_points,), dataset['train_counts'].shape)
+
 
 if __name__ == '__main__':
   tf.test.main()

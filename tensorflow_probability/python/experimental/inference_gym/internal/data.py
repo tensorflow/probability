@@ -25,10 +25,12 @@ import numpy as onp
 import tensorflow.compat.v2 as otf
 
 from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib  # pylint: disable=g-import-not-at-top
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib  # pylint: disable=g-import-not-at-top
 
 __all__ = [
     'german_credit_numeric',
     'synthetic_item_response_theory',
+    'synthetic_log_gaussian_cox_process',
 ]
 
 
@@ -159,9 +161,6 @@ def synthetic_item_response_theory(
     shuffle: Whether to shuffle the dataset.
     shuffle_seed: Seed to use when shuffling.
 
-  Raises:
-    ValueError: If the dataset has an unexpected hash.
-
   Returns:
     dataset: A Dict with the following keys:
       `train_student_ids`: Integer `Tensor` with shape `[num_train_points]`.
@@ -199,4 +198,48 @@ def synthetic_item_response_theory(
       test_student_ids=student_ids[num_train:],
       test_question_ids=question_ids[num_train:],
       test_correct=correct[num_train:],
+  )
+
+
+def synthetic_log_gaussian_cox_process(
+    shuffle=True,
+    shuffle_seed=1337,
+):
+  """Synthetic dataset sampled from the LogGaussianCoxProcess model.
+
+  This dataset was simulated by constructing a 10 by 10 grid of equidistant 2D
+  locations with spacing = 1, and then sampling from the prior to determine the
+  counts at those locations.
+
+  The data are encoded into three parallel arrays. I.e.
+  `train_counts[i]` and `train_extents[i]` correspond to `train_locations[i]`.
+
+  Args:
+    shuffle: Whether to shuffle the dataset.
+    shuffle_seed: Seed to use when shuffling.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      train_locations: Float `Tensor` with shape `[num_train_points, 2]`.
+        Training set locations where counts were measured.
+      train_extents: Float `Tensor` with shape `[num_train_points]`. Training
+        set location extents, must be positive.
+      train_counts: Float `Tensor` with shape `[num_train_points]`. Training set
+        counts, must be positive.
+  """
+  locations = synthetic_log_gaussian_cox_process_lib.LOCATIONS
+  extents = synthetic_log_gaussian_cox_process_lib.EXTENTS
+  counts = synthetic_log_gaussian_cox_process_lib.COUNTS
+
+  if shuffle:
+    shuffle_idxs = onp.arange(locations.shape[0])
+    onp.random.RandomState(shuffle_seed).shuffle(shuffle_idxs)
+    locations = locations[shuffle_idxs]
+    counts = counts[shuffle_idxs]
+    extents = extents[shuffle_idxs]
+
+  return dict(
+      train_locations=locations,
+      train_extents=extents,
+      train_counts=counts,
   )

@@ -39,6 +39,7 @@ multi_substrate_py_library(
         ":bayesian_model",
         ":ill_conditioned_gaussian",
         ":item_response_theory",
+        ":log_gaussian_cox_process",
         ":logistic_regression",
         ":model",
         ":sparse_logistic_regression",
@@ -132,6 +133,33 @@ multi_substrate_py_test(
     srcs = ["item_response_theory_test.py"],
     deps = [
         ":item_response_theory",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "log_gaussian_cox_process",
+    srcs = ["log_gaussian_cox_process.py"],
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth:synthetic_log_gaussian_cox_process",  # buildcleaner: keep
+        "//tensorflow_probability/python/math/psd_kernels",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "log_gaussian_cox_process_test",
+    size = "large",
+    srcs = ["log_gaussian_cox_process_test.py"],
+    deps = [
+        ":log_gaussian_cox_process",
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
         "//tensorflow_probability/python/internal:test_util",
