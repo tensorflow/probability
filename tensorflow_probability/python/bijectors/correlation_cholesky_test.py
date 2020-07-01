@@ -43,7 +43,7 @@ from tensorflow_probability.python.mcmc import transformed_kernel
 # of the output matrices.
 class OutputToUnconstrained(tfb.Bijector):
 
-  def __init__(self, name="output_to_unconstrained"):
+  def __init__(self, name='output_to_unconstrained'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(OutputToUnconstrained, self).__init__(
@@ -151,21 +151,21 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
     b = tfb.FillTriangular(validate_args=True)
 
     x_shape_bad = tf.TensorShape([5, 4, 7])
-    with self.assertRaisesRegexp(ValueError, "is not a triangular number"):
+    with self.assertRaisesRegexp(ValueError, 'is not a triangular number'):
       b.forward_event_shape(x_shape_bad)
-    with self.assertRaisesOpError("is not a triangular number"):
+    with self.assertRaisesOpError('is not a triangular number'):
       self.evaluate(
           b.forward_event_shape_tensor(tensorshape_util.as_list(x_shape_bad)))
 
     y_shape_bad = tf.TensorShape([5, 4, 4, 3])
-    with self.assertRaisesRegexp(ValueError, "Matrix must be square"):
+    with self.assertRaisesRegexp(ValueError, 'Matrix must be square'):
       b.inverse_event_shape(y_shape_bad)
-    with self.assertRaisesOpError("Matrix must be square"):
+    with self.assertRaisesOpError('Matrix must be square'):
       self.evaluate(
           b.inverse_event_shape_tensor(tensorshape_util.as_list(y_shape_bad)))
 
   @test_util.test_graph_mode_only
-  @test_util.substrate_disable_stateful_random_test
+  @test_util.numpy_disable_gradient_test('HMC')
   def testSampleMarginals(self):
     # Verify that the marginals of the LKJ distribution are distributed
     # according to a (scaled) Beta distribution. The LKJ distributed samples are
@@ -181,8 +181,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         target_log_prob_fn=cholesky_lkj.CholeskyLKJ(
             dimension=dim, concentration=concentration).log_prob,
         num_leapfrog_steps=3,
-        step_size=0.3,
-        seed=test_util.test_seed())
+        step_size=0.3)
 
     kernel = transformed_kernel.TransformedTransitionKernel(
         inner_kernel=inner_kernel, bijector=tfb.CorrelationCholesky())
@@ -206,7 +205,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
           current_state=tf.eye(dim, batch_shape=[num_chains], dtype=tf.float64),
           trace_fn=lambda _, pkr: pkr.inner_results.is_accepted,
           kernel=kernel,
-          parallel_iterations=1)
+          seed=test_util.test_seed())
 
     # Draw samples from the HMC chains.
     chol_lkj_samples, is_accepted = self.evaluate(sample_mcmc_chain())
@@ -328,5 +327,5 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         rtol=1e-5)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
