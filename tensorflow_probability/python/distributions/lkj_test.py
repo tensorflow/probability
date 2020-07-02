@@ -27,16 +27,13 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,
+from tensorflow_probability.python.internal import test_util
 
 
 def _det_ok_mask(x, det_bounds, input_output_cholesky=False):
   if input_output_cholesky:
     logdet = 2.0 * tf.reduce_sum(
-        input_tensor=tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
+        tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
   else:
     _, logdet = tf.linalg.slogdet(x)
 
@@ -72,15 +69,16 @@ volume_bounds = {
         0.40: (00.4145900446719042, 0.482655106057178)}}
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 @parameterized.parameters(np.float32, np.float64)
-class LKJTest(parameterized.TestCase, test_case.TestCase):
+class LKJTest(test_util.TestCase):
 
   def testNormConst2D(self, dtype):
     expected = 2.
     # 2x2 correlation matrices are determined by one number between -1
     # and 1, so the volume of density 1 over all of them is 2.
-    answer = self.evaluate(tfd.LKJ(2, dtype([1.]))._log_normalization())
+    answer = self.evaluate(
+        tfd.LKJ(2, dtype([1.]), validate_args=True)._log_normalization())
     self.assertAllClose(answer, np.log([expected]))
 
   def testNormConst3D(self, dtype):
@@ -95,7 +93,8 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
     # is also obtained by Rousseeuw, P. J., & Molenberghs,
     # G. (1994). "The shape of correlation matrices." The American
     # Statistician, 48(4), 276-279.
-    answer = self.evaluate(tfd.LKJ(3, dtype([1.]))._log_normalization())
+    answer = self.evaluate(
+        tfd.LKJ(3, dtype([1.]), validate_args=True)._log_normalization())
     self.assertAllClose(answer, np.log([expected]))
 
   def _testSampleLogProbExact(self,
@@ -162,7 +161,7 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
           dtype=dtype,
           input_output_cholesky=input_output_cholesky,
           target_discrepancy=0.05,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def _testSampleConsistentLogProbInterval(self,
                                            concentrations,
@@ -272,7 +271,7 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.11,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def testSampleConsistentLogProbInterval4(self, dtype):
     # The hardcoded volume boundaries are (5e-7)-confidence intervals
@@ -292,7 +291,7 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.22,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def testSampleConsistentLogProbInterval5(self, dtype):
     # The hardcoded volume boundaries are (5e-7)-confidence intervals
@@ -313,35 +312,82 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
           input_output_cholesky=input_output_cholesky,
           false_fail_rate=5e-7,
           target_discrepancy=0.41,
-          seed=tfp_test_util.test_seed())
+          seed=test_util.test_seed())
 
   def testDimensionGuard(self, dtype):
     testee_lkj = tfd.LKJ(
         dimension=3, concentration=dtype([1., 4.]), validate_args=True)
     with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
-      testee_lkj.log_prob(tf.eye(4))
+      testee_lkj.log_prob(dtype(np.eye(4)))
+
+  def testAssertValidCorrelationMatrix(self, dtype):
+    lkj = tfd.LKJ(
+        dimension=2, concentration=dtype([1., 4.]), validate_args=True)
+    with self.assertRaisesOpError('Correlations must be >= -1.'):
+      self.evaluate(lkj.log_prob(dtype([[1., -1.3], [-1.3, 1.]])))
+    with self.assertRaisesOpError('Correlations must be <= 1.'):
+      self.evaluate(lkj.log_prob(dtype([[1., 1.3], [1.3, 1.]])))
+    with self.assertRaisesOpError('Self-correlations must be = 1.'):
+      self.evaluate(lkj.log_prob(dtype([[0.5, 0.5], [0.5, 1.]])))
+    with self.assertRaisesOpError('Correlation matrices must be symmetric.'):
+      self.evaluate(lkj.log_prob(dtype([[1., 0.2], [0.3, 1.]])))
 
   def testZeroDimension(self, dtype):
     testee_lkj = tfd.LKJ(
         dimension=0, concentration=dtype([1., 4.]), validate_args=True)
-    results = testee_lkj.sample(sample_shape=[4, 3])
+    results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 0, 0])
 
   def testOneDimension(self, dtype):
     testee_lkj = tfd.LKJ(
         dimension=1, concentration=dtype([1., 4.]), validate_args=True)
-    results = testee_lkj.sample(sample_shape=[4, 3])
+    results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 1, 1])
 
   def testMean(self, dtype):
-    testee_lkj = tfd.LKJ(dimension=3, concentration=dtype([1., 3., 5.]))
+    testee_lkj = tfd.LKJ(
+        dimension=3, concentration=dtype([1., 3., 5.]), validate_args=True)
     num_samples = 20000
-    results = testee_lkj.sample(sample_shape=[num_samples])
+    results = testee_lkj.sample(
+        sample_shape=[num_samples], seed=test_util.test_seed())
     mean = testee_lkj.mean()
     self.assertEqual(mean.shape, [3, 3, 3])
-    check1 = st.assert_true_mean_equal_by_dkwm(
+    # tfd.LKJ has some small numerical issues, so we allow for some amount of
+    # numerical tolerance when testing means.
+    numerical_tolerance = 1e-5
+    check1 = st.assert_true_mean_in_interval_by_dkwm(
         samples=results, low=-1., high=1.,
-        expected=mean,
+        expected_low=mean - numerical_tolerance,
+        expected_high=mean + numerical_tolerance,
+        false_fail_rate=1e-6)
+    check2 = assert_util.assert_less(
+        st.min_discrepancy_of_true_means_detectable_by_dkwm(
+            num_samples,
+            low=-1.,
+            high=1.,
+            # Smaller false fail rate because of different batch sizes between
+            # these two checks.
+            false_fail_rate=1e-7,
+            false_pass_rate=1e-6),
+        # 4% relative error
+        0.08)
+    self.evaluate([check1, check2])
+
+  def testMeanHigherDimension(self, dtype):
+    testee_lkj = tfd.LKJ(
+        dimension=6, concentration=dtype([1., 3., 5.]), validate_args=True)
+    num_samples = 20000
+    results = testee_lkj.sample(
+        sample_shape=[num_samples], seed=test_util.test_seed())
+    mean = testee_lkj.mean()
+    self.assertEqual(mean.shape, [3, 6, 6])
+    # tfd.LKJ has some small numerical issues, so we allow for some amount of
+    # numerical tolerance when testing means.
+    numerical_tolerance = 1e-5
+    check1 = st.assert_true_mean_in_interval_by_dkwm(
+        samples=results, low=-1., high=1.,
+        expected_low=mean - numerical_tolerance,
+        expected_high=mean + numerical_tolerance,
         false_fail_rate=1e-6)
     check2 = assert_util.assert_less(
         st.min_discrepancy_of_true_means_detectable_by_dkwm(
@@ -362,7 +408,7 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
     d = tfd.LKJ(dimension, concentration, validate_args=True)
     with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testValidateConcentrationAfterMutation(self, dtype):
     dimension = 3
@@ -374,7 +420,7 @@ class LKJTest(parameterized.TestCase, test_case.TestCase):
         self.evaluate(d.mean())
 
 
-class LKJTestGraphOnly(test_case.TestCase):
+class LKJTestGraphOnly(test_util.TestCase):
 
   def testDimensionGuardDynamicShape(self):
     if tf.executing_eagerly():

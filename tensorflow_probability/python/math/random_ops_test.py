@@ -26,8 +26,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 class _RandomRademacher(object):
@@ -37,7 +36,8 @@ class _RandomRademacher(object):
     shape = (
         tf.constant(shape_) if self.use_static_shape else
         tf1.placeholder_with_default(shape_, shape=None))
-    x = tfp.math.random_rademacher(shape, self.dtype, seed=42)
+    x = tfp.math.random_rademacher(shape, self.dtype,
+                                   seed=test_util.test_seed())
     if self.use_static_shape:
       self.assertAllEqual(shape_, x.shape)
     x_ = self.evaluate(x)
@@ -47,17 +47,17 @@ class _RandomRademacher(object):
     self.assertAllClose(
         np.zeros(shape_[:-1]),
         np.mean(x_, axis=-1),
-        atol=0.05, rtol=0.)
+        atol=0.07, rtol=0.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRademacherDynamic32(test_case.TestCase, _RandomRademacher):
+@test_util.test_all_tf_execution_regimes
+class RandomRademacherDynamic32(test_util.TestCase, _RandomRademacher):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRademacherDynamic64(test_case.TestCase, _RandomRademacher):
+@test_util.test_all_tf_execution_regimes
+class RandomRademacherDynamic64(test_util.TestCase, _RandomRademacher):
   dtype = np.float64
   use_static_shape = True
 
@@ -77,14 +77,14 @@ class _RandomRayleigh(object):
     x = tfp.math.random_rayleigh(shape,
                                  scale=scale[..., tf.newaxis],
                                  dtype=self.dtype,
-                                 seed=42)
+                                 seed=test_util.test_seed())
     self.assertEqual(self.dtype, dtype_util.as_numpy_dtype(x.dtype))
     final_shape_ = [3, 2, int(1e3)]
     if self.use_static_shape:
       self.assertAllEqual(final_shape_, x.shape)
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=-1, keepdims=True)
+    sample_mean = tf.reduce_mean(x, axis=-1, keepdims=True)
     sample_var = tf.reduce_mean(
-        input_tensor=tf.math.squared_difference(x, sample_mean), axis=-1)
+        tf.math.squared_difference(x, sample_mean), axis=-1)
     [x_, sample_mean_, sample_var_] = self.evaluate([
         x, sample_mean[..., 0], sample_var])
     self.assertAllEqual(final_shape_, x_.shape)
@@ -95,14 +95,14 @@ class _RandomRayleigh(object):
                         atol=0.05, rtol=0.)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRayleighDynamic32(test_case.TestCase, _RandomRayleigh):
+@test_util.test_all_tf_execution_regimes
+class RandomRayleighDynamic32(test_util.TestCase, _RandomRayleigh):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RandomRayleighDynamic64(test_case.TestCase, _RandomRayleigh):
+@test_util.test_all_tf_execution_regimes
+class RandomRayleighDynamic64(test_util.TestCase, _RandomRayleigh):
   dtype = np.float64
   use_static_shape = True
 

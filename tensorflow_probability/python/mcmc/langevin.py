@@ -19,17 +19,20 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 # Dependency imports
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -38,17 +41,29 @@ __all__ = [
 ]
 
 
-UncalibratedLangevinKernelResults = collections.namedtuple(
-    'UncalibratedLangevinKernelResults',
-    [
-        'grads_target_log_prob',
-        # Results are for "next_state".
-        'log_acceptance_correction',
-        'target_log_prob',
-        'volatility',
-        'grads_volatility',
-        'diffusion_drift',
-    ])
+class UncalibratedLangevinKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'UncalibratedLangevinKernelResults',
+        [
+            'grads_target_log_prob',
+            # Results are for "next_state".
+            'log_acceptance_correction',
+            'target_log_prob',
+            'volatility',
+            'grads_volatility',
+            'diffusion_drift',
+            'seed',
+        ])):
+  """Internal state and diagnostics for Uncalibrated Langevin."""
+  __slots__ = ()
+
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*langevin',
+                        append=True)  # Don't override user-set filters.
 
 
 class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
@@ -82,52 +97,12 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   distribution using MALA with `step_size` equal to 0.75.
 
   ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-  import numpy as np
-
-  tfd = tfp.distributions
-
-  dtype = np.float32
-
-  with tf.Session(graph=tf.Graph()) as sess:
-    # Target distribution is Standard Univariate Normal
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-
-    # Define MALA sampler with `step_size` equal to 0.75
-    samples, _ = tfp.mcmc.sample_chain(
-        num_results=1000,
-        current_state=dtype(1),
-        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-            target_log_prob_fn=target.log_prob,
-            step_size=0.75,
-            seed=42),
-        num_burnin_steps=500,
-        parallel_iterations=1)  # For determinism.
-
-    sample_mean = tf.reduce_mean(samples, axis=0)
-    sample_std = tf.sqrt(
-        tf.reduce_mean(tf.squared_difference(samples, sample_mean),
-                       axis=0))
-
-    sess.graph.finalize()  # No more graph building.
-
-    [sample_mean_, sample_std_] = sess.run([sample_mean, sample_std])
-
-  print('sample mean', sample_mean_)
-  print('sample standard deviation', sample_std_)
-  ```
-
-  ##### Same example but in eager mode.
-
-  ```python
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   import numpy as np
   import matplotlib.pyplot as plt
 
-  # Support for eager execution
-  tf.enable_eager_execution()
+  tf.enable_v2_behavior()
 
   tfd = tfp.distributions
   dtype = np.float32
@@ -139,20 +114,21 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
     return target.log_prob(x)
 
   # Define MALA sampler with `step_size` equal to 0.75
-  samples, _ = tfp.mcmc.sample_chain(
+  samples = tfp.mcmc.sample_chain(
       num_results=1000,
       current_state=dtype(1),
       kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
           target_log_prob_fn=target_log_prob,
-          step_size=0.75,
-          seed=42),
+          step_size=0.75),
       num_burnin_steps=500,
-      parallel_iterations=1)  # For determinism.
+      trace_fn=None,
+      seed=42)
 
   sample_mean = tf.reduce_mean(samples, axis=0)
   sample_std = tf.sqrt(
-      tf.reduce_mean(tf.squared_difference(samples, sample_mean),
-                     axis=0))
+      tf.reduce_mean(
+          tf.math.squared_difference(samples, sample_mean),
+          axis=0))
 
   print('sample mean', sample_mean)
   print('sample standard deviation', sample_std)
@@ -169,11 +145,11 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   In this example we also consider a non-constant volatility function.
 
   ```python
-  import tensorflow as tf
+  import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   import numpy as np
 
-  tfd = tfp.distributions
+  tf.enable_v2_behavior()
 
   dtype = np.float32
   true_mean = dtype([0, 0, 0])
@@ -181,53 +157,39 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   num_results = 500
   num_chains = 500
 
-  with tf.Session(graph=tf.Graph()) as sess:
-    # Target distribution is defined through the Cholesky decomposition
-    chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+  # Target distribution is defined through the Cholesky decomposition
+  chol = tf.linalg.cholesky(true_cov)
+  target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-    # Assume that the state is passed as a list of tensors `x` and `y`.
-    # Then the target log-density is defined as follows:
-    def target_log_prob(x, y):
-      # Stack the input tensors together
-      z = tf.concat([x, y], axis=-1) - true_mean
-      return target.log_prob(z)
+  # Here we define the volatility function to be non-constant
+  def volatility_fn(x):
+    # Stack the input tensors together
+    return 1. / (0.5 + 0.1 * tf.math.abs(x))
 
-    # Here we define the volatility function to be non-constant
-    def volatility_fn(x, y):
-      # Stack the input tensors together
-      return [1. / (0.5 + 0.1 * tf.sqrt(x * x)),
-              1. / (0.5 + 0.1 *tf.sqrt(y * y))]
+  # Initial state of the chain
+  init_state = np.ones([num_chains, 3], dtype=dtype)
 
-    # Initial state of the chain
-    init_state = [np.ones([num_chains, 2], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
+  # Run MALA with normal proposal for `num_results` iterations for
+  # `num_chains` independent chains:
+  states = tfp.mcmc.sample_chain(
+      num_results=num_results,
+      current_state=init_state,
+      kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+          target_log_prob_fn=target.log_prob,
+          step_size=.1,
+          volatility_fn=volatility_fn),
+      num_burnin_steps=200,
+      num_steps_between_results=1,
+      trace_fn=None,
+      seed=42)
 
-    # Run MALA with normal proposal for `num_results` iterations for
-    # `num_chains` independent chains:
-    states, _ = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        current_state=init_state,
-        kernel=tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
-            target_log_prob_fn=target_log_prob,
-            step_size=.1,
-            volatility_fn=volatility_fn,
-            seed=42),
-        num_burnin_steps=200,
-        num_steps_between_results=1,
-        parallel_iterations=1)
+  sample_mean = tf.reduce_mean(states, axis=[0, 1])
+  x = (states - sample_mean)[..., tf.newaxis]
+  sample_cov = tf.reduce_mean(
+      tf.matmul(x, tf.transpose(x, [0, 1, 3, 2])), [0, 1])
 
-    states = tf.concat(states, axis=-1)
-    sample_mean = tf.reduce_mean(states, axis=[0, 1])
-    x = tf.expand_dims(states - sample_mean, -1)
-    sample_cov = tf.reduce_mean(
-        tf.matmul(x, tf.transpose(x, [0, 1, 3, 2])), [0, 1])
-
-    [sample_mean_, sample_cov_] = sess.run([
-        sample_mean, sample_cov])
-
-  print('sample mean', sample_mean_)
-  print('sample covariance matrix', sample_cov_)
+  print('sample mean', sample_mean.numpy())
+  print('sample covariance matrix', sample_cov.numpy())
   ```
 
   #### References
@@ -242,6 +204,9 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
        https://arxiv.org/abs/1309.2983
   """
 
+  @deprecation.deprecated_args(
+      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
+      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -266,7 +231,8 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
         volatility value at `current_state`. Should return a `Tensor` or Python
         `list` of `Tensor`s that must broadcast with the shape of
         `current_state` Defaults to the identity function.
-      seed: Python integer to seed the random number generator.
+      seed: Python integer to seed the random number generator. Deprecated, pass
+        seed to `tfp.mcmc.sample_chain`.
       parallel_iterations: the number of coordinates for which the gradients of
         the volatility matrix `volatility_fn` can be computed in parallel.
         Default value: `None` (i.e., no seed).
@@ -285,15 +251,18 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
+    seed_stream = SeedStream(seed, salt='langevin')
+    mh_kwargs = {} if seed is None else dict(seed=seed_stream())
+    uncal_kwargs = {} if seed is None else dict(seed=seed_stream())
     impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedLangevin(
             target_log_prob_fn=target_log_prob_fn,
             step_size=step_size,
             volatility_fn=volatility_fn,
-            seed=seed,
             parallel_iterations=parallel_iterations,
-            name=name),
-        seed=seed)
+            name=name,
+            **uncal_kwargs),
+        **mh_kwargs)
 
     self._impl = impl
     parameters = impl.inner_kernel.parameters.copy()
@@ -335,7 +304,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Runs one iteration of MALA.
 
     Args:
@@ -345,6 +314,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
+      seed: Optional, a seed for reproducible sampling.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)
@@ -357,7 +327,8 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
       ValueError: if there isn't one `step_size` or a list with same length as
         `current_state` or `diffusion_drift`.
     """
-    return self._impl.one_step(current_state, previous_kernel_results)
+    return self._impl.one_step(current_state, previous_kernel_results,
+                               seed=seed)
 
   def bootstrap_results(self, init_state):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
@@ -380,6 +351,9 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
   `MetropolisAdjustedLangevinAlgorithm`.
   """
 
+  @deprecation.deprecated_args(
+      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
+      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -410,8 +384,8 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
       compute_acceptance: Python 'bool' indicating whether to compute the
         Metropolis log-acceptance ratio used to construct
         `MetropolisAdjustedLangevinAlgorithm` kernel.
-      seed: Python integer to seed the random number generator.
-        Default value: `None` (i.e., no seed).
+      seed: Python integer to seed the random number generator. Deprecated, pass
+        seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'mala_kernel').
 
@@ -438,7 +412,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
         volatility_fn=volatility_fn,
-        compute_acceptance=tf.convert_to_tensor(value=compute_acceptance),
+        compute_acceptance=tf.convert_to_tensor(compute_acceptance),
         seed=seed,
         parallel_iterations=parallel_iterations,
         name=name)
@@ -481,17 +455,9 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
     return False
 
   @mcmc_util.set_doc(MetropolisAdjustedLangevinAlgorithm.one_step.__doc__)
-  def one_step(self, current_state, previous_kernel_results):
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'mala', 'one_step'),
-        values=[
-            self.step_size, current_state,
-            previous_kernel_results.target_log_prob,
-            previous_kernel_results.grads_target_log_prob,
-            previous_kernel_results.volatility,
-            previous_kernel_results.diffusion_drift
-        ]):
-      with tf1.name_scope('initialize'):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    with tf.name_scope(mcmc_util.make_name(self.name, 'mala', 'one_step')):
+      with tf.name_scope('initialize'):
         # Prepare input arguments to be passed to `_euler_method`.
         [
             current_state_parts,
@@ -513,17 +479,26 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
             previous_kernel_results.diffusion_drift,
             self.parallel_iterations)
 
+        # TODO(b/159636942): Clean up after 2020-09-20.
+        if seed is not None:
+          seed = samplers.sanitize_seed(seed)
+        else:
+          if self._seed_stream.original_seed is not None:
+            warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
+          seed = samplers.sanitize_seed(self._seed_stream())
+        seeds = samplers.split_seed(
+            seed, n=len(current_state_parts), salt='langevin.one_step')
+
         random_draw_parts = []
-        for s in current_state_parts:
+        for state_part, part_seed in zip(current_state_parts, seeds):
           random_draw_parts.append(
-              tf.random.normal(
-                  shape=tf.shape(input=s),
-                  dtype=s.dtype.base_dtype,
-                  seed=self._seed_stream()))
+              samplers.normal(
+                  shape=tf.shape(state_part),
+                  dtype=dtype_util.base_dtype(state_part.dtype),
+                  seed=part_seed))
 
       # Number of independent chains run by the algorithm.
-      independent_chain_ndims = distribution_util.prefer_static_rank(
-          current_target_log_prob)
+      independent_chain_ndims = prefer_static.rank(current_target_log_prob)
 
       # Generate the next state of the algorithm using Euler-Maruyama method.
       next_state_parts = _euler_method(random_draw_parts,
@@ -578,22 +553,22 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
               grads_target_log_prob=next_grads_target_log_prob,
               volatility=maybe_flatten(next_volatility_parts),
               grads_volatility=next_grads_volatility,
-              diffusion_drift=next_drift_parts
+              diffusion_drift=next_drift_parts,
+              seed=seed,
           ),
       ]
 
   @mcmc_util.set_doc(
       MetropolisAdjustedLangevinAlgorithm.bootstrap_results.__doc__)
   def bootstrap_results(self, init_state):
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'mala', 'bootstrap_results'),
-        values=[init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'mala', 'bootstrap_results')):
       init_state_parts = (list(init_state)
                           if mcmc_util.is_list_like(init_state)
                           else [init_state])
 
       init_state_parts = [
-          tf.convert_to_tensor(value=x) for x in init_state_parts
+          tf.convert_to_tensor(x) for x in init_state_parts
       ]
       init_volatility = self.volatility_fn(*init_state_parts)  # pylint: disable=not-callable
 
@@ -622,7 +597,9 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
           grads_target_log_prob=init_grads_target_log_prob,
           volatility=maybe_flatten(init_volatility),
           grads_volatility=init_grads_volatility,
-          diffusion_drift=init_diffusion_drift
+          diffusion_drift=init_diffusion_drift,
+          # Allow room for one_step's seed.
+          seed=samplers.zeros_seed(),
       )
 
 
@@ -670,10 +647,7 @@ def _euler_method(random_draw_parts,
       state(s) of the Markov chain(s) at each result step. Has same shape as
       input `current_state_parts`.
   """
-  with tf1.name_scope(name, 'mala_euler_method', [
-      random_draw_parts, state_parts, drift_parts, step_size_parts,
-      volatility_parts
-  ]):
+  with tf.name_scope(name or 'mala_euler_method'):
     proposed_state_parts = []
     for random_draw, state, drift, step_size, volatility in zip(
         random_draw_parts,
@@ -725,9 +699,7 @@ def _get_drift(step_size_parts, volatility_parts, grads_volatility,
       input `current_state_parts`.
   """
 
-  with tf1.name_scope(name, 'mala_get_drift', [
-      step_size_parts, volatility_parts, grads_volatility, grads_target_log_prob
-  ]):
+  with tf.name_scope(name or 'mala_get_drift'):
 
     drift_parts = []
 
@@ -804,11 +776,7 @@ def _compute_log_acceptance_correction(current_state_parts,
       acceptance-correction.  (See docstring for mathematical definition.)
   """
 
-  with tf1.name_scope(name, 'compute_log_acceptance_correction', [
-      current_state_parts, proposed_state_parts, current_volatility_parts,
-      proposed_volatility_parts, current_drift_parts, proposed_drift_parts,
-      step_size_parts, independent_chain_ndims
-  ]):
+  with tf.name_scope(name or 'compute_log_acceptance_correction'):
 
     proposed_log_density_parts = []
     dual_log_density_parts = []
@@ -842,7 +810,7 @@ def _compute_log_acceptance_correction(current_state_parts,
       # Compute part of `q(proposed_state | current_state)`
       proposed_energy = (
           tf.reduce_sum(
-              input_tensor=mcmc_util.safe_sum(
+              mcmc_util.safe_sum(
                   [tf.math.log(current_volatility),
                    0.5 * (proposed_energy**2)]),
               axis=axis))
@@ -852,20 +820,18 @@ def _compute_log_acceptance_correction(current_state_parts,
       dual_energy = (state_diff + proposed_drift) / proposed_volatility
       dual_energy = (
           tf.reduce_sum(
-              input_tensor=mcmc_util.safe_sum(
+              mcmc_util.safe_sum(
                   [tf.math.log(proposed_volatility), 0.5 * (dual_energy**2)]),
               axis=axis))
       dual_log_density_parts.append(-dual_energy)
 
     # Compute `q(proposed_state | current_state)`
-    proposed_log_density_reduce = tf.reduce_sum(
-        input_tensor=tf.stack(proposed_log_density_parts, axis=-1), axis=-1)
+    proposed_log_density_reduce = tf.add_n(proposed_log_density_parts)
     # Compute `q(current_state | proposed_state)`
-    dual_log_density_reduce = tf.reduce_sum(
-        input_tensor=tf.stack(dual_log_density_parts, axis=-1), axis=-1)
+    dual_log_density_reduce = tf.add_n(dual_log_density_parts)
 
-    return mcmc_util.safe_sum([dual_log_density_reduce,
-                               -proposed_log_density_reduce])
+    return mcmc_util.safe_sum([
+        dual_log_density_reduce, -proposed_log_density_reduce])
 
 
 def _maybe_call_volatility_fn_and_grads(volatility_fn,
@@ -912,8 +878,7 @@ def _maybe_call_volatility_fn_and_grads(volatility_fn,
   # Compute gradient of `volatility_parts**2`
   if needs_volatility_fn_gradients:
     grads_volatility_fn = [
-        2. * g * volatility if g is not None else tf.zeros_like(
-            fn_arg, dtype=fn_arg.dtype.base_dtype)
+        2. * g * volatility if g is not None else tf.zeros_like(fn_arg)
         for g, volatility, fn_arg in zip(
             grads_volatility_fn, volatility_fn_results, state_parts)
     ]
@@ -924,7 +889,7 @@ def _maybe_call_volatility_fn_and_grads(volatility_fn,
 def _maybe_broadcast_volatility(volatility_parts,
                                 state_parts):
   """Helper to broadcast `volatility_parts` to the shape of `state_parts`."""
-  return [v + tf.zeros_like(sp, dtype=sp.dtype.base_dtype)
+  return [v + tf.zeros_like(sp)
           for v, sp in zip(volatility_parts, state_parts)]
 
 
@@ -957,7 +922,7 @@ def _prepare_args(target_log_prob_fn,
       state_parts,
       volatility,
       grads_volatility_fn,
-      distribution_util.prefer_static_shape(target_log_prob),
+      prefer_static.shape(target_log_prob),
       parallel_iterations)
 
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)

@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -144,38 +145,26 @@ class Reshape(bijector.Bijector):
        has non-vector shape (`rank > 1`), or if their sizes do not
        match.
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'reshape') as name:
-      event_shape_out = tf.convert_to_tensor(
-          event_shape_out, name='event_shape_out', dtype_hint=tf.int32)
-      event_shape_in = tf.convert_to_tensor(
-          event_shape_in, name='event_shape_in', dtype_hint=tf.int32)
+      dtype = dtype_util.common_dtype(
+          [event_shape_out, event_shape_in], dtype_hint=tf.int32)
+      event_shape_out = tensor_util.convert_nonref_to_tensor(
+          event_shape_out, name='event_shape_out', dtype=dtype)
+      event_shape_in = tensor_util.convert_nonref_to_tensor(
+          event_shape_in, name='event_shape_in', dtype=dtype)
 
-      forward_min_event_ndims_ = tensorshape_util.num_elements(
-          event_shape_in.shape)
+      forward_min_event_ndims_ = _rank_from_shape(event_shape_in)
       if forward_min_event_ndims_ is None:
         raise NotImplementedError(
-            '`event_shape_in` `size` must be statically known. For dynamic '
-            'support, please contact `tfprobability@tensorflow.org`.')
+            'The length of `event_shape_in` must be statically known. For '
+            'dynamic support, please contact `tfprobability@tensorflow.org`.')
 
-      inverse_min_event_ndims_ = tensorshape_util.num_elements(
-          event_shape_out.shape)
+      inverse_min_event_ndims_ = _rank_from_shape(event_shape_out)
       if inverse_min_event_ndims_ is None:
         raise NotImplementedError(
-            '`event_shape_out` `size` must be statically known. For dynamic '
-            'support, please contact `tfprobability@tensorflow.org`.')
-
-      assertions = []
-      assertions.extend(_maybe_check_valid_shape(
-          event_shape_out, validate_args))
-      assertions.extend(_maybe_check_valid_shape(
-          event_shape_in, validate_args))
-
-      if assertions:
-        with tf.control_dependencies(assertions):
-          event_shape_in = tf.identity(
-              event_shape_in, name='validated_event_shape_in')
-          event_shape_out = tf.identity(
-              event_shape_out, name='validated_event_shape_out')
+            'The length of `event_shape_out` must be statically known. For '
+            'dynamic support, please contact `tfprobability@tensorflow.org`.')
 
       self._event_shape_in = event_shape_in
       self._event_shape_out = event_shape_out
@@ -185,7 +174,18 @@ class Reshape(bijector.Bijector):
           inverse_min_event_ndims=inverse_min_event_ndims_,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name or 'reshape')
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+    if is_init != tensor_util.is_ref(self._event_shape_in):
+      assertions.extend(_maybe_check_valid_shape(
+          self._event_shape_in, self.validate_args))
+    if is_init != tensor_util.is_ref(self._event_shape_out):
+      assertions.extend(_maybe_check_valid_shape(
+          self._event_shape_out, self.validate_args))
+    return assertions
 
   def _forward(self, x):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
@@ -342,7 +342,7 @@ def _replace_event_shape_in_tensorshape(
       input_tensorshape) - event_shape_in_ndims
   if input_non_event_ndims < 0:
     raise ValueError(
-        'Input has fewer ndims ({}) than event shape ndims ({}).'.format(
+        'Input has lower rank ({}) than `event_shape_ndims` ({}).'.format(
             tensorshape_util.rank(input_tensorshape), event_shape_in_ndims))
 
   input_non_event_tensorshape = input_tensorshape[:input_non_event_ndims]
@@ -363,7 +363,7 @@ def _replace_event_shape_in_tensorshape(
     explicit_event_shape_in_ = event_shape_in_[mask]
     if not np.all(explicit_input_event_shape_ == explicit_event_shape_in_):
       raise ValueError(
-          'Input `event_shape` does not match `event_shape_in`. '
+          'Input `event_shape` does not match `event_shape_in` '
           '({} vs {}).'.format(input_event_shape_, event_shape_in_))
 
   event_tensorshape_out = tensorshape_util.constant_value_as_shape(
@@ -380,7 +380,7 @@ def _replace_event_shape_in_tensorshape(
 def _maybe_check_valid_shape(shape, validate_args):
   """Check that a shape Tensor is int-type and otherwise sane."""
   if not dtype_util.is_integer(shape.dtype):
-    raise TypeError('{} dtype ({}) should be `int`-like.'.format(
+    raise TypeError('`{}` dtype (`{}`) should be `int`-like.'.format(
         shape, dtype_util.name(shape.dtype)))
 
   assertions = []
@@ -415,3 +415,20 @@ def _maybe_check_valid_shape(shape, validate_args):
         shape, -2, message=message.format(shape)))
 
   return assertions
+
+
+def _rank_from_shape(x):
+  """Returns the rank implied by this shape."""
+  if not hasattr(x, 'shape'):
+    return tf.TensorShape(x).rank
+  else:
+    # If the input is a Tensor, we can't make a `TensorShape` out of it
+    # directly:
+    # - In graph mode, `TensorShape` complains that it can't iterate over a
+    #   Tensor.
+    # - In eager mode, the underlying `Dimension` complains that a scalar
+    #   integer Tensor is actually an ambiguous dimension, because it !=
+    #   int(it).
+    # However, the (static) size of `x` is also the rank of the Tensor
+    # it represents, which is what we want.
+    return tf.TensorShape(x.shape).num_elements()

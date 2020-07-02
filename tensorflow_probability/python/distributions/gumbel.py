@@ -22,7 +22,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import gumbel as gumbel_bijector
+from tensorflow_probability.python.bijectors import gumbel_cdf as gumbel_cdf_bijector
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -137,22 +138,25 @@ class Gumbel(transformed_distribution.TransformedDistribution):
           scale, name='scale', dtype=dtype)
       dtype_util.assert_same_float_dtype([loc, scale])
       # Positive scale is asserted by the incorporated Gumbel bijector.
-      self._gumbel_bijector = gumbel_bijector.Gumbel(
+      self._gumbel_bijector = gumbel_cdf_bijector.GumbelCDF(
           loc=loc, scale=scale, validate_args=validate_args)
 
       # Because the uniform sampler generates samples in `[0, 1)` this would
       # cause samples to lie in `(inf, -inf]` instead of `(inf, -inf)`. To fix
       # this, we use `np.finfo(dtype_util.as_numpy_dtype(self.dtype).tiny`
       # because it is the smallest, positive, 'normal' number.
+      batch_shape = distribution_util.get_broadcast_shape(loc, scale)
       super(Gumbel, self).__init__(
+          # TODO(b/137665504): Use batch-adding meta-distribution to set the
+          # batch shape instead of tf.ones.
           distribution=uniform.Uniform(
               low=np.finfo(dtype_util.as_numpy_dtype(dtype)).tiny,
-              high=tf.ones([], dtype=dtype),
+              high=tf.ones(batch_shape, dtype=dtype),
               allow_nan_stats=allow_nan_stats),
-          # The Gumbel bijector encodes the quantile function as the forward,
+          # The Gumbel bijector encodes the CDF function as the forward,
           # and hence needs to be inverted.
-          bijector=invert_bijector.Invert(self._gumbel_bijector),
-          batch_shape=distribution_util.get_broadcast_shape(loc, scale),
+          bijector=invert_bijector.Invert(
+              self._gumbel_bijector, validate_args=validate_args),
           parameters=parameters,
           name=name)
 
@@ -194,6 +198,11 @@ class Gumbel(transformed_distribution.TransformedDistribution):
 
   def _mode(self):
     return self.loc * tf.ones_like(self.scale)
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector. Consider switching to
+    # Chain([Softplus(), Log()]) to lighten the doubly-exponential right tail.
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     return self._gumbel_bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access

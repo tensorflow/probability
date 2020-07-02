@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -28,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -121,10 +123,10 @@ class Chi2(distribution.Distribution):
     return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(
-      """Note: See `tf.random_gamma` docstring for sampling details and
+      """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return tf.random.gamma(
+    return samplers.gamma(
         shape=[n],
         alpha=0.5 * self.df,
         beta=tf.convert_to_tensor(0.5, dtype=self.dtype),
@@ -134,15 +136,13 @@ class Chi2(distribution.Distribution):
   def _log_prob(self, x):
     concentration = 0.5 * self.df
     rate = tf.convert_to_tensor(0.5, dtype=self.dtype)
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      log_unnormalized_prob = tf.math.xlogy(concentration - 1., x) - rate * x
-      log_normalization = (tf.math.lgamma(concentration) -
-                           concentration * tf.math.log(rate))
-      return log_unnormalized_prob - log_normalization
+    log_unnormalized_prob = tf.math.xlogy(concentration - 1., x) - rate * x
+    log_normalization = (tf.math.lgamma(concentration) -
+                         concentration * tf.math.log(rate))
+    return log_unnormalized_prob - log_normalization
 
   def _cdf(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      return tf.math.igamma(0.5 * self.df, 0.5 * x)
+    return tf.math.igamma(0.5 * self.df, 0.5 * x)
 
   def _entropy(self):
     concentration = 0.5 * self.df
@@ -176,10 +176,16 @@ class Chi2(distribution.Distribution):
           mode,
           dtype_util.as_numpy_dtype(self.dtype)(np.nan))
 
-  def _maybe_assert_valid_sample(self, x):
+  def _default_event_space_bijector(self):
+    return softplus_bijector.Softplus(validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return []
-    return [assert_util.assert_positive(x, message='Sample must be positive.')]
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

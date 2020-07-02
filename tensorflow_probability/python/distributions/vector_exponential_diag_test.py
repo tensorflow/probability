@@ -23,14 +23,11 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class VectorExponentialDiagTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class VectorExponentialDiagTest(test_util.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
@@ -39,14 +36,15 @@ class VectorExponentialDiagTest(test_case.TestCase):
   def testScalarParams(self):
     mu = -1.
     diag = -5.
-    with self.assertRaisesRegexp(ValueError, "at least 1 dimension"):
+    with self.assertRaisesRegexp(ValueError, 'at least 1 dimension'):
       tfd.VectorExponentialDiag(mu, diag)
 
   def testVectorParams(self):
     mu = [-1.]
     diag = [-5.]
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
-    self.assertAllEqual([3, 1], dist.sample(3).shape)
+    self.assertAllEqual([3, 1], dist.sample(
+        3, seed=test_util.test_seed()).shape)
 
   def testMean(self):
     mu = [-1., 1]
@@ -67,22 +65,27 @@ class VectorExponentialDiagTest(test_case.TestCase):
     self.assertAllEqual([-1. + 1, -1. - 5], self.evaluate(dist.mean()))
 
   def testSample(self):
-    mu = [-2., 1]
-    diag = [1., -2]
+    mu = np.array([-2., 1])
+    diag = np.array([1., -2])
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
-    samps = self.evaluate(dist.sample(int(1e4), seed=tfp_test_util.test_seed()))
+    samps = self.evaluate(dist.sample(int(1e4), seed=test_util.test_seed()))
     cov_mat = self.evaluate(tf.linalg.diag(diag))**2
 
     self.assertAllClose(
         [-2 + 1, 1. - 2], samps.mean(axis=0), atol=0., rtol=0.05)
     self.assertAllClose(cov_mat, np.cov(samps.T), atol=0.05, rtol=0.05)
 
+  def testAssertValidSample(self):
+    v = tfd.VectorExponentialDiag(loc=[4., 5.], validate_args=True)
+    with self.assertRaisesOpError('Sample is not contained in the support.'):
+      self.evaluate(v.log_prob([3., 4.]))
+
   def testSingularScaleRaises(self):
     mu = [-1., 1]
     diag = [1., 0]
     dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
-    with self.assertRaisesOpError("Singular"):
-      self.evaluate(dist.sample())
+    with self.assertRaisesOpError('Singular'):
+      self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   def testSampleWithBroadcastScale(self):
     # mu corresponds to a 2-batch of 3-variate normals
@@ -98,7 +101,7 @@ class VectorExponentialDiagTest(test_case.TestCase):
     self.assertAllClose(mu + diag, self.evaluate(mean))
 
     n = int(1e4)
-    samps = self.evaluate(dist.sample(n, seed=tfp_test_util.test_seed()))
+    samps = self.evaluate(dist.sample(n, seed=test_util.test_seed()))
     samps_centered = samps - samps.mean(axis=0)
     cov_mat = self.evaluate(tf.linalg.diag(diag))**2
     sample_cov = np.matmul(
@@ -109,13 +112,16 @@ class VectorExponentialDiagTest(test_case.TestCase):
     self.assertAllClose([cov_mat, cov_mat], sample_cov, atol=0.10, rtol=0.05)
 
   def testCovariance(self):
-    vex = tfd.VectorExponentialDiag(loc=tf.ones([2, 3], dtype=tf.float32))
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.ones([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
         np.diag(np.ones([3], dtype=np.float32)),
         self.evaluate(vex.covariance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllEqual([2], vex.batch_shape)
     self.assertAllEqual([3], vex.event_shape)
     self.assertAllClose(
@@ -124,7 +130,9 @@ class VectorExponentialDiagTest(test_case.TestCase):
         self.evaluate(vex.covariance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4, 5, 6]])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4, 5, 6]],
+        validate_args=True)
     self.assertAllEqual([2], vex.batch_shape)
     self.assertAllEqual([3], vex.event_shape)
     self.assertAllClose(
@@ -133,35 +141,55 @@ class VectorExponentialDiagTest(test_case.TestCase):
         self.evaluate(vex.covariance()))
 
   def testVariance(self):
-    vex = tfd.VectorExponentialDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
         np.ones([3], dtype=np.float32), self.evaluate(vex.variance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 3, 3], [2., 2, 2]])**2., self.evaluate(vex.variance()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.ones([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4., 5, 6]])
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4., 5, 6]],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 2, 1], [4., 5, 6]])**2., self.evaluate(vex.variance()))
 
   def testStddev(self):
-    vex = tfd.VectorExponentialDiag(loc=tf.zeros([2, 3], dtype=tf.float32))
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
         np.ones([3], dtype=np.float32), self.evaluate(vex.stddev()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_identity_multiplier=[3., 2.])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_identity_multiplier=[3., 2.],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 3, 3], [2., 2, 2]]), self.evaluate(vex.stddev()))
 
     vex = tfd.VectorExponentialDiag(
-        loc=tf.zeros([3], dtype=tf.float32), scale_diag=[[3., 2, 1], [4, 5, 6]])
+        loc=tf.zeros([3], dtype=tf.float32),
+        scale_diag=[[3., 2, 1], [4, 5, 6]],
+        validate_args=True)
     self.assertAllClose(
         np.array([[3., 2, 1], [4., 5, 6]]), self.evaluate(vex.stddev()))
 
+  def testSupportBijectorOutsideRange(self):
+    vex = tfd.VectorExponentialDiag(
+        loc=tf.ones([3], dtype=tf.float32),
+        scale_diag=[[3., 2., 1.], [4., 5., 6.]],
+        validate_args=True)
+    x = np.array([[-8.3, -0.4, -1e-6]])
+    bijector_inverse_x = vex._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
   tf.test.main()

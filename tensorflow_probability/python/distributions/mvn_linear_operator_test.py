@@ -23,15 +23,14 @@ from __future__ import print_function
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalLinearOperatorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalLinearOperatorTest(test_util.TestCase):
 
   def setUp(self):
     self.rng = np.random.RandomState(42)
@@ -39,7 +38,7 @@ class MultivariateNormalLinearOperatorTest(test_case.TestCase):
 
   def _random_tril_matrix(self, shape):
     mat = self.rng.rand(*shape)
-    chol = tfd.matrix_diag_transform(mat, transform=tf.math.softplus)
+    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
     return tf.linalg.band_part(chol, -1, 0)
 
   def _random_loc_and_scale(self, batch_shape, event_shape):
@@ -55,7 +54,8 @@ class MultivariateNormalLinearOperatorTest(test_case.TestCase):
   def testNamePropertyIsSetByInitArg(self):
     loc = [1., 2.]
     scale = tf.linalg.LinearOperatorIdentity(2)
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, name='Billy')
+    mvn = tfd.MultivariateNormalLinearOperator(
+        loc, scale, name='Billy', validate_args=True)
     self.assertStartsWith(mvn.name, 'Billy')
 
   def testLogPDFScalarBatch(self):
@@ -102,7 +102,7 @@ class MultivariateNormalLinearOperatorTest(test_case.TestCase):
   def testMeanAndCovariance(self):
     loc, scale = self._random_loc_and_scale(
         batch_shape=[3, 4], event_shape=[5])
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale)
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
 
     self.assertAllEqual(self.evaluate(mvn.mean()), loc)
     self.assertAllClose(
@@ -111,6 +111,7 @@ class MultivariateNormalLinearOperatorTest(test_case.TestCase):
             self.evaluate(scale.to_dense()),
             np.transpose(self.evaluate(scale.to_dense()), [0, 1, 3, 2])))
 
+  @test_util.tf_tape_safety_test
   def testVariableLocation(self):
     loc = tf.Variable([1., 1.])
     scale = tf.linalg.LinearOperatorLowerTriangular(
@@ -121,6 +122,7 @@ class MultivariateNormalLinearOperatorTest(test_case.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, loc))
 
+  @test_util.jax_disable_variable_test
   def testVariableScaleAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception
     # when validate_args is True. This is really just testing the underlying
@@ -135,7 +137,7 @@ class MultivariateNormalLinearOperatorTest(test_case.TestCase):
     self.evaluate(scale_tensor.initializer)
     with self.assertRaises(Exception):
       with tf.control_dependencies([scale_tensor.assign([[1., 0.], [1., 0.]])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testKLBatch(self):
     batch_shape = [2]

@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import functools
 
-from absl import logging
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
@@ -31,8 +30,10 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
+
+
+JAX_MODE = False
 
 # pylint: disable=no-value-for-parameter
 
@@ -45,6 +46,7 @@ def rq_splines(draw, batch_shape=None, dtype=tf.float32):
   lo = draw(hps.floats(min_value=-5, max_value=.5))
   hi = draw(hps.floats(min_value=-.5, max_value=5))
   lo, hi = min(lo, hi), max(lo, hi) + .2
+  hp.note('lo, hi: {!r}'.format((lo, hi)))
 
   constraints = dict(
       bin_widths=functools.partial(
@@ -58,13 +60,17 @@ def rq_splines(draw, batch_shape=None, dtype=tf.float32):
           batch_shape,
           params_event_ndims=dict(bin_widths=1, bin_heights=1, knot_slopes=1),
           constraint_fn_for=constraints.get))
+  hp.note('params: {!r}'.format(params))
   return tfb.RationalQuadraticSpline(
       range_min=lo, validate_args=draw(hps.booleans()), **params)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class RationalQuadraticSplineTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RationalQuadraticSplineTest(test_util.TestCase):
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='tfb.RealNVP not exposed in JAX and Numpy backend.')
   def testDocExample(self):
 
     nsplits = 3
@@ -163,22 +169,32 @@ class RationalQuadraticSplineTest(test_case.TestCase):
         atol=1e-5,
         rtol=1e-5)
 
+  @test_util.numpy_disable_gradient_test
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testTheoreticalFldj(self, data):
-    # get_fldj_theoretical test rig requires 1-d batches.
-    batch_shape = data.draw(tfp_hps.shapes(min_ndims=1, max_ndims=1))
+    if JAX_MODE:  # TODO(b/160167257): Eliminate this workaround.
+      # get_fldj_theoretical uses tfp.math.batch_jacobian and assumes the
+      # behavior of the bijector does not vary by position. In this case, it
+      # can, so we must vmap the result.
+      batch_shape = [1]
+    else:
+      # get_fldj_theoretical test rig requires 1-d batches.
+      batch_shape = data.draw(tfp_hps.shapes(min_ndims=1, max_ndims=1))
+    hp.note('batch shape: {}'.format(batch_shape))
     bijector = data.draw(rq_splines(batch_shape=batch_shape, dtype=tf.float64))
     self.assertEqual(tf.float64, bijector.dtype)
     bw, bh, kd = self.evaluate(
         [bijector.bin_widths, bijector.bin_heights, bijector.knot_slopes])
-    logging.info('bw: %s\nbh: %s\nkd: %s', bw, bh, kd)
+    hp.note('bw: {!r}\nbh: {!r}\nkd: {!r}'.format(bw, bh, kd))
     x_shp = ((bw + bh)[..., :-1] + kd).shape[:-1]
     if x_shp[-1] == 1:  # Possibly broadcast the x dim.
       dim = data.draw(hps.integers(min_value=1, max_value=7))
       x_shp = x_shp[:-1] + (dim,)
-    x = np.linspace(-5, 5, np.prod(x_shp), dtype=np.float64).reshape(*x_shp)
+    x = np.linspace(-4.9, 4.9, np.prod(x_shp), dtype=np.float64).reshape(*x_shp)
+    hp.note('x: {!r}'.format(x))
     y = self.evaluate(bijector.forward(x))
+    hp.note('x: {!r}'.format(x))
     bijector_test_util.assert_bijective_and_finite(
         bijector,
         x,
@@ -204,6 +220,9 @@ class RationalQuadraticSplineTest(test_case.TestCase):
                                 'non-scalar `knot_slopes` must broadcast'):
       tfb.RationalQuadraticSpline([2, 1, .5], [.5, 2, 1], [.3, 2, .5])
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Shapes are static in JAX and numpy backend.')
   def testVerifiesBroadcastingDynamic(self):
 
     @tf.function

@@ -121,6 +121,7 @@ class Pad(bijector.Bijector):
       name: Python `str`, name given to ops managed by this object.
         Default value: `None` (i.e., `'pad'`).
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'pad') as name:
       paddings = tensor_util.convert_nonref_to_tensor(
           paddings, dtype_hint=tf.int32, name='paddings')
@@ -149,6 +150,7 @@ class Pad(bijector.Bijector):
           inverse_min_event_ndims=min_event_ndims_,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property

@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 
@@ -85,8 +84,8 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
       if sum(sizes_) != n:
         raise ValueError(message)
     elif self.validate_args:
-      assertions.append(tf1.assert_equal(
-          shape[-1], tf.reduce_sum(input_tensor=self.sizes), message=message))
+      assertions.append(tf.debugging.assert_equal(
+          shape[-1], tf.reduce_sum(self.sizes), message=message))
 
     s = (shape[:-1]
          if shape_ is None or any(s is None for s in shape_[:-1])

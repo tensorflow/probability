@@ -27,9 +27,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class OneHotCategorical(distribution.Distribution):
@@ -135,16 +135,6 @@ class OneHotCategorical(distribution.Distribution):
   def _params_event_ndims(cls):
     return dict(logits=1, probs=1)
 
-  @property
-  @deprecation.deprecated(
-      '2019-10-01', 'The `event_size` property is deprecated.  Use '
-      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
-      'instead.')
-  def event_size(self):
-    """Scalar `int32` tensor: the number of classes."""
-    with self._name_and_control_scope('event_size'):
-      return self._event_size()
-
   def _event_size(self, param=None):
     if param is None:
       param = self._logits if self._logits is not None else self._probs
@@ -157,15 +147,11 @@ class OneHotCategorical(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -195,7 +181,7 @@ class OneHotCategorical(distribution.Distribution):
       logits_2d = logits
     else:
       logits_2d = tf.reshape(logits, [-1, event_size])
-    samples = tf.random.categorical(logits_2d, n, seed=seed)
+    samples = samplers.categorical(logits_2d, n, seed=seed)
     samples = tf.transpose(a=samples)
     samples = tf.one_hot(samples, event_size, dtype=self.dtype)
     ret = tf.reshape(samples, sample_shape)
@@ -206,7 +192,6 @@ class OneHotCategorical(distribution.Distribution):
     event_size = self._event_size(logits)
 
     x = tf.cast(x, logits.dtype)
-    x = self._maybe_assert_valid_sample(x, dtype=logits.dtype)
 
     # broadcast logits or x if need be.
     if (not tensorshape_util.is_fully_defined(x.shape) or
@@ -294,31 +279,18 @@ class OneHotCategorical(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.softmax(self._logits)
 
-  def _maybe_assert_valid_sample(self, x, dtype):
+  def _default_event_space_bijector(self):
+    return
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return x
-    one = tf.ones([], dtype=dtype)
-    return distribution_util.with_dependencies([
-        assert_util.assert_non_negative(x),
-        assert_util.assert_less_equal(x, one),
-        assert_util.assert_near(one, tf.reduce_sum(x, axis=[-1])),
-    ], x)
-
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `logits` property will return `None` when the distribution is '
-       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
-
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `probs` property will return `None` when the distribution is '
-       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(assert_util.assert_equal(
+        tf.ones([], dtype=x.dtype), tf.reduce_sum(x, axis=[-1]),
+        message='Last dimension of sample must sum to 1.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
@@ -347,12 +319,12 @@ class OneHotCategorical(distribution.Distribution):
 
       msg1 = 'Argument `{}` must have final dimension >= 1.'.format(name)
       msg2 = 'Argument `{}` must have final dimension <= {}.'.format(
-          name, tf.int32.max)
+          name, dtype_util.max(tf.int32))
       event_size = shape_static[-1] if shape_static is not None else None
       if event_size is not None:
         if event_size < 1:
           raise ValueError(msg1)
-        if event_size > tf.int32.max:
+        if event_size > dtype_util.max(tf.int32):
           raise ValueError(msg2)
       elif self.validate_args:
         param = tf.convert_to_tensor(param)

@@ -24,75 +24,16 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MultivariateNormalDiagPlusLowRankTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MultivariateNormalDiagPlusLowRankTest(test_util.TestCase):
   """Well tested because this is a simple override of the base class."""
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
-
-  def testDiagBroadcastBothBatchAndEvent(self):
-    # batch_shape: [3], event_shape: [2]
-    diag = np.array([[1., 2], [3, 4], [5, 6]])
-    # batch_shape: [1], event_shape: []
-    identity_multiplier = np.array([5.])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        scale_diag=diag,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[[1. + 5, 0], [0, 2 + 5]], [[3 + 5, 0], [0, 4 + 5]],
-                  [[5 + 5, 0], [0, 6 + 5]]]),
-        self.evaluate(dist.scale.to_dense()))
-
-  def testDiagBroadcastBothBatchAndEvent2(self):
-    # This test differs from `testDiagBroadcastBothBatchAndEvent` in that it
-    # broadcasts batch_shape's from both the `scale_diag` and
-    # `scale_identity_multiplier` args.
-    # batch_shape: [3], event_shape: [2]
-    diag = np.array([[1., 2], [3, 4], [5, 6]])
-    # batch_shape: [3, 1], event_shape: []
-    identity_multiplier = np.array([[5.], [4], [3]])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        scale_diag=diag,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllEqual([3, 3, 2, 2], dist.scale.to_dense().shape)
-
-  def testDiagBroadcastOnlyEvent(self):
-    # batch_shape: [3], event_shape: [2]
-    diag = np.array([[1., 2], [3, 4], [5, 6]])
-    # batch_shape: [3], event_shape: []
-    identity_multiplier = np.array([5., 4, 3])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        scale_diag=diag,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[[1. + 5, 0], [0, 2 + 5]], [[3 + 4, 0], [0, 4 + 4]],
-                  [[5 + 3, 0], [0, 6 + 3]]]),  # shape: [3, 2, 2]
-        self.evaluate(dist.scale.to_dense()))
-
-  def testDiagBroadcastMultiplierAndLoc(self):
-    # batch_shape: [], event_shape: [3]
-    loc = np.array([1., 0, -1])
-    # batch_shape: [3], event_shape: []
-    identity_multiplier = np.array([5., 4, 3])
-    dist = tfd.MultivariateNormalDiagPlusLowRank(
-        loc=loc,
-        scale_identity_multiplier=identity_multiplier,
-        validate_args=True)
-    self.assertAllClose(
-        np.array([[[5, 0, 0], [0, 5, 0], [0, 0, 5]],
-                  [[4, 0, 0], [0, 4, 0], [0, 0, 4]], [[3, 0, 0], [0, 3, 0],
-                                                      [0, 0, 3]]]),
-        self.evaluate(dist.scale.to_dense()))
+    super(MultivariateNormalDiagPlusLowRankTest, self).setUp()
 
   def testMean(self):
     mu = [-1.0, 1.0]
@@ -106,6 +47,48 @@ class MultivariateNormalDiagPlusLowRankTest(test_case.TestCase):
         scale_perturb_diag=diag_small,
         validate_args=True)
     self.assertAllEqual(mu, self.evaluate(dist.mean()))
+
+  @test_util.tf_tape_safety_test
+  def testVariableLocation(self):
+    loc = tf.Variable([1., 1.])
+    d = tfd.MultivariateNormalDiagPlusLowRank(loc=loc, validate_args=True)
+    self.evaluate(loc.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, loc))
+
+  @test_util.tf_tape_safety_test
+  def testVariableScaleDiag(self):
+    scale_diag = tf.Variable([1., 1.])
+    d = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_diag=scale_diag, validate_args=True)
+    self.evaluate(scale_diag.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_diag))
+
+  @test_util.tf_tape_safety_test
+  def testVariableScalePerturbFactor(self):
+    scale_perturb_factor = tf.Variable([[1.], [2.]])
+    d = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_perturb_factor=scale_perturb_factor, validate_args=True)
+    self.evaluate(scale_perturb_factor.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_perturb_factor))
+
+  @test_util.tf_tape_safety_test
+  def testVariableScalePerturbDiag(self):
+    scale_perturb_factor = tf.constant([[1.], [2.]])
+    scale_perturb_diag = tf.Variable([3.])
+    d = tfd.MultivariateNormalDiagPlusLowRank(
+        scale_perturb_factor=scale_perturb_factor,
+        scale_perturb_diag=scale_perturb_diag,
+        validate_args=True)
+    self.evaluate(scale_perturb_diag.initializer)
+    with tf.GradientTape() as tape:
+      lp = d.log_prob([0., 0.])
+    self.assertIsNotNone(tape.gradient(lp, scale_perturb_diag))
 
   def testSample(self):
     # TODO(jvdillon): This test should be the basis of a new test fixture which
@@ -152,28 +135,28 @@ class MultivariateNormalDiagPlusLowRankTest(test_case.TestCase):
 
     scale = dist.scale.to_dense()
 
-    n = int(30e3)
+    n = int(70e3)
     samps = dist.sample(
-        n, seed=tfp_test_util.test_seed(hardcoded_seed=0, set_eager_seed=False))
-    sample_mean = tf.reduce_mean(input_tensor=samps, axis=0)
+        n, seed=test_util.test_seed())
+    sample_mean = tf.reduce_mean(samps, axis=0)
     x = samps - sample_mean
     sample_covariance = tf.matmul(x, x, transpose_a=True) / n
 
     sample_kl_identity = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_identity.log_prob(samps),
+        dist.log_prob(samps) - mvn_identity.log_prob(samps),
         axis=0)
     analytical_kl_identity = tfd.kl_divergence(dist, mvn_identity)
 
     sample_kl_scaled = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_scaled.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_scaled.log_prob(samps), axis=0)
     analytical_kl_scaled = tfd.kl_divergence(dist, mvn_scaled)
 
     sample_kl_diag = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_diag.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_diag.log_prob(samps), axis=0)
     analytical_kl_diag = tfd.kl_divergence(dist, mvn_diag)
 
     sample_kl_chol = tf.reduce_mean(
-        input_tensor=dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
+        dist.log_prob(samps) - mvn_chol.log_prob(samps), axis=0)
     analytical_kl_chol = tfd.kl_divergence(dist, mvn_chol)
 
     n = int(10e3)
@@ -181,26 +164,26 @@ class MultivariateNormalDiagPlusLowRankTest(test_case.TestCase):
         loc=np.array([-1., 0.25, 1.25], dtype=np.float32),
         scale_diag=np.array([1.5, 0.5, 1.], dtype=np.float32),
         validate_args=True)
-    samps = baseline.sample(n, seed=tfp_test_util.test_seed())
+    samps = baseline.sample(n, seed=test_util.test_seed())
 
     sample_kl_identity_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_identity.log_prob(samps),
+        baseline.log_prob(samps) - mvn_identity.log_prob(samps),
         axis=0)
     analytical_kl_identity_diag_baseline = tfd.kl_divergence(
         baseline, mvn_identity)
 
     sample_kl_scaled_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_scaled.log_prob(samps),
+        baseline.log_prob(samps) - mvn_scaled.log_prob(samps),
         axis=0)
     analytical_kl_scaled_diag_baseline = tfd.kl_divergence(baseline, mvn_scaled)
 
     sample_kl_diag_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_diag.log_prob(samps),
+        baseline.log_prob(samps) - mvn_diag.log_prob(samps),
         axis=0)
     analytical_kl_diag_diag_baseline = tfd.kl_divergence(baseline, mvn_diag)
 
     sample_kl_chol_diag_baseline = tf.reduce_mean(
-        input_tensor=baseline.log_prob(samps) - mvn_chol.log_prob(samps),
+        baseline.log_prob(samps) - mvn_chol.log_prob(samps),
         axis=0)
     analytical_kl_chol_diag_baseline = tfd.kl_divergence(baseline, mvn_chol)
 
@@ -315,50 +298,50 @@ class MultivariateNormalDiagPlusLowRankTest(test_case.TestCase):
         2, "kl_chol_diag_baseline:  analytical:{}  sample:{}".format(
             analytical_kl_chol_diag_baseline_, sample_kl_chol_diag_baseline_))
 
-    self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.02)
+    self.assertAllClose(true_mean, sample_mean_, atol=0., rtol=0.05)
     self.assertAllClose(true_mean, analytical_mean_, atol=0., rtol=1e-6)
 
-    self.assertAllClose(true_covariance, sample_covariance_, atol=0., rtol=0.02)
+    self.assertAllClose(true_covariance, sample_covariance_, atol=0., rtol=0.06)
     self.assertAllClose(
         true_covariance, analytical_covariance_, atol=0., rtol=1e-6)
 
-    self.assertAllClose(true_variance, sample_variance_, atol=0., rtol=0.02)
+    self.assertAllClose(true_variance, sample_variance_, atol=0., rtol=0.05)
     self.assertAllClose(true_variance, analytical_variance_, atol=0., rtol=1e-6)
 
-    self.assertAllClose(true_stddev, sample_stddev_, atol=0., rtol=0.02)
+    self.assertAllClose(true_stddev, sample_stddev_, atol=0., rtol=0.05)
     self.assertAllClose(true_stddev, analytical_stddev_, atol=0., rtol=1e-6)
 
     self.assertAllClose(true_scale, scale_, atol=0., rtol=1e-6)
 
     self.assertAllClose(
-        sample_kl_identity_, analytical_kl_identity_, atol=0., rtol=0.02)
+        sample_kl_identity_, analytical_kl_identity_, atol=0., rtol=0.05)
     self.assertAllClose(
-        sample_kl_scaled_, analytical_kl_scaled_, atol=0., rtol=0.02)
+        sample_kl_scaled_, analytical_kl_scaled_, atol=0., rtol=0.05)
     self.assertAllClose(
-        sample_kl_diag_, analytical_kl_diag_, atol=0., rtol=0.02)
+        sample_kl_diag_, analytical_kl_diag_, atol=0., rtol=0.05)
     self.assertAllClose(
-        sample_kl_chol_, analytical_kl_chol_, atol=0., rtol=0.02)
+        sample_kl_chol_, analytical_kl_chol_, atol=0., rtol=0.05)
 
     self.assertAllClose(
         sample_kl_identity_diag_baseline_,
         analytical_kl_identity_diag_baseline_,
         atol=0.,
-        rtol=0.02)
+        rtol=0.05)
     self.assertAllClose(
         sample_kl_scaled_diag_baseline_,
         analytical_kl_scaled_diag_baseline_,
         atol=0.,
-        rtol=0.02)
+        rtol=0.05)
     self.assertAllClose(
         sample_kl_diag_diag_baseline_,
         analytical_kl_diag_diag_baseline_,
         atol=0.,
-        rtol=0.04)
+        rtol=0.05)
     self.assertAllClose(
         sample_kl_chol_diag_baseline_,
         analytical_kl_chol_diag_baseline_,
         atol=0.,
-        rtol=0.02)
+        rtol=0.05)
 
   def testImplicitLargeDiag(self):
     mu = np.array([[1., 2, 3],
@@ -381,7 +364,10 @@ class MultivariateNormalDiagPlusLowRankTest(test_case.TestCase):
                     np.matmul(scale[1], scale[1].T)])
     tf1.logging.vlog(2, "expected_cov:\n{}".format(cov))
     mvn = tfd.MultivariateNormalDiagPlusLowRank(
-        loc=mu, scale_perturb_factor=u, scale_perturb_diag=m)
+        loc=mu,
+        scale_perturb_factor=u,
+        scale_perturb_diag=m,
+        validate_args=True)
     self.assertAllClose(
         cov, self.evaluate(mvn.covariance()), atol=0., rtol=1e-6)
 

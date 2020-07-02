@@ -18,7 +18,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -168,9 +167,8 @@ class DynamicLinearRegressionStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
     """
 
-    with tf1.name_scope(name, 'DynamicLinearRegressionStateSpaceModel',
-                                 values=[drift_scale]) as name:
-
+    with tf.name_scope(
+        name or 'DynamicLinearRegressionStateSpaceModel') as name:
       dtype = dtype_util.common_dtype(
           [design_matrix, drift_scale, initial_state_prior])
 
@@ -283,8 +281,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
 
     """
 
-    with tf1.name_scope(
-        name, 'DynamicLinearRegression', values=[observed_time_series]) as name:
+    with tf.name_scope(name or 'DynamicLinearRegression') as name:
 
       dtype = dtype_util.common_dtype(
           [design_matrix, drift_scale_prior, initial_weights_prior])

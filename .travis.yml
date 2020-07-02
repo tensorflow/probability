@@ -35,13 +35,12 @@ jobs:
       script: ./testing/run_lints.sh
 
 # The below implicitly run under a build stage called "Test". The full matrix
-# of python versions x SHARD will be expanded and run in parallel.
+# of python version(s) x SHARD will be expanded and run in parallel.
 python:
-  - "2.7"
   - "3.5"
 env:
   global:
-    - NUM_SHARDS=5
+    - NUM_SHARDS=8
   matrix:
     # We shard our tests to avoid timeouts. The run_tests.sh script uses the
     # $NUM_SHARDS and $SHARD environment variables to select a partition of the
@@ -51,4 +50,7 @@ env:
     - SHARD=2
     - SHARD=3
     - SHARD=4
+    - SHARD=5
+    - SHARD=6
+    - SHARD=7
 script: ./testing/run_tests.sh

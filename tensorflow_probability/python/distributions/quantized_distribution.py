@@ -26,27 +26,12 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import tensor_util
 
 
-__all__ = ["QuantizedDistribution"]
-
-
-def _logsum_expbig_minus_expsmall(big, small):
-  """Stable evaluation of `Log[exp{big} - exp{small}]`.
-
-  To work correctly, we should have the pointwise relation:  `small <= big`.
-
-  Args:
-    big: Floating-point `Tensor`
-    small: Floating-point `Tensor` with same `dtype` as `big` and broadcastable
-      shape.
-
-  Returns:
-    `Tensor` of same `dtype` of `big` and broadcast shape.
-  """
-  with tf.name_scope("logsum_expbig_minus_expsmall"):
-    return tf.math.log1p(-tf.exp(small - big)) + big
+__all__ = ['QuantizedDistribution']
 
 
 _prob_base_note = """
@@ -198,8 +183,8 @@ class QuantizedDistribution(distributions.Distribution):
   scale = tf.math.softplus(unconstrained_scale)
 
   # Form mixture of discretized logistic distributions. Note we shift the
-  # logistic distribution by -0.5. This lets the quantization capture "rounding"
-  # intervals, `(x-0.5, x+0.5]`, and not "ceiling" intervals, `(x-1, x]`.
+  # logistic distribution by -0.5. This lets the quantization capture 'rounding'
+  # intervals, `(x-0.5, x+0.5]`, and not 'ceiling' intervals, `(x-1, x]`.
   discretized_logistic_dist = tfd.QuantizedDistribution(
       distribution=tfd.TransformedDistribution(
           distribution=tfd.Logistic(loc=loc, scale=scale),
@@ -234,7 +219,7 @@ class QuantizedDistribution(distributions.Distribution):
                low=None,
                high=None,
                validate_args=False,
-               name="QuantizedDistribution"):
+               name='QuantizedDistribution'):
     """Construct a Quantized Distribution representing `Y = ceiling(X)`.
 
     Some properties are inherited from the distribution defining `X`. Example:
@@ -245,14 +230,15 @@ class QuantizedDistribution(distributions.Distribution):
       distribution:  The base distribution class to transform. Typically an
         instance of `Distribution`.
       low: `Tensor` with same `dtype` as this distribution and shape
-        able to be added to samples. Should be a whole number. Default `None`.
-        If provided, base distribution's `prob` should be defined at
+        that broadcasts to that of samples but does not result in additional
+        batch dimensions after broadcasting. Should be a whole number. Default
+        `None`. If provided, base distribution's `prob` should be defined at
         `low`.
       high: `Tensor` with same `dtype` as this distribution and shape
-        able to be added to samples. Should be a whole number. Default `None`.
-        If provided, base distribution's `prob` should be defined at
-        `high - 1`.
-        `high` must be strictly greater than `low`.
+        that broadcasts to that of samples but does not result in additional
+        batch dimensions after broadcasting. Should be a whole number. Default
+        `None`. If provided, base distribution's `prob` should be defined at
+        `high - 1`. `high` must be strictly greater than `low`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -266,37 +252,20 @@ class QuantizedDistribution(distributions.Distribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([distribution, high, low],
+                                      dtype_hint=tf.float32)
       self._dist = distribution
-
-      if low is not None:
-        low = tf.convert_to_tensor(low, name="low", dtype=distribution.dtype)
-      if high is not None:
-        high = tf.convert_to_tensor(high, name="high", dtype=distribution.dtype)
-      dtype_util.assert_same_float_dtype(
-          tensors=[self.distribution, low, high])
-
-      checks = []
-      if validate_args and low is not None and high is not None:
-        message = "low must be strictly less than high."
-        checks.append(assert_util.assert_less(low, high, message=message))
-      self._validate_args = validate_args  # self._check_integer uses this.
-      with tf.control_dependencies(checks if validate_args else []):
-        if low is not None:
-          self._low = self._check_integer(low)
-        else:
-          self._low = None
-        if high is not None:
-          self._high = self._check_integer(high)
-        else:
-          self._high = None
-
-    super(QuantizedDistribution, self).__init__(
-        dtype=self._dist.dtype,
-        reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
-        validate_args=validate_args,
-        allow_nan_stats=self._dist.allow_nan_stats,
-        parameters=parameters,
-        name=name)
+      self._low = tensor_util.convert_nonref_to_tensor(
+          low, name='low', dtype=dtype)
+      self._high = tensor_util.convert_nonref_to_tensor(
+          high, name='high', dtype=dtype)
+      super(QuantizedDistribution, self).__init__(
+          dtype=dtype,
+          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          validate_args=validate_args,
+          allow_nan_stats=self._dist.allow_nan_stats,
+          parameters=parameters,
+          name=name)
 
   @property
   def distribution(self):
@@ -326,37 +295,47 @@ class QuantizedDistribution(distributions.Distribution):
     return self.distribution.event_shape
 
   def _sample_n(self, n, seed=None):
-    low = self._low
-    high = self._high
-    with tf.name_scope("transform"):
-      n = tf.convert_to_tensor(n, name="n")
+    with tf.name_scope('transform'):
+      n = tf.convert_to_tensor(n, name='n')
       x_samps = self.distribution.sample(n, seed=seed)
 
       # Snap values to the intervals (j - 1, j].
       result_so_far = tf.math.ceil(x_samps)
 
-      if low is not None:
+      if self._low is not None:
+        low = tf.convert_to_tensor(self._low)
         result_so_far = tf.where(result_so_far < low, low, result_so_far)
 
-      if high is not None:
+      if self._high is not None:
+        high = tf.convert_to_tensor(self._high)
         result_so_far = tf.where(result_so_far > high, high, result_so_far)
 
       return result_so_far
 
   @distribution_util.AppendDocstring(_log_prob_note)
   def _log_prob(self, y):
-    if not hasattr(self.distribution, "_log_cdf"):
+    # Changes of mass are only at the integers, so we must use tf.floor in our
+    # computation of log_cdf/log_sf.  Floor now, since
+    # tf.floor(y - 1) can incur unwanted rounding near powers of two, but
+    # tf.floor(y) - 1 can't.
+    y = tf.floor(y)
+
+    if not (hasattr(self.distribution, '_log_cdf') or
+            hasattr(self.distribution, '_cdf')):
       raise NotImplementedError(
-          "'log_prob' not implemented unless the base distribution implements "
-          "'log_cdf'")
-    y = self._check_integer(y)
+          '`log_prob` not implemented unless the base distribution implements '
+          '`log_cdf`')
     try:
       return self._log_prob_with_logsf_and_logcdf(y)
     except NotImplementedError:
       return self._log_prob_with_logcdf(y)
 
   def _log_prob_with_logcdf(self, y):
-    return _logsum_expbig_minus_expsmall(self.log_cdf(y), self.log_cdf(y - 1))
+    low = None if self._low is None else tf.convert_to_tensor(self._low)
+    high = None if self._high is None else tf.convert_to_tensor(self._high)
+    return _logsum_expbig_minus_expsmall(
+        self.log_cdf(y, low=low, high=high),
+        self.log_cdf(y - 1., low=low, high=high))
 
   def _log_prob_with_logsf_and_logcdf(self, y):
     """Compute log_prob(y) using log survival_function and cdf together."""
@@ -365,10 +344,12 @@ class QuantizedDistribution(distributions.Distribution):
     #   = Log[ exp{logsf(y - 1)} - exp{logsf(y)} ]
     # Log[ cdf(y) - cdf(y - 1) ]
     #   = Log[ exp{logcdf(y)} - exp{logcdf(y - 1)} ]
-    logsf_y = self.log_survival_function(y)
-    logsf_y_minus_1 = self.log_survival_function(y - 1)
-    logcdf_y = self.log_cdf(y)
-    logcdf_y_minus_1 = self.log_cdf(y - 1)
+    low = None if self._low is None else tf.convert_to_tensor(self._low)
+    high = None if self._high is None else tf.convert_to_tensor(self._high)
+    logsf_y = self._log_survival_function(y, low=low, high=high)
+    logsf_y_minus_1 = self._log_survival_function(y - 1., low=low, high=high)
+    logcdf_y = self._log_cdf(y, low=low, high=high)
+    logcdf_y_minus_1 = self._log_cdf(y - 1., low=low, high=high)
 
     # Important:  Here we use select in a way such that no input is inf, this
     # prevents the troublesome case where the output of select can be finite,
@@ -384,27 +365,37 @@ class QuantizedDistribution(distributions.Distribution):
 
   @distribution_util.AppendDocstring(_prob_note)
   def _prob(self, y):
-    if not hasattr(self.distribution, "_cdf"):
+    # Changes of mass are only at the integers, so we must use tf.floor in our
+    # computation of log_cdf/log_sf.  Floor now, since
+    # tf.floor(y - 1) can incur unwanted rounding near powers of two, but
+    # tf.floor(y) - 1 can't.
+    y = tf.floor(y)
+
+    if not hasattr(self.distribution, '_cdf'):
       raise NotImplementedError(
-          "'prob' not implemented unless the base distribution implements "
-          "'cdf'")
-    y = self._check_integer(y)
+          '`prob` not implemented unless the base distribution implements '
+          '`cdf`')
     try:
       return self._prob_with_sf_and_cdf(y)
     except NotImplementedError:
       return self._prob_with_cdf(y)
 
   def _prob_with_cdf(self, y):
-    return self.cdf(y) - self.cdf(y - 1)
+    low = None if self._low is None else tf.convert_to_tensor(self._low)
+    high = None if self._high is None else tf.convert_to_tensor(self._high)
+    return (self._cdf(y, low=low, high=high) -
+            self._cdf(y - 1., low=low, high=high))
 
   def _prob_with_sf_and_cdf(self, y):
     # There are two options that would be equal if we had infinite precision:
-    # sf(y - 1) - sf(y)
-    # cdf(y) - cdf(y - 1)
-    sf_y = self.survival_function(y)
-    sf_y_minus_1 = self.survival_function(y - 1)
-    cdf_y = self.cdf(y)
-    cdf_y_minus_1 = self.cdf(y - 1)
+    # sf(y - 1.) - sf(y)
+    # cdf(y) - cdf(y - 1.)
+    low = None if self._low is None else tf.convert_to_tensor(self._low)
+    high = None if self._high is None else tf.convert_to_tensor(self._high)
+    sf_y = self._survival_function(y, low=low, high=high)
+    sf_y_minus_1 = self._survival_function(y - 1., low=low, high=high)
+    cdf_y = self._cdf(y, low=low, high=high)
+    cdf_y_minus_1 = self._cdf(y - 1., low=low, high=high)
 
     # sf_prob has greater precision iff we're on the right side of the median.
     return tf.where(
@@ -413,10 +404,9 @@ class QuantizedDistribution(distributions.Distribution):
         cdf_y - cdf_y_minus_1)
 
   @distribution_util.AppendDocstring(_log_cdf_note)
-  def _log_cdf(self, y):
-    low = self._low
-    high = self._high
-
+  def _log_cdf(self, y, low=None, high=None):
+    low = self._low if low is None else low
+    high = self._high if high is None else high
     # Recall the promise:
     # cdf(y) := P[Y <= y]
     #         = 1, if y >= high,
@@ -432,19 +422,18 @@ class QuantizedDistribution(distributions.Distribution):
     # Re-define values at the cutoffs.
     if low is not None:
       result_so_far = tf.where(
-          j < low,
-          dtype_util.as_numpy_dtype(self.dtype)(-np.inf),
-          result_so_far)
+          j < low, tf.constant(-np.inf, self.dtype), result_so_far)
+
     if high is not None:
       result_so_far = tf.where(
-          j >= high, tf.zeros_like(result_so_far), result_so_far)
+          j < high, result_so_far, tf.zeros([], self.dtype))
 
     return result_so_far
 
   @distribution_util.AppendDocstring(_cdf_note)
-  def _cdf(self, y):
-    low = self._low
-    high = self._high
+  def _cdf(self, y, low=None, high=None):
+    low = self._low if low is None else low
+    high = self._high if high is None else high
 
     # Recall the promise:
     # cdf(y) := P[Y <= y]
@@ -462,17 +451,18 @@ class QuantizedDistribution(distributions.Distribution):
     # Re-define values at the cutoffs.
     if low is not None:
       result_so_far = tf.where(
-          j < low, tf.zeros_like(result_so_far), result_so_far)
+          j < low, tf.zeros([], self.dtype), result_so_far)
+
     if high is not None:
       result_so_far = tf.where(
-          j >= high, tf.ones_like(result_so_far), result_so_far)
+          j < high, result_so_far, tf.ones([], self.dtype))
 
     return result_so_far
 
   @distribution_util.AppendDocstring(_log_sf_note)
-  def _log_survival_function(self, y):
-    low = self._low
-    high = self._high
+  def _log_survival_function(self, y, low=None, high=None):
+    low = self._low if low is None else low
+    high = self._high if high is None else high
 
     # Recall the promise:
     # survival_function(y) := P[Y > y]
@@ -490,19 +480,18 @@ class QuantizedDistribution(distributions.Distribution):
     # Re-define values at the cutoffs.
     if low is not None:
       result_so_far = tf.where(
-          j < low, tf.zeros_like(result_so_far), result_so_far)
+          j < low, tf.zeros([], self.dtype), result_so_far)
+
     if high is not None:
       result_so_far = tf.where(
-          j >= high,
-          dtype_util.as_numpy_dtype(self.dtype)(-np.inf),
-          result_so_far)
+          j < high, result_so_far, tf.constant(-np.inf, self.dtype))
 
     return result_so_far
 
   @distribution_util.AppendDocstring(_sf_note)
-  def _survival_function(self, y):
-    low = self._low
-    high = self._high
+  def _survival_function(self, y, low=None, high=None):
+    low = self._low if low is None else low
+    high = self._high if high is None else high
 
     # Recall the promise:
     # survival_function(y) := P[Y > y]
@@ -519,19 +508,81 @@ class QuantizedDistribution(distributions.Distribution):
 
     # Re-define values at the cutoffs.
     if low is not None:
-      result_so_far = tf.where(j < low, tf.ones_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf.where(
+          j < low, tf.ones([], self.dtype), result_so_far)
+
     if high is not None:
-      result_so_far = tf.where(j >= high, tf.zeros_like(result_so_far),
-                               result_so_far)
+      result_so_far = tf.where(
+          j < high, result_so_far, tf.zeros([], self.dtype))
 
     return result_so_far
 
-  def _check_integer(self, value):
-    with tf.name_scope("check_integer"):
-      value = tf.convert_to_tensor(value, name="value")
-      if not self.validate_args:
-        return value
-      dependencies = [distribution_util.assert_integer_form(
-          value, message="value has non-integer components.")]
-      return distribution_util.with_dependencies(dependencies, value)
+  def _default_event_space_bijector(self):
+    return
+
+  def _parameter_control_dependencies(self, is_init):
+    if not self.validate_args:
+      return []
+
+    sample_shape = tf.concat(
+        [self._batch_shape_tensor(), self._event_shape_tensor()], axis=0)
+
+    low = None if self._low is None else tf.convert_to_tensor(self._low)
+    high = None if self._high is None else tf.convert_to_tensor(self._high)
+
+    assertions = []
+    if self._low is not None and is_init != tensor_util.is_ref(self._low):
+      low_shape = prefer_static.shape(low)
+      broadcast_shape = prefer_static.broadcast_shape(sample_shape, low_shape)
+      assertions.extend(
+          [distribution_util.assert_integer_form(
+              low, message='`low` has non-integer components.'),
+           assert_util.assert_equal(
+               tf.reduce_prod(broadcast_shape),
+               tf.reduce_prod(sample_shape),
+               message=('Shape of `low` adds extra batch dimensions to '
+                        'sample shape.'))])
+    if self._high is not None and is_init != tensor_util.is_ref(self._high):
+      high_shape = prefer_static.shape(high)
+      broadcast_shape = prefer_static.broadcast_shape(sample_shape, high_shape)
+      assertions.extend(
+          [distribution_util.assert_integer_form(
+              high, message='`high` has non-integer components.'),
+           assert_util.assert_equal(
+               tf.reduce_prod(broadcast_shape),
+               tf.reduce_prod(sample_shape),
+               message=('Shape of `high` adds extra batch dimensions to '
+                        'sample shape.'))])
+    if (self._low is not None and self._high is not None and
+        (is_init != (tensor_util.is_ref(self._low)
+                     or tensor_util.is_ref(self._high)))):
+      assertions.append(assert_util.assert_less(
+          low, high,
+          message='`low` must be strictly less than `high`.'))
+
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(distribution_util.assert_integer_form(
+        x, message='Sample has non-integer components.'))
+    return assertions
+
+
+def _logsum_expbig_minus_expsmall(big, small):
+  """Stable evaluation of `Log[exp{big} - exp{small}]`.
+
+  To work correctly, we should have the pointwise relation:  `small <= big`.
+
+  Args:
+    big: Floating-point `Tensor`
+    small: Floating-point `Tensor` with same `dtype` as `big` and broadcastable
+      shape.
+
+  Returns:
+    log_sub_exp: `Tensor` of same `dtype` of `big` and broadcast shape.
+  """
+  with tf.name_scope('logsum_expbig_minus_expsmall'):
+    return big + tf.math.log1p(-tf.exp(small - big))

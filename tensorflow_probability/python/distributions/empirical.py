@@ -25,9 +25,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.ops import gen_array_ops  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -180,16 +180,6 @@ class Empirical(distribution.Distribution):
     """Distribution parameter."""
     return self._samples
 
-  @property
-  @deprecation.deprecated(
-      '2019-11-01', 'The `num_samples` property is deprecated. Use '
-      'Empirical.compute_num_samples() instead.')
-  # Note this function has graph side-effects which is why it must be
-  # deprecated.
-  def num_samples(self):
-    """Number of samples."""
-    return self.compute_num_samples()
-
   def compute_num_samples(self):
     """Compute and return the number of values in `self.samples`.
 
@@ -215,7 +205,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(samples)[:self._samples_axis]
 
   def _batch_shape(self):
-    if self.samples.shape.rank is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[:self._samples_axis]
 
@@ -225,7 +215,7 @@ class Empirical(distribution.Distribution):
     return tf.shape(samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
-    if self.samples.shape.rank is None:
+    if tensorshape_util.rank(self.samples.shape) is None:
       return tf.TensorShape(None)
     return self.samples.shape[self._samples_axis + 1:]
 
@@ -243,8 +233,8 @@ class Empirical(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     samples = tf.convert_to_tensor(self._samples)
-    indices = tf.random.uniform([n], maxval=self._compute_num_samples(samples),
-                                dtype=tf.int32, seed=seed)
+    indices = samplers.uniform([n], maxval=self._compute_num_samples(samples),
+                               dtype=tf.int32, seed=seed)
     draws = tf.gather(samples, indices, axis=self._samples_axis)
     axes = tf.concat(
         [[self._samples_axis],
@@ -258,8 +248,7 @@ class Empirical(distribution.Distribution):
     # Samples count can vary by batch member. Use map_fn to compute mode for
     # each batch separately.
     def _get_mode(samples):
-      # TODO(b/123985779): Switch to tf.unique_with_counts_v2 when exposed
-      count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
+      count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0]).count
       return tf.argmax(count)
 
     if samples is None:
@@ -278,7 +267,9 @@ class Empirical(distribution.Distribution):
           axis=0)
       flattened_samples = tf.reshape(samples, [-1, num_samples, event_size])
 
-    indices = tf.map_fn(_get_mode, flattened_samples, dtype=tf.int64)
+    indices = tf.map_fn(_get_mode,
+                        flattened_samples,
+                        fn_output_signature=tf.int64)
     full_indices = tf.stack(
         [tf.range(tf.shape(indices)[0]),
          tf.cast(indices, tf.int32)], axis=1)
@@ -300,8 +291,7 @@ class Empirical(distribution.Distribution):
 
     # Use map_fn to compute entropy for each batch separately.
     def _get_entropy(samples):
-      # TODO(b/123985779): Switch to tf.unique_with_counts_v2 when exposed
-      count = gen_array_ops.unique_with_counts_v2(samples, axis=[0]).count
+      count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0]).count
       prob = tf.cast(count / num_samples, dtype=self.dtype)
       entropy = tf.reduce_sum(-prob * tf.math.log(prob))
       return entropy
@@ -341,14 +331,17 @@ class Empirical(distribution.Distribution):
       prob = tf.cast(prob, self.dtype)
     return prob
 
+  def _default_event_space_bijector(self):
+    return
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 
     message = 'Rank of `samples` must be at least `event_ndims + 1`.'
     if is_init:
-      samples_rank = self.samples.shape.rank
+      samples_rank = tensorshape_util.rank(self.samples.shape)
       if samples_rank is not None:
-        if self.samples.shape.rank < self._event_ndims + 1:
+        if samples_rank < self._event_ndims + 1:
           raise ValueError(message)
       elif self._validate_args:
         assertions.append(

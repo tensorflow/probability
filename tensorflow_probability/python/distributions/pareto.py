@@ -22,14 +22,19 @@ from __future__ import print_function
 import numpy as np
 
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
-
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 class Pareto(distribution.Distribution):
@@ -128,7 +133,7 @@ class Pareto(distribution.Distribution):
         [[n],
          self._batch_shape_tensor(concentration=concentration, scale=scale)],
         axis=0)
-    sampled = tf.random.uniform(shape, maxval=1., seed=seed, dtype=self.dtype)
+    sampled = samplers.uniform(shape, maxval=1., seed=seed, dtype=self.dtype)
     log_sample = tf.math.log(scale) - tf.math.log1p(-sampled) / concentration
     return tf.exp(log_sample)
 
@@ -251,6 +256,15 @@ class Pareto(distribution.Distribution):
           assert_util.assert_positive(
               self.scale, message='`scale` must be positive.'))
     return assertions
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    deferred_scale = DeferredTensor(self.scale, lambda x: x)
+    return chain_bijector.Chain([
+        shift_bijector.Shift(
+            shift=deferred_scale, validate_args=self.validate_args),
+        softplus_bijector.Softplus(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
 
 
 @kullback_leibler.RegisterKL(Pareto, Pareto)

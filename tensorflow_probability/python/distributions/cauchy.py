@@ -22,11 +22,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -175,7 +178,7 @@ class Cauchy(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     batch_shape = self._batch_shape_tensor(loc=loc, scale=scale)
     shape = tf.concat([[n], batch_shape], 0)
-    probs = tf.random.uniform(
+    probs = samplers.uniform(
         shape=shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     return self._quantile(probs, loc=loc, scale=scale)
 
@@ -229,6 +232,11 @@ class Cauchy(distribution.Distribution):
     else:
       raise ValueError('`stddev` is undefined for Cauchy distribution.')
 
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector (consider one that
+    # transforms away the heavy tails).
+    return identity_bijector.Identity(validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -237,3 +245,36 @@ class Cauchy(distribution.Distribution):
       assertions.append(assert_util.assert_positive(
           self.scale, message='Argument `scale` must be positive.'))
     return assertions
+
+
+@kullback_leibler.RegisterKL(Cauchy, Cauchy)
+def _kl_cauchy_cauchy(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b Cauchy.
+
+  Note that this KL divergence is symmetric in its arguments.
+
+  Args:
+    a: instance of a Cauchy distribution object.
+    b: instance of a Cauchy distribution object.
+    name: Name to use for created operations.
+      Default value: `None` (i.e., `'kl_cauchy_cauchy'`).
+
+  Returns:
+    kl_div: Batchwise KL(a || b)
+
+  #### References
+
+  [1] Frederic Chyzak and Frank Nielsen. A closed-form formula for the
+  Kullback-Leibler divergence between Cauchy distributions.
+  https://arxiv.org/abs/1905.10965
+  """
+  with tf.name_scope(name or 'kl_cauchy_cauchy'):
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_scale = tf.convert_to_tensor(b.scale)
+    b_loc = tf.convert_to_tensor(b.loc)
+    scale_sum_square = tf.math.square(a_scale + b_scale)
+    loc_diff_square = tf.math.squared_difference(a.loc, b_loc)
+
+    return (tf.math.log(scale_sum_square + loc_diff_square) -
+            np.log(4.) - tf.math.log(a_scale) - tf.math.log(b_scale))
+

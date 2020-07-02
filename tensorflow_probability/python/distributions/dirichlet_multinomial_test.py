@@ -23,22 +23,20 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DirichletMultinomialTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DirichletMultinomialTest(test_util.TestCase):
 
   def setUp(self):
     self._rng = np.random.RandomState(42)
 
   def testSimpleShapes(self):
     alpha = np.random.rand(3)
-    dist = tfd.DirichletMultinomial(1., alpha)
+    dist = tfd.DirichletMultinomial(1., alpha, validate_args=True)
     self.assertEqual(3, self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([3]), dist.event_shape)
@@ -47,23 +45,25 @@ class DirichletMultinomialTest(test_case.TestCase):
   def testComplexShapes(self):
     alpha = np.random.rand(3, 2, 2)
     n = np.array([[3., 2], [4, 5], [6, 7]], dtype=np.float64)
-    dist = tfd.DirichletMultinomial(n, alpha)
+    dist = tfd.DirichletMultinomial(n, alpha, validate_args=True)
     self.assertEqual(2, self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([3, 2], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([2]), dist.event_shape)
     self.assertEqual(tf.TensorShape([3, 2]), dist.batch_shape)
-    self.assertEqual(tf.TensorShape([3, 2, 2]), dist.sample().shape)
+    self.assertEqual(
+        tf.TensorShape([3, 2, 2]), dist.sample(
+            seed=test_util.test_seed()).shape)
 
   def testNproperty(self):
     alpha = [[1., 2, 3]]
     n = [[5.]]
-    dist = tfd.DirichletMultinomial(n, alpha)
+    dist = tfd.DirichletMultinomial(n, alpha, validate_args=True)
     self.assertEqual([1, 1], dist.total_count.shape)
     self.assertAllClose(n, self.evaluate(dist.total_count))
 
   def testAlphaProperty(self):
     alpha = [[1., 2, 3]]
-    dist = tfd.DirichletMultinomial(1, alpha)
+    dist = tfd.DirichletMultinomial(1, alpha, validate_args=True)
     self.assertEqual([1, 3], dist.concentration.shape)
     self.assertAllClose(alpha, self.evaluate(dist.concentration))
 
@@ -102,7 +102,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # Both zero-batches.  No broadcast
     alpha = [1., 2]
     counts = [1., 0]
-    dist = tfd.DirichletMultinomial(1., alpha)
+    dist = tfd.DirichletMultinomial(1., alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose(1 / 3., self.evaluate(pmf))
     self.assertEqual((), pmf.shape)
@@ -113,7 +113,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # Both zero-batches.  No broadcast
     alpha = [1., 2]
     counts = [3., 2]
-    dist = tfd.DirichletMultinomial(5., alpha)
+    dist = tfd.DirichletMultinomial(5., alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose(1 / 7., self.evaluate(pmf))
     self.assertEqual((), pmf.shape)
@@ -124,7 +124,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     alpha = [1., 2]
     counts = [3., 2]
     n = np.full([4, 3], 5., dtype=np.float32)
-    dist = tfd.DirichletMultinomial(n, alpha)
+    dist = tfd.DirichletMultinomial(n, alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose([[1 / 7., 1 / 7., 1 / 7.]] * 4, self.evaluate(pmf))
     self.assertEqual((4, 3), pmf.shape)
@@ -134,7 +134,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # k.
     alpha = [[1., 2]]
     counts = [[1., 0], [0., 1]]
-    dist = tfd.DirichletMultinomial([1.], alpha)
+    dist = tfd.DirichletMultinomial([1.], alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose([1 / 3., 2 / 3.], self.evaluate(pmf))
     self.assertAllEqual([2], pmf.shape)
@@ -144,7 +144,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # k.
     alpha = [1., 2]
     counts = [[1., 0], [0., 1]]
-    pmf = tfd.DirichletMultinomial(1., alpha).prob(counts)
+    pmf = tfd.DirichletMultinomial(1., alpha, validate_args=True).prob(counts)
     self.assertAllClose([1 / 3., 2 / 3.], self.evaluate(pmf))
     self.assertAllEqual([2], pmf.shape)
 
@@ -153,7 +153,8 @@ class DirichletMultinomialTest(test_case.TestCase):
     # k.
     alpha = [[1., 2], [2., 3]]
     counts = [[1., 0]]
-    pmf = tfd.DirichletMultinomial([1., 1.], alpha).prob(counts)
+    pmf = tfd.DirichletMultinomial([1., 1.], alpha,
+                                   validate_args=True).prob(counts)
     self.assertAllClose([1 / 3., 2 / 5.], self.evaluate(pmf))
     self.assertAllEqual([2], pmf.shape)
 
@@ -162,7 +163,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # k.
     alpha = [[1., 2], [2., 3]]
     counts = [1., 0]
-    pmf = tfd.DirichletMultinomial(1., alpha).prob(counts)
+    pmf = tfd.DirichletMultinomial(1., alpha, validate_args=True).prob(counts)
     self.assertAllClose([1 / 3., 2 / 5.], self.evaluate(pmf))
     self.assertAllEqual([2], pmf.shape)
 
@@ -170,7 +171,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # The probabilities of one vote falling into class k is the mean for class
     # k.
     alpha = [1., 2, 3]
-    dist = tfd.DirichletMultinomial(1., alpha)
+    dist = tfd.DirichletMultinomial(1., alpha, validate_args=True)
     mean = self.evaluate(dist.mean())
     for class_num in range(3):
       counts = np.zeros([3], dtype=np.float32)
@@ -186,8 +187,8 @@ class DirichletMultinomialTest(test_case.TestCase):
     # DirichletMultinomial(2, alpha) is twice as much as the probability of one
     # vote falling into class k for DirichletMultinomial(1, alpha)
     alpha = [1., 2, 3]
-    dist1 = tfd.DirichletMultinomial(1., alpha)
-    dist2 = tfd.DirichletMultinomial(2., alpha)
+    dist1 = tfd.DirichletMultinomial(1., alpha, validate_args=True)
+    dist2 = tfd.DirichletMultinomial(2., alpha, validate_args=True)
 
     mean1 = self.evaluate(dist1.mean())
     mean2 = self.evaluate(dist2.mean())
@@ -201,14 +202,13 @@ class DirichletMultinomialTest(test_case.TestCase):
                       [2.5, 4, 0.1]], dtype=np.float32)
     n = np.array([10, 30], dtype=np.float32)
     # batch_shape=[2], event_shape=[3]
-    dist = tfd.DirichletMultinomial(n, alpha)
+    dist = tfd.DirichletMultinomial(n, alpha, validate_args=True)
     # Sample count chosen based on what can be drawn in about 1 minute.
-    x = dist.sample(int(25e3), seed=tfp_test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+    x = dist.sample(int(25e3), seed=test_util.test_seed())
+    sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(x_centered[..., tf.newaxis],
-                               x_centered[..., tf.newaxis, :]),
+        tf.matmul(x_centered[..., tf.newaxis], x_centered[..., tf.newaxis, :]),
         axis=0)
     sample_var = tf.linalg.diag_part(sample_cov)
     sample_stddev = tf.sqrt(sample_var)
@@ -266,7 +266,7 @@ class DirichletMultinomialTest(test_case.TestCase):
 
     # ns is shape [4, 1] and alpha is shape [2].
     ns = [[2.], [3.], [4.], [5.]]
-    dist = tfd.DirichletMultinomial(ns, alpha)
+    dist = tfd.DirichletMultinomial(ns, alpha, validate_args=True)
     covariance = self.evaluate(dist.covariance())
     for i in range(len(ns)):
       n = ns[i][0]
@@ -302,7 +302,7 @@ class DirichletMultinomialTest(test_case.TestCase):
         dtype=np.float32)
 
     # ns is shape [4], and alpha is shape [4, 3].
-    dist = tfd.DirichletMultinomial(ns, alpha)
+    dist = tfd.DirichletMultinomial(ns, alpha, validate_args=True)
     covariance = dist.covariance()
     expected_covariance = shared_matrix * (
         ns * (ns + alpha_0) / (1 + alpha_0))[..., tf.newaxis, tf.newaxis]
@@ -317,8 +317,8 @@ class DirichletMultinomialTest(test_case.TestCase):
     ns = np.random.randint(low=1, high=11, size=[3, 5]).astype(np.float32)
     ns2 = np.random.randint(low=1, high=11, size=[6, 1]).astype(np.float32)
 
-    dist = tfd.DirichletMultinomial(ns, alpha)
-    dist2 = tfd.DirichletMultinomial(ns2, alpha2)
+    dist = tfd.DirichletMultinomial(ns, alpha, validate_args=True)
+    dist2 = tfd.DirichletMultinomial(ns2, alpha2, validate_args=True)
 
     covariance = dist.covariance()
     covariance2 = dist2.covariance()
@@ -330,7 +330,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # probability 1.
     alpha = [5, 0.5]
     counts = [0., 0]
-    dist = tfd.DirichletMultinomial(0., alpha)
+    dist = tfd.DirichletMultinomial(0., alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose(1.0, self.evaluate(pmf))
     self.assertEqual((), pmf.shape)
@@ -344,21 +344,21 @@ class DirichletMultinomialTest(test_case.TestCase):
     # One (three sided) coin flip.  Prob[coin 3] = 0.8.
     # Note that since it was one flip, value of tau didn't matter.
     counts = [0., 0, 1]
-    dist = tfd.DirichletMultinomial(1., alpha)
+    dist = tfd.DirichletMultinomial(1., alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose(0.8, self.evaluate(pmf), atol=1e-4)
     self.assertEqual((), pmf.shape)
 
     # Two (three sided) coin flips.  Prob[coin 3] = 0.8.
     counts = [0., 0, 2]
-    dist = tfd.DirichletMultinomial(2., alpha)
+    dist = tfd.DirichletMultinomial(2., alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose(0.8**2, self.evaluate(pmf), atol=1e-2)
     self.assertEqual((), pmf.shape)
 
     # Three (three sided) coin flips.
     counts = [1., 0, 2]
-    dist = tfd.DirichletMultinomial(3., alpha)
+    dist = tfd.DirichletMultinomial(3., alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose(3 * 0.1 * 0.8 * 0.8, self.evaluate(pmf), atol=1e-2)
     self.assertEqual((), pmf.shape)
@@ -372,7 +372,7 @@ class DirichletMultinomialTest(test_case.TestCase):
 
     # If there is only one draw, it is still a coin flip, even with small tau.
     counts = [1., 0]
-    dist = tfd.DirichletMultinomial(1., alpha)
+    dist = tfd.DirichletMultinomial(1., alpha, validate_args=True)
     pmf = dist.prob(counts)
     self.assertAllClose(0.5, self.evaluate(pmf))
     self.assertEqual((), pmf.shape)
@@ -380,7 +380,7 @@ class DirichletMultinomialTest(test_case.TestCase):
     # If there are two draws, it is much more likely that they are the same.
     counts_same = [2., 0]
     counts_different = [1, 1.]
-    dist = tfd.DirichletMultinomial(2., alpha)
+    dist = tfd.DirichletMultinomial(2., alpha, validate_args=True)
     pmf_same = dist.prob(counts_same)
     pmf_different = dist.prob(counts_different)
     self.assertLess(
@@ -397,12 +397,16 @@ class DirichletMultinomialTest(test_case.TestCase):
     self.evaluate(dist.prob(counts))  # Should not raise.
 
   def testSampleUnbiasedNonScalarBatch(self):
+    seed_stream = test_util.test_seed_stream()
+    concentration = 1. + 2. * tf.random.uniform(
+        shape=[4, 3, 2], dtype=np.float32, seed=seed_stream())
     dist = tfd.DirichletMultinomial(
         total_count=5.,
-        concentration=1. + 2. * self._rng.rand(4, 3, 2).astype(np.float32))
-    n = int(3e3)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+        concentration=concentration,
+        validate_args=True)
+    n = int(5e3)
+    x = dist.sample(n, seed=seed_stream())
+    sample_mean = tf.reduce_mean(x, axis=0)
     # Cyclically rotate event dims left.
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
     sample_covariance = tf.matmul(
@@ -425,14 +429,18 @@ class DirichletMultinomialTest(test_case.TestCase):
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
 
   def testSampleUnbiasedScalarBatch(self):
+    seed_stream = test_util.test_seed_stream()
+    concentration = 1. + 2. * tf.random.uniform(
+        shape=[4], dtype=np.float32, seed=seed_stream())
     dist = tfd.DirichletMultinomial(
         total_count=5.,
-        concentration=1. + 2. * self._rng.rand(4).astype(np.float32))
-    n = int(5e3)
-    x = dist.sample(n, seed=tfp_test_util.test_seed())
-    sample_mean = tf.reduce_mean(input_tensor=x, axis=0)
+        concentration=concentration,
+        validate_args=True)
+    n = int(1e4)
+    x = dist.sample(n, seed=seed_stream())
+    sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
-    sample_covariance = tf.matmul(
+    sample_covariance = tf.linalg.matmul(
         x_centered, x_centered, adjoint_a=True) / n
     [
         sample_mean_,
@@ -446,10 +454,10 @@ class DirichletMultinomialTest(test_case.TestCase):
         dist.covariance(),
     ])
     self.assertAllEqual([4], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.20)
+    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.25)
     self.assertAllEqual([4, 4], sample_covariance.shape)
     self.assertAllClose(
-        actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
+        actual_covariance_, sample_covariance_, atol=0., rtol=0.25)
 
   def testNotReparameterized(self):
     if tf1.control_flow_v2_enabled():
@@ -457,14 +465,26 @@ class DirichletMultinomialTest(test_case.TestCase):
     total_count = tf.constant(5.0)
     concentration = tf.constant([0.1, 0.1, 0.1])
     _, [grad_total_count, grad_concentration] = tfp.math.value_and_gradient(
-        lambda n, c: tfd.DirichletMultinomial(n, c).sample(100),
-        [total_count, concentration])
+        lambda n, c: tfd.DirichletMultinomial(n, c, validate_args=True).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()), [total_count, concentration])
     self.assertIsNone(grad_total_count)
     self.assertIsNone(grad_concentration)
 
+  def testSamplesHaveCorrectTotalCounts(self):
+    seed_stream = test_util.test_seed_stream()
+    concentration = 1. + 2. * tf.random.uniform(
+        shape=[4], dtype=np.float32, seed=seed_stream())
+    total_count = tf.constant(list(range(int(1e4))), dtype=np.float32)
+    dist = tfd.DirichletMultinomial(
+        total_count=total_count,
+        concentration=concentration,
+        validate_args=True)
+    x = dist.sample(seed=seed_stream())
+    self.assertAllEqual(tf.reduce_sum(x, axis=-1), total_count)
 
-@test_util.run_all_in_graph_and_eager_modes
-class DirichletMultinomialFromVariableTest(test_case.TestCase):
+
+@test_util.test_all_tf_execution_regimes
+class DirichletMultinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionCategoricalEventShape(self):
     total_count = tf.constant(10.0, dtype=tf.float16)
@@ -479,9 +499,7 @@ class DirichletMultinomialFromVariableTest(test_case.TestCase):
     total_count = tf.Variable(-1.0)
     concentration = tf.constant([1., 1., 1.])
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'must be non-negative'):
+    with self.assertRaisesOpError('must be non-negative'):
       d = tfd.DirichletMultinomial(total_count, concentration,
                                    validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
@@ -496,18 +514,14 @@ class DirichletMultinomialFromVariableTest(test_case.TestCase):
     self.evaluate(d.mean())
     self.evaluate(total_count.assign(-1.0))
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'must be non-negative'):
+    with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(d.mean())
 
   def testAssertionIntegerFormTotalCount(self):
     total_count = tf.Variable(0.5)
     concentration = tf.constant([1., 1., 1.])
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'cannot contain fractional components'):
+    with self.assertRaisesOpError('cannot contain fractional components'):
       d = tfd.DirichletMultinomial(total_count, concentration,
                                    validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
@@ -522,18 +536,14 @@ class DirichletMultinomialFromVariableTest(test_case.TestCase):
     self.evaluate(d.mean())
     self.evaluate(total_count.assign(0.5))
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'cannot contain fractional components'):
+    with self.assertRaisesOpError('cannot contain fractional components'):
       self.evaluate(d.mean())
 
   def testAssertionPositiveConcentration(self):
     total_count = tf.constant(10.0)
     concentration = tf.Variable([1., 1., -1.])
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'Concentration parameter must be positive.'):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       d = tfd.DirichletMultinomial(total_count, concentration,
                                    validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
@@ -549,9 +559,7 @@ class DirichletMultinomialFromVariableTest(test_case.TestCase):
     self.evaluate(d.mean())
     self.evaluate(concentration.assign([1., 1., -1.]))
 
-    with self.assertRaisesRegexp(
-        tf.errors.InvalidArgumentError,
-        'Concentration parameter must be positive.'):
+    with self.assertRaisesOpError('Concentration parameter must be positive.'):
       self.evaluate(d.mean())
 
 

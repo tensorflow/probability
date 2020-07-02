@@ -25,12 +25,14 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class Log1pSquareTest32(test_case.TestCase, parameterized.TestCase):
+NUMPY_MODE = False
+
+
+@test_util.test_all_tf_execution_regimes
+class Log1pSquareTest32(test_util.TestCase):
 
   dtype = tf.float32
 
@@ -53,19 +55,23 @@ class Log1pSquareTest32(test_case.TestCase, parameterized.TestCase):
   # pyformat: enable
   def test_log1psquare(self, x, expected_y, expected_dydx):
     x = tf.convert_to_tensor(x, dtype=self.dtype)
-    y, dydx = tfp.math.value_and_gradient(tfp.math.log1psquare, x)
+    if NUMPY_MODE:
+      y = tfp.math.log1psquare(x)
+      dydx, expected_dydx = np.zeros([]), np.zeros([])
+    else:
+      y, dydx = tfp.math.value_and_gradient(tfp.math.log1psquare, x)
     y_, dydx_ = self.evaluate([y, dydx])
     self.assertAllClose(expected_y, y_)
     self.assertAllClose(expected_dydx, dydx_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class Log1pSquareTest64(Log1pSquareTest32):
   dtype = tf.float64
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ClipByValuePreserveGrad32(test_util.TestCase):
 
   dtype = tf.float32
 
@@ -80,6 +86,7 @@ class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
   )
   # pylint: enable=bad-whitespace
   # pyformat: enable
+  @test_util.numpy_disable_gradient_test
   def test_clip_by_value_preserve_grad(self, x, lo, hi, expected_y):
     expected_dydx = np.ones_like(x)
     x = tf.convert_to_tensor(x, dtype=self.dtype)
@@ -90,7 +97,7 @@ class ClipByValuePreserveGrad32(test_case.TestCase, parameterized.TestCase):
     self.assertAllClose(expected_dydx, dydx_)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ClipByValuePreserveGrad64(ClipByValuePreserveGrad32):
 
   dtype = tf.float64

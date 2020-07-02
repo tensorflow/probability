@@ -31,13 +31,14 @@ _trace_loss = lambda loss, grads, variables: loss
 _reparameterized_elbo = functools.partial(
     csiszar_divergence.monte_carlo_variational_loss,
     discrepancy_fn=csiszar_divergence.kl_reverse,
-    use_reparametrization=True)
+    use_reparameterization=True)
 
 
 def fit_surrogate_posterior(target_log_prob_fn,
                             surrogate_posterior,
                             optimizer,
                             num_steps,
+                            convergence_criterion=None,
                             trace_fn=_trace_loss,
                             variational_loss_fn=_reparameterized_elbo,
                             sample_size=1,
@@ -78,23 +79,32 @@ def fit_surrogate_posterior(target_log_prob_fn,
       `tfd.JointDistribution`). Crucially, the distribution's `log_prob` and
       (if reparameterized) `sample` methods must directly invoke all ops
       that generate gradients to the underlying variables. One way to ensure
-      this is to use `tfp.util.DeferredTensor` to represent any parameters
-      defined as transformations of unconstrained variables, so that the
-      transformations execute at runtime instead of at distribution creation.
+      this is to use `tfp.util.TransformedVariable` and/or
+      `tfp.util.DeferredTensor` to represent any parameters defined as
+      transformations of unconstrained variables, so that the transformations
+      execute at runtime instead of at distribution creation.
     optimizer: Optimizer instance to use. This may be a TF1-style
       `tf.train.Optimizer`, TF2-style `tf.optimizers.Optimizer`, or any Python
       object that implements `optimizer.apply_gradients(grads_and_vars)`.
     num_steps: Python `int` number of steps to run the optimizer.
-    trace_fn: Python callable with signature `state = trace_fn(
-      loss, grads, variables)`, where `state` may be a `Tensor` or nested
-      structure of `Tensor`s. The state values are accumulated (by `tf.scan`)
-      and returned. The default `trace_fn` simply returns the loss, but in
-      general can depend on the gradients and variables (if
-      `trainable_variables` is not `None` then `variables==trainable_variables`;
-      otherwise it is the list of all variables accessed during execution of
-      `loss_fn()`), as well as any other quantities captured in the closure of
-      `trace_fn`, for example, statistics of a variational distribution.
-      Default value: `lambda loss, grads, variables: loss`.
+    convergence_criterion: Optional instance of
+      `tfp.optimizer.convergence_criteria.ConvergenceCriterion`
+      representing a criterion for detecting convergence. If `None`,
+      the optimization will run for `num_steps` steps, otherwise, it will run
+      for at *most* `num_steps` steps, as determined by the provided criterion.
+      Default value: `None`.
+    trace_fn: Python callable with signature `traced_values = trace_fn(
+      traceable_quantities)`, where the argument is an instance of
+      `tfp.math.MinimizeTraceableQuantities` and the returned `traced_values`
+      may be a `Tensor` or nested structure of `Tensor`s. The traced values are
+      stacked across steps and returned.
+      The default `trace_fn` simply returns the loss. In general, trace
+      functions may also examine the gradients, values of parameters,
+      the state propagated by the specified `convergence_criterion`, if any (if
+      no convergence criterion is specified, this will be `None`),
+      as well as any other quantities captured in the closure of `trace_fn`,
+      for example, statistics of a variational distribution.
+      Default value: `lambda traceable_quantities: traceable_quantities.loss`.
     variational_loss_fn: Python `callable` with signature
       `loss = variational_loss_fn(target_log_prob_fn, surrogate_posterior,
        sample_size, seed)` defining a variational loss function. The default is
@@ -146,9 +156,9 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   ```python
   q_z = tfd.Normal(loc=tf.Variable(0., name='q_z_loc'),
-                   scale=tfp.util.DeferredTensor(
-                     tf.nn.softplus,
-                     tf.Variable(0., name='q_z_scale')), name='q_z')
+                   scale=tfp.util.TransformedVariable(1., tfb.Softplus(),
+                                                      name='q_z_scale'),
+                   name='q_z')
   losses = tfp.vi.fit_surrogate_posterior(
       conditioned_log_prob,
       surrogate_posterior=q,
@@ -158,15 +168,15 @@ def fit_surrogate_posterior(target_log_prob_fn,
   ```
 
   Note that we ensure positive scale by using a softplus transformation of
-  the underlying variable, invoked via `DeferredTensor`. Deferring the
-  transformation causes it to be performed at runtime of the distribution's
+  the underlying variable, invoked via `TransformedVariable`. Deferring the
+  transformation causes it to be applied upon evaluation of the distribution's
   methods, creating a gradient to the underlying variable. If we
   had simply specified `scale=tf.nn.softplus(scale_var)` directly,
-  without the `DeferredTensor`, fitting would fail because calls to
+  without the `TransformedVariable`, fitting would fail because calls to
   `q.log_prob` and `q.sample` would never access the underlying variable. In
   general, transformations of trainable parameters must be deferred to runtime,
-  using either `DeferredTensor` or by the callable mechanisms available in
-  joint distribution classes (demonstrated below).
+  using either `TransformedVariable` or `DeferredTensor` or by the callable
+  mechanisms available in joint distribution classes (demonstrated below).
 
   **Custom loss function**. Suppose we prefer to fit the same model using
     the forward KL divergence `KL[p||q]`. We can pass a custom loss function:
@@ -174,7 +184,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   ```python
     import functools
     forward_kl_loss = functools.partial(
-      tfp.vi.monte_carlo_csiszar_f_divergence, tfp.vi.kl_forward)
+      tfp.vi.monte_carlo_variational_loss, discrepancy_fn=tfp.vi.kl_forward)
     losses = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
         surrogate_posterior=q,
@@ -200,10 +210,10 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   ```python
   # Toy 1D data.
-  index_points = np.array(
-      [-10., -7.2, -4., -1., 0.8, 4., 6.2, 9.]).astype(np.float32)
+  index_points = np.array([-10., -7.2, -4., -0.1, 0.1, 4., 6.2, 9.]).reshape(
+      [-1, 1]).astype(np.float32)
   observed_counts = np.array(
-      [100, 90, 60, 1, 4, 37, 55, 42]).astype(np.float32)
+      [100, 90, 60, 13, 18, 37, 55, 42]).astype(np.float32)
 
   # Trainable GP hyperparameters.
   kernel_log_amplitude = tf.Variable(0., name='kernel_log_amplitude')
@@ -214,7 +224,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   # Generative model.
   Root = tfd.JointDistributionCoroutine.Root
   def model_fn():
-    kernel = tfp.positive_semidefinite_kernels.ExponentiatedQuadratic(
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude=tf.exp(kernel_log_amplitude),
         length_scale=tf.exp(kernel_log_lengthscale))
     latent_log_rates = yield Root(tfd.GaussianProcess(
@@ -240,13 +250,15 @@ def fit_surrogate_posterior(target_log_prob_fn,
     latent_rates = yield Root(tfd.Independent(
       tfd.Normal(loc=logit_locs, scale=tf.nn.softplus(logit_softplus_scales)),
       reinterpreted_batch_ndims=1))
-    y = yield tfd.VectorDeterministic(y)
+    y = yield tfd.VectorDeterministic(observed_counts)
   q = tfd.JointDistributionCoroutine(variational_model_fn)
   ```
 
   Note that here we could apply transforms to variables without using
-  `DeferredTensor` because `JointDistributionCoroutine` inherently defers
-  execution of its callable argument. As long as variables are transformed
+  `DeferredTensor` because the `JointDistributionCoroutine` argument is a
+  function, i.e., executed "on demand." (The same is true when
+  distribution-making functions are supplied to `JointDistributionSequential`
+  and `JointDistributionNamed`. That is, as long as variables are transformed
   *within* the callable, they will appear on the gradient tape when
   `q.log_prob()` or `q.sample()` are invoked.
 
@@ -283,6 +295,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
   return tfp_math.minimize(complete_variational_loss_fn,
                            num_steps=num_steps,
                            optimizer=optimizer,
+                           convergence_criterion=convergence_criterion,
                            trace_fn=trace_fn,
                            trainable_variables=trainable_variables,
                            name=name)

@@ -15,19 +15,20 @@
 # Description:
 #   Models for CIFAR10 BNN example
 
-licenses(["notice"])  # Apache 2.0
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
 )
 
+licenses(["notice"])  # Apache 2.0
+
 exports_files(["LICENSE"])
 
 py_library(
     name = "models",
     srcs = ["__init__.py"],
+    srcs_version = "PY3",
     deps = [
         ":bayesian_resnet",
         ":bayesian_vgg",
@@ -37,6 +38,7 @@ py_library(
 py_library(
     name = "bayesian_resnet",
     srcs = ["bayesian_resnet.py"],
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -46,6 +48,7 @@ py_library(
 py_library(
     name = "bayesian_vgg",
     srcs = ["bayesian_vgg.py"],
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

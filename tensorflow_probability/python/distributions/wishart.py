@@ -23,21 +23,28 @@ import math
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
+from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.bijectors import transform_diagonal as transform_diagonal_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
-    "Wishart",
+    'WishartLinearOperator',
+    'WishartTriL',
 ]
 
 
-class _WishartLinearOperator(distribution.Distribution):
+class WishartLinearOperator(distribution.Distribution):
   """The matrix Wishart distribution on positive definite matrices.
 
   This distribution is defined by a scalar number of degrees of freedom `df` and
@@ -68,7 +75,7 @@ class _WishartLinearOperator(distribution.Distribution):
 
   def __init__(self,
                df,
-               scale_operator,
+               scale,
                input_output_cholesky=False,
                validate_args=False,
                allow_nan_stats=True,
@@ -78,7 +85,7 @@ class _WishartLinearOperator(distribution.Distribution):
     Args:
       df: `float` or `double` tensor, the degrees of freedom of the
         distribution(s). `df` must be greater than or equal to `k`.
-      scale_operator: `float` or `double` instance of `LinearOperator`.
+      scale: `float` or `double` instance of `LinearOperator`.
       input_output_cholesky: Python `bool`. If `True`, functions whose input or
         output have the semantics of samples assume inputs are in Cholesky form
         and return outputs in Cholesky form. In particular, if this flag is
@@ -95,7 +102,7 @@ class _WishartLinearOperator(distribution.Distribution):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -109,130 +116,89 @@ class _WishartLinearOperator(distribution.Distribution):
     parameters = dict(locals())
     self._input_output_cholesky = input_output_cholesky
     with tf.name_scope(name) as name:
-      with tf.name_scope("init"):
-        if not dtype_util.is_floating(scale_operator.dtype):
-          raise TypeError(
-              "scale_operator.dtype=%s is not a floating-point type" %
-              scale_operator.dtype)
-        if not scale_operator.is_square:
-          print(scale_operator.to_dense().eval())
-          raise ValueError("scale_operator must be square.")
+      dtype = dtype_util.common_dtype([scale, df], dtype_hint=tf.float32)
+      self._scale = scale
+      self._df = tensor_util.convert_nonref_to_tensor(
+          df, name='df', dtype=dtype)
 
-        self._scale_operator = scale_operator
-        self._df = tf.convert_to_tensor(
-            df, dtype=scale_operator.dtype, name="df")
-        dtype_util.assert_same_float_dtype([self._df, self._scale_operator])
-        if tf.compat.dimension_value(self._scale_operator.shape[-1]) is None:
-          self._dimension = tf.cast(
-              self._scale_operator.domain_dimension_tensor(),
-              dtype=self._scale_operator.dtype,
-              name="dimension")
-        else:
-          self._dimension = tf.convert_to_tensor(
-              tf.compat.dimension_value(self._scale_operator.shape[-1]),
-              dtype=self._scale_operator.dtype,
-              name="dimension")
-        df_val = tf.get_static_value(self._df)
-        dim_val = tf.get_static_value(self._dimension)
-        if df_val is not None and dim_val is not None:
-          df_val = np.asarray(df_val)
-          if not df_val.shape:
-            df_val = [df_val]
-          if np.any(df_val < dim_val):
-            raise ValueError(
-                "Degrees of freedom (df = %s) cannot be less than "
-                "dimension of scale matrix (scale.dimension = %s)"
-                % (df_val, dim_val))
-        elif validate_args:
-          assertions = assert_util.assert_less_equal(
-              self._dimension,
-              self._df,
-              message=("Degrees of freedom (df = %s) cannot be "
-                       "less than dimension of scale matrix "
-                       "(scale.dimension = %s)" % (self._dimension, self._df)))
-          self._df = distribution_util.with_dependencies(
-              [assertions], self._df)
-    super(_WishartLinearOperator, self).__init__(
-        dtype=self._scale_operator.dtype,
-        validate_args=validate_args,
-        allow_nan_stats=allow_nan_stats,
-        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
-        parameters=parameters,
-        name=name)
+      super(WishartLinearOperator, self).__init__(
+          dtype=dtype,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+          parameters=parameters,
+          name=name)
 
   @property
   def df(self):
     """Wishart distribution degree(s) of freedom."""
     return self._df
 
-  def _square_scale_operator(self):
-    return self.scale_operator.matmul(
-        self.scale_operator.to_dense(), adjoint_arg=True)
+  def _square_scale(self):
+    scale = self._scale
+    return scale.matmul(scale, adjoint_arg=True).to_dense()
 
-  def scale(self):
+  def scale_matrix(self):
     """Wishart distribution scale matrix."""
-    if self._input_output_cholesky:
-      return self.scale_operator.to_dense()
+    if self.input_output_cholesky:
+      return self._scale.to_dense()
     else:
-      return self._square_scale_operator()
+      return self._square_scale()
 
   @property
-  def scale_operator(self):
+  def scale(self):
     """Wishart distribution scale matrix as an Linear Operator."""
-    return self._scale_operator
+    return self._scale
 
   @property
   def input_output_cholesky(self):
     """Boolean indicating if `Tensor` input/outputs are Cholesky factorized."""
     return self._input_output_cholesky
 
-  @property
-  def dimension(self):
-    """Dimension of underlying vector space. The `p` in `R^(p*p)`."""
-    return self._dimension
-
   def _event_shape_tensor(self):
-    dimension = self.scale_operator.domain_dimension_tensor()
+    dimension = self._scale.domain_dimension_tensor()
     return tf.stack([dimension, dimension])
 
   def _event_shape(self):
-    dimension = self.scale_operator.domain_dimension
+    dimension = self._scale.domain_dimension
     return tf.TensorShape([dimension, dimension])
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, df=None):
+    df = tf.convert_to_tensor(self.df) if df is None else df
     return tf.broadcast_dynamic_shape(
-        tf.shape(self.df), self.scale_operator.batch_shape_tensor())
+        tf.shape(df), self._scale.batch_shape_tensor())
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
-        self.df.shape, self.scale_operator.batch_shape)
+        self.df.shape, self._scale.batch_shape)
 
   def _sample_n(self, n, seed):
-    batch_shape = self.batch_shape_tensor()
-    event_shape = self.event_shape_tensor()
+    df = tf.convert_to_tensor(self.df)
+    batch_shape = self._batch_shape_tensor(df)
+    event_shape = self._event_shape_tensor()
     batch_ndims = tf.shape(batch_shape)[0]
 
     ndims = batch_ndims + 3  # sample_ndims=1, event_ndims=2
     shape = tf.concat([[n], batch_shape, event_shape], 0)
-    stream = SeedStream(seed, salt="Wishart")
+    normal_seed, gamma_seed = samplers.split_seed(seed, salt='Wishart')
 
     # Complexity: O(nbk**2)
-    x = tf.random.normal(
-        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=stream())
+    x = samplers.normal(
+        shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=normal_seed)
 
     # Complexity: O(nbk)
-    # This parametrization is equivalent to Chi2, i.e.,
+    # This parameterization is equivalent to Chi2, i.e.,
     # ChiSquared(k) == Gamma(alpha=k/2, beta=1/2)
-    expanded_df = self.df * tf.ones(
-        self.scale_operator.batch_shape_tensor(),
-        dtype=dtype_util.base_dtype(self.df.dtype))
+    expanded_df = df * tf.ones(
+        self._scale.batch_shape_tensor(),
+        dtype=dtype_util.base_dtype(df.dtype))
 
-    g = tf.random.gamma(
+    g = samplers.gamma(
         shape=[n],
-        alpha=self._multi_gamma_sequence(0.5 * expanded_df, self.dimension),
+        alpha=self._multi_gamma_sequence(0.5 * expanded_df, self._dimension()),
         beta=0.5,
         dtype=self.dtype,
-        seed=stream())
+        seed=gamma_seed)
 
     # Complexity: O(nbk**2)
     x = tf.linalg.band_part(x, -1, 0)  # Tri-lower.
@@ -250,7 +216,7 @@ class _WishartLinearOperator(distribution.Distribution):
     # Complexity: O(nbM) where M is the complexity of the operator solving a
     # vector system. For LinearOperatorLowerTriangular, each matmul is O(k^3) so
     # this step has complexity O(nbk^3).
-    x = self.scale_operator.matmul(x)
+    x = self._scale.matmul(x)
 
     # Undo make batch-op ready.
     # Complexity: O(nbk**2)
@@ -272,8 +238,10 @@ class _WishartLinearOperator(distribution.Distribution):
       # Complexity: O(nbk**3)
       x_sqrt = tf.linalg.cholesky(x)
 
-    batch_shape = self.batch_shape_tensor()
-    event_shape = self.event_shape_tensor()
+    df = tf.convert_to_tensor(self.df)
+    batch_shape = self._batch_shape_tensor(df)
+    event_shape = self._event_shape_tensor()
+    dimension = self._dimension()
     x_ndims = tf.rank(x_sqrt)
     num_singleton_axes_to_prepend = (
         tf.maximum(tf.size(batch_shape) + 2, x_ndims) - x_ndims)
@@ -304,18 +272,18 @@ class _WishartLinearOperator(distribution.Distribution):
                       tf.range(0, sample_ndims)], 0)
     scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
     last_dim_size = (
-        tf.cast(self.dimension, dtype=tf.int32) *
+        tf.cast(dimension, dtype=tf.int32) *
         tf.reduce_prod(x_with_prepended_singletons_shape[:sample_ndims]))
     shape = tf.concat(
         [x_with_prepended_singletons_shape[sample_ndims:-2],
-         [tf.cast(self.dimension, dtype=tf.int32), last_dim_size]],
+         [tf.cast(dimension, dtype=tf.int32), last_dim_size]],
         axis=0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
 
     # Complexity: O(nbM*k) where M is the complexity of the operator solving a
     # vector system. For LinearOperatorLowerTriangular, each solve is O(k**2) so
     # this step has complexity O(nbk^3).
-    scale_sqrt_inv_x_sqrt = self.scale_operator.solve(scale_sqrt_inv_x_sqrt)
+    scale_sqrt_inv_x_sqrt = self._scale.solve(scale_sqrt_inv_x_sqrt)
 
     # Undo make batch-op ready.
     # Complexity: O(nbk**2)
@@ -344,9 +312,9 @@ class _WishartLinearOperator(distribution.Distribution):
         tf.math.log(tf.linalg.diag_part(x_sqrt)), axis=[-1])
 
     # Complexity: O(nbk**2)
-    log_prob = ((self.df - self.dimension - 1.) * half_log_det_x -
+    log_prob = ((df - dimension - 1.) * half_log_det_x -
                 0.5 * trace_scale_inv_x -
-                self.log_normalization())
+                self._log_normalization(df=df, scale=self._scale))
 
     # Set shape hints.
     # Try to merge what we know from the input x with what we know from the
@@ -359,88 +327,164 @@ class _WishartLinearOperator(distribution.Distribution):
 
     return log_prob
 
-  def _prob(self, x):
-    return tf.exp(self._log_prob(x))
-
   def _entropy(self):
-    half_dp1 = 0.5 * self.dimension + 0.5
-    half_df = 0.5 * self.df
-    return (self.dimension * (half_df + half_dp1 * math.log(2.)) +
-            2 * half_dp1 * self.scale_operator.log_abs_determinant() +
-            self._multi_lgamma(half_df, self.dimension) +
-            (half_dp1 - half_df) * self._multi_digamma(half_df, self.dimension))
+    dimension = self._dimension()
+    half_dp1 = 0.5 * dimension + 0.5
+    df = tf.convert_to_tensor(self.df)
+    half_df = 0.5 * df
+    return (dimension * (half_df + half_dp1 * math.log(2.)) +
+            2 * half_dp1 * self._scale.log_abs_determinant() +
+            self._multi_lgamma(half_df, dimension) +
+            (half_dp1 - half_df) * self._multi_digamma(half_df, dimension))
 
   def _mean(self):
     # Because df is a scalar, we need to expand dimensions to match
-    # scale_operator. We use ellipses notation (...) to select all dimensions
+    # scale. We use ellipses notation (...) to select all dimensions
     # and add two dimensions to the end.
-    df = self.df[..., tf.newaxis, tf.newaxis]
+    df = tf.convert_to_tensor(self.df)
+    df = df[..., tf.newaxis, tf.newaxis]
     if self.input_output_cholesky:
-      return tf.sqrt(df) * self.scale_operator.to_dense()
-    return df * self._square_scale_operator()
+      return tf.sqrt(df) * self._scale.to_dense()
+    return df * self._square_scale()
 
   def _variance(self):
     # Because df is a scalar, we need to expand dimensions to match
-    # scale_operator. We use ellipses notation (...) to select all dimensions
+    # scale. We use ellipses notation (...) to select all dimensions
     # and add two dimensions to the end.
-    df = self.df[..., tf.newaxis, tf.newaxis]
-    x = tf.sqrt(df) * self._square_scale_operator()
-    d = tf.expand_dims(tf.linalg.diag_part(x), -1)
-    v = tf.square(x) + tf.matmul(d, d, adjoint_b=True)
+    df = tf.convert_to_tensor(self.df)
+    df = df[..., tf.newaxis, tf.newaxis]
+    x = self._scale.matmul(self._scale, adjoint_arg=True)
+    d = x.diag_part()[..., tf.newaxis]
+    v = df * (tf.square(x.to_dense()) + tf.matmul(d, d, adjoint_b=True))
     return v
 
   def _mode(self):
-    s = self.df - self.dimension - 1.
+    df = tf.convert_to_tensor(self.df)
+    df = df[..., tf.newaxis, tf.newaxis]
+    s = df - self._dimension() - 1.
     s = tf.where(
         s < 0.,
         dtype_util.as_numpy_dtype(s.dtype)(np.nan), s)
     if self.input_output_cholesky:
-      return tf.sqrt(s) * self.scale_operator.to_dense()
-    return s * self._square_scale_operator()
+      return tf.sqrt(s) * self._scale.to_dense()
+    return s * self._square_scale()
 
-  def mean_log_det(self, name="mean_log_det"):
+  def mean_log_det(self, name='mean_log_det'):
     """Computes E[log(det(X))] under this Wishart distribution."""
     with self._name_and_control_scope(name):
-      return (self._multi_digamma(0.5 * self.df, self.dimension) +
-              self.dimension * math.log(2.) +
-              2 * self.scale_operator.log_abs_determinant())
+      dimension = self._dimension()
+      return (self._multi_digamma(0.5 * self.df, dimension) +
+              dimension * math.log(2.) +
+              2 * self._scale.log_abs_determinant())
 
-  def log_normalization(self, name="log_normalization"):
+  def _log_normalization(self, df=None, scale=None, name='log_normalization'):
+    df = tf.convert_to_tensor(self.df) if df is None else df
+    scale = self._scale if scale is None else scale
+    dimension = self._dimension()
+    return (df * scale.log_abs_determinant() +
+            0.5 * df * dimension * math.log(2.) +
+            self._multi_lgamma(0.5 * df, dimension))
+
+  def log_normalization(self, df=None, name='log_normalization'):
     """Computes the log normalizing constant, log(Z)."""
     with self._name_and_control_scope(name):
-      return (self.df * self.scale_operator.log_abs_determinant() +
-              0.5 * self.df * self.dimension * math.log(2.) +
-              self._multi_lgamma(0.5 * self.df, self.dimension))
+      return self._log_normalization(df=df, name=name)
 
-  def _multi_gamma_sequence(self, a, p, name="multi_gamma_sequence"):
+  def _multi_gamma_sequence(self, a, p, name='multi_gamma_sequence'):
     """Creates sequence used in multivariate (di)gamma; shape = shape(a)+[p]."""
-    with self._name_and_control_scope(name):
+    with tf.name_scope(name):
       # Linspace only takes scalars, so we'll add in the offset afterwards.
       seq = tf.linspace(
-          tf.constant(0., dtype=self.dtype), 0.5 - 0.5 * p, tf.cast(
-              p, tf.int32))
-      return seq + tf.expand_dims(a, [-1])
+          tf.constant(0., dtype=self.dtype),
+          0.5 - 0.5 * p, tf.cast(p, tf.int32))
+      return seq + a[..., tf.newaxis]
 
-  def _multi_lgamma(self, a, p, name="multi_lgamma"):
+  def _multi_lgamma(self, a, p, name='multi_lgamma'):
     """Computes the log multivariate gamma function; log(Gamma_p(a))."""
-    with self._name_and_control_scope(name):
+    with tf.name_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return (0.25 * p * (p - 1.) * math.log(math.pi) +
               tf.reduce_sum(tf.math.lgamma(seq), axis=[-1]))
 
-  def _multi_digamma(self, a, p, name="multi_digamma"):
+  def _multi_digamma(self, a, p, name='multi_digamma'):
     """Computes the multivariate digamma function; Psi_p(a)."""
-    with self._name_and_control_scope(name):
+    with tf.name_scope(name):
       seq = self._multi_gamma_sequence(a, p)
       return tf.reduce_sum(tf.math.digamma(seq), axis=[-1])
 
+  def _dimension(self):
+    """Scalar dimension of underlying vector space."""
+    with tf.name_scope('dimension'):
+      if tf.compat.dimension_value(self._scale.shape[-1]) is None:
+        return tf.cast(
+            self._scale.domain_dimension_tensor(),
+            dtype=self._scale.dtype,
+            name='dimension')
+      else:
+        return tf.convert_to_tensor(
+            tf.compat.dimension_value(self._scale.shape[-1]),
+            dtype=self._scale.dtype,
+            name='dimension')
 
-class Wishart(_WishartLinearOperator):
-  """The matrix Wishart distribution on positive definite matrices.
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    tril_bijector = chain_bijector.Chain([
+        transform_diagonal_bijector.TransformDiagonal(
+            diag_bijector=softplus_bijector.Softplus(
+                validate_args=self.validate_args),
+            validate_args=self.validate_args),
+        fill_scale_tril_bijector.FillScaleTriL(
+            validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
+    if self.input_output_cholesky:
+      return tril_bijector
+    return chain_bijector.Chain([
+        cholesky_outer_product_bijector.CholeskyOuterProduct(
+            validate_args=self.validate_args),
+        tril_bijector
+    ], validate_args=self.validate_args)
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+    if is_init:
+      if not dtype_util.is_floating(self._scale.dtype):
+        raise TypeError(
+            'scale.dtype={} is not a floating-point type.'.format(
+                self._scale.dtype))
+      if not self._scale.is_square:
+        raise ValueError('scale must be square.')
+      dtype_util.assert_same_float_dtype([self._df, self._scale])
+
+    df_val = tf.get_static_value(self._df)
+    dim_val = tf.compat.dimension_value(self._scale.shape[-1])
+    msg = ('Degrees of freedom (`df = {}`) cannot be less than dimension of '
+           'scale matrix (`scale.dimension = {}`).')
+    if is_init and df_val is not None and dim_val is not None:
+      df_val = np.asarray(df_val)
+      dim_val = np.asarray(dim_val)
+      if not dim_val.shape:
+        dim_val = dim_val[np.newaxis, ...]
+      if not df_val.shape:
+        df_val = df_val[np.newaxis, ...]
+      if np.any(df_val < dim_val):
+        raise ValueError(msg.format(df_val, dim_val))
+
+    elif self.validate_args:
+      if (is_init != tensor_util.is_ref(self._df) or
+          is_init != tensor_util.is_ref(self._scale)):
+        df = tf.convert_to_tensor(self._df)
+        dimension = self._dimension()
+        assertions.append(assert_util.assert_less_equal(
+            dimension, df, message=(msg.format(df, dimension))))
+
+    return assertions
+
+
+class WishartTriL(WishartLinearOperator):
+  """The matrix Wishart distribution parameterized with Cholesky factors.
 
   This distribution is defined by a scalar degrees of freedom `df` and a scale
-  matrix, which can either be a full symmetric matrix or a lower triangular
-  Cholesky factor.
+  matrix, expressed as a lower triangular Cholesky factor.
 
   #### Mathematical Details
 
@@ -453,7 +497,8 @@ class Wishart(_WishartLinearOperator):
 
   where:
   * `df >= k` denotes the degrees of freedom,
-  * `scale` is a symmetric, positive definite, `k x k` matrix,
+  * `scale` is a symmetric, positive definite, `k x k` matrix equivalent to
+    `scale_tril * scale_tril.T`,
   * `Z` is the normalizing constant, and,
   * `Gamma_k` is the [multivariate Gamma function](
     https://en.wikipedia.org/wiki/Multivariate_gamma_function).
@@ -465,8 +510,8 @@ class Wishart(_WishartLinearOperator):
   # Initialize a single 3x3 Wishart with Cholesky factored scale matrix and 5
   # degrees-of-freedom.(*)
   df = 5
-  chol_scale = tf.cholesky(...)  # Shape is [3, 3].
-  dist = tfd.Wishart(df=df, scale_tril=chol_scale)
+  chol_scale = tf.linalg.cholesky(...)  # Shape is [3, 3].
+  dist = tfd.WishartTriL(df=df, scale_tril=chol_scale)
 
   # Evaluate this on an observation in R^3, returning a scalar.
   x = ...  # A 3x3 positive definite matrix.
@@ -477,15 +522,6 @@ class Wishart(_WishartLinearOperator):
   x = [x0, x1]  # Shape is [2, 3, 3].
   dist.prob(x)  # Shape is [2].
 
-  # Initialize two 3x3 Wisharts with full scale matrices.
-  df = [5, 4]
-  scale = ...  # Shape is [2, 3, 3].
-  dist = tfd.Wishart(df=df, scale=scale)
-
-  # Evaluate this on four observations.
-  x = [[x0, x1], [x2, x3]]  # Shape is [2, 2, 3, 3].
-  dist.prob(x)  # Shape is [2, 2].
-
   # (*) - To efficiently create a trainable covariance matrix, see the example
   #   in tfp.distributions.matrix_diag_transform.
   ```
@@ -493,23 +529,18 @@ class Wishart(_WishartLinearOperator):
 
   def __init__(self,
                df,
-               scale=None,
                scale_tril=None,
                input_output_cholesky=False,
                validate_args=False,
                allow_nan_stats=True,
-               name="Wishart"):
+               name='WishartTriL'):
     """Construct Wishart distributions.
 
     Args:
       df: `float` or `double` `Tensor`. Degrees of freedom, must be greater than
         or equal to dimension of the scale matrix.
-      scale: `float` or `double` `Tensor`. The symmetric positive definite
-        scale matrix of the distribution. Exactly one of `scale` and
-        'scale_tril` must be passed.
       scale_tril: `float` or `double` `Tensor`. The Cholesky factorization
         of the symmetric positive definite scale matrix of the distribution.
-        Exactly one of `scale` and 'scale_tril` must be passed.
       input_output_cholesky: Python `bool`. If `True`, functions whose input or
         output have the semantics of samples assume inputs are in Cholesky form
         and return outputs in Cholesky form. In particular, if this flag is
@@ -526,45 +557,23 @@ class Wishart(_WishartLinearOperator):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
-    Raises:
-      ValueError: if zero or both of 'scale' and 'scale_tril' are passed in.
     """
     parameters = dict(locals())
 
     with tf.name_scope(name) as name:
-      with tf.name_scope("init"):
-        if (scale is None) == (scale_tril is None):
-          raise ValueError("Must pass scale or scale_tril, but not both.")
+      dtype = dtype_util.common_dtype([df, scale_tril], tf.float32)
+      df = tensor_util.convert_nonref_to_tensor(df, name='df', dtype=dtype)
+      self._scale_tril = tensor_util.convert_nonref_to_tensor(
+          scale_tril, name='scale_tril', dtype=dtype)
 
-        dtype = dtype_util.common_dtype([df, scale, scale_tril], tf.float32)
-        df = tf.convert_to_tensor(df, name="df", dtype=dtype)
-        if scale is not None:
-          scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
-          if validate_args:
-            scale = distribution_util.assert_symmetric(scale)
-          scale_tril = tf.linalg.cholesky(scale)
-        else:  # scale_tril is not None
-          scale_tril = tf.convert_to_tensor(
-              scale_tril, name="scale_tril", dtype=dtype)
-          if validate_args:
-            scale_tril = distribution_util.with_dependencies([
-                assert_util.assert_positive(
-                    tf.linalg.diag_part(scale_tril),
-                    message="scale_tril must be positive definite"),
-                assert_util.assert_equal(
-                    tf.shape(scale_tril)[-1],
-                    tf.shape(scale_tril)[-2],
-                    message="scale_tril must be square")
-            ], scale_tril)
-
-      super(Wishart, self).__init__(
+      super(WishartTriL, self).__init__(
           df=df,
-          scale_operator=tf.linalg.LinearOperatorLowerTriangular(
-              tril=scale_tril,
+          scale=tf.linalg.LinearOperatorLowerTriangular(
+              tril=self._scale_tril,
               is_non_singular=True,
               is_positive_definite=True,
               is_square=True),
@@ -572,8 +581,34 @@ class Wishart(_WishartLinearOperator):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
-    self._parameters = parameters
+      self._parameters = parameters
 
   @classmethod
   def _params_event_ndims(cls):
-    return dict(df=0, scale=2, scale_tril=2)
+    return dict(df=0, scale_tril=2)
+
+  @property
+  def scale_tril(self):
+    """Cholesky decomposition of Wishart scale matrix."""
+    return self._scale_tril
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = super(
+        WishartTriL, self)._parameter_control_dependencies(is_init)
+
+    if not self.validate_args:
+      assert not assertions
+      return []
+
+    if is_init != tensor_util.is_ref(self._scale_tril):
+      shape = prefer_static.shape(self._scale_tril)
+      assertions.extend(
+          [assert_util.assert_positive(
+              tf.linalg.diag_part(self._scale_tril),
+              message='`scale_tril` must be positive definite.'),
+           assert_util.assert_equal(
+               shape[-1],
+               shape[-2],
+               message='`scale_tril` must be square.')]
+          )
+    return assertions

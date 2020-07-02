@@ -20,7 +20,9 @@ from __future__ import print_function
 
 import contextlib
 import os
+import re
 import traceback
+import unittest
 
 # Dependency imports
 import hypothesis as hp
@@ -29,7 +31,6 @@ import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions.deprecated_linalg import matrix_diag_transform
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
@@ -43,6 +44,16 @@ def randomize_hypothesis():
 def hypothesis_max_examples(default=None):
   # Use --test_env=TFP_HYPOTHESIS_MAX_EXAMPLES=1000 to get fuller coverage.
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', default or 20))
+
+
+def hypothesis_reproduction_seed():
+  # Use --test_env=TFP_HYPOTHESIS_REPRODUCE=hexjunk to reproduce a failure.
+  return os.environ.get('TFP_HYPOTHESIS_REPRODUCE', None)
+
+
+def running_under_guitar():
+  # The Guitar build sets --test_env=TFP_GUITAR=1
+  return bool(int(os.environ.get('TFP_GUITAR', 0)))
 
 
 def tfp_hp_settings(default_max_examples=None, **kwargs):
@@ -68,7 +79,60 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
       max_examples=hypothesis_max_examples(default=default_max_examples),
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
-  return hp.settings(**kwds)
+  def decorator(test_method):
+    seed = hypothesis_reproduction_seed()
+    if seed is not None:
+      # This implements the semantics of TFP_HYPOTHESIS_REPRODUCE via
+      # the `hp.reproduce_failure` decorator.
+      test_method = hp.reproduce_failure('3.56.5', seed)(test_method)
+    return hp.settings(**kwds)(test_method)
+  return decorator
+
+
+def guitar_skip(reason):
+  """Skips tests in the Guitar build.
+
+  Why skip specifically in Guitar?  The Guitar build uses more compute to look
+  for bad inputs than our regular test suite.  It is therefore common for a test
+  to be failing in Guitar but passing on TAP.  This calls for disabling it in
+  Guitar, to keep Guitar green, while leaving it enabled on TAP, to get its
+  value as a presubmit.
+
+  Args:
+    reason: Python string.  The reason to skip, or a reference to the relevant
+      bug.
+
+  Returns nothing.
+
+  Raises:
+    SkipTest: If the test should be skipped.
+  """
+  if running_under_guitar():
+    raise unittest.case.SkipTest(reason)
+
+
+def guitar_skip_if_matches(pattern, name, reason):
+  """Skips tests in the Guitar build if `name` matches `pattern`.
+
+  This is an alternative to `guitar_skip` for parameterized tests, when the
+  goal is to disable only some tests in a parameterized group.
+
+  Args:
+    pattern: Regex to apply to `name` to detect whether to skip.
+    name: Python string giving a "name" for this test, e.g., the Bijector or
+      Distribution being tested.  The test will be skipped if this matches the
+      `pattern`.
+    reason: Python string.  The reason to skip, or a reference to the relevant
+      bug.
+
+  Returns nothing.
+
+  Raises:
+    SkipTest: If the test should be skipped.
+  """
+  if running_under_guitar():
+    if re.search(pattern, name):
+      raise unittest.case.SkipTest(reason)
 
 
 VAR_USAGES = {}
@@ -76,12 +140,12 @@ VAR_USAGES = {}
 
 def usage_counting_identity(var):
   key = (id(var), var.name)
-  VAR_USAGES[key] = VAR_USAGES.get(key, []) + [traceback.format_stack(limit=15)]
+  VAR_USAGES[key] = VAR_USAGES.get(key, []) + [traceback.format_stack(limit=25)]
   return tf.identity(var)
 
 
 def defer_and_count_usage(var):
-  return DeferredTensor(usage_counting_identity, var)
+  return DeferredTensor(var, usage_counting_identity)
 
 
 @contextlib.contextmanager
@@ -131,6 +195,7 @@ class Support(object):
   VECTOR_SIZE_TRIANGULAR = 'VECTOR_SIZE_TRIANGULAR'
   VECTOR_WITH_L1_NORM_1_SIZE_GT1 = 'VECTOR_WITH_L1_NORM_1_SIZE_GT1'
   VECTOR_STRICTLY_INCREASING = 'VECTOR_STRICTLY_INCREASING'
+  MATRIX_UNCONSTRAINED = 'MATRIX_UNCONSTRAINED'
   MATRIX_LOWER_TRIL = 'MATRIX_LOWER_TRIL'
   MATRIX_LOWER_TRIL_POSITIVE_DEFINITE = 'MATRIX_LOWER_TRIL_POSITIVE_DEFINITE'
   MATRIX_POSITIVE_DEFINITE = 'MATRIX_POSITIVE_DEFINITE'
@@ -196,6 +261,8 @@ def _vector_constrainer(support):
 def _matrix_constrainer(support):
   """Helper for `constrainer` for matrix supports."""
   constrainers = {
+      Support.MATRIX_UNCONSTRAINED:
+          identity_fn,
       Support.MATRIX_POSITIVE_DEFINITE:
           positive_definite,
       Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE:
@@ -230,13 +297,14 @@ def min_rank_for_support(support):
   raise NotImplementedError(support)
 
 
-def constrained_tensors(constraint_fn, shape):
+def constrained_tensors(constraint_fn, shape, dtype=np.float32):
   """Strategy for drawing a constrained Tensor.
 
   Args:
     constraint_fn: Function mapping the unconstrained space to the desired
       constrained space.
     shape: Shape of the desired Tensors as a Python list.
+    dtype: Dtype for constrained Tensors.
 
   Returns:
     tensors: A strategy for drawing constrained Tensors of the given shape.
@@ -245,26 +313,26 @@ def constrained_tensors(constraint_fn, shape):
   # float32s = hps.floats(
   #     np.finfo(np.float32).min / 2, np.finfo(np.float32).max / 2,
   #     allow_nan=False, allow_infinity=False)
-  float32s = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
+  floats = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
 
   def mapper(x):
-    x = constraint_fn(tf.convert_to_tensor(x))
+    x = constraint_fn(tf.convert_to_tensor(x, dtype_hint=dtype))
     if dtype_util.is_floating(x.dtype) and tf.executing_eagerly():
       # We'll skip this check in graph mode; too expensive.
-      if not np.all(np.isfinite(x.numpy())):
+      if not np.all(np.isfinite(np.array(x))):
         raise AssertionError('{} generated non-finite param value: {}'.format(
-            constraint_fn, x.numpy()))
+            constraint_fn, np.array(x)))
     return x
 
-  return hpnp.arrays(
-      dtype=np.float32, shape=shape, elements=float32s).map(mapper)
+  return hpnp.arrays(dtype=dtype, shape=shape, elements=floats).map(mapper)
 
 
 # pylint: disable=no-value-for-parameter
 
 
 @hps.composite
-def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
+def tensors_in_support(draw, support, batch_shape=None, event_dim=None,
+                       dtype=np.float32):
   """Strategy for drawing Tensors in the given support.
 
   Supports have a notion of event shape, which is the trailing dimensions in
@@ -280,6 +348,8 @@ def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
     event_dim: Optional Python int giving the size of each event dimension.
       This is shared across all event dimensions, permitting square event
       matrices, etc. If omitted, Hypothesis will choose one.
+    dtype: DType to use in generating tensor data.
+      Default value: `np.float32`.
 
   Returns:
     tensors: A strategy for drawing such Tensors.
@@ -290,11 +360,11 @@ def tensors_in_support(draw, support, batch_shape=None, event_dim=None):
     batch_shape = tensorshape_util.as_list(draw(shapes()))
   shape = batch_shape + [event_dim] * min_rank_for_support(support)
   constraint_fn = constrainer(support)
-  return draw(constrained_tensors(constraint_fn, shape))
+  return draw(constrained_tensors(constraint_fn, shape, dtype=dtype))
 
 
 @hps.composite
-def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
+def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1, max_side=None):
   """Strategy for drawing TensorShapes with some control over rank/dim sizes.
 
   Args:
@@ -303,6 +373,7 @@ def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
     max_ndims: Python `int` giving the maximum rank.
     min_lastdimsize: Python `int`.  The trailing dimension will always be at
       least this large.  Ignored if the rank turns out to be 0.
+    max_side: Python `int` giving the maximum size of each dimension
 
   Returns:
     shapes: A strategy for drawing fully-specified TensorShapes obeying
@@ -315,9 +386,12 @@ def shapes(draw, min_ndims=0, max_ndims=3, min_lastdimsize=1):
     def resize_lastdim(x):
       return x[:-1] + (max(x[-1], min_lastdimsize),)
 
-    shape = draw(
-        hpnp.array_shapes(min_dims=rank, max_dims=rank).map(resize_lastdim).map(
-            tf.TensorShape))
+    if max_side is None:
+      # Apparently we can't pass an explicit None to the Hypothesis strategy?
+      shps = hpnp.array_shapes(min_dims=rank, max_dims=rank)
+    else:
+      shps = hpnp.array_shapes(min_dims=rank, max_dims=rank, max_side=max_side)
+    shape = draw(shps.map(resize_lastdim).map(tf.TensorShape))
   return shape
 
 
@@ -332,7 +406,8 @@ def broadcasting_params(draw,
                         event_dim=None,
                         enable_vars=False,
                         constraint_fn_for=lambda param: identity_fn,
-                        mutex_params=()):
+                        mutex_params=(),
+                        dtype=np.float32):
   """Streategy for drawing parameters which jointly have the given batch shape.
 
   Specifically, the batch shapes of the returned parameters will broadcast to
@@ -353,8 +428,9 @@ def broadcasting_params(draw,
       matrices, compatible location and scale Tensors, etc. If omitted,
       Hypothesis will choose one.
     enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+      initialization in slicing_test. If `False`, the returned parameters are
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}.
     constraint_fn_for: Python callable mapping parameter name to constraint
       function.  The latter is itself a Python callable which converts an
       unconstrained Tensor (currently with float32 values from -200 to +200)
@@ -363,13 +439,15 @@ def broadcasting_params(draw,
       mutually exclusive parameters (e.g., the 'probs' and 'logits' of a
       Categorical).  At most one parameter from each set will appear in the
       result.
+    dtype: Dtype for generated parameters.
 
   Returns:
     params: A Hypothesis strategy for drawing Python `dict`s mapping parameter
-      name to a Tensor, Variable, or DeferredTensor.  The batch shapes of the
-      returned parameters broadcast together to the supplied `batch_shape`.
-      Only parameters whose names appear as keys in `params_event_ndims` will
-      appear (but possibly not all of them, depending on `mutex_params`).
+      name to a `tf.Tensor`, `tf.Variable`, `tfp.util.DeferredTensor`, or
+      `tfp.util.TransformedVariable`.  The batch shapes of the returned
+      parameters broadcast together to the supplied `batch_shape`.  Only
+      parameters whose names appear as keys in `params_event_ndims` will appear
+      (but possibly not all of them, depending on `mutex_params`).
   """
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
@@ -400,19 +478,52 @@ def broadcasting_params(draw,
     # TODO(axch): Can I replace `params_event_ndims` and `constraint_fn_for`
     # with a map from params to `Suppport`s, and use `tensors_in_support` here
     # instead of this explicit `constrained_tensors` function?
-    param_strategy = constrained_tensors(constraint_fn_for(param), param_shape)
-    params_kwargs[param] = tf.convert_to_tensor(
-        draw(param_strategy), dtype_hint=tf.float32, name=param)
-    if enable_vars and draw(hps.booleans()):
-      params_kwargs[param] = tf.Variable(params_kwargs[param], name=param)
-      alt_value = tf.convert_to_tensor(
-          draw(param_strategy),
-          dtype_hint=tf.float32,
-          name='{}_alt_value'.format(param))
-      setattr(params_kwargs[param], '_tfp_alt_value', alt_value)
-      if draw(hps.booleans()):
-        params_kwargs[param] = defer_and_count_usage(params_kwargs[param])
+    param_strategy = constrained_tensors(
+        constraint_fn_for(param), param_shape, dtype=dtype)
+    params_kwargs[param] = draw(maybe_variable(
+        param_strategy, enable_vars=enable_vars, dtype=dtype, name=param))
   return params_kwargs
+
+
+@hps.composite
+def maybe_variable(draw,
+                   strategy,
+                   enable_vars=False,
+                   dtype=None,
+                   name=None):
+  """Strategy for drawing objects that should sometimes be tf.Variables.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    strategy: Hypothesis strategy for drawing suitable values
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test. If `False`, the returned parameters are
+      never {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}.
+    dtype: Dtype for generated parameters.
+    name: Name for the produced `Tensor`s and `Variable`s, if any.
+
+  Returns:
+    strategy: A Hypothesis strategy for drawing a value, `tf.Variable`,
+      `tfp.util.DeferredTensor`, or `tfp.util.TransformedVariable`.  The
+      `DeferredTensor`s are sometimes instrumented to count how many times they
+      are concretized.
+  """
+  result = tf.convert_to_tensor(draw(strategy), dtype_hint=dtype, name=name)
+  if enable_vars and draw(hps.booleans()):
+    result = tf.Variable(result, name=name)
+    if name is None:
+      alt_name = None
+    else:
+      alt_name = '{}_alt_value'.format(name)
+    alt_value = tf.convert_to_tensor(
+        draw(strategy), dtype_hint=dtype, name=alt_name)
+    # This field provides an acceptable alternate value, to enable tests that
+    # mutate the Variable (once).
+    setattr(result, '_tfp_alt_value', alt_value)
+    if draw(hps.booleans()):
+      result = defer_and_count_usage(result)
+  return result
 
 
 @hps.composite
@@ -458,17 +569,20 @@ def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):
       corresponding axis of the shape must be full-sized (True) or is allowed to
       be 1 (i.e., broadcast) (False).
   """
-  target_rank = target_shape.ndims
+  target_rank = tensorshape_util.rank(target_shape)
   if is_last:
     # We must force full size dim on any mismatched axes, and proper rank.
     full_rank_current = tf.broadcast_static_shape(
         current_shape, tf.TensorShape([1] * target_rank))
     # Identify axes in which the target shape is not yet matched.
+    full_rank_current_list = tensorshape_util.as_list(full_rank_current)
+    target_shape_list = tensorshape_util.as_list(target_shape)
     axis_is_mismatched = [
-        full_rank_current[i] != target_shape[i] for i in range(target_rank)
+        full_rank_current_list[i] !=
+        target_shape_list[i] for i in range(target_rank)
     ]
     min_rank = target_rank
-    if current_shape.ndims == target_rank:
+    if tensorshape_util.rank(current_shape) == target_rank:
       # Current rank might be already correct, but we could have a case like
       # batch_shape=[4,3,2] and current_batch_shape=[4,1,2], in which case
       # we must have at least 2 axes on this param's batch shape.
@@ -512,7 +626,7 @@ def broadcasting_shapes(draw, target_shape, n):
       fully defined.
   """
   target_shape = tf.TensorShape(target_shape)
-  target_rank = target_shape.ndims
+  target_rank = tensorshape_util.rank(target_shape)
   result = []
   current_shape = tf.TensorShape([])
   for is_last in [False] * (n - 1) + [True]:
@@ -520,7 +634,8 @@ def broadcasting_shapes(draw, target_shape, n):
         draw, target_shape, current_shape, is_last=is_last)
 
     # Get the last next_rank (possibly 0!) dimensions.
-    next_shape = target_shape[target_rank - next_rank:].as_list()
+    next_shape = tensorshape_util.as_list(
+        target_shape[target_rank - next_rank:])
     for i, force_fullsize in enumerate(force_fullsize_dim):
       if not force_fullsize and draw(hps.booleans()):
         # Choose to make this param broadcast against some other param.
@@ -529,6 +644,49 @@ def broadcasting_shapes(draw, target_shape, n):
     current_shape = tf.broadcast_static_shape(current_shape, next_shape)
     result.append(next_shape)
   return result
+
+
+def _rank_broadcasting_error_pattern(left_rank, right_rank, op=None):
+  ans = (r'Broadcast between \[([0-9]*,){' + str(left_rank - 1) + r',}[0-9]*\] '
+         r'and \[([0-9]*,){' + str(right_rank - 1) + r',}[0-9]*\] '
+         r'is not supported yet')
+  if op is not None:
+    ans += r'. \[' + op + r'\]'
+  return ans
+
+
+@contextlib.contextmanager
+def no_tf_rank_errors():
+  # TODO(axch): Instead of catching and `assume`ing away rank errors, could try
+  # harder to avoid generating them in the first place.  For instance, could add
+  # a parameter to `valid_slices` that limits how much the rank may increase
+  # after the slice.  Trouble is, predicting what limits to set is difficult
+  # because rank handling is non-uniform, and actually meeting them is also
+  # non-trivial because in addition to the batch shape there is the event shape,
+  # and at least one more dimention added by `sample`, and the parameters may
+  # have larger "event" shapes than the distribution itself.
+  input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
+  input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
+  pat_1 = _rank_broadcasting_error_pattern(1, 6)
+  pat_2 = _rank_broadcasting_error_pattern(6, 1)
+  try:
+    yield
+  except tf.errors.UnimplementedError as e:
+    # TODO(b/138385438): This really shouldn't be so complicated.
+    # Bug requesting that TF increase the rank limit: b/137689241.
+    # See also b/148230377.
+    msg = str(e)
+    if re.search(pat_1, msg) or re.search(pat_2, msg):
+      # We asked some op to broadcast Tensors one of whose ranks >= 6.
+      hp.assume(False)
+    elif re.search(input_dims_pat, msg):
+      # We asked some TF op (StridedSlice?) to operate on a Tensor of rank >= 8.
+      hp.assume(False)
+    elif re.search(input_rank_pat, msg):
+      # We asked some TF op (PadV2?) to operate on a Tensor of rank >= 7.
+      hp.assume(False)
+    else:
+      raise
 
 
 # Utility functions for constraining parameters and/or domain/codomain members.
@@ -552,7 +710,9 @@ def positive_definite(x):
 
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
-      matrix_diag_transform(x, softplus_plus_eps()), -1, 0)
+      tf.linalg.set_diag(x, softplus_plus_eps()(tf.linalg.diag_part(x))),
+      num_lower=-1,
+      num_upper=0)
 
 
 def lower_tril(x):

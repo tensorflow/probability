@@ -25,13 +25,11 @@ from scipy import fftpack
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class DiscreteCosineTransformTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class DiscreteCosineTransformTest(test_util.TestCase):
   """Tests correctness of the DiscreteCosineTransform bijector."""
 
   def testBijector(self):

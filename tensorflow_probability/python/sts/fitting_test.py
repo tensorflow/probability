@@ -22,8 +22,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 class _VariationalInferenceTests(object):
@@ -105,8 +104,11 @@ class _VariationalInferenceTests(object):
     observed_time_series = self._build_tensor(
         -1e8 + 1e6 * np.random.randn(num_timesteps))
     model = self._build_model(observed_time_series)
-    variational_loss, _ = tfp.sts.build_factored_variational_loss(
-        model=model, observed_time_series=observed_time_series)
+    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+        model=model)
+    variational_loss = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=model.joint_log_prob(observed_time_series),
+        surrogate_posterior=surrogate_posterior)
     self.evaluate(tf1.global_variables_initializer())
     loss_ = self.evaluate(variational_loss)
     self.assertTrue(np.isfinite(loss_))
@@ -132,18 +134,18 @@ class _VariationalInferenceTests(object):
 
     ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class VariationalInferenceTestsStatic64(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class VariationalInferenceTestsStatic64(test_util.TestCase,
                                         _VariationalInferenceTests):
   dtype = np.float64
   use_static_shape = True
 
 
 # This test runs in graph mode only to reduce test weight.
-class VariationalInferenceTestsDynamic32(test_case.TestCase,
+class VariationalInferenceTestsDynamic32(test_util.TestCase,
                                          _VariationalInferenceTests):
   dtype = np.float32
   use_static_shape = False
@@ -240,7 +242,7 @@ class _HMCTests(object):
     if self.use_static_shape:
       return tensor.shape.as_list()
     else:
-      return list(self.evaluate(tf.shape(input=tensor)))
+      return list(self.evaluate(tf.shape(tensor)))
 
   def _batch_shape_as_list(self, distribution):
     if self.use_static_shape:
@@ -269,11 +271,11 @@ class _HMCTests(object):
 
     ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HMCTestsStatic32(test_case.TestCase, parameterized.TestCase, _HMCTests):
+@test_util.test_all_tf_execution_regimes
+class HMCTestsStatic32(test_util.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = True
 
@@ -310,13 +312,13 @@ class HMCTestsStatic32(test_case.TestCase, parameterized.TestCase, _HMCTests):
 
 
 # This test runs in graph mode only to reduce test weight.
-class HMCTestsDynamic32(test_case.TestCase, _HMCTests):
+class HMCTestsDynamic32(test_util.TestCase, _HMCTests):
   dtype = np.float32
   use_static_shape = False
 
 
 # This test runs in graph mode only to reduce test weight.
-class HMCTestsStatic64(test_case.TestCase, _HMCTests):
+class HMCTestsStatic64(test_util.TestCase, _HMCTests):
   dtype = np.float64
   use_static_shape = True
 

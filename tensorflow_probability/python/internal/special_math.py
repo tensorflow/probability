@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Functions "ndtr" and "ndtri" are derived from calculations made in:
+# The "ndtr" function is derived from calculations made in:
 # https://root.cern.ch/doc/v608/SpecFuncCephesInv_8cxx_source.html
 # In the following email exchange, the author gives his consent to redistribute
 # derived works under an Apache 2.0 license.
@@ -81,9 +81,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
-    "erfinv",
     "ndtr",
-    "ndtri",
     "log_ndtr",
     "log_cdf_laplace",
 ]
@@ -96,15 +94,15 @@ __all__ = [
 # then made more conservative just to be safe. (Conservative means use the
 # expansion more than we probably need to.) See `NdtrTest` in
 # special_math_test.py.
-LOGNDTR_FLOAT64_LOWER = np.array(-20, np.float64)
-LOGNDTR_FLOAT32_LOWER = np.array(-10, np.float32)
+LOGNDTR_FLOAT64_LOWER = -20.
+LOGNDTR_FLOAT32_LOWER = -10.
 
 # Upper bound values were chosen by examining for which values of 'x'
 # Log[cdf(x)] is 0, after which point we need to use the approximation
 # Log[cdf(x)] = Log[1 - cdf(-x)] approx -cdf(-x). We chose a value slightly
 # conservative, meaning we use the approximation earlier than needed.
-LOGNDTR_FLOAT64_UPPER = np.array(8, np.float64)
-LOGNDTR_FLOAT32_UPPER = np.array(5, np.float32)
+LOGNDTR_FLOAT64_UPPER = 8.
+LOGNDTR_FLOAT32_UPPER = 5.
 
 
 def ndtr(x, name="ndtr"):
@@ -153,138 +151,6 @@ def _ndtr(x):
       1. + tf.math.erf(w),
       tf.where(w > 0., 2. - tf.math.erfc(z), tf.math.erfc(z)))
   return 0.5 * y
-
-
-def ndtri(p, name="ndtri"):
-  """The inverse of the CDF of the Normal distribution function.
-
-  Returns x such that the area under the pdf from minus infinity to x is equal
-  to p.
-
-  A piece-wise rational approximation is done for the function.
-  This is a port of the implementation in netlib.
-
-  Args:
-    p: `Tensor` of type `float32`, `float64`.
-    name: Python string. A name for the operation (default="ndtri").
-
-  Returns:
-    x: `Tensor` with `dtype=p.dtype`.
-
-  Raises:
-    TypeError: if `p` is not floating-type.
-  """
-
-  with tf.name_scope(name):
-    p = tf.convert_to_tensor(p, name="p")
-    if dtype_util.as_numpy_dtype(p.dtype) not in [np.float32, np.float64]:
-      raise TypeError(
-          "p.dtype=%s is not handled, see docstring for supported types."
-          % p.dtype)
-    return _ndtri(p)
-
-
-def _ndtri(p):
-  """Implements ndtri core logic."""
-
-  # Constants used in piece-wise rational approximations. Taken from the cephes
-  # library:
-  # https://root.cern.ch/doc/v608/SpecFuncCephesInv_8cxx_source.html
-  p0 = list(reversed([-5.99633501014107895267E1,
-                      9.80010754185999661536E1,
-                      -5.66762857469070293439E1,
-                      1.39312609387279679503E1,
-                      -1.23916583867381258016E0]))
-  q0 = list(reversed([1.0,
-                      1.95448858338141759834E0,
-                      4.67627912898881538453E0,
-                      8.63602421390890590575E1,
-                      -2.25462687854119370527E2,
-                      2.00260212380060660359E2,
-                      -8.20372256168333339912E1,
-                      1.59056225126211695515E1,
-                      -1.18331621121330003142E0]))
-  p1 = list(reversed([4.05544892305962419923E0,
-                      3.15251094599893866154E1,
-                      5.71628192246421288162E1,
-                      4.40805073893200834700E1,
-                      1.46849561928858024014E1,
-                      2.18663306850790267539E0,
-                      -1.40256079171354495875E-1,
-                      -3.50424626827848203418E-2,
-                      -8.57456785154685413611E-4]))
-  q1 = list(reversed([1.0,
-                      1.57799883256466749731E1,
-                      4.53907635128879210584E1,
-                      4.13172038254672030440E1,
-                      1.50425385692907503408E1,
-                      2.50464946208309415979E0,
-                      -1.42182922854787788574E-1,
-                      -3.80806407691578277194E-2,
-                      -9.33259480895457427372E-4]))
-  p2 = list(reversed([3.23774891776946035970E0,
-                      6.91522889068984211695E0,
-                      3.93881025292474443415E0,
-                      1.33303460815807542389E0,
-                      2.01485389549179081538E-1,
-                      1.23716634817820021358E-2,
-                      3.01581553508235416007E-4,
-                      2.65806974686737550832E-6,
-                      6.23974539184983293730E-9]))
-  q2 = list(reversed([1.0,
-                      6.02427039364742014255E0,
-                      3.67983563856160859403E0,
-                      1.37702099489081330271E0,
-                      2.16236993594496635890E-1,
-                      1.34204006088543189037E-2,
-                      3.28014464682127739104E-4,
-                      2.89247864745380683936E-6,
-                      6.79019408009981274425E-9]))
-
-  def _create_polynomial(var, coeffs):
-    """Compute n_th order polynomial via Horner's method."""
-    coeffs = np.array(coeffs, dtype_util.as_numpy_dtype(var.dtype))
-    if not coeffs.size:
-      return tf.zeros_like(var)
-    return coeffs[0] + _create_polynomial(var, coeffs[1:]) * var
-
-  maybe_complement_p = tf.where(p > -np.expm1(-2.), 1. - p, p)
-  # Write in an arbitrary value in place of 0 for p since 0 will cause NaNs
-  # later on. The result from the computation when p == 0 is not used so any
-  # number that doesn't result in NaNs is fine.
-  sanitized_mcp = tf.where(
-      maybe_complement_p <= 0.,
-      dtype_util.as_numpy_dtype(p.dtype)(0.5), maybe_complement_p)
-
-  # Compute x for p > exp(-2): x/sqrt(2pi) = w + w**3 P0(w**2)/Q0(w**2).
-  w = sanitized_mcp - 0.5
-  ww = w ** 2
-  x_for_big_p = w + w * ww * (_create_polynomial(ww, p0)
-                              / _create_polynomial(ww, q0))
-  x_for_big_p *= -np.sqrt(2. * np.pi)
-
-  # Compute x for p <= exp(-2): x = z - log(z)/z - (1/z) P(1/z) / Q(1/z),
-  # where z = sqrt(-2. * log(p)), and P/Q are chosen between two different
-  # arrays based on whether p < exp(-32).
-  z = tf.sqrt(-2. * tf.math.log(sanitized_mcp))
-  first_term = z - tf.math.log(z) / z
-  second_term_small_p = (
-      _create_polynomial(1. / z, p2) /
-      _create_polynomial(1. / z, q2) / z)
-  second_term_otherwise = (
-      _create_polynomial(1. / z, p1) /
-      _create_polynomial(1. / z, q1) / z)
-  x_for_small_p = first_term - second_term_small_p
-  x_otherwise = first_term - second_term_otherwise
-
-  x = tf.where(sanitized_mcp > np.exp(-2.), x_for_big_p,
-               tf.where(z >= 8.0, x_for_small_p, x_otherwise))
-
-  x = tf.where(p > 1. - np.exp(-2.), x, -x)
-  infinity_scalar = tf.constant(np.inf, dtype=p.dtype)
-  x_nan_replaced = tf.where(p <= 0.0, -infinity_scalar,
-                            tf.where(p >= 1.0, infinity_scalar, x))
-  return x_nan_replaced
 
 
 def log_ndtr(x, series_order=3, name="log_ndtr"):
@@ -348,11 +214,11 @@ def log_ndtr(x, series_order=3, name="log_ndtr"):
     x = tf.convert_to_tensor(x, name="x")
 
     if dtype_util.base_equal(x.dtype, tf.float64):
-      lower_segment = LOGNDTR_FLOAT64_LOWER
-      upper_segment = LOGNDTR_FLOAT64_UPPER
+      lower_segment = np.array(LOGNDTR_FLOAT64_LOWER, dtype=np.float64)
+      upper_segment = np.array(LOGNDTR_FLOAT64_UPPER, dtype=np.float64)
     elif dtype_util.base_equal(x.dtype, tf.float32):
-      lower_segment = LOGNDTR_FLOAT32_LOWER
-      upper_segment = LOGNDTR_FLOAT32_UPPER
+      lower_segment = np.array(LOGNDTR_FLOAT32_LOWER, dtype=np.float32)
+      upper_segment = np.array(LOGNDTR_FLOAT32_UPPER, dtype=np.float32)
     else:
       raise TypeError("x.dtype=%s is not supported." % x.dtype)
 
@@ -383,7 +249,8 @@ def _log_ndtr_lower(x, series_order):
   """Asymptotic expansion version of `Log[cdf(x)]`, appropriate for `x<<-1`."""
   x_2 = tf.square(x)
   # Log of the term multiplying (1 + sum)
-  log_scale = -0.5 * x_2 - tf.math.log(-x) - 0.5 * np.log(2. * np.pi)
+  log_scale = (-0.5 * x_2 - tf.math.log(-x)
+               - tf.constant(0.5 * np.log(2. * np.pi), dtype=x.dtype))
   return log_scale + tf.math.log(_log_ndtr_asymptotic_series(x, series_order))
 
 
@@ -404,28 +271,6 @@ def _log_ndtr_asymptotic_series(x, series_order):
       even_sum += y
     x_2n *= x_2
   return 1. + even_sum - odd_sum
-
-
-def erfinv(x, name="erfinv"):
-  """The inverse function for erf, the error function.
-
-  Args:
-    x: `Tensor` of type `float32`, `float64`.
-    name: Python string. A name for the operation (default="erfinv").
-
-  Returns:
-    x: `Tensor` with `dtype=x.dtype`.
-
-  Raises:
-    TypeError: if `x` is not floating-type.
-  """
-
-  with tf.name_scope(name):
-    x = tf.convert_to_tensor(x, name="x")
-    if dtype_util.as_numpy_dtype(x.dtype) not in [np.float32, np.float64]:
-      raise TypeError("x.dtype={} is not handled, see docstring for supported "
-                      "types.".format(dtype_util.name(x.dtype)))
-    return ndtri((x + 1.) / 2.) / np.sqrt(2.)
 
 
 def _double_factorial(n):
@@ -466,7 +311,7 @@ def log_cdf_laplace(x, name="log_cdf_laplace"):
     x = tf.convert_to_tensor(x, name="x")
 
     # For x < 0, L(x) = 0.5 * exp{x} exactly, so Log[L(x)] = log(0.5) + x.
-    lower_solution = -np.log(2.) + x
+    lower_solution = tf.constant(-np.log(2.), dtype=x.dtype) + x
 
     # safe_exp_neg_x = exp{-x} for x > 0, but is
     # bounded above by 1, which avoids

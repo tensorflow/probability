@@ -78,7 +78,7 @@ class MultivariateNormalTriL(
 
   Trainable (batch) lower-triangular matrices can be created with
   `tfp.distributions.matrix_diag_transform()` and/or
-  `tfp.distributions.fill_triangular()`
+  `tfp.math.fill_triangular()`
 
   #### Examples
 
@@ -127,10 +127,10 @@ class MultivariateNormalTriL(
   dims = 4
   mvn = tfd.MultivariateNormalTriL(
       loc=tf.Variable(tf.zeros([dims], dtype=tf.float32), name="mu"),
-      scale_tril=tfp.utils.DeferredTensor(
-          tfp.bijectors.ScaleTriL().forward,
-          tf.Variable(tf.zeros([dims * (dims + 1) // 2], dtype=tf.float32),
-                      name="raw_scale_tril")))
+      scale_tril=tfp.util.TransformedVariable(
+          tf.eye(dims, dtype=tf.float32),
+          tfp.bijectors.FillScaleTriL(),
+          name="raw_scale_tril")
   ```
 
   """
@@ -188,6 +188,7 @@ class MultivariateNormalTriL(
       loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
       scale_tril = tensor_util.convert_nonref_to_tensor(
           scale_tril, name='scale_tril', dtype=dtype)
+      self._scale_tril = scale_tril
       if scale_tril is None:
         scale = tf.linalg.LinearOperatorIdentity(
             num_rows=distribution_util.dimension_size(loc, -1),
@@ -215,3 +216,7 @@ class MultivariateNormalTriL(
   @classmethod
   def _params_event_ndims(cls):
     return dict(loc=1, scale_tril=2)
+
+  @property
+  def scale_tril(self):
+    return self._scale_tril

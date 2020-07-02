@@ -19,7 +19,6 @@ from tensorflow_probability.python.vi.csiszar_divergence import amari_alpha
 from tensorflow_probability.python.vi.csiszar_divergence import arithmetic_geometric
 from tensorflow_probability.python.vi.csiszar_divergence import chi_square
 from tensorflow_probability.python.vi.csiszar_divergence import csiszar_vimco
-from tensorflow_probability.python.vi.csiszar_divergence import csiszar_vimco_helper
 from tensorflow_probability.python.vi.csiszar_divergence import dual_csiszar_function
 from tensorflow_probability.python.vi.csiszar_divergence import jeffreys
 from tensorflow_probability.python.vi.csiszar_divergence import jensen_shannon
@@ -27,7 +26,6 @@ from tensorflow_probability.python.vi.csiszar_divergence import kl_forward
 from tensorflow_probability.python.vi.csiszar_divergence import kl_reverse
 from tensorflow_probability.python.vi.csiszar_divergence import log1p_abs
 from tensorflow_probability.python.vi.csiszar_divergence import modified_gan
-from tensorflow_probability.python.vi.csiszar_divergence import monte_carlo_csiszar_f_divergence
 from tensorflow_probability.python.vi.csiszar_divergence import monte_carlo_variational_loss
 from tensorflow_probability.python.vi.csiszar_divergence import pearson
 from tensorflow_probability.python.vi.csiszar_divergence import squared_hellinger
@@ -45,7 +43,6 @@ _allowed_symbols = [
     'arithmetic_geometric',
     'chi_square',
     'csiszar_vimco',
-    'csiszar_vimco_helper',
     'dual_csiszar_function',
     'fit_surrogate_posterior',
     'jensen_shannon',
@@ -54,7 +51,6 @@ _allowed_symbols = [
     'kl_reverse',
     'log1p_abs',
     'modified_gan',
-    'monte_carlo_csiszar_f_divergence',
     'monte_carlo_variational_loss',
     'mutual_information',
     'pearson',

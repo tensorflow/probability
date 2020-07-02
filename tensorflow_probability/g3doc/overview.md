@@ -26,33 +26,32 @@ in core TensorFlow.
 
 ### Layer 1: Statistical Building Blocks
 
-* *Distributions* ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions),
-  [`tf.distributions`](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/python/ops/distributions)):
-  A large collection of probability distributions and related statistics with
-  batch and [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html){:.external}
-  semantics.
-* *Bijectors* ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors)):
-  Reversible and composable transformations of random variables. Bijectors
-  provide a rich class of transformed distributions, from classical examples
-  like the
-  [log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution){:.external}
-  to sophisticated deep learning models such as
-  [masked autoregressive flows](https://arxiv.org/abs/1705.07057){:.external}.
+*   *Distributions*
+    ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions)):
+    A large collection of probability distributions and related statistics with
+    batch and
+    [broadcasting](https://docs.scipy.org/doc/numpy-1.14.0/user/basics.broadcasting.html){:.external}
+    semantics.
+*   *Bijectors*
+    ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors)):
+    Reversible and composable transformations of random variables. Bijectors
+    provide a rich class of transformed distributions, from classical examples
+    like the
+    [log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution){:.external}
+    to sophisticated deep learning models such as
+    [masked autoregressive flows](https://arxiv.org/abs/1705.07057){:.external}.
 
 ### Layer 2: Model Building
 
-*   *Edward2*
-    ([`tfp.edward2`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/edward2)):
-    A probabilistic programming language for specifying flexible probabilistic
-    models as programs.
+*   Joint Distributions (e.g.,
+    [`tfp.distributions.JointDistributionSequential`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/joint_distribution_sequential.py)):
+    Joint distributions over one or more possibly-interdependent distributions.
+    For an introduction to modeling with TFP's `JointDistribution`s, check out
+    [this colab](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Modeling_with_JointDistribution.ipynb)
 *   *Probabilistic layers*
     ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
     Neural network layers with uncertainty over the functions they represent,
     extending TensorFlow layers.
-*   *Trainable distributions*
-    ([`tfp.trainable_distributions`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/trainable_distributions)):
-    Probability distributions parameterized by a single tensor, making it easy
-    to build neural nets that output probability distributions.
 
 ### Layer 3: Probabilistic Inference
 

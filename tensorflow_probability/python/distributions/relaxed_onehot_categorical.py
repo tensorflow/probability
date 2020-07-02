@@ -21,14 +21,16 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -211,15 +213,11 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self, temperature=None, logits=None):
@@ -260,7 +258,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         [[n],
          self._batch_shape_tensor(temperature=temperature, logits=logits),
          self._event_shape_tensor(logits=logits)], 0)
-    uniform = tf.random.uniform(
+    uniform = samplers.uniform(
         shape=uniform_shape,
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
@@ -274,7 +272,6 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     temperature = tf.convert_to_tensor(self.temperature)
     logits = self._logits_parameter_no_checks()
 
-    x = self._assert_valid_sample(x)
     # broadcast logits or x if need be.
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(logits.shape) or
@@ -311,30 +308,21 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       return tf.identity(self._probs)
     return tf.math.softmax(self._logits)
 
-  def _assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return x
-    return distribution_util.with_dependencies([
-        assert_util.assert_non_positive(x),
-        assert_util.assert_near(
-            tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1])),
-    ], x)
-
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `logits` property will return `None` when the distribution is '
-       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
-
-  @deprecation.deprecated(
-      '2019-11-01',
-      ('The `probs` property will return `None` when the distribution is '
-       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
+      return assertions
+    assertions.append(assert_util.assert_non_positive(
+        x,
+        message=('Samples must be less than or equal to `0` for '
+                 '`ExpRelaxedOneHotCategorical` or `1` for '
+                 '`RelaxedOneHotCategorical`.')))
+    assertions.append(assert_util.assert_near(
+        tf.zeros([], dtype=self.dtype), tf.reduce_logsumexp(x, axis=[-1]),
+        message=('Final dimension of samples must sum to `0` for ''.'
+                 '`ExpRelaxedOneHotCategorical` or `1` '
+                 'for `RelaxedOneHotCategorical`.')))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
@@ -361,12 +349,12 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
 
       msg1 = 'Argument `{}` must have final dimension >= 1.'.format(name)
       msg2 = 'Argument `{}` must have final dimension <= {}.'.format(
-          name, tf.int32.max)
+          name, dtype_util.max(tf.int32))
       event_size = shape_static[-1] if shape_static is not None else None
       if event_size is not None:
         if event_size < 1:
           raise ValueError(msg1)
-        if event_size > tf.int32.max:
+        if event_size > dtype_util.max(tf.int32):
           raise ValueError(msg2)
       elif self.validate_args:
         param = tf.convert_to_tensor(param)
@@ -397,6 +385,14 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         ])
 
     return assertions
+
+  def _default_event_space_bijector(self):
+    # TODO(b/145620027) Finalize choice of bijector.
+    return chain_bijector.Chain([
+        exp_bijector.Log(validate_args=self.validate_args),
+        softmax_centered_bijector.SoftmaxCentered(
+            validate_args=self.validate_args),
+    ], validate_args=self.validate_args)
 
 
 class RelaxedOneHotCategorical(
@@ -511,6 +507,7 @@ class RelaxedOneHotCategorical(
 
     super(RelaxedOneHotCategorical, self).__init__(dist,
                                                    exp_bijector.Exp(),
+                                                   validate_args=validate_args,
                                                    name=name)
 
   @property
@@ -544,3 +541,7 @@ class RelaxedOneHotCategorical(
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     return self.distribution.probs_parameter(name)
+
+  def _default_event_space_bijector(self):
+    return softmax_centered_bijector.SoftmaxCentered(
+        validate_args=self.validate_args)

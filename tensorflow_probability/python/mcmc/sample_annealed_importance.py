@@ -22,23 +22,37 @@ import collections
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
-    "sample_annealed_importance_chain",
+    'sample_annealed_importance_chain',
 ]
 
 
-AISResults = collections.namedtuple(
-    "AISResults",
-    [
-        "proposal_log_prob",
-        "target_log_prob",
-        "inner_results",
-    ])
+class AISResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'AISResults',
+        [
+            'proposal_log_prob',
+            'target_log_prob',
+            'inner_results',
+        ])):
+  __slots__ = ()
+
+
+def _find_inner_mh_results(results):
+  if (hasattr(results, 'proposed_results')
+      and hasattr(results, 'accepted_results')):
+    return results
+  if hasattr(results, 'inner_results'):
+    return _find_inner_mh_results(results.inner_results)
+  raise TypeError('Cannot find MH results.')
 
 
 def sample_annealed_importance_chain(
@@ -48,12 +62,13 @@ def sample_annealed_importance_chain(
     current_state,
     make_kernel_fn,
     parallel_iterations=10,
+    seed=None,
     name=None):
   """Runs annealed importance sampling (AIS) to estimate normalizing constants.
 
   This function uses an MCMC transition operator (e.g., Hamiltonian Monte Carlo)
   to sample from a series of distributions that slowly interpolates between
-  an initial "proposal" distribution:
+  an initial 'proposal' distribution:
 
   `exp(proposal_log_prob_fn(x) - proposal_log_normalizer)`
 
@@ -94,9 +109,10 @@ def sample_annealed_importance_chain(
       `proposal_log_prob_fn`; it is this interpolated function which is used as
       an argument to `make_kernel_fn`.
     parallel_iterations: The number of iterations allowed to run in parallel.
-        It must be a positive integer. See `tf.while_loop` for more details.
+      It must be a positive integer. See `tf.while_loop` for more details.
+    seed: Optional, a seed for reproducible sampling.
     name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., "sample_annealed_importance_chain").
+      Default value: `None` (i.e., 'sample_annealed_importance_chain').
 
   Returns:
     next_state: `Tensor` or Python list of `Tensor`s representing the
@@ -190,31 +206,36 @@ def sample_annealed_importance_chain(
   ```
 
   """
-  with tf1.name_scope(name, "sample_annealed_importance_chain",
-                               [num_steps, current_state]):
+  is_seeded = seed is not None
+  seed = samplers.sanitize_seed(seed, salt='mcmc.sample_ais_chain')
+
+  with tf.name_scope(name or 'sample_annealed_importance_chain'):
     num_steps = tf.convert_to_tensor(
-        value=num_steps, dtype=tf.int32, name="num_steps")
+        value=num_steps, dtype=tf.int32, name='num_steps')
     if mcmc_util.is_list_like(current_state):
       current_state = [
-          tf.convert_to_tensor(value=s, name="current_state")
+          tf.convert_to_tensor(s, name='current_state')
           for s in current_state
       ]
     else:
       current_state = tf.convert_to_tensor(
-          value=current_state, name="current_state")
+          value=current_state, name='current_state')
 
     def _make_convex_combined_log_prob_fn(iter_):
       def _fn(*args):
-        p = tf.identity(proposal_log_prob_fn(*args), name="proposal_log_prob")
-        t = tf.identity(target_log_prob_fn(*args), name="target_log_prob")
-        dtype = p.dtype.base_dtype
+        p = tf.identity(proposal_log_prob_fn(*args), name='proposal_log_prob')
+        t = tf.identity(target_log_prob_fn(*args), name='target_log_prob')
+        dtype = dtype_util.base_dtype(p.dtype)
         beta = tf.cast(iter_ + 1, dtype) / tf.cast(num_steps, dtype)
         return tf.identity(beta * t + (1. - beta) * p,
-                           name="convex_combined_log_prob")
+                           name='convex_combined_log_prob')
       return _fn
 
-    def _loop_body(iter_, ais_weights, current_state, kernel_results):
+    def _loop_body(iter_, seed, ais_weights, current_state, kernel_results):
       """Closure which implements `tf.while_loop` body."""
+      iter_seed, next_seed = samplers.split_seed(
+          seed, salt='ais_chain.seeded_one_step') if is_seeded else (seed, seed)
+
       x = (current_state if mcmc_util.is_list_like(current_state)
            else [current_state])
       proposal_log_prob = proposal_log_prob_fn(*x)
@@ -222,27 +243,30 @@ def sample_annealed_importance_chain(
       ais_weights += ((target_log_prob - proposal_log_prob) /
                       tf.cast(num_steps, ais_weights.dtype))
       kernel = make_kernel_fn(_make_convex_combined_log_prob_fn(iter_))
+      # TODO(b/147676843): Should we warn if the kernel is not calibrated?
+      one_step_kwargs = dict(seed=iter_seed) if is_seeded else {}
       next_state, inner_results = kernel.one_step(
-          current_state, kernel_results.inner_results)
+          current_state, kernel_results.inner_results, **one_step_kwargs)
       kernel_results = AISResults(
           proposal_log_prob=proposal_log_prob,
           target_log_prob=target_log_prob,
           inner_results=inner_results,
       )
-      return [iter_ + 1, ais_weights, next_state, kernel_results]
+      return [iter_ + 1, next_seed, ais_weights, next_state, kernel_results]
 
     def _bootstrap_results(init_state):
       """Creates first version of `previous_kernel_results`."""
       kernel = make_kernel_fn(_make_convex_combined_log_prob_fn(iter_=0))
       inner_results = kernel.bootstrap_results(init_state)
+      mh_results = _find_inner_mh_results(inner_results)
 
-      convex_combined_log_prob = inner_results.accepted_results.target_log_prob
-      dtype = convex_combined_log_prob.dtype.as_numpy_dtype
-      shape = tf.shape(input=convex_combined_log_prob)
+      convex_combined_log_prob = mh_results.accepted_results.target_log_prob
+      dtype = dtype_util.as_numpy_dtype(convex_combined_log_prob.dtype)
+      shape = tf.shape(convex_combined_log_prob)
       proposal_log_prob = tf.fill(shape, dtype(np.nan),
-                                  name="bootstrap_proposal_log_prob")
+                                  name='bootstrap_proposal_log_prob')
       target_log_prob = tf.fill(shape, dtype(np.nan),
-                                name="target_target_log_prob")
+                                name='target_target_log_prob')
 
       return AISResults(
           proposal_log_prob=proposal_log_prob,
@@ -252,18 +276,20 @@ def sample_annealed_importance_chain(
 
     previous_kernel_results = _bootstrap_results(current_state)
     inner_results = previous_kernel_results.inner_results
+    mh_results = _find_inner_mh_results(inner_results)
 
     ais_weights = tf.zeros(
         shape=tf.broadcast_dynamic_shape(
-            tf.shape(input=inner_results.proposed_results.target_log_prob),
-            tf.shape(input=inner_results.accepted_results.target_log_prob)),
-        dtype=inner_results.proposed_results.target_log_prob.dtype.base_dtype)
+            tf.shape(mh_results.proposed_results.target_log_prob),
+            tf.shape(mh_results.accepted_results.target_log_prob)),
+        dtype=mh_results.proposed_results.target_log_prob.dtype)
 
-    [_, ais_weights, current_state, kernel_results] = tf.while_loop(
+    [_, _, ais_weights, current_state, kernel_results] = tf.while_loop(
         cond=lambda iter_, *args: iter_ < num_steps,
         body=_loop_body,
         loop_vars=[
             np.int32(0),  # iter_
+            seed,
             ais_weights,
             current_state,
             previous_kernel_results,

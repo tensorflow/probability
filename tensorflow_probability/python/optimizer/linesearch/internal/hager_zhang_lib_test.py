@@ -22,10 +22,9 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 # Define value and gradient namedtuple
@@ -42,13 +41,13 @@ def _interval(val_left, val_right):
   return LineSearchInterval(
       converged=false,
       failed=false,
-      func_evals=tf.constant(value=0),
-      iterations=tf.constant(value=0),
+      func_evals=tf.constant(0),
+      iterations=tf.constant(0),
       left=val_left,
       right=val_right)
 
 
-def test_function_x_y(x, y):
+def _test_function_x_y(x, y):
   """Builds a function that passes through the given points.
 
   Args:
@@ -62,31 +61,31 @@ def test_function_x_y(x, y):
   batches = y.shape[0] if len(y.shape) == 2 else None
   deg = len(x) - 1
   poly = np.polyfit(x, y.T, deg)
-  poly = [tf.convert_to_tensor(value=c, dtype=tf.float32) for c in poly]
+  poly = [tf.convert_to_tensor(c, dtype=tf.float32) for c in poly]
 
   def f(t):
-    t = tf.convert_to_tensor(value=t, dtype=tf.float32)
+    t = tf.convert_to_tensor(t, dtype=tf.float32)
     if batches is not None and not tuple(t.shape):
       # Broadcast a scalar through all batches.
-      t = tf.tile(tf.expand_dims(t, -1), [batches])
+      t = tf.tile(t[..., tf.newaxis], [batches])
     f, df = value_and_gradient(lambda t_: tf.math.polyval(poly, t_), t)
     return ValueAndGradient(x=t, f=tf.squeeze(f), df=tf.squeeze(df))
 
   return f
 
 
-def test_function_x_y_dy(x, y, dy, eps=0.01):
+def _test_function_x_y_dy(x, y, dy, eps=0.01):
   """Builds a polynomial with (approx) given values and derivatives."""
   x1 = x + eps
   y1 = y + eps * dy
   x2 = x - eps
   y2 = y - eps * dy
-  return test_function_x_y(
+  return _test_function_x_y(
       np.concatenate([x1, x2], axis=-1), np.concatenate([y1, y2], axis=-1))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HagerZhangLibTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class HagerZhangLibTest(test_util.TestCase):
 
   def test_secant2_batching_vs_mapping(self):
     # We build a simple example function with 2 batches, one where the wolfe
@@ -99,9 +98,9 @@ class HagerZhangLibTest(test_case.TestCase):
                     [-0.8, -0.8, -1.0, 0.8]])
 
     # Create each individual and batched functions.
-    fun1 = test_function_x_y_dy(x, ys[0], dys[0])
-    fun2 = test_function_x_y_dy(x, ys[1], dys[1])
-    funs = test_function_x_y_dy(x, ys, dys)
+    fun1 = _test_function_x_y_dy(x, ys[0], dys[0])
+    fun2 = _test_function_x_y_dy(x, ys[1], dys[1])
+    funs = _test_function_x_y_dy(x, ys, dys)
 
     def eval_secant2(fun):
       val_0 = fun(0.0)
@@ -140,7 +139,7 @@ class HagerZhangLibTest(test_case.TestCase):
     x = np.array([0.0, 0.6, 1.0])
     y = np.array([1.0, 0.9, 1.2])
     dy = np.array([-0.8, -0.7, 0.6])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)
     val_b = fun(1.0)
@@ -176,7 +175,7 @@ class HagerZhangLibTest(test_case.TestCase):
                    [-0.8, -0.7, 0.6],
                    [-0.8, -0.7, 0.6],
                    [-0.8, -0.7, 0.6]])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Values at zero.
     val_b = fun(1.0)  # Values at initial step.
@@ -205,9 +204,9 @@ class HagerZhangLibTest(test_case.TestCase):
                     [-0.8, -0.7, 0.6]])
 
     # Create each individual and batched functions.
-    fun1 = test_function_x_y_dy(x, ys[0], dys[0])
-    fun2 = test_function_x_y_dy(x, ys[1], dys[1])
-    funs = test_function_x_y_dy(x, ys, dys)
+    fun1 = _test_function_x_y_dy(x, ys[0], dys[0])
+    fun2 = _test_function_x_y_dy(x, ys[1], dys[1])
+    funs = _test_function_x_y_dy(x, ys, dys)
 
     def eval_update(fun):
       val_a = fun(0.0)
@@ -234,7 +233,7 @@ class HagerZhangLibTest(test_case.TestCase):
     x = np.array([0.0, 1.0, 2.5, 5.0])
     y = np.array([1.0, 0.9, -2.0, 1.1])
     dy = np.array([-0.8, -0.7, 1.6, -0.8])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Value at zero.
     val_b = fun(1.0)  # Value at initial step.
@@ -268,7 +267,7 @@ class HagerZhangLibTest(test_case.TestCase):
                    [-0.8, -0.7, -0.5, 0.6],
                    [-0.8, -0.7, -0.3, -0.8],
                    [-0.8, -0.7, 1.6, -0.8]])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)
     val_b = fun(1.0)
@@ -293,7 +292,7 @@ class HagerZhangLibTest(test_case.TestCase):
     x = np.array([0.0, 0.5, 1.0])
     y = np.array([1.0, 0.6, 1.2])
     dy = np.array([-0.8, 0.6, -0.7])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Value at zero.
     val_b = fun(1.0)  # Value at initial step.
@@ -318,7 +317,7 @@ class HagerZhangLibTest(test_case.TestCase):
                    [-0.8, -0.4, -0.7],
                    [-0.8, 0.8, -0.7],
                    [-0.8, -0.4, -0.7]])
-    fun = test_function_x_y_dy(x, y, dy)
+    fun = _test_function_x_y_dy(x, y, dy)
 
     val_a = fun(0.0)  # Values at zero.
     val_b = fun(1.0)  # Values at initial step.

@@ -24,20 +24,19 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class FitTestFast(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class FitTestFast(test_util.TestCase):
 
   dtype = np.float32
   fast = True
 
   def make_dataset(self, n, d, link, offset=None, scale=1.):
-    seed = tfd.SeedStream(
+    seed = tfp.util.SeedStream(
         seed=213356351, salt='tfp.glm.fisher_scoring_test')
     model_coefficients = tfd.Uniform(
         low=np.array(-0.5, self.dtype),

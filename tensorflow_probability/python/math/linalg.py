@@ -27,76 +27,25 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
-# pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops.linalg import linear_operator_util
-from tensorflow.python.util import deprecation
-# pylint: enable=g-direct-tensorflow-import
+
 
 __all__ = [
     'cholesky_concat',
+    'cholesky_update',
     'fill_triangular',
     'fill_triangular_inverse',
     'lu_matrix_inverse',
     'lu_reconstruct',
     'lu_reconstruct_assertions',  # Internally visible for MatvecLU.
     'lu_solve',
-    'matrix_rank',
-    'pinv',
     'pivoted_cholesky',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
 ]
-
-
-def matrix_rank(a, tol=None, validate_args=False, name=None):
-  """Compute the matrix rank; the number of non-zero SVD singular values.
-
-  Arguments:
-    a: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
-      pseudo-inverted.
-    tol: Threshold below which the singular value is counted as 'zero'.
-      Default value: `None` (i.e., `eps * max(rows, cols) * max(singular_val)`).
-    validate_args: When `True`, additional assertions might be embedded in the
-      graph.
-      Default value: `False` (i.e., no graph assertions are added).
-    name: Python `str` prefixed to ops created by this function.
-      Default value: 'matrix_rank'.
-
-  Returns:
-    matrix_rank: (Batch of) `int32` scalars representing the number of non-zero
-      singular values.
-  """
-  with tf.name_scope(name or 'matrix_rank'):
-    a = tf.convert_to_tensor(a, dtype_hint=tf.float32, name='a')
-    assertions = _maybe_validate_matrix(a, validate_args)
-    if assertions:
-      with tf.control_dependencies(assertions):
-        a = tf.identity(a)
-    s = tf.linalg.svd(a, compute_uv=False)
-    if tol is None:
-      if tensorshape_util.is_fully_defined(a.shape[-2:]):
-        m = np.max(a.shape[-2:].as_list())
-      else:
-        m = tf.reduce_max(tf.shape(a)[-2:])
-      eps = np.finfo(dtype_util.as_numpy_dtype(a.dtype)).eps
-      tol = (
-          eps * tf.cast(m, a.dtype) * tf.reduce_max(s, axis=-1, keepdims=True))
-    return tf.reduce_sum(tf.cast(s > tol, tf.int32), axis=-1)
-
-
-try:
-  matrix_rank = tf.linalg.matrix_rank
-except AttributeError:
-  pass
-
-
-matrix_rank = deprecation.deprecated(
-    '2019-10-01',
-    'tfp.math.matrix_rank is deprecated. Use tf.linalg.matrix_rank instead',
-    warn_once=True)(matrix_rank)
 
 
 def cholesky_concat(chol, cols, name=None):
@@ -142,8 +91,7 @@ def cholesky_concat(chol, cols, name=None):
     cols = tf.convert_to_tensor(cols, name='cols', dtype=dtype)
     n = prefer_static.shape(chol)[-1]
     mat_nm, mat_mm = cols[..., :n, :], cols[..., n:, :]
-    solved_nm = linear_operator_util.matrix_triangular_solve_with_broadcast(
-        chol, mat_nm)
+    solved_nm = tf.linalg.triangular_solve(chol, mat_nm)
     lower_right_mm = tf.linalg.cholesky(
         mat_mm - tf.matmul(solved_nm, solved_nm, adjoint_a=True))
     lower_left_mn = tf.math.conj(tf.linalg.matrix_transpose(solved_nm))
@@ -155,6 +103,113 @@ def cholesky_concat(chol, cols, name=None):
     return tf.concat([tf.concat([chol, top_right_zeros_nm], axis=-1),
                       tf.concat([lower_left_mn, lower_right_mm], axis=-1)],
                      axis=-2)
+
+
+def cholesky_update(chol, update_vector, multiplier=1., name=None):
+  """Returns cholesky of chol @ chol.T + multiplier * u @ u.T.
+
+  Given a (batch of) lower triangular cholesky factor(s) `chol`, along with a
+  (batch of) vector(s) `update_vector`, compute the lower triangular cholesky
+  factor of the rank-1 update `chol @ chol.T + multiplier * u @ u.T`, where
+  `multiplier` is a (batch of) scalar(s).
+
+  If `chol` has shape `[L, L]`, this has complexity `O(L^2)` compared to the
+  naive algorithm which has complexity `O(L^3)`.
+
+  Args:
+    chol: Floating-point `Tensor` with shape `[B1, ..., Bn, L, L]`.
+      Cholesky decomposition of `mat = chol @ chol.T`. Batch dimensions
+      must be broadcastable with `update_vector` and `multiplier`.
+    update_vector: Floating-point `Tensor` with shape `[B1, ... Bn, L]`. Vector
+      defining rank-one update. Batch dimensions must be broadcastable with
+      `chol` and `multiplier`.
+    multiplier: Floating-point `Tensor` with shape `[B1, ..., Bn]. Scalar
+      multiplier to rank-one update. Batch dimensions must be broadcastable
+      with `chol` and `update_vector`. Note that updates where `multiplier` is
+      positive are numerically stable, while when `multiplier` is negative
+      (downdating), the update will only work if the new resulting matrix is
+      still positive definite.
+    name: Optional name for this op.
+
+  #### References
+  [1] Oswin Krause. Christian Igel. A More Efficient Rank-one Covariance
+      Matrix Update for Evolution Strategies. 2015 ACM Conference.
+      https://www.researchgate.net/publication/300581419_A_More_Efficient_Rank-one_Covariance_Matrix_Update_for_Evolution_Strategies
+  """
+  # TODO(b/154638092): Move this functionality in to TensorFlow.
+  with tf.name_scope(name or 'cholesky_update'):
+    dtype = dtype_util.common_dtype(
+        [chol, update_vector, multiplier], dtype_hint=tf.float32)
+    chol = tf.convert_to_tensor(chol, name='chol', dtype=dtype)
+    update_vector = tf.convert_to_tensor(
+        update_vector, name='update_vector', dtype=dtype)
+    multiplier = tf.convert_to_tensor(
+        multiplier, name='multiplier', dtype=dtype)
+
+    batch_shape = prefer_static.broadcast_shape(
+        prefer_static.broadcast_shape(
+            tf.shape(chol)[:-2],
+            tf.shape(update_vector)[:-1]), tf.shape(multiplier))
+    chol = tf.broadcast_to(
+        chol, prefer_static.concat(
+            [batch_shape, tf.shape(chol)[-2:]], axis=0))
+    update_vector = tf.broadcast_to(
+        update_vector, prefer_static.concat(
+            [batch_shape, tf.shape(update_vector)[-1:]], axis=0))
+    multiplier = tf.broadcast_to(multiplier, batch_shape)
+
+    chol_diag = tf.linalg.diag_part(chol)
+
+    # The algorithm in [1] is implemented as a double for loop. We can treat
+    # the inner loop in Algorithm 3.1 as a vector operation, and thus the
+    # whole algorithm as a single for loop, and hence can use a `tf.scan`
+    # on it.
+
+    # We use for accumulation omega and b as defined in Algorithm 3.1, since
+    # these are updated per iteration.
+
+    def compute_new_column(accumulated_quantities, state):
+      """Computes the next column of the updated cholesky."""
+      _, _, omega, b = accumulated_quantities
+      index, diagonal_member, col = state
+      omega_at_index = tf.gather(omega, index, axis=-1)
+
+      # Line 4
+      new_diagonal_member = tf.math.sqrt(
+          tf.math.square(diagonal_member) + multiplier / b * tf.math.square(
+              omega_at_index))
+      # `scaling_factor` is the same as `gamma` on Line 5.
+      scaling_factor = (tf.math.square(diagonal_member) * b +
+                        multiplier * tf.math.square(omega_at_index))
+
+      # The following updates are the same as the for loop in lines 6-8.
+      omega = omega - (omega_at_index / diagonal_member)[..., tf.newaxis] * col
+      new_col = new_diagonal_member[..., tf.newaxis]  * (
+          col / diagonal_member[..., tf.newaxis] +
+          (multiplier * omega_at_index / scaling_factor)[
+              ..., tf.newaxis] * omega)
+      b = b + multiplier * tf.math.square(omega_at_index / diagonal_member)
+      return new_diagonal_member, new_col, omega, b
+
+    # We will scan over the columns.
+    chol = distribution_util.move_dimension(chol, source_idx=-1, dest_idx=0)
+    chol_diag = distribution_util.move_dimension(
+        chol_diag, source_idx=-1, dest_idx=0)
+
+    new_diag, new_chol, _, _ = tf.scan(
+        fn=compute_new_column,
+        elems=(tf.range(0, tf.shape(chol)[0]), chol_diag, chol),
+        initializer=(
+            tf.zeros_like(multiplier),
+            tf.zeros_like(chol[0, ...]),
+            update_vector,
+            tf.ones_like(multiplier)))
+    new_chol = distribution_util.move_dimension(
+        new_chol, source_idx=0, dest_idx=-1)
+    new_diag = distribution_util.move_dimension(
+        new_diag, source_idx=0, dest_idx=-1)
+    new_chol = tf.linalg.set_diag(new_chol, new_diag)
+    return new_chol
 
 
 def _swap_m_with_i(vecs, m, i):
@@ -186,9 +241,16 @@ def _swap_m_with_i(vecs, m, i):
       vecs[..., m + 1:])
   # TODO(bjp): Could we use tensor_scatter_nd_update?
   vecs_shape = vecs.shape
+  vecs_rank = tensorshape_util.rank(vecs_shape)
+  if vecs_rank is None:
+    raise NotImplementedError(
+        'Input vector to swap must have statically known rank. If you cannot '
+        'provide static rank please contact core TensorFlow team and request '
+        'that `tf.gather` `batch_dims` argument support `tf.Tensor`-valued '
+        'inputs.')
   vecs = tf.concat([
       vecs[..., :m],
-      tf.gather(vecs, i, batch_dims=int(prefer_static.rank(vecs)) - 1),
+      tf.gather(vecs, i, batch_dims=int(vecs_rank) - 1),
       trailing_elts
   ], axis=-1)
   tensorshape_util.set_shape(vecs, vecs_shape)
@@ -196,9 +258,7 @@ def _swap_m_with_i(vecs, m, i):
 
 
 def _invert_permutation(perm):  # TODO(b/130217510): Remove this function.
-  return tf.cast(
-      tf.math.top_k(perm, k=prefer_static.shape(perm)[-1],
-                    sorted=True).indices[..., ::-1], perm.dtype)
+  return tf.cast(tf.argsort(perm, axis=-1), perm.dtype)
 
 
 def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
@@ -243,14 +303,18 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
   with tf.name_scope(name or 'pivoted_cholesky'):
     dtype = dtype_util.common_dtype([matrix, diag_rtol],
                                     dtype_hint=tf.float32)
-    matrix = tf.convert_to_tensor(matrix, name='matrix', dtype=dtype)
+    if not isinstance(matrix, tf.linalg.LinearOperator):
+      matrix = tf.convert_to_tensor(matrix, name='matrix', dtype=dtype)
     if tensorshape_util.rank(matrix.shape) is None:
       raise NotImplementedError('Rank of `matrix` must be known statically')
+    if isinstance(matrix, tf.linalg.LinearOperator):
+      matrix_shape = tf.cast(matrix.shape_tensor(), tf.int64)
+    else:
+      matrix_shape = prefer_static.shape(matrix, out_type=tf.int64)
 
     max_rank = tf.convert_to_tensor(
         max_rank, name='max_rank', dtype=tf.int64)
-    max_rank = tf.minimum(max_rank,
-                          prefer_static.shape(matrix, out_type=tf.int64)[-1])
+    max_rank = tf.minimum(max_rank, matrix_shape[-1])
     diag_rtol = tf.convert_to_tensor(
         diag_rtol, dtype=dtype, name='diag_rtol')
     matrix_diag = tf.linalg.diag_part(matrix)
@@ -294,7 +358,10 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       # Update perm: Swap perm[...,m] with perm[...,maxi]. Step 3 above.
       perm = _swap_m_with_i(perm, m, maxi)
       # Step 4.
-      row = batch_gather(matrix, perm[..., m:m + 1], axis=-2)
+      if callable(getattr(matrix, 'row', None)):
+        row = matrix.row(perm[..., m])[..., tf.newaxis, :]
+      else:
+        row = batch_gather(matrix, perm[..., m:m + 1], axis=-2)
       row = batch_gather(row, perm[..., m + 1:])
       # Step 5.
       prev_rows = pchol[..., :m, :]
@@ -326,8 +393,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       return m + 1, pchol, perm, matrix_diag
 
     m = np.int64(0)
-    pchol = tf.zeros_like(matrix[..., :max_rank, :])
-    matrix_shape = prefer_static.shape(matrix, out_type=tf.int64)
+    pchol = tf.zeros(matrix_shape, dtype=matrix.dtype)[..., :max_rank, :]
     perm = tf.broadcast_to(
         prefer_static.range(matrix_shape[-1]), matrix_shape[:-1])
     _, pchol, _, _ = tf.while_loop(
@@ -336,143 +402,6 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
     tensorshape_util.set_shape(
         pchol, tensorshape_util.concatenate(matrix_diag.shape, [None]))
     return pchol
-
-
-def pinv(a, rcond=None, validate_args=False, name=None):
-  """Compute the Moore-Penrose pseudo-inverse of a matrix.
-
-  Calculate the [generalized inverse of a matrix](
-  https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse) using its
-  singular-value decomposition (SVD) and including all large singular values.
-
-  The pseudo-inverse of a matrix `A`, is defined as: 'the matrix that 'solves'
-  [the least-squares problem] `A @ x = b`,' i.e., if `x_hat` is a solution, then
-  `A_pinv` is the matrix such that `x_hat = A_pinv @ b`. It can be shown that if
-  `U @ Sigma @ V.T = A` is the singular value decomposition of `A`, then
-  `A_pinv = V @ inv(Sigma) U^T`. [(Strang, 1980)][1]
-
-  This function is analogous to [`numpy.linalg.pinv`](
-  https://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.pinv.html).
-  It differs only in default value of `rcond`. In `numpy.linalg.pinv`, the
-  default `rcond` is `1e-15`. Here the default is
-  `10. * max(num_rows, num_cols) * np.finfo(dtype).eps`.
-
-  Args:
-    a: (Batch of) `float`-like matrix-shaped `Tensor`(s) which are to be
-      pseudo-inverted.
-    rcond: `Tensor` of small singular value cutoffs.  Singular values smaller
-      (in modulus) than `rcond` * largest_singular_value (again, in modulus) are
-      set to zero. Must broadcast against `tf.shape(a)[:-2]`.
-      Default value: `10. * max(num_rows, num_cols) * np.finfo(a.dtype).eps`.
-    validate_args: When `True`, additional assertions might be embedded in the
-      graph.
-      Default value: `False` (i.e., no graph assertions are added).
-    name: Python `str` prefixed to ops created by this function.
-      Default value: 'pinv'.
-
-  Returns:
-    a_pinv: The pseudo-inverse of input `a`. Has same shape as `a` except
-      rightmost two dimensions are transposed.
-
-  Raises:
-    TypeError: if input `a` does not have `float`-like `dtype`.
-    ValueError: if input `a` has fewer than 2 dimensions.
-
-  #### Examples
-
-  ```python
-  import tensorflow as tf
-  import tensorflow_probability as tfp
-
-  a = tf.constant([[1.,  0.4,  0.5],
-                   [0.4, 0.2,  0.25],
-                   [0.5, 0.25, 0.35]])
-  tf.matmul(tfp.math.pinv(a), a)
-  # ==> array([[1., 0., 0.],
-               [0., 1., 0.],
-               [0., 0., 1.]], dtype=float32)
-
-  a = tf.constant([[1.,  0.4,  0.5,  1.],
-                   [0.4, 0.2,  0.25, 2.],
-                   [0.5, 0.25, 0.35, 3.]])
-  tf.matmul(tfp.math.pinv(a), a)
-  # ==> array([[ 0.76,  0.37,  0.21, -0.02],
-               [ 0.37,  0.43, -0.33,  0.02],
-               [ 0.21, -0.33,  0.81,  0.01],
-               [-0.02,  0.02,  0.01,  1.  ]], dtype=float32)
-  ```
-
-  #### References
-
-  [1]: G. Strang. 'Linear Algebra and Its Applications, 2nd Ed.' Academic Press,
-       Inc., 1980, pp. 139-142.
-  """
-  with tf.name_scope(name or 'pinv'):
-    a = tf.convert_to_tensor(a, name='a')
-
-    assertions = _maybe_validate_matrix(a, validate_args)
-    if assertions:
-      with tf.control_dependencies(assertions):
-        a = tf.identity(a)
-
-    dtype = dtype_util.as_numpy_dtype(a.dtype)
-
-    if rcond is None:
-      def get_dim_size(dim):
-        if tf.compat.dimension_value(a.shape[dim]) is not None:
-          return tf.compat.dimension_value(a.shape[dim])
-        return tf.shape(a)[dim]
-
-      num_rows = get_dim_size(-2)
-      num_cols = get_dim_size(-1)
-      if isinstance(num_rows, int) and isinstance(num_cols, int):
-        max_rows_cols = float(max(num_rows, num_cols))
-      else:
-        max_rows_cols = tf.cast(tf.maximum(num_rows, num_cols), dtype)
-      rcond = 10. * max_rows_cols * np.finfo(dtype).eps
-
-    rcond = tf.convert_to_tensor(rcond, dtype=dtype, name='rcond')
-
-    # Calculate pseudo inverse via SVD.
-    # Note: if a is symmetric then u == v. (We might observe additional
-    # performance by explicitly setting `v = u` in such cases.)
-    [
-        singular_values,         # Sigma
-        left_singular_vectors,   # U
-        right_singular_vectors,  # V
-    ] = tf.linalg.svd(a, full_matrices=False, compute_uv=True)
-
-    # Saturate small singular values to inf. This has the effect of make
-    # `1. / s = 0.` while not resulting in `NaN` gradients.
-    cutoff = rcond * tf.reduce_max(singular_values, axis=-1)
-    singular_values = tf.where(
-        singular_values > cutoff[..., tf.newaxis], singular_values,
-        np.array(np.inf, dtype))
-
-    # Although `a == tf.matmul(u, s * v, transpose_b=True)` we swap
-    # `u` and `v` here so that `tf.matmul(pinv(A), A) = tf.eye()`, i.e.,
-    # a matrix inverse has 'transposed' semantics.
-    a_pinv = tf.matmul(
-        right_singular_vectors / singular_values[..., tf.newaxis, :],
-        left_singular_vectors,
-        adjoint_b=True)
-
-    if tensorshape_util.rank(a.shape) is not None:
-      a_pinv.set_shape(a.shape[:-2].concatenate([a.shape[-1], a.shape[-2]]))
-
-    return a_pinv
-
-
-try:
-  pinv = tf.linalg.pinv
-except AttributeError:
-  pass
-
-
-pinv = deprecation.deprecated(
-    '2019-10-01',
-    'tfp.math.pinv is deprecated. Use tf.linalg.pinv instead',
-    warn_once=True)(pinv)
 
 
 def lu_solve(lower_upper, perm, rhs,
@@ -567,11 +496,9 @@ def lu_solve(lower_upper, perm, rhs,
     lower = tf.linalg.set_diag(
         tf.linalg.band_part(lower_upper, num_lower=-1, num_upper=0),
         tf.ones(tf.shape(lower_upper)[:-1], dtype=lower_upper.dtype))
-    return linear_operator_util.matrix_triangular_solve_with_broadcast(
+    return tf.linalg.triangular_solve(
         lower_upper,  # Only upper is accessed.
-        linear_operator_util.matrix_triangular_solve_with_broadcast(
-            lower, permuted_rhs),
-        lower=False)
+        tf.linalg.triangular_solve(lower, permuted_rhs), lower=False)
 
 
 def lu_matrix_inverse(lower_upper, perm, validate_args=False, name=None):
@@ -704,7 +631,7 @@ def lu_reconstruct(lower_upper, perm, validate_args=False, name=None):
     else:
       x = tf.gather(x, tf.math.invert_permutation(perm))
 
-    x.set_shape(lower_upper.shape)
+    tensorshape_util.set_shape(x, lower_upper.shape)
     return x
 
 
@@ -747,8 +674,8 @@ def _lu_solve_assertions(lower_upper, perm, rhs, validate_args):
   assertions = lu_reconstruct_assertions(lower_upper, perm, validate_args)
 
   message = 'Input `rhs` must have at least 2 dimensions.'
-  if rhs.shape.ndims is not None:
-    if rhs.shape.ndims < 2:
+  if tensorshape_util.rank(rhs.shape) is not None:
+    if tensorshape_util.rank(rhs.shape) < 2:
       raise ValueError(message)
   elif validate_args:
     assertions.append(
@@ -921,6 +848,7 @@ def fill_triangular(x, upper=False, name=None):
 
   From this example we see that the resuting matrix is upper-triangular, and
   contains all the entries of x, as desired. The rest is details:
+
   - If `n` is even, `x` doesn't exactly fill an even number of rows (it fills
     `n / 2` rows and half of an additional row), but the whole scheme still
     works.

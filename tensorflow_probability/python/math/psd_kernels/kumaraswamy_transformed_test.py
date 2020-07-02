@@ -25,8 +25,7 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 def _kumaraswamy_warp(x, c1, c0):
@@ -48,8 +47,8 @@ def _numpy_exp_quad_matrix(amplitude, length_scale, x, feature_ndims):
       feature_ndims)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class _KumaraswamyTransformedTest(parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class _KumaraswamyTransformedTest(test_util.TestCase):
 
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
@@ -88,7 +87,7 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
         _numpy_exp_quad_matrix(
             amplitude[..., None, None], inner_length_scale, z,
             feature_ndims=feature_ndims),
-        self.evaluate(kum_kernel.matrix(z, z)))
+        self.evaluate(kum_kernel.matrix(z, z)), rtol=1e-5)
 
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
@@ -144,13 +143,11 @@ class _KumaraswamyTransformedTest(parameterized.TestCase):
         self.evaluate(kum_kernel.matrix(z, z)), atol=1e-4, rtol=1e-4)
 
 
-class KumaraswamyTransformedFloat32Test(
-    _KumaraswamyTransformedTest, test_case.TestCase):
+class KumaraswamyTransformedFloat32Test(_KumaraswamyTransformedTest):
   dtype = np.float32
 
 
-class KumaraswamyTransformedFloat64Test(
-    _KumaraswamyTransformedTest, test_case.TestCase):
+class KumaraswamyTransformedFloat64Test(_KumaraswamyTransformedTest):
   dtype = np.float64
 
 

@@ -18,25 +18,39 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import itertools
+
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import masked_autoregressive
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-
+from tensorflow_probability.python.internal import test_util
 
 tfk = tf.keras
-
 tfkl = tf.keras.layers
+
+
+def _funnel_bijector_fn(x):
+  """Funnel transform."""
+  batch_shape = tf.shape(x)[:-1]
+  ndims = 4
+  scale = tf.concat(
+      [
+          tf.ones(tf.concat([batch_shape, [1]], axis=0)),
+          tf.exp(x[..., :1] / 2) *
+          tf.ones(tf.concat([batch_shape, [ndims - 1]], axis=0)),
+      ],
+      axis=-1,
+  )
+  return tfb.Scale(scale)
 
 
 def _masked_autoregressive_2d_template(base_template, event_shape):
@@ -44,7 +58,11 @@ def _masked_autoregressive_2d_template(base_template, event_shape):
   def wrapper(x):
     x_flat = tf.reshape(
         x, tf.concat([tf.shape(x)[:-len(event_shape)], [-1]], -1))
-    x_shift, x_log_scale = base_template(x_flat)
+    t = base_template(x_flat)
+    if tf.is_tensor(t):
+      x_shift, x_log_scale = tf.unstack(t, axis=-1)
+    else:
+      x_shift, x_log_scale = t
     return tf.reshape(x_shift, tf.shape(x)), tf.reshape(
         x_log_scale, tf.shape(x))
 
@@ -63,7 +81,7 @@ def _masked_autoregressive_shift_and_log_scale_fn(hidden_units,
   if shift_only:
     return lambda x: (layer(x)[..., 0], None)
 
-  return lambda x: tf.unstack(layer(x), axis=-1)
+  return layer
 
 
 def _masked_autoregressive_gated_bijector_fn(hidden_units,
@@ -89,8 +107,8 @@ def _masked_autoregressive_gated_bijector_fn(hidden_units,
   return _bijector_fn
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GenMaskTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GenMaskTest(test_util.TestCase):
 
   def test346Exclusive(self):
     expected_mask = np.array(
@@ -100,7 +118,8 @@ class GenMaskTest(test_case.TestCase):
          [1, 0, 0, 0],
          [1, 1, 0, 0],
          [1, 1, 0, 0]])
-    mask = _gen_mask(num_blocks=3, n_in=4, n_out=6, mask_type="exclusive")
+    mask = masked_autoregressive._gen_mask(
+        num_blocks=3, n_in=4, n_out=6, mask_type="exclusive")
     self.assertAllEqual(expected_mask, mask)
 
   def test346Inclusive(self):
@@ -111,13 +130,164 @@ class GenMaskTest(test_case.TestCase):
          [1, 1, 0, 0],
          [1, 1, 1, 0],
          [1, 1, 1, 0]])
-    mask = _gen_mask(num_blocks=3, n_in=4, n_out=6, mask_type="inclusive")
+    mask = masked_autoregressive._gen_mask(
+        num_blocks=3, n_in=4, n_out=6, mask_type="inclusive")
     self.assertAllEqual(expected_mask, mask)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
-                                   test_case.TestCase):
+class MakeDenseAutoregressiveMasksTest(test_util.TestCase):
+
+  def testRandomMade(self):
+    hidden_size = 8
+    num_hidden = 3
+    params = 2
+    event_size = 4
+
+    def random_made(x):
+      masks = masked_autoregressive._make_dense_autoregressive_masks(
+          params=params,
+          event_size=event_size,
+          hidden_units=[hidden_size] * num_hidden)
+      output_sizes = [hidden_size] * num_hidden
+      input_size = event_size
+      for (mask, output_size) in zip(masks, output_sizes):
+        mask = tf.cast(mask, tf.float32)
+        x = tf.matmul(
+            x,
+            np.random.randn(input_size, output_size).astype(np.float32) * mask)
+        x = tf.nn.relu(x)
+        input_size = output_size
+      x = tf.matmul(
+          x,
+          np.random.randn(input_size, params * event_size).astype(np.float32) *
+          masks[-1])
+      x = tf.reshape(x, [-1, event_size, params])
+      return x
+
+    y = random_made(tf.zeros([1, event_size]))
+    self.assertEqual([1, event_size, params], y.shape)
+
+  def testLeftToRight(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order="left-to-right",
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 0, 0],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+    ], masks[2])
+
+  def testRandom(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order="random",
+        hidden_degrees="random",
+        seed=1)
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 0, 1, 1],
+        [0, 0, 0, 0],
+        [1, 1, 1, 1],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 0, 1, 1],
+        [1, 1, 1, 1],
+        [1, 0, 1, 1],
+        [1, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 0, 0],
+        [1, 1, 1, 1, 0, 0],
+        [0, 0, 1, 1, 0, 0],
+        [0, 0, 1, 1, 0, 0],
+    ], masks[2])
+
+  def testRightToLeft(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order=list(reversed(range(1, 4))),
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [0, 0, 0, 0],
+        [0, 0, 1, 1],
+        [1, 1, 1, 1],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 0, 0, 0, 0],
+        [1, 1, 0, 0, 0, 0],
+    ], masks[2])
+
+  def testUneven(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[5, 3],
+        input_order="left-to-right",
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 1, 1, 1, 1],
+        [0, 0, 0, 1, 1],
+        [0, 0, 0, 0, 0],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+    ], masks[2])
+
+
+@test_util.test_all_tf_execution_regimes
+class _MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
+                                    test_util.TestCase):
 
   event_shape = [4]
 
@@ -197,6 +367,20 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
     self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=1e-4)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=1e-6)
 
+  @test_util.numpy_disable_gradient_test
+  def testGradients(self):
+    maf = tfb.MaskedAutoregressiveFlow(
+        validate_args=True, **self._autoregressive_flow_kwargs)
+
+    def _transform(x):
+      y = maf.forward(x)
+      return maf.inverse(tf.identity(y))
+
+    self.evaluate(tf1.global_variables_initializer())
+    _, gradient = tfp_math.value_and_gradient(_transform,
+                                              tf.zeros(self.event_shape))
+    self.assertIsNotNone(gradient)
+
   def testMutuallyConsistent(self):
     maf = tfb.MaskedAutoregressiveFlow(
         validate_args=True, **self._autoregressive_flow_kwargs)
@@ -265,8 +449,17 @@ class MaskedAutoregressiveFlowTest(tfp_test_util.VectorDistributionTestHelpers,
       maf.forward([1., 2.])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
+@test_util.numpy_disable_test_missing_functionality("tf.make_template")
+@test_util.jax_disable_test_missing_functionality("tf.make_template")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFlowTest(_MaskedAutoregressiveFlowTest):
+  pass
+
+
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFlowShiftOnlyTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -279,8 +472,10 @@ class MaskedAutoregressiveFlowShiftOnlyTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressiveFlowShiftOnlyLayerTest(MaskedAutoregressiveFlowTest):
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFlowShiftOnlyLayerTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -293,8 +488,10 @@ class MaskedAutoregressiveFlowShiftOnlyLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
+@test_util.numpy_disable_test_missing_functionality("tf.make_template")
+@test_util.jax_disable_test_missing_functionality("tf.make_template")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFlowUnrollLoopTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -309,8 +506,11 @@ class MaskedAutoregressiveFlowUnrollLoopTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressiveFlowUnrollLoopLayerTest(MaskedAutoregressiveFlowTest):
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFlowUnrollLoopLayerTest(_MaskedAutoregressiveFlowTest
+                                                 ):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -325,8 +525,10 @@ class MaskedAutoregressiveFlowUnrollLoopLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressive2DTest(_MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 
   @property
@@ -344,8 +546,10 @@ class MaskedAutoregressive2DTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressiveGatedTest(MaskedAutoregressiveFlowTest):
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveGatedTest(_MaskedAutoregressiveFlowTest):
 
   @property
   def _autoregressive_flow_kwargs(self):
@@ -358,8 +562,10 @@ class MaskedAutoregressiveGatedTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressive2DLayerTest(_MaskedAutoregressiveFlowTest):
   event_shape = [3, 2]
 
   @property
@@ -377,8 +583,23 @@ class MaskedAutoregressive2DLayerTest(MaskedAutoregressiveFlowTest):
     }
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AutoregressiveNetworkTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MaskedAutoregressiveFunnelTest(_MaskedAutoregressiveFlowTest):
+
+  @property
+  def _autoregressive_flow_kwargs(self):
+    return {
+        "bijector_fn":
+            _funnel_bijector_fn,
+        "is_constant_jacobian":
+            False,
+    }
+
+
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class AutoregressiveNetworkTest(test_util.TestCase):
 
   def _count_trainable_params(self, layer):
     ret = 0
@@ -482,10 +703,8 @@ class AutoregressiveNetworkTest(test_case.TestCase):
     made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
 
     distribution = tfd.TransformedDistribution(
-        distribution=tfd.Normal(loc=0., scale=1.),
-        bijector=tfb.MaskedAutoregressiveFlow(
-            lambda x: tf.unstack(made(x), num=2, axis=-1)),
-        event_shape=[2])
+        distribution=tfd.Sample(tfd.Normal(0., 1.), [2]),
+        bijector=tfb.MaskedAutoregressiveFlow(made))
 
     # Construct and fit model.
     x_ = tfkl.Input(shape=(2,), dtype=tf.float32)
@@ -601,6 +820,97 @@ class AutoregressiveNetworkTest(test_case.TestCase):
                         distribution.sample(7).shape)
     self.assertAllEqual((n,), distribution.log_prob(reshaped_images).shape)
 
+
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class ConditionalTests(test_util.TestCase):
+
+  def test_conditional_missing_event_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`event_shape` must be provided when `conditional` is True"):
+
+      tfb.AutoregressiveNetwork(
+          params=2, conditional=True, conditional_event_shape=[4])
+
+  def test_conditional_missing_conditional_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_event_shape` must be provided when `conditional` is True"
+    ):
+
+      tfb.AutoregressiveNetwork(params=2, conditional=True, event_shape=[4])
+
+  def test_conditional_incorrect_layers(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_input_layers` must be \"first_layers\" or \"all_layers\""
+    ):
+
+      tfb.AutoregressiveNetwork(
+          params=2,
+          conditional=True,
+          event_shape=[4],
+          conditional_event_shape=[4],
+          conditional_input_layers="non-existent-option")
+
+  def test_conditional_false_with_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_event_shape` passed but `conditional` is set to False."):
+
+      tfb.AutoregressiveNetwork(params=2, conditional_event_shape=[4])
+
+  def test_conditional_wrong_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "Parameter `conditional_event_shape` must describe a rank-1 shape"):
+
+      tfb.AutoregressiveNetwork(
+          params=2,
+          conditional=True,
+          event_shape=[4],
+          conditional_event_shape=[10, 4])
+
+  def test_conditional_missing_tensor(self):
+    with self.assertRaisesRegexp(
+        ValueError, "`conditional_input` must be passed as a named argument"):
+
+      made = tfb.AutoregressiveNetwork(
+          params=2,
+          event_shape=[4],
+          conditional=True,
+          conditional_event_shape=[6])
+
+      made(np.random.normal(0, 1, (1, 4)))
+
+  @parameterized.named_parameters(
+      *(("{} {}".format(ns, cs), ns, cs) for ns, cs in itertools.product(
+          [[3], [1, 3], [2, 3], [1, 2, 3], [2, 1, 3], [2, 2, 3]],
+          [[4], [1, 4], [2, 4], [1, 2, 4], [2, 1, 4], [2, 2, 4]],
+      )))
+  def test_conditional_broadcasting(self, input_shape, cond_shape):
+    made = tfb.AutoregressiveNetwork(
+        params=2,
+        event_shape=[3],
+        conditional=True,
+        conditional_event_shape=[4])
+
+    made_shape = tf.shape(
+        made(tf.ones(input_shape), conditional_input=tf.ones(cond_shape)))
+    broadcast_shape = tf.concat(
+        [
+            tf.broadcast_dynamic_shape(cond_shape[:-1], input_shape[:-1]),
+            input_shape[-1:]
+        ],
+        axis=0,
+    )
+    self.assertAllEqual(
+        self.evaluate(tf.concat([broadcast_shape, [2]], axis=0)), made_shape)
+
+
+del _MaskedAutoregressiveFlowTest
 
 if __name__ == "__main__":
   tf.test.main()

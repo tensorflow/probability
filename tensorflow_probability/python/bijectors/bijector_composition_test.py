@@ -25,15 +25,14 @@ import functools
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorCompositionTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorCompositionTest(test_util.TestCase):
 
   def testComposeFromChainBijector(self):
     x = tf.constant([-5., 0., 5.])
@@ -79,7 +78,7 @@ class BijectorCompositionTest(test_case.TestCase):
         atol=0, rtol=1e-3)
 
   def testHandlesKwargs(self):
-    x = tfb.Exp()(tfd.Normal(0, 1), event_shape=[4])
+    x = tfb.Exp()(tfd.Sample(tfd.Normal(0., 1.), sample_shape=[4]))
     y = tfd.Independent(tfd.LogNormal(tf.zeros(4), 1), 1)
     z = tf.constant([[1., 2, 3, 4],
                      [0.5, 1.5, 2., 2.5]])

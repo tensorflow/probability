@@ -57,18 +57,24 @@ class NormalCDF(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(NormalCDF, self).__init__(
           validate_args=validate_args,
           forward_min_event_ndims=0,
+          parameters=parameters,
           name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     return special_math.ndtr(x)
 
   def _inverse(self, y):
     with tf.control_dependencies(self._assertions(y)):
-      return special_math.ndtri(y)
+      return tf.math.ndtri(y)
 
   def _forward_log_det_jacobian(self, x):
     return -0.5 * np.log(2 * np.pi) - tf.square(x) / 2.

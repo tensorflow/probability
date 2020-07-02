@@ -23,16 +23,38 @@ import collections
 # Dependency imports
 
 from absl.testing import parameterized
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
+# Defer creating test dists (by hiding them in functions) until we know what
+# execution regime (eager/graph/tf-function) the test will run under.
+def basic_ordered_model_fn():
+  return collections.OrderedDict(
+      (('a', tfd.Normal(0., 1.)),
+       ('e',
+        tfd.Independent(tfd.Exponential(rate=[100, 120]),
+                        reinterpreted_batch_ndims=1)),
+       ('x', lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])),
+      ))
+
+
+def nested_lists_model_fn():
+  return collections.OrderedDict((
+      ('abc', tfd.JointDistributionSequential([
+          tfd.MultivariateNormalDiag([0., 0.], [1., 1.]),
+          tfd.JointDistributionSequential(
+              [tfd.StudentT(3., -2., 5.),
+               tfd.Exponential(4.)])])),
+      ('de', lambda abc: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
+          tfd.Normal(abc[0] * abc[1][0], abc[1][1]),
+          tfd.Normal(abc[0] + abc[1][0], abc[1][1])]))))
+
+
+@test_util.test_all_tf_execution_regimes
+class JointDistributionNamedTest(test_util.TestCase):
 
   def test_dict_sample_log_prob(self):
     # pylint: disable=bad-whitespace
@@ -53,14 +75,14 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
             ('m', ('loc', 'scale')),
             ('x', ('m',)),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
-    xs = d.sample(seed=tfp_test_util.test_seed())
+    xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
 
-    ds, _ = d.sample_distributions(value=xs)
+    ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
     self.assertIsInstance(ds['e'], tfd.Independent)
     self.assertIsInstance(ds['scale'], tfd.Gamma)
@@ -116,14 +138,14 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
             ('m', ('loc', 'scale')),
             ('x', ('m',)),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
-    xs = d.sample(seed=tfp_test_util.test_seed())
+    xs = d.sample(seed=test_util.test_seed())
     self.assertLen(xs, 5)
     # We'll verify the shapes work as intended when we plumb these back into the
     # respective log_probs.
 
-    ds, _ = d.sample_distributions(value=xs)
+    ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
     self.assertLen(ds, 5)
     self.assertIsInstance(ds.e, tfd.Independent)
     self.assertIsInstance(ds.scale, tfd.Gamma)
@@ -155,6 +177,156 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
     actual_jlp = d.log_prob(xs)
     self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
                         atol=0., rtol=1e-4)
+
+  def test_ordereddict_sample_log_prob(self):
+    build_ordereddict = lambda e, scale, loc, m, x: collections.OrderedDict([  # pylint: disable=g-long-lambda
+        ('e', e), ('scale', scale), ('loc', loc), ('m', m), ('x', x)])
+
+    # pylint: disable=bad-whitespace
+    model = build_ordereddict(
+        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        loc  =          tfd.Normal(loc=0, scale=2.),
+        m    =          tfd.Normal,
+        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12))
+    # pylint: enable=bad-whitespace
+    d = tfd.JointDistributionNamed(model, validate_args=True)
+
+    self.assertEqual(
+        (
+            ('e', ()),
+            ('scale', ('e',)),
+            ('loc', ()),
+            ('m', ('loc', 'scale')),
+            ('x', ('m',)),
+        ),
+        d.resolve_graph())
+
+    xs = d.sample(seed=test_util.test_seed())
+    self.assertLen(xs, 5)
+    # We'll verify the shapes work as intended when we plumb these back into the
+    # respective log_probs.
+
+    ds, _ = d.sample_distributions(value=xs, seed=test_util.test_seed())
+    self.assertLen(ds, 5)
+    values = tuple(ds.values())
+    self.assertIsInstance(values[0], tfd.Independent)
+    self.assertIsInstance(values[1], tfd.Gamma)
+    self.assertIsInstance(values[2], tfd.Normal)
+    self.assertIsInstance(values[3], tfd.Normal)
+    self.assertIsInstance(values[4], tfd.Sample)
+
+    # Static properties.
+    self.assertAllEqual(build_ordereddict(
+        e=tf.float32, scale=tf.float32, loc=tf.float32,
+        m=tf.float32, x=tf.int32), d.dtype)
+
+    batch_shape_tensor_, event_shape_tensor_ = self.evaluate([
+        d.batch_shape_tensor(), d.event_shape_tensor()])
+
+    expected_batch_shape = build_ordereddict(e=[], scale=[], loc=[], m=[], x=[])
+    for (expected, actual_tensorshape, actual_shape_tensor_) in zip(
+        expected_batch_shape, d.batch_shape, batch_shape_tensor_):
+      self.assertAllEqual(expected, actual_tensorshape)
+      self.assertAllEqual(expected, actual_shape_tensor_)
+
+    expected_event_shape = build_ordereddict(
+        e=[2], scale=[], loc=[], m=[], x=[12])
+    for (expected, actual_tensorshape, actual_shape_tensor_) in zip(
+        expected_event_shape, d.event_shape, event_shape_tensor_):
+      self.assertAllEqual(expected, actual_tensorshape)
+      self.assertAllEqual(expected, actual_shape_tensor_)
+
+    expected_jlp = sum(d.log_prob(x) for d, x in zip(ds.values(), xs.values()))
+    actual_jlp = d.log_prob(xs)
+    self.assertAllClose(*self.evaluate([expected_jlp, actual_jlp]),
+                        atol=0., rtol=1e-4)
+
+  def test_can_call_log_prob_with_kwargs(self):
+
+    d = tfd.JointDistributionNamed({
+        'e': tfd.Normal(0., 1.),
+        'a': tfd.Independent(
+            tfd.Exponential(rate=[100, 120]),
+            reinterpreted_batch_ndims=1),
+        'x': lambda a: tfd.Gamma(concentration=a[..., 0], rate=a[..., 1])
+    }, validate_args=True)
+
+    sample = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
+    e, a, x = sample['e'], sample['a'], sample['x']
+
+    lp_value_positional = self.evaluate(d.log_prob({'e': e, 'a': a, 'x': x}))
+    lp_value_named = self.evaluate(d.log_prob(value={'e': e, 'a': a, 'x': x}))
+    # Assert all close (rather than equal) because order is not defined for
+    # dicts, and reordering the computation can give subtly different results.
+    self.assertAllClose(lp_value_positional, lp_value_named)
+
+    lp_kwargs = self.evaluate(d.log_prob(a=a, e=e, x=x))
+    self.assertAllClose(lp_value_positional, lp_kwargs)
+
+    with self.assertRaisesRegexp(ValueError,
+                                 'Joint distribution with unordered variables '
+                                 "can't take positional args"):
+      lp_kwargs = d.log_prob(e, a, x)
+
+  @parameterized.named_parameters(
+      ('basic', basic_ordered_model_fn),
+      ('nested_lists', nested_lists_model_fn))
+  def test_can_call_ordereddict_log_prob_with_args_and_kwargs(self, model_fn):
+    # With an OrderedDict, we can pass keyword and/or positional args.
+    d = tfd.JointDistributionNamed(model_fn(), validate_args=True)
+
+    # Destructure vector-valued Tensors into Python lists, to mimic the values
+    # a user might type.
+    def _convert_ndarray_to_list(x):
+      if isinstance(x, np.ndarray) and x.ndim > 0:
+        return list(x)
+      return x
+    sample = tf.nest.map_structure(
+        _convert_ndarray_to_list,
+        self.evaluate(d.sample(seed=test_util.test_seed())))
+    sample_dict = dict(sample)
+
+    lp_value_positional = self.evaluate(d.log_prob(sample_dict))
+    lp_value_named = self.evaluate(d.log_prob(value=sample_dict))
+    self.assertAllClose(lp_value_positional, lp_value_named)
+
+    lp_args = self.evaluate(d.log_prob(*sample.values()))
+    self.assertAllClose(lp_value_positional, lp_args)
+
+    lp_kwargs = self.evaluate(d.log_prob(**sample_dict))
+    self.assertAllClose(lp_value_positional, lp_kwargs)
+
+    lp_args_then_kwargs = self.evaluate(d.log_prob(
+        *list(sample.values())[:1], **dict(list(sample.items())[1:])))
+    self.assertAllClose(lp_value_positional, lp_args_then_kwargs)
+
+  def test_can_call_namedtuple_log_prob_with_args_and_kwargs(self):
+    # With an namedtuple, we can pass keyword and/or positional args.
+    Model = collections.namedtuple('Model', ['e', 'a', 'x'])  # pylint: disable=invalid-name
+    d = tfd.JointDistributionNamed(
+        Model(e=tfd.Normal(0., 1.),
+              a=tfd.Independent(
+                  tfd.Exponential(rate=[100, 120]),
+                  reinterpreted_batch_ndims=1),
+              x=lambda a: tfd.Gamma(concentration=a[..., 0], rate=a[..., 1])),
+        validate_args=True)
+
+    sample = self.evaluate(d.sample([2, 3], seed=test_util.test_seed()))
+    e, a, x = sample.e, sample.a, sample.x
+
+    lp_value_positional = self.evaluate(d.log_prob(Model(e=e, a=a, x=x)))
+    lp_value_named = self.evaluate(d.log_prob(value=Model(e=e, a=a, x=x)))
+    self.assertAllClose(lp_value_positional, lp_value_named)
+
+    lp_kwargs = self.evaluate(d.log_prob(e=e, a=a, x=x))
+    self.assertAllClose(lp_value_positional, lp_kwargs)
+
+    lp_args = self.evaluate(d.log_prob(e, a, x))
+    self.assertAllClose(lp_value_positional, lp_args)
+
+    lp_args_then_kwargs = self.evaluate(d.log_prob(e, a=a, x=x))
+    self.assertAllClose(lp_value_positional, lp_args_then_kwargs)
 
   def test_kl_divergence(self):
     d0 = tfd.JointDistributionNamed(
@@ -218,7 +390,7 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
             ('df', ()),
             ('x', ('df', 'loc', 'scale'))
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
   @parameterized.parameters('mean', 'mode', 'stddev', 'variance')
   def test_summary_statistic(self, attr):
@@ -240,9 +412,7 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
       getattr(d, attr)()
 
   @parameterized.parameters(
-      'quantile', 'log_cdf', 'cdf',
-      'log_survival_function', 'survival_function',
-  )
+      'log_cdf', 'cdf', 'log_survival_function', 'survival_function')
   def test_notimplemented_evaluative_statistic(self, attr):
     d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
                                         x=tfd.Bernoulli(probs=0.5)),
@@ -251,6 +421,15 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
         NotImplementedError,
         attr + ' is not implemented: JointDistributionNamed'):
       getattr(d, attr)(dict(logits=0., x=0.5))
+
+  def test_notimplemented_quantile(self):
+    d = tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
+                                        x=tfd.Bernoulli(probs=0.5)),
+                                   validate_args=True)
+    with self.assertRaisesWithPredicateMatch(
+        NotImplementedError,
+        'quantile is not implemented: JointDistributionNamed'):
+      d.quantile(0.5)
 
   def test_copy(self):
     pgm = dict(logits=tfd.Normal(0., 1.), probs=tfd.Bernoulli(logits=0.5))
@@ -272,8 +451,8 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
     # pylint: enable=bad-whitespace
 
     d0, d1 = d[:1], d[1:]
-    x0 = d0.sample(seed=tfp_test_util.test_seed())
-    x1 = d1.sample(seed=tfp_test_util.test_seed())
+    x0 = d0.sample(seed=test_util.test_seed())
+    x1 = d1.sample(seed=test_util.test_seed())
 
     self.assertLen(x0, 3)
     self.assertEqual([1], x0['s'].shape)
@@ -296,7 +475,7 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
         x    =          tfd.StudentT),
                                    validate_args=False)
     # pylint: enable=bad-whitespace
-    x = d.sample([2, 3], seed=tfp_test_util.test_seed())
+    x = d.sample([2, 3], seed=test_util.test_seed())
     self.assertLen(x, 6)
     self.assertEqual((2, 3, 2), x['e'].shape)
     self.assertEqual((2, 3), x['scale'].shape)
@@ -321,7 +500,7 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
     # The following enables the nondefault sample shape behavior.
     d._always_use_specified_sample_shape = True
     sample_shape = (2, 3)
-    x = d.sample(sample_shape, seed=tfp_test_util.test_seed())
+    x = d.sample(sample_shape, seed=test_util.test_seed())
     self.assertLen(x, 6)
     self.assertEqual(sample_shape + (2,), x['e'].shape)
     self.assertEqual(sample_shape * 2, x['scale'].shape)  # Has 1 arg.
@@ -359,18 +538,86 @@ class JointDistributionNamedTest(test_case.TestCase, parameterized.TestCase):
             ('y', ('df', 'loc', 'scale')),
             ('x', ('df', 'loc', 'scale')),
         ),
-        d._resolve_graph())
+        d.resolve_graph())
 
-    x = d.sample()
+    x = d.sample(seed=test_util.test_seed())
     self.assertLen(x, 7)
 
-    ds, s = d.sample_distributions()
+    ds, s = d.sample_distributions(seed=test_util.test_seed())
     self.assertEqual(ds['x'].parameters['df'], s['df'])
     self.assertEqual(ds['x'].parameters['loc'], s['loc'])
     self.assertEqual(ds['x'].parameters['scale'], s['scale'])
     self.assertEqual(ds['y'].parameters['df'], s['df'])
     self.assertEqual(ds['y'].parameters['loc'], s['loc'])
     self.assertEqual(ds['y'].parameters['scale'], s['scale'])
+
+  def test_default_event_space_bijector(self):
+    # pylint: disable=bad-whitespace
+    d = tfd.JointDistributionNamed(dict(
+        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        s    =          tfd.HalfNormal(2.5),
+        loc  =lambda s: tfd.Normal(loc=0, scale=s),
+        df   =          tfd.Exponential(2),
+        x    =          tfd.StudentT),
+                                   validate_args=True)
+    # pylint: enable=bad-whitespace
+
+    # The event space bijector is inherited from `JointDistributionSequential`
+    # and is tested more thoroughly in the tests for that class.
+    b = d._experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(seed=test_util.test_seed()))
+    y_ = self.evaluate(b.forward(b.inverse(y)))
+    self.assertAllClose(y, y_)
+
+    # Verify that event shapes are passed through and flattened/unflattened
+    # correctly.
+    forward_event_shapes = b.forward_event_shape(d.event_shape)
+    inverse_event_shapes = b.inverse_event_shape(d.event_shape)
+    self.assertEqual(forward_event_shapes, d.event_shape)
+    self.assertEqual(inverse_event_shapes, d.event_shape)
+
+    # Verify that the outputs of other methods have the correct dict structure.
+    forward_event_shape_tensors = b.forward_event_shape_tensor(
+        d.event_shape_tensor())
+    inverse_event_shape_tensors = b.inverse_event_shape_tensor(
+        d.event_shape_tensor())
+    for item in [forward_event_shape_tensors, inverse_event_shape_tensors]:
+      self.assertSetEqual(set(self.evaluate(item).keys()), set(d.model.keys()))
+
+  def test_sample_kwargs(self):
+    joint = tfd.JointDistributionNamed(
+        dict(
+            a=tfd.Normal(0., 1.),
+            b=lambda a: tfd.Normal(a, 1.),
+            c=lambda a, b: tfd.Normal(a + b, 1.)))
+
+    seed = test_util.test_seed()
+    tf.random.set_seed(seed)
+    samples = joint.sample(seed=seed, a=1.)
+    # Check the first value is actually 1.
+    self.assertEqual(1., self.evaluate(samples['a']))
+
+    # Check the sample is reproducible using the `value` argument.
+    tf.random.set_seed(seed)
+    samples_named = joint.sample(seed=seed, value={'a': 1.})
+    self.assertAllEqual(self.evaluate(samples), self.evaluate(samples_named))
+
+    # Make sure to throw an exception if strange keywords are passed.
+    expected_error = (
+        'Found unexpected keyword arguments. Distribution names are\n'
+        'a, b, c\n'
+        'but received\n'
+        'z\n'
+        'These names were invalid:\n'
+        'z')
+    with self.assertRaisesRegex(ValueError, expected_error):
+      joint.sample(z=2.)
+
+    # Raise if value and keywords are passed.
+    with self.assertRaisesRegex(
+        ValueError, r'Supplied both `value` and keyword arguments .*'):
+      joint.sample(a=1., value={'a': 1})
 
 
 if __name__ == '__main__':

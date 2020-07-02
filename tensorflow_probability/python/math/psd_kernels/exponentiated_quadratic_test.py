@@ -25,12 +25,11 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ExponentiatedQuadraticTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ExponentiatedQuadraticTest(test_util.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
     tfp.math.psd_kernels.ExponentiatedQuadratic(
@@ -67,7 +66,7 @@ class ExponentiatedQuadraticTest(test_case.TestCase, parameterized.TestCase):
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.ExponentiatedQuadratic(
         amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
-    self.assertEqual([2, 3, 2], k.batch_shape.as_list())
+    self.assertAllEqual((2, 3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
     k = tfp.math.psd_kernels.ExponentiatedQuadratic(
@@ -96,22 +95,37 @@ class ExponentiatedQuadraticTest(test_case.TestCase, parameterized.TestCase):
         ).shape)
 
   def testValidateArgs(self):
-    # Wrap -1 const in identity so that asserts don't fire at ExpSinSquared
-    # construction time.
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('must be positive'):
       k = tfp.math.psd_kernels.ExponentiatedQuadratic(
-          minus_1, minus_1, validate_args=True)
+          -1., 1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
-    if not tf.executing_eagerly():
-      with self.assertRaises(tf.errors.InvalidArgumentError):
-        self.evaluate(k.apply([1.], [1.]))
+    with self.assertRaisesOpError('must be positive'):
+      tfp.math.psd_kernels.ExponentiatedQuadratic(
+          2., -2., validate_args=True)
+      self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
     k = tfp.math.psd_kernels.ExponentiatedQuadratic(
         None, None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
+
+  @test_util.jax_disable_variable_test
+  def testValidateVariableArgs(self):
+    amplitude = tf.Variable(1.)
+    length_scale = tf.Variable(1.)
+    k = tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude, length_scale,
+                                                    validate_args=True)
+    self.evaluate([v.initializer for v in k.variables])
+
+    with self.assertRaisesOpError('must be positive'):
+      with tf.control_dependencies([amplitude.assign(-1.)]):
+        self.evaluate(k.apply([1.], [1.]))
+
+    with self.assertRaisesOpError('must be positive'):
+      with tf.control_dependencies([amplitude.assign(2.),
+                                    length_scale.assign(-1.)]):
+        self.evaluate(k.apply([3.], [3.]))
 
 
 if __name__ == '__main__':

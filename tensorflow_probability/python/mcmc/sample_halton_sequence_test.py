@@ -21,27 +21,18 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import monte_carlo
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-def _set_seed(seed):
-  """Helper which uses graph seed if using TFE."""
-  # TODO(b/68017812): Deprecate once TFE supports seed.
-  if tf.executing_eagerly():
-    tf1.set_random_seed(seed)
-    return None
-  return seed
+JAX_MODE = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class HaltonSequenceTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class HaltonSequenceTest(test_util.TestCase):
 
   def test_known_values_small_bases(self):
     # The first five elements of the non-randomized Halton sequence
@@ -83,14 +74,14 @@ class HaltonSequenceTest(test_case.TestCase):
     """Tests that all supported dtypes work without error."""
     dim = 3
     sample_float32 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=10, dtype=tf.float32, seed=11)
+        dim, num_results=10, dtype=tf.float32, seed=test_util.test_seed())
     sample_float64 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=10, dtype=tf.float64, seed=21)
+        dim, num_results=10, dtype=tf.float64, seed=test_util.test_seed())
     self.assertEqual(self.evaluate(sample_float32).dtype, np.float32)
     self.assertEqual(self.evaluate(sample_float64).dtype, np.float64)
 
   def test_normal_integral_mean_and_var_correctly_estimated(self):
-    n = int(1000)
+    n = 1000
     # This test is almost identical to the similarly named test in
     # monte_carlo_test.py. The only difference is that we use the Halton
     # samples instead of the random samples to evaluate the expectations.
@@ -106,7 +97,7 @@ class HaltonSequenceTest(test_case.TestCase):
     q = tfd.Normal(loc=mu_q, scale=sigma_q)
 
     cdf_sample = tfp.mcmc.sample_halton_sequence(
-        2, num_results=n, dtype=tf.float64, seed=1729)
+        2, num_results=n, dtype=tf.float64, seed=test_util.test_seed())
     q_sample = q.quantile(cdf_sample)
 
     # Compute E_p[X].
@@ -134,9 +125,8 @@ class HaltonSequenceTest(test_case.TestCase):
     # Evaluate the integral of x_1 * x_2^2 * x_3^3  over the three dimensional
     # hypercube.
     powers = tf.range(1., limit=dim + 1)
-    integral = tf.reduce_mean(
-        input_tensor=tf.reduce_prod(input_tensor=sample**powers, axis=-1))
-    true_value = 1. / tf.reduce_prod(input_tensor=powers + 1.)
+    integral = tf.reduce_mean(tf.reduce_prod(sample**powers, axis=-1))
+    true_value = 1. / tf.reduce_prod(powers + 1.)
 
     # Produces a relative absolute error of 1.7%.
     self.assertAllClose(
@@ -151,8 +141,7 @@ class HaltonSequenceTest(test_case.TestCase):
         dim, sequence_indices=sequence_indices, randomized=False)
 
     integral_leaped = tf.reduce_mean(
-        input_tensor=tf.reduce_prod(
-            input_tensor=sample_leaped**powers, axis=-1))
+        tf.reduce_prod(sample_leaped**powers, axis=-1))
     self.assertAllClose(
         self.evaluate(integral_leaped), self.evaluate(true_value), rtol=0.05)
 
@@ -162,17 +151,16 @@ class HaltonSequenceTest(test_case.TestCase):
 
     dim = 20
     num_results = 2000
-    replica = 5
-    seed = tfp.util.SeedStream(121117, "randomized_qmc_basic")
+    replicas = 50
 
-    values = []
-    for _ in range(replica):
-      sample = tfp.mcmc.sample_halton_sequence(
-          dim, num_results=num_results, seed=seed())
-      f = tf.reduce_mean(
-          input_tensor=tf.reduce_sum(input_tensor=sample, axis=1)**2)
-      values.append(self.evaluate(f))
-    self.assertAllClose(np.mean(values), 101.6667, atol=np.std(values) * 2)
+    samples = tfp.mcmc.sample_halton_sequence(
+        dim, num_results=replicas * num_results,
+        seed=test_util.test_seed_stream())
+    samples = tf.reshape(samples, [replicas, num_results, dim])
+    values = self.evaluate(
+        tf.reduce_mean(tf.reduce_sum(samples, axis=-1)**2, axis=-1))
+    self.assertAllClose(values.mean(), 101.6667,
+                        atol=values.std() / np.sqrt(replicas))
 
   def test_partial_sum_func_qmc(self):
     """Tests the QMC evaluation of (x_j + x_{j+1} ...+x_{n})^2.
@@ -198,39 +186,53 @@ class HaltonSequenceTest(test_case.TestCase):
     n, m = 10, 10
     dim = n + m
     num_results_lo, num_results_hi = 1000, 10000
-    replica = 10
+    replica = 100
     true_mean = m / 12.
-    seed_lo = tfp.util.SeedStream(1925, "partial_sum_func_qmc_lo")
-    seed_hi = tfp.util.SeedStream(898128, "partial_sum_func_qmc_hi")
 
     def func_estimate(x):
       return tf.reduce_mean(
-          input_tensor=tf.math.squared_difference(
-              tf.reduce_sum(input_tensor=x[:, -m:], axis=-1), m / 2.))
+          tf.math.squared_difference(
+              tf.reduce_sum(x[..., -m:], axis=-1),
+              m / 2.),
+          axis=-1)
 
-    estimates = []
-    for _ in range(replica):
-      sample_lo = tfp.mcmc.sample_halton_sequence(
-          dim, num_results=num_results_lo, seed=seed_lo())
-      sample_hi = tfp.mcmc.sample_halton_sequence(
-          dim, num_results=num_results_hi, seed=seed_hi())
-      f_lo, f_hi = func_estimate(sample_lo), func_estimate(sample_hi)
-      estimates.append((self.evaluate(f_lo), self.evaluate(f_hi)))
-    var_lo, var_hi = np.mean((np.array(estimates) - true_mean) ** 2, axis=0)
+    stream = test_util.test_seed_stream()
+    sample_lo = tfp.mcmc.sample_halton_sequence(
+        dim, num_results=replica * num_results_lo,
+        seed=stream())
+    sample_hi = tfp.mcmc.sample_halton_sequence(
+        dim, num_results=replica * num_results_hi,
+        seed=stream())
 
-    # Expect that the variance scales as N^2 so var_hi / var_lo ~ k / 10^2
-    # with k a fudge factor accounting for the residual N dependence
-    # of the QMC error and the sampling error.
+    sample_lo = tf.reshape(sample_lo, [replica, -1, dim])
+    sample_hi = tf.reshape(sample_hi, [replica, -1, dim])
+
+    f_lo = self.evaluate(func_estimate(sample_lo))
+    f_hi = self.evaluate(func_estimate(sample_hi))
+    var_lo = np.mean((f_lo - true_mean) ** 2, axis=0)
+    var_hi = np.mean((f_hi - true_mean) ** 2, axis=0)
+
+    # Expect that the variance scales as N^(-2-epsilon) (see section 3 of
+    # https://arxiv.org/pdf/1706.02808.pdf). Thus, since
+    # num_results_hi = 10 * num_results_lo, we expect to have
+    #
+    #   var_hi / var_lo ~= k / 100
+    #
+    # with k a fudge factor accounting for the residual N dependence of the QMC
+    # error and the sampling error. Here we take log(k) = 1.5.
     log_rel_err = np.log(100 * var_hi / var_lo)
-    self.assertAllClose(log_rel_err, 0., atol=1.2)
+    self.assertAllLess(np.abs(log_rel_err), 1.5)
 
   def test_seed_implies_deterministic_results(self):
     dim = 20
     num_results = 100
+    seed = test_util.test_seed()
     sample1 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=_set_seed(1925))
+        dim, num_results=num_results, seed=seed)
+    if tf.executing_eagerly() and not JAX_MODE:
+      tf.random.set_seed(seed)
     sample2 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=_set_seed(1925))
+        dim, num_results=num_results, seed=seed)
     [sample1_, sample2_] = self.evaluate([sample1, sample2])
     self.assertAllClose(sample1_, sample2_, atol=0., rtol=1e-6)
 

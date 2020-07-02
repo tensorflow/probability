@@ -26,7 +26,7 @@ from tensorflow_probability.python.experimental.auto_batching import lowering
 from tensorflow_probability.python.experimental.auto_batching import numpy_backend
 from tensorflow_probability.python.experimental.auto_batching import test_programs
 from tensorflow_probability.python.experimental.auto_batching import virtual_machine as vm
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 NP_BACKEND = numpy_backend.NumpyBackend()
@@ -50,7 +50,7 @@ def _is_even_lowered_execute(inputs, backend):
       max_stack_depth=int(max(inputs)) + 3, backend=backend))
 
 
-class LoweringTest(test_case.TestCase):
+class LoweringTest(tfp_test_util.TestCase):
 
   def testLoweringFibonacciNumpy(self):
     self.assertEqual([8], _fibonacci_lowered_execute([5], NP_BACKEND))

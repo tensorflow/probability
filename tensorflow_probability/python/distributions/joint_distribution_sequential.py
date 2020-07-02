@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import joint_distribution as jo
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -88,6 +89,14 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
   `range(i - 1, i - 1 - num_args[i], -1)`.
   (See "Examples" and "Discussion" for why the order is reversed.)
 
+  **Name resolution**: `The names of `JointDistributionSequential` components
+  are defined by explicit `name` arguments passed to distributions
+  (`tfd.Normal(0., 1., name='x')`) and/or by the argument names in
+  distribution-making functions (`lambda x: tfd.Normal(x., 1.)`). Both
+  approaches may be used in the same distribution, as long as they are
+  consistent; referring to a single component by multiple names will raise a
+  `ValueError`. Unnamed components will be assigned a dummy name.
+
   #### Examples
 
   ```python
@@ -106,18 +115,19 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
                    tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),  # e
       lambda    e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),    # g
                    tfd.Normal(loc=0, scale=2.),                           # n
-      lambda n, g: tfd.Normal(loc=n, scale=g)                             # m
+      lambda n, g: tfd.Normal(loc=n, scale=g),                            # m
       lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12)                # x
   ])
   # (Notice the 1:1 correspondence between "math" and "code".)
 
   x = joint.sample()
-  # ==> A length-5 list of Tensors
+  # ==> A length-5 list of Tensors representing a draw/realization from each
+  #     distribution.
   joint.log_prob(x)
   # ==> A scalar `Tensor` representing the total log prob under all five
   #     distributions.
 
-  joint._resolve_graph()
+  joint.resolve_graph()
   # ==> (('e', ()),
   #      ('g', ('e',)),
   #      ('n', ()),
@@ -196,9 +206,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       self._model_trackable = model
       self._model = self._no_dependency(model)
       self._build(model)
-      self._most_recently_built_distributions = [
+
+      self._single_sample_distributions = {}
+      self._get_single_sample_distributions(candidate_dists=[
           None if a else d() for d, a
-          in zip(self._dist_fn_wrapped, self._dist_fn_args)]
+          in zip(self._dist_fn_wrapped, self._dist_fn_args)])
+
       self._always_use_specified_sample_shape = False
       super(JointDistributionSequential, self).__init__(
           dtype=None,  # Ignored; we'll override.
@@ -210,6 +223,10 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       # Check valid structure.
       self._model_unflatten(self._model_flatten(model))
 
+  @property
+  def model(self):
+    return self._model
+
   def _build(self, model):
     """Creates `dist_fn`, `dist_fn_wrapped`, `dist_fn_args`."""
     if not isinstance(model, collections.Sequence):
@@ -220,12 +237,18 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         _unify_call_signature(i, dist_fn)
         for i, dist_fn in enumerate(model)])
 
+  def _model_coroutine(self):
+    xs = []
+    for dist_fn in self._dist_fn_wrapped:
+      x = yield dist_fn(*xs)
+      xs.append(x)
+
   def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
     # This function additionally depends on:
     #   self._dist_fn_wrapped
     #   self._dist_fn_args
     #   self._always_use_specified_sample_shape
-    seed = SeedStream('JointDistributionSequential', seed)
+    seed = SeedStream(seed, salt='JointDistributionSequential')
     ds = []
     xs = [None]*len(self._dist_fn_wrapped) if value is None else list(value)
     if len(xs) != len(self._dist_fn_wrapped):
@@ -242,7 +265,13 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
             () if args and not self._always_use_specified_sample_shape
             else sample_shape, seed=seed())
       else:
-        xs[i] = tf.convert_to_tensor(xs[i], dtype_hint=ds[-1].dtype)
+        # This signature does not allow kwarg names. Applies
+        # `convert_to_tensor` on the next value.
+        xs[i] = nest.map_structure_up_to(
+            ds[-1].dtype,  # shallow_tree
+            lambda x, dtype: tf.convert_to_tensor(x, dtype_hint=dtype),  # func
+            xs[i],  # x
+            ds[-1].dtype)  # dtype
         seed()  # Ensure reproducibility even when xs are (partially) set.
     # Note: we could also resolve distributions up to the first non-`None` in
     # `self._model_flatten(value)`, however we omit this feature for simplicity,
@@ -276,7 +305,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       ds = tuple(d() for d in self._dist_fn_wrapped)
     return (getattr(d, attr)() for d in ds)
 
-  def _resolve_graph(self, distribution_names=None, leaf_name='x'):
+  def resolve_graph(self, distribution_names=None, leaf_name='x'):
     """Creates a `tuple` of `tuple`s of dependencies.
 
     This function is **experimental**. That said, we encourage its use
@@ -302,7 +331,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
                      tfd.Normal(loc=0, scale=2.),
         lambda n, g: tfd.Normal(loc=n, scale=g),
     ])
-    d._resolve_graph()
+    d.resolve_graph()
     # ==> (
     #       ('e', ()),
     #       ('g', ('e',)),
@@ -312,21 +341,32 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     ```
 
     """
+    distribution_names = self._flat_resolve_names(
+        distribution_names=distribution_names, leaf_name=leaf_name)
+    graph_parents = tuple(() if a is None else a for a in self._dist_fn_args)
+    return tuple(zip(distribution_names, graph_parents))
+
+  def _flat_resolve_names(self, distribution_names=None, leaf_name='x'):
     # This function additionally depends on:
     #   self._dist_fn_args
     #   self._dist_fn_wrapped
-    # TODO(b/129008220): Robustify this procedure. Eg, handle collisions better,
-    # ignore args prefixed with `_`.
     if distribution_names is None or any(self._dist_fn_args):
+      # Extract user-passed `name` parameters from distribution instances.
+      instance_names = [
+          joint_distribution_lib.get_explicit_name_for_component(d)
+          for d in self._get_single_sample_distributions()]
       distribution_names = _resolve_distribution_names(
-          self._dist_fn_args, distribution_names, leaf_name)
+          self._dist_fn_args,
+          dist_names=distribution_names,
+          leaf_name=leaf_name,
+          instance_names=instance_names)
+
     if len(set(distribution_names)) != len(distribution_names):
       raise ValueError('Distribution names must be unique: {}'.format(
           distribution_names))
     if len(distribution_names) != len(self._dist_fn_wrapped):
       raise ValueError('Distribution names must be 1:1 with `rvs`.')
-    return tuple(zip(distribution_names,
-                     tuple(() if a is None else a for a in self._dist_fn_args)))
+    return distribution_names
 
   _mean = _make_summary_statistic('mean')
   _mode = _make_summary_statistic('mode')
@@ -419,7 +459,7 @@ def _unify_call_signature(i, dist_fn):
 
   Returns:
     dist_fn_wrapped: Python `callable` which takes all previous distributions
-      (in non reverse order) and produces a  new distribution instance.
+      (in non reverse order) and produces a new distribution instance.
     args: `tuple` of `str` representing the arg names of `dist_fn` (and in non
       wrapped, "natural" order). `None` is returned only if the input is not a
       `callable`.
@@ -452,7 +492,10 @@ def _unify_call_signature(i, dist_fn):
   return dist_fn_wrapped, args
 
 
-def _resolve_distribution_names(dist_fn_args, dist_names, leaf_name):
+def _resolve_distribution_names(dist_fn_args,
+                                dist_names,
+                                leaf_name,
+                                instance_names):
   """Uses arg names to resolve distribution names."""
   if dist_names is None:
     dist_names = []
@@ -460,18 +503,51 @@ def _resolve_distribution_names(dist_fn_args, dist_names, leaf_name):
     dist_names = dist_names.copy()
   n = len(dist_fn_args)
   dist_names.extend([None]*(n - len(dist_names)))
+
+  # First, fill in distribution names by the function args used to refer
+  # to them (e.g., in `[tfd.Normal(0., 1), lambda x: tfd.Normal(x, 1.)]`
+  # the first distribution is named `x`.
+  name_is_nontrivial = lambda name: name and name != '_'
   for i_, args in enumerate(reversed(dist_fn_args)):
     if not args:
       continue  # There's no args to analyze.
     i = n - i_ - 1
     for j, arg_name in enumerate(args):
-      dist_names[i - j - 1] = arg_name
+      if name_is_nontrivial(arg_name):
+        existing_name = dist_names[i - j - 1]
+        if (name_is_nontrivial(existing_name) and existing_name != arg_name):
+          raise ValueError('Inconsistent names: component with name "{}" was '
+                           'referred to by a different name "{}".'.format(
+                               arg_name, existing_name))
+        dist_names[i - j - 1] = arg_name
+
+  # Then, fill in names using any user-provided `name` arguments (e.g.,
+  # `tfd.Normal(0., 1., name='x')`.
+  for i in range(len(dist_names)):
+    if instance_names[i] is not None:
+      if (name_is_nontrivial(dist_names[i]) and
+          dist_names[i] != instance_names[i]):
+        raise ValueError('Inconsistent names: component with name "{}" was '
+                         'referred to by a different name "{}".'.format(
+                             instance_names[i], dist_names[i]))
+      else:
+        dist_names[i] = instance_names[i]
+
+  # Finally generate unique dummy names for any remaining components.
+  unavailable_names = set(dist_names)
   j = 0
   for i_ in range(len(dist_names)):
     i = n - i_ - 1
-    if dist_names[i] is None:
-      dist_names[i] = leaf_name if j == 0 else leaf_name + str(j)
-      j += 1
+    if not name_is_nontrivial(dist_names[i]):
+      # TODO(davmre): consider wrapping dummy names with `<>` to prevent them
+      # from being passed as kwargs.
+      dummy_name = '{}{}'.format(leaf_name, j if j else '')
+      while dummy_name in unavailable_names:
+        j += 1
+        dummy_name = '{}{}'.format(leaf_name, j)
+      dist_names[i] = dummy_name
+      unavailable_names.add(dummy_name)
+
   return tuple(dist_names)
 
 

@@ -28,15 +28,20 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
-PARAMS_0 = 2.
-PARAMS_1 = [2.]
-PARAMS_2 = [1., 2.]
-PARAMS_21 = [[1.], [2.]]
+JAX_MODE = False
+if JAX_MODE:
+  ERROR_TYPES = TypeError  # pylint: disable=invalid-name
+else:
+  ERROR_TYPES = (ValueError, tf.errors.InvalidArgumentError)  # pylint: disable=invalid-name
+
+PARAMS_0 = np.array(2.).astype(np.float32)
+PARAMS_1 = np.array([2.]).astype(np.float32)
+PARAMS_2 = np.array([1., 2.]).astype(np.float32)
+PARAMS_21 = np.array([[1.], [2.]]).astype(np.float32)
 
 
 class IncompletelyDefinedKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel
@@ -80,23 +85,22 @@ class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
     if self.multiplier is not None:
       multiplier = kernels_util.pad_shape_with_ones(
           self._multiplier, example_ndims)
-      value *= multiplier
+      value = value * multiplier
 
     return value
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PositiveSemidefiniteKernelTest(test_case.TestCase,
-                                     parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PositiveSemidefiniteKernelTest(test_util.TestCase):
   """Test the abstract base class behaviors."""
 
   def createKernelInputs(self, batched=False):
-    x = tf1.placeholder_with_default([[1., 1., 1.], [2., 2., 2.], [3., 3., 3.]],
-                                     shape=[3, 3])
-    y = tf1.placeholder_with_default([[4., 4., 4.], [5., 5., 5.], [6., 6., 6.]],
-                                     shape=[3, 3])
-    z = tf1.placeholder_with_default(
-        [[4., 4., 4.], [5., 5., 5.], [6., 6., 6.], [7., 7., 7.]], shape=[4, 3])
+    x = tf1.placeholder_with_default(np.float32(
+        [[1., 1., 1.], [2., 2., 2.], [3., 3., 3.]]), shape=[3, 3])
+    y = tf1.placeholder_with_default(np.float32(
+        [[4., 4., 4.], [5., 5., 5.], [6., 6., 6.]]), shape=[3, 3])
+    z = tf1.placeholder_with_default(np.float32(
+        [[4., 4., 4.], [5., 5., 5.], [6., 6., 6.], [7., 7., 7.]]), shape=[4, 3])
     if not batched:
       return x, y, z
 
@@ -190,7 +194,7 @@ class PositiveSemidefiniteKernelTest(test_case.TestCase,
       ('Shape [2, 1] kernel', [[1.], [2.]], [2, 1]))
   def testStaticBatchShape(self, params, shape):
     k = TestKernel(params)
-    self.assertAllEqual(shape, k.batch_shape.as_list())
+    self.assertAllEqual(shape, k.batch_shape)
     self.assertAllEqual(shape, self.evaluate(k.batch_shape_tensor()))
 
   @parameterized.named_parameters(
@@ -207,7 +211,7 @@ class PositiveSemidefiniteKernelTest(test_case.TestCase,
     self.assertAllEqual([3], k.apply(x, y).shape)
 
     k = TestKernel(PARAMS_2)  # batch_shape = [2]
-    with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
+    with self.assertRaises(ERROR_TYPES):
       # Param batch shape [2] won't broadcast with the input batch shape, [3].
       k.apply(
           x,  # shape [3, 3]
@@ -225,7 +229,11 @@ class PositiveSemidefiniteKernelTest(test_case.TestCase,
     params_2_dynamic = tf1.placeholder_with_default([1., 2.], shape=None)
     k = TestKernel(params_2_dynamic)
     x, y, _ = self.createKernelInputs()
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    if JAX_MODE:
+      error_types = TypeError
+    else:
+      error_types = tf.errors.InvalidArgumentError
+    with self.assertRaises(error_types):
       apply_op = k.apply(
           x,  # shape [3, 3]
           y   # shape [3, 3]
@@ -260,8 +268,7 @@ class PositiveSemidefiniteKernelTest(test_case.TestCase,
     k = TestKernel(PARAMS_2)  # batch_shape = [2]
     batch_x, _, batch_z = self.createKernelInputs(batched=True)
 
-    with self.assertRaises(
-        (ValueError, tf.errors.InvalidArgumentError)):
+    with self.assertRaises(ERROR_TYPES):
       k.matrix(
           batch_x,  # shape = [5, 3, 3]
           batch_z)  # shape = [5, 4, 3]
@@ -319,8 +326,10 @@ class PositiveSemidefiniteKernelTest(test_case.TestCase,
         self.evaluate(sum_kernel.matrix(x, y)))
 
   def testDynamicShapesAndValuesOfSum(self):
-    params_2_dynamic = tf1.placeholder_with_default([1., 2.], shape=None)
-    params_21_dynamic = tf1.placeholder_with_default([[1.], [2.]], shape=None)
+    params_2_dynamic = tf1.placeholder_with_default(np.float32([1., 2.]),
+                                                    shape=None)
+    params_21_dynamic = tf1.placeholder_with_default(np.float32([[1.], [2.]]),
+                                                     shape=None)
     k2 = TestKernel(params_2_dynamic)
     k21 = TestKernel(params_21_dynamic)
 
@@ -351,8 +360,10 @@ class PositiveSemidefiniteKernelTest(test_case.TestCase,
         self.evaluate(product_kernel.matrix(x, y)))
 
   def testDynamicShapesAndValuesOfProduct(self):
-    params_2_dynamic = tf1.placeholder_with_default([1., 2.], shape=None)
-    params_21_dynamic = tf1.placeholder_with_default([[1.], [2.]], shape=None)
+    params_2_dynamic = tf1.placeholder_with_default(np.float32([1., 2.]),
+                                                    shape=None)
+    params_21_dynamic = tf1.placeholder_with_default(np.float32([[1.], [2.]]),
+                                                     shape=None)
     k2 = TestKernel(params_2_dynamic)
     k21 = TestKernel(params_21_dynamic)
 

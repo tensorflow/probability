@@ -14,7 +14,8 @@
 # ============================================================================
 book_path: /probability/_book.yaml
 project_path: /probability/_project.yaml
-description: <!--no description-->
+description: A library to combine probabilistic models and deep learning on modern hardware (TPU,
+ GPU) for data scientists, statisticians, ML researchers, and practitioners.
 landing_page:
   custom_css_path: /site-assets/css/style.css
   rows:
@@ -71,22 +72,22 @@ landing_page:
         path: https://www.youtube.com/watch?v=BrwKURU-wpk
     - heading: "Structural time series modeling in TFP"
       image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://medium.com/tensorflow/structural-time-series-modeling-in-tensorflow-probability-344edac24083
+      path: https://blog.tensorflow.org/2019/03/structural-time-series-modeling-in.html
       buttons:
       - label: Read on TensorFlow blog
-        path: https://medium.com/tensorflow/structural-time-series-modeling-in-tensorflow-probability-344edac24083
+        path: https://blog.tensorflow.org/2019/03/structural-time-series-modeling-in.html
     - heading: "Variational autoencoders with TFP"
       image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://medium.com/tensorflow/variational-autoencoders-with-tensorflow-probability-layers-d06c658931b7
+      path: https://blog.tensorflow.org/2019/03/variational-autoencoders-with.html
       buttons:
       - label: Read on TensorFlow blog
-        path: https://medium.com/tensorflow/variational-autoencoders-with-tensorflow-probability-layers-d06c658931b7
+        path: https://blog.tensorflow.org/2019/03/variational-autoencoders-with.html
     - heading: "Regression with probabilistic layers in TFP"
       image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://medium.com/tensorflow/regression-with-probabilistic-layers-in-tensorflow-probability-e46ff5d37baf
+      path: https://blog.tensorflow.org/2019/03/regression-with-probabilistic-layers-in.html
       buttons:
       - label: Read on TensorFlow blog
-        path: https://medium.com/tensorflow/regression-with-probabilistic-layers-in-tensorflow-probability-e46ff5d37baf
+        path: https://blog.tensorflow.org/2019/03/regression-with-probabilistic-layers-in.html
   - classname: devsite-landing-row-cards
     items:
     - heading: "An introduction to probabilistic programming"
@@ -94,22 +95,22 @@ landing_page:
         <em>Bayesian Methods for Hackers</em>, an introductory, hands-on tutorial,
         is now available with examples in TensorFlow Probability.
       image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://medium.com/tensorflow/an-introduction-to-probabilistic-programming-now-available-in-tensorflow-probability-6dcc003ca29e
+      path: https://blog.tensorflow.org/2018/12/an-introduction-to-probabilistic.html
       buttons:
       - label: Read on TensorFlow blog
-        path: https://medium.com/tensorflow/an-introduction-to-probabilistic-programming-now-available-in-tensorflow-probability-6dcc003ca29e
+        path: https://blog.tensorflow.org/2018/12/an-introduction-to-probabilistic.html
     - heading: "Analyzing errors in financial models with TFP"
       image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
+      path: https://blog.tensorflow.org/2018/09/the-trinity-of-errors-in-financial-models.html
       buttons:
       - label: Read on TensorFlow blog
-        path: https://medium.com/tensorflow/the-trinity-of-errors-in-financial-models-an-introductory-analysis-using-tensorflow-probability-9fdefb4d283d
+        path: https://blog.tensorflow.org/2018/09/the-trinity-of-errors-in-financial-models.html
     - heading: "Industrial AI: physics-based, probabilistic deep learning using TFP"
       image_path: /resources/images/tf-logo-card-16x9.png
-      path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
+      path: https://blog.tensorflow.org/2018/10/industrial-ai-bhges-physics-based.html
       buttons:
       - label: Read on TensorFlow blog
-        path: https://medium.com/tensorflow/industrial-ai-bhges-physics-based-probabilistic-deep-learning-using-tensorflow-probability-5f215c791863
+        path: https://blog.tensorflow.org/2018/10/industrial-ai-bhges-physics-based.html
     - heading: "TensorFlow Probability on GitHub"
       image_path: /resources/images/github-card-16x9.png
       path: https://github.com/tensorflow/probability

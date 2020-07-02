@@ -37,7 +37,8 @@ import zipfile
 
 from absl import flags
 from six.moves import urllib
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+from tensorflow.python.ops import lookup_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = ["SpritesDataset"]
@@ -232,11 +233,11 @@ def create_sprites_dataset(characters, actions, directions, channels=3,
 
   dataset = tf.data.Dataset.zip((chars, act_names, acts_metadata, dir_rows))
 
-  skin_table = tf.contrib.lookup.index_table_from_tensor(sorted(SKIN_COLORS))
-  hair_table = tf.contrib.lookup.index_table_from_tensor(sorted(HAIRSTYLES))
-  top_table = tf.contrib.lookup.index_table_from_tensor(sorted(TOPS))
-  pants_table = tf.contrib.lookup.index_table_from_tensor(sorted(PANTS))
-  action_table = tf.contrib.lookup.index_table_from_tensor(sorted(action_names))
+  skin_table = lookup_ops.index_table_from_tensor(sorted(SKIN_COLORS))
+  hair_table = lookup_ops.index_table_from_tensor(sorted(HAIRSTYLES))
+  top_table = lookup_ops.index_table_from_tensor(sorted(TOPS))
+  pants_table = lookup_ops.index_table_from_tensor(sorted(PANTS))
+  action_table = lookup_ops.index_table_from_tensor(sorted(action_names))
 
   def process_example(attrs, act_name, act_metadata, dir_row_offset):
     """Processes a dataset row."""

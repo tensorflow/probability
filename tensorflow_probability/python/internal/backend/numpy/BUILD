@@ -31,26 +31,42 @@ py_library(
     name = "numpy",
     srcs = ["__init__.py"],
     deps = [
+        ":bitwise",
         ":compat",
         ":control_flow",
         ":debugging",
+        ":deprecation",
         ":dtype",
         ":errors",
         ":functional_ops",
         ":keras",
         ":linalg",
         ":misc",
+        ":nest",
         ":nn",
         ":numpy_array",
         ":numpy_logging",
         ":numpy_math",
         ":numpy_signal",
         ":ops",
+        ":private",
         ":random_generators",
+        ":raw_ops",
         ":sets_lib",
         ":sparse_lib",
+        ":static_rewrites",
+        ":tensor_array_ops",
         ":test_lib",
-        # tensorflow dep,
+        ":tf_inspect",
+    ],
+)
+
+py_library(
+    name = "bitwise",
+    srcs = ["bitwise.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
     ],
 )
 
@@ -58,10 +74,8 @@ py_library(
     name = "compat",
     srcs = ["compat.py"],
     deps = [
-        ":_utils",
         ":v1",
         ":v2",
-        # tensorflow dep,
     ],
 )
 
@@ -70,7 +84,9 @@ py_library(
     srcs = ["control_flow.py"],
     deps = [
         ":_utils",
-        # tensorflow dep,
+        ":dtype",
+        ":ops",
+        # numpy dep,
     ],
 )
 
@@ -81,8 +97,14 @@ py_library(
         ":_utils",
         ":v1",
         ":v2",
-        # tensorflow dep,
+        # six dep,
     ],
+)
+
+py_library(
+    name = "deprecation",
+    srcs = ["deprecation.py"],
+    deps = [],
 )
 
 py_library(
@@ -91,7 +113,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -99,7 +120,6 @@ py_library(
     name = "errors",
     srcs = ["errors.py"],
     deps = [
-        # tensorflow dep,
     ],
 )
 
@@ -109,7 +129,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -119,7 +138,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -130,7 +148,6 @@ py_library(
         ":_utils",
         ":keras_layers",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -140,7 +157,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -152,10 +168,9 @@ py_library(
     ],
     deps = [
         ":_utils",
-        ":linear_operator",
+        ":static_rewrites",
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -165,7 +180,14 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "nest",
+    srcs = ["nest.py"],
+    deps = [
+        # tree dep,
     ],
 )
 
@@ -174,9 +196,10 @@ py_library(
     srcs = ["nn.py"],
     deps = [
         ":_utils",
+        ":numpy_array",
         ":numpy_math",
+        ":ops",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -187,7 +210,6 @@ py_library(
         ":_utils",
         ":ops",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -197,7 +219,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -208,7 +229,6 @@ py_library(
         ":_utils",
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -218,7 +238,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -228,8 +247,39 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
+        # six dep,
         # wrapt dep,
+    ],
+)
+
+py_library(
+    name = "private",
+    srcs = ["private.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
+    ],
+)
+
+py_library(
+    name = "tensor_array_ops",
+    srcs = ["tensor_array_ops.py"],
+    deps = [
+        ":_utils",
+        # numpy dep,
+    ],
+)
+
+# py2and3
+py_test(
+    name = "tensor_array_ops_test",
+    size = "small",
+    srcs = ["tensor_array_ops_test.py"],
+    tags = ["tfp_numpy"],
+    deps = [
+        ":tensor_array_ops",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -238,9 +288,22 @@ py_library(
     srcs = ["random_generators.py"],
     deps = [
         ":_utils",
+        ":numpy_array",
         ":numpy_math",
+        ":ops",
         # numpy dep,
-        # tensorflow dep,
+    ],
+)
+
+py_library(
+    name = "raw_ops",
+    srcs = ["raw_ops.py"],
+    deps = [
+        ":_utils",
+        ":numpy_array",
+        ":numpy_math",
+        ":ops",
+        # numpy dep,
     ],
 )
 
@@ -250,7 +313,6 @@ py_library(
     deps = [
         ":_utils",
         # numpy dep,
-        # tensorflow dep,
     ],
 )
 
@@ -259,7 +321,23 @@ py_library(
     srcs = ["sparse_lib.py"],
     deps = [
         ":_utils",
-        # tensorflow dep,
+    ],
+)
+
+genrule(
+    name = "rewrite_tensor_shape",
+    srcs = [],
+    outs = ["tensor_shape_gen.py"],
+    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@"),
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
+)
+
+py_library(
+    name = "tensor_shape_gen",
+    testonly = 1,
+    srcs = ["tensor_shape_gen.py"],
+    deps = [
+        # six dep,
     ],
 )
 
@@ -267,23 +345,34 @@ py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
     deps = [
-        ":_utils",
-        # tensorflow dep,
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # numpy dep,
     ],
 )
 
+py_library(
+    name = "tf_inspect",
+    srcs = ["tf_inspect.py"],
+    deps = [],
+)
+
+# py2and3
 py_test(
     name = "numpy_test",
+    size = "small",
     srcs = ["numpy_test.py"],
-    shard_count = 5,
+    shard_count = 11,
     tags = ["tfp_numpy"],
     deps = [
         ":numpy",
         # absl/testing:parameterized dep,
         # hypothesis dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -294,6 +383,8 @@ py_library(
         ":_utils",
         ":initializers",
         ":ops",
+        ":random_generators",
+        ":tensor_array_ops",
     ],
 )
 
@@ -302,8 +393,9 @@ py_library(
     srcs = ["v2.py"],
     deps = [
         ":_utils",
+        ":nest",
         ":ops",
-        # tensorflow dep,
+        ":tensor_array_ops",
     ],
 )
 
@@ -311,17 +403,8 @@ py_library(
     name = "_utils",
     srcs = ["_utils.py"],
     deps = [
-        # decorator dep,
-    ],
-)
-
-py_binary(
-    name = "gen_linear_operators",
-    srcs = ["gen_linear_operators.py"],
-    python_version = "PY3",
-    deps = [
-        # absl:app dep,
-        # tensorflow dep,
+        ":nest",
+        # wrapt dep,
     ],
 )
 
@@ -333,6 +416,7 @@ LINOP_FILES = [
     "linear_operator_adjoint",
     "linear_operator_algebra",
     "linear_operator_block_diag",
+    "linear_operator_block_lower_triangular",
     "linear_operator_circulant",
     "linear_operator_composition",
     "linear_operator_diag",
@@ -354,19 +438,80 @@ LINOP_FILES = [
 
 [genrule(
     name = "rewrite_{}".format(filename),
+    testonly = 1,
     srcs = [],
-    outs = ["{}.py".format(filename)],
-    cmd = "$(location :gen_linear_operators) --module_name={} > $@".format(filename),
-    tools = [":gen_linear_operators"],
+    outs = ["{}_gen.py".format(filename)],
+    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
+           "--module_name={} --allowlist={} > $@").format(
+        filename,
+        ",".join(LINOP_FILES),
+    ),
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+) for filename in LINOP_FILES]
+
+# Rules helpful for generating new rewritten files.
+[genrule(
+    name = "generate_{}".format(filename),
+    testonly = 1,
+    srcs = [],
+    outs = ["gen_new/{}.py".format(filename)],
+    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_linear_operators) " +
+           "--module_name={} --allowlist={} > $@").format(
+        filename,
+        ",".join(LINOP_FILES),
+    ),
+    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 py_library(
-    name = "linear_operator",
-    srcs = [":{}.py".format(filename) for filename in LINOP_FILES],
+    name = "generated_files",
+    testonly = 1,
+    srcs = ["gen_new/{}.py".format(filename) for filename in LINOP_FILES],
+    srcs_version = "PY2AND3",
+)
+
+py_library(
+    name = "linear_operator_gen",
+    testonly = 1,
+    srcs = [":{}_gen.py".format(filename) for filename in LINOP_FILES],
     deps = [
         ":_utils",
         # numpy dep,
         # scipy dep,
-        # tensorflow dep,
     ],
+)
+
+# py2and3
+py_test(
+    name = "rewrite_equivalence_test",
+    srcs = ["rewrite_equivalence_test.py"],
+    args = [
+        "--modules_to_check",
+        ",".join(LINOP_FILES + ["tensor_shape"]),
+    ],
+    srcs_version = "PY2AND3",
+    tags = ["no-oss-ci"],
+    deps = [
+        ":linear_operator_gen",
+        ":static_rewrites",
+        ":tensor_shape_gen",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "static_rewrites",
+    srcs = glob(["gen/*.py"]),
+    deps = [
+        ":_utils",
+        # numpy dep,
+        # scipy dep,
+        # six dep,
+    ],
+)
+
+exports_files(
+    glob(["**/*.py"]),
+    visibility = ["//tensorflow_probability:__subpackages__"],
 )

@@ -19,12 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
+from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'DeferredTensor',
+    'TransformedVariable',
     'SeedStream',
 ]
 

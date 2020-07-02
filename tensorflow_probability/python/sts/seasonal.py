@@ -19,7 +19,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -209,10 +208,7 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     {seasonal_init_args}
     """
 
-    with tf1.name_scope(
-        name, 'SeasonalStateSpaceModel',
-        values=[drift_scale, observation_noise_scale]) as name:
-
+    with tf.name_scope(name or 'SeasonalStateSpaceModel') as name:
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
       dtype = initial_state_prior.dtype
@@ -424,9 +420,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     {seasonal_init_args}
     """
 
-    with tf1.name_scope(
-        name, 'ConstrainedSeasonalStateSpaceModel',
-        values=[drift_scale, observation_noise_scale]) as name:
+    with tf.name_scope(name or 'ConstrainedSeasonalStateSpaceModel') as name:
 
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -522,8 +516,7 @@ def build_is_last_day_of_season(num_steps_per_season):
       return any(step_in_cycle == changepoints)
     else:
       step_in_cycle = tf.math.floormod(t, num_steps_per_cycle)
-      return tf.reduce_any(
-          input_tensor=tf.equal(step_in_cycle, changepoints))
+      return tf.reduce_any(tf.equal(step_in_cycle, changepoints))
   return is_last_day_of_season
 
 
@@ -576,7 +569,7 @@ def build_seasonal_transition_matrix(
     basis_change_matrix=None, basis_change_matrix_inv=None):
   """Build a function computing transitions for a seasonal effect model."""
 
-  with tf1.name_scope('build_seasonal_transition_matrix'):
+  with tf.name_scope('build_seasonal_transition_matrix'):
     # If the season is changing, the transition matrix permutes the latent
     # state to shift all seasons up by a dimension, and sends the current
     # season's effect to the bottom.
@@ -593,7 +586,7 @@ def build_seasonal_transition_matrix(
           tf.matmul(seasonal_permutation_matrix, basis_change_matrix_inv))
 
     identity_matrix = tf.eye(
-        tf.shape(input=seasonal_permutation_matrix)[-1], dtype=dtype)
+        tf.shape(seasonal_permutation_matrix)[-1], dtype=dtype)
 
     def seasonal_transition_matrix(t):
       return tf.linalg.LinearOperatorFullMatrix(
@@ -832,8 +825,7 @@ class Seasonal(StructuralTimeSeries):
         Default value: 'Seasonal'.
     """
 
-    with tf1.name_scope(
-        name, 'Seasonal', values=[observed_time_series]) as name:
+    with tf.name_scope(name or 'Seasonal') as name:
 
       _, observed_stddev, observed_initial = (
           sts_util.empirical_statistics(observed_time_series)

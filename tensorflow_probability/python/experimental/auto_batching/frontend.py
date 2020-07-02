@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import dsl
+from tensorflow_probability.python.experimental.auto_batching import gast_util
 from tensorflow_probability.python.experimental.auto_batching import instructions
 from tensorflow_probability.python.experimental.auto_batching import lowering
 from tensorflow_probability.python.experimental.auto_batching import stack_optimization as stack
@@ -41,15 +42,35 @@ from tensorflow.python.autograph.converters import break_statements
 from tensorflow.python.autograph.converters import continue_statements
 from tensorflow.python.autograph.converters import return_statements
 from tensorflow.python.autograph.core import converter
-from tensorflow.python.autograph.core import naming
 from tensorflow.python.autograph.pyct import anno
-from tensorflow.python.autograph.pyct import compiler
 from tensorflow.python.autograph.pyct import inspect_utils
 from tensorflow.python.autograph.pyct import parser
 from tensorflow.python.autograph.pyct import qual_names
 from tensorflow.python.autograph.pyct import templates
 from tensorflow.python.autograph.pyct import transformer
 from tensorflow.python.autograph.pyct.common_transformers import anf
+from tensorflow.python.autograph.pyct.static_analysis import activity
+
+
+# For backward compatibility:
+# - `compiler` will be renamed to `loader` in TF 2.2+.
+# - `naming` will be moved to `core` in TF 2.2+.
+# - 'converter.standard_analysis` will no longer be needed in TF 2.3+.
+try:
+  from tensorflow.python.autograph.pyct import naming  # pylint:disable=g-import-not-at-top
+except ImportError:
+  from tensorflow.python.autograph.core import naming  # pylint:disable=g-import-not-at-top
+try:
+  from tensorflow.python.autograph.pyct import loader  # pylint:disable=g-import-not-at-top
+except ImportError:
+  from tensorflow.python.autograph.pyct import compiler  # pylint:disable=g-import-not-at-top
+
+  loader = compiler
+  loader.load_ast = compiler.ast_to_object
+
+converter.standard_analysis = getattr(
+    converter, 'standard_analysis', (lambda node, *_, **__: node))
+
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
 
@@ -72,6 +93,7 @@ def _parse_and_analyze(f, autobatch_functions):
     entity_info: An AutoGraph `EntityInfo` object, with some information
       about `f`.  Required for initializing `_AutoBatchingTransformer`.
   """
+  # TODO(mdan): Replace all this boilerplate with FunctionTranspiler.
   namespace = {}
 
   # Get the AST of the function
@@ -79,29 +101,46 @@ def _parse_and_analyze(f, autobatch_functions):
   node, _ = parser.parse_entity(f, future_features=future_features)
 
   # Boilerplate for AutoGraph transforms
-  entity_info = transformer.EntityInfo(
-      source_code='',
-      source_file=None,
-      future_features=future_features,
-      namespace=namespace)
-  program_ctx = converter.ProgramContext(
-      options=converter.ConversionOptions(recursive=True),
-      autograph_module=None)
-  ctx = converter.EntityContext(
-      namer=naming.Namer(namespace),
-      entity_info=entity_info,
-      program_ctx=program_ctx)
+  if hasattr(converter, 'EntityContext'):
+    # TF 2.2-
+    entity_info = transformer.EntityInfo(
+        source_code='',
+        source_file=None,
+        future_features=future_features,
+        namespace=namespace)
+    program_ctx = converter.ProgramContext(
+        options=converter.ConversionOptions(recursive=True),
+        autograph_module=None)
+    ctx = converter.EntityContext(
+        namer=naming.Namer(namespace),
+        entity_info=entity_info,
+        program_ctx=program_ctx)
+  else:
+    # TF 2.3+
+    entity_info = transformer.EntityInfo(
+        name=f.__name__,
+        source_code='',
+        source_file=None,
+        future_features=future_features,
+        namespace=namespace)
+    program_ctx = converter.ProgramContext(
+        options=converter.ConversionOptions(recursive=True),
+        autograph_module=None)
+    ctx = transformer.Context(
+        info=entity_info,
+        namer=naming.Namer(namespace),
+        user_context=program_ctx)
 
   # Canonicalize away break statements
-  node = converter.standard_analysis(node, ctx, is_initial=True)
+  node = converter.standard_analysis(node, ctx)
   node = break_statements.transform(node, ctx)
 
   # Canonicalize away continue statements
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = converter.standard_analysis(node, ctx)
   node = continue_statements.transform(node, ctx)
 
   # Force single returns
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = converter.standard_analysis(node, ctx)
   node = return_statements.transform(node, ctx, default_to_null_return=False)
 
   # Transform into ANF
@@ -125,20 +164,10 @@ def _parse_and_analyze(f, autobatch_functions):
        maybe_replace_function_argument),
   ]
   node = anf.transform(node, ctx, config=anf_config)
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = qual_names.resolve(node)
+  node = activity.resolve(node, ctx)
 
   return node, ctx
-
-
-_LITERALS = (gast.Num, gast.Str, gast.Bytes, gast.Ellipsis, gast.NameConstant)
-
-
-def _is_literal(node):
-  if isinstance(node, _LITERALS):
-    return True
-  if isinstance(node, gast.Name) and node.id in ['True', 'False', 'None']:
-    return True
-  return False
 
 
 class _AutoBatchingTransformer(transformer.Base):
@@ -203,7 +232,7 @@ class _AutoBatchingTransformer(transformer.Base):
       local_declarations.append(templates.replace(
           'target = _tfp_autobatching_context_.param(name=target_name)',
           target=arg.id,
-          target_name=gast.Str(arg.id))[0])
+          target_name=gast_util.Str(arg.id))[0])
 
     # Visit the content of the function
     node = self.generic_visit(node)
@@ -217,8 +246,9 @@ class _AutoBatchingTransformer(transformer.Base):
     # the auto-batching `ProgramBuilder` and the `instruction.Function`s that
     # may be called in the body) can be passed in through regular Python
     # variable references.
-    callable_function_names = [gast.Name(n, ctx=gast.Store(), annotation=None)
-                               for n in self.known_functions]
+    callable_function_names = [
+        gast_util.Name(n, ctx=gast.Store(), annotation=None)
+        for n in self.known_functions]
     node = templates.replace(
         '''
         def func(_tfp_autobatching_context_,
@@ -252,7 +282,7 @@ class _AutoBatchingTransformer(transformer.Base):
     """
     # If we're assigning a constant value, use the `ProgramBuilder.const`
     # shorthand.
-    if _is_literal(node.value):
+    if gast_util.is_literal(node.value):
       # Emit `_tfp_autobatching_context_.const`
       node = templates.replace(
           'target = _tfp_autobatching_context_.const(value)',
@@ -289,7 +319,7 @@ class _AutoBatchingTransformer(transformer.Base):
     # We want the root names of any attribute accesses; the accesses will happen
     # inside the expression.
     used_vars = set().union(*[qn.support_set for qn in scope.read])
-    # Exclude names from the blacklist.
+    # Exclude names from the blocklist.
     used_vars = list(used_vars - set(non_autobatch_names))
     # Exclude names that will be available from the enclosing scope.
     used_vars = [v for v in used_vars if str(v) not in self.enclosing_names]
@@ -330,7 +360,7 @@ class _AutoBatchingTransformer(transformer.Base):
     if isinstance(node, (gast.Name, qual_names.QN)):
       return templates.replace_as_expression(
           '_tfp_autobatching_context_.var.name', name=node)
-    elif _is_literal(node):
+    elif gast_util.is_literal(node):
       raise ValueError('TODO(axch): Support literals, not just variables')
     else:
       msg = 'Expected trivial node, got {}.  Is the input in A-normal form?'
@@ -360,7 +390,7 @@ class _AutoBatchingTransformer(transformer.Base):
     # NOTE: this is a little hackery to make sure that prepending works
     # properly. Wrapping a list of statements in a Module ensures
     # that the AST-visiting machinery won't choke on, e.g., a list.
-    then = self.generic_visit(gast.Module(node.body)).body
+    then = self.generic_visit(gast_util.Module(node.body)).body
 
     # Construct header (goes in the `with`s).
     then_header = templates.replace_as_expression(
@@ -373,7 +403,7 @@ class _AutoBatchingTransformer(transformer.Base):
         'with header: body', header=then_header, body=then)[0]
 
     if node.orelse:
-      orelse = self.generic_visit(gast.Module(node.orelse)).body
+      orelse = self.generic_visit(gast_util.Module(node.orelse)).body
       orelse_header = templates.replace_as_expression(
           '_tfp_autobatching_context_.else_()')
       orelse_node = templates.replace(
@@ -596,13 +626,11 @@ class Context(object):
     for function, _ in self._tagged_functions:
       name = function.__name__
       node, ctx = _parse_and_analyze(function, self.function_names())
-      # print(compiler.ast_to_source(node, indentation='  '))
       node = _AutoBatchingTransformer(
           self.function_names(),
           [scoped_name for scoped_name, _ in _environment(function, [name])],
           ctx).visit(node)
-      # print(compiler.ast_to_source(node, indentation='  '))
-      builder_module, _, _ = compiler.ast_to_object(node)
+      builder_module, _, _ = loader.load_ast(node)
       for scoped_name, val in _environment(function, [name]):
         builder_module.__dict__[scoped_name] = val
       builder = getattr(builder_module, name)

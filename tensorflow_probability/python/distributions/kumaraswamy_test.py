@@ -24,10 +24,7 @@ from scipy import stats as sp_stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 def _kumaraswamy_mode(a, b):
@@ -51,7 +48,9 @@ def _kumaraswamy_cdf(a, b, x):
   a = np.asarray(a)
   b = np.asarray(b)
   x = np.asarray(x)
-  return 1 - (1 - x**a)**b
+  # The CDF is 1. - (1 - x ** a) ** b
+  # We write this in a numerically stable way.
+  return -np.expm1(b * np.log1p(-x ** a))
 
 
 def _kumaraswamy_pdf(a, b, x):
@@ -61,13 +60,13 @@ def _kumaraswamy_pdf(a, b, x):
   return a * b * x ** (a - 1) * (1 - x ** a) ** (b - 1)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class KumaraswamyTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class KumaraswamyTest(test_util.TestCase):
 
   def testSimpleShapes(self):
     a = np.random.rand(3)
     b = np.random.rand(3)
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([3], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
@@ -76,7 +75,7 @@ class KumaraswamyTest(test_case.TestCase):
   def testComplexShapes(self):
     a = np.random.rand(3, 2, 2)
     b = np.random.rand(3, 2, 2)
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([3, 2, 2], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
@@ -85,7 +84,7 @@ class KumaraswamyTest(test_case.TestCase):
   def testComplexShapesBroadcast(self):
     a = np.random.rand(3, 2, 2)
     b = np.random.rand(2, 2)
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
     self.assertAllEqual([3, 2, 2], self.evaluate(dist.batch_shape_tensor()))
     self.assertEqual(tf.TensorShape([]), dist.event_shape)
@@ -94,14 +93,14 @@ class KumaraswamyTest(test_case.TestCase):
   def testAProperty(self):
     a = [[1., 2, 3]]
     b = [[2., 4, 3]]
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     self.assertEqual([1, 3], dist.concentration1.shape)
     self.assertAllClose(a, self.evaluate(dist.concentration1))
 
   def testBProperty(self):
     a = [[1., 2, 3]]
     b = [[2., 4, 3]]
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     self.assertEqual([1, 3], dist.concentration0.shape)
     self.assertAllClose(b, self.evaluate(dist.concentration0))
 
@@ -112,16 +111,16 @@ class KumaraswamyTest(test_case.TestCase):
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
-    with self.assertRaisesOpError('sample must be non-negative'):
+    with self.assertRaisesOpError('Sample must be non-negative'):
       self.evaluate(dist.prob([-1., 0.1, 0.5]))
-    with self.assertRaisesOpError('sample must be no larger than `1`'):
+    with self.assertRaisesOpError('Sample must be less than or equal to `1`'):
       self.evaluate(dist.prob([.1, .2, 1.2]))
 
   def testPdfTwoBatches(self):
     a = [1., 2]
     b = [1., 2]
     x = [.5, .5]
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
@@ -131,7 +130,7 @@ class KumaraswamyTest(test_case.TestCase):
     a = [1., 2]
     b = [1., 2]
     x = [.3, .7]
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
@@ -142,7 +141,7 @@ class KumaraswamyTest(test_case.TestCase):
     a = 1.
     b = 1.
     x = np.array([.1, .2, .3, .5, .8], dtype=np.float32)
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
@@ -152,7 +151,7 @@ class KumaraswamyTest(test_case.TestCase):
     a = [[1., 2]]
     b = [[1., 2]]
     x = [[.5, .5], [.3, .7]]
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     pdf = dist.prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
@@ -162,7 +161,7 @@ class KumaraswamyTest(test_case.TestCase):
     a = [1., 2]
     b = [1., 2]
     x = [[.5, .5], [.2, .8]]
-    pdf = tfd.Kumaraswamy(a, b).prob(x)
+    pdf = tfd.Kumaraswamy(a, b, validate_args=True).prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
     self.assertEqual((2, 2), pdf.shape)
@@ -171,7 +170,7 @@ class KumaraswamyTest(test_case.TestCase):
     a = [[1., 2], [2., 3]]
     b = [[1., 2], [2., 3]]
     x = [[.5, .5]]
-    pdf = tfd.Kumaraswamy(a, b).prob(x)
+    pdf = tfd.Kumaraswamy(a, b, validate_args=True).prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
     self.assertEqual((2, 2), pdf.shape)
@@ -180,7 +179,7 @@ class KumaraswamyTest(test_case.TestCase):
     a = [[1., 2], [2., 3]]
     b = [[1., 2], [2., 3]]
     x = [.5, .5]
-    pdf = tfd.Kumaraswamy(a, b).prob(x)
+    pdf = tfd.Kumaraswamy(a, b, validate_args=True).prob(x)
     expected_pdf = _kumaraswamy_pdf(a, b, x)
     self.assertEqual((2, 2), pdf.shape)
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
@@ -188,7 +187,7 @@ class KumaraswamyTest(test_case.TestCase):
   def testKumaraswamyMean(self):
     a = [1., 2, 3]
     b = [2., 4, 1.2]
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     expected_mean = _kumaraswamy_moment(a, b, 1)
     self.assertEqual((3,), dist.mean().shape)
     self.assertAllClose(expected_mean, self.evaluate(dist.mean()))
@@ -196,7 +195,7 @@ class KumaraswamyTest(test_case.TestCase):
   def testKumaraswamyVariance(self):
     a = [1., 2, 3]
     b = [2., 4, 1.2]
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     expected_variance = _kumaraswamy_moment(a, b, 2) - _kumaraswamy_moment(
         a, b, 1)**2
     self.assertEqual((3,), dist.variance().shape)
@@ -206,7 +205,7 @@ class KumaraswamyTest(test_case.TestCase):
     a = np.array([1.1, 2, 3])
     b = np.array([2., 4, 1.2])
     expected_mode = _kumaraswamy_mode(a, b)
-    dist = tfd.Kumaraswamy(a, b)
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
     self.assertEqual((3,), dist.mode().shape)
     self.assertAllClose(expected_mode, self.evaluate(dist.mode()))
 
@@ -214,13 +213,13 @@ class KumaraswamyTest(test_case.TestCase):
     with tf1.Session():
       a = np.array([1., 2, 3])
       b = np.array([2., 4, 1.2])
-      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=False)
+      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=False, validate_args=True)
       with self.assertRaisesOpError('Mode undefined for concentration1 <= 1.'):
         self.evaluate(dist.mode())
 
       a = np.array([2., 2, 3])
       b = np.array([1., 4, 1.2])
-      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=False)
+      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=False, validate_args=True)
       with self.assertRaisesOpError('Mode undefined for concentration0 <= 1.'):
         self.evaluate(dist.mode())
 
@@ -228,7 +227,7 @@ class KumaraswamyTest(test_case.TestCase):
     with tf1.Session():
       a = np.array([1., 2, 3])
       b = np.array([2., 4, 1.2])
-      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=True)
+      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=True, validate_args=True)
 
       expected_mode = _kumaraswamy_mode(a, b)
       expected_mode[0] = np.nan
@@ -237,7 +236,7 @@ class KumaraswamyTest(test_case.TestCase):
 
       a = np.array([2., 2, 3])
       b = np.array([1., 4, 1.2])
-      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=True)
+      dist = tfd.Kumaraswamy(a, b, allow_nan_stats=True, validate_args=True)
 
       expected_mode = _kumaraswamy_mode(a, b)
       expected_mode[0] = np.nan
@@ -248,7 +247,7 @@ class KumaraswamyTest(test_case.TestCase):
     with tf1.Session():
       a = np.array([1., 2, 3])
       b = np.array([2., 4, 1.2])
-      dist = tfd.Kumaraswamy(a, b)
+      dist = tfd.Kumaraswamy(a, b, validate_args=True)
       self.assertEqual(dist.entropy().shape, (3,))
       expected_entropy = (1 - 1. / b) + (
           1 - 1. / a) * _harmonic_number(b) - np.log(a * b)
@@ -257,9 +256,9 @@ class KumaraswamyTest(test_case.TestCase):
   def testKumaraswamySample(self):
     a = 1.
     b = 2.
-    kumaraswamy = tfd.Kumaraswamy(a, b)
+    kumaraswamy = tfd.Kumaraswamy(a, b, validate_args=True)
     n = tf.constant(100000)
-    samples = kumaraswamy.sample(n)
+    samples = kumaraswamy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000,))
     self.assertFalse(np.any(sample_values < 0.0))
@@ -282,16 +281,22 @@ class KumaraswamyTest(test_case.TestCase):
     a_val = 1.
     b_val = 2.
     n_val = 100
-    seed = tfp_test_util.test_seed()
+    seed = test_util.test_seed()
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     kumaraswamy1 = tfd.Kumaraswamy(
-        concentration1=a_val, concentration0=b_val, name='kumaraswamy1')
+        concentration1=a_val,
+        concentration0=b_val,
+        name='kumaraswamy1',
+        validate_args=True)
     samples1 = self.evaluate(kumaraswamy1.sample(n_val, seed=seed))
 
-    tf1.set_random_seed(seed)
+    tf.random.set_seed(seed)
     kumaraswamy2 = tfd.Kumaraswamy(
-        concentration1=a_val, concentration0=b_val, name='kumaraswamy2')
+        concentration1=a_val,
+        concentration0=b_val,
+        name='kumaraswamy2',
+        validate_args=True)
     samples2 = self.evaluate(kumaraswamy2.sample(n_val, seed=seed))
 
     self.assertAllClose(samples1, samples2)
@@ -299,9 +304,9 @@ class KumaraswamyTest(test_case.TestCase):
   def testKumaraswamySampleMultidimensional(self):
     a = np.random.rand(3, 2, 2).astype(np.float32)
     b = np.random.rand(3, 2, 2).astype(np.float32)
-    kumaraswamy = tfd.Kumaraswamy(a, b)
+    kumaraswamy = tfd.Kumaraswamy(a, b, validate_args=True)
     n = tf.constant(100000)
-    samples = kumaraswamy.sample(n)
+    samples = kumaraswamy.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 3, 2, 2))
     self.assertFalse(np.any(sample_values < 0.0))
@@ -316,10 +321,10 @@ class KumaraswamyTest(test_case.TestCase):
       a = 10. * np.random.random(shape).astype(dt)
       b = 10. * np.random.random(shape).astype(dt)
       x = np.random.random(shape).astype(dt)
-      actual = self.evaluate(tfd.Kumaraswamy(a, b).cdf(x))
+      actual = self.evaluate(tfd.Kumaraswamy(a, b, validate_args=True).cdf(x))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual)
 
   def testKumaraswamyLogCdf(self):
     shape = (30, 40, 50)
@@ -327,10 +332,35 @@ class KumaraswamyTest(test_case.TestCase):
       a = 10. * np.random.random(shape).astype(dt)
       b = 10. * np.random.random(shape).astype(dt)
       x = np.random.random(shape).astype(dt)
-      actual = self.evaluate(tf.exp(tfd.Kumaraswamy(a, b).log_cdf(x)))
+      actual = self.evaluate(
+          tf.exp(tfd.Kumaraswamy(a, b, validate_args=True).log_cdf(x)))
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
       self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
-      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual, rtol=1e-4, atol=0)
+      self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual)
+
+  def testPdfAtBoundary(self):
+    a = [0.5, 2.]
+    b = [0.5, 5.]
+    x = [[0.], [1.]]
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
+    pdf = self.evaluate(dist.prob(x))
+    log_pdf = self.evaluate(dist.log_prob(x))
+    self.assertAllPositiveInf(pdf[:, 0])
+    self.assertAllFinite(pdf[:, 1])
+    self.assertAllPositiveInf(log_pdf[:, 0])
+    self.assertAllNegativeInf(log_pdf[:, 1])
+
+  def testAssertValidSample(self):
+    a = [[1., 2, 3]]
+    b = [[2., 4, 3]]
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
+    self.evaluate(dist.prob([.1, .3, .6]))
+    self.evaluate(dist.prob([.2, .3, .5]))
+    # Either condition can trigger.
+    with self.assertRaisesOpError('Sample must be non-negative.'):
+      self.evaluate(dist.prob([-1., 0.1, 0.5]))
+    with self.assertRaisesOpError('Sample must be less than or equal to `1`.'):
+      self.evaluate(dist.prob([.1, .2, 1.2]))
 
   def testInvalidConcentration1(self):
     x = tf.Variable(1.)
@@ -342,7 +372,7 @@ class KumaraswamyTest(test_case.TestCase):
     with self.assertRaisesOpError(
         'Argument `concentration1` must be positive.'):
       with tf.control_dependencies([x.assign(-1.)]):
-        self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+        self.evaluate(dist.event_shape_tensor())
 
   def testInvalidConcentration0(self):
     x = tf.Variable(1.)
@@ -354,8 +384,17 @@ class KumaraswamyTest(test_case.TestCase):
     with self.assertRaisesOpError(
         'Argument `concentration0` must be positive.'):
       with tf.control_dependencies([x.assign(-1.)]):
-        self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+        self.evaluate(dist.event_shape_tensor())
 
+  def testSupportBijectorOutsideRange(self):
+    a = np.array([1., 2., 3.])
+    b = np.array([2., 4., 1.2])
+    dist = tfd.Kumaraswamy(a, b, validate_args=True)
+    eps = 1e-6
+    x = np.array([-2.3, -eps, 1. + eps, 1.4])
+    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+        ).inverse(x)
+    self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == '__main__':
   tf.test.main()

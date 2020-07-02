@@ -61,6 +61,7 @@ class CategoricalToDiscrete(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([map_values], tf.float32)
       self._map_values = tensor_util.convert_nonref_to_tensor(
@@ -69,6 +70,7 @@ class CategoricalToDiscrete(bijector.Bijector):
           forward_min_event_ndims=0,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x):
@@ -109,9 +111,8 @@ class CategoricalToDiscrete(bijector.Bijector):
         candidates = tf.identity(candidates)
     candidate_selector = tf.stack([
         tf.range(tf.size(flat_y), dtype=tf.int32),
-        tf.argmin([lower_cand_diff, upper_cand_diff], output_type=tf.int32)
-    ],
-                                  axis=-1)
+        tf.argmin([lower_cand_diff, upper_cand_diff],
+                  output_type=tf.int32)], axis=-1)
     return tf.reshape(
         tf.gather_nd(candidates, candidate_selector), shape=y.shape)
 

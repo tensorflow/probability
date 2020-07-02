@@ -22,7 +22,8 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
@@ -30,8 +31,8 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'MultivariateStudentTLinearOperator',
@@ -142,13 +143,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
     Raises:
       TypeError: if not `scale.dtype.is_floating`.
-      ValueError: if not `scale.is_positive_definite`.
+      ValueError: if not `scale.is_non_singular`.
     """
     parameters = dict(locals())
     if not dtype_util.is_floating(scale.dtype):
       raise TypeError('`scale` must have floating-point dtype.')
-    if validate_args and not scale.is_positive_definite:
-      raise ValueError('`scale` must be positive definite.')
+    if validate_args and not scale.is_non_singular:
+      raise ValueError('`scale` must be non-singular.')
 
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([df, loc, scale], dtype_hint=tf.float32)
@@ -238,16 +239,16 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     # Like with the univariate Student's t, sampling can be implemented as a
     # ratio of samples from a multivariate gaussian with the appropriate
     # covariance matrix and a sample from the chi-squared distribution.
-    seed = SeedStream(seed, salt='multivariate t')
+    normal_seed, chi2_seed = samplers.split_seed(seed, salt='multivariate t')
 
     loc = tf.broadcast_to(self.loc, self._sample_shape())
     mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=tf.zeros_like(loc), scale=self.scale)
-    normal_samp = mvn.sample(n, seed=seed())
+    normal_samp = mvn.sample(n, seed=normal_seed)
 
     df = tf.broadcast_to(self.df, self.batch_shape_tensor())
     chi2 = chi2_lib.Chi2(df=df)
-    chi2_samp = chi2.sample(n, seed=seed())
+    chi2_samp = chi2.sample(n, seed=chi2_seed)
 
     return (self._loc +
             normal_samp * tf.math.rsqrt(chi2_samp / self._df)[..., tf.newaxis])
@@ -255,10 +256,9 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
   def _log_normalization(self):
     df = tf.convert_to_tensor(self.df)
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
-    return (tf.math.lgamma(df / 2.) + num_dims / 2. *
-            (tf.math.log(df) + np.log(np.pi)) +
-            self.scale.log_abs_determinant() - tf.math.lgamma(
-                (num_dims + df) / 2.))
+    return (tfp_math.log_gamma_difference(num_dims / 2., df / 2.) +
+            num_dims / 2. * (tf.math.log(df) + np.log(np.pi)) +
+            self.scale.log_abs_determinant())
 
   def _log_unnormalized_prob(self, value):
     df = tf.convert_to_tensor(self.df)
@@ -267,7 +267,8 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
     mahalanobis = tf.norm(value, axis=[-1, -2])
-    return -(num_dims + df) / 2. * math.log1psquare(mahalanobis / tf.sqrt(df))
+    return -(num_dims + df) / 2. * tfp_math.log1psquare(
+        mahalanobis / tf.sqrt(df))
 
   def _log_prob(self, value):
     return self._log_unnormalized_prob(value) - self._log_normalization()
@@ -303,9 +304,9 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
         tf.concat(
             [tf.shape(self.df),
              tf.ones([statistic_ndims], dtype=tf.int32)], -1))
-    # We need to put the tf.where inside the outer tf1.where to ensure we never
+    # We need to put the tf.where inside the outer tf.where to ensure we never
     # hit a NaN in the gradient.
-    denom = tf.where(df > 2., df - 2., tf.ones_like(df))
+    denom = tf.where(df > 2., df - 2., dtype_util.as_numpy_dtype(df.dtype)(1.))
     statistic = statistic * df_factor_fn(df / denom)
     # When 1 < df <= 2, stddev/variance are infinite.
     result_where_defined = tf.where(
@@ -398,17 +399,15 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
     df = tf.broadcast_to(self.df, self.batch_shape_tensor())
     num_dims = tf.cast(self.event_shape_tensor()[0], self.dtype)
 
-    def _lbeta(concentration0, concentration1):
-      return (tf.math.lgamma(concentration1) + tf.math.lgamma(concentration0) -
-              tf.math.lgamma(concentration0 + concentration1))
-
     shape_factor = self._scale.log_abs_determinant()
-    beta_factor = num_dims / 2. * (
-        tf.math.log(df) + np.log(np.pi)) - tf.math.lgamma(
-            num_dims / 2.) + _lbeta(num_dims / 2., df / 2.)
+    beta_factor = (num_dims / 2. * (tf.math.log(df) + np.log(np.pi)) +
+                   tfp_math.log_gamma_difference(num_dims / 2., df / 2.))
     digamma_factor = (num_dims + df) / 2. * (
         tf.math.digamma((num_dims + df) / 2.) - tf.math.digamma(df / 2.))
     return shape_factor + beta_factor + digamma_factor
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

@@ -22,12 +22,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 
@@ -156,7 +158,7 @@ class Laplace(distribution.Distribution):
     # exists only at zero; here we need the smallest usable number larger than
     # -1, i.e., `-1 + eps/2`.
     dt = dtype_util.as_numpy_dtype(self.dtype)
-    uniform_samples = tf.random.uniform(
+    uniform_samples = samplers.uniform(
         shape=shape,
         minval=np.nextafter(dt(-1.), dt(1.)),
         maxval=1.,
@@ -201,8 +203,20 @@ class Laplace(distribution.Distribution):
   def _mode(self):
     return self._mean()
 
+  def _quantile(self, p):
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    return tf.where(p > 0.5,
+                    loc - scale * (
+                        tf.constant(np.log(2), dtype=p.dtype) +
+                        tf.math.log1p(-p)),
+                    loc + scale * tf.math.log(2 * p))
+
   def _z(self, x):
     return (x - self.loc) / self.scale
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

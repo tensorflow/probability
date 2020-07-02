@@ -51,6 +51,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "generated_random_variables_test",
     size = "small",
@@ -60,7 +61,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -70,6 +71,7 @@ py_library(
     srcs_version = "PY2AND3",
 )
 
+# py2and3
 py_test(
     name = "interceptor_test",
     size = "small",
@@ -78,7 +80,7 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -92,6 +94,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "program_transformations_test",
     size = "small",
@@ -99,7 +102,7 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -112,6 +115,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "random_variable_test",
     size = "small",
@@ -121,6 +125,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

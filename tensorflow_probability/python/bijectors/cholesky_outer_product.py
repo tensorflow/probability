@@ -77,10 +77,12 @@ class CholeskyOuterProduct(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(CholeskyOuterProduct, self).__init__(
           forward_min_event_ndims=2,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x):
@@ -199,7 +201,7 @@ class CholeskyOuterProduct(bijector.Bijector):
     return tf.reshape(x, maybe_expanded_shape)
 
   def _assertions(self, t):
-    if self.validate_args:
+    if not self.validate_args:
       return []
     is_matrix = assert_util.assert_rank_at_least(t, 2)
     is_square = assert_util.assert_equal(tf.shape(t)[-2], tf.shape(t)[-1])

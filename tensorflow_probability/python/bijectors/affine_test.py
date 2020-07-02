@@ -25,13 +25,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AffineBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AffineBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = scale @ x + shift transformation."""
 
   def testProperties(self):
@@ -412,7 +410,9 @@ class AffineBijectorTest(test_case.TestCase):
 
   def testNoBatchMultivariateRaisesWhenSingular(self):
     mu = [1., -1]
-    with self.assertRaisesOpError("diagonal part must be non-zero"):
+    with self.assertRaisesRegexp(
+        Exception,
+        ".*Singular operator:  Diagonal contained zero values.*"):
       bijector = tfb.Affine(
           shift=mu,
           # Has zero on the diagonal.

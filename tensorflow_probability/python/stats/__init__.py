@@ -22,10 +22,14 @@ from __future__ import print_function
 from tensorflow_probability.python.stats.calibration import brier_decomposition
 from tensorflow_probability.python.stats.calibration import brier_score
 from tensorflow_probability.python.stats.calibration import expected_calibration_error
+from tensorflow_probability.python.stats.calibration import expected_calibration_error_quantiles
 from tensorflow_probability.python.stats.leave_one_out import log_loomean_exp
 from tensorflow_probability.python.stats.leave_one_out import log_loosum_exp
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
 from tensorflow_probability.python.stats.leave_one_out import log_soosum_exp
+from tensorflow_probability.python.stats.moving_stats import assign_log_moving_mean_exp
+from tensorflow_probability.python.stats.moving_stats import assign_moving_mean_variance
+from tensorflow_probability.python.stats.moving_stats import moving_mean_variance_zero_debiased
 from tensorflow_probability.python.stats.quantiles import count_integers
 from tensorflow_probability.python.stats.quantiles import find_bins
 from tensorflow_probability.python.stats.quantiles import histogram
@@ -45,6 +49,8 @@ from tensorflow_probability.python.stats.sample_stats import variance
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
+    'assign_log_moving_mean_exp',
+    'assign_moving_mean_variance',
     'auto_correlation',
     'brier_decomposition',
     'brier_score',
@@ -53,6 +59,7 @@ __all__ = [
     'count_integers',
     'covariance',
     'expected_calibration_error',
+    'expected_calibration_error_quantiles',
     'find_bins',
     'histogram',
     'log_average_probs',
@@ -60,6 +67,7 @@ __all__ = [
     'log_loosum_exp',
     'log_soomean_exp',
     'log_soosum_exp',
+    'moving_mean_variance_zero_debiased',
     'percentile',
     'quantile_auc',
     'quantiles',

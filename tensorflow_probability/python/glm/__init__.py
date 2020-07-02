@@ -20,38 +20,46 @@ from __future__ import print_function
 
 from tensorflow_probability.python.glm.family import Bernoulli
 from tensorflow_probability.python.glm.family import BernoulliNormalCDF
+from tensorflow_probability.python.glm.family import Binomial
 from tensorflow_probability.python.glm.family import CustomExponentialFamily
 from tensorflow_probability.python.glm.family import ExponentialFamily
 from tensorflow_probability.python.glm.family import GammaExp
 from tensorflow_probability.python.glm.family import GammaSoftplus
 from tensorflow_probability.python.glm.family import LogNormal
 from tensorflow_probability.python.glm.family import LogNormalSoftplus
+from tensorflow_probability.python.glm.family import NegativeBinomial
+from tensorflow_probability.python.glm.family import NegativeBinomialSoftplus
 from tensorflow_probability.python.glm.family import Normal
 from tensorflow_probability.python.glm.family import NormalReciprocal
 from tensorflow_probability.python.glm.family import Poisson
 from tensorflow_probability.python.glm.family import PoissonSoftplus
+from tensorflow_probability.python.glm.fisher_scoring import compute_predicted_linear_response
 from tensorflow_probability.python.glm.fisher_scoring import convergence_criteria_small_relative_norm_weights_change
 from tensorflow_probability.python.glm.fisher_scoring import fit
 from tensorflow_probability.python.glm.fisher_scoring import fit_one_step
 from tensorflow_probability.python.glm.proximal_hessian import fit_sparse
 from tensorflow_probability.python.glm.proximal_hessian import fit_sparse_one_step
 
-from tensorflow.python.util.all_util import remove_undocumented
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
+    'compute_predicted_linear_response',
+    'convergence_criteria_small_relative_norm_weights_change',
     'fit',
     'fit_one_step',
     'fit_sparse',
     'fit_sparse_one_step',
-    'convergence_criteria_small_relative_norm_weights_change',
     'Bernoulli',
     'BernoulliNormalCDF',
+    'Binomial',
     'CustomExponentialFamily',
     'ExponentialFamily',
     'GammaExp',
     'GammaSoftplus',
     'LogNormal',
     'LogNormalSoftplus',
+    'NegativeBinomial',
+    'NegativeBinomialSoftplus',
     'Normal',
     'NormalReciprocal',
     'Poisson',

@@ -19,16 +19,20 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 # Dependency imports
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import slice_sampler_utils as ssu
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -36,15 +40,26 @@ __all__ = [
 ]
 
 
-SliceSamplerKernelResults = collections.namedtuple(
-    'SliceSamplerKernelResults',
-    [
-        'target_log_prob',  # For "next_state".
-        'bounds_satisfied',  # Were the slice bounds chosen outside the slice.
-        'direction',  # The direction in which the slice was sampled.
-        'upper_bounds',  # Upper bound of the slice in the sampling direction.
-        'lower_bounds',  # Lower bound of the slice in the sampling direction.
-    ])
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*slice_sampler_kernel',
+                        append=True)  # Don't override user-set filters.
+
+
+class SliceSamplerKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'SliceSamplerKernelResults',
+        ['target_log_prob',  # For "next_state".
+         'bounds_satisfied',  # Were the slice bounds chosen outside the slice.
+         'direction',  # The direction in which the slice was sampled.
+         'upper_bounds',  # Upper bound of the slice in the sampling direction.
+         'lower_bounds',  # Lower bound of the slice in the sampling direction.
+         'seed',
+         ])):
+  """Internal state and diagnostics for Slice sampler."""
+  __slots__ = ()
 
 
 class SliceSampler(kernel_base.TransitionKernel):
@@ -85,37 +100,35 @@ class SliceSampler(kernel_base.TransitionKernel):
   distribution using slice sampling.
 
   ```python
-    import tensorflow as tf
-    import tensorflow_probability as tfp
-    import numpy as np
+  import tensorflow.compat.v2 as tf
+  import tensorflow_probability as tfp
+  import numpy as np
 
-    tfd = tfp.distributions
+  tf.enable_v2_behavior()
 
-    dtype = np.float32
+  dtype = np.float32
 
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
+  target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-    samples, _ = tfp.mcmc.sample_chain(
-        num_results=1000,
-        current_state=dtype(1),
-        kernel=tfp.mcmc.SliceSampler(
-            target.log_prob,
-            step_size=1.0,
-            max_doublings=5,
-            seed=1234),
-        num_burnin_steps=500,
-        parallel_iterations=1)  # For determinism.
+  samples = tfp.mcmc.sample_chain(
+      num_results=1000,
+      current_state=dtype(1),
+      kernel=tfp.mcmc.SliceSampler(
+          target.log_prob,
+          step_size=1.0,
+          max_doublings=5),
+      num_burnin_steps=500,
+      trace_fn=None,
+      seed=1234)
 
-    sample_mean = tf.reduce_mean(samples, axis=0)
-    sample_std = tf.sqrt(
-      tf.reduce_mean(tf.squared_difference(samples, sample_mean),
-                     axis=0))
+  sample_mean = tf.reduce_mean(samples, axis=0)
+  sample_std = tf.sqrt(
+      tf.reduce_mean(
+          tf.math.squared_difference(samples, sample_mean),
+          axis=0))
 
-    with tf.Session() as sess:
-      [sample_mean, sample_std] = sess.run([sample_mean, sample_std])
-
-    print "Sample mean: ", sample_mean
-    print "Sample Std: ", sample_std
+  print('Sample mean: ', sample_mean.numpy())
+  print('Sample Std: ', sample_std.numpy())
   ```
 
   #### Sample from a Two Dimensional Normal.
@@ -124,59 +137,51 @@ class SliceSampler(kernel_base.TransitionKernel):
   distribution using slice sampling.
 
   ```python
-    import tensorflow as tf
-    import tensorflow_probability as tfp
-    import numpy as np
+  import tensorflow.compat.v2 as tf
+  import tensorflow_probability as tfp
+  import numpy as np
 
-    tfd = tfp.distributions
+  tf.enable_v2_behavior()
 
-    dtype = np.float32
-    true_mean = dtype([0, 0])
-    true_cov = dtype([[1, 0.5], [0.5, 1]])
-    num_results = 500
-    num_chains = 50
+  dtype = np.float32
+  true_mean = dtype([0, 0])
+  true_cov = dtype([[1, 0.5], [0.5, 1]])
+  num_results = 500
+  num_chains = 50
 
-    # Target distribution is defined through the Cholesky decomposition
-    chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+  # Target distribution is defined through the Cholesky decomposition
+  chol = tf.linalg.cholesky(true_cov)
+  target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-    # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
-    # Then the target log-density is defined as follows:
-    def target_log_prob(x, y):
-      # Stack the input tensors together
-      z = tf.stack([x, y], axis=-1) - true_mean
-      return target.log_prob(z)
+  # Initial state of the chain
+  init_state = np.ones([num_chains, 2], dtype=dtype)
 
-    # Initial state of the chain
-    init_state = [np.ones([num_chains, 1], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
-
-    # Run Slice Samper for `num_results` iterations for `num_chains`
-    # independent chains:
-    [x, y], _ = tfp.mcmc.sample_chain(
+  # Run Slice Samper for `num_results` iterations for `num_chains`
+  # independent chains:
+  @tf.function
+  def run_mcmc():
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target_log_prob,
+            target_log_prob_fn=target.log_prob,
             step_size=1.0,
-            max_doublings=5,
-            seed=47),
+            max_doublings=5),
         num_burnin_steps=200,
         num_steps_between_results=1,
-        parallel_iterations=1)
+        trace_fn=None,
+        seed=47)
+    return states
 
-    states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(states, axis=[0, 1])
-    z = states - sample_mean
-    sample_cov = tf.reduce_mean(tf.matmul(z, z, transpose_a=True),
-                                axis=[0, 1])
+  states = run_mcmc()
 
-    with tf.Session() as sess:
-      [sample_mean, sample_cov] = sess.run([
-          sample_mean, sample_cov])
+  sample_mean = tf.reduce_mean(states, axis=[0, 1])
+  z = (states - sample_mean)[..., tf.newaxis]
+  sample_cov = tf.reduce_mean(
+      tf.matmul(z, tf.transpose(z, [0, 1, 3, 2])), [0, 1])
 
-    print "sample_mean: ", sample_mean
-    print "sample_cov: ", sample_cov
+  print('sample mean', sample_mean.numpy())
+  print('sample covariance matrix', sample_cov.numpy())
   ```
 
   ### References
@@ -191,6 +196,9 @@ class SliceSampler(kernel_base.TransitionKernel):
        https://www.jstor.org/stable/3690278?seq=1#page_scan_tab_contents
   """
 
+  @deprecation.deprecated_args(
+      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
+      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -207,7 +215,8 @@ class SliceSampler(kernel_base.TransitionKernel):
         with `x_initial`. The size of the initial interval.
       max_doublings: Scalar positive int32 `tf.Tensor`. The maximum number of
       doublings to consider.
-      seed: Python integer to seed the random number generator.
+      seed: Python integer to seed the random number generator. Deprecated, pass
+        seed to `tfp.mcmc.sample_chain`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'slice_sampler_kernel').
 
@@ -255,7 +264,7 @@ class SliceSampler(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Runs one iteration of Slice Sampler.
 
     Args:
@@ -266,6 +275,7 @@ class SliceSampler(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
+      seed: Optional, a seed for reproducible sampling.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)
@@ -279,13 +289,16 @@ class SliceSampler(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `not target_log_prob.dtype.is_floating`.
     """
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'slice', 'one_step'),
-        values=[
-            self.step_size, self.max_doublings, self._seed_stream,
-            current_state, previous_kernel_results.target_log_prob
-        ]):
-      with tf1.name_scope('initialize'):
+    # TODO(b/159636942): Clean up after 2020-09-20.
+    if seed is not None:
+      seed = samplers.sanitize_seed(seed)
+    else:
+      if self._seed_stream.original_seed is not None:
+        warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
+      seed = samplers.sanitize_seed(self._seed_stream())
+
+    with tf.name_scope(mcmc_util.make_name(self.name, 'slice', 'one_step')):
+      with tf.name_scope('initialize'):
         [
             current_state_parts,
             step_sizes,
@@ -300,8 +313,7 @@ class SliceSampler(kernel_base.TransitionKernel):
         max_doublings = tf.convert_to_tensor(
             value=self.max_doublings, dtype=tf.int32, name='max_doublings')
 
-      independent_chain_ndims = distribution_util.prefer_static_rank(
-          current_target_log_prob)
+      independent_chain_ndims = prefer_static.rank(current_target_log_prob)
 
       [
           next_state_parts,
@@ -317,7 +329,7 @@ class SliceSampler(kernel_base.TransitionKernel):
           max_doublings,
           current_target_log_prob,
           independent_chain_ndims,
-          seed=self._seed_stream()
+          seed=seed,
       )
 
       def maybe_flatten(x):
@@ -330,43 +342,45 @@ class SliceSampler(kernel_base.TransitionKernel):
               bounds_satisfied=bounds_satisfied,
               direction=direction,
               upper_bounds=upper_bounds,
-              lower_bounds=lower_bounds
+              lower_bounds=lower_bounds,
+              seed=seed,
           ),
       ]
 
   def bootstrap_results(self, init_state):
-    with tf1.name_scope(
-        name=mcmc_util.make_name(self.name, 'slice', 'bootstrap_results'),
-        values=[init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'slice', 'bootstrap_results')):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
-      init_state = [tf.convert_to_tensor(value=x) for x in init_state]
+      init_state = [tf.convert_to_tensor(x) for x in init_state]
       direction = [tf.zeros_like(x) for x in init_state]
       init_target_log_prob = self.target_log_prob_fn(*init_state)  # pylint:disable=not-callable
       return SliceSamplerKernelResults(
           target_log_prob=init_target_log_prob,
           bounds_satisfied=tf.zeros(
-              shape=tf.shape(input=init_target_log_prob), dtype=tf.bool),
+              shape=tf.shape(init_target_log_prob), dtype=tf.bool),
           direction=direction,
           upper_bounds=tf.zeros_like(init_target_log_prob),
-          lower_bounds=tf.zeros_like(init_target_log_prob))
+          lower_bounds=tf.zeros_like(init_target_log_prob),
+          # Allow room for one_step's seed.
+          seed=samplers.zeros_seed())
 
 
 def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   """Chooses a random direction in the event space."""
-  seed_gen = SeedStream(seed, salt='_choose_random_direction')
+  seeds = samplers.split_seed(seed, n=len(current_state_parts))
   # Chooses the random directions across each of the input components.
   rnd_direction_parts = [
-      tf.random.normal(
-          tf.shape(input=current_state_part), dtype=tf.float32, seed=seed_gen())
-      for current_state_part in current_state_parts
+      samplers.normal(
+          tf.shape(current_state_part), dtype=tf.float32, seed=part_seed)
+      for (current_state_part, part_seed) in zip(current_state_parts, seeds)
   ]
 
   # Sum squares over all of the input components. Note this takes all
   # components into account.
   sum_squares = sum(
-      tf.reduce_sum(
-          input_tensor=rnd_direction**2.,
+      tf.reduce_sum(  # pylint: disable=g-complex-comprehension
+          rnd_direction**2,
           axis=tf.range(batch_rank, tf.rank(rnd_direction)),
           keepdims=True) for rnd_direction in rnd_direction_parts)
 
@@ -408,7 +422,7 @@ def _sample_next(target_log_prob_fn,
       this argument is to reduce TF graph size.
     batch_rank: Integer. The number of axes in the state that correspond to
       independent batches.
-    seed: Python integer to seed random number generators.
+    seed: Tensor seed pair.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'find_slice_bounds').
 
@@ -429,16 +443,14 @@ def _sample_next(target_log_prob_fn,
     lower_bounds: `Tensor` of batch shape and the dtype of the input state. The
       lower bounds of the slices along the sampling direction.
   """
-  with tf1.name_scope(name, 'sample_next', [
-      current_state_parts, step_sizes, max_doublings, current_target_log_prob,
-      batch_rank
-  ]):
+  direction_seed, slice_seed = samplers.split_seed(seed)
+  with tf.name_scope(name or 'sample_next'):
     # First step: Choose a random direction.
     # Direction is a list of tensors. The i'th tensor should have the same shape
     # as the i'th state part.
     direction = _choose_random_direction(current_state_parts,
                                          batch_rank=batch_rank,
-                                         seed=seed)
+                                         seed=direction_seed)
 
     # Interpolates the step sizes for the chosen direction.
     # Applies an ellipsoidal interpolation to compute the step direction for
@@ -465,16 +477,13 @@ def _sample_next(target_log_prob_fn,
                    for dirn_part in direction]
 
     components = [
-        tf.reduce_sum(
-            input_tensor=(dirn_part / step_size)**2, axis=reduce_axes[i])
+        tf.reduce_sum((dirn_part / step_size)**2, axis=reduce_axes[i])
         for i, (step_size, dirn_part) in enumerate(zip(step_sizes, direction))
     ]
     step_size = tf.math.rsqrt(tf.add_n(components))
     # Computes the rank of a tensor. Uses the static rank if possible.
-    def _get_rank(x):
-      return (len(x.shape.as_list()) if x.shape.dims is not None
-              else tf.rank(x))
-    state_part_ranks = [_get_rank(part) for part in current_state_parts]
+    state_part_ranks = [prefer_static.rank(part)
+                        for part in current_state_parts]
 
     def _step_along_direction(alpha):
       """Converts the scalar alpha into an n-dim vector with full state info.
@@ -494,9 +503,8 @@ def _sample_next(target_log_prob_fn,
       padded_alphas = [_right_pad(alpha, final_rank=part_rank)
                        for part_rank in state_part_ranks]
 
-      state_parts = [state_part + padded_alpha
-                     * direction_part for state_part, direction_part,
-                     padded_alpha in
+      state_parts = [state_part + padded_alpha * direction_part
+                     for state_part, direction_part, padded_alpha in
                      zip(current_state_parts, direction, padded_alphas)]
       return state_parts
 
@@ -515,7 +523,7 @@ def _sample_next(target_log_prob_fn,
       return target_log_prob_fn(*_step_along_direction(alpha))
 
     alpha_init = tf.zeros_like(current_target_log_prob,
-                               dtype=current_state_parts[0].dtype.base_dtype)
+                               dtype=current_state_parts[0].dtype)
     [
         next_alpha,
         next_target_log_prob,
@@ -525,7 +533,7 @@ def _sample_next(target_log_prob_fn,
     ] = ssu.slice_sampler_one_dim(projected_target_log_prob_fn,
                                   x_initial=alpha_init,
                                   max_doublings=max_doublings,
-                                  step_size=step_size, seed=seed)
+                                  step_size=step_size, seed=slice_seed)
     return [
         _step_along_direction(next_alpha),
         next_target_log_prob,
@@ -545,7 +553,7 @@ def _maybe_call_fn(fn,
                  else [fn_arg_list])
   if fn_result is None:
     fn_result = fn(*fn_arg_list)
-  if not fn_result.dtype.is_floating:
+  if not dtype_util.is_floating(fn_result.dtype):
     raise TypeError('`{}` must be a `Tensor` with `float` `dtype`.'.format(
         description))
   return fn_result
@@ -566,12 +574,12 @@ def _right_pad(x, final_rank):
     padded_x: A tensor of rank final_rank.
   """
   padded_shape = tf.concat(
-      [tf.shape(input=x),
+      [tf.shape(x),
        tf.ones(final_rank - tf.rank(x), dtype=tf.int32)],
       axis=0)
   static_padded_shape = None
-  if x.shape.is_fully_defined() and isinstance(final_rank, int):
-    static_padded_shape = x.shape.as_list()
+  if tensorshape_util.is_fully_defined(x.shape) and isinstance(final_rank, int):
+    static_padded_shape = tensorshape_util.as_list(x.shape)
     extra_dims = final_rank - len(static_padded_shape)
     static_padded_shape.extend([1] * extra_dims)
 
@@ -583,10 +591,10 @@ def _prepare_args(target_log_prob_fn, state, step_size,
                   target_log_prob=None, maybe_expand=False,
                   description='target_log_prob'):
   """Processes input args to meet list-like assumptions."""
+  dtype = dtype_util.common_dtype([state, step_size], dtype_hint=tf.float32)
   state_parts = list(state) if mcmc_util.is_list_like(state) else [state]
-  state_parts = [
-      tf.convert_to_tensor(value=s, name='current_state') for s in state_parts
-  ]
+  state_parts = [tf.convert_to_tensor(s, name='current_state', dtype=dtype)
+                 for s in state_parts]
 
   target_log_prob = _maybe_call_fn(
       target_log_prob_fn,
@@ -596,8 +604,7 @@ def _prepare_args(target_log_prob_fn, state, step_size,
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)
                 else [step_size])
   step_sizes = [
-      tf.convert_to_tensor(
-          value=s, name='step_size', dtype=target_log_prob.dtype)
+      tf.convert_to_tensor(value=s, name='step_size', dtype=dtype)
       for s in step_sizes
   ]
   if len(step_sizes) == 1:

@@ -25,13 +25,11 @@ import numpy as np
 from scipy import special as sp_special
 from scipy import stats as sp_stats
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import special_math
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 
 def _check_strictly_increasing(array_1d):
@@ -56,60 +54,8 @@ GridSpec = collections.namedtuple("GridSpec", ["min", "max", "shape"])
 ErrorSpec = collections.namedtuple("ErrorSpec", ["rtol", "atol"])
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NdtriTest(test_case.TestCase):
-
-  def assertAllFinite(self, x):
-    is_finite = np.isfinite(x)
-    all_true = np.ones_like(is_finite, dtype=np.bool)
-    self.assertAllEqual(all_true, is_finite)
-
-  def testNdtri(self):
-    """Verifies that ndtri computation is correct."""
-
-    p = np.linspace(0., 1., 50).astype(np.float64)
-    # Quantile performs piecewise rational approximation so adding some
-    # sp_special input values to make sure we hit all the pieces.
-    p = np.hstack((p, np.exp(-32), 1. - np.exp(-32), np.exp(-2),
-                   1. - np.exp(-2)))
-    expected_x = sp_special.ndtri(p)
-    x = special_math.ndtri(p)
-    self.assertAllClose(expected_x, self.evaluate(x), atol=0.)
-
-  def testNdtriDynamicShape(self):
-    """Verifies that ndtri computation is correct."""
-    p_ = np.linspace(0., 1., 50).astype(np.float32)
-    p = tf1.placeholder_with_default(p_, shape=None)
-    self.assertAllClose(sp_special.ndtri(p_),
-                        self.evaluate(special_math.ndtri(p)),
-                        atol=0.)
-
-  def _baseNdtriFiniteGradientTest(self, dtype):
-    """Verifies that ndtri has finite gradients at interesting points."""
-    # Tests gradients at 0, 1, and piece-wise boundaries.
-    p = tf.constant(
-        np.array([
-            0.,
-            np.exp(-32.),
-            np.exp(-2.),
-            1. - np.exp(-2.),
-            1. - np.exp(-32.),
-            1.,
-        ]).astype(dtype))
-    # Not having the lambda sanitzer means we'd get an `IndexError` whenever
-    # the user supplied function has default args.
-    _, grads = value_and_gradient(special_math.ndtri, p)
-    self.assertAllFinite(self.evaluate(grads[0]))
-
-  def testNdtriFiniteGradientFloat32(self):
-    self._baseNdtriFiniteGradientTest(np.float32)
-
-  def testNdtriFiniteGradientFloat64(self):
-    self._baseNdtriFiniteGradientTest(np.float64)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class NdtrTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NdtrTest(test_util.TestCase):
   _use_log = False
   # Grid min/max chosen to ensure 0 < cdf(x) < 1.
   _grid32 = GridSpec(min=-12.9, max=5., shape=[100])
@@ -178,7 +124,7 @@ class NdtrTest(test_case.TestCase):
     self._test_grid(np.float64, self._grid64, self._error64)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrTestLower(NdtrTest):
   _use_log = True
   _grid32 = GridSpec(
@@ -195,7 +141,7 @@ class LogNdtrTestLower(NdtrTest):
 # scipy.sp_special.log_ndtr becomes zero very early, before 10,
 # (due to ndtr becoming 1).  We approximate Log[1 + epsilon] as epsilon, and
 # avoid this issue.
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrTestMid(NdtrTest):
   _use_log = True
   _grid32 = GridSpec(
@@ -209,7 +155,7 @@ class LogNdtrTestMid(NdtrTest):
   _error64 = ErrorSpec(rtol=0.1, atol=1e-7)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrTestUpper(NdtrTest):
   _use_log = True
   _grid32 = GridSpec(
@@ -224,8 +170,8 @@ class LogNdtrTestUpper(NdtrTest):
   _error64 = ErrorSpec(rtol=1e-6, atol=1e-14)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NdtrGradientTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NdtrGradientTest(test_util.TestCase):
   _use_log = False
   _grid = GridSpec(min=-100., max=100., shape=[1, 2, 3, 8])
   _error32 = ErrorSpec(rtol=1e-4, atol=0)
@@ -239,8 +185,6 @@ class NdtrGradientTest(test_case.TestCase):
 
   def _test_grad_finite(self, dtype):
     x = tf.constant([-100., 0., 100.], dtype=dtype)
-    output = (special_math.log_ndtr(x) if self._use_log
-              else special_math.ndtr(x))
     fn = special_math.log_ndtr if self._use_log else special_math.ndtr
     # Not having the lambda sanitzer means we'd get an `IndexError` whenever
     # the user supplied function has default args.
@@ -294,32 +238,13 @@ class NdtrGradientTest(test_case.TestCase):
     self._test_grad_finite(np.float64)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class LogNdtrGradientTest(NdtrGradientTest):
   _use_log = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ErfInvTest(test_case.TestCase):
-
-  def testErfInvValues(self):
-    x = np.linspace(0., 1., 50).astype(np.float64)
-    self.assertAllClose(sp_special.erfinv(x),
-                        self.evaluate(special_math.erfinv(x)),
-                        atol=0)
-
-  def testErfInvIntegerInput(self):
-    with self.assertRaises(TypeError):
-      x = np.array([1, 2, 3]).astype(np.int32)
-      special_math.erfinv(x)
-
-    with self.assertRaises(TypeError):
-      x = np.array([1, 2, 3]).astype(np.int64)
-      special_math.erfinv(x)
-
-
-@test_util.run_all_in_graph_and_eager_modes
-class LogCDFLaplaceTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogCDFLaplaceTest(test_util.TestCase):
   # Note that scipy.stats.laplace does not have a stable Log CDF, so we cannot
   # rely on scipy to cross check the extreme values.
 

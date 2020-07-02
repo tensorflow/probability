@@ -24,7 +24,12 @@ from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
     'convert_nonref_to_tensor',
+    'discover_trainable_variables',
+    'discover_variables',
+    'is_module',
     'is_ref',
+    'is_trainable_variable',
+    'is_variable',
 ]
 
 
@@ -83,7 +88,7 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
   tf.is_tensor(y)
   # ==> True
 
-  x = tfp.util.DeferredTensor(lambda x: x, 13.37)
+  x = tfp.util.DeferredTensor(13.37, lambda x: x)
   y = tensor_util.convert_nonref_to_tensor(x)
   x is y
   # ==> True
@@ -129,6 +134,62 @@ def is_ref(x):
   # behalf and it would need a `dtype` and `shape`. (I.e., there would be some
   # work to support this.)
   return (
-      isinstance(x, tf.Variable) or
-      (isinstance(x, tf.Module) and hasattr(x, 'dtype') and hasattr(x, 'shape'))
+      is_variable(x) or
+      (is_module(x) and hasattr(x, 'dtype') and hasattr(x, 'shape'))
   )
+
+
+def is_variable(x):
+  """Returns `True` when input is a `tf.Variable`, otherwise `False`."""
+  return isinstance(x, tf.Variable)
+
+
+def is_trainable_variable(x):
+  """Returns `True` when input is trainable `tf.Variable`, otherwise `False`."""
+  return is_variable(x) and getattr(x, 'trainable', False)
+
+
+def is_module(x):
+  """Returns `True` when input is a `tf.Module`, otherwise `False`."""
+  return isinstance(x, tf.Module)
+
+
+class _Track(tf.Module):
+  """Bridge to create functional interface for variable tracking."""
+
+  def __init__(self, *args, **kwargs):
+    self._args = args
+    self._kwargs = kwargs
+
+
+def discover_trainable_variables(x):
+  """Returns `tuple` of all trainable `tf.Variables` discoverable in input.
+
+  Warning: unlike possibly `tf.Module`, use of this function only does a static,
+  "one-time" discovery. (This is self-evidently true from its functional
+  nature.)
+
+  Args:
+    x: An object to inspected for `tf.Variable` dependencies.
+
+  Returns:
+    trainable_vars: A Python `tuple` of `tf.Variable`s with `trainable=True`.
+  """
+  return _Track(x).trainable_variables
+
+
+def discover_variables(x):
+  """Returns `tuple` of all `tf.Variables` discoverable in input.
+
+  Warning: unlike possibly `tf.Module`, use of this function only does a static,
+  "one-time" discovery. (This is self-evidently true from its functional
+  nature.)
+
+  Args:
+    x: An object to inspected for `tf.Variable` dependencies.
+
+  Returns:
+    vars: A Python `tuple` of `tf.Variable`s, regardless of their value of
+      `trainable`.
+  """
+  return _Track(x).variables

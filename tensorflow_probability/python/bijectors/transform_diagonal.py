@@ -22,7 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 
 __all__ = [
-    "TransformDiagonal",
+    'TransformDiagonal',
 ]
 
 
@@ -45,7 +45,7 @@ class TransformDiagonal(bijector.Bijector):
   def __init__(self,
                diag_bijector,
                validate_args=False,
-               name="transform_diagonal"):
+               name='transform_diagonal'):
     """Instantiates the `TransformDiagonal` bijector.
 
     Args:
@@ -54,13 +54,17 @@ class TransformDiagonal(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
-    self._diag_bijector = diag_bijector
-    super(TransformDiagonal, self).__init__(
-        forward_min_event_ndims=2,
-        inverse_min_event_ndims=2,
-        validate_args=validate_args,
-        dtype=diag_bijector.dtype,
-        name=name)
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
+      self._diag_bijector = diag_bijector
+      super(TransformDiagonal, self).__init__(
+          forward_min_event_ndims=2,
+          inverse_min_event_ndims=2,
+          is_constant_jacobian=diag_bijector.is_constant_jacobian,
+          validate_args=validate_args,
+          dtype=diag_bijector.dtype,
+          parameters=parameters,
+          name=name)
 
   @property
   def diag_bijector(self):

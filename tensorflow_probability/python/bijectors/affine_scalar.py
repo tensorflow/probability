@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -51,6 +52,11 @@ class AffineScalar(bijector.Bijector):
 
   """
 
+  @deprecation.deprecated(
+      '2020-01-01',
+      '`AffineScalar` bijector is deprecated; please use '
+      '`tfb.Shift(loc)(tfb.Scale(...))` instead.',
+      warn_once=True)
   def __init__(self,
                shift=None,
                scale=None,
@@ -89,6 +95,7 @@ class AffineScalar(bijector.Bijector):
     Raises:
       ValueError: If both `scale` and `log_scale` are specified.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [shift, scale, log_scale], dtype_hint=tf.float32)
@@ -109,6 +116,7 @@ class AffineScalar(bijector.Bijector):
           is_constant_jacobian=True,
           validate_args=validate_args,
           dtype=dtype,
+          parameters=parameters,
           name=name)
 
   @property
@@ -125,6 +133,11 @@ class AffineScalar(bijector.Bijector):
   def log_scale(self):
     """The `log_scale` term in `Y = exp(log_scale) * X + shift`."""
     return self._log_scale
+
+  def _is_increasing(self):
+    if self.scale is None:
+      return True
+    return self.scale > 0
 
   def _forward(self, x):
     y = tf.identity(x)

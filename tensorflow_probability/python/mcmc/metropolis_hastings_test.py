@@ -26,9 +26,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal.util import is_list_like
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 InnerKernelResultsWithoutCorrection = collections.namedtuple(
 
@@ -57,11 +56,13 @@ InnerKernelResultsWithCorrection = collections.namedtuple(
 class FakeTransitionKernel(tfp.mcmc.TransitionKernel):
   """Fake TransitionKernel for testing MetropolisHastings."""
 
-  def __init__(self, is_calibrated, one_step_fn, bootstrap_fn):
+  def __init__(self, is_calibrated, one_step_fn, bootstrap_fn,
+               accepts_seed_arg=True):
     self._is_calibrated = is_calibrated
     self._one_step_fn = one_step_fn
     self._bootstrap_fn = bootstrap_fn
     self._call_count = collections.Counter()
+    self._accepts_seed_arg = accepts_seed_arg
 
   @property
   def call_count(self):
@@ -72,11 +73,13 @@ class FakeTransitionKernel(tfp.mcmc.TransitionKernel):
     self.call_count['is_calibrated'] += 1
     return self._is_calibrated
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, **kwargs):
     self.call_count['one_step'] += 1
+    if ('seed' in kwargs) and not self._accepts_seed_arg:
+      raise TypeError('`seed` arg not welcome')
     return self._one_step_fn(current_state, previous_kernel_results)
 
-  def bootstrap_results(self, init_state):
+  def bootstrap_results(self, init_state, **kwargs):
     self.call_count['bootstrap_results'] += 1
     return self._bootstrap_fn(init_state)
 
@@ -130,8 +133,8 @@ def make_bootstrap_results_fn(true_kernel_results):
   return bootstrap_results
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class MetropolisHastingsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class MetropolisHastingsTest(test_util.TestCase):
 
   def setUp(self):
     self.dtype = np.float32
@@ -139,7 +142,7 @@ class MetropolisHastingsTest(test_case.TestCase):
   def testCorrectlyWorksWithoutCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(s) for s in current_state_]
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([
             +100.,
@@ -163,11 +166,11 @@ class MetropolisHastingsTest(test_case.TestCase):
         FakeTransitionKernel(
             is_calibrated=False,
             one_step_fn=one_step_fn,
-            bootstrap_fn=bootstrap_fn),
-        seed=1)
+            bootstrap_fn=bootstrap_fn))
+    stream = test_util.test_seed_stream()
     init_kernel_results = mh.bootstrap_results(current_state)
     next_state, kernel_results = mh.one_step(
-        current_state, init_kernel_results)
+        current_state, init_kernel_results, seed=stream())
 
     # Unmodified state is passed through unmodified.
     self.assertIs(kernel_results.accepted_results.extraneous,
@@ -238,7 +241,7 @@ class MetropolisHastingsTest(test_case.TestCase):
   def testCorrectlyWorksWithCorrection(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(s) for s in current_state_]
 
     expected_inner_init_kernel_results = InnerKernelResultsWithCorrection(
         log_acceptance_correction=self.dtype([+300., -300.]),
@@ -261,11 +264,10 @@ class MetropolisHastingsTest(test_case.TestCase):
         FakeTransitionKernel(
             is_calibrated=False,
             one_step_fn=one_step_fn,
-            bootstrap_fn=bootstrap_fn),
-        seed=1)
+            bootstrap_fn=bootstrap_fn))
     init_kernel_results = mh.bootstrap_results(current_state)
     next_state, kernel_results = mh.one_step(
-        current_state, init_kernel_results)
+        current_state, init_kernel_results, seed=test_util.test_seed())
 
     # Unmodified state is passed through unmodified.
     self.assertIs(kernel_results.accepted_results.extraneous,
@@ -334,10 +336,12 @@ class MetropolisHastingsTest(test_case.TestCase):
                          self.dtype([1 + 2, 1]) * current_state_[1]],
                         next_state_)
 
+  @test_util.jax_disable_test_missing_functionality('stateful sampler/legacy')
   def testWarnings(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
-    current_state = [tf.convert_to_tensor(value=s) for s in current_state_]
+    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+    # Verify the warning about lacking a log-acceptance correction field.
     expected_inner_init_kernel_results = InnerKernelResultsWithoutCorrection(
         target_log_prob=self.dtype([100., -100.]),
         grads_target_log_prob=[
@@ -353,18 +357,23 @@ class MetropolisHastingsTest(test_case.TestCase):
     with warnings.catch_warnings(record=True) as w:
       mh = tfp.mcmc.MetropolisHastings(
           FakeTransitionKernel(
-              is_calibrated=True,
+              is_calibrated=True,  # Verify the already-calibrated warning.
               one_step_fn=one_step_fn,
-              bootstrap_fn=bootstrap_fn),
-          seed=1)
+              bootstrap_fn=bootstrap_fn,
+              # Verify M-H supports legacy kernels lacking seed arg, warns.
+              accepts_seed_arg=False),
+          seed=test_util.test_seed())
       init_kernel_results = mh.bootstrap_results(current_state)
       _, _ = mh.one_step(current_state, init_kernel_results)
     w = sorted(w, key=lambda w: str(w.message))
     self.assertRegexpMatches(
         str(w[0].message),
-        r'`TransitionKernel` is already calibrated')
+        r'Seeding.*TransitionKernel.*by constructor argument is deprecated.')
     self.assertRegexpMatches(
         str(w[1].message),
+        r'`TransitionKernel` is already calibrated')
+    self.assertRegexpMatches(
+        str(w[2].message),
         r'`TransitionKernel` does not have a `log_acceptance_correction`')
 
 

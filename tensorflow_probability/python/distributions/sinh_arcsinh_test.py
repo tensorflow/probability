@@ -25,16 +25,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 rng = np.random.RandomState(123)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SinhArcsinhTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SinhArcsinhTest(test_util.TestCase):
 
   def testDefaultIsSameAsNormal(self):
     b = 10
@@ -48,8 +46,8 @@ class SinhArcsinhTest(test_case.TestCase):
     self.assertAllClose(norm_pdf, sasnorm_pdf)
 
     norm_samps, sasnorm_samps = self.evaluate([
-        norm.sample(10000, seed=tfp_test_util.test_seed()),
-        sasnorm.sample(10000, seed=tfp_test_util.test_seed())
+        norm.sample(10000, seed=test_util.test_seed()),
+        sasnorm.sample(10000, seed=test_util.test_seed())
     ])
     self.assertAllClose(loc, sasnorm_samps.mean(axis=0), atol=0.1)
     self.assertAllClose(
@@ -58,14 +56,14 @@ class SinhArcsinhTest(test_case.TestCase):
         norm_samps.std(axis=0), sasnorm_samps.std(axis=0), atol=0.1)
 
   def testBroadcastParamsDynamic(self):
-    loc = tf1.placeholder_with_default(input=rng.rand(5), shape=None)
+    loc = tf1.placeholder_with_default(rng.rand(5), shape=None)
     scale = tf1.placeholder_with_default(
-        input=np.float64(rng.rand()), shape=None)
-    skewness = tf1.placeholder_with_default(input=rng.rand(5), shape=None)
+        np.float64(rng.rand()), shape=None)
+    skewness = tf1.placeholder_with_default(rng.rand(5), shape=None)
     sasnorm = tfd.SinhArcsinh(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 
-    samp = self.evaluate(sasnorm.sample())
+    samp = self.evaluate(sasnorm.sample(seed=test_util.test_seed()))
     self.assertAllEqual((5,), samp.shape)
 
   def testPassingInLaplacePlusDefaultsIsSameAsLaplace(self):
@@ -73,6 +71,9 @@ class SinhArcsinhTest(test_case.TestCase):
     scale = rng.rand(b) + 0.5
     loc = rng.randn(b)
     lap = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
+    # TODO(b/151180729): When shape overrides of `TransformedDistribution` are
+    # deprecated, change `distribution` below to
+    # `tfd.Laplace(np.float64(np.zeros(b)), np.float64(1))`.
     saslap = tfd.SinhArcsinh(
         loc=loc,
         scale=scale,
@@ -84,8 +85,8 @@ class SinhArcsinhTest(test_case.TestCase):
     self.assertAllClose(lap_pdf, saslap_pdf)
 
     lap_samps, saslap_samps = self.evaluate([
-        lap.sample(10000, seed=tfp_test_util.test_seed()),
-        saslap.sample(10000, seed=tfp_test_util.test_seed())
+        lap.sample(10000, seed=test_util.test_seed()),
+        saslap.sample(10000, seed=test_util.test_seed())
     ])
     self.assertAllClose(loc, saslap_samps.mean(axis=0), atol=0.1)
     self.assertAllClose(
@@ -109,8 +110,8 @@ class SinhArcsinhTest(test_case.TestCase):
     # 0.1% quantile and 99.9% quantile are outliers, and should be more
     # extreme in the normal.  The 97.772% quantiles should be the same.
     norm_samps, sasnorm_samps = self.evaluate([
-        norm.sample(int(5e5), seed=tfp_test_util.test_seed()),
-        sasnorm.sample(int(5e5), seed=tfp_test_util.test_seed())
+        norm.sample(int(5e5), seed=test_util.test_seed()),
+        sasnorm.sample(int(5e5), seed=test_util.test_seed())
     ])
     np.testing.assert_array_less(
         np.percentile(norm_samps, 0.1, axis=0),
@@ -145,8 +146,8 @@ class SinhArcsinhTest(test_case.TestCase):
     # 0.1% quantile and 99.9% quantile are outliers, and should be more
     # extreme in the sasnormal.  The 97.772% quantiles should be the same.
     norm_samps, sasnorm_samps = self.evaluate([
-        norm.sample(int(5e5), seed=tfp_test_util.test_seed()),
-        sasnorm.sample(int(5e5), seed=tfp_test_util.test_seed())
+        norm.sample(int(5e5), seed=test_util.test_seed()),
+        sasnorm.sample(int(5e5), seed=test_util.test_seed())
     ])
     np.testing.assert_array_less(
         np.percentile(sasnorm_samps, 0.1, axis=0),
@@ -173,7 +174,7 @@ class SinhArcsinhTest(test_case.TestCase):
         loc=loc, scale=scale, skewness=3.0, validate_args=True)
 
     sasnorm_samps = self.evaluate(
-        sasnorm.sample(10000, seed=tfp_test_util.test_seed()))
+        sasnorm.sample(10000, seed=test_util.test_seed()))
     np.testing.assert_array_less(loc, sasnorm_samps.mean(axis=0))
 
   def testPdfReflectedForNegativeSkewness(self):
@@ -185,7 +186,7 @@ class SinhArcsinhTest(test_case.TestCase):
     self.assertAllClose(*self.evaluate(
         [sas_pos_skew.prob(x), sas_neg_skew.prob(x[::-1])]))
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.tf_tape_safety_test
   def testVariableGradients(self):
     b = 10
     scale = tf.Variable(rng.rand(b) + 0.5)
@@ -199,6 +200,7 @@ class SinhArcsinhTest(test_case.TestCase):
     self.assertLen(grads, 2)
     self.assertAllNotNone(grads)
 
+  @test_util.tf_tape_safety_test
   def testNonVariableGradients(self):
     b = 10
     scale = tf.convert_to_tensor(rng.rand(b) + 0.5)

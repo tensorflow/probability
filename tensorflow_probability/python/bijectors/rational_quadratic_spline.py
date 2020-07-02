@@ -179,6 +179,7 @@ class RationalQuadraticSpline(bijector.Bijector):
       name: Optional name scope for associated ops. (Defaults to
         `'RationalQuadraticSpline'`).
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'RationalQuadraticSpline') as name:
       dtype = dtype_util.common_dtype(
           [bin_widths, bin_heights, knot_slopes, range_min],
@@ -195,6 +196,7 @@ class RationalQuadraticSpline(bijector.Bijector):
           dtype=dtype,
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property
@@ -212,6 +214,10 @@ class RationalQuadraticSpline(bijector.Bijector):
   @property
   def range_min(self):
     return self._range_min
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _compute_shared(self, x=None, y=None):
     """Captures shared computations across forward/inverse/logdet.

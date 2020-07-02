@@ -22,11 +22,14 @@ from __future__ import print_function
 import functools
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import generalized_pareto as generalized_pareto_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -213,7 +216,7 @@ class GeneralizedPareto(distribution.Distribution):
              loc=loc, scale=scale, concentration=concentration)],
         axis=0)
     logu = tf.math.log1p(
-        -tf.random.uniform(sample_shp, dtype=self.dtype, seed=seed))
+        -samplers.uniform(sample_shp, dtype=self.dtype, seed=seed))
     eq_zero = tf.equal(concentration, 0)
     safe_conc = tf.where(eq_zero, tf.constant(1, dtype=self.dtype),
                          concentration)
@@ -224,32 +227,34 @@ class GeneralizedPareto(distribution.Distribution):
   def _log_prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
     concentration = tf.convert_to_tensor(self.concentration)
-    z = self._z(x, scale, concentration)
+    z = self._z(x, scale)
     eq_zero = tf.equal(concentration, 0)  # Concentration = 0 ==> Exponential.
     nonzero_conc = tf.where(eq_zero, tf.constant(1, self.dtype), concentration)
-    where_nonzero = (1 / nonzero_conc + 1) * tf.math.log1p(nonzero_conc * z)
+    y = 1 / nonzero_conc + tf.ones_like(z, self.dtype)
+    where_nonzero = tf.where(
+        tf.equal(y, 0), y, y * tf.math.log1p(nonzero_conc * z))
     return -tf.math.log(scale) - tf.where(eq_zero, z, where_nonzero)
 
-  def _log_cdf(self, x):
+  def _log_survival_function(self, x):
     scale = tf.convert_to_tensor(self.scale)
     concentration = tf.convert_to_tensor(self.concentration)
-    z = self._z(x, scale, concentration)
+    z = self._z(x, scale)
     eq_zero = tf.equal(concentration, 0)  # Concentration = 0 ==> Exponential.
     nonzero_conc = tf.where(eq_zero, tf.constant(1, self.dtype), concentration)
-    where_nonzero = tf.math.log1p(-(1 + nonzero_conc * z)**(-1 / nonzero_conc))
-    where_zero = tf.math.log1p(-tf.exp(-z))
-    return tf.where(eq_zero, where_zero, where_nonzero)
+    where_nonzero = -tf.math.log1p(nonzero_conc * z) / nonzero_conc
+    return tf.where(eq_zero, -z, where_nonzero)
 
-  def _z(self, x, scale, concentration):
+  def _log_cdf(self, x):
+    # Going through the survival function is more accurate when conc is near
+    # zero, because it amounts to computing the (1 + conc * z)**(-1 / conc)
+    # term in log-space with log1p.
+    # tfp_math.log1mexp(a) accurately computes log(1 - exp(-|a|)).  The negation
+    # and the absolute value are fine here because the log survival function is
+    # always non-positive.
+    return tfp_math.log1mexp(self._log_survival_function(x))
+
+  def _z(self, x, scale):
     loc = tf.convert_to_tensor(self.loc)
-    if self.validate_args:
-      valid = (x >= loc) & ((concentration >= 0) |
-                            (x <= loc - scale / concentration))
-      with tf.control_dependencies([
-          assert_util.assert_equal(
-              valid, True, message='`x` outside distribution\'s support.')
-      ]):
-        x = tf.identity(x)
     return (x - loc) / scale
 
   def _mean(self):
@@ -287,6 +292,14 @@ class GeneralizedPareto(distribution.Distribution):
   def _entropy(self):
     return tf.math.log(self.scale) + self.concentration + 1
 
+  # TODO(b/145620027): Finalize choice of bijector.
+  def _default_event_space_bijector(self):
+    return generalized_pareto_bijector.GeneralizedPareto(
+        self.loc,
+        scale=self.scale,
+        concentration=self.concentration,
+        validate_args=self.validate_args)
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
@@ -295,4 +308,22 @@ class GeneralizedPareto(distribution.Distribution):
       assertions.append(
           assert_util.assert_positive(
               self.scale, message='Argument `scale` must be positive.'))
+    return assertions
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    concentration = tf.convert_to_tensor(self.concentration)
+    assertions.append(assert_util.assert_greater_equal(
+        x, loc, message='Sample must be greater than or equal to `loc`.'))
+    assertions.append(assert_util.assert_equal(
+        tf.logical_or(tf.greater_equal(concentration, 0),
+                      tf.less_equal(x, loc - scale / concentration)),
+        True,
+        message=('If `concentration < 0`, sample must be less than or '
+                 'equal to `loc - scale / concentration`.'),
+        summarize=100))
     return assertions

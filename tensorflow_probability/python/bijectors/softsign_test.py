@@ -24,13 +24,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SoftsignBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SoftsignBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = g(X) = X / (1 + |X|) transformation."""
 
   def _softsign(self, x):
@@ -42,14 +40,14 @@ class SoftsignBijectorTest(test_case.TestCase):
 
   def testBijectorBounds(self):
     bijector = tfb.Softsign(validate_args=True)
-    with self.assertRaisesOpError("greater than -1"):
+    with self.assertRaisesOpError(">= -1"):
       self.evaluate(bijector.inverse(-3.))
-    with self.assertRaisesOpError("greater than -1"):
+    with self.assertRaisesOpError(">= -1"):
       self.evaluate(bijector.inverse_log_det_jacobian(-3., event_ndims=0))
 
-    with self.assertRaisesOpError("less than 1"):
+    with self.assertRaisesOpError("<= 1"):
       self.evaluate(bijector.inverse(3.))
-    with self.assertRaisesOpError("less than 1"):
+    with self.assertRaisesOpError("<= 1"):
       self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
 
   def testBijectorForwardInverse(self):

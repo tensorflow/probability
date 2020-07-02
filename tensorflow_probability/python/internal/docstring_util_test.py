@@ -21,10 +21,10 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import docstring_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
-class DocstringUtil(test_case.TestCase):
+class DocstringUtil(tfp_test_util.TestCase):
 
   def _testFunction(self):
     doc_args = """x: Input to return as output.

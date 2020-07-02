@@ -43,9 +43,11 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:monte_carlo",
     ],
 )
 
+# py2and3
 py_test(
     name = "expectation_test",
     size = "small",
@@ -54,6 +56,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

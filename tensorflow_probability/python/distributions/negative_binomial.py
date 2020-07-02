@@ -20,15 +20,15 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -63,23 +63,23 @@ class NegativeBinomial(distribution.Distribution):
     """Construct NegativeBinomial distributions.
 
     Args:
-      total_count: Non-negative floating-point `Tensor` with shape
-        broadcastable to `[B1,..., Bb]` with `b >= 0` and the same dtype as
-        `probs` or `logits`. Defines this as a batch of `N1 x ... x Nm`
-        different Negative Binomial distributions. In practice, this represents
-        the number of negative Bernoulli trials to stop at (the `total_count`
-        of failures). Its components should be equal to integer values.
+      total_count: Positive floating-point `Tensor` with shape broadcastable to
+        `[B1,..., Bb]` with `b >= 0` and the same dtype as `probs` or
+        `logits`. Defines this as a batch of `N1 x ... x Nm` different Negative
+        Binomial distributions. In practice, this represents the number of
+        negative Bernoulli trials to stop at (the `total_count` of
+        failures). Its components should be equal to integer values.
       logits: Floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents logits for the probability of success for
-        independent Negative Binomial distributions and must be in the open
-        interval `(-inf, inf)`. Only one of `logits` or `probs` should be
+        independent Negative Binomial distributions and must be in the half-open
+        interval `[-inf, inf)`. Only one of `logits` or `probs` should be
         specified.
       probs: Positive floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents the probability of success for independent
-        Negative Binomial distributions and must be in the open interval
-        `(0, 1)`. Only one of `logits` or `probs` should be specified.
+        Negative Binomial distributions and must be in the half-open interval
+        `[0, 1)`. Only one of `logits` or `probs` should be specified.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -99,9 +99,9 @@ class NegativeBinomial(distribution.Distribution):
       dtype = dtype_util.common_dtype([total_count, logits, probs],
                                       dtype_hint=tf.float32)
       self._probs = tensor_util.convert_nonref_to_tensor(
-          probs, dtype_hint=tf.float32, name='probs')
+          probs, dtype=dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
-          logits, dtype_hint=tf.float32, name='logits')
+          logits, dtype=dtype, name='logits')
       self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, dtype=dtype, name='total_count')
 
@@ -125,15 +125,11 @@ class NegativeBinomial(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self, logits_or_probs=None, total_count=None):
@@ -158,18 +154,18 @@ class NegativeBinomial(distribution.Distribution):
     # lam ~ Gamma(concentration=total_count, rate=(1-probs)/probs)
     # then X ~ Poisson(lam) is Negative Binomially distributed.
     logits = self._logits_parameter_no_checks()
-    stream = SeedStream(seed, salt='NegativeBinomial')
-    rate = tf.random.gamma(
+    gamma_seed, poisson_seed = samplers.split_seed(
+        seed, salt='NegativeBinomial')
+    rate = samplers.gamma(
         shape=[n],
         alpha=self.total_count,
-        beta=tf.exp(-logits),
+        beta=tf.math.exp(-logits),
         dtype=self.dtype,
-        seed=stream())
-    return tf.random.poisson(
-        lam=rate, shape=[], dtype=self.dtype, seed=stream())
+        seed=gamma_seed)
+    return samplers.poisson(
+        shape=[], lam=rate, dtype=self.dtype, seed=poisson_seed)
 
   def _cdf(self, x):
-    x = self._maybe_assert_valid_sample(x)
     logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
     shape = self._batch_shape_tensor(
@@ -180,14 +176,13 @@ class NegativeBinomial(distribution.Distribution):
         tf.broadcast_to(tf.sigmoid(-logits), shape))
 
   def _log_prob(self, x):
-    x = self._maybe_assert_valid_sample(x)
     total_count = tf.convert_to_tensor(self.total_count)
     logits = self._logits_parameter_no_checks()
-    log_unnormalized_prob = (total_count * tf.math.log_sigmoid(-logits) +
-                             x * tf.math.log_sigmoid(logits))
-    log_normalization = (-tf.math.lgamma(total_count + x) +
-                         tf.math.lgamma(1. + x) +
-                         tf.math.lgamma(total_count))
+    log_unnormalized_prob = (
+        total_count * tf.math.log_sigmoid(-logits) +
+        tf.math.multiply_no_nan(tf.math.log_sigmoid(logits), x))
+    log_normalization = (tfp_math.lbeta(1. + x, total_count) +
+                         tf.math.log(total_count + x))
     return log_unnormalized_prob - log_normalization
 
   def _mean(self, logits=None):
@@ -227,32 +222,21 @@ class NegativeBinomial(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       return self._probs_parameter_no_checks()
 
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `logits` property will return `None` when the distribution is '
-       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
-
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `probs` property will return `None` when the distribution is '
-       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
+  def _default_event_space_bijector(self):
+    return
 
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_negative_binomial_param_correctness(
         is_init, self.validate_args, self._total_count, self._probs,
         self._logits)
 
-  def _maybe_assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
     """Check counts for proper shape and values, then return tensor version."""
+    assertions = []
     if not self.validate_args:
-      return x
-    return distribution_util.embed_check_nonnegative_integer_form(x)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    return assertions
 
 
 def maybe_assert_negative_binomial_param_correctness(
@@ -271,9 +255,9 @@ def maybe_assert_negative_binomial_param_correctness(
   if is_init != tensor_util.is_ref(total_count):
     total_count = tf.convert_to_tensor(total_count)
     assertions.extend([
-        assert_util.assert_non_negative(
+        assert_util.assert_positive(
             total_count,
-            message='`total_count` has components less than 0.'),
+            message='`total_count` has components less than or equal to 0.'),
         distribution_util.assert_integer_form(
             total_count,
             message='`total_count` has fractional components.')

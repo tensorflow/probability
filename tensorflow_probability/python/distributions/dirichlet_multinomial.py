@@ -27,10 +27,10 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'DirichletMultinomial',
@@ -94,11 +94,11 @@ class DirichletMultinomial(distribution.Distribution):
     2. Draw integers:
        `counts = [n_0,...,n_{K-1}] ~ Multinomial(total_count, probs)`
 
-  The last `concentration` dimension parametrizes a single Dirichlet-Multinomial
-  distribution. When calling distribution functions (e.g., `dist.prob(counts)`),
-  `concentration`, `total_count` and `counts` are broadcast to the same shape.
-  The last dimension of `counts` corresponds single Dirichlet-Multinomial
-  distributions.
+  The last `concentration` dimension parameterizes a single
+  Dirichlet-Multinomial distribution. When calling distribution functions
+  (e.g., `dist.prob(counts)`), `concentration`, `total_count` and `counts` are
+  broadcast to the same shape. The last dimension of `counts` corresponds to
+  single Dirichlet-Multinomial distributions.
 
   Distribution parameters are automatically broadcast in all functions; see
   examples for details.
@@ -106,6 +106,7 @@ class DirichletMultinomial(distribution.Distribution):
   #### Pitfalls
 
   The number of classes, `K`, must not exceed:
+
   - the largest integer representable by `self.dtype`, i.e.,
     `2**(mantissa_bits+1)` (IEE754),
   - the maximum `Tensor` index, i.e., `2**31-1`.
@@ -228,14 +229,6 @@ class DirichletMultinomial(distribution.Distribution):
     """Concentration parameter; expected prior counts for that coordinate."""
     return self._concentration
 
-  @property
-  @deprecation.deprecated(
-      '2019-11-08', 'The `total_concentration` property is deprecated. Use '
-      'DirichletMultinomial.compute_total_concentration() instead.')
-  def total_concentration(self):
-    """Sum of last dim of concentration parameter."""
-    return self._total_concentration
-
   def compute_total_concentration(self):
     """Compute and return the sum of last dim of concentration parameter."""
     with self._name_and_control_scope('compute_total_concentration'):
@@ -273,7 +266,8 @@ class DirichletMultinomial(distribution.Distribution):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
-    seed = SeedStream(seed, 'dirichlet_multinomial')
+    gamma_seed, multinomial_seed = samplers.split_seed(
+        seed, salt='dirichlet_multinomial')
 
     concentration = tf.convert_to_tensor(self._concentration)
     total_count = tf.convert_to_tensor(self._total_count)
@@ -286,20 +280,19 @@ class DirichletMultinomial(distribution.Distribution):
         name='alpha')
 
     unnormalized_logits = tf.math.log(
-        tf.random.gamma(
+        samplers.gamma(
             shape=[n],
             alpha=alpha,
             dtype=self.dtype,
-            seed=seed()))
+            seed=gamma_seed))
     x = multinomial.draw_sample(
-        1, k, unnormalized_logits, n_draws, self.dtype, seed())
+        1, k, unnormalized_logits, n_draws, self.dtype, multinomial_seed)
     final_shape = tf.concat(
         [[n], self._batch_shape_tensor(concentration, total_count), [k]], 0)
     return tf.reshape(x, final_shape)
 
   @distribution_util.AppendDocstring(_dirichlet_multinomial_sample_note)
   def _log_prob(self, counts):
-    counts = self._maybe_assert_valid_sample(counts)
     concentration = tf.convert_to_tensor(self.concentration)
     ordered_prob = (
         tf.math.lbeta(concentration + counts) -
@@ -373,17 +366,20 @@ class DirichletMultinomial(distribution.Distribution):
     c0 = self._compute_total_concentration(concentration)[..., tf.newaxis]
     return tf.sqrt((1. + c0 / total_count[..., tf.newaxis]) / (1. + c0))
 
-  def _maybe_assert_valid_sample(self, counts):
-    """Check counts for proper shape, values, then return tensor version."""
+  def _default_event_space_bijector(self):
+    return
+
+  def _sample_control_dependencies(self, x):
+    """Checks the validity of a sample."""
+    assertions = []
     if not self.validate_args:
-      return counts
-    counts = distribution_util.embed_check_nonnegative_integer_form(counts)
-    return distribution_util.with_dependencies([
-        assert_util.assert_equal(
-            self.total_count,
-            tf.reduce_sum(counts, axis=-1),
-            message='counts last-dimension must sum to `self.total_count`'),
-    ], counts)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(assert_util.assert_equal(
+        self.total_count,
+        tf.reduce_sum(x, axis=-1),
+        message='counts last-dimension must sum to `self.total_count`'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

@@ -69,10 +69,13 @@ def base_equal(a, b):
 def common_dtype(args_list, dtype_hint=None):
   """Returns explict dtype from `args_list` if there is one."""
   dtype = None
+  seen = []
   for a in tf.nest.flatten(args_list):
     if hasattr(a, 'dtype') and a.dtype:
       dt = as_numpy_dtype(a.dtype)
+      seen.append(dt)
     else:
+      seen.append(None)
       continue
     if dtype is None:
       dtype = dt
@@ -81,8 +84,35 @@ def common_dtype(args_list, dtype_hint=None):
         dtype = (np.ones([2], dtype) + np.ones([2], dt)).dtype
       else:
         raise TypeError(
-            'Found incompatible dtypes, {} and {}.'.format(dtype, dt))
-  return dtype_hint if dtype is None else tf.as_dtype(dtype)
+            'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
+                dtype, dt, seen))
+  return dtype_hint if dtype is None else base_dtype(dtype)
+
+
+def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):
+  """Get a dtype from a list/tensor/dtype using convert_to_tensor semantics."""
+  if tensor_or_dtype is None:
+    return dtype or dtype_hint
+
+  # Tensorflow dtypes need to be typechecked
+  if tf.is_tensor(tensor_or_dtype):
+    dt = base_dtype(tensor_or_dtype.dtype)
+  elif isinstance(tensor_or_dtype, tf.DType):
+    dt = base_dtype(tensor_or_dtype)
+  # Numpy dtypes defer to dtype/dtype_hint
+  elif isinstance(tensor_or_dtype, np.ndarray):
+    dt = base_dtype(dtype or dtype_hint or tensor_or_dtype.dtype)
+  elif np.issctype(tensor_or_dtype):
+    dt = base_dtype(dtype or dtype_hint or tensor_or_dtype)
+  else:
+    # If this is a Python object, call `convert_to_tensor` and grab the dtype.
+    # Note that this will add ops in graph-mode; we may want to consider
+    # other ways to handle this case.
+    dt = tf.convert_to_tensor(tensor_or_dtype, dtype, dtype_hint).dtype
+
+  if not SKIP_DTYPE_CHECKS and dtype and not base_equal(dtype, dt):
+    raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
+  return dt
 
 
 def is_bool(dtype):
@@ -100,7 +130,7 @@ def is_complex(dtype):
   dtype = tf.as_dtype(dtype)
   if hasattr(dtype, 'is_complex'):
     return dtype.is_complex
-  return np.issubdtype(np.dtype(dtype), np.complex)
+  return np.issubdtype(np.dtype(dtype), np.complexfloating)
 
 
 def is_floating(dtype):
@@ -122,7 +152,7 @@ def is_integer(dtype):
 def max(dtype):  # pylint: disable=redefined-builtin
   """Returns the maximum representable value in this data type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'max'):
+  if hasattr(dtype, 'max') and not callable(dtype.max):
     return dtype.max
   use_finfo = is_floating(dtype) or is_complex(dtype)
   return np.finfo(dtype).max if use_finfo else np.iinfo(dtype).max
@@ -131,7 +161,7 @@ def max(dtype):  # pylint: disable=redefined-builtin
 def min(dtype):  # pylint: disable=redefined-builtin
   """Returns the minimum representable value in this data type."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'min'):
+  if hasattr(dtype, 'min') and not callable(dtype.min):
     return dtype.min
   use_finfo = is_floating(dtype) or is_complex(dtype)
   return np.finfo(dtype).min if use_finfo else np.iinfo(dtype).min
@@ -150,7 +180,7 @@ def name(dtype):
 def size(dtype):
   """Returns the number of bytes to represent this `dtype`."""
   dtype = tf.as_dtype(dtype)
-  if hasattr(dtype, 'size'):
+  if hasattr(dtype, 'size') and hasattr(dtype, 'as_numpy_dtype'):
     return dtype.size
   return np.dtype(dtype).itemsize
 
@@ -185,7 +215,7 @@ def _assert_same_base_type(items, expected_type=None):
   for item in items:
     if item is not None:
       item_type = base_dtype(item.dtype)
-      if not expected_type:
+      if expected_type is None:
         expected_type = item_type
       elif expected_type != item_type:
         mismatch = True
@@ -203,8 +233,6 @@ def _assert_same_base_type(items, expected_type=None):
           expected_type = item_type
           original_item_str = get_name(item)
         elif expected_type != item_type:
-          if SKIP_DTYPE_CHECKS:
-            return (np.ones([2], expected_type) + np.ones([2], item_type)).dtype
           raise ValueError(
               '{}, type={}, must be of the same type ({}){}.'.format(
                   get_name(item),

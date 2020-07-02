@@ -21,13 +21,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class Geometric(distribution.Distribution):
@@ -86,13 +87,13 @@ class Geometric(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([logits, probs], dtype_hint=tf.float32)
       self._probs = tensor_util.convert_nonref_to_tensor(
-          probs, dtype_hint=tf.float32, name='probs')
+          probs, dtype=dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
-          logits, dtype_hint=tf.float32, name='logits')
+          logits, dtype=dtype, name='logits')
       super(Geometric, self).__init__(
-          dtype=(self._logits.dtype if self._probs is None
-                 else self._probs.dtype),
+          dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
@@ -106,15 +107,11 @@ class Geometric(distribution.Distribution):
   @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self):
@@ -141,7 +138,7 @@ class Geometric(distribution.Distribution):
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
     probs = self._probs_parameter_no_checks()
-    sampled = tf.random.uniform(
+    sampled = samplers.uniform(
         tf.concat([[n], tf.shape(probs)], 0),
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
@@ -150,25 +147,34 @@ class Geometric(distribution.Distribution):
 
     return tf.floor(tf.math.log(sampled) / tf.math.log1p(-probs))
 
-  def _cdf(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      probs = self._probs_parameter_no_checks()
-      if not self.validate_args:
-        # Whether or not x is integer-form, the following is well-defined.
-        # However, scipy takes the floor, so we do too.
-        x = tf.floor(x)
-      return tf.where(x < 0., tf.zeros_like(x), -tf.math.expm1(
-          (1. + x) * tf.math.log1p(-probs)))
+  def _log_survival_function(self, x):
+    probs = self._probs_parameter_no_checks()
+    if not self.validate_args:
+      # Whether or not x is integer-form, the following is well-defined.
+      # However, scipy takes the floor, so we do too.
+      x = tf.floor(x)
+    return tf.where(
+        x < 0.,
+        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+        (1. + x) * tf.math.log1p(-probs))
+
+  def _log_cdf(self, x):
+    probs = self._probs_parameter_no_checks()
+    if not self.validate_args:
+      # Whether or not x is integer-form, the following is well-defined.
+      # However, scipy takes the floor, so we do too.
+      x = tf.floor(x)
+    return tf.where(
+        x < 0.,
+        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+        tfp_math.log1mexp((1. + x) * tf.math.log1p(-probs)))
 
   def _log_prob(self, x):
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x)):
-      probs = self._probs_parameter_no_checks()
-      if not self.validate_args:
-        # For consistency with cdf, we take the floor.
-        x = tf.floor(x)
-      safe_domain = tf.where(
-          tf.equal(x, 0.), tf.zeros_like(probs), probs)
-      return x * tf.math.log1p(-safe_domain) + tf.math.log(probs)
+    probs = self._probs_parameter_no_checks()
+    if not self.validate_args:
+      # For consistency with cdf, we take the floor.
+      x = tf.floor(x)
+    return tf.math.xlog1py(x, -probs) + tf.math.log(probs)
 
   def _entropy(self):
     logits, probs = self._logits_and_probs_no_checks()
@@ -244,26 +250,15 @@ class Geometric(distribution.Distribution):
       probs = tf.math.sigmoid(logits)
     return logits, probs
 
-  @deprecation.deprecated(
-      '2019-10-01',
-      'The `logits` property will return `None` when the distribution is '
-      'parameterized with `logits=None`. Use `logits_parameter()` instead.',
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
+  def _default_event_space_bijector(self):
+    return
 
-  @deprecation.deprecated(
-      '2019-10-01',
-      'The `probs` property will return `None` when the distribution is '
-      'parameterized with `probs=None`. Use `probs_parameter()` instead.',
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
-
-  def _maybe_assert_valid_sample(self, x):
+  def _sample_control_dependencies(self, x):
+    assertions = []
     if not self.validate_args:
-      return []
-    return distribution_util.assert_nonnegative_integer_form(x)
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

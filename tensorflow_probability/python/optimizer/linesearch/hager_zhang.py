@@ -19,7 +19,7 @@ BFGS, conjugate gradient etc). Most of the sophisticated line search methods
 aim to find a step length in a given search direction so that the step length
 satisfies the
 [Wolfe conditions](https://en.wikipedia.org/wiki/Wolfe_conditions).
-[Hager-Zhang 2006](http://users.clas.ufl.edu/hager/papers/CG/cg_compare.pdf)
+[Hager-Zhang 2006](https://epubs.siam.org/doi/abs/10.1137/030601880)
 algorithm is a refinement of the commonly used
 [More-Thuente](https://dl.acm.org/citation.cfm?id=192132) algorithm.
 
@@ -33,8 +33,8 @@ from __future__ import print_function
 import collections
 
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
 
@@ -45,8 +45,7 @@ __all__ = [
 
 def _machine_eps(dtype):
   """Returns the machine epsilon for the supplied dtype."""
-  if isinstance(dtype, tf.DType):
-    dtype = dtype.as_numpy_dtype()
+  dtype = dtype_util.as_numpy_dtype(tf.as_dtype(dtype))
   return np.finfo(dtype).eps
 
 
@@ -247,10 +246,7 @@ def hager_zhang(value_and_gradients_function,
         equal to those of `left` on batch members where converged is True.
         Otherwise, it corresponds to the last interval computed.
   """
-  with tf1.name_scope(name, 'hager_zhang', [
-      initial_step_size, value_at_initial_step, value_at_zero, converged,
-      threshold_use_approximate_wolfe_condition, shrinkage_param,
-      expansion_param, sufficient_decrease_param, curvature_param]):
+  with tf.name_scope(name or 'hager_zhang'):
     val_0, val_initial, f_lim, prepare_evals = _prepare_args(
         value_and_gradients_function,
         initial_step_size,
@@ -264,7 +260,7 @@ def hager_zhang(value_and_gradients_function,
     if converged is None:
       init_converged = tf.zeros_like(valid_inputs)  # i.e. all false.
     else:
-      init_converged = tf.convert_to_tensor(value=converged)
+      init_converged = tf.convert_to_tensor(converged)
 
     failed = ~init_converged & ~valid_inputs
     active = ~init_converged & valid_inputs
@@ -279,7 +275,7 @@ def hager_zhang(value_and_gradients_function,
         converged=init_converged,
         failed=failed | fix_failed,
         func_evals=prepare_evals + fix_step_evals,
-        iterations=tf.convert_to_tensor(value=0),
+        iterations=tf.convert_to_tensor(0),
         left=val_0,
         right=hzl.val_where(init_converged, val_0, val_c))
 
@@ -292,7 +288,7 @@ def hager_zhang(value_and_gradients_function,
 
     init_active = ~init_interval.failed & ~init_interval.converged
     return prefer_static.cond(
-        tf.reduce_any(input_tensor=init_active),
+        tf.reduce_any(init_active),
         _apply_bracket_and_search,
         lambda: init_interval)
 
@@ -308,11 +304,10 @@ def _fix_step_size(value_and_gradients_function,
 
   def _cond(i, val_c, to_fix):
     del val_c  # Unused.
-    return (i < iter_max) & tf.reduce_any(input_tensor=to_fix)
+    return (i < iter_max) & tf.reduce_any(to_fix)
 
   def _body(i, val_c, to_fix):
-    next_c = tf1.where(to_fix, val_c.x * step_size_shrink_param,
-                                val_c.x)
+    next_c = tf.where(to_fix, val_c.x * step_size_shrink_param, val_c.x)
     next_val_c = value_and_gradients_function(next_c)
     still_to_fix = to_fix & ~hzl.is_finite(next_val_c)
     return (i + 1, next_val_c, still_to_fix)
@@ -402,8 +397,8 @@ def _bracket_and_search(
       bracket_result.left.x, bracket_result.right.x)
 
   # We fail if we have not yet converged but already exhausted all iterations.
-  exhausted_iterations = ~converged & tf.greater_equal(
-      bracket_result.iteration, max_iterations)
+  exhausted_iterations = ~converged & (
+      bracket_result.iteration >= max_iterations)
 
   line_search_args = HagerZhangLineSearchResult(
       converged=converged,
@@ -485,7 +480,7 @@ def _line_search_after_bracketing(
     """Loop condition."""
     active = ~(curr_interval.converged | curr_interval.failed)
     return (curr_interval.iterations <
-            max_iterations) & tf.reduce_any(input_tensor=active)
+            max_iterations) & tf.reduce_any(active)
 
   def _loop_body(curr_interval):
     """The loop body."""
@@ -524,12 +519,12 @@ def _line_search_after_bracketing(
             needs_inner_bisect, f_lim)
 
       return prefer_static.cond(
-          tf.reduce_any(input_tensor=needs_inner_bisect),
+          tf.reduce_any(needs_inner_bisect),
           _apply_inner_bisect,
           lambda: inner_bisect_args)
 
     next_args = prefer_static.cond(
-        tf.reduce_any(input_tensor=should_check_shrinkage),
+        tf.reduce_any(should_check_shrinkage),
         _do_check_shrinkage,
         lambda: secant2_result)
 
@@ -573,9 +568,7 @@ def _line_search_inner_bisection(
         right=update_result.right)
 
   return prefer_static.cond(
-      tf.reduce_any(input_tensor=still_active),
-      _apply_update,
-      lambda: next_inteval)
+      tf.reduce_any(still_active), _apply_update, lambda: next_inteval)
 
 
 def _prepare_args(value_and_gradients_function,
@@ -637,9 +630,9 @@ def _prepare_args(value_and_gradients_function,
   eval_count = 0
   if val_initial is None:
     if initial_step_size is not None:
-      initial_step_size = tf.convert_to_tensor(value=initial_step_size)
+      initial_step_size = tf.convert_to_tensor(initial_step_size)
     else:
-      initial_step_size = tf.convert_to_tensor(value=1.0, dtype=tf.float32)
+      initial_step_size = np.float32(1.)
     val_initial = value_and_gradients_function(initial_step_size)
     eval_count += 1
 
@@ -648,8 +641,8 @@ def _prepare_args(value_and_gradients_function,
     val_0 = value_and_gradients_function(x_0)
     eval_count += 1
 
-  f_lim = val_0.f + (approximate_wolfe_threshold * tf.abs(val_0.f))
-  return val_0, val_initial, f_lim, tf.convert_to_tensor(value=eval_count)
+  f_lim = val_0.f + (approximate_wolfe_threshold * tf.math.abs(val_0.f))
+  return val_0, val_initial, f_lim, tf.convert_to_tensor(eval_count)
 
 
 def _very_close(x, y):
@@ -658,10 +651,9 @@ def _very_close(x, y):
 
 def _to_str(x):
   """Converts a bool tensor to a string with True/False values."""
-  x = tf.convert_to_tensor(value=x)
+  x = tf.convert_to_tensor(x)
   if x.dtype == tf.bool:
-    return tf1.where(x, tf.fill(x.shape, 'True'),
-                              tf.fill(x.shape, 'False'))
+    return tf.where(x, 'True', 'False')
   return x
 
 
@@ -680,4 +672,4 @@ def _print(pass_through_tensor, values):
         flat_values.append(_to_str(v))
       continue
     flat_values.append(_to_str(value))
-  return tf1.Print(pass_through_tensor, flat_values)
+  return tf.Print(pass_through_tensor, flat_values)

@@ -21,13 +21,11 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AbsoluteValueTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AbsoluteValueTest(test_util.TestCase):
   """Tests correctness of the absolute value bijector."""
 
   def testBijectorVersusNumpyRewriteOfBasicFunctionsEventNdims0(self):

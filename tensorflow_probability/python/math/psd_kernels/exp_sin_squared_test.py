@@ -25,12 +25,11 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ExpSinSquaredTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ExpSinSquaredTest(test_util.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
     tfp.math.psd_kernels.ExpSinSquared(1, 1)  # Should be OK (float32 fallback).
@@ -75,7 +74,7 @@ class ExpSinSquaredTest(test_case.TestCase, parameterized.TestCase):
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.ExpSinSquared(
         amplitude=np.reshape([1.] * 6, [3, 2]))
-    self.assertEqual([3, 2], k.batch_shape.as_list())
+    self.assertAllEqual((3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
     k = tfp.math.psd_kernels.ExpSinSquared(
@@ -105,28 +104,35 @@ class ExpSinSquaredTest(test_case.TestCase, parameterized.TestCase):
         ).shape)
 
   def testValidateArgs(self):
-    # Wrap -1 const in identity so that asserts don't fire at ExpSinSquared
-    # construction time.
-    minus_1 = tf.identity(tf.convert_to_tensor(-1.))
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError('must be positive'):
       k = tfp.math.psd_kernels.ExpSinSquared(
-          amplitude=minus_1,
-          length_scale=minus_1,
-          period=minus_1,
+          amplitude=-1.,
+          length_scale=-1.,
+          period=-1.,
           validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
-
-    if not tf.executing_eagerly():
-      with self.assertRaises(tf.errors.InvalidArgumentError):
-        self.evaluate(k.apply([1.], [1.]))
-
-      with self.assertRaises(tf.errors.InvalidArgumentError):
-        self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
     k = tfp.math.psd_kernels.ExpSinSquared(
         amplitude=None, length_scale=None, period=None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
+
+  @test_util.jax_disable_variable_test
+  def testValidateVariableArgs(self):
+    amplitude = tf.Variable(1.)
+    length_scale = tf.Variable(1.)
+    period = tf.Variable(1.)
+    k = tfp.math.psd_kernels.ExpSinSquared(
+        amplitude=amplitude,
+        length_scale=length_scale,
+        period=period,
+        validate_args=True)
+    self.evaluate([v.initializer for v in k.variables])
+    self.evaluate(k.apply([1.], [1.]))
+
+    with self.assertRaisesOpError('must be positive'):
+      with tf.control_dependencies([period.assign(-7.3)]):
+        self.evaluate(k.apply([1.], [1.]))
 
 
 if __name__ == '__main__':

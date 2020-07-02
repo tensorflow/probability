@@ -25,16 +25,14 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class AurocAuprcTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class AurocAuprcTest(test_util.TestCase):
 
   @parameterized.parameters(
       ('ROC', ((.7, .8), (.6, .5)), ((.2, .4), (.6, .7))),
@@ -46,7 +44,6 @@ class AurocAuprcTest(test_case.TestCase, parameterized.TestCase):
 
     num_positive_trials = 4001
     num_negative_trials = 5156
-    total_trials = num_positive_trials + num_negative_trials
     num_positive_quantiles = 445
     num_negative_quantiles = 393
 
@@ -56,9 +53,9 @@ class AurocAuprcTest(test_case.TestCase, parameterized.TestCase):
         negative_means, scale=0.2, low=0., high=1.)
 
     positive_trials = dist_positive.sample(
-        num_positive_trials, seed=tfp_test_util.test_seed())
+        num_positive_trials, seed=test_util.test_seed())
     negative_trials = dist_negative.sample(
-        num_negative_trials, seed=tfp_test_util.test_seed())
+        num_negative_trials, seed=test_util.test_seed())
 
     positive_trials_, negative_trials_ = self.evaluate(
         [positive_trials, negative_trials])
@@ -68,14 +65,21 @@ class AurocAuprcTest(test_case.TestCase, parameterized.TestCase):
     y_true = np.array([1] * num_positive_trials + [0] * num_negative_trials)
     y_pred = np.concatenate([positive_trials_, negative_trials_])
 
-    m = tf.keras.metrics.AUC(num_thresholds=total_trials, curve=curve)
-    self.evaluate([v.initializer for v in m.variables])
-
     def auc_fn(y_pred):
-      self.evaluate(m.update_state(y_true, y_pred))
-      out = self.evaluate(m.result())
-      m.reset_states()
-      return out
+      if curve == 'PR':
+        sort_indices = np.argsort(-y_pred)
+        sorted_y_true = y_true[sort_indices]
+        true_positives = np.cumsum(sorted_y_true)
+        precision = true_positives / np.arange(1, len(sorted_y_true)+1)
+        recall = true_positives / true_positives[-1]
+        return np.sum(np.diff(recall) * precision[1:])
+      else:
+        # 'ROC'
+        sort_indices = np.argsort(y_pred)
+        sorted_y_true = y_true[sort_indices]
+        false_count = np.cumsum(1 - sorted_y_true)
+        area = np.sum(sorted_y_true * false_count)
+        return area / (false_count[-1] * (len(sorted_y_true) - false_count[-1]))
 
     batch_shape = np.array(positive_means).shape
     batch_rank = len(batch_shape)

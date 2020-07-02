@@ -21,6 +21,7 @@ from __future__ import print_function
 import abc
 import collections
 import contextlib
+import functools
 import inspect
 import types
 import decorator
@@ -31,10 +32,14 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
+# Symbol import needed to avoid BUILD-dependency cycle
+from tensorflow_probability.python.math.generic import log1mexp
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -64,7 +69,11 @@ _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
     'variance',
 ]
 
+
 _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
+
+
+UNSET_VALUE = object()
 
 
 JAX_MODE = False  # Overwritten by rewrite script.
@@ -162,15 +171,18 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
       tf.nest.is_nested(dtype_hint)):
     if dtype is None:
       fn = lambda v, dh: tf.convert_to_tensor(v, dtype_hint=dh, name=name)
-      return tf.nest.map_structure(fn, value, dtype_hint)
+      return nest.map_structure_up_to(dtype_hint, fn, value, dtype_hint,
+                                      # Allow list<->tuple conflation.
+                                      check_types=False)
     elif dtype_hint is None:
       fn = lambda v, d: tf.convert_to_tensor(v, dtype=d, name=name)
-      return tf.nest.map_structure(fn, value, dtype)
+      return nest.map_structure_up_to(dtype, fn, value, dtype,
+                                      check_types=False)
     else:
       fn = lambda v, d, dh: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
           v, dtype=d, dtype_hint=dh, name=name)
-      return tf.nest.map_structure(fn, value, dtype, dtype_hint,
-                                   expand_composites=True)
+      return nest.map_structure_up_to(dtype, fn, value, dtype, dtype_hint,
+                                      check_types=False, expand_composites=True)
   return tf.convert_to_tensor(
       value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 
@@ -178,6 +190,52 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
 def _remove_dict_keys_with_value(dict_, val):
   """Removes `dict` keys which have have `self` as value."""
   return {k: v for k, v in dict_.items() if v is not val}
+
+
+def _set_sample_static_shape_for_tensor(x,
+                                        event_shape,
+                                        batch_shape,
+                                        sample_shape):
+  """Helper to `_set_sample_static_shape`; sets shape info for a `Tensor`."""
+  sample_shape = tf.TensorShape(tf.get_static_value(sample_shape))
+
+  ndims = tensorshape_util.rank(x.shape)
+  sample_ndims = tensorshape_util.rank(sample_shape)
+  batch_ndims = tensorshape_util.rank(batch_shape)
+  event_ndims = tensorshape_util.rank(event_shape)
+
+  # Infer rank(x).
+  if (ndims is None and
+      sample_ndims is not None and
+      batch_ndims is not None and
+      event_ndims is not None):
+    ndims = sample_ndims + batch_ndims + event_ndims
+    tensorshape_util.set_shape(x, [None] * ndims)
+
+  # Infer sample shape.
+  if ndims is not None and sample_ndims is not None:
+    shape = tensorshape_util.concatenate(sample_shape,
+                                         [None] * (ndims - sample_ndims))
+    tensorshape_util.set_shape(x, shape)
+
+  # Infer event shape.
+  if ndims is not None and event_ndims is not None:
+    shape = tf.TensorShape(
+        [None]*(ndims - event_ndims)).concatenate(event_shape)
+    tensorshape_util.set_shape(x, shape)
+
+  # Infer batch shape.
+  if batch_ndims is not None:
+    if ndims is not None:
+      if sample_ndims is None and event_ndims is not None:
+        sample_ndims = ndims - batch_ndims - event_ndims
+      elif event_ndims is None and sample_ndims is not None:
+        event_ndims = ndims - batch_ndims - sample_ndims
+    if sample_ndims is not None and event_ndims is not None:
+      shape = tf.TensorShape([None]*sample_ndims).concatenate(
+          batch_shape).concatenate([None]*event_ndims)
+      tensorshape_util.set_shape(x, shape)
+  return x
 
 
 class _DistributionMeta(abc.ABCMeta):
@@ -329,11 +387,10 @@ class Distribution(_BaseDistribution):
   The batch shape is determined by broadcasting together the parameters.
 
   The shape of arguments to `__init__`, `cdf`, `log_cdf`, `prob`, and
-  `log_prob` reflect this broadcasting, as does the return value of `sample` and
-  `sample_n`.
+  `log_prob` reflect this broadcasting, as does the return value of `sample`.
 
   `sample_n_shape = [n] + batch_shape + event_shape`, where `sample_n_shape` is
-  the shape of the `Tensor` returned from `sample_n`, `n` is the number of
+  the shape of the `Tensor` returned from `sample(n)`, `n` is the number of
   samples, `batch_shape` defines how many independent distributions there are,
   and `event_shape` defines the shape of samples from each of those independent
   distributions. Samples are independent along the `batch_shape` dimensions, but
@@ -360,7 +417,7 @@ class Distribution(_BaseDistribution):
   # Sampling returns a sample per distribution. `samples` has shape
   # [5, 2, 2], which is [n] + batch_shape + event_shape, where n=5,
   # batch_shape=[2, 2], and event_shape=[].
-  samples = u.sample_n(5)
+  samples = u.sample(5)
 
   # The broadcasting holds across methods. Here we use `cdf` as an example. The
   # same holds for `log_cdf` and the likelihood functions.
@@ -383,6 +440,7 @@ class Distribution(_BaseDistribution):
 
   There are three important concepts associated with TensorFlow Distributions
   shapes:
+
   - Event shape describes the shape of a single draw from the distribution;
     it may be dependent across dimensions. For scalar distributions, the event
     shape is `[]`. For a 5-dimensional MultivariateNormal, the event shape is
@@ -724,12 +782,27 @@ class Distribution(_BaseDistribution):
       batch_shape: `Tensor`.
     """
     with self._name_and_control_scope(name):
-      if tensorshape_util.is_fully_defined(self.batch_shape):
-        v = tensorshape_util.as_list(self.batch_shape)
+      # Joint distributions may have a structured `batch shape_tensor` or a
+      # single `batch_shape_tensor` that applies to all components. (Simple
+      # distributions always have a single `batch_shape_tensor`.) If the
+      # distribution's `batch_shape` is an instance of `tf.TensorShape`, we
+      # infer that `batch_shape_tensor` is not structured.
+      shallow_structure = (None if isinstance(self.batch_shape, tf.TensorShape)
+                           else self.dtype)
+      if all([tensorshape_util.is_fully_defined(s)
+              for s in nest.flatten_up_to(
+                  shallow_structure, self.batch_shape, check_types=False)]):
+        batch_shape = nest.map_structure_up_to(
+            shallow_structure,
+            tensorshape_util.as_list,
+            self.batch_shape, check_types=False)
       else:
-        v = self._batch_shape_tensor()
-      return tf.identity(tf.convert_to_tensor(v, dtype_hint=tf.int32),
-                         name='batch_shape')
+        batch_shape = self._batch_shape_tensor()
+      return nest.map_structure_up_to(
+          shallow_structure,
+          lambda s: tf.identity(  # pylint: disable=g-long-lambda
+              tf.convert_to_tensor(s, dtype=tf.int32), name='batch_shape'),
+          batch_shape, check_types=False)
 
   def _batch_shape(self):
     return None
@@ -746,7 +819,16 @@ class Distribution(_BaseDistribution):
     Returns:
       batch_shape: `TensorShape`, possibly unknown.
     """
-    return tf.TensorShape(self._batch_shape())
+    batch_shape = self._batch_shape()
+    # See comment in `batch_shape_tensor()` on structured batch shapes. If
+    # `_batch_shape()` is a `tf.TensorShape` instance or a flat list/tuple that
+    # does not contain `tf.TensorShape`s, we infer that it is not structured.
+    if (isinstance(batch_shape, tf.TensorShape)
+        or all(len(path) == 1 and not isinstance(s, tf.TensorShape)
+               for path, s in nest.flatten_with_tuple_paths(batch_shape))):
+      return tf.TensorShape(batch_shape)
+    return nest.map_structure_up_to(
+        self.dtype, tf.TensorShape, batch_shape, check_types=False)
 
   def _event_shape_tensor(self):
     raise NotImplementedError(
@@ -762,12 +844,19 @@ class Distribution(_BaseDistribution):
       event_shape: `Tensor`.
     """
     with self._name_and_control_scope(name):
-      if tensorshape_util.is_fully_defined(self.event_shape):
-        v = tensorshape_util.as_list(self.event_shape)
+      if all([tensorshape_util.is_fully_defined(s)
+              for s in nest.flatten(self.event_shape)]):
+        event_shape = nest.map_structure_up_to(
+            self.dtype,
+            tensorshape_util.as_list,
+            self.event_shape, check_types=False)
       else:
-        v = self._event_shape_tensor()
-      return tf.identity(tf.convert_to_tensor(v, dtype_hint=tf.int32),
-                         name='event_shape')
+        event_shape = self._event_shape_tensor()
+      return nest.map_structure_up_to(
+          self.dtype,
+          lambda s: tf.identity(  # pylint: disable=g-long-lambda
+              tf.convert_to_tensor(s, dtype=tf.int32), name='event_shape'),
+          event_shape, check_types=False)
 
   def _event_shape(self):
     return None
@@ -781,7 +870,8 @@ class Distribution(_BaseDistribution):
     Returns:
       event_shape: `TensorShape`, possibly unknown.
     """
-    return tf.TensorShape(self._event_shape())
+    return nest.map_structure_up_to(
+        self.dtype, tf.TensorShape, self._event_shape(), check_types=False)
 
   def is_scalar_event(self, name='is_scalar_event'):
     """Indicates that `event_shape == []`.
@@ -823,7 +913,8 @@ class Distribution(_BaseDistribution):
       sample_shape = tf.cast(sample_shape, tf.int32, name='sample_shape')
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
-      samples = self._sample_n(n, seed, **kwargs)
+      samples = self._sample_n(
+          n, seed=seed() if callable(seed) else seed, **kwargs)
       batch_event_shape = tf.shape(samples)[1:]
       final_shape = tf.concat([sample_shape, batch_event_shape], 0)
       samples = tf.reshape(samples, final_shape)
@@ -838,7 +929,7 @@ class Distribution(_BaseDistribution):
 
     Args:
       sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-      seed: Python integer seed for RNG
+      seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
       name: name to give to the op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
@@ -849,9 +940,8 @@ class Distribution(_BaseDistribution):
 
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_prob'):
         return self._log_prob(value, **kwargs)
       if hasattr(self, '_prob'):
@@ -875,9 +965,8 @@ class Distribution(_BaseDistribution):
 
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_prob'):
         return self._prob(value, **kwargs)
       if hasattr(self, '_log_prob'):
@@ -901,9 +990,8 @@ class Distribution(_BaseDistribution):
 
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_cdf'):
         return self._log_cdf(value, **kwargs)
       if hasattr(self, '_cdf'):
@@ -937,9 +1025,8 @@ class Distribution(_BaseDistribution):
 
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_cdf'):
         return self._cdf(value, **kwargs)
       if hasattr(self, '_log_cdf'):
@@ -974,16 +1061,16 @@ class Distribution(_BaseDistribution):
 
   def _call_log_survival_function(self, value, name, **kwargs):
     """Wrapper around _log_survival_function."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._log_survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
-        try:
-          return tf.math.log1p(-self.cdf(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+        if hasattr(self, '_log_cdf'):
+          return log1mexp(self._log_cdf(value, **kwargs))
+        if hasattr(self, '_cdf'):
+          return tf.math.log1p(-self._cdf(value, **kwargs))
+        raise original_exception
 
   def log_survival_function(self, value, name='log_survival_function',
                             **kwargs):
@@ -1017,16 +1104,16 @@ class Distribution(_BaseDistribution):
 
   def _call_survival_function(self, value, name, **kwargs):
     """Wrapper around _survival_function."""
-    with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
-        try:
+        if hasattr(self, '_log_cdf'):
+          return -tf.math.expm1(self._log_cdf(value, **kwargs))
+        if hasattr(self, '_cdf'):
           return 1. - self.cdf(value, **kwargs)
-        except NotImplementedError:
-          raise original_exception
+        raise original_exception
 
   def survival_function(self, value, name='survival_function', **kwargs):
     """Survival function.
@@ -1074,8 +1161,15 @@ class Distribution(_BaseDistribution):
 
   def _call_quantile(self, value, name, **kwargs):
     with self._name_and_control_scope(name):
-      value = _convert_to_tensor(
-          value, name='value', dtype_hint=self.dtype)
+      dtype = tf.float32 if tf.nest.is_nested(self.dtype) else self.dtype
+      value = tf.convert_to_tensor(value, name='value', dtype_hint=dtype)
+      if self.validate_args:
+        value = distribution_util.with_dependencies([
+            assert_util.assert_less_equal(value, tf.cast(1, value.dtype),
+                                          message='`value` must be <= 1'),
+            assert_util.assert_greater_equal(value, tf.cast(0, value.dtype),
+                                             message='`value` must be >= 0')
+        ], value)
       return self._quantile(value, **kwargs)
 
   def quantile(self, value, name='quantile', **kwargs):
@@ -1284,6 +1378,31 @@ class Distribution(_BaseDistribution):
     # must ensure that assertions are applied for both `self` and `other`.
     return self._kl_divergence(other)
 
+  def _default_event_space_bijector(self):
+    raise NotImplementedError(
+        '_default_event_space_bijector` is not implemented: {}'.format(
+            type(self).__name__))
+
+  def _experimental_default_event_space_bijector(self):
+    """Bijector mapping the reals (R**n) to the event space of the distribution.
+
+    Returns:
+      event_space_bijector: `Bijector` instance or `None`.
+
+    Distributions with continuous support have a
+    `_default_event_space_bijector`, a subclass of `tfp.bijectors.Bijector`
+    that maps R**n to the distribution's event space. For example, the
+    `_default_event_space_bijector` of the `Beta` distribution is
+    `tfb.Sigmoid()`, which maps the real line to `[0, 1]`, the support of the
+    `Beta` distribution. The purpose of `_default_event_space_bijector` is
+    to enable gradient descent in an unconstrained space for Variational
+    Inference and Hamiltonian Monte Carlo methods. An effort has been made to
+    choose bijectors such that the tails of the distribution in the
+    unconstrained space are between Gaussian and Exponential. For distributions
+    with discrete event space, `_default_event_space_bijector` returns `None`.
+    """
+    return self._default_event_space_bijector()
+
   def __str__(self):
     if self.batch_shape:
       maybe_batch_shape = ', batch_shape=' + _str_tensorshape(self.batch_shape)
@@ -1321,15 +1440,18 @@ class Distribution(_BaseDistribution):
                 dtype=_str_dtype(self.dtype)))
 
   @contextlib.contextmanager
-  def _name_and_control_scope(self, name=None):
+  def _name_and_control_scope(self, name=None, value=UNSET_VALUE, kwargs=None):
     """Helper function to standardize op scope."""
+    # Note: we recieve `kwargs` and not `**kwargs` to ensure no collisions on
+    # other args we choose to take in this function.
     with tf.name_scope(self.name):
       with tf.name_scope(name) as name_scope:
-        deps = tuple(
-            d for d in (  # pylint: disable=g-complex-comprehension
-                tuple(self._initial_parameter_control_dependencies) +
-                tuple(self._parameter_control_dependencies(is_init=False)))
-            if d is not None)
+        deps = []
+        deps.extend(self._initial_parameter_control_dependencies)
+        deps.extend(self._parameter_control_dependencies(is_init=False))
+        if value is not UNSET_VALUE:
+          deps.extend(self._sample_control_dependencies(
+              value, **({} if kwargs is None else kwargs)))
         if not deps:
           yield name_scope
           return
@@ -1349,47 +1471,16 @@ class Distribution(_BaseDistribution):
 
   def _set_sample_static_shape(self, x, sample_shape):
     """Helper to `sample`; sets static shape info."""
-    # Set shape hints.
-    sample_shape = tf.TensorShape(tf.get_static_value(sample_shape))
+    batch_shape = self.batch_shape
+    if (tf.nest.is_nested(self.dtype)
+        and not tf.nest.is_nested(batch_shape)):
+      batch_shape = tf.nest.map_structure(
+          lambda _: batch_shape, self.dtype)
 
-    ndims = tensorshape_util.rank(x.shape)
-    sample_ndims = tensorshape_util.rank(sample_shape)
-    batch_ndims = tensorshape_util.rank(self.batch_shape)
-    event_ndims = tensorshape_util.rank(self.event_shape)
-
-    # Infer rank(x).
-    if (ndims is None and
-        sample_ndims is not None and
-        batch_ndims is not None and
-        event_ndims is not None):
-      ndims = sample_ndims + batch_ndims + event_ndims
-      tensorshape_util.set_shape(x, [None] * ndims)
-
-    # Infer sample shape.
-    if ndims is not None and sample_ndims is not None:
-      shape = tensorshape_util.concatenate(sample_shape,
-                                           [None] * (ndims - sample_ndims))
-      tensorshape_util.set_shape(x, shape)
-
-    # Infer event shape.
-    if ndims is not None and event_ndims is not None:
-      shape = tf.TensorShape(
-          [None]*(ndims - event_ndims)).concatenate(self.event_shape)
-      tensorshape_util.set_shape(x, shape)
-
-    # Infer batch shape.
-    if batch_ndims is not None:
-      if ndims is not None:
-        if sample_ndims is None and event_ndims is not None:
-          sample_ndims = ndims - batch_ndims - event_ndims
-        elif event_ndims is None and sample_ndims is not None:
-          event_ndims = ndims - batch_ndims - sample_ndims
-      if sample_ndims is not None and event_ndims is not None:
-        shape = tf.TensorShape([None]*sample_ndims).concatenate(
-            self.batch_shape).concatenate([None]*event_ndims)
-        tensorshape_util.set_shape(x, shape)
-
-    return x
+    return tf.nest.map_structure(
+        functools.partial(
+            _set_sample_static_shape_for_tensor, sample_shape=sample_shape),
+        x, self.event_shape, batch_shape)
 
   def _is_scalar_helper(self, static_shape, dynamic_shape_fn):
     """Implementation for `is_scalar_batch` and `is_scalar_event`."""
@@ -1415,6 +1506,27 @@ class Distribution(_BaseDistribution):
     Returns:
       dependencies: `list`-like of ops to be executed in member functions with
         graph dependencies.
+    """
+    return ()
+
+  def _sample_control_dependencies(self, value, **kwargs):
+    """Returns a list of ops to be executed to validate distribution samples.
+
+    The ops are executed in methods that take distribution samples as an
+    argument (e.g. `log_prob` and `cdf`). They validate that `value` is
+    within the support of the distribution. Typically subclasses override this
+    function to return assertions specific to the distribution (e.g. samples
+    from `Beta` must be between `0` and `1`). By convention, finite bounds of
+    the support are considered valid samples, since `sample` may output values
+    that are numerically equivalent to the bounds.
+
+    Args:
+      value: `float` or `double` `Tensor`.
+      **kwargs: Additional keyword args.
+
+    Returns:
+      assertions: `list`-like of ops to be executed in member functions that
+        take distribution samples as input.
     """
     return ()
 

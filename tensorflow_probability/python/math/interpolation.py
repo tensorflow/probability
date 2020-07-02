@@ -305,7 +305,7 @@ def interp_regular_1d_grid(x,
   y_ref = tf.exp(tf.linspace(start=0., stop=10., num=200))
 
   interp_regular_1d_grid(
-      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=1., y_ref=y_ref)
+      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=10., y_ref=y_ref)
   ==> approx [exp(6.0), exp(0.5), exp(3.3)]
   ```
 
@@ -434,7 +434,7 @@ def batch_interp_regular_1d_grid(x,
   y_ref = tf.exp(tf.linspace(start=0., stop=10., 20))
 
   batch_interp_regular_1d_grid(
-      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=1., y_ref=y_ref)
+      x=[6.0, 0.5, 3.3], x_ref_min=0., x_ref_max=10., y_ref=y_ref)
   ==> approx [exp(6.0), exp(0.5), exp(3.3)]
   ```
 
@@ -551,19 +551,20 @@ def batch_interp_regular_nd_grid(x,
   Interpolate a function of one variable.
 
   ```python
-  y_ref = tf.exp(tf.linspace(start=0., stop=10., 20))
+  y_ref = tf.exp(tf.linspace(start=0., stop=10., num=20))
 
   tfp.math.batch_interp_regular_nd_grid(
       # x.shape = [3, 1], x_ref_min/max.shape = [1].  Trailing `1` for `1-D`.
-      x=[[6.0], [0.5], [3.3]], x_ref_min=[0.], x_ref_max=[1.], y_ref=y_ref)
+      x=[[6.0], [0.5], [3.3]], x_ref_min=[0.], x_ref_max=[10.], y_ref=y_ref,
+      axis=0)
   ==> approx [exp(6.0), exp(0.5), exp(3.3)]
   ```
 
   Interpolate a scalar function of two variables.
 
   ```python
-  x_ref_min = [0., 2 * np.pi]
-  x_ref_max = [0., 2 * np.pi]
+  x_ref_min = [0., 0.]
+  x_ref_max = [2 * np.pi, 2 * np.pi]
 
   # Build y_ref.
   x0s, x1s = tf.meshgrid(
@@ -576,7 +577,7 @@ def batch_interp_regular_nd_grid(x,
 
   y_ref = func(x0s, x1s)
 
-  x = np.pi * tf.random_uniform(shape=(10, 2))
+  x = np.pi * tf.random.uniform(shape=(10, 2))
 
   tfp.math.batch_interp_regular_nd_grid(x, x_ref_min, x_ref_max, y_ref, axis=-2)
   ==> tf.sin(x[:, 0]) * tf.cos(x[:, 1])

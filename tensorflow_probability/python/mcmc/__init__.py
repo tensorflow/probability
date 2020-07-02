@@ -33,7 +33,7 @@ from tensorflow_probability.python.mcmc.random_walk_metropolis import random_wal
 from tensorflow_probability.python.mcmc.random_walk_metropolis import random_walk_uniform_fn
 from tensorflow_probability.python.mcmc.random_walk_metropolis import RandomWalkMetropolis
 from tensorflow_probability.python.mcmc.random_walk_metropolis import UncalibratedRandomWalk
-from tensorflow_probability.python.mcmc.replica_exchange_mc import default_exchange_proposed_fn
+from tensorflow_probability.python.mcmc.replica_exchange_mc import default_swap_proposal_fn
 from tensorflow_probability.python.mcmc.replica_exchange_mc import ReplicaExchangeMC
 from tensorflow_probability.python.mcmc.sample import CheckpointableStatesAndTrace
 from tensorflow_probability.python.mcmc.sample import sample_chain
@@ -61,7 +61,7 @@ __all__ = [
     'UncalibratedHamiltonianMonteCarlo',
     'UncalibratedLangevin',
     'UncalibratedRandomWalk',
-    'default_exchange_proposed_fn',
+    'default_swap_proposal_fn',
     'effective_sample_size',
     'make_simple_step_size_update_policy',
     'potential_scale_reduction',

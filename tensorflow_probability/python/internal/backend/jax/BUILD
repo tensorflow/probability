@@ -14,6 +14,13 @@
 # ============================================================================
 # Description: JAX backend.
 
+# py_test rules are rewritten to py3_test on export to OSS, for reasons of
+# reversibility of import<->export transforms. This is only necessary until we
+# eliminate all py2and3_test targets, after which everything can safely use
+# py_test, interanlly and externally, and no rewrites will be needed.
+# @unused  <-- satisfy buildifier errors
+load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
+
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -26,9 +33,11 @@ exports_files(["LICENSE"])
 
 FILENAMES = [
     "__init__",
+    "bitwise",
     "compat",
     "control_flow",
     "debugging",
+    "deprecation",
     "dtype",
     "errors",
     "functional_ops",
@@ -38,6 +47,7 @@ FILENAMES = [
     "linalg",
     "linalg_impl",
     "misc",
+    "nest",
     "nn",
     "numpy_array",
     "numpy_logging",
@@ -45,38 +55,46 @@ FILENAMES = [
     "numpy_signal",
     "numpy_test",
     "ops",
+    "private",
     "random_generators",
+    "raw_ops",
     "sets_lib",
     "sparse_lib",
+    "tensor_array_ops",
+    "tensor_array_ops_test",
     "test_lib",
+    "tf_inspect",
     "v1",
     "v2",
     "_utils",
 ] + [
-    "adjoint_registrations",
-    "cholesky_registrations",
-    "inverse_registrations",
-    "linear_operator_addition",
-    "linear_operator_adjoint",
-    "linear_operator_algebra",
-    "linear_operator_block_diag",
-    "linear_operator_circulant",
-    "linear_operator_composition",
-    "linear_operator_diag",
-    "linear_operator_full_matrix",
-    "linear_operator_householder",
-    "linear_operator_identity",
-    "linear_operator_inversion",
-    "linear_operator_kronecker",
-    "linear_operator_lower_triangular",
-    "linear_operator_low_rank_update",
-    "linear_operator",
-    "linear_operator_toeplitz",
-    "linear_operator_util",
-    "linear_operator_zeros",
-    "matmul_registrations",
-    "registrations_util",
-    "solve_registrations",
+    "gen/__init__",
+    "gen/tensor_shape",
+    "gen/adjoint_registrations",
+    "gen/cholesky_registrations",
+    "gen/inverse_registrations",
+    "gen/linear_operator_addition",
+    "gen/linear_operator_adjoint",
+    "gen/linear_operator_algebra",
+    "gen/linear_operator_block_diag",
+    "gen/linear_operator_block_lower_triangular",
+    "gen/linear_operator_full_matrix",
+    "gen/linear_operator_circulant",
+    "gen/linear_operator_composition",
+    "gen/linear_operator_diag",
+    "gen/linear_operator_householder",
+    "gen/linear_operator_identity",
+    "gen/linear_operator_inversion",
+    "gen/linear_operator_kronecker",
+    "gen/linear_operator_lower_triangular",
+    "gen/linear_operator_low_rank_update",
+    "gen/linear_operator",
+    "gen/linear_operator_toeplitz",
+    "gen/linear_operator_util",
+    "gen/linear_operator_zeros",
+    "gen/matmul_registrations",
+    "gen/registrations_util",
+    "gen/solve_registrations",
 ]
 
 [
@@ -105,13 +123,12 @@ py_library(
     ],
 )
 
-# [internal] load python3.bzl
-
-py_test(
-    name = "jax_test",
-    srcs = ["numpy_test.py"],
-    main = "numpy_test.py",
-    shard_count = 5,
+# py_test
+py3_test(
+    name = "tensor_array_ops_test",
+    srcs = ["tensor_array_ops_test.py"],
+    main = "tensor_array_ops_test.py",
+    python_version = "PY3",
     tags = ["tfp_jax"],
     deps = [
         ":jax",
@@ -121,7 +138,28 @@ py_test(
         # jax dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+# py_test
+py3_test(
+    name = "jax_test",
+    srcs = ["numpy_test.py"],
+    main = "numpy_test.py",
+    python_version = "PY3",
+    shard_count = 8,
+    tags = ["tfp_jax"],
+    deps = [
+        ":jax",
+        ":jax_testlib",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # jax dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

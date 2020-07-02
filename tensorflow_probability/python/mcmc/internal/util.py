@@ -26,27 +26,98 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.gradient import value_and_gradient as tfp_math_value_and_gradients
-
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'choose',
+    'enable_store_parameters_in_results',
+    'left_justified_expand_dims_like',
+    'left_justified_expand_dims_to',
+    'left_justified_broadcast_like',
+    'left_justified_broadcast_to',
+    'index_remapping_gather',
     'is_list_like',
     'is_namedtuple_like',
-    'make_innermost_setter',
     'make_innermost_getter',
+    'make_innermost_setter',
     'make_name',
     'maybe_call_fn_and_grads',
+    'prepare_state_parts',
+    'PrettyNamedTupleMixin',
     'safe_sum',
+    'SEED_CTOR_ARG_DEPRECATION_MSG',
     'set_doc',
     'smart_for_loop',
+    'strip_seeds',
     'trace_scan',
-    'enable_store_parameters_in_results',
     'warn_if_parameters_are_not_simple_tensors',
 ]
+
+
+SEED_CTOR_ARG_DEPRECATION_MSG = (
+    'Seeding `tfp.mcmc.TransitionKernel` instances by constructor argument is '
+    'deprecated. Use the `seed` argument to `tfp.mcmc.sample_chain` or '
+    'directly on `one_step`. The legacy behavior is still supported and should '
+    'be through 2020-09-20.')
+
+
+class PrettyNamedTupleMixin(object):
+  """Mixin adding a nicer `__repr__` for `namedtuple`s."""
+  __slots__ = ()
+
+  def __repr__(self):
+    return '{}(\n{}\n)'.format(
+        type(self).__name__,
+        ',\n'.join('  {}={}'.format(k, repr(v).replace('\n', '\n    '))
+                   for (k, v) in self._asdict().items()))
+
+
+def left_justified_expand_dims_like(x, reference, name=None):
+  """Right pads `x` with `rank(reference) - rank(x)` ones."""
+  with tf.name_scope(name or 'left_justified_expand_dims_like'):
+    return left_justified_expand_dims_to(x, prefer_static.rank(reference))
+
+
+def left_justified_expand_dims_to(x, rank, name=None):
+  """Right pads `x` with `rank - rank(x)` ones."""
+  with tf.name_scope(name or 'left_justified_expand_dims_to'):
+    rank = tf.convert_to_tensor(rank, dtype=tf.int32)
+    expand_ndims = prefer_static.maximum(rank - prefer_static.rank(x), 0)
+    expand_shape = prefer_static.concat(
+        [prefer_static.shape(x),
+         prefer_static.ones(shape=[expand_ndims], dtype=tf.int32)],
+        axis=0)
+    return prefer_static.reshape(x, expand_shape)
+
+
+def left_justified_broadcast_like(x, reference, name=None):
+  """Broadcasts `x` to shape of reference, in a left-justified manner."""
+  with tf.name_scope(name or 'left_justified_broadcast_like'):
+    return left_justified_broadcast_to(x, prefer_static.shape(reference))
+
+
+def left_justified_broadcast_to(x, shape, name=None):
+  """Broadcasts `x` to shape, in a left-justified manner."""
+  with tf.name_scope(name or 'left_justified_broadcast_to'):
+    return tf.broadcast_to(
+        left_justified_expand_dims_to(x, prefer_static.size(shape)), shape)
+
+
+def prepare_state_parts(state_or_state_part, dtype=None, name=None):
+  """Calls c2t on each element or the entirety if not iterable; returns list."""
+  # Don't use tf.name_scope since this function has ct2-like semantics.
+  is_multipart = is_list_like(state_or_state_part)
+  state_parts = state_or_state_part if is_multipart else [state_or_state_part]
+  state_parts = [tf.convert_to_tensor(x, dtype=dtype, name=name)
+                 for x in state_parts]
+  return state_parts, is_multipart
 
 
 def is_list_like(x):
@@ -65,7 +136,7 @@ def is_namedtuple_like(x):
 
 
 def make_name(super_name, default_super_name, sub_name):
-  """Helper which makes a `str` name; useful for tf1.name_scope."""
+  """Helper which makes a `str` name; useful for tf.name_scope."""
   name = super_name if super_name is not None else default_super_name
   if sub_name is not None:
     name += '_' + sub_name
@@ -73,62 +144,55 @@ def make_name(super_name, default_super_name, sub_name):
 
 
 def _choose_base_case(is_accepted,
-                      accepted,
-                      rejected,
+                      proposed,
+                      current,
                       name=None):
   """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
-  def _expand_is_accepted_like(x):
-    """Helper to expand `is_accepted` like the shape of some input arg."""
-    with tf1.name_scope('expand_is_accepted_like'):
-      expand_shape = tf.concat([
-          tf.shape(input=is_accepted),
-          tf.ones([tf.rank(x) - tf.rank(is_accepted)], dtype=tf.int32),
-      ],
-                               axis=0)
-      multiples = tf.concat([
-          tf.ones([tf.rank(is_accepted)], dtype=tf.int32),
-          tf.shape(input=x)[tf.rank(is_accepted):],
-      ],
-                            axis=0)
-      m = tf.tile(tf.reshape(is_accepted, expand_shape),
-                  multiples)
-      m.set_shape(m.shape.merge_with(x.shape))
-      return m
-  def _where(accepted, rejected):
-    if accepted is rejected:
-      return accepted
-    accepted = tf.convert_to_tensor(value=accepted, name='accepted')
-    rejected = tf.convert_to_tensor(value=rejected, name='rejected')
-    r = tf1.where(
-        _expand_is_accepted_like(accepted), accepted, rejected)
-    r.set_shape(r.shape.merge_with(accepted.shape.merge_with(rejected.shape)))
-    return r
-
-  with tf1.name_scope(
-      name, 'choose', values=[is_accepted, accepted, rejected]):
-    if not is_list_like(accepted):
-      return _where(accepted, rejected)
-    return [(choose(is_accepted, a, r, name=name) if is_namedtuple_like(a)
-             else _where(a, r))
-            for a, r in zip(accepted, rejected)]
+  def _where(proposed, current):
+    """Wraps `tf.where`."""
+    if proposed is current:
+      return proposed
+    # Preserve the name from `current` so names can propagate from
+    # `bootstrap_results`.
+    name = getattr(current, 'name', None)
+    if name is not None:
+      name = name.rpartition('/')[2].rsplit(':', 1)[0]
+    # Since this is an internal utility it is ok to assume
+    # tf.shape(proposed) == tf.shape(current).
+    return tf.where(left_justified_expand_dims_like(is_accepted, proposed),
+                    proposed, current, name=name)
+  with tf.name_scope(name or 'choose'):
+    if not is_list_like(proposed):
+      return _where(proposed, current)
+    return [(choose(is_accepted, p, c, name=name) if is_namedtuple_like(p)
+             else _where(p, c))
+            for p, c in zip(proposed, current)]
 
 
-def choose(is_accepted, accepted, rejected, name=None):
+def choose(is_accepted, proposed, current, name=None):
   """Helper which expand_dims `is_accepted` then applies tf.where."""
-  if not is_namedtuple_like(accepted):
-    return _choose_base_case(is_accepted, accepted, rejected, name=name)
-  if not isinstance(accepted, type(rejected)):
-    raise TypeError('Type of `accepted` ({}) must be identical to '
-                    'type of `rejected` ({})'.format(
-                        type(accepted).__name__,
-                        type(rejected).__name__))
-  return type(accepted)(**dict(
-      [(fn,
-        choose(is_accepted,
-               getattr(accepted, fn),
-               getattr(rejected, fn),
-               name=name))
-       for fn in accepted._fields]))
+  with tf.name_scope(name or 'choose'):
+    if not is_namedtuple_like(proposed):
+      return _choose_base_case(is_accepted, proposed, current, name=name)
+    if not isinstance(proposed, type(current)):
+      raise TypeError('Type of `proposed` ({}) must be identical to '
+                      'type of `current` ({})'.format(
+                          type(proposed).__name__,
+                          type(current).__name__))
+    items = {}
+    for fn in proposed._fields:
+      items[fn] = choose(is_accepted,
+                         getattr(proposed, fn),
+                         getattr(current, fn),
+                         name=name)
+    return type(proposed)(**items)
+
+
+def strip_seeds(obj):
+  if not is_namedtuple_like(obj):
+    return obj
+  return type(obj)(**{fn: strip_seeds(fv) if fn != 'seed' else []
+                      for fn, fv in obj._asdict().items()})
 
 
 def safe_sum(x, alt_value=-np.inf, name=None):
@@ -152,18 +216,15 @@ def safe_sum(x, alt_value=-np.inf, name=None):
     TypeError: if `x` is not list-like.
     ValueError: if `x` is empty.
   """
-  with tf1.name_scope(name, 'safe_sum', [x, alt_value]):
+  with tf.name_scope(name or 'safe_sum'):
     if not is_list_like(x):
       raise TypeError('Expected list input.')
     if not x:
       raise ValueError('Input should not be empty.')
     in_shape = x[0].shape
-    x = tf.stack(x, axis=-1)
-    x = tf.reduce_sum(input_tensor=x, axis=-1)
-    alt_value = np.array(alt_value, x.dtype.as_numpy_dtype)
-    alt_fill = tf.fill(tf.shape(input=x), value=alt_value)
-    x = tf1.where(tf.math.is_finite(x), x, alt_fill)
-    x.set_shape(x.shape.merge_with(in_shape))
+    x = tf.add_n(x)
+    x = tf.where(tf.math.is_finite(x), x, tf.constant(alt_value, dtype=x.dtype))
+    tensorshape_util.set_shape(x, in_shape)
     return x
 
 
@@ -177,12 +238,11 @@ def set_doc(value):
 
 def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
   """Helper to `maybe_call_fn_and_grads`."""
-  with tf1.name_scope(name, 'value_and_gradients',
-                               [fn_arg_list, result, grads]):
+  with tf.name_scope(name or 'value_and_gradients'):
 
     def _convert_to_tensor(x, name):
-      ctt = lambda x_: x_ if x_ is None else tf.convert_to_tensor(
-          value=x_, name=name)
+      ctt = lambda x_: None if x_ is None else tf.convert_to_tensor(  # pylint: disable=g-long-lambda
+          x_, name=name)
       return [ctt(x_) for x_ in x] if is_list_like(x) else ctt(x)
 
     fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
@@ -227,12 +287,11 @@ def maybe_call_fn_and_grads(fn,
                             check_non_none_grads=True,
                             name=None):
   """Calls `fn` and computes the gradient of the result wrt `args_list`."""
-  with tf1.name_scope(name, 'maybe_call_fn_and_grads',
-                               [fn_arg_list, result, grads]):
+  with tf.name_scope(name or 'maybe_call_fn_and_grads'):
     fn_arg_list = (list(fn_arg_list) if is_list_like(fn_arg_list)
                    else [fn_arg_list])
     result, grads = _value_and_gradients(fn, fn_arg_list, result, grads)
-    if not all(r.dtype.is_floating
+    if not all(dtype_util.is_floating(r.dtype)
                for r in (result if is_list_like(result) else [result])):  # pylint: disable=superfluous-parens
       raise TypeError('Function result must be a `Tensor` with `float` '
                       '`dtype`.')
@@ -271,8 +330,7 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   Returns:
     result: `Tensor` representing applying `body_fn` iteratively `n` times.
   """
-  with tf1.name_scope(name, 'smart_for_loop',
-                               [loop_num_iter, initial_loop_vars]):
+  with tf.name_scope(name or 'smart_for_loop'):
     loop_num_iter_ = tf.get_static_value(loop_num_iter)
     if (loop_num_iter_ is None or tf.executing_eagerly() or
         control_flow_util.GraphOrParentsInXlaContext(
@@ -296,6 +354,8 @@ def trace_scan(loop_fn,
                initial_state,
                elems,
                trace_fn,
+               trace_criterion_fn=None,
+               static_trace_allocation_size=None,
                parallel_iterations=10,
                name=None):
   """A simplified version of `tf.scan` that has configurable tracing.
@@ -318,6 +378,17 @@ def trace_scan(loop_fn,
       of which is passed to `loop_fn`.
     trace_fn: A callable that takes in the return value of `loop_fn` and returns
       a `Tensor` or a nested collection of `Tensor`s.
+    trace_criterion_fn: Optional callable that takes in the return value of
+      `loop_fn` and returns a boolean `Tensor` indicating whether to trace it.
+      If `None`, all steps are traced.
+      Default value: `None`.
+    static_trace_allocation_size: Optional Python `int` size of trace to
+      allocate statically. This should be an upper bound on the number of steps
+      traced and is used only when the length cannot be
+      statically inferred (for example, if a `trace_criterion_fn` is specified).
+      It is primarily intended for contexts where static shapes are required,
+      such as in XLA-compiled code.
+      Default value: `None`.
     parallel_iterations: Passed to the internal `tf.while_loop`.
     name: Name scope used in this function. Default: 'trace_scan'.
 
@@ -327,23 +398,17 @@ def trace_scan(loop_fn,
       `Tensor` being a stack of the corresponding `Tensors` in the return value
       of `trace_fn` for each slice of `elems`.
   """
-  with tf1.name_scope(
-      name, 'trace_scan', [initial_state, elems]), tf1.variable_scope(
-          tf1.get_variable_scope()) as vs:
+  with tf.name_scope(name or 'trace_scan'), tf1.variable_scope(
+      tf1.get_variable_scope()) as vs:
     if vs.caching_device is None and not tf.executing_eagerly():
       vs.set_caching_device(lambda op: op.device)
 
     initial_state = tf.nest.map_structure(
-        lambda x: tf.convert_to_tensor(value=x, name='initial_state'),
+        lambda x: tf.convert_to_tensor(x, name='initial_state'),
         initial_state)
-    elems = tf.convert_to_tensor(value=elems, name='elems')
+    elems = tf.convert_to_tensor(elems, name='elems')
 
-    static_length = elems.shape[0]
-    if tf.compat.dimension_value(static_length) is None:
-      length = tf.shape(input=elems)[0]
-    else:
-      length = tf.convert_to_tensor(
-          value=static_length, dtype=tf.int32, name='length')
+    length = prefer_static.size0(elems)
 
     # This is an TensorArray in part because of XLA, which had trouble with
     # non-statically known indices. I.e. elems[i] errored, but
@@ -352,29 +417,50 @@ def trace_scan(loop_fn,
         elems.dtype, size=length, element_shape=elems.shape[1:])
     elems_array = elems_array.unstack(elems)
 
+    # Initialize trace arrays.
+    dynamic_size, initial_size = True, 0
+    if trace_criterion_fn is None:
+      dynamic_size, initial_size = tf.is_tensor(length), length
+    elif static_trace_allocation_size:
+      dynamic_size, initial_size = False, static_trace_allocation_size
     trace_arrays = tf.nest.map_structure(
-        lambda x: tf.TensorArray(x.dtype, size=length, element_shape=x.shape),
+        lambda x: tf.TensorArray(x.dtype,  # pylint: disable=g-long-lambda
+                                 size=initial_size,
+                                 dynamic_size=dynamic_size,
+                                 element_shape=x.shape),
         trace_fn(initial_state))
 
-    def _body(i, state, trace_arrays):
-      state = loop_fn(state, elems_array.read(i))
-      trace_arrays = tf.nest.pack_sequence_as(trace_arrays, [
-          a.write(i, v) for a, v in zip(
-              tf.nest.flatten(trace_arrays), tf.nest.flatten(trace_fn(state)))
-      ])
-      return i + 1, state, trace_arrays
+    # Helper for writing a (structured) state to (structured) arrays.
+    def trace_one_step(num_steps_traced, trace_arrays, state):
+      return tf.nest.map_structure(
+          lambda ta, x: ta.write(num_steps_traced, x),
+          trace_arrays,
+          trace_fn(state))
 
-    _, final_state, trace_arrays = tf.while_loop(
-        cond=lambda i, *args: i < length,
+    def _body(i, state, num_steps_traced, trace_arrays):
+      elem = elems_array.read(i)
+      state = loop_fn(state, elem)
+
+      trace_arrays, num_steps_traced = prefer_static.cond(
+          trace_criterion_fn(state) if trace_criterion_fn else True,
+          lambda: (trace_one_step(num_steps_traced, trace_arrays, state),  # pylint: disable=g-long-lambda
+                   num_steps_traced + 1),
+          lambda: (trace_arrays, num_steps_traced))
+
+      return i + 1, state, num_steps_traced, trace_arrays
+
+    _, final_state, _, trace_arrays = tf.while_loop(
+        cond=lambda i, *_: i < length,
         body=_body,
-        loop_vars=(0, initial_state, trace_arrays),
+        loop_vars=(0, initial_state, 0, trace_arrays),
         parallel_iterations=parallel_iterations)
 
     stacked_trace = tf.nest.map_structure(lambda x: x.stack(), trace_arrays)
 
     # Restore the static length if we know it.
+    static_length = tf.TensorShape(None if dynamic_size else initial_size)
     def _merge_static_length(x):
-      x.set_shape(tf.TensorShape(static_length).concatenate(x.shape[1:]))
+      tensorshape_util.set_shape(x, static_length.concatenate(x.shape[1:]))
       return x
 
     stacked_trace = tf.nest.map_structure(_merge_static_length, stacked_trace)
@@ -493,3 +579,139 @@ def warn_if_parameters_are_not_simple_tensors(params_dict):
           '`store_parameters_in_results` details and use '
           '`store_parameters_in_results=True` to silence this warning.'.format(
               param_name))
+
+
+def index_remapping_gather(params,
+                           indices,
+                           axis=0,
+                           indices_axis=0,
+                           name='index_remapping_gather'):
+  """Gather values from `axis` of `params` using `indices_axis` of `indices`.
+
+  The shape of `indices` must broadcast to that of `params` when
+  their `indices_axis` and `axis` (respectively) are aligned:
+
+  ```python
+  # params.shape:
+  [p[0],  ..., ...,         p[axis], ..., ..., p[rank(params)] - 1])
+  # indices.shape:
+        [i[0], ..., i[indices_axis], ..., i[rank(indices)] - 1])
+  ```
+
+  In particular, `params` must have at least as many
+  leading dimensions as `indices` (`axis >= indices_axis`), and at least as many
+  trailing dimensions (`rank(params) - axis >= rank(indices) - indices_axis`).
+
+  The `result` has the same shape as `params`, except that the dimension
+  of size `p[axis]` is replaced by one of size `i[indices_axis]`:
+
+  ```python
+  # result.shape:
+  [p[0],  ..., ..., i[indices_axis], ..., ..., p[rank(params) - 1]]
+  ```
+
+  In the case where `rank(params) == 5`, `rank(indices) == 3`, `axis = 2`, and
+  `indices_axis = 1`, the result is given by
+
+   ```python
+   # alignment is:                       v axis
+   # params.shape    ==   [p[0], p[1], p[2], p[3], p[4]]
+   # indices.shape   ==         [i[0], i[1], i[2]]
+   #                                     ^ indices_axis
+   result[i, j, k, l, m] = params[i, j, indices[j, k, l], l, m]
+  ```
+
+  Args:
+    params:  `N-D` `Tensor` (`N > 0`) from which to gather values.
+      Number of dimensions must be known statically.
+    indices: `Tensor` with values in `{0, ..., params.shape[axis] - 1}`, whose
+      shape broadcasts to that of `params` as described above.
+    axis: Python `int` axis of `params` from which to gather.
+    indices_axis: Python `int` axis of `indices` to align with the `axis`
+      over which `params` is gathered.
+    name: String name for scoping created ops.
+
+  Returns:
+    `Tensor` composed of elements of `params`.
+
+  Raises:
+    ValueError: If shape/rank requirements are not met.
+  """
+  with tf.name_scope(name):
+    params = tf.convert_to_tensor(params, name='params')
+    indices = tf.convert_to_tensor(indices, name='indices')
+
+    params_ndims = tensorshape_util.rank(params.shape)
+    indices_ndims = tensorshape_util.rank(indices.shape)
+    # `axis` dtype must match ndims, which are 64-bit Python ints.
+    axis = tf.get_static_value(tf.convert_to_tensor(axis, dtype=tf.int64))
+    indices_axis = tf.get_static_value(
+        tf.convert_to_tensor(indices_axis, dtype=tf.int64))
+
+    if params_ndims is None:
+      raise ValueError(
+          'Rank of `params`, must be known statically. This is due to '
+          'tf.gather not accepting a `Tensor` for `batch_dims`.')
+
+    if axis is None:
+      raise ValueError(
+          '`axis` must be known statically. This is due to '
+          'tf.gather not accepting a `Tensor` for `batch_dims`.')
+
+    if indices_axis is None:
+      raise ValueError(
+          '`indices_axis` must be known statically. This is due to '
+          'tf.gather not accepting a `Tensor` for `batch_dims`.')
+
+    if indices_axis > axis:
+      raise ValueError(
+          '`indices_axis` should be <= `axis`, but was {} > {}'.format(
+              indices_axis, axis))
+
+    if params_ndims < 1:
+      raise ValueError(
+          'Rank of params should be `> 0`, but was {}'.format(params_ndims))
+
+    if indices_ndims is not None and indices_ndims < 1:
+      raise ValueError(
+          'Rank of indices should be `> 0`, but was {}'.format(indices_ndims))
+
+    if (indices_ndims is not None and
+        (indices_ndims - indices_axis > params_ndims - axis)):
+      raise ValueError(
+          '`rank(params) - axis` ({} - {}) must be >= `rank(indices) - '
+          'indices_axis` ({} - {}), but was not.'.format(
+              params_ndims, axis, indices_ndims, indices_axis))
+
+    # `tf.gather` requires the axis to be the rightmost batch ndim. So, we
+    # transpose `indices_axis` to be the rightmost dimension of `indices`...
+    transposed_indices = dist_util.move_dimension(indices,
+                                                  source_idx=indices_axis,
+                                                  dest_idx=-1)
+
+    # ... and `axis` to be the corresponding (aligned as in the docstring)
+    # dimension of `params`.
+    broadcast_indices_ndims = indices_ndims + (axis - indices_axis)
+    transposed_params = dist_util.move_dimension(
+        params,
+        source_idx=axis,
+        dest_idx=broadcast_indices_ndims - 1)
+
+    # Next we broadcast `indices` so that its shape has the same prefix as
+    # `params.shape`.
+    transposed_params_shape = prefer_static.shape(transposed_params)
+    result_shape = prefer_static.concat([
+        transposed_params_shape[:broadcast_indices_ndims - 1],
+        prefer_static.shape(indices)[indices_axis:indices_axis + 1],
+        transposed_params_shape[broadcast_indices_ndims:]], axis=0)
+    broadcast_indices = prefer_static.broadcast_to(
+        transposed_indices,
+        result_shape[:broadcast_indices_ndims])
+
+    result_t = tf.gather(transposed_params,
+                         broadcast_indices,
+                         batch_dims=broadcast_indices_ndims - 1,
+                         axis=broadcast_indices_ndims - 1)
+    return dist_util.move_dimension(result_t,
+                                    source_idx=broadcast_indices_ndims - 1,
+                                    dest_idx=axis)

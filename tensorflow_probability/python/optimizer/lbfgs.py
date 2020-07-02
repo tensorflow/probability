@@ -30,7 +30,6 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
@@ -80,6 +79,7 @@ LBfgsOptimizerResults = collections.namedtuple(
 
 def minimize(value_and_gradients_function,
              initial_position,
+             previous_optimizer_results=None,
              num_correction_pairs=10,
              tolerance=1e-8,
              x_tolerance=0,
@@ -88,6 +88,7 @@ def minimize(value_and_gradients_function,
              max_iterations=50,
              parallel_iterations=1,
              stopping_condition=None,
+             max_line_search_iterations=50,
              name=None):
   """Applies the L-BFGS algorithm to minimize a differentiable function.
 
@@ -106,21 +107,22 @@ def minimize(value_and_gradients_function,
     scales = np.arange(ndims, dtype='float64') + 1.0
 
     # The objective function and the gradient.
-    def quadratic(x):
-      value = tf.reduce_sum(scales * (x - minimum) ** 2)
-      return value, tf.gradients(value, x)[0]
-
+    def quadratic_loss_and_gradient(x):
+      return tfp.math.value_and_gradient(
+          lambda x: tf.reduce_sum(
+              scales * tf.math.squared_difference(x, minimum), axis=-1),
+          x)
     start = np.arange(ndims, 0, -1, dtype='float64')
     optim_results = tfp.optimizer.lbfgs_minimize(
-        quadratic, initial_position=start, num_correction_pairs=10,
+        quadratic_loss_and_gradient,
+        initial_position=start,
+        num_correction_pairs=10,
         tolerance=1e-8)
 
-    with tf.Session() as session:
-      results = session.run(optim_results)
-      # Check that the search converged
-      assert(results.converged)
-      # Check that the argmin is close to the actual value.
-      np.testing.assert_allclose(results.position, minimum)
+    # Check that the search converged
+    assert(optim_results.converged)
+    # Check that the argmin is close to the actual value.
+    np.testing.assert_allclose(optim_results.position, minimum)
   ```
 
   ### References:
@@ -142,6 +144,13 @@ def minimize(value_and_gradients_function,
     initial_position: Real `Tensor` of shape `[..., n]`. The starting point, or
       points when using batching dimensions, of the search procedure. At these
       points the function value and the gradient norm should be finite.
+      Exactly one of `initial_position` and `previous_optimizer_results` can be
+      non-None.
+    previous_optimizer_results: An `LBfgsOptimizerResults` namedtuple to
+      intialize the optimizer state from, instead of an `initial_position`.
+      This can be passed in from a previous return value to resume optimization
+      with a different `stopping_condition`. Exactly one of `initial_position`
+      and `previous_optimizer_results` can be non-None.
     num_correction_pairs: Positive integer. Specifies the maximum number of
       (position_delta, gradient_delta) correction pairs to keep as implicit
       approximation of the Hessian matrix.
@@ -167,6 +176,8 @@ def minimize(value_and_gradients_function,
       which only stops when all batch members have either converged or failed.
       An alternative is tfp.optimizer.converged_any which stops as soon as one
       batch member has converged, or when all have failed.
+    max_line_search_iterations: Python int. The maximum number of iterations
+      for the `hager_zhang` line search algorithm.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'minimize' is used.
 
@@ -205,18 +216,27 @@ def minimize(value_and_gradients_function,
   if stopping_condition is None:
     stopping_condition = bfgs_utils.converged_all
 
-  with tf1.name_scope(name, 'minimize', [initial_position, tolerance]):
-    initial_position = tf.convert_to_tensor(
-        value=initial_position, name='initial_position')
-    dtype = initial_position.dtype.base_dtype
+  with tf.name_scope(name or 'minimize'):
+    if (initial_position is None) == (previous_optimizer_results is None):
+      raise ValueError(
+          'Exactly one of `initial_position` or '
+          '`previous_optimizer_results` may be specified.')
+
+    if initial_position is not None:
+      initial_position = tf.convert_to_tensor(
+          initial_position, name='initial_position')
+      dtype = initial_position.dtype.base_dtype
+
+    if previous_optimizer_results is not None:
+      dtype = previous_optimizer_results.position.dtype.base_dtype
+
     tolerance = tf.convert_to_tensor(
-        value=tolerance, dtype=dtype, name='grad_tolerance')
+        tolerance, dtype=dtype, name='grad_tolerance')
     f_relative_tolerance = tf.convert_to_tensor(
-        value=f_relative_tolerance, dtype=dtype, name='f_relative_tolerance')
+        f_relative_tolerance, dtype=dtype, name='f_relative_tolerance')
     x_tolerance = tf.convert_to_tensor(
-        value=x_tolerance, dtype=dtype, name='x_tolerance')
-    max_iterations = tf.convert_to_tensor(
-        value=max_iterations, name='max_iterations')
+        x_tolerance, dtype=dtype, name='x_tolerance')
+    max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
 
     # The `state` here is a `LBfgsOptimizerResults` tuple with values for the
     # current state of the algorithm computation.
@@ -236,7 +256,8 @@ def minimize(value_and_gradients_function,
       next_state = bfgs_utils.line_search_step(
           current_state,
           value_and_gradients_function, search_direction,
-          tolerance, f_relative_tolerance, x_tolerance, stopping_condition)
+          tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
+          max_line_search_iterations)
 
       # If not failed or converged, update the Hessian estimate.
       should_update = ~(next_state.converged | next_state.failed)
@@ -250,10 +271,15 @@ def minimize(value_and_gradients_function,
               next_state.objective_gradient - current_state.objective_gradient))
       return [state_after_inv_hessian_update]
 
-    initial_state = _get_initial_state(value_and_gradients_function,
-                                       initial_position,
-                                       num_correction_pairs,
-                                       tolerance)
+    if previous_optimizer_results is None:
+      assert initial_position is not None
+      initial_state = _get_initial_state(value_and_gradients_function,
+                                         initial_position,
+                                         num_correction_pairs,
+                                         tolerance)
+    else:
+      initial_state = previous_optimizer_results
+
     return tf.while_loop(
         cond=_cond,
         body=_body,
@@ -325,14 +351,14 @@ def _get_search_direction(state):
 
     # Pre-compute all `inv_rho[i]`s.
     inv_rhos = tf.reduce_sum(
-        input_tensor=gradient_deltas * position_deltas, axis=-1)
+        gradient_deltas * position_deltas, axis=-1)
 
     def first_loop(acc, args):
       _, q_direction = acc
       position_delta, gradient_delta, inv_rho = args
       alpha = tf.reduce_sum(
-          input_tensor=position_delta * q_direction, axis=-1) / inv_rho
-      direction_delta = tf.expand_dims(alpha, axis=-1) * gradient_delta
+          position_delta * q_direction, axis=-1) / inv_rho
+      direction_delta = alpha[..., tf.newaxis] * gradient_delta
       return (alpha, q_direction - direction_delta)
 
     # Run first loop body computing and collecting `alpha[i]`s, while also
@@ -345,14 +371,14 @@ def _get_search_direction(state):
     # We use `H^0_k = gamma_k * I` as an estimate for the initial inverse
     # hessian for the k-th iteration; then `r_direction = H^0_k * q_direction`.
     gamma_k = inv_rhos[-1] / tf.reduce_sum(
-        input_tensor=gradient_deltas[-1] * gradient_deltas[-1], axis=-1)
-    r_direction = tf.expand_dims(gamma_k, axis=-1) * q_directions[0]
+        gradient_deltas[-1] * gradient_deltas[-1], axis=-1)
+    r_direction = gamma_k[..., tf.newaxis] * q_directions[0]
 
     def second_loop(r_direction, args):
       alpha, position_delta, gradient_delta, inv_rho = args
       beta = tf.reduce_sum(
-          input_tensor=gradient_delta * r_direction, axis=-1) / inv_rho
-      direction_delta = tf.expand_dims(alpha - beta, axis=-1) * position_delta
+          gradient_delta * r_direction, axis=-1) / inv_rho
+      direction_delta = (alpha - beta)[..., tf.newaxis] * position_delta
       return r_direction + direction_delta
 
     # Finally, run second loop body computing the updated `r_direction` at each
@@ -461,7 +487,5 @@ def _queue_push(queue, should_update, new_vecs):
     A new `tf.Tensor` of shape `[k, ..., n]`.
   """
   new_queue = tf.concat([queue[1:], [new_vecs]], axis=0)
-  update_pattern = tf.broadcast_to(
-      should_update[tf.newaxis, ..., tf.newaxis],
-      distribution_util.prefer_static_shape(queue))
-  return tf1.where(update_pattern, new_queue, queue)
+  return tf.where(
+      should_update[tf.newaxis, ..., tf.newaxis], new_queue, queue)

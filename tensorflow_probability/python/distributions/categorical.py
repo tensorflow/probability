@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import six
 
 import tensorflow.compat.v2 as tf
 
@@ -28,9 +29,9 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
@@ -82,6 +83,7 @@ class Categorical(distribution.Distribution):
   #### Pitfalls
 
   The number of classes, `K`, must not exceed:
+
   - the largest integer representable by `self.dtype`, i.e.,
     `2**(mantissa_bits+1)` (IEEE 754),
   - the maximum `Tensor` index, i.e., `2**31-1`.
@@ -202,39 +204,19 @@ class Categorical(distribution.Distribution):
     return dict(logits=1, probs=1)
 
   @property
-  @deprecation.deprecated(
-      '2019-10-01', 'The `num_categories` property is deprecated.  Use '
-      '`tf.shape(self.probs if self.logits is None else self.logits)[-1]` '
-      'instead.')
-  # Note this function has graph side-effects which is why it must be
-  # deprecated.
-  def num_categories(self):
-    """Scalar `int32` tensor: the number of categories."""
-    with self._name_and_control_scope('num_categories'):
-      # Note: its safe to use `convert_to_tensor` because either
-      # `self._num_categories()` has no graph side-effects or already hit our
-      # assertions checks. Ideally we'd use tf.identity but cannot because of
-      # its failure to preserve static value; b/135200956.
-      return tf.convert_to_tensor(
-          self._num_categories(), dtype_hint=tf.int32, name='num_categories')
-
-  @property
   def logits(self):
     """Input argument `logits`."""
-    if self._logits is None:
-      return self._logits_deprecated_behavior()
     return self._logits
 
   @property
   def probs(self):
     """Input argument `probs`."""
-    if self._probs is None:
-      return self._probs_deprecated_behavior()
     return self._probs
 
   def _batch_shape_tensor(self, x=None):
     if x is None:
-      x = self._probs if self._logits is None else self._logits
+      x = tf.convert_to_tensor(
+          self._probs if self._logits is None else self._logits)
     return tf.shape(x)[:-1]
 
   def _batch_shape(self):
@@ -251,8 +233,13 @@ class Categorical(distribution.Distribution):
     logits = self._logits_parameter_no_checks()
     logits_2d = tf.reshape(logits, [-1, self._num_categories(logits)])
     sample_dtype = tf.int64 if dtype_util.size(self.dtype) > 4 else tf.int32
-    draws = tf.random.categorical(
-        logits_2d, n, dtype=sample_dtype, seed=seed)
+    # TODO(b/147874898): Remove workaround for seed-sensitive tests.
+    if seed is None or isinstance(seed, six.integer_types):
+      draws = tf.random.categorical(
+          logits_2d, n, dtype=sample_dtype, seed=seed)
+    else:
+      draws = samplers.categorical(
+          logits_2d, n, dtype=sample_dtype, seed=seed)
     draws = tf.cast(draws, self.dtype)
     return tf.reshape(
         tf.transpose(draws),
@@ -296,7 +283,7 @@ class Categorical(distribution.Distribution):
     logits = self.logits_parameter()
     if self.validate_args:
       k = distribution_util.embed_check_integer_casting_closed(
-          k, target_dtype=tf.int32)
+          k, target_dtype=self.dtype)
     k, logits = _broadcast_cat_event_and_params(
         k, logits, base_dtype=dtype_util.base_dtype(self.dtype))
     return -tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -361,27 +348,28 @@ class Categorical(distribution.Distribution):
       num_categories = tf.compat.dimension_value(x.shape[-1])
       if num_categories is not None:
         return num_categories
-      return tf.shape(x)[-1]
+      # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
+      # so we pre-emptively convert-to-tensor.
+      return tf.shape(tf.convert_to_tensor(x))[-1]
 
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `logits` property will return `None` when the distribution is '
-       'parameterized with `logits=None`. Use `logits_parameter()` instead.'),
-      warn_once=True)
-  def _logits_deprecated_behavior(self):
-    return self.logits_parameter()
-
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `probs` property will return `None` when the distribution is '
-       'parameterized with `probs=None`. Use `probs_parameter()` instead.'),
-      warn_once=True)
-  def _probs_deprecated_behavior(self):
-    return self.probs_parameter()
+  def _default_event_space_bijector(self):
+    return
 
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_categorical_param_correctness(
         is_init, self.validate_args, self._probs, self._logits)
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(
+        assert_util.assert_less_equal(
+            x, tf.cast(self._num_categories(), x.dtype),
+            message=('Categorical samples must be between `0` and `n-1` '
+                     'where `n` is the number of categories.')))
+    return assertions
 
 
 def maybe_assert_categorical_param_correctness(

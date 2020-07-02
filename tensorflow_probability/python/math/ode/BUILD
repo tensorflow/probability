@@ -34,6 +34,7 @@ py_library(
     deps = [
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -47,6 +48,20 @@ py_library(
         ":util",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
+py_library(
+    name = "dormand_prince",
+    srcs = ["dormand_prince.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":base",
+        ":runge_kutta_util",
+        ":util",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
     ],
 )
 
@@ -60,6 +75,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "bdf_util_test",
     size = "small",
@@ -70,7 +86,32 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "runge_kutta_util",
+    srcs = ["runge_kutta_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "runge_kutta_util_test",
+    size = "small",
+    srcs = ["runge_kutta_util_test.py"],
+    deps = [
+        ":runge_kutta_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -81,19 +122,63 @@ py_library(
     deps = [
         ":base",
         ":bdf",
+        ":dormand_prince",
     ],
 )
 
+# py2and3
 py_test(
     name = "ode_test",
     size = "large",
     srcs = ["ode_test.py"],
+    shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "xla_test_cpu",
+    srcs = ["xla_test.py"],
+    args = ["--test_device=cpu"],
+    main = "xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+# py2and3
+py_test(
+    name = "xla_test_gpu",
+    srcs = ["xla_test.py"],
+    args = ["--test_device=gpu"],
+    main = "xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -102,10 +187,12 @@ py_library(
     srcs = ["util.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
 
+# py2and3
 py_test(
     name = "util_test",
     size = "small",
@@ -115,6 +202,6 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

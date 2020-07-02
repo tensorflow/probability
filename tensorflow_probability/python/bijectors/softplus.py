@@ -33,6 +33,31 @@ __all__ = [
 ]
 
 
+JAX_MODE = False  # Overwritten by rewrite script.
+
+
+# TODO(b/155501444): Remove this when tf.nn.softplus is fixed.
+if JAX_MODE:
+  _stable_grad_softplus = tf.nn.softplus
+else:
+
+  @tf.custom_gradient
+  def _stable_grad_softplus(x):
+    """A (more) numerically stable softplus than `tf.nn.softplus`."""
+    x = tf.convert_to_tensor(x)
+    if x.dtype == tf.float64:
+      cutoff = -20
+    else:
+      cutoff = -9
+
+    y = tf.where(x < cutoff, tf.math.log1p(tf.exp(x)), tf.nn.softplus(x))
+
+    def grad_fn(dy):
+      return dy * tf.where(x < cutoff, tf.exp(x), tf.nn.sigmoid(x))
+
+    return y, grad_fn
+
+
 class Softplus(bijector.Bijector):
   """Bijector which computes `Y = g(X) = Log[1 + exp(X)]`.
 
@@ -85,19 +110,25 @@ class Softplus(bijector.Bijector):
                hinge_softness=None,
                validate_args=False,
                name='softplus'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._hinge_softness = tensor_util.convert_nonref_to_tensor(
           hinge_softness, name='hinge_softness')
       super(Softplus, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     if self.hinge_softness is None:
-      return tf.math.softplus(x)
+      return _stable_grad_softplus(x)
     hinge_softness = tf.cast(self.hinge_softness, x.dtype)
-    return hinge_softness * tf.math.softplus(x / hinge_softness)
+    return hinge_softness * _stable_grad_softplus(x / hinge_softness)
 
   def _inverse(self, y):
     if self.hinge_softness is None:

@@ -25,15 +25,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
 class _ProximalHessianTest(object):
 
   def _make_placeholder(self, x):
     return tf1.placeholder_with_default(
-        input=x, shape=(x.shape if self.use_static_shape else None))
+        x, shape=(x.shape if self.use_static_shape else None))
 
   def _adjust_dtype_and_shape_hints(self, x):
     x_ = tf.cast(x, self.dtype)
@@ -94,7 +93,8 @@ class _ProximalHessianTest(object):
           indices=[
               b + (i, i) for i in range(n) for b in np.ndindex(*batch_shape)
           ],
-          values=tf.ones(shape=[np.product(batch_shape) * n], dtype=self.dtype),
+          values=tf.ones(
+              shape=[np.prod(batch_shape, dtype=int) * n], dtype=self.dtype),
           dense_shape=batch_shape + [n, n])
 
       hessian_middle_per_batch = 2 * tf.concat(
@@ -212,29 +212,29 @@ class _ProximalHessianTest(object):
     self.assertAllClose(w_, expected_w, atol=0., rtol=0.03)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestStaticShapeFloat32(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class ProximalHessianTestStaticShapeFloat32(test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestDynamicShapeFloat32(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class ProximalHessianTestDynamicShapeFloat32(test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestStaticShapeFloat64(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class ProximalHessianTestStaticShapeFloat64(test_util.TestCase,
                                             _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class ProximalHessianTestDynamicShapeFloat64(test_case.TestCase,
+@test_util.test_all_tf_execution_regimes
+class ProximalHessianTestDynamicShapeFloat64(test_util.TestCase,
                                              _ProximalHessianTest):
   dtype = tf.float64
   use_static_shape = False

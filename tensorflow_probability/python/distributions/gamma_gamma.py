@@ -23,13 +23,15 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -181,20 +183,20 @@ class GammaGamma(distribution.Distribution):
     concentration = tf.convert_to_tensor(self.concentration)
     mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
     mixing_rate = tf.convert_to_tensor(self.mixing_rate)
-    seed = SeedStream(seed, 'gamma_gamma')
-    rate = tf.random.gamma(
+    seed_rate, seed_samples = samplers.split_seed(seed, salt='gamma_gamma')
+    rate = samplers.gamma(
         shape=[n],
         # Be sure to draw enough rates for the fully-broadcasted gamma-gamma.
         alpha=mixing_concentration + tf.zeros_like(concentration),
         beta=mixing_rate,
         dtype=self.dtype,
-        seed=seed())
-    return tf.random.gamma(
+        seed=seed_rate)
+    return samplers.gamma(
         shape=[],
         alpha=concentration,
         beta=rate,
         dtype=self.dtype,
-        seed=seed())
+        seed=seed_samples)
 
   def _log_prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -202,12 +204,9 @@ class GammaGamma(distribution.Distribution):
     mixing_rate = tf.convert_to_tensor(self.mixing_rate)
 
     log_normalization = (
-        tf.math.lgamma(concentration) +
-        tf.math.lgamma(mixing_concentration) -
-        tf.math.lgamma(concentration + mixing_concentration) -
+        tfp_math.lbeta(concentration, mixing_concentration) -
         mixing_concentration * tf.math.log(mixing_rate))
 
-    x = self._maybe_assert_valid_sample(x)
     log_unnormalized_prob = (tf.math.xlogy(concentration - 1., x) -
                              (concentration + mixing_concentration) *
                              tf.math.log(x + mixing_rate))
@@ -266,13 +265,17 @@ class GammaGamma(distribution.Distribution):
               message='variance undefined when `mixing_concentration` <= 2')]):
         return tf.identity(variance)
 
-  def _maybe_assert_valid_sample(self, x):
+  def _default_event_space_bijector(self):
+    return exp_bijector.Exp(validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
     dtype_util.assert_same_float_dtype(tensors=[x], dtype=self.dtype)
+    assertions = []
     if not self.validate_args:
-      return x
-    with tf.control_dependencies([
-        assert_util.assert_positive(x)]):
-      return tf.identity(x)
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

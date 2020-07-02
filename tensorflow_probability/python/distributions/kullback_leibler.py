@@ -106,7 +106,7 @@ def kl_divergence(distribution_a, distribution_b,
     kl_t = tf.identity(kl_t, name="kl")
 
     with tf.control_dependencies([
-        tf.Assert(
+        tf.debugging.Assert(
             tf.logical_not(tf.reduce_any(tf.math.is_nan(kl_t))),
             [("KL calculation between {} and {} returned NaN values "
               "(and was called with allow_nan_stats=False). Values:".format(

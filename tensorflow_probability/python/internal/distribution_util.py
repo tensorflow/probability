@@ -27,7 +27,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -80,203 +79,6 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
   sq_mean_wa = tf.reshape(sq_mean_wa, (-1,))
   mixture_variance = var_wa + sq_mean_wa - tf.square(mean_wa)
   return tf.sqrt(mixture_variance)
-
-
-def make_tril_scale(loc=None,
-                    scale_tril=None,
-                    scale_diag=None,
-                    scale_identity_multiplier=None,
-                    shape_hint=None,
-                    validate_args=False,
-                    assert_positive=False,
-                    name=None):
-  """Creates a LinearOperator representing a lower triangular matrix.
-
-  Args:
-    loc: Floating-point `Tensor`. This is used for inferring shape in the case
-      where only `scale_identity_multiplier` is set.
-    scale_tril: Floating-point `Tensor` representing the diagonal matrix.
-      `scale_diag` has shape [N1, N2, ...  k, k], which represents a k x k lower
-      triangular matrix. When `None` no `scale_tril` term is added to the
-      LinearOperator. The upper triangular elements above the diagonal are
-      ignored.
-    scale_diag: Floating-point `Tensor` representing the diagonal matrix.
-      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
-      matrix. When `None` no diagonal term is added to the LinearOperator.
-    scale_identity_multiplier: floating point rank 0 `Tensor` representing a
-      scaling done to the identity matrix. When `scale_identity_multiplier =
-      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
-      no scaled-identity-matrix is added to `scale`.
-    shape_hint: scalar integer `Tensor` representing a hint at the dimension of
-      the identity matrix when only `scale_identity_multiplier` is set.
-    validate_args: Python `bool` indicating whether arguments should be checked
-      for correctness.
-    assert_positive: Python `bool` indicating whether LinearOperator should be
-      checked for being positive definite.
-    name: Python `str` name given to ops managed by this object.
-
-  Returns:
-    `LinearOperator` representing a lower triangular matrix.
-
-  Raises:
-    ValueError:  If only `scale_identity_multiplier` is set and `loc` and
-      `shape_hint` are both None.
-  """
-
-  def _maybe_attach_assertion(x):
-    if not validate_args:
-      return x
-    if assert_positive:
-      return with_dependencies([
-          assert_util.assert_positive(
-              tf.linalg.diag_part(x), message='diagonal part must be positive'),
-      ], x)
-    return with_dependencies([
-        assert_util.assert_none_equal(
-            tf.linalg.diag_part(x),
-            tf.zeros([], x.dtype),
-            message='diagonal part must be non-zero'),
-    ], x)
-
-  with tf.name_scope(name or 'make_tril_scale'):
-
-    dtype = dtype_util.common_dtype(
-        [loc, scale_tril, scale_diag, scale_identity_multiplier],
-        dtype_hint=tf.float32)
-    loc = _convert_to_tensor(loc, name='loc', dtype=dtype)
-    scale_tril = _convert_to_tensor(scale_tril, name='scale_tril', dtype=dtype)
-    scale_diag = _convert_to_tensor(scale_diag, name='scale_diag', dtype=dtype)
-    scale_identity_multiplier = _convert_to_tensor(
-        scale_identity_multiplier,
-        name='scale_identity_multiplier',
-        dtype=dtype)
-
-  if scale_tril is not None:
-    scale_tril = tf.linalg.band_part(scale_tril, -1, 0)  # Zero out TriU.
-    tril_diag = tf.linalg.diag_part(scale_tril)
-    if scale_diag is not None:
-      tril_diag = tril_diag + scale_diag
-    if scale_identity_multiplier is not None:
-      tril_diag = tril_diag + scale_identity_multiplier[..., tf.newaxis]
-
-    scale_tril = tf.linalg.set_diag(scale_tril, tril_diag)
-
-    return tf.linalg.LinearOperatorLowerTriangular(
-        tril=_maybe_attach_assertion(scale_tril),
-        is_non_singular=True,
-        is_self_adjoint=False,
-        is_positive_definite=assert_positive)
-
-  return make_diag_scale(
-      loc=loc,
-      scale_diag=scale_diag,
-      scale_identity_multiplier=scale_identity_multiplier,
-      shape_hint=shape_hint,
-      validate_args=validate_args,
-      assert_positive=assert_positive,
-      name=name)
-
-
-def make_diag_scale(loc=None,
-                    scale_diag=None,
-                    scale_identity_multiplier=None,
-                    shape_hint=None,
-                    validate_args=False,
-                    assert_positive=False,
-                    name=None,
-                    dtype=None):
-  """Creates a LinearOperator representing a diagonal matrix.
-
-  Args:
-    loc: Floating-point `Tensor`. This is used for inferring shape in the case
-      where only `scale_identity_multiplier` is set.
-    scale_diag: Floating-point `Tensor` representing the diagonal matrix.
-      `scale_diag` has shape [N1, N2, ...  k], which represents a k x k diagonal
-      matrix. When `None` no diagonal term is added to the LinearOperator.
-    scale_identity_multiplier: floating point rank 0 `Tensor` representing a
-      scaling done to the identity matrix. When `scale_identity_multiplier =
-      scale_diag = scale_tril = None` then `scale += IdentityMatrix`. Otherwise
-      no scaled-identity-matrix is added to `scale`.
-    shape_hint: scalar integer `Tensor` representing a hint at the dimension of
-      the identity matrix when only `scale_identity_multiplier` is set.
-    validate_args: Python `bool` indicating whether arguments should be checked
-      for correctness.
-    assert_positive: Python `bool` indicating whether LinearOperator should be
-      checked for being positive definite.
-    name: Python `str` name given to ops managed by this object.
-    dtype: TF `DType` to prefer when converting args to `Tensor`s. Else, we fall
-      back to a compatible dtype across all of `loc`, `scale_diag`, and
-      `scale_identity_multiplier`.
-
-  Returns:
-    `LinearOperator` representing a lower triangular matrix.
-
-  Raises:
-    ValueError:  If only `scale_identity_multiplier` is set and `loc` and
-      `shape_hint` are both None.
-  """
-
-  def _maybe_attach_assertion(x):
-    if not validate_args:
-      return x
-    if assert_positive:
-      return with_dependencies([
-          assert_util.assert_positive(
-              x, message='diagonal part must be positive'),
-      ], x)
-    return with_dependencies([
-        assert_util.assert_none_equal(
-            x, tf.zeros([], x.dtype), message='diagonal part must be non-zero')
-    ], x)
-
-  with tf.name_scope(name or 'make_diag_scale'):
-    if dtype is None:
-      dtype = dtype_util.common_dtype(
-          [loc, scale_diag, scale_identity_multiplier],
-          dtype_hint=tf.float32)
-    loc = tensor_util.convert_nonref_to_tensor(loc, name='loc', dtype=dtype)
-    scale_diag = tensor_util.convert_nonref_to_tensor(
-        scale_diag, name='scale_diag', dtype=dtype)
-    scale_identity_multiplier = tensor_util.convert_nonref_to_tensor(
-        scale_identity_multiplier,
-        name='scale_identity_multiplier',
-        dtype=dtype)
-
-    if scale_diag is not None:
-      if scale_identity_multiplier is not None:
-        scale_diag = scale_diag + scale_identity_multiplier[..., tf.newaxis]
-      return tf.linalg.LinearOperatorDiag(
-          diag=_maybe_attach_assertion(scale_diag),
-          is_non_singular=True,
-          is_self_adjoint=True,
-          is_positive_definite=assert_positive)
-
-    if loc is None and shape_hint is None:
-      raise ValueError('Cannot infer `event_shape` unless `loc` or '
-                       '`shape_hint` is specified.')
-
-    num_rows = shape_hint
-    del shape_hint
-    if num_rows is None:
-      num_rows = tf.compat.dimension_value(loc.shape[-1])
-      if num_rows is None:
-        num_rows = tf.shape(loc)[-1]
-
-    if scale_identity_multiplier is None:
-      return tf.linalg.LinearOperatorIdentity(
-          num_rows=num_rows,
-          dtype=dtype,
-          is_self_adjoint=True,
-          is_positive_definite=True,
-          assert_proper_shapes=validate_args)
-
-    return tf.linalg.LinearOperatorScaledIdentity(
-        num_rows=num_rows,
-        multiplier=_maybe_attach_assertion(scale_identity_multiplier),
-        is_non_singular=True,
-        is_self_adjoint=True,
-        is_positive_definite=assert_positive,
-        assert_proper_shapes=validate_args)
 
 
 def shapes_from_loc_and_scale(loc, scale, name='shapes_from_loc_and_scale'):
@@ -611,7 +413,6 @@ def move_dimension(x, source_idx, dest_idx):
 
 
 def assert_integer_form(x,
-                        data=None,
                         summarize=None,
                         message=None,
                         int_dtype=None,
@@ -620,8 +421,6 @@ def assert_integer_form(x,
 
   Args:
     x: Floating-point `Tensor`
-    data: The tensors to print out if the condition is `False`. Defaults to
-      error message and first few entries of `x` and `y`.
     summarize: Print this many entries of each tensor.
     message: A string to prefix to the default message.
     int_dtype: A `tf.dtype` used to cast the float to. The default (`None`)
@@ -648,7 +447,6 @@ def assert_integer_form(x,
     return assert_util.assert_equal(
         x,
         tf.cast(tf.cast(x, int_dtype), x.dtype),
-        data=data,
         summarize=summarize,
         message=message,
         name=name)
@@ -658,6 +456,25 @@ def assert_symmetric(matrix):
   matrix_t = tf.linalg.matrix_transpose(matrix)
   return with_dependencies(
       [assert_util.assert_near(matrix, matrix_t)], matrix)
+
+
+def assert_nondecreasing(x, summarize=None, message=None, name=None):
+  """Assert (batched) elements in `x` are non decreasing."""
+
+  with tf.name_scope(name or 'assert_non_decreasing'):
+    if message is None:
+      message = '`Tensor` contained decreasing values.'
+    x = tf.convert_to_tensor(x)
+    x_ = tf.get_static_value(x)
+    if x_ is not None:
+      if not np.all(x_[..., :-1] <= x_[..., 1:]):
+        raise ValueError(message)
+      return x
+    return assert_util.assert_less_equal(
+        x[..., :-1],
+        x[..., 1:],
+        summarize=summarize,
+        message=message)
 
 
 def assert_nonnegative_integer_form(
@@ -741,96 +558,13 @@ def maybe_get_static_value(x, dtype=None):
   return np.array(x_, dtype)
 
 
-def get_logits_and_probs(logits=None,
-                         probs=None,
-                         multidimensional=False,
-                         validate_args=False,
-                         name='get_logits_and_probs',
-                         dtype=None):
-  """Converts logit to probabilities (or vice-versa), and returns both.
-
-  Args:
-    logits: Floating-point `Tensor` representing log-odds.
-    probs: Floating-point `Tensor` representing probabilities.
-    multidimensional: Python `bool`, default `False`. If `True`, represents
-      whether the last dimension of `logits` or `probs`, a `[N1, N2, ...  k]`
-      dimensional tensor, representing the logit or probability of `shape[-1]`
-      classes.
-    validate_args: Python `bool`, default `False`. When `True`, either assert `0
-      <= probs <= 1` (if not `multidimensional`) or that the last dimension of
-      `probs` sums to one.
-    name: A name for this operation (optional).
-    dtype: `tf.DType` to prefer when converting args to `Tensor`s.
-
-  Returns:
-    logits, probs: Tuple of `Tensor`s. If `probs` has an entry that is `0` or
-      `1`, then the corresponding entry in the returned logit will be `-Inf` and
-      `Inf` respectively.
-
-  Raises:
-    ValueError: if neither `probs` nor `logits` were passed in, or both were.
-  """
-  if dtype is None:
-    dtype = dtype_util.common_dtype([probs, logits], dtype_hint=tf.float32)
-  with tf.name_scope(name):
-    if (probs is None) == (logits is None):
-      raise ValueError('Must pass probs or logits, but not both.')
-
-    if probs is None:
-      logits = tf.convert_to_tensor(logits, name='logits', dtype=dtype)
-      if not dtype_util.is_floating(logits.dtype):
-        raise TypeError('logits must having floating type.')
-      # We can early return since we constructed probs and therefore know
-      # they're valid.
-      if multidimensional:
-        if validate_args:
-          logits = embed_check_categorical_event_shape(logits)
-        return logits, tf.nn.softmax(logits, name='probs')
-      return logits, tf.sigmoid(logits, name='probs')
-
-    probs = tf.convert_to_tensor(probs, name='probs', dtype=dtype)
-    if not dtype_util.is_floating(probs.dtype):
-      raise TypeError('probs must having floating type.')
-
-    if validate_args:
-      with tf.name_scope('validate_probs'):
-        one = tf.constant(1., probs.dtype)
-        dependencies = [assert_util.assert_non_negative(probs)]
-        if multidimensional:
-          probs = embed_check_categorical_event_shape(probs)
-          dependencies += [
-              assert_util.assert_near(
-                  tf.reduce_sum(probs, axis=-1),
-                  one,
-                  message='probs does not sum to 1.')
-          ]
-        else:
-          dependencies += [
-              assert_util.assert_less_equal(
-                  probs, one, message='probs has components greater than 1.')
-          ]
-        probs = with_dependencies(dependencies, probs)
-
-    with tf.name_scope('logits'):
-      if multidimensional:
-        # Here we don't compute the multidimensional case, in a manner
-        # consistent with respect to the unidimensional case. We do so
-        # following the TF convention. Typically, you might expect to see
-        # logits = log(probs) - log(probs[pivot]). A side-effect of
-        # being consistent with the TF approach is that the unidimensional case
-        # implicitly handles the second dimension but the multidimensional case
-        # explicitly keeps the pivot dimension.
-        return tf.math.log(probs), probs
-      return tf.math.log(probs) - tf.math.log1p(-1. * probs), probs
-
-
 def _is_known_unsigned_by_dtype(dt):
   """Helper returning True if dtype is known to be unsigned."""
   return {
       tf.bool: True,
       tf.uint8: True,
       tf.uint16: True,
-  }.get(dt.base_dtype, False)
+  }.get(dtype_util.base_dtype(dt), False)
 
 
 def _is_known_signed_by_dtype(dt):
@@ -843,7 +577,7 @@ def _is_known_signed_by_dtype(dt):
       tf.int16: True,
       tf.int32: True,
       tf.int64: True,
-  }.get(dt.base_dtype, False)
+  }.get(dtype_util.base_dtype(dt), False)
 
 
 def _is_known_dtype(dt):
@@ -854,21 +588,21 @@ def _is_known_dtype(dt):
 def _largest_integer_by_dtype(dt):
   """Helper returning the largest integer exactly representable by dtype."""
   if not _is_known_dtype(dt):
-    raise TypeError('Unrecognized dtype: {}'.format(dt.name))
-  if dt.is_floating:
-    return int(2**(np.finfo(dt.as_numpy_dtype).nmant + 1))
-  if dt.is_integer:
-    return np.iinfo(dt.as_numpy_dtype).max
-  if dt.base_dtype == tf.bool:
+    raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
+  if dtype_util.is_floating(dt):
+    return int(2**(np.finfo(dtype_util.as_numpy_dtype(dt)).nmant + 1))
+  if dtype_util.is_integer(dt):
+    return np.iinfo(dtype_util.as_numpy_dtype(dt)).max
+  if dtype_util.base_dtype(dt) == tf.bool:
     return int(1)
   # We actually can't land here but keep the case for completeness.
-  raise TypeError('Unrecognized dtype: {}'.format(dt.name))
+  raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
 
 
 def _smallest_integer_by_dtype(dt):
   """Helper returning the smallest integer exactly representable by dtype."""
   if not _is_known_dtype(dt):
-    raise TypeError('Unrecognized dtype: {}'.format(dt.name))
+    raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
   if _is_known_unsigned_by_dtype(dt):
     return 0
   return -1 * _largest_integer_by_dtype(dt)
@@ -877,8 +611,8 @@ def _smallest_integer_by_dtype(dt):
 def _is_integer_like_by_dtype(dt):
   """Helper returning True if dtype.is_integer or is `bool`."""
   if not _is_known_dtype(dt):
-    raise TypeError('Unrecognized dtype: {}'.format(dt.name))
-  return dt.is_integer or dt.base_dtype == tf.bool
+    raise TypeError('Unrecognized dtype: {}'.format(dtype_util.name(dt)))
+  return dtype_util.is_integer(dt) or dtype_util.base_dtype(dt) == tf.bool
 
 
 def assert_categorical_event_shape(
@@ -1141,7 +875,7 @@ def rotate_transpose(x, shift, name='rotate_transpose'):
   Example:
 
   ```python
-  x = tf.random_normal([1, 2, 3, 4])  # Tensor of shape [1, 2, 3, 4].
+  x = tf.random.normal([1, 2, 3, 4])  # Tensor of shape [1, 2, 3, 4].
   rotate_transpose(x, -1).shape == [2, 3, 4, 1]
   rotate_transpose(x, -2).shape == [3, 4, 1, 2]
   rotate_transpose(x,  1).shape == [4, 1, 2, 3]
@@ -1215,9 +949,13 @@ def pick_vector(cond, true_vector, false_vector, name='pick_vector'):
     true_vector: `Tensor` of one dimension. Returned when cond is `True`.
     false_vector: `Tensor` of one dimension. Returned when cond is `False`.
     name: Python `str`. The name to give this op.
-  Example:  ```python pick_vector(tf.less(0, 5), tf.range(10, 12), tf.range(15,
-    18))  # [10, 11] pick_vector(tf.less(5, 0), tf.range(10, 12), tf.range(15,
-    18))  # [15, 16, 17] ```
+
+  Example:
+
+  ```python
+  pick_vector(tf.less(0, 5), tf.range(10, 12), tf.range(15, 18))  # [10, 11]
+  pick_vector(tf.less(5, 0), tf.range(10, 12), tf.range(15, 18))  # [15, 16, 17]
+  ```
 
   Returns:
     true_or_false_vector: `Tensor`.

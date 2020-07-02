@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import collections
 
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import joint_distribution_sequential
 from tensorflow_probability.python.internal import distribution_util
 
@@ -51,8 +53,8 @@ class JointDistributionNamed(
   p(x) = prod{ p(x[i] | x[:i]) : i = 0, ..., (d - 1) }
   ```
 
-  The `JointDistributionNamed` is parameterized by a `dict` (or `namedtuple`)
-  composed of either:
+  The `JointDistributionNamed` is parameterized by a `dict` (or `namedtuple` or
+  `collections.OrderedDict`) composed of either:
 
   1. `tfp.distributions.Distribution`-like instances or,
   2. `callable`s which return a `tfp.distributions.Distribution`-like instance.
@@ -63,6 +65,9 @@ class JointDistributionNamed(
   `Distribution`-like instance are allowed for convenience and semantically
   identical a zero argument `callable`. When the maker takes no arguments it is
   preferable to directly provide the distribution instance.
+
+  **Name resolution**: `The names of `JointDistributionNamed` components are
+  simply the keys specified explicitly in the model definition.
 
   #### Examples
 
@@ -91,12 +96,13 @@ class JointDistributionNamed(
   # necessary to use dummy arguments to skip dependencies.
 
   x = joint.sample()
-  # ==> A 5-element `dict` of tfd.Distribution instances.
+  # ==> A 5-element `dict` of Tensors representing a draw/realization from each
+  #     distribution.
   joint.log_prob(x)
   # ==> A scalar `Tensor` representing the total log prob under all five
   #     distributions.
 
-  joint._resolve_graph()
+  joint.resolve_graph()
   # ==> (('e', ()),
   #      ('g', ('e',)),
   #      ('n', ()),
@@ -157,8 +163,9 @@ class JointDistributionNamed(
     """Construct the `JointDistributionNamed` distribution.
 
     Args:
-      model: Python `dict` or `namedtuple` of distribution-making functions each
-        with required args corresponding only to other keys.
+      model: Python `dict`, `collections.OrderedDict`, or `namedtuple` of
+        distribution-making functions each with required args corresponding
+        only to other keys.
       validate_args: Python `bool`.  Whether to validate input with asserts.
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
@@ -182,8 +189,10 @@ class JointDistributionNamed(
     ] = _prob_chain_rule_model_flatten(model)
 
   def _model_unflatten(self, xs):
-    kwargs = dict(zip(self._dist_fn_name, tuple(xs)))
-    return type(self.model)(**kwargs)
+    kwargs_list = zip(self._dist_fn_name, tuple(xs))
+    if isinstance(self.model, collections.OrderedDict):
+      return collections.OrderedDict(kwargs_list)
+    return type(self.model)(**dict(kwargs_list))
 
   def _model_flatten(self, xs):
     if xs is None:
@@ -192,10 +201,8 @@ class JointDistributionNamed(
       return tuple(xs.get(n, None) for n in self._dist_fn_name)
     return tuple(getattr(xs, n) for n in self._dist_fn_name)
 
-  def _resolve_graph(self, distribution_names=None, leaf_name='x'):
-    return tuple(zip(self._dist_fn_name,
-                     [() if x is None else x
-                      for x in self._dist_fn_args]))
+  def _flat_resolve_names(self, distribution_names=None, leaf_name='x'):
+    return self._dist_fn_name
 
 
 class _Node(object):
@@ -222,6 +229,9 @@ def _depth(g):
 
 def _best_order(g):
   """Creates tuple of str tuple-str pairs representing resolved & sorted DAG."""
+  if isinstance(g, collections.OrderedDict):
+    return g.items()
+
   def _explore(u):
     """Recursive function to ascend up through unvisited dependencies."""
     if u.depth < 0:
@@ -254,9 +264,10 @@ def _prob_chain_rule_model_flatten(named_makers):
       return dist_fn(**kwargs)
     return _fn
   named_makers = _convert_to_dict(named_makers)
-  g = {k: None if distribution_util.is_distribution_instance(v)
-          else joint_distribution_sequential._get_required_args(v)  # pylint: disable=protected-access
-       for k, v in named_makers.items()}
+  g = tf.nest.map_structure(
+      lambda v: (None if distribution_util.is_distribution_instance(v)  # pylint: disable=g-long-lambda
+                 else joint_distribution_sequential._get_required_args(v)),  # pylint: disable=protected-access
+      named_makers)
   g = _best_order(g)
   dist_fn_name, dist_fn_args = zip(*g)
   dist_fn_args = tuple(None if a is None else tuple(a) for a in dist_fn_args)
@@ -273,6 +284,10 @@ def _is_dict_like(x):
 
 def _convert_to_dict(x):
   """Converts input to `dict`."""
+  if isinstance(x, collections.OrderedDict):
+    return x
   if hasattr(x, '_asdict'):
-    return x._asdict()
+    # Wrap with `OrderedDict` to indicate that namedtuples have a well-defined
+    # order (by default, they convert to just `dict` in Python 3.8+).
+    return collections.OrderedDict(x._asdict())
   return dict(x)

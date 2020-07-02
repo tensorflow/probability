@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import weakref
-
 # Dependency imports
 import mock
 import numpy as np
@@ -28,12 +26,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BaseBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BaseBijectorTest(test_util.TestCase):
   """Tests properties of the Bijector base-class."""
 
   def testIsAbstract(self):
@@ -163,8 +160,8 @@ class ConstantJacobian(tfb.Bijector):
     return tf.constant(-2., x.dtype)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorTestEventNdims(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorTestEventNdims(test_util.TestCase):
 
   def assertRaisesError(self, msg):
     return self.assertRaisesRegexp(Exception, msg)
@@ -196,8 +193,8 @@ class BijectorTestEventNdims(test_case.TestCase):
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorCachingTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorCachingTest(test_util.TestCase):
 
   def testCachingOfForwardResults(self):
     forward_only_bijector = ForwardOnlyBijector()
@@ -213,11 +210,7 @@ class BijectorCachingTest(test_case.TestCase):
     # Call forward and forward_log_det_jacobian one-by-one (not together).
     y = forward_only_bijector.forward(x)
     _ = forward_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
-    if tf.executing_eagerly():
-      self.assertIsNot(y, forward_only_bijector.forward(x))
-    else:
-      self.assertIs(y, forward_only_bijector.forward(x))
-
+    self.assertIs(y, forward_only_bijector.forward(x))
     # Now, everything should be cached if the argument `is y`, so these are ok.
     forward_only_bijector.inverse(y)
     forward_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
@@ -236,10 +229,7 @@ class BijectorCachingTest(test_case.TestCase):
     # Call inverse and inverse_log_det_jacobian one-by-one (not together).
     x = inverse_only_bijector.inverse(y)
     _ = inverse_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
-    if tf.executing_eagerly():
-      self.assertIsNot(x, inverse_only_bijector.inverse(y))
-    else:
-      self.assertIs(x, inverse_only_bijector.inverse(y))
+    self.assertIs(x, inverse_only_bijector.inverse(y))
 
     # Now, everything should be cached if the argument `is x`.
     inverse_only_bijector.forward(x)
@@ -247,19 +237,18 @@ class BijectorCachingTest(test_case.TestCase):
 
   def testCachingGarbageCollection(self):
     bijector = ForwardOnlyBijector()
-    refs = []
-    niters = 3
-    for _ in range(niters):
-      y = bijector.forward(tf.zeros([10]))
-      refs.append(weakref.ref(y))
+    niters = 6
+    for i in range(niters):
+      x = tf.constant(i, dtype=tf.float32)
+      y = bijector.forward(x)  # pylint: disable=unused-variable
 
     # We tolerate leaking tensor references in graph mode only.
     expected_live = 1 if tf.executing_eagerly() else niters
-    self.assertEqual(expected_live, sum(ref() is not None for ref in refs))
+    self.assertEqual(expected_live, len(bijector._cache.forward))
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class BijectorReduceEventDimsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BijectorReduceEventDimsTest(test_util.TestCase):
   """Test reducing of event dims."""
 
   def testReduceEventNdimsForward(self):
@@ -331,7 +320,7 @@ class BijectorReduceEventDimsTest(test_case.TestCase):
     self.assertAllClose(-np.log(x_), ildj)
 
 
-class BijectorLDJCachingTest(test_case.TestCase):
+class BijectorLDJCachingTest(test_util.TestCase):
 
   def testShapeCachingIssue(self):
     if tf.executing_eagerly(): return
@@ -351,10 +340,14 @@ class BijectorLDJCachingTest(test_case.TestCase):
       sess.run(a, feed_dict={x1: x1_value})
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class NumpyArrayCaching(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class NumpyArrayCaching(test_util.TestCase):
 
   def test_caches(self):
+    # We need to call convert_to_tensor on outputs to make sure scalar
+    # outputs from the numpy backend are wrapped correctly. We could just
+    # directly wrap numpy scalars with np.array, but it would look pretty
+    # out of place, considering that the numpy backend is still private.
     if mock is None:
       return
 
@@ -369,14 +362,16 @@ class NumpyArrayCaching(test_case.TestCase):
       with mock.patch.object(tf, 'exp', return_value=y_):
         y = b.forward(x_)
         self.assertIsInstance(y, np.ndarray)
-        self.assertAllEqual([x_], [k() for k in b._from_x.keys()])
+        self.assertAllEqual([x_],
+                            [k() for k in b._cache.forward.weak_keys()])
 
     with mock.patch.object(tf, 'convert_to_tensor', return_value=y_):
       with mock.patch.object(tf.math, 'log', return_value=x_):
         x = b.inverse(y_)
         self.assertIsInstance(x, np.ndarray)
         self.assertIs(x, b.inverse(y))
-        self.assertAllEqual([y_], [k() for k in b._from_y.keys()])
+        self.assertAllEqual([y_],
+                            [k() for k in b._cache.inverse.weak_keys()])
 
     yt_ = y_.T
     xt_ = x_.T
@@ -387,15 +382,17 @@ class NumpyArrayCaching(test_case.TestCase):
         self.assertIs(xt_, xt)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TfModuleTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TfModuleTest(test_util.TestCase):
 
+  @test_util.jax_disable_variable_test
   def test_variable_tracking(self):
     x = tf.Variable(1.)
     b = ForwardOnlyBijector(scale=x, validate_args=True)
     self.assertIsInstance(b, tf.Module)
     self.assertEqual((x,), b.trainable_variables)
 
+  @test_util.jax_disable_variable_test
   def test_gradient(self):
     x = tf.Variable(1.)
     b = InverseOnlyBijector(scale=x, validate_args=True)
@@ -427,8 +424,8 @@ class _ConditionalBijector(tfb.Bijector):
 
 # Test that ensures kwargs from public methods are passed in to
 # private methods.
-@test_util.run_all_in_graph_and_eager_modes
-class ConditionalBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class ConditionalBijectorTest(test_util.TestCase):
 
   def testConditionalBijector(self):
     b = _ConditionalBijector()

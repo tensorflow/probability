@@ -13,13 +13,19 @@
 # limitations under the License.
 # ============================================================================
 """TFP for Numpy."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
-from tensorflow_probability.python.experimental.substrates.numpy import bijectors
-from tensorflow_probability.python.experimental.substrates.numpy import distributions
-from tensorflow_probability.python.experimental.substrates.numpy import internal
-from tensorflow_probability.python.experimental.substrates.numpy import util
+
+# pylint: disable=g-bad-import-order
+
+
+from tensorflow_probability.python.bijectors import _numpy as bijectors
+from tensorflow_probability.python.distributions import _numpy as distributions
+from tensorflow_probability.python.experimental import _numpy as experimental
+from tensorflow_probability.python.internal import _numpy as internal
+from tensorflow_probability.python.math import _numpy as math
+from tensorflow_probability.python.mcmc import _numpy as mcmc
+from tensorflow_probability.python.random import _numpy as random
+from tensorflow_probability.python.stats import _numpy as stats
+from tensorflow_probability.python.util import _numpy as util
 
 from tensorflow_probability.python.internal.backend import numpy as tf2numpy

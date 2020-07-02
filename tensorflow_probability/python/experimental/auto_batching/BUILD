@@ -176,6 +176,7 @@ py_library(
     name = "frontend",
     srcs = [
         "frontend.py",
+        "gast_util.py",
     ],
     srcs_version = "PY2AND3",
     deps = [
@@ -215,18 +216,6 @@ py_library(
 )
 
 py_library(
-    name = "tfp_xla_test_case",
-    testonly = 1,
-    srcs = ["tfp_xla_test_case.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        ":xla",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
-    ],
-)
-
-py_library(
     name = "xla",
     srcs = ["xla.py"],
     srcs_version = "PY2AND3",
@@ -235,6 +224,50 @@ py_library(
     ],
 )
 
+# py2and3
+py_test(
+    name = "virtual_machine_test_cpu",
+    size = "medium",
+    srcs = ["virtual_machine_test.py"],
+    args = ["--test_device=cpu"],
+    main = "virtual_machine_test.py",
+    shard_count = 10,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        "//tensorflow_probability/python/experimental/auto_batching:numpy_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:test_programs",
+        "//tensorflow_probability/python/experimental/auto_batching:tf_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:virtual_machine",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+# py2and3
+py_test(
+    name = "virtual_machine_test_gpu",
+    size = "medium",
+    srcs = ["virtual_machine_test.py"],
+    args = ["--test_device=gpu"],
+    main = "virtual_machine_test.py",
+    shard_count = 10,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        "//tensorflow_probability/python/experimental/auto_batching:numpy_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:test_programs",
+        "//tensorflow_probability/python/experimental/auto_batching:tf_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:virtual_machine",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+# py2and3
 py_test(
     name = "instructions_test",
     size = "small",
@@ -243,10 +276,11 @@ py_test(
         ":instructions",
         ":test_programs",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "numpy_backend_test",
     size = "small",
@@ -259,13 +293,14 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "tf_backend_test",
-    size = "medium",
+    size = "large",
     srcs = ["tf_backend_test.py"],
     srcs_version = "PY2AND3",
     deps = [
@@ -275,10 +310,12 @@ py_test(
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "lowering_test",
     size = "small",
@@ -291,10 +328,11 @@ py_test(
         ":test_programs",
         ":virtual_machine",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "allocation_strategy_test",
     size = "small",
@@ -305,10 +343,11 @@ py_test(
         ":instructions",
         ":test_programs",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "stackless_test",
     size = "small",
@@ -320,10 +359,11 @@ py_test(
         ":stackless",
         ":test_programs",
         ":tf_backend",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "stack_optimization_test",
     size = "small",
@@ -332,10 +372,11 @@ py_test(
     deps = [
         ":stack_optimization",
         ":test_programs",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "type_inference_test",
     size = "small",
@@ -353,10 +394,11 @@ py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "dsl_test",
     size = "small",
@@ -372,13 +414,14 @@ py_test(
         ":virtual_machine",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
+# py2and3
 py_test(
     name = "frontend_test",
-    size = "medium",
+    size = "small",
     srcs = ["frontend_test.py"],
     shard_count = 4,
     srcs_version = "PY2AND3",
@@ -391,6 +434,6 @@ py_test(
         ":virtual_machine",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

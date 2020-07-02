@@ -25,13 +25,13 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class GradientTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class GradientTest(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test
   def test_non_list(self):
     f = lambda x: x**2 / 2
     g = lambda x: x
@@ -40,6 +40,7 @@ class GradientTest(test_case.TestCase):
     self.assertAllClose(f(x), y, atol=1e-6, rtol=1e-6)
     self.assertAllClose(g(x), dydx, atol=1e-6, rtol=1e-6)
 
+  @test_util.numpy_disable_gradient_test
   def test_list(self):
     f = lambda x, y: x * y
     g = lambda x, y: [y, x]
@@ -49,6 +50,17 @@ class GradientTest(test_case.TestCase):
     self.assertAllClose(f(*args), y, atol=1e-6, rtol=1e-6)
     self.assertAllClose(g(*args), dydx, atol=1e-6, rtol=1e-6)
 
+  @test_util.numpy_disable_gradient_test
+  def test_output_list(self):
+    f = lambda x, y: [x, x * y]
+    g = lambda x, y: [y + 1., x]
+    args = [np.linspace(0, 100, int(1e1)),
+            np.linspace(-100, 0, int(1e1))]
+    y, dydx = self.evaluate(tfp.math.value_and_gradient(f, args))
+    self.assertAllClose(f(*args), y, atol=1e-6, rtol=1e-6)
+    self.assertAllClose(g(*args), dydx, atol=1e-6, rtol=1e-6)
+
+  @test_util.numpy_disable_gradient_test
   def test_output_gradients(self):
     jacobian = np.float32([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
     f = lambda x: tf.squeeze(tf.matmul(jacobian, x[:, tf.newaxis]))

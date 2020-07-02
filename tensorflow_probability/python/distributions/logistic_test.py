@@ -25,24 +25,21 @@ from scipy import stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LogisticTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LogisticTest(test_util.TestCase):
 
   def testReparameterizable(self):
     batch_size = 6
     np_loc = np.array([2.0] * batch_size, dtype=np.float32)
     loc = tf.constant(np_loc)
     scale = 1.5
-    dist = tfd.Logistic(loc, scale)
-    self.assertTrue(
-        dist.reparameterization_type == tfd.FULLY_REPARAMETERIZED)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
+    self.assertEqual(tfd.FULLY_REPARAMETERIZED, dist.reparameterization_type)
 
   def testLogisticLogProb(self):
     batch_size = 6
@@ -50,7 +47,7 @@ class LogisticTest(test_case.TestCase):
     loc = tf.constant(np_loc)
     scale = 1.5
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     expected_log_prob = stats.logistic.logpdf(x, np_loc, scale)
 
     log_prob = dist.log_prob(x)
@@ -67,7 +64,7 @@ class LogisticTest(test_case.TestCase):
     loc = tf.constant(np_loc)
     scale = 1.5
 
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
     cdf = dist.cdf(x)
     expected_cdf = stats.logistic.cdf(x, np_loc, scale)
@@ -81,7 +78,7 @@ class LogisticTest(test_case.TestCase):
     loc = tf.constant(np_loc)
     scale = 1.5
 
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
     logcdf = dist.log_cdf(x)
     expected_logcdf = stats.logistic.logcdf(x, np_loc, scale)
@@ -95,7 +92,7 @@ class LogisticTest(test_case.TestCase):
     loc = tf.constant(np_loc)
     scale = 1.5
 
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
     survival_function = dist.survival_function(x)
     expected_survival_function = stats.logistic.sf(x, np_loc, scale)
@@ -110,7 +107,7 @@ class LogisticTest(test_case.TestCase):
     loc = tf.constant(np_loc)
     scale = 1.5
 
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
     logsurvival_function = dist.log_survival_function(x)
     expected_logsurvival_function = stats.logistic.logsf(x, np_loc, scale)
@@ -123,14 +120,14 @@ class LogisticTest(test_case.TestCase):
     loc = [2.0, 1.5, 1.0]
     scale = 1.5
     expected_mean = stats.logistic.mean(loc, scale)
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
   def testLogisticVariance(self):
     loc = [2.0, 1.5, 1.0]
     scale = 1.5
     expected_variance = stats.logistic.var(loc, scale)
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     self.assertAllClose(self.evaluate(dist.variance()), expected_variance)
 
   def testLogisticEntropy(self):
@@ -139,34 +136,40 @@ class LogisticTest(test_case.TestCase):
     loc = tf.constant(np_loc)
     scale = 1.5
     expected_entropy = stats.logistic.entropy(np_loc, scale)
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
   def testLogisticSample(self):
-    loc = [3.0, 4.0, 2.0]
-    scale = 1.0
-    dist = tfd.Logistic(loc, scale)
-    sample = dist.sample(
-        seed=tfp_test_util.test_seed(hardcoded_seed=100, set_eager_seed=False))
-    self.assertEqual(sample.shape, (3,))
-    self.assertAllClose(
-        self.evaluate(sample), [6.22460556, 3.79602098, 2.05084133])
+    loc_ = [3.0, 4.0, 2.0]
+    scale_ = 1.0
+    dist = tfd.Logistic(loc_, scale_, validate_args=True)
+    n = int(15e3)
+    samples = dist.sample(n, seed=test_util.test_seed())
+    self.assertEqual(samples.shape, (n, 3))
+    samples_ = self.evaluate(samples)
+    for i in range(3):
+      self.assertLess(
+          stats.kstest(
+              samples_[:, i],
+              stats.logistic(loc=loc_[i], scale=scale_).cdf)[0],
+          0.013)
 
   def testLogisticQuantile(self):
     loc = [3.0, 4.0, 2.0]
     scale = np.random.randn(3)**2 + 1e-3
     x = [.2, .5, .99]
     expected_quantile = stats.logistic.ppf(x, loc=loc, scale=scale)
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     self.assertAllClose(self.evaluate(dist.quantile(x)), expected_quantile)
 
   def testDtype(self):
     loc = tf.constant([0.1, 0.4], dtype=tf.float32)
     scale = tf.constant(1.0, dtype=tf.float32)
-    dist = tfd.Logistic(loc, scale)
+    dist = tfd.Logistic(loc, scale, validate_args=True)
     self.assertEqual(dist.dtype, tf.float32)
     self.assertEqual(dist.loc.dtype, dist.scale.dtype)
-    self.assertEqual(dist.dtype, dist.sample(5).dtype)
+    self.assertEqual(dist.dtype, dist.sample(
+        5, seed=test_util.test_seed()).dtype)
     self.assertEqual(dist.dtype, dist.mode().dtype)
     self.assertEqual(dist.loc.dtype, dist.mean().dtype)
     self.assertEqual(dist.loc.dtype, dist.variance().dtype)
@@ -177,10 +180,12 @@ class LogisticTest(test_case.TestCase):
 
     loc = tf.constant([0.1, 0.4], dtype=tf.float64)
     scale = tf.constant(1.0, dtype=tf.float64)
-    dist64 = tfd.Logistic(loc, scale)
+    dist64 = tfd.Logistic(loc, scale, validate_args=True)
     self.assertEqual(dist64.dtype, tf.float64)
-    self.assertEqual(dist64.dtype, dist64.sample(5).dtype)
+    self.assertEqual(dist64.dtype, dist64.sample(
+        5, seed=test_util.test_seed()).dtype)
 
+  @test_util.tf_tape_safety_test
   def testGradientThroughParams(self):
     loc = tf.Variable([-5., 0., 5.])
     scale = tf.Variable(2.)
@@ -196,7 +201,7 @@ class LogisticTest(test_case.TestCase):
     with self.assertRaisesOpError("Argument `scale` must be positive."):
       d = tfd.Logistic(loc=0, scale=scale, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
-      self.evaluate(d.sample())
+      self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
@@ -204,7 +209,7 @@ class LogisticTest(test_case.TestCase):
     d = tfd.Logistic(loc=0., scale=scale, validate_args=True)
     with self.assertRaisesOpError("Argument `scale` must be positive."):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
-        self.evaluate(d.sample())
+        self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertParamsAreFloats(self):
     loc = tf.convert_to_tensor(0, dtype=tf.int32)

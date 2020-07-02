@@ -91,6 +91,8 @@ class WeightNorm(tf.keras.layers.Wrapper):
     # the shape of `v`.
     new_axis = -self.filter_axis - 3
 
+    # `self.kernel_norm_axes` is determined by `self.filter_axis` and the rank
+    # of the layer kernel, and is thus statically known.
     self.layer.kernel = tf.nn.l2_normalize(
         self.v, axis=self.kernel_norm_axes) * tf.expand_dims(self.g, new_axis)
 
@@ -149,8 +151,11 @@ class WeightNorm(tf.keras.layers.Wrapper):
         raise ValueError('`WeightNorm` must wrap a layer that'
                          ' contains a `kernel` for weights')
 
-      self.kernel_norm_axes = list(range(self.layer.kernel.shape.ndims))
-      self.kernel_norm_axes.pop(self.filter_axis)
+      kernel_norm_axes = list(range(self.layer.kernel.shape.rank))
+      kernel_norm_axes.pop(self.filter_axis)
+      # Convert `kernel_norm_axes` from a list to a constant Tensor to allow
+      # TF checkpoint saving.
+      self.kernel_norm_axes = tf.constant(kernel_norm_axes)
 
       self.v = self.layer.kernel
 

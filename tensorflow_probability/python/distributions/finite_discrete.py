@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -178,12 +179,14 @@ class FiniteDiscrete(distribution.Distribution):
     values_at_ub = tf.gather(
         self.outcomes,
         indices=tf.minimum(upper_bound,
-                           dist_util.prefer_static_shape(self.outcomes)[-1] -
-                           1))
+                           prefer_static.shape(self.outcomes)[-1] - 1))
     should_use_upper_bound = self._is_equal_or_close(flat_x, values_at_ub)
     indices = tf.where(should_use_upper_bound, upper_bound, upper_bound - 1)
-    return self._categorical.cdf(
-        tf.reshape(indices, shape=dist_util.prefer_static_shape(x)))
+    indices = tf.reshape(indices, shape=dist_util.prefer_static_shape(x))
+    indices_non_negative = tf.where(
+        tf.equal(indices, -1), tf.zeros([], indices.dtype), indices)
+    cdf = self._categorical.cdf(indices_non_negative)
+    return tf.where(tf.equal(indices, -1), tf.zeros([], cdf.dtype), cdf)
 
   def _entropy(self):
     return self._categorical.entropy()
@@ -200,7 +203,7 @@ class FiniteDiscrete(distribution.Distribution):
         tf.reshape(
             tf.searchsorted(
                 self.outcomes, values=tf.reshape(x, shape=[-1]), side='right'),
-            dist_util.prefer_static_shape(x)))
+            prefer_static.shape(x)))
     use_right_indices = self._is_equal_or_close(
         x, tf.gather(self.outcomes, indices=right_indices))
     left_indices = tf.maximum(0, right_indices - 1)
@@ -235,8 +238,7 @@ class FiniteDiscrete(distribution.Distribution):
 
   def _variance(self):
     probs = self._categorical.probs_parameter()
-    outcomes = tf.broadcast_to(
-        self.outcomes, shape=dist_util.prefer_static_shape(probs))
+    outcomes = tf.broadcast_to(self.outcomes, shape=prefer_static.shape(probs))
     if dtype_util.is_integer(outcomes.dtype):
       if self._validate_args:
         outcomes = dist_util.embed_check_integer_casting_closed(
@@ -255,6 +257,9 @@ class FiniteDiscrete(distribution.Distribution):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
     with self._name_and_control_scope(name or 'probs_parameter'):
       return self._categorical.probs_parameter()
+
+  def _default_event_space_bijector(self):
+    return
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

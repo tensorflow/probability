@@ -26,8 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _make_val_and_grad_fn(value_fn):
@@ -41,8 +40,8 @@ def _norm(x):
   return np.linalg.norm(x, np.inf)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class LBfgsTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class LBfgsTest(test_util.TestCase):
   """Tests for LBFGS optimization algorithm."""
 
   def test_quadratic_bowl_2d(self):
@@ -52,13 +51,13 @@ class LBfgsTest(test_case.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = tf.constant([0.6, 0.8])
     results = self.evaluate(tfp.optimizer.lbfgs_minimize(
         quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
-    self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+    self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
   def test_high_dims_quadratic_bowl_trivial(self):
@@ -69,14 +68,14 @@ class LBfgsTest(test_case.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = np.zeros([ndims], dtype='float64')
     results = self.evaluate(tfp.optimizer.lbfgs_minimize(
         quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
     self.assertEqual(results.num_iterations, 1)  # Solved by first line search.
-    self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+    self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
   def test_quadratic_bowl_40d(self):
@@ -88,13 +87,13 @@ class LBfgsTest(test_case.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.lbfgs_minimize(
         quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
-    self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+    self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
   def test_quadratic_with_skew(self):
@@ -110,13 +109,13 @@ class LBfgsTest(test_case.TestCase):
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      return tf.reduce_sum(input_tensor=y * yp) / 2
+      return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.lbfgs_minimize(
         quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
-    self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+    self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
   def test_quadratic_with_strong_skew(self):
@@ -131,13 +130,13 @@ class LBfgsTest(test_case.TestCase):
     def quadratic(x):
       y = x - minimum
       yp = tf.tensordot(hessian, y, axes=[1, 0])
-      return tf.reduce_sum(input_tensor=y * yp) / 2
+      return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
     results = self.evaluate(tfp.optimizer.lbfgs_minimize(
         quadratic, initial_position=start, tolerance=1e-8))
     self.assertTrue(results.converged)
-    self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+    self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
   def test_rosenbrock_2d(self):
@@ -172,7 +171,7 @@ class LBfgsTest(test_case.TestCase):
     results = self.evaluate(tfp.optimizer.lbfgs_minimize(
         rosenbrock, initial_position=start, tolerance=1e-5))
     self.assertTrue(results.converged)
-    self.assertTrue(_norm(results.objective_gradient) <= 1e-5)
+    self.assertLessEqual(_norm(results.objective_gradient), 1e-5)
     self.assertArrayNear(results.position, np.array([1.0, 1.0]), 1e-5)
 
   def test_himmelblau(self):
@@ -271,6 +270,72 @@ class LBfgsTest(test_case.TestCase):
       self.assertArrayNear(actual, expected, 1e-5)
     self.assertEqual(batch_results.num_objective_evaluations, 28)
 
+  def test_himmelblau_batch_any_resume_then_all(self):
+    @_make_val_and_grad_fn
+    def himmelblau(coord):
+      x, y = coord[..., 0], coord[..., 1]
+      return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
+
+    dtype = 'float64'
+    starts = tf.constant([[1, 1],
+                          [-2, 2],
+                          [-1, -1],
+                          [1, -2]], dtype=dtype)
+    expected_minima = np.array([[3, 2],
+                                [-2.805118, 3.131312],
+                                [-3.779310, -3.283186],
+                                [3.584428, -1.848126]], dtype=dtype)
+
+    # Run with `converged_any` stopping condition, to stop as soon as any of
+    # the batch members have converged.
+    raw_batch_results = tfp.optimizer.lbfgs_minimize(
+        himmelblau, initial_position=starts,
+        stopping_condition=tfp.optimizer.converged_any, tolerance=1e-8)
+    batch_results = self.evaluate(raw_batch_results)
+
+    self.assertFalse(np.any(batch_results.failed))  # None have failed.
+    self.assertTrue(np.any(batch_results.converged))  # At least one converged.
+    self.assertFalse(np.all(batch_results.converged))  # But not all did.
+
+    # Converged points are near expected minima.
+    for actual, expected in zip(batch_results.position[batch_results.converged],
+                                expected_minima[batch_results.converged]):
+      self.assertArrayNear(actual, expected, 1e-5)
+    self.assertEqual(batch_results.num_objective_evaluations, 28)
+
+    # Run with `converged_all`, starting from previous state.
+    batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
+        himmelblau, initial_position=None,
+        previous_optimizer_results=raw_batch_results,
+        stopping_condition=tfp.optimizer.converged_all, tolerance=1e-8))
+
+    # All converged points are near expected minima and the nunmber of
+    # evaluaitons is as if we never stopped.
+    for actual, expected in zip(batch_results.position, expected_minima):
+      self.assertArrayNear(actual, expected, 1e-5)
+    self.assertEqual(batch_results.num_objective_evaluations, 36)
+
+  def test_initial_position_and_previous_optimizer_results_are_exclusive(self):
+    minimum = np.array([1.0, 1.0])
+    scales = np.array([2.0, 3.0])
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
+
+    start = tf.constant([0.6, 0.8])
+
+    def run(position, state):
+      raw_results = tfp.optimizer.lbfgs_minimize(
+          quadratic, initial_position=position,
+          previous_optimizer_results=state, tolerance=1e-8)
+      self.evaluate(raw_results)
+      return raw_results
+
+    self.assertRaises(ValueError, run, None, None)
+    results = run(start, None)
+    self.assertRaises(ValueError, run, start, results)
+
   def test_data_fitting(self):
     """Tests MLE estimation for a simple geometric GLM."""
     n, dim = 100, 30
@@ -280,8 +345,8 @@ class LBfgsTest(test_case.TestCase):
     s = 0.01 * np.sum(x, 0)
     p = 1. / (1 + np.exp(-s))
     y = np.random.geometric(p)
-    x_data = tf.convert_to_tensor(value=x, dtype=dtype)
-    y_data = tf.expand_dims(tf.convert_to_tensor(value=y, dtype=dtype), -1)
+    x_data = tf.convert_to_tensor(x, dtype=dtype)
+    y_data = tf.convert_to_tensor(y, dtype=dtype)[..., tf.newaxis]
 
     @_make_val_and_grad_fn
     def neg_log_likelihood(state):
@@ -291,11 +356,11 @@ class LBfgsTest(test_case.TestCase):
                                  linear_part], axis=0)
       term1 = tf.squeeze(
           tf.matmul(
-              tf.reduce_logsumexp(input_tensor=linear_part_ex, axis=0), y_data),
+              tf.reduce_logsumexp(linear_part_ex, axis=0), y_data),
           -1)
       term2 = (
-          0.5 * tf.reduce_sum(input_tensor=state_ext * state_ext, axis=-1) -
-          tf.reduce_sum(input_tensor=linear_part, axis=-1))
+          0.5 * tf.reduce_sum(state_ext * state_ext, axis=-1) -
+          tf.reduce_sum(linear_part, axis=-1))
       return  tf.squeeze(term1 + term2)
 
     start = tf.ones(shape=[dim], dtype=dtype)
@@ -328,7 +393,7 @@ class LBfgsTest(test_case.TestCase):
           gradient: A `Tensor` of shape [2] containing the gradient of the
             function along the two axes.
       """
-      return tf.reduce_sum(input_tensor=x**2 -
+      return tf.reduce_sum(x**2 -
                            10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
 
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
@@ -362,7 +427,7 @@ class LBfgsTest(test_case.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(input_tensor=scales * (x - minimum)**2)
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):
@@ -375,7 +440,7 @@ class LBfgsTest(test_case.TestCase):
       with self.cached_session() as session:
         results = session.run(lbfgs_op, feed_dict={start: start_value})
       self.assertTrue(results.converged)
-      self.assertTrue(_norm(results.objective_gradient) <= 1e-8)
+      self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
       self.assertArrayNear(results.position, minimum, 1e-5)
 
 

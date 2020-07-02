@@ -15,6 +15,12 @@
 # Description:
 #   API-unstable code that is part of the TFP package.
 
+# [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+)
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -25,15 +31,57 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "experimental",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
+    substrates_omit_deps = [
+        ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/edward2",
+        "//tensorflow_probability/python/experimental/linalg",
+        "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/experimental/nn",
+        "//tensorflow_probability/python/experimental/sequential",
+        "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/vi",
+    ],
+    deps = [
+        ":composite_tensor",
+        "//tensorflow_probability/python/experimental/auto_batching",
+        "//tensorflow_probability/python/experimental/edward2",
+        "//tensorflow_probability/python/experimental/inference_gym",
+        "//tensorflow_probability/python/experimental/linalg",
+        "//tensorflow_probability/python/experimental/marginalize",
+        "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/experimental/nn",
+        "//tensorflow_probability/python/experimental/sequential",
+        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/vi",
+    ],
+)
+
+py_library(
+    name = "composite_tensor",
+    srcs = ["composite_tensor.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "composite_tensor_test",
+    srcs = ["composite_tensor_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

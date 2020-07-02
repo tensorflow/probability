@@ -21,7 +21,7 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from discussion import neutra

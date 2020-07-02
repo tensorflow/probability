@@ -23,14 +23,15 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python import random as tfp_random
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -151,7 +152,6 @@ class DoublesidedMaxwell(distribution.Distribution):
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
         parameters=parameters,
-        graph_parents=[self._loc, self._scale],
         name=name)
 
   @staticmethod
@@ -205,7 +205,8 @@ class DoublesidedMaxwell(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     # Generate samples using:
     # mu + sigma* sgn(U-0.5)* sqrt(X^2 + Y^2 + Z^2) U~Unif; X,Y,Z ~N(0,1)
-    seed = SeedStream(seed, salt='DoublesidedMaxwell')
+    normal_seed, rademacher_seed = samplers.split_seed(
+        seed, salt='DoublesidedMaxwell')
 
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
@@ -214,14 +215,14 @@ class DoublesidedMaxwell(distribution.Distribution):
         paddings=[[1, 0]], constant_values=n)
 
     # Generate one-sided Maxwell variables by using 3 Gaussian variates
-    norm_rvs = tf.random.normal(
+    norm_rvs = samplers.normal(
         shape=prefer_static.pad(shape, paddings=[[0, 1]], constant_values=3),
         dtype=self.dtype,
-        seed=seed())
+        seed=normal_seed)
     maxwell_rvs = tf.norm(norm_rvs, axis=-1)
 
     # Generate random signs for the symmetric variates.
-    random_sign = tfp_math.random_rademacher(shape, seed=seed())
+    random_sign = tfp_random.rademacher(shape, seed=rademacher_seed)
     sampled = random_sign * maxwell_rvs * scale + loc
     return sampled
 
@@ -230,6 +231,9 @@ class DoublesidedMaxwell(distribution.Distribution):
 
   def _stddev(self):
     return np.sqrt(3.) * self.scale * tf.ones_like(self.loc)
+
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

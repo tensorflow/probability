@@ -18,11 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
-import numpy as np
-
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -31,30 +29,6 @@ from tensorflow_probability.python.internal import tensor_util
 __all__ = [
     "SinhArcsinh",
 ]
-
-
-def _sqrtx2p1(x):
-  """Implementation of `sqrt(1 + x**2)` which is stable despite large `x`."""
-  sqrt_eps = np.sqrt(np.finfo(dtype_util.as_numpy_dtype(x.dtype)).eps)
-  return tf.where(
-      tf.abs(x) * sqrt_eps <= 1.,
-      tf.sqrt(x**2. + 1.),
-      # For large x, calculating x**2 can overflow. This can be alleviated by
-      # considering:
-      # sqrt(1 + x**2)
-      # = exp(0.5 log(1 + x**2))
-      # = exp(0.5 log(x**2 * (1 + x**-2)))
-      # = exp(log(x) + 0.5 * log(1 + x**-2))
-      # = |x| * exp(0.5 log(1 + x**-2))
-      # = |x| * sqrt(1 + x**-2)
-      # We omit the last term in this approximation.
-      # When |x| > 1 / sqrt(machineepsilon), the second term will be 1,
-      # due to sqrt(1 + x**-2) = 1. This is also true with the gradient term,
-      # and higher order gradients, since the first order derivative of
-      # sqrt(1 + x**-2) is -2 * x**-3 / (1 + x**-2) = -2 / (x**3 + x),
-      # and all nth-order derivatives will be O(x**-(n + 2)). This makes any
-      # gradient terms that contain any derivatives of sqrt(1 + x**-2) vanish.
-      tf.abs(x))
 
 
 class SinhArcsinh(bijector.Bijector):
@@ -109,6 +83,7 @@ class SinhArcsinh(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       tailweight = 1. if tailweight is None else tailweight
       skewness = 0. if skewness is None else skewness
@@ -122,6 +97,7 @@ class SinhArcsinh(bijector.Bijector):
       super(SinhArcsinh, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property
@@ -137,6 +113,10 @@ class SinhArcsinh(bijector.Bijector):
   def _output_multiplier(self, tailweight):
     return self._scale_number / tf.sinh(
         tf.asinh(self._scale_number) * tailweight)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     tailweight = tf.convert_to_tensor(self.tailweight)
@@ -156,18 +136,13 @@ class SinhArcsinh(bijector.Bijector):
     # = cosh(arcsinh(y / multiplier) / tailweight - skewness)
     #     / (tailweight * sqrt((y / multiplier)**2 + 1)) / multiplier
 
-    # This is computed inside the log to avoid catastrophic cancellations
-    # from cosh((arcsinh(y / multiplier) / tailweight)
-    # - skewness) and sqrt(x**2 + 1).
     tailweight = tf.convert_to_tensor(self.tailweight)
     multiplier = self._output_multiplier(tailweight)
     y = y / multiplier
-    subtract_term = tf.math.log(multiplier)
-    return (tf.math.log(
-        tf.cosh(tf.asinh(y) / tailweight - self.skewness)
-        # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
-        # where (arcsinh(x) / tailweight) - skewness ~= arcsinh(x).
-        / _sqrtx2p1(y)) - tf.math.log(tailweight)) - subtract_term
+
+    return (tfp_math.log_cosh(tf.asinh(y) / tailweight - self.skewness) -
+            0.5 * tfp_math.log1psquare(y) -
+            tf.math.log(tailweight) - tf.math.log(multiplier))
 
   def _forward_log_det_jacobian(self, x):
     # y = sinh((arcsinh(x) + skewness) * tailweight) * multiplier
@@ -176,15 +151,12 @@ class SinhArcsinh(bijector.Bijector):
     # = cosh((arcsinh(x) + skewness) * tailweight) * tailweight / sqrt(x**2 + 1)
     # * multiplier
 
-    # This is computed inside the log to avoid catastrophic cancellations
-    # from cosh((arcsinh(x) + skewness) * tailweight) and sqrt(x**2 + 1).
     tailweight = tf.convert_to_tensor(self.tailweight)
-    add_term = tf.math.log(self._output_multiplier(tailweight))
-    return (tf.math.log(
-        tf.cosh((tf.asinh(x) + self.skewness) * tailweight)
-        # TODO(srvasude): Consider using cosh(arcsinh(x)) in cases
-        # where (arcsinh(x) + skewness) * tailweight ~= arcsinh(x).
-        / _sqrtx2p1(x)) + tf.math.log(tailweight) + add_term)
+
+    return (tfp_math.log_cosh((tf.asinh(x) + self.skewness) * tailweight) -
+            0.5 * tfp_math.log1psquare(x) +
+            tf.math.log(tailweight) +
+            tf.math.log(self._output_multiplier(tailweight)))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

@@ -18,240 +18,190 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SliceSamplerTest(test_case.TestCase):
+JAX_MODE = False
 
-  def testOneDimNormal(self):
+
+def _get_mode_dependent_settings():
+  if tf.executing_eagerly() and not JAX_MODE:
+    num_results = 100
+    tolerance = .2
+  else:
+    num_results = 400
+    tolerance = .1
+  return num_results, tolerance
+
+
+@test_util.test_graph_and_eager_modes
+class SliceSamplerTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_slow_asserts', asserts=True),
+      dict(testcase_name='_fast_execute_only', asserts=False),
+  )
+  def testOneDimNormal(self, asserts):
     """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
-
+    num_results, tolerance = _get_mode_dependent_settings()
+    # We're not using multiple chains in this test, so dial up samples.
+    num_results = int(num_results * (5 if asserts else .2))
     target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
-    samples, _ = tfp.mcmc.sample_chain(
-        num_results=500,
+    kernel = tfp.mcmc.SliceSampler(
+        target.log_prob,
+        step_size=1.0,
+        max_doublings=5)
+    if asserts:
+      kernel.one_step = tf.function(kernel.one_step, autograph=False)
+    samples = tfp.mcmc.sample_chain(
+        num_results=num_results,
         current_state=dtype(1),
-        kernel=tfp.mcmc.SliceSampler(
-            target.log_prob,
-            step_size=1.0,
-            max_doublings=5,
-            seed=1234),
-        num_burnin_steps=500,
-        parallel_iterations=1)  # For determinism.
+        kernel=kernel,
+        num_burnin_steps=100,
+        trace_fn=None,
+        seed=test_util.test_seed_stream())
 
-    sample_mean = tf.reduce_mean(input_tensor=samples, axis=0)
-    sample_std = tf.sqrt(
-        tf.reduce_mean(
-            input_tensor=tf.math.squared_difference(samples, sample_mean),
-            axis=0))
-    [sample_mean, sample_std] = self.evaluate([sample_mean, sample_std])
+    sample_mean = tf.reduce_mean(samples, axis=0)
+    sample_std = tfp.stats.stddev(samples)
 
-    self.assertAllClose(0., b=sample_mean, atol=0.1, rtol=0.1)
-    self.assertAllClose(1., b=sample_std, atol=0.1, rtol=0.1)
+    if not asserts:
+      return
+    self.assertAllClose(0., sample_mean, atol=tolerance, rtol=tolerance)
+    self.assertAllClose(1., sample_std, atol=tolerance, rtol=tolerance)
 
-  def testTwoDimNormal(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='StaticShape', static_shape=True, static_rank=True),
+      dict(testcase_name='DynamicShape', static_shape=False, static_rank=True),
+      dict(testcase_name='DynamicRank', static_shape=False, static_rank=False),
+  )
+  def testTwoDimNormal(self, static_shape, static_rank):
     """Sampling from a 2-D Multivariate Normal distribution."""
     dtype = np.float32
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5], [0.5, 1]])
-    num_results = 200
-    num_chains = 75
+    num_results, tolerance = _get_mode_dependent_settings()
+    num_chains = 16
     # Target distribution is defined through the Cholesky decomposition.
     chol = tf.linalg.cholesky(true_cov)
     target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
-    # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
-    # Then the target log-density is defined as follows:
-    def target_log_prob(x, y):
-      # Stack the input tensors together
-      z = tf.stack([x, y], axis=-1) - true_mean
-      return target.log_prob(z)
-
     # Initial state of the chain
-    init_state = [np.ones([num_chains, 1], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
+    if static_shape and static_rank:
+      shape = [num_chains, 2]
+    elif static_rank:
+      shape = [None, 2]
+    else:
+      shape = None
+
+    init_state = tf1.placeholder_with_default(
+        np.ones([num_chains, 2], dtype=dtype), shape=shape)
 
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    [x, y], _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target_log_prob,
+            target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.0,
-            max_doublings=5,
-            seed=47),
-        num_burnin_steps=200,
-        num_steps_between_results=1,
-        parallel_iterations=1)
+            max_doublings=5),
+        num_burnin_steps=1000,
+        trace_fn=None,
+        seed=test_util.test_seed_stream())
 
-    states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
-    z = states - sample_mean
-    sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(z, z, transpose_a=True), axis=[0, 1])
-    [sample_mean, sample_cov] = self.evaluate([
-        sample_mean, sample_cov])
+    states = tf.reshape(states, [-1, 2])
+    sample_mean = tf.reduce_mean(states, axis=0)
+    sample_cov = tfp.stats.covariance(states)
 
-    self.assertAllClose(true_mean, b=np.squeeze(sample_mean),
-                        atol=0.1, rtol=0.1)
-    self.assertAllClose(true_cov, b=np.squeeze(sample_cov), atol=0.1, rtol=0.1)
-
-  def testTwoDimNormalDynamicShape(self):
-    """Checks that dynamic batch shapes for the initial state are supported."""
-    if tf.executing_eagerly(): return
-
-    dtype = np.float32
-    true_mean = dtype([0, 0])
-    true_cov = dtype([[1, 0.5], [0.5, 1]])
-    num_results = 200
-    num_chains = 75
-    # Target distribution is defined through the Cholesky decomposition.
-    chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
-
-    # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
-    # Then the target log-density is defined as follows:
-    def target_log_prob(x, y):
-      # Stack the input tensors together
-      z = tf.stack([x, y], axis=-1) - true_mean
-      return target.log_prob(z)
-
-    # Initial state of the chain
-    init_state = [np.ones([num_chains, 1], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
-    placeholder_init_state = [
-        tf1.placeholder_with_default(init_state[0], shape=[None, 1]),
-        tf1.placeholder_with_default(init_state[1], shape=[None, 1])
-    ]
-    # Run Slice Samper for `num_results` iterations for `num_chains`
-    # independent chains:
-    [x, y], _ = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        current_state=placeholder_init_state,
-        kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target_log_prob,
-            step_size=1.0,
-            max_doublings=5,
-            seed=47),
-        num_burnin_steps=200,
-        num_steps_between_results=1,
-        parallel_iterations=1)
-
-    states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
-    z = states - sample_mean
-    sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(z, z, transpose_a=True), axis=[0, 1])
-    [sample_mean, sample_cov] = self.evaluate([sample_mean, sample_cov])
-
-    self.assertAllClose(true_mean, b=np.squeeze(sample_mean),
-                        atol=0.1, rtol=0.1)
-    self.assertAllClose(true_cov, b=np.squeeze(sample_cov), atol=0.1, rtol=0.1)
-
-  def testTwoDimNormalDynamicRank(self):
-    """Checks that fully dynamic shape for the initial state is supported."""
-    if tf.executing_eagerly(): return
-    dtype = np.float32
-    true_mean = dtype([0, 0])
-    true_cov = dtype([[1, 0.5], [0.5, 1]])
-    num_results = 200
-    num_chains = 75
-    # Target distribution is defined through the Cholesky decomposition.
-    chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
-
-    # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
-    # Then the target log-density is defined as follows:
-    def target_log_prob(x, y):
-      # Stack the input tensors together
-      z = tf.stack([x, y], axis=-1) - true_mean
-      return target.log_prob(z)
-
-    # Initial state of the chain
-    init_state = [np.ones([num_chains, 1], dtype=dtype),
-                  np.ones([num_chains, 1], dtype=dtype)]
-    placeholder_init_state = [
-        tf1.placeholder_with_default(init_state[0], shape=None),
-        tf1.placeholder_with_default(init_state[1], shape=None)
-    ]
-    # Run Slice Samper for `num_results` iterations for `num_chains`
-    # independent chains:
-    [x, y], _ = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        current_state=placeholder_init_state,
-        kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target_log_prob,
-            step_size=1.0,
-            max_doublings=5,
-            seed=47),
-        num_burnin_steps=200,
-        num_steps_between_results=1,
-        parallel_iterations=1)
-
-    states = tf.stack([x, y], axis=-1)
-    sample_mean = tf.reduce_mean(input_tensor=states, axis=[0, 1])
-    z = states - sample_mean
-    sample_cov = tf.reduce_mean(
-        input_tensor=tf.matmul(z, z, transpose_a=True), axis=[0, 1])
-    [sample_mean, sample_cov] = self.evaluate([sample_mean, sample_cov])
-
-    self.assertAllClose(true_mean, b=np.squeeze(sample_mean),
-                        atol=0.1, rtol=0.1)
-    self.assertAllClose(true_cov, b=np.squeeze(sample_cov), atol=0.1, rtol=0.1)
+    self.assertAllClose(true_mean, sample_mean, atol=tolerance, rtol=tolerance)
+    self.assertAllClose(true_cov, sample_cov, atol=tolerance, rtol=tolerance)
 
   def testFourDimNormal(self):
     """Sampling from a 4-D Multivariate Normal distribution."""
 
     dtype = np.float32
     true_mean = dtype([0, 4, -8, 2])
-    true_cov = dtype([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    num_results = 25
-    num_chains = 500
-    # Target distribution is defined through the Cholesky decomposition
-    chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    true_cov = np.eye(4, dtype=dtype)
+    num_results, tolerance = _get_mode_dependent_settings()
+    num_chains = 16
+    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=true_cov)
 
     # Initial state of the chain
-    init_state = [np.ones([num_chains, 4], dtype=dtype)]
+    init_state = np.ones([num_chains, 4], dtype=dtype)
 
     # Run Slice Samper for `num_results` iterations for `num_chains`
     # independent chains:
-    states, _ = tfp.mcmc.sample_chain(
+    states = tfp.mcmc.sample_chain(
         num_results=num_results,
         current_state=init_state,
         kernel=tfp.mcmc.SliceSampler(
-            target_log_prob_fn=target.log_prob,
+            target_log_prob_fn=tf.function(target.log_prob, autograph=False),
             step_size=1.0,
-            max_doublings=5,
-            seed=47),
-        num_burnin_steps=300,
-        num_steps_between_results=1,
-        parallel_iterations=1)
-    result = states[0]
-    sample_mean = tf.reduce_mean(input_tensor=result, axis=[0, 1])
-    deviation = tf.reshape(result - sample_mean, shape=[-1, 4])
-    sample_cov = tf.matmul(deviation, b=deviation, transpose_a=True)
-    sample_cov /= tf.cast(tf.shape(input=deviation)[0], dtype=tf.float32)
-    sample_mean_err = sample_mean - true_mean
-    sample_cov_err = sample_cov - true_cov
+            max_doublings=5),
+        num_burnin_steps=100,
+        trace_fn=None,
+        seed=test_util.test_seed_stream())
 
-    [sample_mean_err, sample_cov_err] = self.evaluate([sample_mean_err,
-                                                       sample_cov_err])
+    result = tf.reshape(states, [-1, 4])
+    sample_mean = tf.reduce_mean(result, axis=0)
+    sample_cov = tfp.stats.covariance(result)
 
-    self.assertAllClose(np.zeros_like(sample_mean_err), b=sample_mean_err,
-                        atol=0.1, rtol=0.1)
-    self.assertAllClose(np.zeros_like(sample_cov_err), b=sample_cov_err,
-                        atol=0.1, rtol=0.1)
+    self.assertAllClose(true_mean, sample_mean, atol=tolerance, rtol=tolerance)
+    self.assertAllClose(true_cov, sample_cov, atol=tolerance, rtol=tolerance)
+
+  def testTwoStateParts(self):
+    dtype = np.float32
+    num_results, tolerance = _get_mode_dependent_settings()
+
+    true_loc1 = 1.
+    true_scale1 = 1.
+    true_loc2 = -1.
+    true_scale2 = 2.
+    target = tfd.JointDistributionSequential([
+        tfd.Normal(true_loc1, true_scale1),
+        tfd.Normal(true_loc2, true_scale2),
+    ])
+
+    num_chains = 16
+
+    init_state = [np.ones([num_chains], dtype=dtype),
+                  np.ones([num_chains], dtype=dtype)]
+
+    target_fn = tf.function(
+        lambda *states: target.log_prob(states), autograph=False)
+    [states1, states2] = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=init_state,
+        kernel=tfp.mcmc.SliceSampler(
+            target_log_prob_fn=target_fn,
+            step_size=1.0,
+            max_doublings=5),
+        num_burnin_steps=100,
+        trace_fn=None,
+        seed=test_util.test_seed_stream())
+
+    states1 = tf.reshape(states1, [-1])
+    states2 = tf.reshape(states2, [-1])
+    sample_mean1 = tf.reduce_mean(states1, axis=0)
+    sample_stddev1 = tfp.stats.stddev(states1)
+    sample_mean2 = tf.reduce_mean(states2, axis=0)
+    sample_stddev2 = tfp.stats.stddev(states2)
+
+    self.assertAllClose(true_loc1, sample_mean1, atol=tolerance, rtol=tolerance)
+    self.assertAllClose(
+        true_scale1, sample_stddev1, atol=tolerance, rtol=tolerance)
+    self.assertAllClose(true_loc2, sample_mean2, atol=tolerance, rtol=tolerance)
+    self.assertAllClose(
+        true_scale2, sample_stddev2, atol=tolerance, rtol=tolerance)
+
 
 if __name__ == '__main__':
   tf.test.main()

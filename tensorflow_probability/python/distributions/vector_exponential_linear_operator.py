@@ -20,13 +20,19 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import scale_matvec_linear_operator as scale_matvec_linear_operator_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 
-__all__ = ["VectorExponentialLinearOperator"]
+__all__ = ['VectorExponentialLinearOperator']
 
 _mvn_sample_note = """
 `value` is a batch vector with compatible shape if `value` is a `Tensor` whose
@@ -142,7 +148,7 @@ class VectorExponentialLinearOperator(
                scale=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="VectorExponentialLinearOperator"):
+               name='VectorExponentialLinearOperator'):
     """Construct Vector Exponential distribution supported on a subset of `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -176,26 +182,32 @@ class VectorExponentialLinearOperator(
     """
     parameters = dict(locals())
     if scale is None:
-      raise ValueError("Missing required `scale` parameter.")
+      raise ValueError('Missing required `scale` parameter.')
     if not dtype_util.is_floating(scale.dtype):
-      raise TypeError("`scale` parameter must have floating-point dtype.")
+      raise TypeError('`scale` parameter must have floating-point dtype.')
 
     with tf.name_scope(name) as name:
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
       loc = loc if loc is None else tf.convert_to_tensor(
-          loc, name="loc", dtype=scale.dtype)
+          loc, name='loc', dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
 
       super(VectorExponentialLinearOperator, self).__init__(
-          distribution=exponential.Exponential(
-              rate=tf.ones([], dtype=scale.dtype),
-              allow_nan_stats=allow_nan_stats),
+          # TODO(b/137665504): Use batch-adding meta-distribution to set the
+          # batch shape instead of tf.ones.
+          # We use `Sample` instead of `Independent` because `Independent`
+          # requires concatenating `batch_shape` and `event_shape`, which loses
+          # static `batch_shape` information when `event_shape` is not
+          # statically known.
+          distribution=sample.Sample(
+              exponential.Exponential(
+                  rate=tf.ones(batch_shape, dtype=scale.dtype),
+                  allow_nan_stats=allow_nan_stats),
+              event_shape),
           bijector=affine_linear_operator_bijector.AffineLinearOperator(
               shift=loc, scale=scale, validate_args=validate_args),
-          batch_shape=batch_shape,
-          event_shape=event_shape,
           validate_args=validate_args,
           name=name)
       self._parameters = parameters
@@ -285,3 +297,21 @@ class VectorExponentialLinearOperator(
           self.event_shape_tensor(),
       ], 0)
     return shape
+
+  def _sample_control_dependencies(self, x):
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    loc = 0. if self.loc is None else tf.convert_to_tensor(self.loc)
+    y = self.scale.solvevec(x - loc)
+    assertions.append(assert_util.assert_non_negative(
+        y, message='Sample is not contained in the support.'))
+    return assertions
+
+  def _default_event_space_bijector(self):
+    return chain_bijector.Chain([
+        shift_bijector.Shift(shift=self.loc, validate_args=self.validate_args),
+        scale_matvec_linear_operator_bijector.ScaleMatvecLinearOperator(
+            scale=self.scale, validate_args=self.validate_args),
+        softplus_bijector.Softplus(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)

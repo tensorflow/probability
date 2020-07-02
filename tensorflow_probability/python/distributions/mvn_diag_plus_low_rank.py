@@ -22,10 +22,10 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "MultivariateNormalDiagPlusLowRank",
+    'MultivariateNormalDiagPlusLowRank',
 ]
 
 
@@ -34,9 +34,31 @@ class MultivariateNormalDiagPlusLowRank(
   """The multivariate normal distribution on `R^k`.
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized
-  by a (batch of) length-`k` `loc` vector (aka "mu") and a (batch of) `k x k`
+  by a (batch of) length-`k` `loc` vector (aka 'mu') and a (batch of) `k x k`
   `scale` matrix; `covariance = scale @ scale.T` where `@` denotes
   matrix-multiplication.
+
+  Note that this is not the usual construction of a multivariate normal with a
+  diagonal plus low-rank _covariance_ matrix. Instead the _scale_ matrix is
+  diagonal plus low-rank.  This means
+
+  ```none
+  C = S S.T
+    = (D + U E U.T)(D + U E U.T)
+    = D**2 + D U E U.T + U E U.T D + (U E U.T)(U E U.T)
+  ```
+
+  where
+
+  * `C` is the `NxN` covariance matrix,
+  * `S` is the `NxN` scale matrix,
+  * `D` is the `NxN` diagonal part of the scale matrix,
+  * `U` is the `NxK` low-rank update part of the scale matrix,
+  * `E` is the `KxK` diagonal inside the low-rank update, and
+  * `M.T` is matrix transpose.
+
+  A covariance matrix in this form is not typically itself easily expressible as
+  a diagonal plus low-rank.
 
   #### Mathematical Details
 
@@ -58,21 +80,19 @@ class MultivariateNormalDiagPlusLowRank(
   A (non-batch) `scale` matrix is:
 
   ```none
-  scale = diag(scale_diag + scale_identity_multiplier ones(k)) +
+  scale = diag(scale_diag) +
         scale_perturb_factor @ diag(scale_perturb_diag) @ scale_perturb_factor.T
   ```
 
   where:
 
   * `scale_diag.shape = [k]`,
-  * `scale_identity_multiplier.shape = []`,
   * `scale_perturb_factor.shape = [k, r]`, typically `k >> r`, and,
   * `scale_perturb_diag.shape = [r]`.
 
   Additional leading dimensions (if any) will index batches.
 
-  If both `scale_diag` and `scale_identity_multiplier` are `None`, then
-  `scale` is the Identity matrix.
+  If `scale_diag` is `None`, then it defaults to the Identity matrix.
 
   The MultivariateNormal distribution is a member of the [location-scale
   family](https://en.wikipedia.org/wiki/Location-scale_family), i.e., it can be
@@ -144,12 +164,11 @@ class MultivariateNormalDiagPlusLowRank(
   def __init__(self,
                loc=None,
                scale_diag=None,
-               scale_identity_multiplier=None,
                scale_perturb_factor=None,
                scale_perturb_diag=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalDiagPlusLowRank"):
+               name='MultivariateNormalDiagPlusLowRank'):
     """Construct Multivariate Normal distribution on `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and `scale`
@@ -161,53 +180,43 @@ class MultivariateNormalDiagPlusLowRank(
     Recall that `covariance = scale @ scale.T`. A (non-batch) `scale` matrix is:
 
     ```none
-    scale = diag(scale_diag + scale_identity_multiplier ones(k)) +
+    scale = diag(scale_diag) +
         scale_perturb_factor @ diag(scale_perturb_diag) @ scale_perturb_factor.T
     ```
 
     where:
 
     * `scale_diag.shape = [k]`,
-    * `scale_identity_multiplier.shape = []`,
     * `scale_perturb_factor.shape = [k, r]`, typically `k >> r`, and,
     * `scale_perturb_diag.shape = [r]`.
 
     Additional leading dimensions (if any) will index batches.
 
-    If both `scale_diag` and `scale_identity_multiplier` are `None`, then
-    `scale` is the Identity matrix.
-
     Args:
       loc: Floating-point `Tensor`. If this is set to `None`, `loc` is
-        implicitly `0`. When specified, may have shape `[B1, ..., Bb, k]` where
+        implicitly `0`. When specified, must have shape `[B1, ..., Bb, k]` where
         `b >= 0` and `k` is the event size.
-      scale_diag: Non-zero, floating-point `Tensor` representing a diagonal
-        matrix added to `scale`. May have shape `[B1, ..., Bb, k]`, `b >= 0`,
+      scale_diag: Floating-point `Tensor` representing a non-singular diagonal
+        matrix added to `scale`. Must have shape `[B1, ..., Bb, k]`, `b >= 0`,
         and characterizes `b`-batches of `k x k` diagonal matrices added to
-        `scale`. When both `scale_identity_multiplier` and `scale_diag` are
-        `None` then `scale` is the `Identity`.
-      scale_identity_multiplier: Non-zero, floating-point `Tensor` representing
-        a scaled-identity-matrix added to `scale`. May have shape
-        `[B1, ..., Bb]`, `b >= 0`, and characterizes `b`-batches of scaled
-        `k x k` identity matrices added to `scale`. When both
-        `scale_identity_multiplier` and `scale_diag` are `None` then `scale` is
-        the `Identity`.
+        `scale`. When `scale_diag` is `None` it defaults to the `Identity`
+        matrix.
       scale_perturb_factor: Floating-point `Tensor` representing a rank-`r`
-        perturbation added to `scale`. May have shape `[B1, ..., Bb, k, r]`,
+        perturbation added to `scale`. Must have shape `[B1, ..., Bb, k, r]`,
         `b >= 0`, and characterizes `b`-batches of rank-`r` updates to `scale`.
         When `None`, no rank-`r` update is added to `scale`.
-      scale_perturb_diag: Floating-point `Tensor` representing a diagonal matrix
-        inside the rank-`r` perturbation added to `scale`. May have shape
-        `[B1, ..., Bb, r]`, `b >= 0`, and characterizes `b`-batches of `r x r`
-        diagonal matrices inside the perturbation added to `scale`. When
-        `None`, an identity matrix is used inside the perturbation. Can only be
-        specified if `scale_perturb_factor` is also specified.
+      scale_perturb_diag: Floating-point `Tensor` representing a non-singular
+        diagonal matrix inside the rank-`r` perturbation added to `scale`. Must
+        have shape `[B1, ..., Bb, r]`, `b >= 0`, and characterizes `b`-batches
+        of `r x r` diagonal matrices inside the perturbation added to `scale`.
+        When `None`, an identity matrix is used inside the perturbation. Can
+        only be specified if `scale_perturb_factor` is also specified.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -216,40 +225,53 @@ class MultivariateNormalDiagPlusLowRank(
       ValueError: if at most `scale_identity_multiplier` is specified.
     """
     parameters = dict(locals())
-
-    def _convert_to_tensor(x, name, dtype=None):
-      return None if x is None else tf.convert_to_tensor(
-          x, name=name, dtype=dtype)
+    if all(x is None for x in [loc, scale_diag, scale_perturb_factor]):
+      raise ValueError('At least one of `loc`, `scale_diag`, or '
+                       '`scale_perturb_factor` required.')
+    if scale_perturb_diag is not None and scale_perturb_factor is None:
+      raise ValueError('`scale_perturb_diag` should be set only if '
+                       '`scale_perturb_factor` is also set.')
 
     with tf.name_scope(name) as name:
-      with tf.name_scope("init"):
-        dtype = dtype_util.common_dtype([
-            loc, scale_diag, scale_identity_multiplier, scale_perturb_factor,
-            scale_perturb_diag
-        ], tf.float32)
-        has_low_rank = (scale_perturb_factor is not None or
-                        scale_perturb_diag is not None)
-        scale = distribution_util.make_diag_scale(
-            loc=loc,
-            scale_diag=scale_diag,
-            scale_identity_multiplier=scale_identity_multiplier,
-            validate_args=validate_args,
-            assert_positive=has_low_rank,
-            dtype=dtype)
-        scale_perturb_factor = _convert_to_tensor(
-            scale_perturb_factor, name="scale_perturb_factor", dtype=dtype)
-        scale_perturb_diag = _convert_to_tensor(
-            scale_perturb_diag, name="scale_perturb_diag", dtype=dtype)
-        if has_low_rank:
-          scale = tf.linalg.LinearOperatorLowRankUpdate(
-              scale,
-              u=scale_perturb_factor,
-              diag_update=scale_perturb_diag,
-              is_diag_update_positive=scale_perturb_diag is None,
-              is_non_singular=True,  # Implied by is_positive_definite=True.
-              is_self_adjoint=True,
-              is_positive_definite=True,
-              is_square=True)
+      dtype = dtype_util.common_dtype([
+          loc, scale_diag, scale_perturb_factor, scale_perturb_diag
+      ], tf.float32)
+      loc = tensor_util.convert_nonref_to_tensor(loc, dtype=dtype, name='loc')
+      scale_diag = tensor_util.convert_nonref_to_tensor(
+          scale_diag, dtype=dtype, name='scale_diag')
+      scale_perturb_factor = tensor_util.convert_nonref_to_tensor(
+          scale_perturb_factor, dtype=dtype, name='scale_perturb_factor')
+      scale_perturb_diag = tensor_util.convert_nonref_to_tensor(
+          scale_perturb_diag, dtype=dtype, name='scale_perturb_diag')
+
+      if scale_diag is not None:
+        scale = tf.linalg.LinearOperatorDiag(
+            diag=scale_diag,
+            is_non_singular=True,
+            is_self_adjoint=True,
+            is_positive_definite=False)
+      else:
+        # This might not be tape-safe if shape unknown and assigned to later.
+        if loc is not None:
+          num_rows = distribution_util.dimension_size(loc, -1)
+        else:
+          num_rows = distribution_util.dimension_size(scale_perturb_factor, -2)
+        scale = tf.linalg.LinearOperatorIdentity(
+            num_rows=num_rows,
+            dtype=dtype,
+            is_self_adjoint=True,
+            is_positive_definite=True,
+            assert_proper_shapes=validate_args)
+
+      if scale_perturb_factor is not None:
+        scale = tf.linalg.LinearOperatorLowRankUpdate(
+            scale,
+            u=scale_perturb_factor,
+            diag_update=scale_perturb_diag,
+            is_diag_update_positive=scale_perturb_diag is None,
+            is_self_adjoint=True,
+            is_non_singular=True,
+            is_square=True)
     super(MultivariateNormalDiagPlusLowRank, self).__init__(
         loc=loc,
         scale=scale,

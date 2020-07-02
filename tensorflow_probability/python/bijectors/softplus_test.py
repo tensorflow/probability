@@ -20,19 +20,20 @@ from __future__ import print_function
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 rng = np.random.RandomState(42)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SoftplusBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SoftplusBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = g(X) = Log[1 + exp(X)] transformation."""
 
   def _softplus(self, x):
@@ -139,18 +140,6 @@ class SoftplusBijectorTest(test_case.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-2,
         atol=1e-2)
 
-  def testBijectiveAndFinite16bit(self):
-    bijector = tfb.Softplus()
-    # softplus(-20) is zero, so we can't use such a large range as in 32bit.
-    x = np.linspace(-10., 20., 100).astype(np.float16)
-    # Note that float16 is only in the open set (0, inf) for a smaller
-    # logspace range.  The actual range was (-7, 4), so use something smaller
-    # for the test.
-    y = np.logspace(-6, 3, 100).astype(np.float16)
-    bijector_test_util.assert_bijective_and_finite(
-        bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-1,
-        atol=1e-3)
-
   def testVariableHingeSoftness(self):
     hinge_softness = tf.Variable(1.)
     b = tfb.Softplus(hinge_softness=hinge_softness, validate_args=True)
@@ -161,6 +150,25 @@ class SoftplusBijectorTest(test_case.TestCase):
         'Argument `hinge_softness` must be non-zero.'):
       with tf.control_dependencies([hinge_softness.assign(0.)]):
         self.evaluate(b.forward(0.5))
+
+  @parameterized.named_parameters(
+      ('32bitGraph', np.float32, False),
+      ('64bitGraph', np.float64, False),
+      ('32bitXLA', np.float32, True),
+      ('64bitXLA', np.float64, True),
+  )
+  @test_util.numpy_disable_gradient_test
+  def testLeftTailGrad(self, dtype, do_compile):
+    x = np.linspace(-50., -8., 1000).astype(dtype)
+
+    @tf.function(autograph=False, experimental_compile=do_compile)
+    def fn(x):
+      return tf.math.log(tfb.Softplus().forward(x))
+
+    _, grad = tfp_math.value_and_gradient(fn, x)
+
+    true_grad = 1 / (1 + np.exp(-x)) / np.log1p(np.exp(x))
+    self.assertAllClose(true_grad, self.evaluate(grad), atol=1e-3)
 
 
 if __name__ == '__main__':

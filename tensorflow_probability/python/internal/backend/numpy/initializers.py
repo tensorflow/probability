@@ -18,22 +18,24 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
-
-import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
-
-from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
 __all__ = [
     'constant',
 ]
 
-constant = utils.copy_docstring(
-    tf1.initializers.constant,
-    lambda value=0, dtype=tf.dtypes.float32, verify_shape=False: (  # pylint: disable=g-long-lambda
-        lambda shape, dtype=None, partition_info=None, verify_shape=None: (  # pylint: disable=g-long-lambda
-            np.ones(shape, dtype=dtype) * value))
-)
+
+class constant(object):  # pylint: disable=invalid-name
+  """Constant initializer."""
+
+  def __init__(self, value=0., dtype=np.float32, verify_shape=False):
+    del verify_shape
+    self.value = value
+    self.dtype = dtype
+
+  def __call__(self, shape, dtype=None, partition_info=None,
+               verify_shape=None):
+    del partition_info, verify_shape
+    dtype = dtype or self.dtype
+    return np.full(shape, self.value, dtype)

@@ -27,16 +27,12 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
-
-@tf_test_util.run_all_in_graph_and_eager_modes
-class BatchNormTest(test_util.VectorDistributionTestHelpers,
-                    parameterized.TestCase,
-                    test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BatchNormTest(test_util.TestCase,
+                    test_util.VectorDistributionTestHelpers):
 
   def _reduction_axes(self, input_shape, event_dims):
     if isinstance(event_dims, int):
@@ -188,9 +184,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
                                         training=training)
     dist = distributions.TransformedDistribution(
-        distribution=distributions.Normal(loc=0., scale=1.),
+        distribution=distributions.Sample(distributions.Normal(0., 1.), [dims]),
         bijector=batch_norm,
-        event_shape=[dims],
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
@@ -211,9 +206,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     batch_norm = tfb.Invert(
         tfb.BatchNormalization(batchnorm_layer=layer, training=training))
     dist = distributions.TransformedDistribution(
-        distribution=distributions.Normal(loc=0., scale=1.),
+        distribution=distributions.Sample(distributions.Normal(0., 1.), [dims]),
         bijector=batch_norm,
-        event_shape=[dims],
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
         sess_run_fn=self.evaluate,
@@ -229,9 +223,8 @@ class BatchNormTest(test_util.VectorDistributionTestHelpers,
     layer = None
 
     dist = distributions.TransformedDistribution(
-        distribution=distributions.Normal(loc=0., scale=1.),
+        distribution=distributions.Sample(distributions.Normal(0., 1.), [1]),
         bijector=tfb.BatchNormalization(batchnorm_layer=layer),
-        event_shape=[1],
         validate_args=True)
 
     x_ = tf.keras.Input(shape=(1,))

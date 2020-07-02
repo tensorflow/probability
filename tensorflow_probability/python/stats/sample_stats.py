@@ -129,7 +129,7 @@ def auto_correlation(x,
     x_rotated = distribution_util.rotate_transpose(x, shift)
 
     if center:
-      x_rotated -= tf.reduce_mean(x_rotated, axis=-1, keepdims=True)
+      x_rotated = x_rotated - tf.reduce_mean(x_rotated, axis=-1, keepdims=True)
 
     # x_len = N / 2 from above explanation.  The length of x along axis.
     # Get a value for x_len that works in all cases.
@@ -197,7 +197,7 @@ def auto_correlation(x,
     if know_static_shape:
       chopped_shape = tensorshape_util.as_list(x_rotated.shape)
       chopped_shape[-1] = min(x_len, max_lags + 1)
-      shifted_product_chopped.set_shape(chopped_shape)
+      tensorshape_util.set_shape(shifted_product_chopped, chopped_shape)
 
     # Recall R[m] is a sum of N / 2 - m nonzero terms x[n] Conj(x[n - m]).  The
     # other terms were zeros arising only due to zero padding.
@@ -263,7 +263,7 @@ def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
   L = tfp.stats.cholesky_covariance(observed_data, sample_axis=0)
 
   # Make fake_data with the same covariance as observed_data.
-  uncorrelated_normal = tf.random_normal(shape=(500, 10))
+  uncorrelated_normal = tf.random.normal(shape=(500, 10))
   fake_data = tf.linalg.matvec(L, uncorrelated_normal)
   ```
 
@@ -309,8 +309,8 @@ def covariance(x,
   one is often interested in the covariance matrix, `C_{ij} := Cov[Xi, Yj]`.
 
   ```python
-  x = tf.random_normal(shape=(100, 2, 3))
-  y = tf.random_normal(shape=(100, 2, 3))
+  x = tf.random.normal(shape=(100, 2, 3))
+  y = tf.random.normal(shape=(100, 2, 3))
 
   # cov[i, j] is the sample covariance between x[:, i, j] and y[:, i, j].
   cov = tfp.stats.covariance(x, y, sample_axis=0, event_axis=None)
@@ -376,11 +376,13 @@ def covariance(x,
 
     # If we get lucky and axis is statically defined, we can do some checks.
     if _is_list_like(event_axis) and _is_list_like(sample_axis):
+      event_axis = tuple(map(int, event_axis))
+      sample_axis = tuple(map(int, sample_axis))
       if set(event_axis).intersection(sample_axis):
         raise ValueError(
             'sample_axis ({}) and event_axis ({}) overlapped'.format(
                 sample_axis, event_axis))
-      if (np.diff(sorted(event_axis)) > 1).any():
+      if (np.diff(np.array(sorted(event_axis))) > 1).any():
         raise ValueError(
             'event_axis must be contiguous. Found: {}'.format(event_axis))
       batch_axis = list(
@@ -493,8 +495,8 @@ def correlation(x,
   one is often interested in the correlation matrix, `C_{ij} := Corr[Xi, Yj]`.
 
   ```python
-  x = tf.random_normal(shape=(100, 2, 3))
-  y = tf.random_normal(shape=(100, 2, 3))
+  x = tf.random.normal(shape=(100, 2, 3))
+  y = tf.random.normal(shape=(100, 2, 3))
 
   # corr[i, j] is the sample correlation between x[:, i, j] and y[:, i, j].
   corr = tfp.stats.correlation(x, y, sample_axis=0, event_axis=None)
@@ -567,7 +569,7 @@ def stddev(x, sample_axis=0, keepdims=False, name=None):
   ```
 
   ```python
-  x = tf.random_normal(shape=(100, 2, 3))
+  x = tf.random.normal(shape=(100, 2, 3))
 
   # stddev[i, j] is the sample standard deviation of the (i, j) batch member.
   stddev = tfp.stats.stddev(x, sample_axis=0)
@@ -581,7 +583,7 @@ def stddev(x, sample_axis=0, keepdims=False, name=None):
   stddev = tfp.stats.stddev(observed_data)
 
   # Make fake_data with the same standard deviation as observed_data.
-  fake_data = stddev * tf.random_normal(shape=(100,))
+  fake_data = stddev * tf.random.normal(shape=(100,))
   ```
 
   Notice we divide by `N` (the numpy default), which does not create `NaN`
@@ -616,7 +618,7 @@ def variance(x, sample_axis=0, keepdims=False, name=None):
   ```
 
   ```python
-  x = tf.random_normal(shape=(100, 2, 3))
+  x = tf.random.normal(shape=(100, 2, 3))
 
   # var[i, j] is the sample variance of the (i, j) batch member of x.
   var = tfp.stats.variance(x, sample_axis=0)

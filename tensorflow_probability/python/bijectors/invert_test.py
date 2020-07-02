@@ -18,19 +18,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class InvertBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class InvertBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = Invert(bij) transformation."""
 
   def testBijector(self):
@@ -86,7 +85,12 @@ class InvertBijectorTest(test_case.TestCase):
         [],
         self.evaluate(
             tf.shape(
-                exp_gamma_distribution.sample(seed=tfp_test_util.test_seed()))))
+                exp_gamma_distribution.sample(seed=test_util.test_seed()))))
+
+  def testInvertCallStillWorks(self):
+    x = [1., 2.]
+    self.assertAllClose(np.log(x), tfb.Invert(tfb.Exp())(x),
+                        atol=1e-5, rtol=1e-5)
 
 
 if __name__ == "__main__":

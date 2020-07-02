@@ -18,7 +18,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -168,20 +167,16 @@ class LinearRegression(StructuralTimeSeries):
         an instance of `tf.linalg.LinearOperator`.
       weights_prior: `tfd.Distribution` representing a prior over the regression
         weights. Must have event shape `[num_features]` and batch shape
-        broadcastable to the design matrix's `batch_shape`. Alternately,
-        `event_shape` may be scalar (`[]`), in which case the prior is
-        internally broadcast as `TransformedDistribution(weights_prior,
-        tfb.Identity(), event_shape=[num_features],
-        batch_shape=design_matrix.batch_shape)`. If `None`,
-        defaults to `StudentT(df=5, loc=0., scale=10.)`, a weakly-informative
-        prior loosely inspired by the [Stan prior choice recommendations](
+        broadcastable to the design matrix's `batch_shape`. If `None`, defaults
+        to `Sample(StudentT(df=5, loc=0., scale=10.), num_features])`, a
+        weakly-informative prior loosely inspired by the
+        [Stan prior choice recommendations](
         https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations).
         Default value: `None`.
       name: the name of this model component.
         Default value: 'LinearRegression'.
     """
-    with tf1.name_scope(
-        name, 'LinearRegression', values=[design_matrix]) as name:
+    with tf.name_scope(name or 'LinearRegression') as name:
 
       if not isinstance(design_matrix, tfl.LinearOperator):
         design_matrix = tfl.LinearOperatorFullMatrix(
@@ -195,21 +190,18 @@ class LinearRegression(StructuralTimeSeries):
 
       # Default to a weakly-informative StudentT(df=5, 0., 10.) prior.
       if weights_prior is None:
-        weights_prior = tfd.StudentT(
-            df=5,
-            loc=tf.zeros([], dtype=design_matrix.dtype),
-            scale=10 * tf.ones([], dtype=design_matrix.dtype))
-      # Sugar: if prior is static scalar, broadcast it to a default shape.
-      if weights_prior.event_shape.ndims == 0:
         if design_matrix.batch_shape.is_fully_defined():
           design_matrix_batch_shape_ = design_matrix.batch_shape
         else:
           design_matrix_batch_shape_ = design_matrix.batch_shape_tensor()
-        weights_prior = tfd.TransformedDistribution(
-            weights_prior,
-            bijector=tfb.Identity(),
-            batch_shape=design_matrix_batch_shape_,
-            event_shape=[num_features])
+        weights_prior = tfd.StudentT(
+            df=5,
+            loc=tf.zeros(
+                design_matrix_batch_shape_, dtype=design_matrix.dtype),
+            scale=10 * tf.ones([], dtype=design_matrix.dtype))
+      # Sugar: if prior is static scalar, lift it to a prior on feature vectors.
+      if weights_prior.event_shape.ndims == 0:
+        weights_prior = tfd.Sample(weights_prior, sample_shape=[num_features])
 
       tf.debugging.assert_same_float_dtype([design_matrix, weights_prior])
 
@@ -217,7 +209,19 @@ class LinearRegression(StructuralTimeSeries):
 
       super(LinearRegression, self).__init__(
           parameters=[
-              Parameter('weights', weights_prior, tfb.Identity()),
+              Parameter(
+                  name='weights',
+                  prior=weights_prior,
+                  # If the weights prior has constrained support, then we'd like
+                  # to avoid considering invalid weights at inference time. For
+                  # example, an Exponential prior should only see nonnegative
+                  # weights. For now, we enforce this using the prior's default
+                  # bijector. Given sufficient motivation we might consider
+                  # adding a `weights_constraining_bijector` argument
+                  # to customize the bijector choice, analogous to
+                  # `sts.Autoregressive.coef_constraining_bijector`.
+                  bijector=(weights_prior  # pylint: disable=protected-access
+                            ._experimental_default_event_space_bijector())),
           ],
           latent_size=0,
           name=name)
@@ -407,9 +411,7 @@ class SparseLinearRegression(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'SparseLinearRegression'.
     """
-    with tf1.name_scope(
-        name, 'SparseLinearRegression',
-        values=[design_matrix, weights_prior_scale]) as name:
+    with tf.name_scope(name or 'SparseLinearRegression') as name:
 
       if not isinstance(design_matrix, tfl.LinearOperator):
         design_matrix = tfl.LinearOperatorFullMatrix(

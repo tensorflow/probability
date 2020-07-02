@@ -19,9 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
-import collections
 import contextlib
-import weakref
 
 # Dependency imports
 import numpy as np
@@ -29,10 +27,12 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
+
 
 __all__ = [
     'Bijector',
@@ -40,173 +40,6 @@ __all__ = [
 
 
 SKIP_DTYPE_CHECKS = False
-
-
-class _Mapping(
-    collections.namedtuple('_Mapping', ['x', 'y', 'ildj', 'kwargs'])):
-  """Helper class to make it easier to manage caching in `Bijector`."""
-
-  def __new__(cls, x=None, y=None, ildj=None, kwargs=None):
-    """Custom __new__ so namedtuple items have defaults.
-
-    Args:
-      x: `Tensor` or None. Input to forward; output of inverse.
-      y: `Tensor` or None. Input to inverse; output of forward.
-      ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
-      kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
-        functions.
-
-    Returns:
-      mapping: New instance of _Mapping.
-    """
-    return super(_Mapping, cls).__new__(cls, x, y, ildj, kwargs)
-
-  @property
-  def subkey(self):
-    """Returns subkey used for caching (nested under either `x` or `y`)."""
-    return self._deep_tuple(self.kwargs)
-
-  def merge(self, x=None, y=None, ildj=None, kwargs=None, mapping=None):
-    """Returns new _Mapping with args merged with self.
-
-    Args:
-      x: `Tensor` or None. Input to forward; output of inverse.
-      y: `Tensor` or None. Input to inverse; output of forward.
-      ildj: `Tensor`. This is the (un-reduce_sum'ed) inverse log det jacobian.
-      kwargs: Python dictionary. Extra args supplied to forward/inverse/etc
-        functions.
-      mapping: Instance of _Mapping to merge. Can only be specified if no other
-        arg is specified.
-
-    Returns:
-      mapping: New instance of `_Mapping` which has inputs merged with self.
-
-    Raises:
-      ValueError: if mapping and any other arg is not `None`.
-    """
-    if mapping is None:
-      mapping = _Mapping(x=x, y=y, ildj=ildj, kwargs=kwargs)
-    elif any(arg is not None for arg in [x, y, ildj, kwargs]):
-      raise ValueError('Cannot simultaneously specify mapping and individual '
-                       'arguments.')
-
-    return _Mapping(
-        x=self._merge(self.x, mapping.x),
-        y=self._merge(self.y, mapping.y),
-        ildj=self._merge(self.ildj, mapping.ildj),
-        kwargs=self._merge(self.kwargs, mapping.kwargs, use_equals=True))
-
-  def remove(self, field):
-    """To support weak referencing, removes cache key from the cache value."""
-    return _Mapping(
-        x=None if field == 'x' else self.x,
-        y=None if field == 'y' else self.y,
-        ildj=self.ildj,
-        kwargs=self.kwargs)
-
-  def _merge(self, old, new, use_equals=False):
-    """Helper to merge which handles merging one value."""
-    def generic_to_array(x):
-      if isinstance(x, np.generic):
-        x = np.array(x)
-      if isinstance(x, np.ndarray):
-        x.flags.writeable = False
-      return x
-    if old is None:
-      return generic_to_array(new)
-    if new is None:
-      return generic_to_array(old)
-    if (old == new) if use_equals else (old is new):
-      return generic_to_array(old)
-    raise ValueError('Incompatible values: %s != %s' % (old, new))
-
-  def _deep_tuple(self, x):
-    """Converts nested `tuple`, `list`, or `dict` to nested `tuple`."""
-    if isinstance(x, dict):
-      return self._deep_tuple(tuple(sorted(x.items())))
-    elif isinstance(x, (list, tuple)):
-      return tuple(map(self._deep_tuple, x))
-    elif isinstance(x, tf.Tensor):
-      return x.experimental_ref()
-
-    return x
-
-
-class WeakKeyDefaultDict(dict):
-  """`WeakKeyDictionary` which always adds `defaultdict(dict)` in getitem."""
-
-  # Q:Why not subclass `collections.defaultdict`?
-  # Subclassing collections.defaultdict means we have a more complicated `repr`,
-  # `str` which makes debugging the bijector cache more tedious. Additionally it
-  # means we need to think about passing through __init__ args but manually
-  # specifying the `default_factory`. That is, just overriding `__missing__`
-  # ends up being a lot cleaner.
-
-  # Q:Why not subclass `weakref.WeakKeyDictionary`?
-  # `weakref.WeakKeyDictionary` has an even worse `repr`, `str` than
-  # collections.defaultdict. Plus, since we want explicit control over how the
-  # keys are created we need to override __getitem__ which is the only feature
-  # of `weakref.WeakKeyDictionary` we're using.
-
-  # This is the 'WeakKey' part.
-  def __getitem__(self, key):
-    weak_key = HashableWeakRef(key, lambda w: self.pop(w, None))
-    return super(WeakKeyDefaultDict, self).__getitem__(weak_key)
-
-  # This is the 'DefaultDict' part.
-  def __missing__(self, key):
-    assert isinstance(key, HashableWeakRef)  # Can't happen.
-    return super(WeakKeyDefaultDict, self).setdefault(key, {})
-
-  # Everything that follows is only useful to help make debugging easier.
-
-  def __contains__(self, key):
-    return super(WeakKeyDefaultDict, self).__contains__(HashableWeakRef(key))
-
-  # We don't want mutation except through __getitem__.
-
-  def __setitem__(self, *args, **kwargs):
-    raise NotImplementedError()
-
-  def update(self, *args, **kwargs):
-    raise NotImplementedError()
-
-  def setdefault(self, *args, **kwargs):
-    raise NotImplementedError()
-
-
-class HashableWeakRef(weakref.ref):
-  """weakref.ref which makes np.array objects hashable."""
-
-  def __hash__(self):
-    x = self()
-    if not isinstance(x, np.ndarray):
-      return id(x)
-    if isinstance(x, np.generic):
-      raise ValueError('Unable to weakref np.generic')
-    # Note: The following logic can never be reached by the public API because
-    # the bijector base class always calls `convert_to_tensor` before accessing
-    # the cache.
-    x.flags.writeable = False
-    return hash(str(x.__array_interface__) + str(id(x)))
-
-  def __repr__(self):
-    return repr(self())
-
-  def __str__(self):
-    return str(self())
-
-  def __eq__(self, other):
-    x = self()
-    if isinstance(x, np.generic):
-      raise ValueError('Unable to weakref np.generic')
-    y = other()
-    ids_are_equal = id(x) == id(y)
-    if isinstance(x, np.ndarray):
-      return (isinstance(y, np.ndarray) and
-              x.__array_interface__ == y.__array_interface__ and
-              ids_are_equal)
-    return ids_are_equal
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -480,7 +313,8 @@ class Bijector(tf.Module):
       - `_forward`,
       - `_inverse`,
       - `_inverse_log_det_jacobian`,
-      - `_forward_log_det_jacobian` (optional).
+      - `_forward_log_det_jacobian` (optional),
+      - `_is_increasing` (scalar bijectors only)
 
     The `_forward_log_det_jacobian` is called when the bijector is inverted via
     the `Invert` bijector. If undefined, a slightly less efficiently
@@ -514,12 +348,12 @@ class Bijector(tf.Module):
 
   #### Non Injective Transforms
 
-  **WARNING** Handing of non-injective transforms is subject to change.
+  **WARNING** Handling of non-injective transforms is subject to change.
 
   Non injective maps `g` are supported, provided their domain `D` can be
   partitioned into `k` disjoint subsets, `Union{D1, ..., Dk}`, such that,
   ignoring sets of measure zero, the restriction of `g` to each subset is a
-  differentiable bijection onto `g(D)`.  In particular, this imples that for
+  differentiable bijection onto `g(D)`.  In particular, this implies that for
   `y in g(D)`, the set inverse, i.e. `g^{-1}(y) = {x in D : g(x) = y}`, always
   contains exactly `k` distinct points.
 
@@ -571,8 +405,7 @@ class Bijector(tf.Module):
       (
           '_graph_parents',
           '_is_constant_jacobian',
-          '_from_y',
-          '_from_x',
+          '_cache',
       ))
 
   @abc.abstractmethod
@@ -583,6 +416,7 @@ class Bijector(tf.Module):
                dtype=None,
                forward_min_event_ndims=None,
                inverse_min_event_ndims=None,
+               parameters=None,
                name=None):
     """Constructs Bijector.
 
@@ -614,6 +448,8 @@ class Bijector(tf.Module):
       inverse_min_event_ndims: Python `integer` indicating the minimum number of
         dimensions `inverse` operates on. Will be set to
         `forward_min_event_ndims` by default, if no value is provided.
+      parameters: Python `dict` of parameters used to instantiate this
+        `Bijector`.
       name: The name to give Ops created by the initializer.
 
     Raises:
@@ -629,15 +465,13 @@ class Bijector(tf.Module):
     name = name_util.strip_invalid_chars(name)
     super(Bijector, self).__init__(name=name)
     self._name = name
+    self._parameters = self._no_dependency(parameters)
 
     self._graph_parents = self._no_dependency(graph_parents or [])
 
     self._is_constant_jacobian = is_constant_jacobian
     self._validate_args = validate_args
     self._dtype = dtype
-
-    self._from_y = self._no_dependency(WeakKeyDefaultDict())
-    self._from_x = self._no_dependency(WeakKeyDefaultDict())
 
     self._initial_parameter_control_dependencies = tuple(
         d for d in self._parameter_control_dependencies(is_init=True)
@@ -677,6 +511,17 @@ class Bijector(tf.Module):
     for i, t in enumerate(self._graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError('Graph parent item %d is not a Tensor; %s.' % (i, t))
+
+    # Setup caching after everything else is done.
+    self._cache = self._setup_cache()
+
+  def _setup_cache(self):
+    """Defines the cache for this bijector."""
+    # Wrap forward/inverse with getters so instance methods can be patched.
+    return cache_util.BijectorCache(
+        forward_impl=(lambda x, **kwargs: self._forward(x, **kwargs)),  # pylint: disable=unnecessary-lambda
+        inverse_impl=(lambda y, **kwargs: self._inverse(y, **kwargs)),  # pylint: disable=unnecessary-lambda
+        cache_type=cache_util.CachedDirectedFunction)
 
   @property
   def graph_parents(self):
@@ -735,6 +580,15 @@ class Bijector(tf.Module):
   def name(self):
     """Returns the string name of this `Bijector`."""
     return self._name
+
+  @property
+  def parameters(self):
+    """Dictionary of parameters used to instantiate this `Bijector`."""
+    # Remove "self", "__class__", or other special variables. These can appear
+    # if the subclass used:
+    # `parameters = dict(locals())`.
+    return {k: v for k, v in self._parameters.items()
+            if not k.startswith('__') and k != 'self'}
 
   def __call__(self, value, name=None, **kwargs):
     """Applies or composes the `Bijector`, depending on input type.
@@ -821,7 +675,7 @@ class Bijector(tf.Module):
     if isinstance(value, Bijector):
       return chain.Chain([self, value], name=name, **kwargs)
 
-    return self._call_forward(value, name=name or 'forward', **kwargs)
+    return self.forward(value, name=name or 'forward', **kwargs)
 
   def _forward_event_shape_tensor(self, input_shape):
     """Subclass implementation for `forward_event_shape_tensor` function."""
@@ -930,18 +784,7 @@ class Bijector(tf.Module):
       self._maybe_assert_dtype(x)
       if not self._is_injective:  # No caching for non-injective
         return self._forward(x, **kwargs)
-      mapping = self._lookup(x=x, kwargs=kwargs)
-      if mapping.y is not None:
-        return mapping.y
-      mapping = mapping.merge(y=self._forward(x, **kwargs))
-      # It's most important to cache the y->x mapping, because computing
-      # inverse(forward(y)) may be numerically unstable / lossy. Caching the
-      # x->y mapping only saves work. Since python doesn't support ephemerons,
-      # we cannot be simultaneously weak-keyed on both x and y, so we choose y.
-      self._cache_by_y(mapping)
-      if not tf.executing_eagerly():
-        self._cache_by_x(mapping)
-      return mapping.y
+      return self._cache.forward(x, **kwargs)
 
   def forward(self, x, name='forward', **kwargs):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y).
@@ -961,6 +804,32 @@ class Bijector(tf.Module):
     """
     return self._call_forward(x, name, **kwargs)
 
+  @classmethod
+  def _is_increasing(cls, **kwargs):
+    """Subclass implementation for `is_increasing` public function."""
+    raise NotImplementedError('`_is_increasing` not implemented.')
+
+  def _call_is_increasing(self, name, **kwargs):
+    """Wraps call to _is_increasing, allowing extra shared logic."""
+    with self._name_and_control_scope(name):
+      return tf.identity(self._is_increasing(**kwargs))
+
+  def _internal_is_increasing(self, name='is_increasing', **kwargs):
+    """For scalar bijectors, returns True where `d forward(x) / d x > 0`.
+
+    This method, like `_is_injective`, is part of a contract with
+    `TransformedDistribution`. This method supports the correctness of scalar
+    `quantile` / `cdf` / `survival_function` for transformed distributions.
+
+    Args:
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      A python `bool` or a `tf.bool` `Tensor`.
+    """
+    return self._call_is_increasing(name, **kwargs)
+
   def _inverse(self, y):
     """Subclass implementation for `inverse` public function."""
     raise NotImplementedError('inverse not implemented')
@@ -972,18 +841,7 @@ class Bijector(tf.Module):
       self._maybe_assert_dtype(y)
       if not self._is_injective:  # No caching for non-injective
         return self._inverse(y, **kwargs)
-      mapping = self._lookup(y=y, kwargs=kwargs)
-      if mapping.x is not None:
-        return mapping.x
-      mapping = mapping.merge(x=self._inverse(y, **kwargs))
-      # It's most important to cache the x->y mapping, because computing
-      # forward(inverse(y)) may be numerically unstable / lossy. Caching the
-      # y->x mapping only saves work. Since python doesn't support ephemerons,
-      # we cannot be simultaneously weak-keyed on both x and y, so we choose x.
-      self._cache_by_x(mapping)
-      if not tf.executing_eagerly():
-        self._cache_by_y(mapping)
-      return mapping.x
+      return self._cache.inverse(y, **kwargs)
 
   def inverse(self, y, name='inverse', **kwargs):
     """Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
@@ -1045,8 +903,14 @@ class Bijector(tf.Module):
         transformation, at whose value the ILDJ is to be computed. Can be
         `None` as long as `x` is not `None`.
       prefer_inverse_ldj_fn: Python `bool`, if `True`, will strictly prefer to
-        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will
-        strictly prefer to use `_forward_log_det_jacobian`.
+        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will strictly
+        prefer to use `_forward_log_det_jacobian`. The switching behavior allows
+        the caller to communicate that one of the inverse or forward LDJ
+        computations may be more efficient (usually because it can avoid an
+        extra call to `inverse` or `forward`). It's only a "preference" because
+        it may not always be possible, namely if the underlying implementation
+        only has one of `_inverse_log_det_jacobian` or
+        `_forward_log_det_jacobian` defined.
       event_ndims: int-like `Tensor`, the number of dims of an event (in the
         pre- or post-transformed space, as appropriate). These need to be summed
         over to compute the total ildj.
@@ -1118,18 +982,16 @@ class Bijector(tf.Module):
       ildj: the (un-reduce_sum'ed) value of the ILDJ at the specified input
         location. Also updates the cache as needed.
     """
-    mapping = self._lookup(x=x, y=y, kwargs=kwargs)
-    if mapping.ildj is not None:
-      return mapping.ildj
-
     if use_inverse_ldj_fn:
-      ildj = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
+      attrs = self._cache.inverse.attributes(tensor_to_use, **kwargs)
+      if 'ildj' not in attrs:
+        attrs['ildj'] = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
     else:
-      ildj = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
+      attrs = self._cache.forward.attributes(tensor_to_use, **kwargs)
+      if 'ildj' not in attrs:
+        attrs['ildj'] = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
 
-    mapping = mapping.merge(x=x, y=y, ildj=ildj)
-    self._cache_update(mapping)
-    return ildj
+    return attrs['ildj']
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     """Wraps call to _inverse_log_det_jacobian, allowing extra shared logic.
@@ -1279,6 +1141,52 @@ class Bijector(tf.Module):
     """
     return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
+  def _forward_dtype(self, dtype):
+    # TODO(emilyaf): Raise an error if not implemented for bijectors with
+    # multipart forward or inverse event shapes.
+    return dtype
+
+  def _inverse_dtype(self, dtype):
+    # TODO(emilyaf): Raise an error if not implemented for bijectors with
+    # multipart forward or inverse event shapes.
+    return dtype
+
+  def forward_dtype(self,
+                    dtype,
+                    name='forward_dtype',
+                    **kwargs):
+    """Returns the dtype of the output of the forward transformation.
+
+    Args:
+      dtype: `tf.dtype`, or nested structure of `tf.dtype`s, of the input to
+        `forward`.
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      `tf.dtype` or nested structure of `tf.dtype`s of the output of `forward`.
+    """
+    with self._name_and_control_scope(name):
+      return self._forward_dtype(dtype, **kwargs)
+
+  def inverse_dtype(self,
+                    dtype,
+                    name='inverse_dtype',
+                    **kwargs):
+    """Returns the dtype of the output of the inverse transformation.
+
+    Args:
+      dtype: `tf.dtype`, or nested structure of `tf.dtype`s, of the input to
+        `inverse`.
+      name: The name to give this op.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      `tf.dtype` or nested structure of `tf.dtype`s of the output of `inverse`.
+    """
+    with self._name_and_control_scope(name):
+      return self._inverse_dtype(dtype, **kwargs)
+
   @contextlib.contextmanager
   def _name_and_control_scope(self, name=None):
     """Helper function to standardize op scope."""
@@ -1303,45 +1211,6 @@ class Bijector(tf.Module):
         not dtype_util.base_equal(self.dtype, x.dtype)):
       raise TypeError(
           'Input had dtype %s but expected %s.' % (x.dtype, self.dtype))
-
-  def _cache_by_x(self, mapping):
-    """Helper which stores new mapping info in the forward dict."""
-    # Merging from lookup is an added check that we're not overwriting anything
-    # which is not None.
-    mapping = mapping.merge(
-        mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
-    if mapping.x is None:
-      raise ValueError('Caching expects x to be known, i.e., not None.')
-    self._from_x[mapping.x][mapping.subkey] = mapping.remove('x')
-
-  def _cache_by_y(self, mapping):
-    """Helper which stores new mapping info in the inverse dict."""
-    # Merging from lookup is an added check that we're not overwriting anything
-    # which is not None.
-    mapping = mapping.merge(
-        mapping=self._lookup(mapping.x, mapping.y, mapping.kwargs))
-    if mapping.y is None:
-      raise ValueError('Caching expects y to be known, i.e., not None.')
-    self._from_y[mapping.y][mapping.subkey] = mapping.remove('y')
-
-  def _cache_update(self, mapping):
-    """Helper which updates only those cached entries that already exist."""
-    if mapping.x is not None and mapping.subkey in self._from_x[mapping.x]:
-      self._cache_by_x(mapping)
-    if mapping.y is not None and mapping.subkey in self._from_y[mapping.y]:
-      self._cache_by_y(mapping)
-
-  def _lookup(self, x=None, y=None, kwargs=None):
-    """Helper which retrieves mapping info from forward/inverse dicts."""
-    mapping = _Mapping(x=x, y=y, kwargs=kwargs)
-    subkey = mapping.subkey
-    if x is not None:
-      # We removed x at caching time. Add it back if we lookup successfully.
-      mapping = self._from_x[x].get(subkey, mapping).merge(x=x)
-    if y is not None:
-      # We removed y at caching time. Add it back if we lookup successfully.
-      mapping = self._from_y[y].get(subkey, mapping).merge(y=y)
-    return mapping
 
   def _reduce_jacobian_det_over_event(
       self, shape_tensor, ildj, min_event_ndims, event_ndims):

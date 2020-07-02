@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tempfile
+
 # Dependency imports
 
 from absl.testing import parameterized
@@ -25,16 +27,17 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.layers import weight_norm
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
 tfk = tf.keras
 
 tfkl = tf.keras.layers
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class WeightNormTest(test_case.TestCase, parameterized.TestCase):
+# TODO(b/143642032): Figure out how to get this working with
+# @test_util.test_all_tf_execution_regimes
+@test_util.test_graph_and_eager_modes
+class WeightNormTest(test_util.TestCase):
 
   def setUp(self):
     super(WeightNormTest, self).setUp()
@@ -313,6 +316,12 @@ class WeightNormTest(test_case.TestCase, parameterized.TestCase):
     self.assertAllClose(true_init_g, self.evaluate(norm_layer.g))
     self.assertAllClose(true_init_bias, self.evaluate(norm_layer.layer.bias))
 
+  def testCheckpoint(self):
+    model = self._define_model('sequential', self.data_dim, self.num_hidden)
+    self.evaluate([v.initializer for v in model.weights])
+    checkpoint = tf.train.Checkpoint(model=model)
+    model_dir = tempfile.mkdtemp()
+    checkpoint.save(file_prefix=model_dir)
 
 if __name__ == '__main__':
   tf.test.main()

@@ -22,10 +22,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -136,7 +140,7 @@ class HalfCauchy(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     shape = tf.concat([[n], self._batch_shape_tensor(
         loc=loc, scale=scale)], 0)
-    probs = tf.random.uniform(
+    probs = samplers.uniform(
         shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     # Quantile function.
     return loc + scale * tf.tan((np.pi / 2) * probs)
@@ -144,21 +148,19 @@ class HalfCauchy(distribution.Distribution):
   def _log_prob(self, x):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x, loc)):
-      safe_x = self._get_safe_input(x, loc=loc, scale=scale)
-      log_prob = (np.log(2 / np.pi) - tf.math.log(scale) - tf.math.log1p(
-          ((safe_x - loc) / scale)**2))
-      return tf.where(x < loc, dtype_util.as_numpy_dtype(
-          self.dtype)(-np.inf), log_prob)
+    safe_x = self._get_safe_input(x, loc=loc, scale=scale)
+    log_prob = (np.log(2 / np.pi) - tf.math.log(scale) - tf.math.log1p(
+        ((safe_x - loc) / scale)**2))
+    return tf.where(x < loc, dtype_util.as_numpy_dtype(
+        self.dtype)(-np.inf), log_prob)
 
   def _log_cdf(self, x):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    with tf.control_dependencies(self._maybe_assert_valid_sample(x, loc)):
-      safe_x = self._get_safe_input(x, loc=loc, scale=scale)
-      log_cdf = np.log(2 / np.pi) + tf.math.log(tf.atan((safe_x - loc) / scale))
-      return tf.where(x < loc, dtype_util.as_numpy_dtype(
-          self.dtype)(-np.inf), log_cdf)
+    safe_x = self._get_safe_input(x, loc=loc, scale=scale)
+    log_cdf = np.log(2 / np.pi) + tf.math.log(tf.atan((safe_x - loc) / scale))
+    return tf.where(x < loc, dtype_util.as_numpy_dtype(
+        self.dtype)(-np.inf), log_cdf)
 
   def _entropy(self):
     h = np.log(2 * np.pi) + tf.math.log(self.scale)
@@ -193,13 +195,22 @@ class HalfCauchy(distribution.Distribution):
     safe_value = 0.5 * scale + loc
     return tf.where(x < loc, safe_value, x)
 
-  def _maybe_assert_valid_sample(self, x, loc):
+  def _default_event_space_bijector(self):
+    return chain_bijector.Chain([
+        shift_bijector.Shift(
+            shift=self.loc, validate_args=self.validate_args),
+        exp_bijector.Exp(validate_args=self.validate_args)
+    ], validate_args=self.validate_args)
+
+  def _sample_control_dependencies(self, x):
     """Checks the validity of a sample."""
+    assertions = []
     if not self.validate_args:
-      return []
-    return [
-        assert_util.assert_greater_equal(
-            x, loc, message='x is not in the support of the distribution')]
+      return assertions
+    loc = tf.convert_to_tensor(self.loc)
+    assertions.append(assert_util.assert_greater_equal(
+        x, loc, message='Sample must be greater than or equal to `loc`.'))
+    return assertions
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

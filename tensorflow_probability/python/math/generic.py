@@ -24,29 +24,39 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math.scan_associative import scan_associative
 
 
 __all__ = [
     'log_add_exp',
+    'log_cosh',
+    'log_sub_exp',
     'log_combinations',
+    'log_cumsum_exp',
+    'log1mexp',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
+    'smootherstep',
+    'soft_sorting_matrix',
     'soft_threshold',
     'softplus_inverse',
 ]
 
 
 def log_combinations(n, counts, name='log_combinations'):
-  """Multinomial coefficient.
+  """Log multinomial coefficient.
 
-  Given `n` and `counts`, where `counts` has last dimension `k`, we compute
+  Given `n` and `counts`, where `counts` has last dimension `k`, we define
   the multinomial coefficient as:
 
-  ```n! / sum_i n_i!```
+  ```n! / prod_i n_i!```
 
   where `i` runs over all `k` classes.
+
+  This function computes the natural logarithm of the multinomial coefficient.
 
   Args:
     n: Floating-point `Tensor` broadcastable with `counts`. This represents `n`
@@ -56,8 +66,8 @@ def log_combinations(n, counts, name='log_combinations'):
     name: A name for this operation (optional).
 
   Returns:
-    log_combinations: `Tensor` representing the multinomial coefficient between
-      `n` and `counts`.
+    log_combinations: `Tensor` representing the log of the multinomial
+      coefficient between `n` and `counts`.
   """
   # First a bit about the number of ways counts could have come in:
   # E.g. if counts = [1, 2], then this is 3 choose 2.
@@ -71,6 +81,38 @@ def log_combinations(n, counts, name='log_combinations'):
     counts_factorial = tf.math.lgamma(counts + 1)
     redundant_permutations = tf.reduce_sum(counts_factorial, axis=-1)
     return total_permutations - redundant_permutations
+
+
+# TODO(b/154562929): Remove this once the built-in op supports XLA.
+# TODO(b/156297366): Derivatives of this function may not always be correct.
+def log_cumsum_exp(x, axis=-1, name=None):
+  """Computes log(cumsum(exp(x))).
+
+  This is a pure-TF implementation of `tf.math.cumulative_logsumexp`; unlike
+  the built-in op, it supports XLA compilation. It uses a similar algorithmic
+  technique (parallel prefix sum) as the built-in op, so it has similar numerics
+  and asymptotic performace. However, this implemenentation currently has higher
+  overhead, so it is significantly slower on smaller inputs (`n < 10000`).
+
+  Args:
+    x: the `Tensor` to sum over.
+    axis: int `Tensor` axis to sum over.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'cumulative_logsumexp'`).
+  Returns:
+    cumulative_logsumexp: `Tensor` of the same shape as `x`.
+  """
+  with tf.name_scope(name or 'cumulative_logsumexp'):
+    x = tf.convert_to_tensor(x, name='x')
+    # TODO(b/154873585) Support `axis` in scan_associative to avoid transposing.
+    def safe_logsumexp(x, y):
+      result = log_add_exp(x, y)
+      # Remove spurious `NaN`s that arise from subtracting infinities.
+      return tf.where(tf.math.is_finite(result), result, -np.inf)
+    x = dist_util.move_dimension(x, source_idx=axis, dest_idx=0)
+    return dist_util.move_dimension(scan_associative(safe_logsumexp, x),
+                                    source_idx=0,
+                                    dest_idx=axis)
 
 
 def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
@@ -367,4 +409,210 @@ def log_add_exp(x, y, name=None):
     dtype = dtype_util.common_dtype([x, y], dtype_hint=tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
     y = tf.convert_to_tensor(y, dtype=dtype, name='y')
-    return tf.maximum(x, y) + tf.math.softplus(-abs(x - y))
+
+    # The following is similar to using the standard method
+    # `tf.maximum(x, y) + tf.math.softplus(-abs(x - y))`
+    # to compute `log_add_exp`. However, both `tf.maximum` and
+    # `abs(x - y)` have discontinuities in their derivatives
+    # along `x == y`.
+    # This version ensures that the contribution of the discontinuities
+    # to the derivative all cancel leaving a continuous result without
+    # changing the domain in which the original was valid.
+    larger = tf.maximum(x, y)
+    return larger + tf.math.softplus((x - larger) + (y - larger))
+
+
+def smootherstep(x, name=None):
+  """Computes a sigmoid-like interpolation function on the unit-interval.
+
+  Equivalent to:
+
+  ```python
+  x = tf.clip_by_value(x, clip_value_min=0., clip_value_max=1.)
+  y = x**3. * (6. * x**2. - 15. * x + 10.)
+  ```
+
+  For more details see [Wikipedia][1].
+
+  Args:
+    x: `float` `Tensor`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'smootherstep'`).
+
+  Returns:
+    smootherstep: `float` `Tensor` with the same shape and dtype as `x`,
+      representing the value of the smootherstep function.
+
+  #### References
+
+  [1]: "Smoothstep." Wikipedia.
+       https://en.wikipedia.org/wiki/Smoothstep#Variations
+  """
+  with tf.name_scope(name or 'smootherstep'):
+    x = tf.clip_by_value(x, clip_value_min=0., clip_value_max=1.)
+    # Note: Grappler will rewrite:
+    #   x**2, x**3
+    # as:
+    #   x2 = tf.square(x)
+    #   x3 = tf.square(x) * x
+    # and common subexpression elimination (CSE) will produce:
+    #   x2 = tf.square(x)
+    #   x3 = x2 * x
+    return x**3. * (6. * x**2. - 15. * x + 10.)
+
+
+def log_sub_exp(x, y, return_sign=False, name=None):
+  """Compute `log(exp(max(x, y)) - exp(min(x, y)))` in a numerically stable way.
+
+  Use `return_sign=True` unless `x >= y`, since we can't represent a negative in
+  log-space.
+
+  Args:
+    x: Float `Tensor` broadcastable with `y`.
+    y: Float `Tensor` broadcastable with `x`.
+    return_sign: Whether or not to return the second output value `sign`. If
+      it is known that `x >= y`, this is unnecessary.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log_sub_exp'`).
+
+  Returns:
+    logsubexp: Float `Tensor` of `log(exp(max(x, y)) - exp(min(x, y)))`.
+    sign: Float `Tensor` +/-1 indicating the sign of `exp(x) - exp(y)`.
+  """
+  with tf.name_scope(name or 'log_sub_exp'):
+    dtype = dtype_util.common_dtype([x, y], dtype_hint=tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    y = tf.convert_to_tensor(y, dtype=dtype, name='y')
+    larger = tf.maximum(x, y)
+    smaller = tf.minimum(x, y)
+    result = larger + log1mexp(tf.maximum(larger - smaller, 0))
+    if return_sign:
+      ones = tf.ones([], result.dtype)
+      return result, tf.where(x < y, -ones, ones)
+    return result
+
+
+def log1mexp(x, name=None):
+  """Compute `log(1 - exp(-|x|))` in a numerically stable way.
+
+  Args:
+    x: Float `Tensor`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log1mexp'`).
+
+  Returns:
+    log1mexp: Float `Tensor` of `log1mexp(a)`.
+
+  #### References
+
+  [1]: Machler, Martin. Accurately computing log(1 - exp(-|a|))
+       https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf
+  """
+
+  with tf.name_scope(name or 'log1mexp'):
+    dtype = dtype_util.common_dtype([x], dtype_hint=tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    x = tf.math.abs(x)
+    return tf.where(
+        # This switching point is recommended in [1].
+        x < np.log(2), tf.math.log(-tf.math.expm1(-x)),
+        tf.math.log1p(-tf.math.exp(-x)))
+
+
+@tf.custom_gradient
+def log_cosh(x, name=None):
+  """Compute `log(cosh(x))` in a numerically stable way.
+
+  Args:
+    x: Float `Tensor`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log_cosh'`).
+
+  Returns:
+    log_cosh: `log_cosh(x)`.
+  """
+  # log(cosh(x)) = log(e^x + e^-x) - log(2).
+  # For x > 0, we can rewrite this as x + log(1 + e^(-2 * x)) - log(2).
+  # The second term will be small when x is large, so we don't get any large
+  # cancellations.
+  # Similarly for x < 0, we can rewrite the expression as -x + log(1 + e^(2 *
+  # x)) - log(2)
+  # This gives us abs(x) + softplus(-2 * abs(x)) - log(2)
+
+  # For x close to zero, we can write the taylor series of softplus(
+  # -2 * abs(x)) to see that we get;
+  # log(2) - abs(x) + x**2 / 2. - x**4 / 12 + x**6 / 45. + O(x**8)
+  # We can cancel out terms to get:
+  # x ** 2 / 2.  * (1. - x ** 2 / 6) + x ** 6 / 45. + O(x**8)
+  # For x < 45 * sixthroot(smallest normal), all higher level terms
+  # disappear and we can use the above expression.
+  with tf.name_scope(name or 'log_cosh'):
+    dtype = dtype_util.common_dtype([x], dtype_hint=tf.float32)
+    numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
+    abs_x = tf.math.abs(x)
+    logcosh = abs_x + tf.math.softplus(-2 * abs_x) - np.log(2).astype(
+        numpy_dtype)
+    bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
+    answer = tf.where(
+        abs_x <= bound,
+        tf.math.exp(
+            tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
+        logcosh)
+
+    # The gradient of log(cosh(x)) is tanh(x)
+    def grad(dy):
+      return dy * tf.math.tanh(x)
+    return answer, grad
+
+
+def soft_sorting_matrix(x, temperature, name=None):
+  """Computes a matrix representing a continuous relaxation of sorting.
+
+  Given a vector `x`, there exists a permutation matrix `P_x`, when applied to
+  `x` gives `x` sorted in decreasing order. Here, we compute a continuous
+  relaxation of `P_x`, parameterized by `temperature`. This continuous
+  relaxation satisfies the property that it is a unimodal row-stochastic matrix,
+  meaning that all entries are non-negative, all rows sum to 1., and there is a
+  unique maximum entry in each column. The unique maximum entry will correspond
+  to the location of a `1` in the exact sorting permutation.
+
+  Complexity: Given a vector `x` of size `N`, this operation will take `O(N**2)`
+    time.
+
+  This is also known as a Neural sort in [1].
+
+  Args:
+    x: `float` `Tensor`. Argument to compute the relaxed sorting matrix with
+      respect to.  The relaxed permutation is computed with respect to the last
+      axis.
+    temperature: Positive `float` Tensor`. When `temperature` approaches zero,
+      this will retrieve the exact permutation matrix corresponding to sorting
+      from largest to smallest.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'soft_sorting_matrix'`).
+  Returns:
+    soft_sort: A unimodal row-stochastic matrix. Applying this matrix on x
+      will in the limit of low temperature, sort it.
+
+  #### References
+
+  [1]: Aditya Grover, Eric Wang, Aaron Zweig, Stefano Ermon.
+       Stochastic Optimization of Sorting Networks via Continuous Relaxations.
+       https://arxiv.org/abs/1903.08850
+  """
+  with tf.name_scope(name or 'soft_sorting_matrix'):
+    dtype = dtype_util.common_dtype([temperature, x], dtype_hint=tf.float32)
+    temperature = tf.convert_to_tensor(
+        temperature, name='temperature', dtype=dtype)
+    x = tf.convert_to_tensor(x, name='x', dtype=dtype)
+    n = tf.shape(x)[-1]
+    y = x[..., tf.newaxis]
+    pairwise_distances = tf.abs(y - tf.linalg.matrix_transpose(y))
+    scaling = tf.cast(
+        tf.range(n - 1, -(n - 1) - 1, delta=-2), dtype=dtype)
+    p_logits = tf.linalg.matrix_transpose(
+        tf.matmul(y, scaling[tf.newaxis, ...]) - tf.reduce_sum(
+            pairwise_distances, axis=-1)[..., tf.newaxis])
+    y = tf.nn.softmax(p_logits / temperature, axis=-1)
+    return y

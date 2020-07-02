@@ -24,8 +24,8 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import softplus as softplus_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -61,15 +61,12 @@ def build_trainable_location_scale_distribution(initial_loc,
   with tf.name_scope(name or 'build_trainable_location_scale_distribution'):
     dtype = dtype_util.common_dtype([initial_loc, initial_scale],
                                     dtype_hint=tf.float32)
-    initial_loc = tf.convert_to_tensor(initial_loc, dtype=dtype)
-    initial_scale = tf.convert_to_tensor(initial_scale, dtype=dtype)
+    initial_loc = initial_loc * tf.ones(tf.shape(initial_scale), dtype=dtype)
+    initial_scale = initial_scale * tf.ones_like(initial_loc)
 
     loc = tf.Variable(initial_value=initial_loc, name='loc')
-    scale = tfp_util.DeferredTensor(
-        tf.nn.softplus, tf.Variable(initial_value=tf.broadcast_to(
-            tfp_math.softplus_inverse(initial_scale),
-            shape=prefer_static.shape(initial_loc)),
-                                    name='inverse_softplus_scale'))
+    scale = tfp_util.TransformedVariable(
+        initial_scale, softplus_lib.Softplus(), name='scale')
     posterior_dist = distribution_fn(loc=loc, scale=scale,
                                      validate_args=validate_args)
 
@@ -149,7 +146,7 @@ def build_factored_surrogate_posterior(
       build the corresponding factor in the surrogate posterior. It is expected
       that the distribution returned is supported on unconstrained real values.
       Default value: `functools.partial(
-        tfp.vi.experimental.build_trainable_location_scale_distribution,
+        tfp.experimental.vi.build_trainable_location_scale_distribution,
         distribution_fn=tfd.Normal)`, i.e., a trainable Normal distribution.
     seed: Python integer to seed the random number generator. This is used
       only when `initial_loc` is not specified.
@@ -186,7 +183,7 @@ def build_factored_surrogate_posterior(
   be positive.
 
   ```python
-  surrogate_posterior = tfp.vi.experimental.build_factored_surrogate_posterior(
+  surrogate_posterior = tfp.experimental.vi.build_factored_surrogate_posterior(
     event_shape=model.event_shape_tensor()[:-1],  # Omit the observed `y`.
     constraining_bijectors=[tfb.Softplus(),   # Rate is positive.
                             tfb.Softplus()])  # Concentration is positive.
@@ -225,7 +222,7 @@ def build_factored_surrogate_posterior(
   initial_unconstrained_loc = tf.nest.map_fn(
     lambda b, x: b.inverse(x) if b is not None else x,
     constraining_bijectors, initial_loc)
-  surrogate_posterior = tfp.vi.experimental.build_factored_surrogate_posterior(
+  surrogate_posterior = tfp.experimental.vi.build_factored_surrogate_posterior(
     event_shape=tf.nest.map_fn(tf.shape, initial_loc),
     constraining_bijectors=constraining_bijectors,
     initial_unconstrained_loc=initial_unconstrained_state,
@@ -235,7 +232,7 @@ def build_factored_surrogate_posterior(
   """
 
   with tf.name_scope(name or 'build_factored_surrogate_posterior'):
-    seed = tfd.SeedStream(seed, salt='build_factored_surrogate_posterior')
+    seed = tfp_util.SeedStream(seed, salt='build_factored_surrogate_posterior')
 
     # Convert event shapes to Tensors.
     shallow_structure = _get_event_shape_shallow_structure(event_shape)

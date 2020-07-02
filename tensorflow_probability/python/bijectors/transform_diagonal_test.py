@@ -29,18 +29,15 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import test_case
-from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 def _preserves_vector_dim(dim):
   return lambda bijector: bijector.forward_event_shape([dim]) == [dim]
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class TransformDiagonalBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class TransformDiagonalBijectorTest(test_util.TestCase):
   """Tests correctness of the TransformDiagonal bijector."""
 
   def testBijector(self):
@@ -72,7 +69,7 @@ class TransformDiagonalBijectorTest(test_case.TestCase):
             np.array([np.diag(y_mat) for y_mat in y]),
             event_ndims=1)))
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   def testTheoreticalFldjNormalCDF(self):
     # b/137367959 test failure trigger case (resolved by using
     # experimental_use_pfor=False as fallback instead of primary in
@@ -91,7 +88,7 @@ class TransformDiagonalBijectorTest(test_case.TestCase):
         atol=1e-5,
         rtol=1e-5)
 
-  @tfp_test_util.numpy_disable_gradient_test
+  @test_util.numpy_disable_gradient_test
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testTheoreticalFldj(self, data):

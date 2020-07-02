@@ -23,7 +23,9 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python.bijectors import kumaraswamy as kumaraswamy_bijector
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import kumaraswamy_cdf as kumaraswamy_cdf
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import assert_util
@@ -32,7 +34,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "Kumaraswamy",
+    'Kumaraswamy',
 ]
 
 _kumaraswamy_sample_note = """Note: `x` must have dtype `self.dtype` and be in
@@ -62,7 +64,7 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
 
   The Kumaraswamy distribution is defined over the `(0, 1)` interval using
   parameters
-  `concentration1` (aka "alpha") and `concentration0` (aka "beta").  It has a
+  `concentration1` (aka 'alpha') and `concentration0` (aka 'beta').  It has a
   shape similar to the Beta distribution, but is easier to reparameterize.
 
   #### Mathematical Details
@@ -127,23 +129,23 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
                concentration0=1.,
                validate_args=False,
                allow_nan_stats=True,
-               name="Kumaraswamy"):
+               name='Kumaraswamy'):
     """Initialize a batch of Kumaraswamy distributions.
 
     Args:
       concentration1: Positive floating-point `Tensor` indicating mean
-        number of successes; aka "alpha". Implies `self.dtype` and
+        number of successes; aka 'alpha'. Implies `self.dtype` and
         `self.batch_shape`, i.e.,
         `concentration1.shape = [N1, N2, ..., Nm] = self.batch_shape`.
       concentration0: Positive floating-point `Tensor` indicating mean
-        number of failures; aka "beta". Otherwise has same semantics as
+        number of failures; aka 'beta'. Otherwise has same semantics as
         `concentration1`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`, statistics
-        (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
+        (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -153,20 +155,24 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       dtype_hint=tf.float32)
       concentration1 = tensor_util.convert_nonref_to_tensor(
-          concentration1, name="concentration1", dtype=dtype)
+          concentration1, name='concentration1', dtype=dtype)
       concentration0 = tensor_util.convert_nonref_to_tensor(
-          concentration0, name="concentration0", dtype=dtype)
+          concentration0, name='concentration0', dtype=dtype)
+      self._kumaraswamy_cdf = kumaraswamy_cdf.KumaraswamyCDF(
+          concentration1=concentration1,
+          concentration0=concentration0,
+          validate_args=validate_args)
+      batch_shape = distribution_util.get_broadcast_shape(
+          concentration1, concentration0)
       super(Kumaraswamy, self).__init__(
+          # TODO(b/137665504): Use batch-adding meta-distribution to set the
+          # batch shape instead of tf.zeros.
           distribution=uniform.Uniform(
-              low=tf.zeros([], dtype=dtype),
+              low=tf.zeros(batch_shape, dtype=dtype),
               high=tf.ones([], dtype=dtype),
               allow_nan_stats=allow_nan_stats),
-          bijector=kumaraswamy_bijector.Kumaraswamy(
-              concentration1=concentration1,
-              concentration0=concentration0,
-              validate_args=validate_args),
-          batch_shape=distribution_util.get_broadcast_shape(
-              concentration1, concentration0),
+          bijector=invert.Invert(
+              self._kumaraswamy_cdf, validate_args=validate_args),
           parameters=parameters,
           name=name)
 
@@ -177,18 +183,22 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
   @property
   def concentration1(self):
     """Concentration parameter associated with a `1` outcome."""
-    return self.bijector.concentration1
+    return self._kumaraswamy_cdf.concentration1
 
   @property
   def concentration0(self):
     """Concentration parameter associated with a `0` outcome."""
-    return self.bijector.concentration0
+    return self._kumaraswamy_cdf.concentration0
 
   def _entropy(self):
     a = tf.convert_to_tensor(self.concentration1)
     b = tf.convert_to_tensor(self.concentration0)
     return ((1 - 1. / b) + (1 - 1. / a) * _harmonic_number(b) -
             tf.math.log(a) - tf.math.log(b))
+
+  def _log_cdf(self, x):
+    return tfp_math.log1mexp(self.concentration0 * tf.math.log1p(
+        -x ** self.concentration1))
 
   def _log_moment(self, n, concentration1=None, concentration0=None):
     """Compute the n'th (uncentered) moment."""
@@ -201,9 +211,9 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
                                               tf.shape(total_concentration))
     expanded_concentration0 = tf.broadcast_to(concentration0,
                                               tf.shape(total_concentration))
-    beta_arg0 = 1 + n / expanded_concentration1
-    beta_arg = tf.stack([beta_arg0, expanded_concentration0], -1)
-    return tf.math.log(expanded_concentration0) + tf.math.lbeta(beta_arg)
+    beta_arg = 1 + n / expanded_concentration1
+    return (tf.math.log(expanded_concentration0) +
+            tfp_math.lbeta(beta_arg, expanded_concentration0))
 
   def _mean(self):
     return tf.exp(self._log_moment(1))
@@ -239,13 +249,27 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
         assert_util.assert_less(
             tf.ones([], dtype=a.dtype),
             a,
-            message="Mode undefined for concentration1 <= 1."),
+            message='Mode undefined for concentration1 <= 1.'),
         assert_util.assert_less(
             tf.ones([], dtype=b.dtype),
             b,
-            message="Mode undefined for concentration0 <= 1.")
+            message='Mode undefined for concentration0 <= 1.')
     ], mode)
 
-  def _parameter_control_dependencies(self, is_init):
-    return self.bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access
+  def _default_event_space_bijector(self):
+    return sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
 
+  def _parameter_control_dependencies(self, is_init):
+    return self.bijector.bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access
+
+  def _sample_control_dependencies(self, x):
+    """Checks the validity of a sample."""
+    assertions = []
+    if not self.validate_args:
+      return assertions
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Sample must be non-negative.'))
+    assertions.append(assert_util.assert_less_equal(
+        x, tf.ones([], x.dtype),
+        message='Sample must be less than or equal to `1`.'))
+    return assertions

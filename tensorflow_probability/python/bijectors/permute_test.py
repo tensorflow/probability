@@ -25,13 +25,11 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
-from tensorflow_probability.python.internal import test_case
-
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class PermuteBijectorTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class PermuteBijectorTest(test_util.TestCase):
   """Tests correctness of the Permute bijector."""
 
   def assertRaisesError(self, msg):
@@ -61,18 +59,12 @@ class PermuteBijectorTest(test_case.TestCase):
         bijector.forward_log_det_jacobian(expected_x, event_ndims=1),
         bijector.inverse_log_det_jacobian(expected_y, event_ndims=1),
     ])
-    self.assertStartsWith(bijector.name, "permute")
+    self.assertStartsWith(bijector.name, 'permute')
     self.assertAllEqual(expected_permutation, permutation_)
     self.assertAllClose(expected_y, y_, rtol=1e-6, atol=0)
     self.assertAllClose(expected_x, x_, rtol=1e-6, atol=0)
     self.assertAllClose(0., fldj, rtol=1e-6, atol=0)
     self.assertAllClose(0., ildj, rtol=1e-6, atol=0)
-
-  def testRaisesOpError(self):
-    with self.assertRaisesError("Permutation over `d` must contain"):
-      permutation = tf1.placeholder_with_default([1, 2], shape=None)
-      bijector = tfb.Permute(permutation=permutation, validate_args=True)
-      self.evaluate(bijector.inverse([1.]))
 
   def testBijectiveAndFinite(self):
     permutation = np.int32([2, 0, 1])
@@ -95,6 +87,8 @@ class PermuteBijectorTest(test_case.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
         atol=0)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'Test specific to Keras with losing shape information.')
   def testPreservesShape(self):
     # TODO(b/131157549, b/131124359): Test should not be needed. Consider
     # deleting when underlying issue with constant eager tensors is fixed.
@@ -108,6 +102,41 @@ class PermuteBijectorTest(test_case.TestCase):
     inverse_y = bijector.inverse(x)
     self.assertAllEqual(inverse_y.shape.as_list(), [None, 3])
 
+  def testNonPermutationAssertion(self):
+    message = 'must contain exactly one of each of'
+    with self.assertRaisesRegexp(Exception, message):
+      permutation = np.int32([1, 0, 1])
+      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
 
-if __name__ == "__main__":
+  def testVariableNonPermutationAssertion(self):
+    message = 'must contain exactly one of each of'
+    permutation = tf.Variable(np.int32([1, 0, 1]))
+    self.evaluate(permutation.initializer)
+    with self.assertRaisesRegexp(Exception, message):
+      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
+
+  def testModifiedVariableNonPermutationAssertion(self):
+    message = 'must contain exactly one of each of'
+    permutation = tf.Variable(np.int32([1, 0, 2]))
+    self.evaluate(permutation.initializer)
+    bijector = tfb.Permute(permutation=permutation, validate_args=True)
+    with self.assertRaisesRegexp(Exception, message):
+      with tf.control_dependencies([permutation.assign([1, 0, 1])]):
+        x = np.random.randn(4, 2, 3)
+        _ = self.evaluate(bijector.forward(x))
+
+  def testPermutationTypeAssertion(self):
+    message = 'should be `int`-like'
+    with self.assertRaisesRegexp(Exception, message):
+      permutation = np.float32([2, 0, 1])
+      bijector = tfb.Permute(permutation=permutation, validate_args=True)
+      x = np.random.randn(4, 2, 3)
+      _ = self.evaluate(bijector.forward(x))
+
+
+if __name__ == '__main__':
   tf.test.main()

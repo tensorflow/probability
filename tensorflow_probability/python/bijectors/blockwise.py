@@ -79,6 +79,7 @@ class Blockwise(bijector_base.Bijector):
       ValueError: If size of `block_sizes` does not equal to the length of
         bijectors or is not a vector.
     """
+    parameters = dict(locals())
     if not name:
       name = 'blockwise_of_' + '_and_'.join([b.name for b in bijectors])
       name = name.replace('/', '')
@@ -86,6 +87,7 @@ class Blockwise(bijector_base.Bijector):
       super(Blockwise, self).__init__(
           forward_min_event_ndims=1,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
       if not bijectors:

@@ -44,13 +44,15 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/util",
     ],
 )
 
+# py2and3
 py_test(
     name = "distribution_tensor_coercible_test",
-    size = "medium",
+    size = "small",
     srcs = ["distribution_tensor_coercible_test.py"],
     deps = [
         ":distribution_tensor_coercible",
@@ -58,7 +60,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -71,6 +73,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "tensor_tuple_test",
     size = "small",
@@ -78,5 +81,6 @@ py_test(
     deps = [
         ":tensor_tuple",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

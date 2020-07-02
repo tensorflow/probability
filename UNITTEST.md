@@ -164,7 +164,7 @@ colab_notebook_test(
         "noasan",
         "nomsan",
         "notsan",
-        "requires-gpu-sm35",
+        "requires-gpu-nvidia",
     ],
     template_params = ["num_steps=2"],  # Avoid long optimization.
 )

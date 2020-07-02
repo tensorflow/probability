@@ -28,9 +28,9 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
 # Tolerance to check for floating point zeros.
@@ -118,15 +118,13 @@ def minimize(objective_function,
         sqrt_quadratic, initial_vertex=start, func_tolerance=1e-8,
         batch_evaluate_objective=True)
 
-    with tf.Session() as session:
-      results = session.run(optim_results)
-      # Check that the search converged
-      assert(results.converged)
-      # Check that the argmin is close to the actual value.
-      np.testing.assert_allclose(results.position, np.array([0.0, 0.0]),
-                                 atol=1e-7)
-      # Print out the total number of function evaluations it took.
-      print ("Function evaluations: %d" % results.num_objective_evaluations)
+    # Check that the search converged
+    assert(optim_results.converged)
+    # Check that the argmin is close to the actual value.
+    np.testing.assert_allclose(optim_results.position, np.array([0.0, 0.0]),
+                                atol=1e-7)
+    # Print out the total number of function evaluations it took.
+    print("Function evaluations: %d" % optim_results.num_objective_evaluations)
   ```
 
   ### References:
@@ -248,10 +246,7 @@ def minimize(objective_function,
         supplied.
       2. If `initial_simplex` and `step_sizes` are both specified.
   """
-  with tf1.name_scope(name, 'minimize', [
-      initial_simplex, initial_vertex, step_sizes, objective_at_initial_simplex,
-      objective_at_initial_vertex, func_tolerance, position_tolerance
-  ]):
+  with tf.name_scope(name or 'minimize'):
     (
         dim,
         _,
@@ -330,13 +325,13 @@ def minimize(objective_function,
     # of the presence of non-tensors. This is very annoying so we explicitly
     # cast those arguments to Tensors.
     return NelderMeadOptimizerResults(
-        converged=tf.convert_to_tensor(value=converged),
+        converged=tf.convert_to_tensor(converged),
         num_objective_evaluations=final_evaluations,
         position=final_simplex[best_index],
         objective_value=final_objective_values[best_index],
         final_simplex=final_simplex,
         final_objective_values=final_objective_values,
-        num_iterations=tf.convert_to_tensor(value=num_iterations),
+        num_iterations=tf.convert_to_tensor(num_iterations),
         initial_simplex=simplex,
         initial_objective_values=objective_at_simplex)
 
@@ -354,7 +349,7 @@ def nelder_mead_one_step(current_simplex,
                          shrinkage=None,
                          name=None):
   """A single iteration of the Nelder Mead algorithm."""
-  with tf1.name_scope(name, 'nelder_mead_one_step'):
+  with tf.name_scope(name or 'nelder_mead_one_step'):
     domain_dtype = current_simplex.dtype.base_dtype
     order = tf.argsort(
         current_objective_values, direction='ASCENDING', stable=True)
@@ -378,7 +373,7 @@ def nelder_mead_one_step(current_simplex,
 
     # Compute the centroid of the face opposite the worst vertex.
     face_centroid = tf.reduce_sum(
-        input_tensor=current_simplex, axis=0) - worst_vertex
+        current_simplex, axis=0) - worst_vertex
     face_centroid /= tf.cast(dim, domain_dtype)
 
     # Reflect the worst vertex through the opposite face.
@@ -643,7 +638,7 @@ def _check_convergence(simplex,
   objective_convergence = tf.abs(worst_objective -
                                  best_objective) < func_tolerance
   simplex_degeneracy = tf.reduce_max(
-      input_tensor=tf.abs(simplex - best_vertex)) < position_tolerance
+      tf.abs(simplex - best_vertex)) < position_tolerance
   return objective_convergence | simplex_degeneracy
 
 
@@ -755,10 +750,10 @@ def _prepare_args(objective_function,
 def _default_step_sizes(reference_vertex):
   """Chooses default step sizes according to [Gao and Han(2010)][3]."""
   # Step size to choose when the coordinate is zero.
-  small_sizes = tf.ones_like(reference_vertex) * 0.00025
+  small_sizes = dtype_util.as_numpy_dtype(reference_vertex.dtype)(0.00025)
   # Step size to choose when the coordinate is non-zero.
   large_sizes = reference_vertex * 0.05
-  return tf1.where(
+  return tf.where(
       tf.abs(reference_vertex) < _EPSILON, small_sizes, large_sizes)
 
 
@@ -767,12 +762,12 @@ def _prepare_args_with_initial_simplex(objective_function,
                                        objective_at_initial_simplex,
                                        batch_evaluate_objective):
   """Evaluates the objective function at the specified initial simplex."""
-  initial_simplex = tf.convert_to_tensor(value=initial_simplex)
+  initial_simplex = tf.convert_to_tensor(initial_simplex)
 
   # If d is the dimension of the problem, the number of vertices in the
   # simplex should be d+1. From this, we can infer the number of dimensions
   # as n - 1 where n is the number of vertices specified.
-  num_vertices = tf.shape(input=initial_simplex)[0]
+  num_vertices = tf.shape(initial_simplex)[0]
   dim = num_vertices - 1
   num_evaluations = 0
 
@@ -781,7 +776,7 @@ def _prepare_args_with_initial_simplex(objective_function,
         objective_function, initial_simplex, batch_evaluate_objective)
     num_evaluations += n_evals
   objective_at_initial_simplex = tf.convert_to_tensor(
-      value=objective_at_initial_simplex)
+      objective_at_initial_simplex)
   return (dim,
           num_vertices,
           initial_simplex,
@@ -795,11 +790,11 @@ def _prepare_args_with_initial_vertex(objective_function,
                                       objective_at_initial_vertex,
                                       batch_evaluate_objective):
   """Constructs a standard axes aligned simplex."""
-  dim = tf.size(input=initial_vertex)
+  dim = tf.size(initial_vertex)
   num_vertices = dim + 1
   unit_vectors_along_axes = tf.reshape(
       tf.eye(dim, dim, dtype=initial_vertex.dtype.base_dtype),
-      tf.concat([[dim], tf.shape(input=initial_vertex)], axis=0))
+      tf.concat([[dim], tf.shape(initial_vertex)], axis=0))
 
   # If step_sizes does not broadcast to initial_vertex, the multiplication
   # in the second term will fail.
@@ -874,7 +869,7 @@ def _evaluate_objective_multiple(objective_function, arg_batch,
       num_evaluations: An `int32` scalar `Tensor`containing the number of
         points on which the objective function was evaluated (i.e `batch_size`).
   """
-  n_points = tf.shape(input=arg_batch)[0]
+  n_points = tf.shape(arg_batch)[0]
   if batch_evaluate_objective:
     return objective_function(arg_batch), n_points
   return tf.map_fn(objective_function, arg_batch), n_points

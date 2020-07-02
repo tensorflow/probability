@@ -25,13 +25,13 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow_probability.python.internal import test_util
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class CustomGradientTest(test_case.TestCase):
+@test_util.test_all_tf_execution_regimes
+class CustomGradientTest(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test
   def test_works_correctly(self):
     f = lambda x: x**2 / 2
     g = lambda x: (x - 1)**3 / 3
@@ -41,6 +41,7 @@ class CustomGradientTest(test_case.TestCase):
     self.assertAllClose(f(x), fx)
     self.assertAllClose(g(x), gx)
 
+  @test_util.numpy_disable_gradient_test
   def test_works_correctly_both_f_g_zero(self):
     f = lambda x: x**2 / 2
     g = lambda x: x**3 / 3
@@ -50,6 +51,8 @@ class CustomGradientTest(test_case.TestCase):
     self.assertAllClose(f(x), fx)
     self.assertAllClose(g(x), gx)
 
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_variable_test
   def test_works_correctly_vector_of_vars(self):
     x = tf.Variable(2, name='x', dtype=tf.float32)
     y = tf.Variable(3, name='y', dtype=tf.float32)
@@ -68,6 +71,8 @@ class CustomGradientTest(test_case.TestCase):
     self.assertEqual(g(z_), gx_)
     self.assertEqual(g(z_), gy_)
 
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_variable_test
   def test_works_correctly_side_vars(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)
@@ -88,6 +93,8 @@ class CustomGradientTest(test_case.TestCase):
     self.assertEqual(np.square(x_) * y_, gx_)
     self.assertIsNone(gy_)
 
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_variable_test
   def test_works_correctly_fx_gx_manually_stopped(self):
     x_ = np.float32(2.1)  # Adding extra tenth to force imprecision.
     y_ = np.float32(3.1)

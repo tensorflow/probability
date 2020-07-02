@@ -19,7 +19,7 @@ BFGS, conjugate gradient etc). Most of the sophisticated line search methods
 aim to find a step length in a given search direction so that the step length
 satisfies the
 [Wolfe conditions](https://en.wikipedia.org/wiki/Wolfe_conditions).
-[Hager-Zhang 2006](http://users.clas.ufl.edu/hager/papers/CG/cg_compare.pdf)
+[Hager-Zhang 2006](https://epubs.siam.org/doi/abs/10.1137/030601880)
 algorithm is a refinement of the commonly used
 [More-Thuente](https://dl.acm.org/citation.cfm?id=192132) algorithm.
 
@@ -138,9 +138,7 @@ def secant2(value_and_gradients_function,
       right: Return value of value_and_gradients_function at the updated right
         end point of the interval.
   """
-  with tf1.name_scope(name, 'secant2', [
-      val_0, search_interval, f_lim, sufficient_decrease_param,
-      curvature_param]):
+  with tf.name_scope(name or 'secant2'):
     # This will always be s.t. left <= c <= right
     val_c = value_and_gradients_function(
         _secant(search_interval.left, search_interval.right))
@@ -170,7 +168,7 @@ def secant2(value_and_gradients_function,
           curvature_param)
 
     return prefer_static.cond(
-        tf.reduce_any(input_tensor=initial_args.active),
+        tf.reduce_any(initial_args.active),
         _apply_secant2_inner,
         lambda: initial_args)
 
@@ -203,14 +201,14 @@ def _secant2_inner(value_and_gradients_function,
   updated_right = active & tf.equal(val_right.x, val_c.x)
   is_new = updated_left | updated_right
 
-  next_c = tf1.where(updated_left, _secant(initial_args.left,
-                                                    val_left), val_c.x)
-  next_c = tf1.where(updated_right,
-                              _secant(initial_args.right, val_right), next_c)
+  next_c = tf.where(
+      updated_left, _secant(initial_args.left, val_left), val_c.x)
+  next_c = tf.where(
+      updated_right, _secant(initial_args.right, val_right), next_c)
   in_range = (val_left.x <= next_c) & (next_c <= val_right.x)
 
   # Figure out if an extra function evaluation is needed for new `c` points.
-  needs_extra_eval = tf.reduce_any(input_tensor=in_range & is_new)
+  needs_extra_eval = tf.reduce_any(in_range & is_new)
   num_evals = initial_args.num_evals + update_result.num_evals
   num_evals = num_evals + tf.cast(needs_extra_eval, num_evals.dtype)
 
@@ -232,7 +230,7 @@ def _secant2_inner(value_and_gradients_function,
         sufficient_decrease_param, curvature_param)
 
   return prefer_static.cond(
-      tf.reduce_any(input_tensor=next_args.active),
+      tf.reduce_any(next_args.active),
       _apply_inner_update,
       lambda: next_args)
 
@@ -284,7 +282,7 @@ def _secant2_inner_update(value_and_gradients_function,
         right=val_right)
 
   return prefer_static.cond(
-      tf.reduce_any(input_tensor=active), _apply_update, _default)
+      tf.reduce_any(active), _apply_update, _default)
 
 
 _IntermediateResult = collections.namedtuple('_IntermediateResult', [
@@ -413,10 +411,10 @@ def update(value_and_gradients_function, val_left, val_right, val_trial, f_lim,
   right = val_where(within_range & ~valid_left, val_trial, val_right)
 
   bisect_args = _IntermediateResult(
-      iteration=tf.convert_to_tensor(value=0),
+      iteration=tf.convert_to_tensor(0),
       stopped=~needs_bisect,
       failed=tf.zeros_like(within_range),  # i.e. all false.
-      num_evals=tf.convert_to_tensor(value=0),
+      num_evals=tf.convert_to_tensor(0),
       left=left,
       right=right)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)
@@ -507,7 +505,7 @@ def bracket(value_and_gradients_function,
 
   def _loop_cond(curr):
     return (curr.iteration <
-            max_iterations) & ~tf.reduce_all(input_tensor=curr.stopped)
+            max_iterations) & ~tf.reduce_all(curr.stopped)
 
   def _loop_body(curr):
     """Main body of bracketing loop."""
@@ -586,10 +584,10 @@ def bisect(value_and_gradients_function,
   failed = ~is_finite(initial_left, initial_right)
   needs_bisect = (initial_right.df < 0) & (initial_right.f > f_lim)
   bisect_args = _IntermediateResult(
-      iteration=tf.convert_to_tensor(value=0),
+      iteration=tf.convert_to_tensor(0),
       stopped=failed | ~needs_bisect,
       failed=failed,
-      num_evals=tf.convert_to_tensor(value=0),
+      num_evals=tf.convert_to_tensor(0),
       left=initial_left,
       right=initial_right)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)
@@ -599,7 +597,7 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
   """Actual implementation of bisect given initial_args in a _BracketResult."""
   def _loop_cond(curr):
     # TODO(b/112524024): Also take into account max_iterations.
-    return ~tf.reduce_all(input_tensor=curr.stopped)
+    return ~tf.reduce_all(curr.stopped)
 
   def _loop_body(curr):
     """Narrow down interval to satisfy opposite slope conditions."""

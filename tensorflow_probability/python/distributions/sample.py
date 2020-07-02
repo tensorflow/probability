@@ -26,8 +26,9 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -35,17 +36,18 @@ def _make_summary_statistic(attr):
   """Factory for implementing summary statistics, eg, mean, stddev, mode."""
   def _fn(self, **kwargs):
     """Implements summary statistic, eg, mean, stddev, mode."""
+    sample_shape = prefer_static.reshape(self.sample_shape, shape=[-1])
     x = getattr(self.distribution, attr)(**kwargs)
     shape = prefer_static.concat([
         self.distribution.batch_shape_tensor(),
-        prefer_static.ones(prefer_static.rank_from_shape(self.sample_shape),
-                           dtype=self.sample_shape.dtype),
+        prefer_static.ones(prefer_static.rank_from_shape(sample_shape),
+                           dtype=sample_shape.dtype),
         self.distribution.event_shape_tensor(),
     ], axis=0)
     x = tf.reshape(x, shape=shape)
     shape = prefer_static.concat([
         self.distribution.batch_shape_tensor(),
-        self.sample_shape,
+        sample_shape,
         self.distribution.event_shape_tensor(),
     ], axis=0)
     return tf.broadcast_to(x, shape)
@@ -96,14 +98,13 @@ class Sample(distribution_lib.Distribution):
                       reinterpreted_batch_ndims=1),
       sample_shape=[5, 4])
   x = s.sample([6, 1])
-  # ==> x.shape: [6, 1, 5, 4, 3, 2]
+  # ==> x.shape: [6, 1, 3, 5, 4, 2]
 
   lp = s.log_prob(x)
   # ==> lp.shape: [6, 1, 3]
-  #     Equivalently: tf.reduce_sum(s.distribution.log_prob(x), axis=[2, 3])
   #
   # `s.log_prob` will reduce over (intrinsic) event dims, i.e., dim `5`, then
-  # sums over `s.sample_shape` dims `[2, 3]` corresponding to shape (slice)
+  # sums over `s.sample_shape` dims `[3, 4]` corresponding to shape (slice)
   # `[5, 4]`.
   ```
 
@@ -129,13 +130,10 @@ class Sample(distribution_lib.Distribution):
         Default value: `None` (i.e., `'Sample' + distribution.name`).
     """
     parameters = dict(locals())
-    name = name or 'Sample' + distribution.name
-    self._distribution = distribution
-    with tf.name_scope(name) as name:
-      sample_shape = distribution_util.expand_to_vector(
-          tf.convert_to_tensor(
-              sample_shape, dtype_hint=tf.int32, name='sample_shape'))
-      self._sample_shape = sample_shape
+    with tf.name_scope(name or 'Sample' + distribution.name) as name:
+      self._distribution = distribution
+      self._sample_shape = tensor_util.convert_nonref_to_tensor(
+          sample_shape, dtype_hint=tf.int32, name='sample_shape')
       super(Sample, self).__init__(
           dtype=self._distribution.dtype,
           reparameterization_type=self._distribution.reparameterization_type,
@@ -160,12 +158,16 @@ class Sample(distribution_lib.Distribution):
 
   def _event_shape_tensor(self):
     return prefer_static.concat([
-        self.sample_shape,
+        prefer_static.reshape(self.sample_shape, shape=[-1]),
         self.distribution.event_shape_tensor(),
     ], axis=0)
 
   def _event_shape(self):
-    sample_shape = tf.TensorShape(tf.get_static_value(self.sample_shape))
+    s = tf.get_static_value(self.sample_shape)
+    if tensorshape_util.rank(s) == 1:
+      sample_shape = tf.TensorShape(s)
+    else:
+      sample_shape = tensorshape_util.constant_value_as_shape(self.sample_shape)
     if (tensorshape_util.rank(sample_shape) is None or
         tensorshape_util.rank(self.distribution.event_shape) is None):
       return tf.TensorShape(None)
@@ -173,7 +175,8 @@ class Sample(distribution_lib.Distribution):
                                         self.distribution.event_shape)
 
   def _sample_n(self, n, seed, **kwargs):
-    fake_sample_ndims = prefer_static.rank_from_shape(self.sample_shape)
+    sample_shape = prefer_static.reshape(self.sample_shape, shape=[-1])
+    fake_sample_ndims = prefer_static.rank_from_shape(sample_shape)
     event_ndims = prefer_static.rank_from_shape(
         self.distribution.event_shape_tensor, self.distribution.event_shape)
     batch_ndims = prefer_static.rank_from_shape(
@@ -181,13 +184,15 @@ class Sample(distribution_lib.Distribution):
     perm = prefer_static.concat([
         [0],
         prefer_static.range(1 + fake_sample_ndims,
-                            1 + fake_sample_ndims + batch_ndims),
-        prefer_static.range(1, 1 + fake_sample_ndims),
+                            1 + fake_sample_ndims + batch_ndims,
+                            dtype=tf.int32),
+        prefer_static.range(1, 1 + fake_sample_ndims, dtype=tf.int32),
         prefer_static.range(1 + fake_sample_ndims + batch_ndims,
-                            1 + fake_sample_ndims + batch_ndims + event_ndims),
+                            1 + fake_sample_ndims + batch_ndims + event_ndims,
+                            dtype=tf.int32),
     ], axis=0)
     x = self.distribution.sample(
-        prefer_static.concat([[n], self.sample_shape], axis=0),
+        prefer_static.concat([[n], sample_shape], axis=0),
         seed=seed,
         **kwargs)
     return tf.transpose(a=x, perm=perm)
@@ -205,10 +210,11 @@ class Sample(distribution_lib.Distribution):
     d = ndims - batch_ndims - extra_sample_ndims - event_ndims
     x = tf.reshape(
         x,
-        shape=tf.pad(
-            tf.shape(x),
+        shape=prefer_static.pad(
+            prefer_static.shape(x),
             paddings=[[prefer_static.maximum(0, -d), 0]],
             constant_values=1))
+    ndims = prefer_static.rank(x)
     sample_ndims = prefer_static.maximum(0, d)
     # (2) Transpose x's dims.
     sample_dims = prefer_static.range(0, sample_ndims)
@@ -237,6 +243,52 @@ class Sample(distribution_lib.Distribution):
   _stddev = _make_summary_statistic('stddev')
   _variance = _make_summary_statistic('variance')
   _mode = _make_summary_statistic('mode')
+
+  def _default_event_space_bijector(self):
+    return self.distribution._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+    sample_shape = None  # Memoize concretization.
+
+    # Check valid shape.
+    ndims_ = tensorshape_util.rank(self.sample_shape.shape)
+    if is_init != (ndims_ is None):
+      msg = 'Argument `sample_shape` must be either a scalar or a vector.'
+      if ndims_ is not None:
+        if ndims_ > 1:
+          raise ValueError(msg)
+      elif self.validate_args:
+        if sample_shape is None:
+          sample_shape = tf.convert_to_tensor(self.sample_shape)
+        assertions.append(assert_util.assert_less(
+            tf.rank(sample_shape), 2, message=msg))
+
+    # Check valid dtype.
+    if is_init:  # No xor check because `dtype` cannot change.
+      dtype_ = self.sample_shape.dtype
+      if dtype_ is None:
+        if sample_shape is None:
+          sample_shape = tf.convert_to_tensor(self.sample_shape)
+        dtype_ = sample_shape.dtype
+      if dtype_util.base_dtype(dtype_) not in {tf.int32, tf.int64}:
+        raise TypeError('Argument `sample_shape` must be integer type; '
+                        'saw {}.'.format(dtype_util.name(dtype_)))
+
+    # Check valid "value".
+    if is_init != tensor_util.is_ref(self.sample_shape):
+      sample_shape_ = tf.get_static_value(self.sample_shape)
+      msg = 'Argument `sample_shape` must have non-negative values.'
+      if sample_shape_ is not None:
+        if np.any(np.array(sample_shape_) < 0):
+          raise ValueError('{} Saw: {}'.format(msg, sample_shape_))
+      elif self.validate_args:
+        if sample_shape is None:
+          sample_shape = tf.convert_to_tensor(self.sample_shape)
+        assertions.append(assert_util.assert_greater(
+            sample_shape, -1, message=msg))
+
+    return assertions
 
 
 @kullback_leibler.RegisterKL(Sample, Sample)

@@ -24,16 +24,15 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import test_case
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import ConstrainedSeasonalStateSpaceModel
 from tensorflow_probability.python.sts import SeasonalStateSpaceModel
 
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 tfl = tf.linalg
 
 
-class _SeasonalStateSpaceModelTest(test_case.TestCase):
+class _SeasonalStateSpaceModelTest(test_util.TestCase):
 
   def test_day_of_week_example(self):
 
@@ -286,28 +285,28 @@ class _SeasonalStateSpaceModelTest(test_case.TestCase):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SeasonalStateSpaceModelTestStaticShape32(_SeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SeasonalStateSpaceModelTestDynamicShape32(_SeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class SeasonalStateSpaceModelTestStaticShape64(_SeasonalStateSpaceModelTest):
   dtype = np.float64
   use_static_shape = True
 
 
-class _ConstrainedSeasonalStateSpaceModelTest(test_case.TestCase):
+class _ConstrainedSeasonalStateSpaceModelTest(test_util.TestCase):
 
   # TODO(b/128635942): write additional tests for ConstrainedSeasonalSSM
 
@@ -380,24 +379,24 @@ class _ConstrainedSeasonalStateSpaceModelTest(test_case.TestCase):
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
     return tf1.placeholder_with_default(
-        input=ndarray, shape=ndarray.shape if self.use_static_shape else None)
+        ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ConstrainedSeasonalStateSpaceModelTestStaticShape32(
     _ConstrainedSeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = True
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ConstrainedSeasonalStateSpaceModelTestDynamicShape32(
     _ConstrainedSeasonalStateSpaceModelTest):
   dtype = np.float32
   use_static_shape = False
 
 
-@test_util.run_all_in_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class ConstrainedSeasonalStateSpaceModelTestStaticShape64(
     _ConstrainedSeasonalStateSpaceModelTest):
   dtype = np.float64

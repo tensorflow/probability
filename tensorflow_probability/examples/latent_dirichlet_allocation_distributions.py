@@ -105,7 +105,7 @@ import numpy as np
 import scipy.sparse
 from six.moves import cPickle as pickle
 from six.moves import urllib
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 tfd = tfp.distributions
@@ -411,7 +411,8 @@ def download(directory, filename):
 
 def newsgroups_dataset(directory, split_name, num_words, shuffle_and_repeat):
   """Return 20 newsgroups tf.data.Dataset."""
-  data = np.load(download(directory, FILE_TEMPLATE.format(split=split_name)))
+  data = np.load(download(directory, FILE_TEMPLATE.format(split=split_name)),
+                 allow_pickle=True, encoding="latin1")
   # The last row is empty in both train and test.
   data = data[:-1]
 
@@ -485,7 +486,7 @@ def build_input_fns(data_dir, batch_size):
     vocabulary: A mapping of word's integer index to the corresponding string.
   """
 
-  with open(download(data_dir, "vocab.pkl"), "r") as f:
+  with open(download(data_dir, "vocab.pkl"), "rb") as f:
     words_to_idx = pickle.load(f)
   num_words = len(words_to_idx)
 

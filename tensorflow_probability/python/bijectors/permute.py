@@ -25,13 +25,13 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
-    "Permute",
+    'Permute',
 ]
 
 
@@ -55,7 +55,7 @@ class Permute(bijector.Bijector):
   ```
 
   Warning: `tf.estimator` may repeatedly build the graph thus
-  `Permute(np.random.permutation(event_size)).astype("int32"))` is not a
+  `Permute(np.random.permutation(event_size)).astype('int32'))` is not a
   reliable parameterization (nor would it be even if using `tf.constant`). A
   safe alternative is to use `tf.get_variable` to achieve "init once" behavior,
   i.e.,
@@ -65,8 +65,8 @@ class Permute(bijector.Bijector):
     return tf.get_variable(name, initializer=x, trainable=False)
 
   Permute(permutation=init_once(
-      np.random.permutation(event_size).astype("int32"),
-      name="permutation"))
+      np.random.permutation(event_size).astype('int32'),
+      name='permutation'))
   ```
 
   """
@@ -93,45 +93,34 @@ class Permute(bijector.Bijector):
       NotImplementedError: if `axis` is not known prior to graph execution.
       NotImplementedError: if `axis` is not negative.
     """
-    with tf.name_scope(name or "permute") as name:
-      axis = tf.convert_to_tensor(axis, name="axis")
+    parameters = dict(locals())
+    with tf.name_scope(name or 'permute') as name:
+      axis = tensor_util.convert_nonref_to_tensor(axis, name='axis')
       if not dtype_util.is_integer(axis.dtype):
-        raise TypeError("axis.dtype ({}) should be `int`-like.".format(
+        raise TypeError('axis.dtype ({}) should be `int`-like.'.format(
             dtype_util.name(axis.dtype)))
-      permutation = tf.convert_to_tensor(permutation, name="permutation")
-      if not dtype_util.is_integer(permutation.dtype):
-        raise TypeError("permutation.dtype ({}) should be `int`-like.".format(
-            dtype_util.name(permutation.dtype)))
-      p = tf.get_static_value(permutation)
-      if p is not None:
-        if set(p) != set(np.arange(p.size)):
-          raise ValueError("Permutation over `d` must contain exactly one of "
-                           "each of `{0, 1, ..., d}`.")
-      elif validate_args:
-        p, _ = tf.math.top_k(
-            -permutation, k=tf.shape(permutation)[-1], sorted=True)
-        permutation = distribution_util.with_dependencies([
-            assert_util.assert_equal(
-                -p,
-                tf.range(tf.size(p)),
-                message=("Permutation over `d` must contain exactly one of "
-                         "each of `{0, 1, ..., d}`.")),
-        ], permutation)
       axis_ = tf.get_static_value(axis)
       if axis_ is None:
-        raise NotImplementedError("`axis` must be known prior to graph "
-                                  "execution.")
+        raise NotImplementedError('`axis` must be known prior to graph '
+                                  'execution.')
       elif axis_ >= 0:
-        raise NotImplementedError("`axis` must be relative the rightmost "
-                                  "dimension, i.e., negative.")
-      else:
-        forward_min_event_ndims = int(np.abs(axis_))
-      self._permutation = permutation
+        raise NotImplementedError('`axis` must be relative the rightmost '
+                                  'dimension, i.e., negative.')
+      forward_min_event_ndims = int(np.abs(axis_))
       self._axis = axis
+
+      permutation = tensor_util.convert_nonref_to_tensor(
+          permutation, name='permutation')
+      if not dtype_util.is_integer(permutation.dtype):
+        raise TypeError('permutation.dtype ({}) should be `int`-like.'.format(
+            dtype_util.name(permutation.dtype)))
+      self._permutation = permutation
+
       super(Permute, self).__init__(
           forward_min_event_ndims=forward_min_event_ndims,
           is_constant_jacobian=True,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
 
   @property
@@ -161,3 +150,28 @@ class Permute(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     return tf.constant(0., dtype=dtype_util.base_dtype(x.dtype))
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+
+    if is_init != tensor_util.is_ref(self.permutation):
+      if not dtype_util.is_integer(self.permutation.dtype):
+        raise TypeError('permutation.dtype ({}) should be `int`-like.'.format(
+            dtype_util.name(self.permutation.dtype)))
+
+      p = tf.get_static_value(self.permutation)
+      if p is not None:
+        if set(p) != set(np.arange(p.size)):
+          raise ValueError('Permutation over `d` must contain exactly one of '
+                           'each of `{0, 1, ..., d}`.')
+
+      if self.validate_args:
+        p = tf.sort(self.permutation, axis=-1)
+        assertions.append(
+            assert_util.assert_equal(
+                p,
+                tf.range(tf.shape(p)[-1]),
+                message=('Permutation over `d` must contain exactly one of '
+                         'each of `{0, 1, ..., d}`.')))
+
+    return assertions

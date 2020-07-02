@@ -15,7 +15,11 @@
 # Description:
 #   Internal helper libraries for distributions.
 
-# [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_test",
+    "multi_substrate_py_library",
+)
 
 licenses(["notice"])  # Apache 2.0
 
@@ -27,7 +31,7 @@ package(
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
@@ -36,24 +40,29 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "util",
     srcs = ["util.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "util_test",
+    size = "small",
     srcs = ["util_test.py"],
+    numpy_tags = ["notap"],
     deps = [
         ":util",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_case",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:gradient",
     ],
 )

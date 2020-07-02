@@ -28,8 +28,7 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import test_case
-from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import test_util
 
 
 # A shape broadcasting fn
@@ -53,8 +52,8 @@ def broadcast_shapes(*shapes):
   return functools.reduce(_broadcast_2, shapes)
 
 
-@test_util.run_all_in_graph_and_eager_modes
-class SchurComplementTest(test_case.TestCase, parameterized.TestCase):
+@test_util.test_all_tf_execution_regimes
+class SchurComplementTest(test_util.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
     base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(

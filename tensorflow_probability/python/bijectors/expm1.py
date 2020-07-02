@@ -20,10 +20,12 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import invert
 
 
 __all__ = [
-    "Expm1",
+    'Log1p',
+    'Expm1',
 ]
 
 
@@ -54,12 +56,18 @@ class Expm1(bijector.Bijector):
 
   def __init__(self,
                validate_args=False,
-               name="expm1"):
+               name='expm1'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Expm1, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return True
 
   def _forward(self, x):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y)."""
@@ -76,3 +84,17 @@ class Expm1(bijector.Bijector):
   def _forward_log_det_jacobian(self, x):
     """Returns the (log o det o Jacobian o g)(x)."""
     return tf.identity(x)
+
+
+class Log1p(invert.Invert):
+  """Compute `Y = log1p(X)`. This is `Invert(Expm1())`."""
+
+  def __init__(self, validate_args=False, name='log1p'):
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
+      bij = Expm1(validate_args=validate_args)
+      super(Log1p, self).__init__(
+          bijector=bij,
+          validate_args=validate_args,
+          parameters=parameters,
+          name=name)
