@@ -25,7 +25,7 @@ import io
 import pickle
 
 # Dependency imports
-from cloudpickle.cloudpickle import CloudPickler
+from cloudpickle import CloudPickler
 import numpy as np
 import six
 import tensorflow.compat.v2 as tf
