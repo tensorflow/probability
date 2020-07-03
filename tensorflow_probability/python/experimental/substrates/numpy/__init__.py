@@ -20,9 +20,11 @@
 
 from tensorflow_probability.python.bijectors import _numpy as bijectors
 from tensorflow_probability.python.distributions import _numpy as distributions
+from tensorflow_probability.python.experimental import _numpy as experimental
 from tensorflow_probability.python.internal import _numpy as internal
 from tensorflow_probability.python.math import _numpy as math
 from tensorflow_probability.python.mcmc import _numpy as mcmc
+from tensorflow_probability.python.random import _numpy as random
 from tensorflow_probability.python.stats import _numpy as stats
 from tensorflow_probability.python.util import _numpy as util
 

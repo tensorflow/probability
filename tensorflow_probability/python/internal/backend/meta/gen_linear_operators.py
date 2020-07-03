@@ -31,14 +31,15 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('module_name', '', 'TF linalg module to transform')
 flags.DEFINE_list(
-    'whitelist', '',
-    'TF linalg module whitelist (other imports will be commented-out)')
+    'allowlist', '',
+    'TF linalg module allowlist (other imports will be commented-out)')
 
 MODULE_MAPPINGS = {
     'framework import dtypes': 'dtype as dtypes',
     'framework import errors': 'errors',
     'framework import ops': 'ops',
-    'framework import tensor_shape': 'ops as tensor_shape',
+    'framework import common_shapes': 'ops as common_shapes',
+    'framework import tensor_shape': 'tensor_shape',
     'module import module': 'ops as module',
     'ops import array_ops': 'numpy_array as array_ops',
     'ops import check_ops': 'debugging as check_ops',
@@ -59,12 +60,22 @@ COMMENT_OUT = [
     'self._check_input_dtype',
 ]
 
-DIST_UTIL_IMPORT = """
-from tensorflow.python.util import lazy_loader
-distribution_util = lazy_loader.LazyLoader(
+UTIL_IMPORTS = """
+from tensorflow_probability.python.internal.backend.numpy import private
+distribution_util = private.LazyLoader(
     "distribution_util", globals(),
     "tensorflow_probability.python.internal._numpy.distribution_util")
+tensorshape_util = private.LazyLoader(
+   "tensorshape_util", globals(),
+    "tensorflow_probability.python.internal._numpy.tensorshape_util")
 """
+
+DISABLED_LINTS = ('g-import-not-at-top', 'g-direct-tensorflow-import',
+                  'g-bad-import-order', 'unused-import', 'line-too-long',
+                  'reimported', 'g-bool-id-comparison',
+                  'g-statement-before-imports', 'bad-continuation',
+                  'useless-import-alias', 'property-with-parameters',
+                  'trailing-whitespace')
 
 
 def gen_module(module_name):
@@ -80,44 +91,49 @@ def gen_module(module_name):
   for k in COMMENT_OUT:
     code = code.replace(k, '# {}'.format(k))
   code = code.replace(
+      '.backend.numpy import tensor_shape',
+      '.backend.numpy.gen import tensor_shape')
+  code = code.replace(
       'from tensorflow.python.platform import tf_logging',
       'from absl import logging')
   code = re.sub(
       r'from tensorflow\.python\.linalg import (\w+)',
-      'from tensorflow_probability.python.internal.backend.numpy import \\1 '
+      'from tensorflow_probability.python.internal.backend.numpy.gen import \\1 '
       'as \\1', code)
   code = code.replace(
       'from tensorflow.python.ops.linalg import ',
       '# from tensorflow.python.ops.linalg import ')
-  for f in FLAGS.whitelist:
+  for f in FLAGS.allowlist:
     code = code.replace(
         '# from tensorflow.python.ops.linalg '
         'import {}'.format(f),
         'from tensorflow.python.ops.linalg '
         'import {}'.format(f))
   code = code.replace(
-      'tensorflow.python.ops.linalg import ',
-      'tensorflow_probability.python.internal.backend.numpy import ')
-
+      'tensorflow.python.ops.linalg import',
+      'tensorflow_probability.python.internal.backend.numpy.gen import')
+  code = code.replace(
+      'tensorflow.python.util import',
+      'tensorflow_probability.python.internal.backend.numpy import')
   code = code.replace('tensor_util.constant_value(', '(')
   code = code.replace('tensor_util.is_tensor(', 'ops.is_tensor(')
   code = code.replace(
       'from tensorflow.python.ops.distributions import '
-      'util as distribution_util', DIST_UTIL_IMPORT)
+      'util as distribution_util', UTIL_IMPORTS)
   code = code.replace(
       'control_flow_ops.with_dependencies',
       'distribution_util.with_dependencies')
   code = code.replace('.base_dtype', '')
   code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
-                '_ops.TensorShape(\\1)\\2', code)
+                'tensor_shape.TensorShape(\\1)\\2', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_complex',
                 'np.issubdtype(\\1, np.complexfloating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_integer',
                 'np.issubdtype(\\1, np.integer)', code)
 
   code = code.replace('array_ops.broadcast_static_shape',
-                      '_ops.broadcast_static_shape_as_tensorshape')
+                      '_ops.broadcast_static_shape')
   code = code.replace('array_ops.broadcast_to', '_ops.broadcast_to')
   code = code.replace('array_ops.matrix_diag', '_linalg.diag')
   code = code.replace('array_ops.matrix_band_part', '_linalg.band_part')
@@ -134,13 +150,34 @@ def gen_module(module_name):
 
   code = code.replace('self.dtype.real_dtype', 'dtypes.real_dtype(self.dtype)')
   code = code.replace('dtype.real_dtype', 'dtypes.real_dtype(dtype)')
+  code = code.replace('.as_numpy_dtype', '')
+
+  # Replace `x.set_shape(...)` with `tensorshape_util.set_shape(x, ...)`.
+  code = re.sub(r' (\w*)\.set_shape\(',
+                ' tensorshape_util.set_shape(\\1, ', code)
+
+  for lint in DISABLED_LINTS:
+    code = code.replace('pylint: enable={}'.format(lint),
+                        'pylint: disable={}'.format(lint))
+
+  print('# Copyright 2020 The TensorFlow Probability Authors. '
+        'All Rights Reserved.')
+  print('# ' + '@' * 78)
+  print('# THIS FILE IS AUTO-GENERATED BY `gen_linear_operators.py`.')
+  print('# DO NOT MODIFY DIRECTLY.')
+  print('# ' + '@' * 78)
+  for lint in DISABLED_LINTS:
+    print('# pylint: disable={}'.format(lint))
+  print()
   print(code)
   print('import numpy as np')
   print('from tensorflow_probability.python.internal.backend.numpy import '
         'linalg_impl as _linalg')
   print('from tensorflow_probability.python.internal.backend.numpy import '
         'ops as _ops')
-  print(DIST_UTIL_IMPORT)
+  print('from tensorflow_probability.python.internal.backend.numpy.gen import '
+        'tensor_shape')
+  print(UTIL_IMPORTS)
 
 
 def main(_):

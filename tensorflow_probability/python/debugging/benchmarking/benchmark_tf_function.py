@@ -38,6 +38,7 @@ import tensorflow.compat.v2 as tf
 RUNTIME_EAGER = 'eager'
 RUNTIME_FUNCTION = 'function/graph'
 RUNTIME_XLA = 'function/xla'
+RUNTIME_XLA_AUTOCLUSTER = 'xla-autoclustering'
 
 HARDWARE_CPU = 'cpu'
 HARDWARE_GPU = 'gpu'
@@ -49,7 +50,8 @@ BenchmarkTfFunctionConfig = collections.namedtuple(
 
 def default_benchmark_config():
   return BenchmarkTfFunctionConfig(
-      strategies=frozenset([RUNTIME_EAGER, RUNTIME_FUNCTION, RUNTIME_XLA]),
+      strategies=frozenset([RUNTIME_EAGER, RUNTIME_FUNCTION,
+                            RUNTIME_XLA, RUNTIME_XLA_AUTOCLUSTER]),
       hardware=frozenset([HARDWARE_CPU, HARDWARE_GPU])
   )
 
@@ -90,15 +92,17 @@ def _run_function_under_strategies(user_fn, iters, config, hardware,
                                    print_intermediates=False):
   """Run user_fn with varying backends. See public API for details."""
 
-  def run_one(function, runtime, print_intermediates):
+  def run_one(function, runtime):
     """Run user_fn. See public API for details."""
     first_iter_time, total_time = _run_function(function, iters)
-    new_dict = _merge_dicts({'runtime': runtime,
-                             'hardware': hardware,
-                             'iters': iters,
-                             'first_iter_time': first_iter_time,
-                             'total_time': total_time},
-                            extra_columns)
+    new_dict = _merge_dicts(
+        {'runtime': runtime,
+         'hardware': hardware,
+         'iters': iters,
+         'first_iter_time': first_iter_time,
+         'total_time': total_time,
+         'avg_warm_iter_time': (total_time - first_iter_time) / (iters - 1)},
+        extra_columns)
 
     if print_intermediates:
       print('New benchmark result:')
@@ -109,23 +113,23 @@ def _run_function_under_strategies(user_fn, iters, config, hardware,
   data_dicts = []
 
   if RUNTIME_EAGER in config.strategies:
-    data_dicts.append(run_one(
-        user_fn, RUNTIME_EAGER, print_intermediates))
+    data_dicts.append(run_one(user_fn, RUNTIME_EAGER))
 
   if RUNTIME_FUNCTION in config.strategies:
-    wrapped_function = tf.function(
-        user_fn, autograph=use_autograph)
-    data_dicts.append(run_one(
-        wrapped_function, RUNTIME_FUNCTION, print_intermediates))
+    graph_fn = tf.function(user_fn, autograph=use_autograph)
+    data_dicts.append(run_one(graph_fn, RUNTIME_FUNCTION))
 
   if RUNTIME_XLA in config.strategies:
-    @tf.function(autograph=use_autograph)
-    def xla_function():
-      # This will raise an exception if XLA isn't built into your version
-      # of TensorFlow.
-      return tf.xla.experimental.compile(user_fn)
+    xla_fn = tf.function(
+        user_fn, autograph=use_autograph, experimental_compile=True)
+    data_dicts.append(run_one(xla_fn, RUNTIME_XLA))
 
-    data_dicts.append(run_one(xla_function, RUNTIME_XLA, print_intermediates))
+  if RUNTIME_XLA_AUTOCLUSTER in config.strategies:
+    @tf.function(autograph=use_autograph)
+    def autocluster_fn(*args, **kwargs):
+      with tf.xla.experimental.jit_scope(compile_ops=True):
+        return user_fn(*args, **kwargs)
+    data_dicts.append(run_one(autocluster_fn, RUNTIME_XLA_AUTOCLUSTER))
 
   return data_dicts
 
@@ -166,7 +170,7 @@ def benchmark_tf_function(
       def f():
         total = tf.constant(0.0)
         for _ in np.arange(inner_iters):
-          m = tf.random_uniform((size, size))
+          m = tf.random.uniform((size, size))
           total += tf.reduce_sum(tf.matmul(m, m))
           return total
 
@@ -211,9 +215,12 @@ def benchmark_tf_function(
           extra_columns, use_autograph, print_intermediates)
 
   if HARDWARE_GPU in config.hardware:
-    with tf.device(gpu_device):
-      data_dicts += _run_function_under_strategies(
-          user_fn, iters, config, HARDWARE_GPU,
-          extra_columns, use_autograph, print_intermediates)
+    if tf.test.is_gpu_available():
+      with tf.device(gpu_device):
+        data_dicts += _run_function_under_strategies(
+            user_fn, iters, config, HARDWARE_GPU,
+            extra_columns, use_autograph, print_intermediates)
+    else:
+      print('Skipping GPU runs -- no GPU!')
 
   return data_dicts

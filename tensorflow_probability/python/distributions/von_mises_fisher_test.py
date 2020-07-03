@@ -36,13 +36,25 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
                          test_util.TestCase):
 
   def testBesselIve(self):
-    self.assertRaises(ValueError, lambda: _bessel_ive(2.0, 1.0))
+    with self.assertRaisesRegexp(ValueError, r'imprecise for large v'):
+      _bessel_ive(2.0, 1.0)
     # Zero is not a supported value for z.
-    self.assertRaises(tf.errors.InvalidArgumentError,
-                      lambda: self.evaluate(_bessel_ive(1.5, 0.0)))
+    with self.assertRaisesOpError(r'NaN'):
+      self.evaluate(_bessel_ive(1.5, 0.0))
     z = np.logspace(-6, 2, 20).astype(np.float64)
     for v in np.float64([-0.5, 0, 0.5, 1, 1.5]):
       self.assertAllClose(sp_special.ive(v, z), _bessel_ive(v, z))
+
+  def testReproducibleGraph(self):
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=tf.math.l2_normalize([1., 2.]),
+        concentration=1.2)
+    seed = test_util.test_seed()
+    s1 = self.evaluate(vmf.sample(50, seed=seed))
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
+    s2 = self.evaluate(vmf.sample(50, seed=seed))
+    self.assertAllEqual(s1, s2)
 
   def testSampleMeanDir2d(self):
     mean_dirs = tf.math.l2_normalize([[1., 1], [-2, 1], [0, -1]], axis=-1)
@@ -55,8 +67,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     self.assertEqual([5, 3], tensorshape_util.as_list(vmf.batch_shape))
     self.assertEqual([2], tensorshape_util.as_list(vmf.event_shape))
     nsamples = int(2e4)
-    samples = vmf.sample(
-        sample_shape=[nsamples], seed=test_util.test_seed())
+    samples = vmf.sample(nsamples, seed=test_util.test_seed())
     self.assertEqual([nsamples, 5, 3, 2],
                      tensorshape_util.as_list(samples.shape))
     sample_mean = self.evaluate(samples).mean(axis=0)
@@ -74,8 +85,9 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     self.assertAllClose(np.ones_like(inner_product)[2:], inner_product[2:],
                         atol=1e-3)
     # Inner products should be roughly ascending by concentration.
-    self.assertAllEqual(np.round(np.sort(inner_product, axis=0), decimals=3),
-                        np.round(inner_product, decimals=3))
+    self.assertAllClose(np.round(np.sort(inner_product, axis=0), decimals=3),
+                        np.round(inner_product, decimals=3),
+                        atol=.005)
     means = self.evaluate(vmf.mean())
     # Mean vector for 0-concentration is precisely (0, 0).
     self.assertAllEqual(np.zeros_like(means[0]), means[0])
@@ -295,8 +307,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     self._verifyPdfWithNumpy(vmf, atol=2e-4)
 
   def testInternalShapeInference(self):
-    # Regression test for the effect of b/139013403 on vMF sampling
-    # The bug only triggers if TF2_BEHAVIOR=1.
+    # Regression test for the effect of b/139013403 on vMF sampling.
     sample_shape = tf.constant([2])
     # There needs to be a 1 dimension in the batch shape to trigger the bug
     mean_dir = tf.math.l2_normalize([1., 2, 3, 4], axis=-1)

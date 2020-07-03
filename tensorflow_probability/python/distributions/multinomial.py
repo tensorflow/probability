@@ -21,12 +21,15 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.distributions import binomial
 from tensorflow_probability.python.distributions import categorical as categorical_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -243,21 +246,22 @@ class Multinomial(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     n_draws = tf.cast(self.total_count, dtype=tf.int32)
-    logits = self._logits_parameter_no_checks()
-    k = tf.compat.dimension_value(logits.shape[-1])
+    probs = self._probs_parameter_no_checks()
+    k = tf.compat.dimension_value(probs.shape[-1])
     if k is None:
-      k = tf.shape(logits)[-1]
-    return draw_sample(n, k, logits, n_draws, self.dtype, seed)
+      k = tf.shape(probs)[-1]
+    return _sample_multinomial_as_iterated_binomial(
+        n, k, probs, n_draws, self.dtype, seed)
 
   @distribution_util.AppendDocstring(_multinomial_sample_note)
   def _log_prob(self, counts):
     log_p = (
         tf.math.log(self._probs)
         if self._logits is None else tf.math.log_softmax(self._logits))
-    return (
-        tf.reduce_sum(counts * log_p, axis=-1) +        # log_unnorm_prob
-        tfp_math.log_combinations(
-            self.total_count, counts))  # -log_normalization
+    log_unnorm_prob = tf.reduce_sum(
+        tf.math.multiply_no_nan(log_p, counts), axis=-1)
+    neg_log_normalizer = tfp_math.log_combinations(self.total_count, counts)
+    return log_unnorm_prob + neg_log_normalizer
 
   def _mean(self):
     p = self._probs_parameter_no_checks()
@@ -333,72 +337,107 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
     num_samples: Python int or singleton integer Tensor: number of multinomial
       samples to draw.
     num_classes: Python int or singleton integer Tensor: number of classes.
-    logits: Floating Tensor with last dimension k, of (unnormalized) logit
-      probabilities per class.
+    logits: Floating Tensor with last dimension `num_classes`, of (unnormalized)
+      logit probabilities per class.
     num_trials: Tensor of number of categorical trials each multinomial consists
       of.  num_trials[..., tf.newaxis] must broadcast with logits.
     dtype: dtype at which to emit samples.
     seed: Random seed.
 
   Returns:
-    samples: Tensor of given dtype and shape [n] + batch_shape + [k].
+    samples: Tensor of given dtype and shape [num_samples] + batch_shape +
+      [num_classes].
+  """
+  probs = tf.math.softmax(logits)
+  return _sample_multinomial_as_iterated_binomial(
+      num_samples, num_classes, probs, num_trials, dtype, seed)
+
+
+def _sample_multinomial_as_iterated_binomial(
+    num_samples, num_classes, probs, num_trials, dtype, seed):
+  """Sample a multinomial by drawing one binomial sample per class.
+
+  The batch shape is given by broadcasting num_trials with
+  remove_last_dimension(probs).
+
+  The loop over binomial samples is a `tf.while_loop`, thus supporting a dynamic
+  number of classes.
+
+  Args:
+    num_samples: Singleton integer Tensor: number of multinomial samples to
+      draw.
+    num_classes: Singleton integer Tensor: number of classes.
+    probs: Floating Tensor with last dimension `num_classes`, of normalized
+      probabilities per class.
+    num_trials: Tensor of number of categorical trials each multinomial consists
+      of.  num_trials[..., tf.newaxis] must broadcast with probs.
+    dtype: dtype at which to emit samples.
+    seed: Random seed.
+
+  Returns:
+    samples: Tensor of given dtype and shape [num_samples] + batch_shape +
+      [num_classes].
   """
   with tf.name_scope('draw_sample'):
-    # broadcast the num_trials and logits to same shape
-    num_trials = tf.ones_like(
-        logits[..., 0], dtype=num_trials.dtype) * num_trials
-    logits = tf.ones_like(
-        num_trials[..., tf.newaxis], dtype=logits.dtype) * logits
+    # `convert_to_tensor(num_classes) here to avoid unstacking inside
+    # `split_seed`.  We can't take advantage of the Python-list code path anyway
+    # because the index at which we will take the seed is a Tensor.
+    seeds = samplers.split_seed(
+        seed, n=tf.convert_to_tensor(num_classes),
+        salt='multinomial_draw_sample')
 
-    # flatten the total_count and logits
-    # flat_logits has shape [B1B2...Bm, num_classes]
-    flat_logits = tf.reshape(logits, [-1, num_classes])
-    flat_num_trials = num_samples * tf.reshape(num_trials, [-1])  # [B1B2...Bm]
+    def fn(i, num_trials, consumed_prob, accum):
+      """Sample the counts for one class using binomial."""
+      probs_here = tf.gather(probs, i, axis=-1)
+      binomial_probs = tf.clip_by_value(probs_here / (1. - consumed_prob), 0, 1)
+      seed_here = tf.gather(seeds, i, axis=0)
+      binom = binomial.Binomial(total_count=num_trials, probs=binomial_probs)
+      # Not passing `num_samples` to `binom.sample`, as it's is already in
+      # `num_trials.shape`.
+      sample = binom.sample(seed=seed_here)
+      accum = accum.write(i, tf.cast(sample, dtype=dtype))
+      return i + 1, num_trials - sample, consumed_prob + probs_here, accum
 
-    # Computes each logits and num_trials situation by map_fn.
+    num_trials = tf.cast(num_trials, probs.dtype)
+    # Pre-broadcast with probs
+    num_trials += tf.zeros_like(probs[..., 0])
+    # Pre-enlarge for different output samples
+    num_trials = _replicate_along_left(num_trials, num_samples)
+    i = tf.constant(0)
+    consumed_prob = tf.zeros_like(probs[..., 0])
+    accum = tf.TensorArray(
+        dtype, size=num_classes, element_shape=num_trials.shape)
+    _, num_trials_left, _, accum = tf.while_loop(
+        cond=lambda index, _0, _1, _2: tf.less(index, num_classes - 1),
+        body=fn,
+        loop_vars=(i, num_trials, consumed_prob, accum))
+    # Force the last iteration to put all the trials into the last bucket,
+    # because probs[..., -1] / (1. - consumed_prob) might numerically not be 1.
+    # Also saves one iteration around the while_loop and one run of the binomial
+    # sampler.
+    accum = accum.write(num_classes - 1, tf.cast(num_trials_left, dtype=dtype))
+    # This stop_gradient is necessary to prevent spurious zero gradients coming
+    # from b/138796859, and a spurious gradient through num_trials_left.
+    results = tf.stop_gradient(accum.stack())
+    return distribution_util.move_dimension(results, 0, -1)
 
-    # Using just one batch tf.random.categorical call doesn't work because that
-    # requires num_trials to be the same across all members of the batch of
-    # logits.  This restriction makes sense for tf.random.categorical because
-    # for it, num_trials is part of the returned shape.  However, the
-    # multinomial sampler does not need that restriction, because it sums out
-    # exactly that dimension.
 
-    # One possibility would be to draw a batch categorical whose sample count is
-    # max(num_trials) and mask out the excess ones.  However, if the elements of
-    # num_trials vary widely, this can be wasteful of memory.
+def _replicate_along_left(tensor, count):
+  """Replicates `tensor` `count` times along a new leading axis.
 
-    # TODO(b/123763054, b/112152209): Revisit the possibility of writing this
-    # with a batch categorical followed by batch unsorted_segment_sum, once both
-    # of those work and are memory-efficient enough.
-    def _sample_one_batch_member(args):
-      logits, num_cat_samples = args[0], args[1]  # [K], []
-      # x has shape [1, num_cat_samples = num_samples * num_trials]
-      x = tf.random.categorical(
-          logits[tf.newaxis, ...], num_cat_samples, seed=seed)
-      x = tf.reshape(x, shape=[num_samples, -1])  # [num_samples, num_trials]
-      x = tf.one_hot(
-          x, depth=num_classes)  # [num_samples, num_trials, num_classes]
-      x = tf.reduce_sum(x, axis=-2)  # [num_samples, num_classes]
-      return tf.cast(x, dtype=dtype)
+  In other words, returns a Tensor of shape '[count] + tensor.shape`, with
+  `count` copies of `tensor`.
 
-    if seed is not None:
-      # Force parallel_iterations to 1 to ensure reproducibility
-      # b/139210489
-      x = tf.map_fn(
-          _sample_one_batch_member, [flat_logits, flat_num_trials],
-          dtype=dtype,  # [B1B2...Bm, num_samples, num_classes]
-          parallel_iterations=1)
-    else:
-      # Invoke default parallel_iterations behavior
-      x = tf.map_fn(
-          _sample_one_batch_member, [flat_logits, flat_num_trials],
-          dtype=dtype)  # [B1B2...Bm, num_samples, num_classes]
+  Args:
+    tensor: Tensor to replicate.
+    count: A scalar integer Tensor giving the number of times to replicate.
 
-    # reshape the results to proper shape
-    x = tf.transpose(a=x, perm=[1, 0, 2])
-    final_shape = tf.concat(
-        [[num_samples], tf.shape(num_trials), [num_classes]], axis=0)
-    x = tf.reshape(x, final_shape)
-
-    return x
+  Returns:
+    result: Replicated Tensor.
+  """
+  # I am surpised that I can't seem to find this utility in the TF API.  tf.tile
+  # is more general, but making it do this seems to require complicated shape
+  # gymnastics.  tf.repeat repeats in place, hence this idiom:
+  desired_shape = prefer_static.concat(
+      [[count], prefer_static.shape(tensor)], axis=0)
+  return tf.broadcast_to(tensor[tf.newaxis, ...], desired_shape)

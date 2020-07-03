@@ -29,6 +29,39 @@ __all__ = [
     'Sigmoid',
 ]
 
+JAX_MODE = False  # Overwritten by rewrite script.
+
+# TODO(b/155501444): Remove when tf.math.sigmoid and tf.nn.softplus are fixed.
+if JAX_MODE:
+  _stable_sigmoid = tf.math.sigmoid
+  _stable_grad_softplus = tf.nn.softplus
+else:
+
+  def _stable_sigmoid(x):
+    """A (more) numerically stable sigmoid than `tf.math.sigmoid`."""
+    x = tf.convert_to_tensor(x)
+    if x.dtype == tf.float64:
+      cutoff = -20
+    else:
+      cutoff = -9
+    return tf.where(x < cutoff, tf.exp(x), tf.math.sigmoid(x))
+
+  @tf.custom_gradient
+  def _stable_grad_softplus(x):
+    """A (more) numerically stable softplus than `tf.nn.softplus`."""
+    x = tf.convert_to_tensor(x)
+    if x.dtype == tf.float64:
+      cutoff = -20
+    else:
+      cutoff = -9
+
+    y = tf.where(x < cutoff, tf.math.log1p(tf.exp(x)), tf.nn.softplus(x))
+
+    def grad_fn(dy):
+      return dy * tf.where(x < cutoff, tf.exp(x), tf.nn.sigmoid(x))
+
+    return y, grad_fn
+
 
 class Sigmoid(bijector.Bijector):
   """Bijector that computes the logistic sigmoid function.
@@ -41,6 +74,10 @@ class Sigmoid(bijector.Bijector):
   a sigmoid that is shifted and scaled along the output axis. This is
   implemented as `high * g(X) + low * g(-X)`, which is more numerically
   stable than direct shifting and scaling.
+
+  Specifically, `low + (high - low) * g(X)` can sometimes evalaute
+  to slightly larger than `high`, which would trigger assertions
+  elsewhere.  The formula `high * g(X) + low * g(-X)` doesn't do that.
   """
 
   def __init__(self, low=None, high=None, validate_args=False, name='sigmoid'):
@@ -98,12 +135,12 @@ class Sigmoid(bijector.Bijector):
 
   def _forward(self, x):
     if self._is_standard_sigmoid:
-      return tf.sigmoid(x)
+      return _stable_sigmoid(x)
     lo = tf.convert_to_tensor(self.low)  # Concretize only once
     hi = tf.convert_to_tensor(self.high)
     diff = hi - lo
-    left = lo + diff * tf.math.sigmoid(x)
-    right = hi - diff * tf.math.sigmoid(-x)
+    left = lo + diff * _stable_sigmoid(x)
+    right = hi - diff * _stable_sigmoid(-x)
     return tf.where(x < 0, left, right)
     # Alternative:
     #   ans = hi * tf.sigmoid(x) + lo * tf.sigmoid(-x)
@@ -127,7 +164,7 @@ class Sigmoid(bijector.Bijector):
   # tf.log(high - y)`) has lower numerical precision.
 
   def _forward_log_det_jacobian(self, x):
-    sigmoid_fldj = -tf.math.softplus(-x) - tf.math.softplus(x)
+    sigmoid_fldj = -_stable_grad_softplus(-x) - _stable_grad_softplus(x)  # pylint: disable=invalid-unary-operand-type
     if self._is_standard_sigmoid:
       return sigmoid_fldj
     return sigmoid_fldj + tf.math.log(self.high - self.low)

@@ -23,12 +23,20 @@ import re
 
 # Dependency imports
 from absl import logging
-import numpy as np  # May be rewritten for JAX.
+from absl.testing import absltest
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 
-import tensorflow.compat.v2 as tf
+try:
+  # If TF is not imported, we return dummy `TestCase` and `Benchmark` classes
+  # because if we aren't testing, we shouldn't need these classes. Thus, tests
+  # that need `nptf.test.TestCase` should also import TF.
+  import tensorflow.compat.v2 as tf  # pylint: disable=g-import-not-at-top
+  have_tf = True
+except ImportError:
+  have_tf = False
 
 __all__ = [
+    'is_gpu_available',
     'Benchmark',
     'TestCase',
 ]
@@ -37,48 +45,55 @@ __all__ = [
 # --- Begin Public Functions --------------------------------------------------
 
 
-class Benchmark(tf.test.Benchmark):
-  pass
+is_gpu_available = lambda: False
 
 
-class TestCase(tf.test.TestCase):
-  """Wrapper of `tf.test.TestCase`."""
+if have_tf:
 
-  def evaluate(self, x):
-    return tf.nest.map_structure(onp.array, x)
+  class Benchmark(tf.test.Benchmark):
+    pass
 
-  def _GetNdArray(self, a):
-    return onp.array(a)
+  class TestCase(tf.test.TestCase):
+    """Wrapper of `tf.test.TestCase`."""
 
-  @contextlib.contextmanager
-  def assertRaisesOpError(self, msg):
-    # Numpy backend doesn't raise OpErrors.
-    try:
-      yield
-      self.fail('No exception raised. Expected exception similar to '
-                'tf.errors.OpError with message: %s' % msg)
-    except Exception as e:  # pylint: disable=broad-except
-      err_str = str(e)
-      if re.search(msg, err_str):
-        return
-      logging.error('Expected exception to match `%s`!', msg)
-      raise
+    def evaluate(self, x):
+      return tf.nest.map_structure(onp.array, x)
 
-  def assertEqual(self, first, second, msg=None):
-    if isinstance(first, list) and isinstance(second, tuple):
-      first = tuple(first)
-    if isinstance(first, tuple) and isinstance(second, list):
-      second = tuple(second)
+    def _GetNdArray(self, a):
+      return onp.array(a)
 
-    if isinstance(first, np.ndarray):
-      second = onp.array(second)
-    if isinstance(second, np.ndarray):
-      first = onp.array(first)
+    @contextlib.contextmanager
+    def assertRaisesOpError(self, msg):
+      # Numpy backend doesn't raise OpErrors.
+      try:
+        yield
+        self.fail('No exception raised. Expected exception similar to '
+                  'tf.errors.OpError with message: %s' % msg)
+      except Exception as e:  # pylint: disable=broad-except
+        err_str = str(e)
+        if re.search(msg, err_str):
+          return
+        logging.error('Expected exception to match `%s`!', msg)
+        raise
 
-    return super(TestCase, self).assertEqual(first, second, msg)
+    def assertEqual(self, first, second, msg=None):
+      if isinstance(first, list) and isinstance(second, tuple):
+        first = tuple(first)
+      if isinstance(first, tuple) and isinstance(second, list):
+        second = tuple(second)
 
-  def assertShapeEqual(self, first, second, msg=None):
-    self.assertTupleEqual(first.shape, second.shape, msg=msg)
+      return super(TestCase, self).assertEqual(first, second, msg)
 
+    def assertShapeEqual(self, first, second, msg=None):
+      self.assertTupleEqual(first.shape, second.shape, msg=msg)
 
-main = tf.test.main
+  main = tf.test.main
+else:
+
+  class Benchmark(object):
+    pass
+
+  class TestCase(absltest.TestCase):
+    pass
+
+  main = None

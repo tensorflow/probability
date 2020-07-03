@@ -297,14 +297,13 @@ class LocalLevel(StructuralTimeSeries):
 
       dtype = dtype_util.common_dtype([level_scale_prior, initial_level_prior])
 
-      if level_scale_prior is None or initial_level_prior is None:
-        if observed_time_series is not None:
-          _, observed_stddev, observed_initial = (
-              sts_util.empirical_statistics(observed_time_series))
-        else:
-          observed_stddev, observed_initial = (tf.convert_to_tensor(
-              value=1., dtype=dtype), tf.convert_to_tensor(
-                  value=0., dtype=dtype))
+      if observed_time_series is not None:
+        _, observed_stddev, observed_initial = (
+            sts_util.empirical_statistics(observed_time_series))
+      else:
+        observed_stddev, observed_initial = (tf.convert_to_tensor(
+            value=1., dtype=dtype), tf.convert_to_tensor(
+                value=0., dtype=dtype))
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.

@@ -27,6 +27,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
@@ -34,6 +35,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'cholesky_concat',
+    'cholesky_update',
     'fill_triangular',
     'fill_triangular_inverse',
     'lu_matrix_inverse',
@@ -101,6 +103,113 @@ def cholesky_concat(chol, cols, name=None):
     return tf.concat([tf.concat([chol, top_right_zeros_nm], axis=-1),
                       tf.concat([lower_left_mn, lower_right_mm], axis=-1)],
                      axis=-2)
+
+
+def cholesky_update(chol, update_vector, multiplier=1., name=None):
+  """Returns cholesky of chol @ chol.T + multiplier * u @ u.T.
+
+  Given a (batch of) lower triangular cholesky factor(s) `chol`, along with a
+  (batch of) vector(s) `update_vector`, compute the lower triangular cholesky
+  factor of the rank-1 update `chol @ chol.T + multiplier * u @ u.T`, where
+  `multiplier` is a (batch of) scalar(s).
+
+  If `chol` has shape `[L, L]`, this has complexity `O(L^2)` compared to the
+  naive algorithm which has complexity `O(L^3)`.
+
+  Args:
+    chol: Floating-point `Tensor` with shape `[B1, ..., Bn, L, L]`.
+      Cholesky decomposition of `mat = chol @ chol.T`. Batch dimensions
+      must be broadcastable with `update_vector` and `multiplier`.
+    update_vector: Floating-point `Tensor` with shape `[B1, ... Bn, L]`. Vector
+      defining rank-one update. Batch dimensions must be broadcastable with
+      `chol` and `multiplier`.
+    multiplier: Floating-point `Tensor` with shape `[B1, ..., Bn]. Scalar
+      multiplier to rank-one update. Batch dimensions must be broadcastable
+      with `chol` and `update_vector`. Note that updates where `multiplier` is
+      positive are numerically stable, while when `multiplier` is negative
+      (downdating), the update will only work if the new resulting matrix is
+      still positive definite.
+    name: Optional name for this op.
+
+  #### References
+  [1] Oswin Krause. Christian Igel. A More Efficient Rank-one Covariance
+      Matrix Update for Evolution Strategies. 2015 ACM Conference.
+      https://www.researchgate.net/publication/300581419_A_More_Efficient_Rank-one_Covariance_Matrix_Update_for_Evolution_Strategies
+  """
+  # TODO(b/154638092): Move this functionality in to TensorFlow.
+  with tf.name_scope(name or 'cholesky_update'):
+    dtype = dtype_util.common_dtype(
+        [chol, update_vector, multiplier], dtype_hint=tf.float32)
+    chol = tf.convert_to_tensor(chol, name='chol', dtype=dtype)
+    update_vector = tf.convert_to_tensor(
+        update_vector, name='update_vector', dtype=dtype)
+    multiplier = tf.convert_to_tensor(
+        multiplier, name='multiplier', dtype=dtype)
+
+    batch_shape = prefer_static.broadcast_shape(
+        prefer_static.broadcast_shape(
+            tf.shape(chol)[:-2],
+            tf.shape(update_vector)[:-1]), tf.shape(multiplier))
+    chol = tf.broadcast_to(
+        chol, prefer_static.concat(
+            [batch_shape, tf.shape(chol)[-2:]], axis=0))
+    update_vector = tf.broadcast_to(
+        update_vector, prefer_static.concat(
+            [batch_shape, tf.shape(update_vector)[-1:]], axis=0))
+    multiplier = tf.broadcast_to(multiplier, batch_shape)
+
+    chol_diag = tf.linalg.diag_part(chol)
+
+    # The algorithm in [1] is implemented as a double for loop. We can treat
+    # the inner loop in Algorithm 3.1 as a vector operation, and thus the
+    # whole algorithm as a single for loop, and hence can use a `tf.scan`
+    # on it.
+
+    # We use for accumulation omega and b as defined in Algorithm 3.1, since
+    # these are updated per iteration.
+
+    def compute_new_column(accumulated_quantities, state):
+      """Computes the next column of the updated cholesky."""
+      _, _, omega, b = accumulated_quantities
+      index, diagonal_member, col = state
+      omega_at_index = tf.gather(omega, index, axis=-1)
+
+      # Line 4
+      new_diagonal_member = tf.math.sqrt(
+          tf.math.square(diagonal_member) + multiplier / b * tf.math.square(
+              omega_at_index))
+      # `scaling_factor` is the same as `gamma` on Line 5.
+      scaling_factor = (tf.math.square(diagonal_member) * b +
+                        multiplier * tf.math.square(omega_at_index))
+
+      # The following updates are the same as the for loop in lines 6-8.
+      omega = omega - (omega_at_index / diagonal_member)[..., tf.newaxis] * col
+      new_col = new_diagonal_member[..., tf.newaxis]  * (
+          col / diagonal_member[..., tf.newaxis] +
+          (multiplier * omega_at_index / scaling_factor)[
+              ..., tf.newaxis] * omega)
+      b = b + multiplier * tf.math.square(omega_at_index / diagonal_member)
+      return new_diagonal_member, new_col, omega, b
+
+    # We will scan over the columns.
+    chol = distribution_util.move_dimension(chol, source_idx=-1, dest_idx=0)
+    chol_diag = distribution_util.move_dimension(
+        chol_diag, source_idx=-1, dest_idx=0)
+
+    new_diag, new_chol, _, _ = tf.scan(
+        fn=compute_new_column,
+        elems=(tf.range(0, tf.shape(chol)[0]), chol_diag, chol),
+        initializer=(
+            tf.zeros_like(multiplier),
+            tf.zeros_like(chol[0, ...]),
+            update_vector,
+            tf.ones_like(multiplier)))
+    new_chol = distribution_util.move_dimension(
+        new_chol, source_idx=0, dest_idx=-1)
+    new_diag = distribution_util.move_dimension(
+        new_diag, source_idx=0, dest_idx=-1)
+    new_chol = tf.linalg.set_diag(new_chol, new_diag)
+    return new_chol
 
 
 def _swap_m_with_i(vecs, m, i):

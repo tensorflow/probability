@@ -42,7 +42,6 @@ from tensorflow.python.autograph.converters import break_statements
 from tensorflow.python.autograph.converters import continue_statements
 from tensorflow.python.autograph.converters import return_statements
 from tensorflow.python.autograph.core import converter
-from tensorflow.python.autograph.core import naming
 from tensorflow.python.autograph.pyct import anno
 from tensorflow.python.autograph.pyct import inspect_utils
 from tensorflow.python.autograph.pyct import parser
@@ -50,9 +49,17 @@ from tensorflow.python.autograph.pyct import qual_names
 from tensorflow.python.autograph.pyct import templates
 from tensorflow.python.autograph.pyct import transformer
 from tensorflow.python.autograph.pyct.common_transformers import anf
+from tensorflow.python.autograph.pyct.static_analysis import activity
 
 
-# For backward compatibility: compiler will be renamed to loader in TF 2.2+.
+# For backward compatibility:
+# - `compiler` will be renamed to `loader` in TF 2.2+.
+# - `naming` will be moved to `core` in TF 2.2+.
+# - 'converter.standard_analysis` will no longer be needed in TF 2.3+.
+try:
+  from tensorflow.python.autograph.pyct import naming  # pylint:disable=g-import-not-at-top
+except ImportError:
+  from tensorflow.python.autograph.core import naming  # pylint:disable=g-import-not-at-top
 try:
   from tensorflow.python.autograph.pyct import loader  # pylint:disable=g-import-not-at-top
 except ImportError:
@@ -60,6 +67,9 @@ except ImportError:
 
   loader = compiler
   loader.load_ast = compiler.ast_to_object
+
+converter.standard_analysis = getattr(
+    converter, 'standard_analysis', (lambda node, *_, **__: node))
 
 
 TF_BACKEND = tf_backend.TensorFlowBackend()
@@ -83,6 +93,7 @@ def _parse_and_analyze(f, autobatch_functions):
     entity_info: An AutoGraph `EntityInfo` object, with some information
       about `f`.  Required for initializing `_AutoBatchingTransformer`.
   """
+  # TODO(mdan): Replace all this boilerplate with FunctionTranspiler.
   namespace = {}
 
   # Get the AST of the function
@@ -90,29 +101,46 @@ def _parse_and_analyze(f, autobatch_functions):
   node, _ = parser.parse_entity(f, future_features=future_features)
 
   # Boilerplate for AutoGraph transforms
-  entity_info = transformer.EntityInfo(
-      source_code='',
-      source_file=None,
-      future_features=future_features,
-      namespace=namespace)
-  program_ctx = converter.ProgramContext(
-      options=converter.ConversionOptions(recursive=True),
-      autograph_module=None)
-  ctx = converter.EntityContext(
-      namer=naming.Namer(namespace),
-      entity_info=entity_info,
-      program_ctx=program_ctx)
+  if hasattr(converter, 'EntityContext'):
+    # TF 2.2-
+    entity_info = transformer.EntityInfo(
+        source_code='',
+        source_file=None,
+        future_features=future_features,
+        namespace=namespace)
+    program_ctx = converter.ProgramContext(
+        options=converter.ConversionOptions(recursive=True),
+        autograph_module=None)
+    ctx = converter.EntityContext(
+        namer=naming.Namer(namespace),
+        entity_info=entity_info,
+        program_ctx=program_ctx)
+  else:
+    # TF 2.3+
+    entity_info = transformer.EntityInfo(
+        name=f.__name__,
+        source_code='',
+        source_file=None,
+        future_features=future_features,
+        namespace=namespace)
+    program_ctx = converter.ProgramContext(
+        options=converter.ConversionOptions(recursive=True),
+        autograph_module=None)
+    ctx = transformer.Context(
+        info=entity_info,
+        namer=naming.Namer(namespace),
+        user_context=program_ctx)
 
   # Canonicalize away break statements
-  node = converter.standard_analysis(node, ctx, is_initial=True)
+  node = converter.standard_analysis(node, ctx)
   node = break_statements.transform(node, ctx)
 
   # Canonicalize away continue statements
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = converter.standard_analysis(node, ctx)
   node = continue_statements.transform(node, ctx)
 
   # Force single returns
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = converter.standard_analysis(node, ctx)
   node = return_statements.transform(node, ctx, default_to_null_return=False)
 
   # Transform into ANF
@@ -136,7 +164,8 @@ def _parse_and_analyze(f, autobatch_functions):
        maybe_replace_function_argument),
   ]
   node = anf.transform(node, ctx, config=anf_config)
-  node = converter.standard_analysis(node, ctx, is_initial=False)
+  node = qual_names.resolve(node)
+  node = activity.resolve(node, ctx)
 
   return node, ctx
 
@@ -290,7 +319,7 @@ class _AutoBatchingTransformer(transformer.Base):
     # We want the root names of any attribute accesses; the accesses will happen
     # inside the expression.
     used_vars = set().union(*[qn.support_set for qn in scope.read])
-    # Exclude names from the blacklist.
+    # Exclude names from the blocklist.
     used_vars = list(used_vars - set(non_autobatch_names))
     # Exclude names that will be available from the enclosing scope.
     used_vars = [v for v in used_vars if str(v) not in self.enclosing_names]

@@ -232,7 +232,7 @@ def _binary_einslogsumexp(formula, a, b):
   # That method can result in -inf entries even though all of the
   # numbers are well within a domain in which `logeinsumexp` shouldn't
   # underflow.
-  almost = tf.reduce_logsumexp(a + b,
-                               axis=tuple(map(intermediates.index, reductions)))
+  almost = tf.reduce_logsumexp(
+      a + b, axis=tuple(set(map(intermediates.index, reductions))))
 
   return rearrange(reduced, rhs, almost)

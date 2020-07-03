@@ -23,13 +23,14 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import half_cauchy
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -193,17 +194,20 @@ class Horseshoe(distribution.Distribution):
     q = 20. / 47. * xx**1.0919284281983377
     h = 1. / (1 + xx**(1.5)) + h_inf * q / (1 + q)
     c = -.5 * np.log(2 * np.pi**3) - tf.math.log(g * scale)
-    return -tf.math.log1p((1 - g) / g * tf.exp(-xx / (1 - g))) + tf.math.log(
+    z = np.log1p(-g) - np.log(g)
+    softplus_bij = softplus_bijector.Softplus()
+    return -softplus_bij.forward(z - xx / (1 - g)) + tf.math.log(
         tf.math.log1p(g / xx - (1 - g) / (h + b * xx)**2)) + c
 
   def _sample_n(self, n, seed=None):
     scale = tf.convert_to_tensor(self.scale)
     shape = tf.concat([[n], tf.shape(scale)], axis=0)
-    seed = SeedStream(seed, salt='random_horseshoe')
-    local_shrinkage = self._half_cauchy.sample(shape, seed=seed())
+    shrinkage_seed, sample_seed = samplers.split_seed(seed,
+                                                      salt='random_horseshoe')
+    local_shrinkage = self._half_cauchy.sample(shape, seed=shrinkage_seed)
     shrinkage = scale * local_shrinkage
-    sampled = tf.random.normal(
-        shape=shape, mean=0., stddev=1., dtype=scale.dtype, seed=seed())
+    sampled = samplers.normal(
+        shape=shape, mean=0., stddev=1., dtype=scale.dtype, seed=sample_seed)
     return sampled * shrinkage
 
   def _mean(self):

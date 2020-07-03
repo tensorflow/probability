@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -198,10 +199,10 @@ class InverseGamma(distribution.Distribution):
     return tf.TensorShape([])
 
   @distribution_util.AppendDocstring(
-      """Note: See `tf.random_gamma` docstring for sampling details and
+      """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return 1. / tf.random.gamma(
+    return 1. / samplers.gamma(
         shape=[n],
         alpha=self.concentration,
         beta=self.scale,

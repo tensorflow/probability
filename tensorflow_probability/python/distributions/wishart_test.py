@@ -191,7 +191,7 @@ class WishartTest(test_util.TestCase):
     variance_estimate = self.evaluate(
         tf.reduce_mean(tf.square(x), axis=[0]) - tf.square(moment1_estimate))
     self.assertAllClose(
-        self.evaluate(chol_w.variance()), variance_estimate, rtol=0.05)
+        self.evaluate(chol_w.variance()), variance_estimate, rtol=0.15)
 
   # Test that sampling with the same seed twice gives the same results.
   def testSampleMultipleTimes(self):

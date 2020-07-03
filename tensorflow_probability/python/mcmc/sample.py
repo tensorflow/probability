@@ -1,6 +1,6 @@
 # Copyright 2018 The TensorFlow Probability Authors.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the 'License');
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -25,24 +25,26 @@ import collections
 import warnings
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
-    "CheckpointableStatesAndTrace",
-    "StatesAndTrace",
-    "sample_chain",
+    'CheckpointableStatesAndTrace',
+    'StatesAndTrace',
+    'sample_chain',
 ]
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings("always",
-                        module="tensorflow_probability.*sample",
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*sample',
                         append=True)  # Don't override user-set filters.
 
 
 class StatesAndTrace(
-    collections.namedtuple("StatesAndTrace", "all_states, trace")):
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('StatesAndTrace', ['all_states', 'trace'])):
   """States and auxiliary trace of an MCMC chain.
 
   The first dimension of all the `Tensor`s in this structure is the same and
@@ -58,8 +60,9 @@ class StatesAndTrace(
 
 
 class CheckpointableStatesAndTrace(
-    collections.namedtuple("CheckpointableStatesAndTrace",
-                           "all_states, trace, final_kernel_results")):
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('CheckpointableStatesAndTrace',
+                           ['all_states', 'trace', 'final_kernel_results'])):
   """States and auxiliary trace of an MCMC chain.
 
   The first dimension of all the `Tensor`s in the `all_states` and `trace`
@@ -87,6 +90,7 @@ def sample_chain(
     trace_fn=lambda current_state, kernel_results: kernel_results,
     return_final_kernel_results=False,
     parallel_iterations=10,
+    seed=None,
     name=None,
 ):
   """Implements Markov chain Monte Carlo via repeated `TransitionKernel` steps.
@@ -103,14 +107,11 @@ def sample_chain(
 
   Since MCMC states are correlated, it is sometimes desirable to produce
   additional intermediate states, and then discard them, ending up with a set of
-  states with decreased autocorrelation.  See [Owen (2017)][1]. Such "thinning"
+  states with decreased autocorrelation.  See [Owen (2017)][1]. Such 'thinning'
   is made possible by setting `num_steps_between_results > 0`. The chain then
   takes `num_steps_between_results` extra steps between the steps that make it
   into the results. The extra steps are never materialized, and thus do not
   increase memory requirements.
-
-  Warning: when setting a `seed` in the `kernel`, ensure that `sample_chain`'s
-  `parallel_iterations=1`, otherwise results will not be reproducible.
 
   In addition to returning the chain state, this function supports tracing of
   auxiliary variables used by the kernel. The traced values are selected by
@@ -142,8 +143,9 @@ def sample_chain(
       `trace_fn`.
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
+    seed: Optional, a seed for reproducible sampling.
     name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., "mcmc_sample_chain").
+      Default value: `None` (i.e., 'mcmc_sample_chain').
 
   Returns:
     checkpointable_states_and_trace: if `return_final_kernel_results` is
@@ -239,7 +241,7 @@ def sample_chain(
   num_chains = 100
 
   weights = make_prior(num_weights).sample(1)
-  factors = tf.random_normal([num_factors, num_weights])
+  factors = tf.random.normal([num_factors, num_weights])
   x = make_likelihood(weights, factors).sample()
 
   # Sample from Hamiltonian Monte Carlo Markov Chain.
@@ -305,20 +307,23 @@ def sample_chain(
        _Technical Report_, 2017.
        http://statweb.stanford.edu/~owen/reports/bestthinning.pdf
   """
+  is_seeded = seed is not None
+  seed = samplers.sanitize_seed(seed, salt='mcmc.sample_chain')
+
   if not kernel.is_calibrated:
-    warnings.warn("supplied `TransitionKernel` is not calibrated. Markov "
-                  "chain may not converge to intended target distribution.")
-  with tf.name_scope(name or "mcmc_sample_chain"):
+    warnings.warn('supplied `TransitionKernel` is not calibrated. Markov '
+                  'chain may not converge to intended target distribution.')
+  with tf.name_scope(name or 'mcmc_sample_chain'):
     num_results = tf.convert_to_tensor(
-        num_results, dtype=tf.int32, name="num_results")
+        num_results, dtype=tf.int32, name='num_results')
     num_burnin_steps = tf.convert_to_tensor(
-        num_burnin_steps, dtype=tf.int32, name="num_burnin_steps")
+        num_burnin_steps, dtype=tf.int32, name='num_burnin_steps')
     num_steps_between_results = tf.convert_to_tensor(
         num_steps_between_results,
         dtype=tf.int32,
-        name="num_steps_between_results")
+        name='num_steps_between_results')
     current_state = tf.nest.map_structure(
-        lambda x: tf.convert_to_tensor(x, name="current_state"),
+        lambda x: tf.convert_to_tensor(x, name='current_state'),
         current_state)
     if previous_kernel_results is None:
       previous_kernel_results = kernel.bootstrap_results(current_state)
@@ -330,22 +335,29 @@ def sample_chain(
     else:
       no_trace = False
     if trace_fn is sample_chain.__defaults__[4]:
-      warnings.warn("Tracing all kernel results by default is deprecated. Set "
-                    "the `trace_fn` argument to None (the future default "
-                    "value) or an explicit callback that traces the values "
-                    "you are interested in.")
+      warnings.warn('Tracing all kernel results by default is deprecated. Set '
+                    'the `trace_fn` argument to None (the future default '
+                    'value) or an explicit callback that traces the values '
+                    'you are interested in.')
 
-    def _trace_scan_fn(state_and_results, num_steps):
-      next_state, current_kernel_results = mcmc_util.smart_for_loop(
+    def _seeded_one_step(seed, *state_and_results):
+      step_seed, passalong_seed = (
+          samplers.split_seed(seed) if is_seeded else (None, seed))
+      one_step_kwargs = dict(seed=step_seed) if is_seeded else {}
+      return [passalong_seed] + list(
+          kernel.one_step(*state_and_results, **one_step_kwargs))
+
+    def _trace_scan_fn(seed_state_and_results, num_steps):
+      seed, next_state, current_kernel_results = mcmc_util.smart_for_loop(
           loop_num_iter=num_steps,
-          body_fn=kernel.one_step,
-          initial_loop_vars=list(state_and_results),
+          body_fn=_seeded_one_step,
+          initial_loop_vars=list(seed_state_and_results),
           parallel_iterations=parallel_iterations)
-      return next_state, current_kernel_results
+      return seed, next_state, current_kernel_results
 
-    (_, final_kernel_results), (all_states, trace) = mcmc_util.trace_scan(
+    (_, _, final_kernel_results), (all_states, trace) = mcmc_util.trace_scan(
         loop_fn=_trace_scan_fn,
-        initial_state=(current_state, previous_kernel_results),
+        initial_state=(seed, current_state, previous_kernel_results),
         elems=tf.one_hot(
             indices=0,
             depth=num_results,
@@ -353,8 +365,8 @@ def sample_chain(
             off_value=1 + num_steps_between_results,
             dtype=tf.int32),
         # pylint: disable=g-long-lambda
-        trace_fn=lambda state_and_results: (state_and_results[0],
-                                            trace_fn(*state_and_results)),
+        trace_fn=lambda seed_state_and_results: (
+            seed_state_and_results[1], trace_fn(*seed_state_and_results[1:])),
         # pylint: enable=g-long-lambda
         parallel_iterations=parallel_iterations)
 

@@ -50,6 +50,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "surrogate_posteriors_test",
     size = "small",

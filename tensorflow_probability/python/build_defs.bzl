@@ -12,22 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Build defs for TF/Numpy/JAX-variadic libraries & tests."""
+"""Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
 # [internal] load python3.bzl
 
 NO_REWRITE_NEEDED = [
     "internal:docstring_util",
-    "internal:name_util",
     "internal:reparameterization",
-    "internal:tensorshape_util",
     "layers",
-    "math:minimize",
-    "math:sparse",
-    "math/ode",
-    "optimizer/convergence_criteria",
-    "optimizer:sgld",
-    "optimizer:variational_sgld",
     "platform_google",
 ]
 
@@ -75,24 +67,36 @@ def _substrate_deps(deps, substrate):
 def py3_test(*args, **kwargs):
     native.py_test(*args, **kwargs)
 
+def _resolve_omit_dep(dep):
+    """Resolves a `substrates_omit_deps` item to full target."""
+    if ":" not in dep:
+        dep = "{}:{}".format(dep, dep.split("/")[-1])
+    if dep.startswith(":"):
+        dep = "{}{}".format(native.package_name(), dep)
+    return dep
+
 def multi_substrate_py_library(
         name,
         srcs = [],
         deps = [],
         substrates_omit_deps = [],
+        jax_omit_deps = [],
+        numpy_omit_deps = [],
         testonly = 0,
         srcs_version = "PY2AND3"):
-    """A TFP `py_library` for each of TF, Numpy, and JAX.
+    """A TFP `py_library` for each of TF, NumPy, and JAX.
 
     Args:
-        name: The TF `py_library` name. Numpy and JAX libraries have '.numpy' and
+        name: The TF `py_library` name. NumPy and JAX libraries have '.numpy' and
             '.jax' appended.
-        srcs: As with `py_library`. A `genrule` is used to rewrite srcs for Numpy
+        srcs: As with `py_library`. A `genrule` is used to rewrite srcs for NumPy
             and JAX substrates.
         deps: As with `py_library`. The list is rewritten to depend on
             substrate-specific libraries for substrate variants.
         substrates_omit_deps: List of deps to omit if those libraries are not
             rewritten for the substrates.
+        jax_omit_deps: List of deps to omit for the JAX substrate.
+        numpy_omit_deps: List of deps to omit for the NumPy substrate.
         testonly: As with `py_library`.
         srcs_version: As with `py_library`.
     """
@@ -104,14 +108,26 @@ def multi_substrate_py_library(
         srcs_version = srcs_version,
         testonly = testonly,
     )
+    remove_deps = [
+        "//third_party/py/tensorflow",
+        "//third_party/py/tensorflow:tensorflow",
+    ]
 
-    trimmed_deps = [dep for dep in deps if dep not in substrates_omit_deps]
+    trimmed_deps = [dep for dep in deps if (dep not in substrates_omit_deps and
+                                            dep not in remove_deps)]
+    resolved_omit_deps_numpy = [
+        _resolve_omit_dep(dep)
+        for dep in substrates_omit_deps + numpy_omit_deps
+    ]
     for src in srcs:
         native.genrule(
             name = "rewrite_{}_numpy".format(src.replace(".", "_")),
             srcs = [src],
             outs = [_substrate_src(src, "numpy")],
-            cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
+            cmd = "$(location {}) $(SRCS) --omit_deps={} > $@".format(
+                REWRITER_TARGET,
+                ",".join(resolved_omit_deps_numpy),
+            ),
             tools = [REWRITER_TARGET],
         )
     native.py_library(
@@ -122,13 +138,20 @@ def multi_substrate_py_library(
         testonly = testonly,
     )
 
+    resolved_omit_deps_jax = [
+        _resolve_omit_dep(dep)
+        for dep in substrates_omit_deps + jax_omit_deps
+    ]
     jax_srcs = _substrate_srcs(srcs, "jax")
     for src in srcs:
         native.genrule(
             name = "rewrite_{}_jax".format(src.replace(".", "_")),
             srcs = [src],
             outs = [_substrate_src(src, "jax")],
-            cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
+            cmd = "$(location {}) $(SRCS) --omit_deps={} --numpy_to_jax > $@".format(
+                REWRITER_TARGET,
+                ",".join(resolved_omit_deps_jax),
+            ),
             tools = [REWRITER_TARGET],
         )
     native.py_library(
@@ -143,31 +166,36 @@ def multi_substrate_py_test(
         name,
         size = "small",
         jax_size = None,
+        numpy_size = None,
         srcs = [],
         deps = [],
         tags = [],
         numpy_tags = [],
         jax_tags = [],
+        disabled_substrates = [],
         srcs_version = "PY2AND3",
         timeout = None,
         shard_count = None):
-    """A TFP `py2and3_test` for each of TF, Numpy, and JAX.
+    """A TFP `py2and3_test` for each of TF, NumPy, and JAX.
 
     Args:
-        name: Name of the `test_suite` which covers TF, Numpy and JAX variants
+        name: Name of the `test_suite` which covers TF, NumPy and JAX variants
             of the test. Each substrate will have a dedicated `py2and3_test`
             suffixed with '.tf', '.numpy', or '.jax' as appropriate.
         size: As with `py_test`.
         jax_size: A size override for the JAX target.
+        numpy_size: A size override for the numpy target.
         srcs: As with `py_test`. These will have a `genrule` emitted to rewrite
-            Numpy and JAX variants, writing the test file into a subdirectory.
+            NumPy and JAX variants, writing the test file into a subdirectory.
         deps: As with `py_test`. The list is rewritten to depend on
             substrate-specific libraries for substrate variants.
-        tags: Tags global to this test target. Numpy also gets a `'tfp_numpy'`
+        tags: Tags global to this test target. NumPy also gets a `'tfp_numpy'`
             tag, and JAX gets a `'tfp_jax'` tag. A `f'_{name}'` tag is used
             to produce the `test_suite`.
-        numpy_tags: Tags specific to the Numpy test. (e.g. `'notap'`).
-        jax_tags: Tags specific to the JAX test. (e.g. `'notap'`).
+        numpy_tags: Tags specific to the NumPy test. (e.g. `"notap"`).
+        jax_tags: Tags specific to the JAX test. (e.g. `"notap"`).
+        disabled_substrates: Iterable of substrates to disable, items from
+            ["numpy", "jax"].
         srcs_version: As with `py_test`.
         timeout: As with `py_test`.
         shard_count: As with `py_test`.
@@ -189,49 +217,51 @@ def multi_substrate_py_test(
         shard_count = shard_count,
     )
 
-    numpy_srcs = _substrate_srcs(srcs, "numpy")
-    native.genrule(
-        name = "rewrite_{}_numpy".format(name),
-        srcs = srcs,
-        outs = numpy_srcs,
-        cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
-        tools = [REWRITER_TARGET],
-    )
-    py3_test(
-        name = "{}.numpy".format(name),
-        size = size,
-        srcs = numpy_srcs,
-        main = _substrate_src("{}.py".format(name), "numpy"),
-        deps = _substrate_deps(deps, "numpy"),
-        tags = tags + ["tfp_numpy"] + numpy_tags,
-        srcs_version = srcs_version,
-        python_version = "PY3",
-        timeout = timeout,
-        shard_count = shard_count,
-    )
+    if "numpy" not in disabled_substrates:
+        numpy_srcs = _substrate_srcs(srcs, "numpy")
+        native.genrule(
+            name = "rewrite_{}_numpy".format(name),
+            srcs = srcs,
+            outs = numpy_srcs,
+            cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
+            tools = [REWRITER_TARGET],
+        )
+        py3_test(
+            name = "{}.numpy".format(name),
+            size = numpy_size or size,
+            srcs = numpy_srcs,
+            main = _substrate_src("{}.py".format(name), "numpy"),
+            deps = _substrate_deps(deps, "numpy"),
+            tags = tags + ["tfp_numpy"] + numpy_tags,
+            srcs_version = srcs_version,
+            python_version = "PY3",
+            timeout = timeout,
+            shard_count = shard_count,
+        )
 
-    jax_srcs = _substrate_srcs(srcs, "jax")
-    native.genrule(
-        name = "rewrite_{}_jax".format(name),
-        srcs = srcs,
-        outs = jax_srcs,
-        cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
-        tools = [REWRITER_TARGET],
-    )
-    jax_deps = _substrate_deps(deps, "jax")
-    # [internal] Add JAX build dep
-    py3_test(
-        name = "{}.jax".format(name),
-        size = jax_size if jax_size else size,
-        srcs = jax_srcs,
-        main = _substrate_src("{}.py".format(name), "jax"),
-        deps = jax_deps,
-        tags = tags + ["tfp_jax"] + jax_tags,
-        srcs_version = srcs_version,
-        python_version = "PY3",
-        timeout = timeout,
-        shard_count = shard_count,
-    )
+    if "jax" not in disabled_substrates:
+        jax_srcs = _substrate_srcs(srcs, "jax")
+        native.genrule(
+            name = "rewrite_{}_jax".format(name),
+            srcs = srcs,
+            outs = jax_srcs,
+            cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
+            tools = [REWRITER_TARGET],
+        )
+        jax_deps = _substrate_deps(deps, "jax")
+        # [internal] Add JAX build dep
+        py3_test(
+            name = "{}.jax".format(name),
+            size = jax_size or size,
+            srcs = jax_srcs,
+            main = _substrate_src("{}.py".format(name), "jax"),
+            deps = jax_deps,
+            tags = tags + ["tfp_jax"] + jax_tags,
+            srcs_version = srcs_version,
+            python_version = "PY3",
+            timeout = timeout,
+            shard_count = shard_count,
+        )
 
     native.test_suite(
         name = name,

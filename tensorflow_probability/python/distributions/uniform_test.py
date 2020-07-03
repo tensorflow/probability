@@ -253,6 +253,7 @@ class UniformTest(test_util.TestCase):
     expected_pdf = [1.0, 0.1]
     self.assertAllClose(expected_pdf, self.evaluate(pdf))
 
+  @test_util.numpy_disable_gradient_test
   def testFullyReparameterized(self):
     a = tf.constant(0.1)
     b = tf.constant(0.8)

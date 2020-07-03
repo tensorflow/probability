@@ -26,6 +26,7 @@ from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import log_cosh
+from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.generic import log_sub_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
@@ -38,6 +39,7 @@ from tensorflow_probability.python.math.interpolation import batch_interp_regula
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
 from tensorflow_probability.python.math.linalg import cholesky_concat
+from tensorflow_probability.python.math.linalg import cholesky_update
 from tensorflow_probability.python.math.linalg import fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse
 from tensorflow_probability.python.math.linalg import lu_matrix_inverse
@@ -50,20 +52,34 @@ from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.minimize import MinimizeTraceableQuantities
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
-from tensorflow_probability.python.math.random_ops import random_rademacher
-from tensorflow_probability.python.math.random_ops import random_rayleigh
 from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
+from tensorflow_probability.python.math.special import bessel_iv_ratio
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
+from tensorflow_probability.python.math.special import lbeta
+from tensorflow_probability.python.math.special import log_gamma_correction
+from tensorflow_probability.python.math.special import log_gamma_difference
+from tensorflow_probability.python.math.special import round_exponential_bump_function
+from tensorflow_probability.python.random import rademacher as random_rademacher
+from tensorflow_probability.python.random import rayleigh as random_rayleigh
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
+random_rademacher = deprecation.deprecated(
+    '2020-09-20', 'Use tfp.random.rademacher')(random_rademacher)
+random_rayleigh = deprecation.deprecated(
+    '2020-09-20', 'Use tfp.random.rayleigh')(random_rayleigh)
+
 _allowed_symbols = [
+    'round_exponential_bump_function',
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
+    'bessel_iv_ratio',
     'cholesky_concat',
+    'cholesky_update',
     'clip_by_value_preserve_gradient',
     'custom_gradient',
     'dense_to_sparse',
@@ -73,11 +89,15 @@ _allowed_symbols = [
     'interp_regular_1d_grid',
     'lambertw',
     'lambertw_winitzki_approx',
+    'lbeta',
     'log1mexp',
     'log1psquare',
     'log_add_exp',
     'log_combinations',
     'log_cosh',
+    'log_cumsum_exp',
+    'log_gamma_correction',
+    'log_gamma_difference',
     'log_sub_exp',
     'lu_matrix_inverse',
     'lu_reconstruct',

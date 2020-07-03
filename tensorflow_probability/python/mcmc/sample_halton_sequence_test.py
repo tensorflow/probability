@@ -28,13 +28,7 @@ from tensorflow_probability.python.internal import monte_carlo
 from tensorflow_probability.python.internal import test_util
 
 
-def _set_seed(seed):
-  """Helper which uses graph seed if using TFE."""
-  # TODO(b/68017812): Deprecate once TFE supports seed.
-  if tf.executing_eagerly():
-    tf.random.set_seed(seed)
-    return None
-  return seed
+JAX_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -80,14 +74,14 @@ class HaltonSequenceTest(test_util.TestCase):
     """Tests that all supported dtypes work without error."""
     dim = 3
     sample_float32 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=10, dtype=tf.float32, seed=11)
+        dim, num_results=10, dtype=tf.float32, seed=test_util.test_seed())
     sample_float64 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=10, dtype=tf.float64, seed=21)
+        dim, num_results=10, dtype=tf.float64, seed=test_util.test_seed())
     self.assertEqual(self.evaluate(sample_float32).dtype, np.float32)
     self.assertEqual(self.evaluate(sample_float64).dtype, np.float64)
 
   def test_normal_integral_mean_and_var_correctly_estimated(self):
-    n = int(1000)
+    n = 1000
     # This test is almost identical to the similarly named test in
     # monte_carlo_test.py. The only difference is that we use the Halton
     # samples instead of the random samples to evaluate the expectations.
@@ -103,7 +97,7 @@ class HaltonSequenceTest(test_util.TestCase):
     q = tfd.Normal(loc=mu_q, scale=sigma_q)
 
     cdf_sample = tfp.mcmc.sample_halton_sequence(
-        2, num_results=n, dtype=tf.float64, seed=1729)
+        2, num_results=n, dtype=tf.float64, seed=test_util.test_seed())
     q_sample = q.quantile(cdf_sample)
 
     # Compute E_p[X].
@@ -202,12 +196,13 @@ class HaltonSequenceTest(test_util.TestCase):
               m / 2.),
           axis=-1)
 
+    stream = test_util.test_seed_stream()
     sample_lo = tfp.mcmc.sample_halton_sequence(
         dim, num_results=replica * num_results_lo,
-        seed=test_util.test_seed_stream())
+        seed=stream())
     sample_hi = tfp.mcmc.sample_halton_sequence(
         dim, num_results=replica * num_results_hi,
-        seed=test_util.test_seed_stream())
+        seed=stream())
 
     sample_lo = tf.reshape(sample_lo, [replica, -1, dim])
     sample_hi = tf.reshape(sample_hi, [replica, -1, dim])
@@ -231,10 +226,13 @@ class HaltonSequenceTest(test_util.TestCase):
   def test_seed_implies_deterministic_results(self):
     dim = 20
     num_results = 100
+    seed = test_util.test_seed()
     sample1 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=_set_seed(1925))
+        dim, num_results=num_results, seed=seed)
+    if tf.executing_eagerly() and not JAX_MODE:
+      tf.random.set_seed(seed)
     sample2 = tfp.mcmc.sample_halton_sequence(
-        dim, num_results=num_results, seed=_set_seed(1925))
+        dim, num_results=num_results, seed=seed)
     [sample1_, sample2_] = self.evaluate([sample1, sample2])
     self.assertAllClose(sample1_, sample2_, atol=0., rtol=1e-6)
 

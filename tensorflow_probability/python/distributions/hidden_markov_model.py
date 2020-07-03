@@ -27,9 +27,9 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -262,7 +262,8 @@ class HiddenMarkovModel(distribution.Distribution):
     return self.transition_distribution.batch_shape_tensor()[-1]
 
   def _sample_n(self, n, seed=None):
-    strm = SeedStream(seed, salt='HiddenMarkovModel')
+    init_seed, scan_seed, observation_seed = samplers.split_seed(
+        seed, n=3, salt='HiddenMarkovModel')
 
     transition_batch_shape = self.transition_distribution.batch_shape_tensor()
     num_states = transition_batch_shape[-1]
@@ -280,7 +281,7 @@ class HiddenMarkovModel(distribution.Distribution):
         tf.reduce_prod(batch_shape) //
         tf.reduce_prod(self._initial_distribution.batch_shape_tensor()))
     init_state = self._initial_distribution.sample(n * init_repeat,
-                                                   seed=strm())
+                                                   seed=init_seed)
     init_state = tf.reshape(init_state, [n, batch_size])
     # init_state :: n batch_size
 
@@ -290,11 +291,13 @@ class HiddenMarkovModel(distribution.Distribution):
 
     init_shape = init_state.shape
 
-    def generate_step(state, _):
+    def generate_step(state_and_seed, _):
       """Take a single step in Markov chain."""
+      state, seed = state_and_seed
+      sample_seed, next_seed = samplers.split_seed(seed)
 
       gen = self._transition_distribution.sample(n * transition_repeat,
-                                                 seed=strm())
+                                                 seed=sample_seed)
       # gen :: (n * transition_repeat) transition_batch
 
       new_states = tf.reshape(gen,
@@ -313,21 +316,13 @@ class HiddenMarkovModel(distribution.Distribution):
       # not know this so we explicitly tell it that the result has the
       # same shape.
       tensorshape_util.set_shape(result, init_shape)
-      return result
+      return result, next_seed
 
     def _scan_multiple_steps():
       """Take multiple steps with tf.scan."""
       dummy_index = tf.zeros(self._num_steps - 1, dtype=tf.float32)
-      if seed is not None:
-        # Force parallel_iterations to 1 to ensure reproducibility
-        # b/139210489
-        hidden_states = tf.scan(generate_step, dummy_index,
-                                initializer=init_state,
-                                parallel_iterations=1)
-      else:
-        # Invoke default parallel_iterations behavior
-        hidden_states = tf.scan(generate_step, dummy_index,
-                                initializer=init_state)
+      hidden_states, _ = tf.scan(generate_step, dummy_index,
+                                 initializer=(init_state, scan_seed))
 
       # TODO(b/115618503): add/use prepend_initializer to tf.scan
       return tf.concat([[init_state],
@@ -351,7 +346,7 @@ class HiddenMarkovModel(distribution.Distribution):
             self._observation_distribution.batch_shape_tensor()[:-1]))
 
     possible_observations = self._observation_distribution.sample(
-        [self._num_steps, observation_repeat * n], seed=strm())
+        [self._num_steps, observation_repeat * n], seed=observation_seed)
 
     inner_shape = self._observation_distribution.event_shape_tensor()
 
@@ -428,11 +423,13 @@ class HiddenMarkovModel(distribution.Distribution):
 
     # Move index into sequence of observations to front so we can apply
     # tf.foldl
-    working_obs = distribution_util.move_dimension(working_obs, -1 - r,
-                                                   0)[..., tf.newaxis]
+    working_obs = distribution_util.move_dimension(working_obs, -1 - r, 0)
     # working_obs :: num_steps batch_shape underlying_event_shape
-    observation_probs = (
-        observation_distribution.log_prob(working_obs))
+    working_obs = tf.expand_dims(working_obs, -1 - r)
+    # working_obs :: num_steps batch_shape 1 underlying_event_shape
+
+    observation_probs = observation_distribution.log_prob(working_obs)
+    # observation_probs :: num_steps batch_shape num_states
 
     def forward_step(log_prev_step, log_prob_observation):
       return _log_vector_matrix(log_prev_step,
@@ -474,7 +471,7 @@ class HiddenMarkovModel(distribution.Distribution):
         # the transition matrix must be square. But TensorFlow might
         # not know this so we explicitly tell it that the result has the
         # same shape.
-        result.set_shape(log_probs.shape)
+        tensorshape_util.set_shape(result, log_probs.shape)
         return result
 
       dummy_index = tf.zeros(self._num_steps - 1, dtype=tf.float32)

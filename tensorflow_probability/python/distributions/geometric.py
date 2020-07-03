@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -137,7 +138,7 @@ class Geometric(distribution.Distribution):
     # this case, a subnormal number (i.e., np.nextafter) can cause us to sample
     # 0.
     probs = self._probs_parameter_no_checks()
-    sampled = tf.random.uniform(
+    sampled = samplers.uniform(
         tf.concat([[n], tf.shape(probs)], 0),
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,

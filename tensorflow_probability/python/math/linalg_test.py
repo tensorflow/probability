@@ -39,14 +39,15 @@ JAX_MODE = False
 class _CholeskyExtend(test_util.TestCase):
 
   def testCholeskyExtension(self):
-    xs = np.random.random(7).astype(self.dtype)[:, tf.newaxis]
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
     xs = tf1.placeholder_with_default(
         xs, shape=xs.shape if self.use_static_shape else None)
     k = tfp.math.psd_kernels.MaternOneHalf()
     mat = k.matrix(xs, xs)
     chol = tf.linalg.cholesky(mat)
 
-    ys = np.random.random(3).astype(self.dtype)[:, tf.newaxis]
+    ys = rng.random_sample(3).astype(self.dtype)[:, tf.newaxis]
     ys = tf1.placeholder_with_default(
         ys, shape=ys.shape if self.use_static_shape else None)
 
@@ -54,12 +55,12 @@ class _CholeskyExtend(test_util.TestCase):
     new_chol_expected = tf.linalg.cholesky(k.matrix(xsys, xsys))
 
     new_chol = tfp.math.cholesky_concat(chol, k.matrix(xsys, ys))
-    self.assertAllClose(new_chol_expected, new_chol)
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
 
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testCholeskyExtensionRandomized(self, data):
-    jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 1e-5
+    jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 5e-5
     target_bs = data.draw(hpnp.array_shapes())
     prev_bs, new_bs = data.draw(tfp_hps.broadcasting_shapes(target_bs, 2))
     ones = tf.TensorShape([1] * len(target_bs))
@@ -72,9 +73,10 @@ class _CholeskyExtend(test_util.TestCase):
     n = data.draw(hps.integers(min_value=0, max_value=z - 1))
     m = z - n
 
-    np.random.seed(data.draw(hps.integers(min_value=0, max_value=2**32 - 1)))
-    xs = np.random.uniform(size=smallest_shared_shp + (n,))
-    data.draw(hps.just(xs))
+    rng_seed = data.draw(hps.integers(min_value=0, max_value=2**32 - 1))
+    rng = np.random.RandomState(seed=rng_seed)
+    xs = rng.uniform(size=smallest_shared_shp + (n,))
+    hp.note(xs)
     xs = (xs + np.zeros(tensorshape_util.as_list(prev_bs) +
                         [n]))[..., np.newaxis]
     xs = xs.astype(self.dtype)
@@ -85,8 +87,8 @@ class _CholeskyExtend(test_util.TestCase):
     mat = k.matrix(xs, xs) + jitter(n)
     chol = tf.linalg.cholesky(mat)
 
-    ys = np.random.uniform(size=smallest_shared_shp + (m,))
-    data.draw(hps.just(ys))
+    ys = rng.uniform(size=smallest_shared_shp + (m,))
+    hp.note(ys)
     ys = (ys + np.zeros(tensorshape_util.as_list(new_bs)
                         + [m]))[..., np.newaxis]
     ys = ys.astype(self.dtype)
@@ -117,10 +119,132 @@ class CholeskyExtend64Dynamic(_CholeskyExtend):
 del _CholeskyExtend
 
 
+def push_apart(xs, axis, shift=1e-3):
+  """Push values of `xs` apart from each other by `shift`, along `axis`."""
+  # The method is to scale the displacement by each item's sort position, so the
+  # 10th item in sorted order gets moved by 10 * shift, the 11th by 11 * shift,
+  # etc.  This way, each item moves `shift` away from each of its neighbors.
+  inv_perm = np.argsort(xs, axis=axis)
+  perm = np.argsort(inv_perm, axis=axis)
+  return xs + perm * shift
+
+
+class PushApartTest(test_util.TestCase):
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testPreservesSortOrder(self, data):
+    dtype = data.draw(hpnp.floating_dtypes())
+    xs = data.draw(hpnp.arrays(dtype, 10, unique=True))
+    pushed = push_apart(xs, axis=-1)
+    hp.note(pushed)
+    self.assertAllEqual(np.argsort(xs, axis=-1), np.argsort(pushed, axis=-1))
+
+
+class _CholeskyUpdate(test_util.TestCase):
+
+  def testCholeskyUpdate(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    xs = tf1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+    k = tfp.math.psd_kernels.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    chol = tf.linalg.cholesky(mat)
+
+    u = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
+    u = tf1.placeholder_with_default(
+        u, shape=u.shape if self.use_static_shape else None)
+
+    new_chol_expected = tf.linalg.cholesky(
+        mat + tf.linalg.matmul(u, u, transpose_b=True))
+    new_chol = tfp.math.cholesky_update(chol, tf.squeeze(u, axis=-1))
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+
+  def testCholeskyUpdateBatches(self):
+    rng = test_util.test_np_rng()
+    xs = rng.random_sample((3, 1, 7)).astype(self.dtype)[..., tf.newaxis]
+    xs = tf1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+    k = tfp.math.psd_kernels.MaternOneHalf()
+    mat = k.matrix(xs, xs)
+    chol = tf.linalg.cholesky(mat)
+
+    u = rng.random_sample((1, 5, 7)).astype(self.dtype)[..., tf.newaxis]
+    u = tf1.placeholder_with_default(
+        u, shape=u.shape if self.use_static_shape else None)
+    multiplier = rng.random_sample((2, 1, 1)).astype(self.dtype)
+
+    new_chol_expected = tf.linalg.cholesky(
+        mat + multiplier[..., np.newaxis, np.newaxis] * tf.linalg.matmul(
+            u, u, transpose_b=True))
+    new_chol = tfp.math.cholesky_update(
+        chol, tf.squeeze(u, axis=-1), multiplier=multiplier)
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testCholeskyUpdateRandomized(self, data):
+    target_bs = data.draw(hpnp.array_shapes())
+    chol_bs, u_bs, multiplier_bs = data.draw(
+        tfp_hps.broadcasting_shapes(target_bs, 3))
+    l = data.draw(hps.integers(min_value=1, max_value=12))
+
+    rng_seed = data.draw(hps.integers(min_value=0, max_value=2**32 - 1))
+    rng = np.random.RandomState(seed=rng_seed)
+    xs = push_apart(
+        rng.uniform(size=tensorshape_util.concatenate(chol_bs, (l, 1))),
+        axis=-2)
+    hp.note(xs)
+    xs = xs.astype(self.dtype)
+    xs = tf1.placeholder_with_default(
+        xs, shape=xs.shape if self.use_static_shape else None)
+
+    k = tfp.math.psd_kernels.MaternOneHalf()
+    jitter = lambda n: tf.linalg.eye(n, dtype=self.dtype) * 5e-5
+
+    mat = k.matrix(xs, xs) + jitter(l)
+    chol = tf.linalg.cholesky(mat)
+
+    u = rng.uniform(size=tensorshape_util.concatenate(u_bs, (l,)))
+    hp.note(u)
+    u = u.astype(self.dtype)
+    u = tf1.placeholder_with_default(
+        u, shape=u.shape if self.use_static_shape else None)
+
+    multiplier = rng.uniform(size=multiplier_bs)
+    hp.note(multiplier)
+    multiplier = multiplier.astype(self.dtype)
+    multiplier = tf1.placeholder_with_default(
+        multiplier, shape=multiplier.shape if self.use_static_shape else None)
+
+    new_chol_expected = tf.linalg.cholesky(
+        mat + multiplier[..., tf.newaxis, tf.newaxis] * tf.linalg.matmul(
+            u[..., tf.newaxis], u[..., tf.newaxis, :]))
+
+    new_chol = tfp.math.cholesky_update(chol, u, multiplier=multiplier)
+    self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+
+
+@test_util.test_all_tf_execution_regimes
+class CholeskyUpdate32Static(_CholeskyUpdate):
+  dtype = np.float32
+  use_static_shape = True
+
+
+@test_util.test_all_tf_execution_regimes
+class CholeskyUpdate64Dynamic(_CholeskyUpdate):
+  dtype = np.float64
+  use_static_shape = False
+
+del _CholeskyUpdate
+
+
 class _PivotedCholesky(test_util.TestCase):
 
   def _random_batch_psd(self, dim):
-    matrix = np.random.random([2, dim, dim])
+    rng = test_util.test_np_rng()
+    matrix = rng.random_sample([2, dim, dim])
     matrix = np.matmul(matrix, np.swapaxes(matrix, -2, -1))
     matrix = (matrix + np.diag(np.arange(dim) * .1)).astype(self.dtype)
     masked_shape = (
@@ -601,44 +725,56 @@ class FillTriangularTest(test_util.TestCase):
     self.assertAllClose(x_, grad_actual_, rtol=1e-8, atol=1e-9)
 
   def testCorrectlyMakes1x1TriLower(self):
-    self._run_test(np.random.randn(3, int(1*2/2)))
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(3, int(1*2/2)))
 
   def testCorrectlyMakesNoBatchTriLower(self):
-    self._run_test(np.random.randn(int(4*5/2)))
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(int(4*5/2)))
 
   def testCorrectlyMakesBatchTriLower(self):
-    self._run_test(np.random.randn(2, 3, int(3*4/2)))
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 3, int(3*4/2)))
 
   def testCorrectlyMakesBatchTriLowerUnknownShape(self):
-    self._run_test(np.random.randn(2, 3, int(3*4/2)), use_deferred_shape=True)
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 3, int(3*4/2)), use_deferred_shape=True)
 
   def testCorrectlyMakesBatch7x7TriLowerUnknownShape(self):
-    self._run_test(np.random.randn(2, 3, int(7*8/2)), use_deferred_shape=True)
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 3, int(7*8/2)), use_deferred_shape=True)
 
   def testCorrectlyMakesBatch7x7TriLower(self):
-    self._run_test(np.random.randn(2, 3, int(7*8/2)))
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 3, int(7*8/2)))
 
   def testCorrectlyMakes1x1TriUpper(self):
-    self._run_test(np.random.randn(3, int(1*2/2)), upper=True)
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(3, int(1*2/2)), upper=True)
 
   def testCorrectlyMakesNoBatchTriUpper(self):
-    self._run_test(np.random.randn(int(4*5/2)), upper=True)
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(int(4*5/2)), upper=True)
 
   def testCorrectlyMakesBatchTriUpper(self):
-    self._run_test(np.random.randn(2, 2, int(3*4/2)), upper=True)
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 2, int(3*4/2)), upper=True)
 
   def testCorrectlyMakesBatchTriUpperUnknownShape(self):
-    self._run_test(np.random.randn(2, 2, int(3*4/2)),
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 2, int(3*4/2)),
                    use_deferred_shape=True,
                    upper=True)
 
   def testCorrectlyMakesBatch7x7TriUpperUnknownShape(self):
-    self._run_test(np.random.randn(2, 3, int(7*8/2)),
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 3, int(7*8/2)),
                    use_deferred_shape=True,
                    upper=True)
 
   def testCorrectlyMakesBatch7x7TriUpper(self):
-    self._run_test(np.random.randn(2, 3, int(7*8/2)), upper=True)
+    rng = test_util.test_np_rng()
+    self._run_test(rng.randn(2, 3, int(7*8/2)), upper=True)
 
 
 @test_util.test_all_tf_execution_regimes

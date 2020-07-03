@@ -25,6 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -33,7 +34,7 @@ tfd = tfp.distributions
 
 
 def make_onehot_categorical(batch_shape, num_classes, dtype=tf.int32):
-  logits = -50. + tf.random.uniform(
+  logits = -50. + samplers.uniform(
       list(batch_shape) + [num_classes], -10, 10,
       dtype=tf.float32, seed=test_util.test_seed())
   return tfd.OneHotCategorical(logits, dtype=dtype, validate_args=True)

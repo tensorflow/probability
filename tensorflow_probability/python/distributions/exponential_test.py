@@ -144,6 +144,7 @@ class ExponentialTest(test_util.TestCase):
           sp_stats.kstest(sample_values[:, 1, i],
                           sp_stats.expon(scale=1.0 / lam_v[i]).cdf)[0], 0.01)
 
+  @test_util.numpy_disable_gradient_test
   def testFullyReparameterized(self):
     lam = tf.constant([0.1, 1.0])
     _, grad_lam = tfp.math.value_and_gradient(

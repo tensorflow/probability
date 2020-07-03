@@ -27,7 +27,7 @@ from tensorflow.python.framework.composite_tensor import CompositeTensor  # pyli
 from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
 
 
-__all__ = ['as_composite']
+__all__ = ['as_composite', 'register_composite']
 
 
 _registry = {}  # Mapping from (python pkg, class name) -> class.
@@ -70,9 +70,10 @@ class _DistributionTypeSpec(tf.TypeSpec):
       raise ValueError('Unexpected version')
     if _find_clsid(clsid) is None:
       raise ValueError(
-          'Unable to identify distribution type for {}. For non-builtin '
-          'distributions, you will need to call `as_composite` before '
-          '`tf.saved_model.load` to warm up a cache.'.format(clsid))
+          'Unable to identify distribution type for {}. For user-defined '
+          'distributions (not in TFP), make sure the distribution is decorated '
+          'with `@tfp.experimental.register_composite` and its module is '
+          'imported before calling `tf.saved_model.load`.'.format(clsid))
     return cls(clsid, param_specs, kwargs)
 
 
@@ -151,7 +152,55 @@ def as_composite(obj):
   `tfp.util.DeferredTensor`, or `tfp.util.TransformedVariable` references it
   closes over converted to tensors at the time this function is called. The
   type of the returned object will be a subclass of both `CompositeTensor` and
-  `type(obj)`.
+  `type(obj)`.  For this reason, one should be careful about using
+  `as_composite()`, especially for `tf.Module` objects.
+
+  For example, when the composite tensor is created even as part of a
+  `tf.Module`, it "fixes" the values of the `DeferredTensor` and `tf.Variable`
+  objects it uses:
+
+  ```python
+  class M(tf.Module):
+    def __init__(self):
+      self._v = tf.Variable(1.)
+      self._d = tfp.distributions.Normal(
+        tfp.util.DeferredTensor(self._v, lambda v: v + 1), 10)
+      self._dct = tfp.experimental.as_composite(self._d)
+
+    @tf.function
+    def mean(self):
+      return self._dct.mean()
+
+  m = M()
+  m.mean()
+  >>> <tf.Tensor: numpy=2.0>
+  m._v.assign(2.)  # Doesn't update the CompositeTensor distribution.
+  m.mean()
+  >>> <tf.Tensor: numpy=2.0>
+  ```
+
+  If, however, the creation of the composite is deferred to a method
+  call, then the Variable and DeferredTensor will be properly captured
+  and respected by the Module and its `SavedModel` (if it is serialized).
+
+  ```python
+  class M(tf.Module):
+    def __init__(self):
+      self._v = tf.Variable(1.)
+      self._d = tfp.distributions.Normal(
+        tfp.util.DeferredTensor(self._v, lambda v: v + 1), 10)
+
+    @tf.function
+    def d(self):
+      return tfp.experimental.as_composite(self._d)
+
+  m = M()
+  m.d().mean()
+  >>> <tf.Tensor: numpy=2.0>
+  m._v.assign(2.)
+  m.d().mean()
+  >>> <tf.Tensor: numpy=3.0>
+  ```
 
   Note: This method is best-effort and based on a heuristic for what the
   tensor parameters are and what the non-tensor parameters are. Things might be
@@ -183,14 +232,78 @@ def as_composite(obj):
     # Use dtype inference from ctor.
     if k in kwargs and kwargs[k] is not None:
       v = getattr(obj, k, kwargs[k])
-      kwargs[k] = tf.convert_to_tensor(v, name=k)
+      try:
+        kwargs[k] = tf.convert_to_tensor(v, name=k)
+      except TypeError as e:
+        raise NotImplementedError(
+            mk_err_msg(
+                '(Unable to convert dependent entry \'{}\' of object '
+                '\'{}\': {})'.format(k, obj, str(e))))
   for k, v in kwargs.items():
     if isinstance(v, distributions.Distribution):
       kwargs[k] = as_composite(v)
     if tensor_util.is_ref(v):
-      kwargs[k] = tf.convert_to_tensor(v, name=k)
+      try:
+        kwargs[k] = tf.convert_to_tensor(v, name=k)
+      except TypeError as e:
+        raise NotImplementedError(
+            mk_err_msg(
+                '(Unable to convert dependent entry \'{}\' of object '
+                '\'{}\': {})'.format(k, obj, str(e))))
   result = cls(**kwargs)
   struct_coder = nested_structure_coder.StructureCoder()
-  if not struct_coder.can_encode(result._type_spec):  # pylint: disable=protected-access
-    raise NotImplementedError(mk_err_msg('(Unable to serialize.)'))
+  try:
+    struct_coder.encode_structure(result._type_spec)  # pylint: disable=protected-access
+  except nested_structure_coder.NotEncodableError as e:
+    raise NotImplementedError(
+        mk_err_msg('(Unable to serialize: {})'.format(str(e))))
   return result
+
+
+def register_composite(cls):
+  """A decorator that registers a Distribution as composite-friendly.
+
+  This registration is not required to call `as_composite` on instances
+  of a given distribution, but it *is* required if a `SavedModel` with
+  functions accepting or returning composite wrappers of this distribution
+  will be loaded in python (without having called `as_composite` already).
+
+  Example:
+
+  ```python
+  class MyDistribution(tfp.distributions.Distribution):
+     ...
+
+  # This will fail to load.
+  model = tf.saved_model.load(
+      '/path/to/sm_with_funcs_returning_composite_tensor_MyDistribution')
+  ```
+
+  Instead:
+  ```python
+  @tfp.experimental.register_composite
+  class MyDistribution(tfp.distributions.Distribution):
+     ...
+
+  # This will load.
+  model = tf.saved_model.load(
+      '/path/to/sm_with_funcs_returning_composite_tensor_MyDistribution')
+  ```
+
+  Args:
+    cls: A subclass of `Distribution`.
+
+  Returns:
+    The input, with the side-effect of registering it as a composite-friendly
+    distribution.
+
+  Raises:
+    TypeError: If `cls` is not a subclass of Distribution, or if
+      registration fails (`cls` is not convertible).
+    NotImplementedError: If registration fails (`cls` is not convertible).
+  """
+  if not issubclass(cls, distributions.Distribution):
+    raise TypeError('Expected cls to be a subclass of Distribution but saw: {}'
+                    .format(cls))
+  _make_convertible(cls)
+  return cls

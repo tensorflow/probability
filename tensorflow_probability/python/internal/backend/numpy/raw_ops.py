@@ -18,20 +18,39 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 import numpy as np
-
-import tensorflow.compat.v2 as tf
+import numpy as onp  # Disable JAX rewrite.  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
 __all__ = [
+    'BroadcastGradientArgs',
     'MatrixDiagPartV2',
 ]
 
 
 JAX_MODE = False
+
+
+_BroadcastGradientArgs = collections.namedtuple(
+    'BroadcastGradientArgs', ['r0', 'r1'])
+
+
+def _broadcast_gradient_args(s0, s1, name=None):  # pylint: disable=unused-argument
+  bc_shp = np.array(
+      (np.zeros(tuple(s0) + (0,)) + np.zeros(tuple(s1) + (0,))).shape[:-1],
+      dtype=np.int32)
+  pad_s0 = np.pad(s0, [[len(bc_shp) - len(s0), 0]],
+                  mode='constant', constant_values=-1)
+  pad_s1 = np.pad(s1, [[len(bc_shp) - len(s1), 0]],
+                  mode='constant', constant_values=-1)
+  return _BroadcastGradientArgs(
+      onp.where((bc_shp != pad_s0) | (pad_s0 == 1))[0].astype(onp.int32),
+      onp.where((bc_shp != pad_s1) | (pad_s1 == 1))[0].astype(onp.int32))
 
 
 def _matrix_diag_part_v2(input, k, padding_value, name=None):  # pylint: disable=redefined-builtin,unused-argument
@@ -52,6 +71,10 @@ def _matrix_diag_part_v2(input, k, padding_value, name=None):  # pylint: disable
   return output.reshape(*(shp[:-2] + output.shape[1:]))
 
 
+BroadcastGradientArgs = utils.copy_docstring(  # pylint: disable=invalid-name
+    'tf.raw_ops.BroadcastGradientArgs',
+    _broadcast_gradient_args)
+
 MatrixDiagPartV2 = utils.copy_docstring(  # pylint: disable=invalid-name
-    tf.raw_ops.MatrixDiagPartV2,
+    'tf.raw_ops.MatrixDiagPartV2',
     _matrix_diag_part_v2)

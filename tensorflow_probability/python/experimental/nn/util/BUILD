@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+
+# [internal] load python3.bzl
+
 licenses(["notice"])  # Apache 2.0
 
 package(
@@ -27,7 +30,56 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":im2row",
+        ":random_variable",
         ":utils",
+    ],
+)
+
+py_library(
+    name = "im2row",
+    srcs = ["im2row.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "im2row_test",
+    size = "medium",
+    srcs = ["im2row_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "random_variable",
+    srcs = ["random_variable.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/util:deferred_tensor",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "random_variable_test",
+    size = "medium",
+    srcs = ["random_variable_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

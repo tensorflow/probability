@@ -193,12 +193,12 @@ def assert_true_cdf_equal_by_dkwm(
       distribution(s) of interest, giving a (batch of) empirical CDF(s).
       Assumed IID across the 0 dimension.
     cdf: Analytic cdf inclusive of any atoms, as a function that can compute CDF
-      values in batch.  Must accept a Tensor of shape B + [n] and the same dtype
-      as `samples` and return a Tensor of shape B + [n] of CDF values.  For each
+      values in batch.  Must accept a Tensor of shape [n] + B and the same dtype
+      as `samples` and return a Tensor of shape [n] + B of CDF values.  For each
       sample x, `cdf(x) = Pr(X <= x)`.
     left_continuous_cdf: Analytic left-continuous cdf, as a function that can
-      compute CDF values in batch.  Must accept a Tensor of shape B + [n] and
-      the same dtype as `samples` and return a Tensor of shape B + [n] of CDF
+      compute CDF values in batch.  Must accept a Tensor of shape [n] + B and
+      the same dtype as `samples` and return a Tensor of shape [n] + B of CDF
       values.  For each sample x, `left_continuous_cdf(x) = Pr(X < x)`.  If the
       distribution under test has no atoms (i.e., the CDF is continuous), this
       is redundant and may be omitted.  Conversely, if this argument is omitted,
@@ -387,12 +387,12 @@ def kolmogorov_smirnov_distance(
       distribution(s) of interest, giving a (batch of) empirical CDF(s).
       Assumed IID across the 0 dimension.
     cdf: Analytic cdf inclusive of any atoms, as a function that can compute CDF
-      values in batch.  Must accept a Tensor of shape B + [n] and the same dtype
-      as `samples` and return a Tensor of shape B + [n] of CDF values.  For each
+      values in batch.  Must accept a Tensor of shape [n] + B and the same dtype
+      as `samples` and return a Tensor of shape [n] + B of CDF values.  For each
       sample x, `cdf(x) = Pr(X <= x)`.
     left_continuous_cdf: Analytic left-continuous cdf, as a function that can
-      compute CDF values in batch.  Must accept a Tensor of shape B + [n] and
-      the same dtype as `samples` and return a Tensor of shape B + [n] of CDF
+      compute CDF values in batch.  Must accept a Tensor of shape [n] + B and
+      the same dtype as `samples` and return a Tensor of shape [n] + B of CDF
       values.  For each sample x, `left_continuous_cdf(x) = Pr(X < x)`.  If the
       distribution under test has no atoms (i.e., the CDF is continuous), this
       is redundant and may be omitted.  Conversely, if this argument is omitted,
@@ -406,14 +406,19 @@ def kolmogorov_smirnov_distance(
   with tf.name_scope(name or 'kolmogorov_smirnov_distance'):
     dtype = dtype_util.common_dtype([samples], tf.float32)
     samples = tf.convert_to_tensor(value=samples, name='samples', dtype=dtype)
-    samples = _move_dim_and_sort(samples)
+    samples = tf.sort(samples, axis=0, direction='ASCENDING')
 
     # Compute analytic cdf values at each sample
     cdfs = cdf(samples)
+    # Move the iid dimension of `cdfs` to the bottom so the empirical cdfs will
+    # broadcast correctly
+    cdfs = distribution_util.move_dimension(cdfs, 0, -1)
     if left_continuous_cdf is None:
       left_continuous_cdfs = cdfs
     else:
       left_continuous_cdfs = left_continuous_cdf(samples)
+      left_continuous_cdfs = distribution_util.move_dimension(
+          left_continuous_cdfs, 0, -1)
 
     # Compute per-batch-member empirical cdf values at each sample
     # If any samples within a batch member are repeated, some of the entries
@@ -425,7 +430,7 @@ def kolmogorov_smirnov_distance(
     # However, this is OK, because those errors do not change the maximums.
     # Could defensively use `empirical_cdfs` here, but those rely on the
     # relatively more expensive `searchsorted` operation.
-    n = tf.cast(tf.shape(samples)[-1], dtype=cdfs.dtype)
+    n = tf.cast(tf.shape(samples)[0], dtype=cdfs.dtype)
     low_empirical_cdfs = tf.range(n, dtype=cdfs.dtype) / n
     high_empirical_cdfs = tf.range(1, n+1, dtype=cdfs.dtype) / n
 
@@ -439,6 +444,12 @@ def kolmogorov_smirnov_distance(
     high_distances = tf.reduce_max(
         high_empirical_cdfs - cdfs, axis=-1)
     return tf.maximum(low_distances, high_distances)
+
+
+def left_continuous_cdf_discrete_distribution(dist):
+  def left_cdf(x):
+    return dist.cdf(x) - dist.prob(x)
+  return left_cdf
 
 
 def kolmogorov_smirnov_distance_two_sample(samples1, samples2, name=None):
@@ -474,7 +485,7 @@ def kolmogorov_smirnov_distance_two_sample(samples1, samples2, name=None):
         value=samples1, name='samples1', dtype=dtype)
     samples2 = tf.convert_to_tensor(
         value=samples2, name='samples2', dtype=dtype)
-    samples2 = _move_dim_and_sort(samples2)
+    samples2 = tf.sort(samples2, axis=0, direction='ASCENDING')
 
     cdf = functools.partial(
         empirical_cdfs, samples2,
@@ -483,17 +494,6 @@ def kolmogorov_smirnov_distance_two_sample(samples1, samples2, name=None):
         empirical_cdfs, samples2,
         continuity='left', dtype=samples1.dtype)
     return kolmogorov_smirnov_distance(samples1, cdf, left_continuous_cdf)
-
-
-def _move_dim_and_sort(samples):
-  """Internal helper for K-S distance computation."""
-  # Move the batch dimension of `samples` to the rightmost position,
-  # where the _batch_sort_vector function wants it.
-  samples = distribution_util.move_dimension(samples, 0, -1)
-
-  # Order the samples within each batch member
-  samples = _batch_sort_vector(samples)
-  return samples
 
 
 def _batch_sort_vector(x, ascending=True, name=None):
@@ -525,13 +525,12 @@ def empirical_cdfs(samples, positions, continuity='right',
   Note: Returns results parallel to `positions`, i.e., the values of the
   empirical CDF at those points.
 
-  Note: The sample dimension is _last_, and the samples must be _sorted_ within
-  each batch.
+  Note: The samples must be _sorted_ within each batch.
 
   Args:
-    samples: Tensor of shape `batch + [num_samples]` of samples.  The samples
+    samples: Tensor of shape `[num_samples] + batch` of samples.  The samples
       must be in ascending order within each batch member.
-    positions: Tensor of shape `batch + [m]` of positions where to evaluate the
+    positions: Tensor of shape `[m] + batch` of positions where to evaluate the
       CDFs.  The positions need not be sorted.
     continuity: Whether to return a conventional, right-continuous CDF
       (`continuity = 'right'`, default) or a left-continuous CDF (`continuity =
@@ -546,6 +545,11 @@ def empirical_cdfs(samples, positions, continuity='right',
       position.  If `positions` contains duplicates, `cdf` will give each the
       same value.
   """
+  # Move the batch dimension of `samples` and `positions` to the rightmost
+  # position, where tf.searchsorted wants it.
+  samples = distribution_util.move_dimension(samples, 0, -1)
+  positions = distribution_util.move_dimension(positions, 0, -1)
+
   if continuity not in ['left', 'right']:
     msg = 'Continuity value must be "left" or "right", got {}.'.format(
         continuity)
@@ -554,7 +558,8 @@ def empirical_cdfs(samples, positions, continuity='right',
     n = tf.cast(tf.shape(samples)[-1], dtype=dtype)
     indexes = tf.searchsorted(
         sorted_sequence=samples, values=positions, side=continuity)
-    return tf.cast(indexes, dtype=dtype) / n
+    result = tf.cast(indexes, dtype=dtype) / n
+    return distribution_util.move_dimension(result, -1, 0)
 
 
 def _do_maximum_mean(samples, envelope, high, name=None):

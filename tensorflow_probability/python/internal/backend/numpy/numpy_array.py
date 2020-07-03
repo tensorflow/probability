@@ -22,9 +22,6 @@ import functools
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.linalg_impl import einsum
@@ -50,6 +47,7 @@ __all__ = [
     'rank',
     'reshape',
     'reverse',
+    'repeat',
     'roll',
     'searchsorted',
     'shape',
@@ -124,6 +122,45 @@ def _gather(  # pylint: disable=unused-argument
       params.shape[:axis] + indices.shape[batch_dims:] + params.shape[axis+1:])
 
 
+def _args_to_matching_arrays(args_list, dtype_hint=None):
+  """Converts a list to array using the first element for dtype.
+
+  This method is used to match the behavior of `tf.concat`.
+
+  Args:
+    args_list: A list or tuple of arguments.
+    dtype_hint: An optional hint used when converting the args to tensors.
+  Returns:
+    A list of tensors.
+  """
+  dtype = None
+  for arg in args_list:
+    if ops.is_tensor(arg):
+      dtype = arg.dtype
+      break
+  if dtype is None:
+    ret = []
+    for arg in args_list:
+      ret.append(ops.convert_to_tensor(arg, dtype, dtype_hint=dtype_hint))
+      if dtype is None:
+        dtype = ret[-1].dtype
+  else:
+    ret = [ops.convert_to_tensor(arg, dtype) for arg in args_list]
+  return ret
+
+
+def _concat(values, axis, name='concat'):
+  del name
+  if axis is None:
+    raise ValueError('None values for `axis` argument not supported.')
+  if not isinstance(values, (list, tuple)):
+    values = [values]
+  if len(values) == 1:
+    return values[0]
+  values = _args_to_matching_arrays(values)
+  return np.concatenate(values, axis=axis)
+
+
 def _gather_nd_single(params, indices):
   idx = tuple(np.moveaxis(indices, -1, 0))
   return params[idx]
@@ -148,6 +185,20 @@ def _gather_nd(  # pylint: disable=unused-argument
         gather_nd_
     )
   return gather_nd_(params, indices)
+
+
+def _linspace(start, stop, num, name=None, axis=0):  # pylint: disable=unused-argument
+  """Match TF behavior with np.linspace."""
+  start = ops.convert_to_tensor(start)
+  # Match TF weirdness arising from truediv(int32, int32) = float64
+  if np.issubdtype(start.dtype, np.integer):
+    start = start.astype(np.float64)
+  stop = ops.convert_to_tensor(stop, dtype=start.dtype)
+  num = ops.convert_to_tensor(num, dtype_hint=np.int32)
+  if not np.issubdtype(num.dtype, np.integer):
+    raise TypeError('`num` must be an integer but got {}'.format(num.dtype))
+  num = num.astype(np.int32)
+  return np.linspace(start, stop, num, axis=axis).astype(start.dtype)
 
 
 def _one_hot(  # pylint: disable=unused-argument
@@ -192,12 +243,36 @@ def _pad(  # pylint: disable=unused-argument
       constant_values=constant_values)
 
 
+def _range(start, limit=None, delta=1, dtype=None, name='range'):  # pylint: disable=unused-argument
+  """Emulates tf.range."""
+   # Emulating dtype inference logic from tf.range
+  dtype = utils.numpy_dtype(dtype)
+  start = ops.convert_to_tensor(start, dtype=dtype)
+  limit = None if limit is None else ops.convert_to_tensor(limit, dtype=dtype)
+  delta = ops.convert_to_tensor(delta, dtype=dtype)
+  if dtype is None:
+    dtype_hierarchy = [np.int32, np.int64, np.float32, np.float64]
+    inferred_dtype = max([arg.dtype for arg in [start, limit, delta]
+                          if arg is not None],
+                         key=dtype_hierarchy.index)
+  else:
+    inferred_dtype = dtype
+  return np.arange(start, limit, delta).astype(inferred_dtype)
+
+
 def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument
   if np.array(axis).ndim == 0:
     return np.flip(tensor, axis)
   for ax in axis:
     tensor = np.flip(tensor, ax)
   return tensor
+
+
+if JAX_MODE:
+  _searchsorted_vmap_sides = {
+      side: jax.vmap(functools.partial(jax.numpy.searchsorted, side=side))
+      for side in ('left', 'right')
+  }
 
 
 def _searchsorted(  # pylint: disable=unused-argument
@@ -207,9 +282,20 @@ def _searchsorted(  # pylint: disable=unused-argument
     out_type=np.int32,
     name=None):
   """Find indices for insertion for list to remain sorted."""
-  # JAX doesn't support searchsorted at the moment, so we do a very naive way
-  # of search sorting. We also don't use np.searchsorted in the numpy backend
-  # because it doesn't support batching.
+  if JAX_MODE:
+    try:
+      func = _searchsorted_vmap_sides[side]
+    except KeyError:
+      raise ValueError("'%s' is an invalid value for keyword 'side'" % side)
+    sorted_sequence_2d = np.reshape(sorted_sequence,
+                                    (-1, sorted_sequence.shape[-1]))
+    values_2d = np.reshape(values, (-1, values.shape[-1]))
+    if sorted_sequence_2d.shape[0] != values_2d.shape[0]:
+      raise ValueError('Leading dim_size of both tensors must match.')
+    return np.reshape(func(sorted_sequence_2d, values_2d).astype(out_type),
+                      values.shape)
+  # We don't use np.searchsorted in the numpy backend because it doesn't support
+  # batching.
   sorted_sequence = sorted_sequence[..., np.newaxis, :]
   values = values[..., :, np.newaxis]
   if side == 'left':
@@ -219,12 +305,13 @@ def _searchsorted(  # pylint: disable=unused-argument
   return np.sum(is_in_right_location, axis=-1).astype(out_type)
 
 
-def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,unused-argument
-  return np.array(np.array(input).shape).astype(utils.numpy_dtype(out_type))
+def _shape(input, out_type=np.int32, name=None):  # pylint: disable=redefined-builtin,unused-argument
+  return ops.convert_to_tensor(ops.convert_to_tensor(input).shape).astype(
+      out_type)
 
 
-def _size(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin, unused-argument
-  return np.prod(np.array(input).shape).astype(utils.numpy_dtype(out_type))
+def _size(input, out_type=np.int32, name=None):  # pylint: disable=redefined-builtin, unused-argument
+  return np.asarray(np.prod(ops.convert_to_tensor(input).shape), dtype=out_type)
 
 
 builtin_slice = slice  # pylint: disable=invalid-name
@@ -264,123 +351,126 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 
 concat = utils.copy_docstring(
-    tf.concat,
-    lambda values, axis, name='concat': (  # pylint: disable=g-long-lambda
-        np.concatenate([ops.convert_to_tensor(v) for v in values], axis)))
+    'tf.concat',
+    lambda values, axis, name='concat': _concat(values, axis))
+
 
 expand_dims = utils.copy_docstring(
-    tf.expand_dims,
+    'tf.expand_dims',
     lambda input, axis, name=None: np.expand_dims(input, axis))
 
 fill = utils.copy_docstring(
-    tf.fill,
+    'tf.fill',
     lambda dims, value, name=None: np.full(dims, value))
 
 gather = utils.copy_docstring(
-    tf.gather,
+    'tf.gather',
     _gather)
 
 gather_nd = utils.copy_docstring(
-    tf.gather_nd,
+    'tf.gather_nd',
     _gather_nd)
 
-reverse = utils.copy_docstring(tf.reverse, _reverse)
+reverse = utils.copy_docstring('tf.reverse', _reverse)
 
 linspace = utils.copy_docstring(
-    tf.linspace,
-    lambda start, stop, num, name=None: (  # pylint: disable=g-long-lambda
-        np.linspace(start, stop, num).astype(np.array(start).dtype)))
+    'tf.linspace',
+    _linspace)
 
 meshgrid = utils.copy_docstring(
-    tf.meshgrid,
+    'tf.meshgrid',
     np.meshgrid)
 
 norm = utils.copy_docstring(
-    tf.norm,
+    'tf.norm',
     norm)
 
 one_hot = utils.copy_docstring(
-    tf.one_hot,
+    'tf.one_hot',
     _one_hot)
 
 ones = utils.copy_docstring(
-    tf.ones,
-    lambda shape, dtype=tf.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
+    'tf.ones',
+    lambda shape, dtype=np.float32, name=None: np.ones(  # pylint: disable=g-long-lambda
         shape, utils.numpy_dtype(dtype)))
 
 ones_like = utils.copy_docstring(
-    tf.ones_like,
+    'tf.ones_like',
     _ones_like)
 
 pad = utils.copy_docstring(
-    tf.pad,
+    'tf.pad',
     _pad)
 
 range = utils.copy_docstring(  # pylint: disable=redefined-builtin
-    tf.range,
-    lambda start, limit=None, delta=1, dtype=None, name='range': np.arange(  # pylint: disable=g-long-lambda
-        start, limit, delta).astype(utils.numpy_dtype(
-            dtype or utils.common_dtype([start], np.int32))))
+    'tf.range',
+    _range)
 
 rank = utils.copy_docstring(
-    tf.rank,
+    'tf.rank',
     lambda input, name=None: np.int32(np.array(input).ndim))  # pylint: disable=redefined-builtin,g-long-lambda
 
+repeat = utils.copy_docstring(
+    'tf.repeat',
+    lambda input, repeats, axis=None, name=None: np.repeat(  # pylint: disable=g-long-lambda
+        input, repeats, axis=axis))
+
 reshape = utils.copy_docstring(
-    tf.reshape,
-    lambda tensor, shape, name=None: np.reshape(tensor, shape))
+    'tf.reshape',
+    lambda tensor, shape, name=None: np.reshape(  # pylint: disable=g-long-lambda
+        ops.convert_to_tensor(tensor), shape))
 
 roll = utils.copy_docstring(
-    tf.roll,
+    'tf.roll',
     lambda input, shift, axis: np.roll(input, shift, axis))  # pylint: disable=unnecessary-lambda
 
 searchsorted = utils.copy_docstring(
-    tf.searchsorted,
+    'tf.searchsorted',
     _searchsorted)
 
 shape = utils.copy_docstring(
-    tf.shape,
+    'tf.shape',
     _shape)
 
 size = utils.copy_docstring(
-    tf.size,
+    'tf.size',
     _size)
 
 slice = utils.copy_docstring(  # pylint: disable=redefined-builtin
-    tf.slice, _slice)
+    'tf.slice', _slice)
 
-split = utils.copy_docstring(tf.split, _split)
+split = utils.copy_docstring('tf.split', _split)
 
 squeeze = utils.copy_docstring(
-    tf.squeeze,
+    'tf.squeeze',
     lambda input, axis=None, name=None: np.squeeze(input, _astuple(axis)))
 
 stack = utils.copy_docstring(
-    tf.stack, lambda values, axis=0, name='stack': np.stack(values, axis))
+    'tf.stack', lambda values, axis=0, name='stack': np.stack(values, axis))
 
 tile = utils.copy_docstring(
-    tf.tile,
+    'tf.tile',
     lambda input, multiples, name=None: np.tile(np.array(input), multiples))
 
 transpose = utils.copy_docstring(
-    tf.transpose,
+    'tf.transpose',
     _transpose)
 
 unstack = utils.copy_docstring(
-    tf.unstack,
+    'tf.unstack',
     lambda value, num=None, axis=0, name='unstack': tuple(  # pylint: disable=g-long-lambda
         np.squeeze(x, axis=axis) for x in
         np.split(value, value.shape[axis] if num is None else num, axis)))
 
 where = utils.copy_docstring(
-    tf1.where,
+    'tf1.where',
     lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = utils.copy_docstring(
-    tf.zeros,
-    lambda shape, dtype=tf.float32, name=None: np.zeros(  # pylint: disable=g-long-lambda
+    'tf.zeros',
+    lambda shape, dtype=np.float32, name=None: np.zeros(  # pylint: disable=g-long-lambda
         shape, utils.numpy_dtype(dtype)))
 
 zeros_like = utils.copy_docstring(
-    tf.zeros_like,
+    'tf.zeros_like',
     _zeros_like)

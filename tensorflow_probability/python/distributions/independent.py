@@ -139,8 +139,9 @@ class Independent(distribution_lib.Distribution):
             reinterpreted_batch_ndims,
             dtype_hint=tf.int32,
             name='reinterpreted_batch_ndims')
-        self._static_reinterpreted_batch_ndims = tf.get_static_value(
-            self._reinterpreted_batch_ndims)
+        static_val = tf.get_static_value(self._reinterpreted_batch_ndims)
+        self._static_reinterpreted_batch_ndims = (
+            None if static_val is None else int(static_val))
 
       super(Independent, self).__init__(
           dtype=self._distribution.dtype,

@@ -172,13 +172,18 @@ class QuantizedDistributionTest(test_util.TestCase):
 
     # With low = 0, the interval j=0 is (-infty, 0], which holds 1/2
     # of the mass of the normals.
-    # rtol chosen to be 2x as large as necessary to pass.
-    self.assertAllClose([0.5, 0.5], (samps_v == 0).mean(axis=0), rtol=0.03)
+    #
+    # NOTE: rtol chosen to be ~5 standard deviations from the expected value,
+    # to give a false positive rate of ~1e-6.
+    self.assertAllClose([0.5, 0.5], (samps_v == 0).mean(axis=0), rtol=0.071)
 
     # The interval j=1 is (0, 1], which is from the mean to one standard
     # deviation out.  This should contain 0.6827 / 2 of the mass.
+    #
+    # NOTE: rtol chosen to be ~5 standard deviations from the expected value,
+    # to give a false positive rate of ~1e-6.
     self.assertAllClose(
-        [0.6827 / 2, 0.6827 / 2], (samps_v == 1).mean(axis=0), rtol=0.03)
+        [0.6827 / 2, 0.6827 / 2], (samps_v == 1).mean(axis=0), rtol=0.098)
 
   def testSamplesAgreeWithCdfForSamplesOverLargeRange(self):
     # Consider the cdf for distribution X, F(x).
@@ -215,11 +220,13 @@ class QuantizedDistributionTest(test_util.TestCase):
     # Make an exponential with mean 5.
     qdist = tfd.QuantizedDistribution(
         distribution=tfd.Exponential(rate=0.2), validate_args=True)
-    # Standard error should be less than 1 / (2 * sqrt(n_samples))
+    # Standard error should be less than 1 / (2 * sqrt(n_samples)).
+    # We check for results off by 5.2+ standard errors to have an overall false
+    # positive rate of ~1e-6.
     n_samples = 10000
-    stddev_err_bound = 1 / (2 * np.sqrt(n_samples))
-    samps = self.evaluate(qdist.sample(
-        (n_samples,), seed=test_util.test_seed(hardcoded_seed=42)))
+    stddev_err_bound = 5.2 / (2 * np.sqrt(n_samples))
+    samps = self.evaluate(
+        qdist.sample((n_samples,), seed=test_util.test_seed()))
     # The smallest value the samples can take on is 1, which corresponds to
     # the interval (0, 1].  Recall we use ceiling in the sampling definition.
     self.assertLess(0.5, samps.min())
@@ -244,6 +251,29 @@ class QuantizedDistributionTest(test_util.TestCase):
 
     self.assertAllClose(
         sp_normal.sf(x), self.evaluate(qdist.survival_function(x)))
+
+  def testLogisticLogProbThatUsedToUnderflowNoLongerDoes(self):
+    # At integer values, the result should be the same as the standard normal.
+    logistic = tfd.Logistic(loc=0.06602609, scale=4.8474164)
+    low = -32768.0
+    high = 32768.0
+    y = -0.062469486 * 32768.0
+    qdist = tfd.QuantizedDistribution(logistic, low=low, high=high)
+    log_prob = qdist.log_prob(y)
+    self.assertTrue(np.isfinite(self.evaluate(log_prob)))
+
+  def testNormalProbFiniteEvenForHugeValues(self):
+    # At integer values, the result should be the same as the standard normal.
+    qdist = tfd.QuantizedDistribution(
+        distribution=tfd.Normal(loc=0., scale=1.),
+        # validate_args=False to allow us to use float x, which is more likely
+        # to result in rounding errors...and rounding errors caused the issue
+        # tested in testLogisticLogProbThatUsedToUnderflowNoLongerDoes.
+        validate_args=False)
+
+    x = tf.linspace(-10000., 10000., num=50)
+
+    self.assertAllFinite(self.evaluate(qdist.log_prob(x)))
 
   def testNormalLogCdfAndLogSurvivalFunction(self):
     # At integer values, the result should be the same as the standard normal.
@@ -319,6 +349,7 @@ class QuantizedDistributionTest(test_util.TestCase):
         self.evaluate(qdist.log_prob(2.)),
         atol=0)
 
+  @test_util.numpy_disable_gradient_test
   def testLogProbAndGradGivesFiniteResults(self):
     def quantized_log_prob(dtype):
       x = np.arange(-100, 100, 2).astype(dtype)
@@ -331,14 +362,33 @@ class QuantizedDistributionTest(test_util.TestCase):
       return inner_func
 
     for dtype in [np.float32, np.float64]:
-      mu = tf.Variable(0., name='mu', dtype=dtype)
-      sigma = tf.Variable(1., name='sigma', dtype=dtype)
-      self.evaluate([mu.initializer, sigma.initializer])
+      mu = tf.constant(0., dtype=dtype, name='mu')
+      sigma = tf.constant(1., dtype=dtype, name='sigma')
       value, grads = self.evaluate(tfp.math.value_and_gradient(
           quantized_log_prob(dtype), [mu, sigma]))
       self.assertAllFinite(value)
       self.assertAllFinite(grads)
 
+  @test_util.numpy_disable_gradient_test
+  def testExponentialLogProbAndGradGivesFiniteResults(self):
+    def quantized_log_prob(dtype):
+      x = np.arange(2, 100, 2).astype(dtype)
+
+      def inner_func(rate):
+        qdist = tfd.QuantizedDistribution(
+            distribution=tfd.Exponential(rate=rate), validate_args=True)
+        return qdist.log_prob(x)
+
+      return inner_func
+
+    for dtype in [np.float32, np.float64]:
+      rate = tf.constant(2., dtype=dtype, name='rate')
+      value, grads = self.evaluate(tfp.math.value_and_gradient(
+          quantized_log_prob(dtype), rate))
+      self.assertAllFinite(value)
+      self.assertAllFinite(grads)
+
+  @test_util.numpy_disable_gradient_test
   def testProbAndGradGivesFiniteResultsForCommonEvents(self):
     def quantized_log_prob(mu, sigma):
       x = tf.math.ceil(4 * rng.rand(100).astype(np.float32) - 2)
@@ -347,10 +397,9 @@ class QuantizedDistributionTest(test_util.TestCase):
           distribution=tfd.Normal(loc=mu, scale=sigma), validate_args=True)
       return qdist.log_prob(x)
 
-    mu = tf.Variable(0.0, name='mu')
-    sigma = tf.Variable(1.0, name='sigma')
+    mu = tf.constant(0.0, name='mu')
+    sigma = tf.constant(1.0, name='sigma')
 
-    self.evaluate([v.initializer for v in [mu, sigma]])
     value, grads = self.evaluate(tfp.math.value_and_gradient(
         quantized_log_prob, [mu, sigma]))
     self.assertAllFinite(value)

@@ -470,10 +470,6 @@ class DistributionLambdaVariableCreation(test_util.TestCase):
 class KLDivergenceAddLossTest(test_util.TestCase):
 
   def test_approx_kl(self):
-    # TODO(b/120320323): Enable this test in eager.
-    if tf.executing_eagerly():
-      self.skipTest('KLDivergenceAddLossTest disabled for Eager (b/120320323).')
-
     event_size = 2
     prior = tfd.MultivariateNormalDiag(loc=tf.zeros(event_size))
 
@@ -489,13 +485,16 @@ class KLDivergenceAddLossTest(test_util.TestCase):
     actual_kl = tfd.kl_divergence(
         tfd.MultivariateNormalTriL(loc, scale_tril), prior)
 
+    # Insert a leading dimension to the input, such that the Keras
+    # batch-shape in `model.fit` is the same for `x` and `y`.
     x = tf.concat(
         [loc, tfb.FillScaleTriL().inverse(scale_tril)], axis=0)[tf.newaxis]
 
     y = model(x)
     self.assertEqual(1, len(model.losses))
     y = model(x)
-    self.assertEqual(2, len(model.losses))
+    # In eager mode, multiple calls won't append new losses.
+    self.assertEqual(1 if tf.executing_eagerly() else 2, len(model.losses))
 
     [loc_, scale_tril_, actual_kl_, approx_kl_] = self.evaluate([
         y.loc, y.scale.to_dense(), actual_kl, model.losses[0]])
@@ -505,18 +504,16 @@ class KLDivergenceAddLossTest(test_util.TestCase):
 
     model.compile(
         optimizer=tf.optimizers.Adam(),
-        loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
+        loss=lambda x, dist: -dist.log_prob(x[0, :, :event_size]),
         metrics=[])
-    model.fit(x, x,
+    model.fit(x=x,
+              # Append a dimension to `y` to account for sample-shape.
+              y=x[tf.newaxis],
               batch_size=25,
               epochs=1,
               steps_per_epoch=1)  # Usually `n // batch_size`.
 
   def test_use_exact_kl(self):
-    # TODO(b/120320323): Enable this test in eager.
-    if tf.executing_eagerly():
-      self.skipTest('KLDivergenceAddLossTest disabled for Eager (b/120320323).')
-
     event_size = 2
     prior = tfd.MultivariateNormalDiag(loc=tf.zeros(event_size))
 
@@ -534,13 +531,16 @@ class KLDivergenceAddLossTest(test_util.TestCase):
     actual_kl = tfd.kl_divergence(
         tfd.MultivariateNormalTriL(loc, scale_tril), prior)
 
+    # Insert a leading dimension to the input, such that the Keras
+    # batch-shape in `model.fit` is the same for `x` and `y`.
     x = tf.concat(
         [loc, tfb.FillScaleTriL().inverse(scale_tril)], axis=0)[tf.newaxis]
 
     y = model(x)
     self.assertEqual(1, len(model.losses))
     y = model(x)
-    self.assertEqual(2, len(model.losses))
+    # In eager mode, multiple calls won't append new losses.
+    self.assertEqual(1 if tf.executing_eagerly() else 2, len(model.losses))
 
     [loc_, scale_tril_, actual_kl_, evaluated_kl_] = self.evaluate([
         y.loc, y.scale.to_dense(), actual_kl, model.losses[0]])
@@ -551,9 +551,11 @@ class KLDivergenceAddLossTest(test_util.TestCase):
 
     model.compile(
         optimizer=tf.optimizers.Adam(),
-        loss=lambda x, dist: -dist.log_prob(x[0, :event_size]),
+        loss=lambda x, dist: -dist.log_prob(x[0, :, :event_size]),
         metrics=[])
-    model.fit(x, x,
+    model.fit(x=x,
+              # Append a dimension to `y` to account for sample-shape.
+              y=x[tf.newaxis],
               batch_size=25,
               epochs=1,
               steps_per_epoch=1)  # Usually `n // batch_size`.

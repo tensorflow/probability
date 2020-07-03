@@ -20,14 +20,15 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -71,14 +72,14 @@ class NegativeBinomial(distribution.Distribution):
       logits: Floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents logits for the probability of success for
-        independent Negative Binomial distributions and must be in the open
-        interval `(-inf, inf)`. Only one of `logits` or `probs` should be
+        independent Negative Binomial distributions and must be in the half-open
+        interval `[-inf, inf)`. Only one of `logits` or `probs` should be
         specified.
       probs: Positive floating-point `Tensor` with shape broadcastable to
         `[B1, ..., Bb]` where `b >= 0` indicates the number of batch dimensions.
         Each entry represents the probability of success for independent
-        Negative Binomial distributions and must be in the open interval
-        `(0, 1)`. Only one of `logits` or `probs` should be specified.
+        Negative Binomial distributions and must be in the half-open interval
+        `[0, 1)`. Only one of `logits` or `probs` should be specified.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -98,9 +99,9 @@ class NegativeBinomial(distribution.Distribution):
       dtype = dtype_util.common_dtype([total_count, logits, probs],
                                       dtype_hint=tf.float32)
       self._probs = tensor_util.convert_nonref_to_tensor(
-          probs, dtype_hint=tf.float32, name='probs')
+          probs, dtype=dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
-          logits, dtype_hint=tf.float32, name='logits')
+          logits, dtype=dtype, name='logits')
       self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, dtype=dtype, name='total_count')
 
@@ -153,15 +154,16 @@ class NegativeBinomial(distribution.Distribution):
     # lam ~ Gamma(concentration=total_count, rate=(1-probs)/probs)
     # then X ~ Poisson(lam) is Negative Binomially distributed.
     logits = self._logits_parameter_no_checks()
-    stream = SeedStream(seed, salt='NegativeBinomial')
-    rate = tf.random.gamma(
+    gamma_seed, poisson_seed = samplers.split_seed(
+        seed, salt='NegativeBinomial')
+    rate = samplers.gamma(
         shape=[n],
         alpha=self.total_count,
         beta=tf.math.exp(-logits),
         dtype=self.dtype,
-        seed=stream())
-    return tf.random.poisson(
-        lam=rate, shape=[], dtype=self.dtype, seed=stream())
+        seed=gamma_seed)
+    return samplers.poisson(
+        shape=[], lam=rate, dtype=self.dtype, seed=poisson_seed)
 
   def _cdf(self, x):
     logits = self._logits_parameter_no_checks()
@@ -176,11 +178,11 @@ class NegativeBinomial(distribution.Distribution):
   def _log_prob(self, x):
     total_count = tf.convert_to_tensor(self.total_count)
     logits = self._logits_parameter_no_checks()
-    log_unnormalized_prob = (total_count * tf.math.log_sigmoid(-logits) +
-                             x * tf.math.log_sigmoid(logits))
-    log_normalization = (-tf.math.lgamma(total_count + x) +
-                         tf.math.lgamma(1. + x) +
-                         tf.math.lgamma(total_count))
+    log_unnormalized_prob = (
+        total_count * tf.math.log_sigmoid(-logits) +
+        tf.math.multiply_no_nan(tf.math.log_sigmoid(logits), x))
+    log_normalization = (tfp_math.lbeta(1. + x, total_count) +
+                         tf.math.log(total_count + x))
     return log_unnormalized_prob - log_normalization
 
   def _mean(self, logits=None):

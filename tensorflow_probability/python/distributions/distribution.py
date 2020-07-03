@@ -37,6 +37,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensorshape_util
+# Symbol import needed to avoid BUILD-dependency cycle
+from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -1064,10 +1066,11 @@ class Distribution(_BaseDistribution):
       try:
         return self._log_survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
-        try:
-          return tf.math.log1p(-self.cdf(value, **kwargs))
-        except NotImplementedError:
-          raise original_exception
+        if hasattr(self, '_log_cdf'):
+          return log1mexp(self._log_cdf(value, **kwargs))
+        if hasattr(self, '_cdf'):
+          return tf.math.log1p(-self._cdf(value, **kwargs))
+        raise original_exception
 
   def log_survival_function(self, value, name='log_survival_function',
                             **kwargs):
@@ -1106,10 +1109,11 @@ class Distribution(_BaseDistribution):
       try:
         return self._survival_function(value, **kwargs)
       except NotImplementedError as original_exception:
-        try:
+        if hasattr(self, '_log_cdf'):
+          return -tf.math.expm1(self._log_cdf(value, **kwargs))
+        if hasattr(self, '_cdf'):
           return 1. - self.cdf(value, **kwargs)
-        except NotImplementedError:
-          raise original_exception
+        raise original_exception
 
   def survival_function(self, value, name='survival_function', **kwargs):
     """Survival function.

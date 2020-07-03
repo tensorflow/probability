@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -232,8 +233,8 @@ class Empirical(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     samples = tf.convert_to_tensor(self._samples)
-    indices = tf.random.uniform([n], maxval=self._compute_num_samples(samples),
-                                dtype=tf.int32, seed=seed)
+    indices = samplers.uniform([n], maxval=self._compute_num_samples(samples),
+                               dtype=tf.int32, seed=seed)
     draws = tf.gather(samples, indices, axis=self._samples_axis)
     axes = tf.concat(
         [[self._samples_axis],
@@ -266,7 +267,9 @@ class Empirical(distribution.Distribution):
           axis=0)
       flattened_samples = tf.reshape(samples, [-1, num_samples, event_size])
 
-    indices = tf.map_fn(_get_mode, flattened_samples, dtype=tf.int64)
+    indices = tf.map_fn(_get_mode,
+                        flattened_samples,
+                        fn_output_signature=tf.int64)
     full_indices = tf.stack(
         [tf.range(tf.shape(indices)[0]),
          tf.cast(indices, tf.int32)], axis=1)

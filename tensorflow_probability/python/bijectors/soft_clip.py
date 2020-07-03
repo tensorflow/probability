@@ -81,7 +81,7 @@ class SoftClip(bijector.Bijector):
   ```python
   dist = tfd.TransformedDistribution(
     distribution=tfd.Normal(loc=0., scale=1.),
-    bijector=tfd.SoftClip(low=-5., high=5.))
+    bijector=tfb.SoftClip(low=-5., high=5.))
   samples = dist.sample(100)  # => samples guaranteed in [-10., 10.]
   ```
 
@@ -105,13 +105,14 @@ class SoftClip(bijector.Bijector):
   target_log_prob_fn = lambda z: dist.log_prob(z=z, x=3.)  # Condition on x==3.
 
   # Use SoftClip to ensure sampler stays within the numerically valid region.
-  mcmc_samples, _ = tfp.mcmc.sample_chain(
-    tfp.mcmc.TransformedTransitionKernel(
+  mcmc_samples = tfp.mcmc.sample_chain(
+    kernel=tfp.mcmc.TransformedTransitionKernel(
       tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=0.1),
-      bijector=tfb.SoftClip(-5., 5.))
+      bijector=tfb.SoftClip(-5., 5.)),
+    trace_fn=None,
     current_state=0.,
     num_results=100)
   ```

@@ -47,7 +47,7 @@ class _PoissonLogNormalQuadratureCompoundTest(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
-    self.run_test_sample_consistent_mean_variance(self.evaluate, pln, rtol=0.02)
+    self.run_test_sample_consistent_mean_variance(self.evaluate, pln, rtol=0.03)
 
   def testSampleProbConsistentBroadcastScalar(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(
@@ -57,8 +57,11 @@ class _PoissonLogNormalQuadratureCompoundTest(
             1., shape=[] if self.static_shape else None),
         quadrature_size=10,
         validate_args=True)
+    # JAX needs more samples to get good agreement.
     self.run_test_sample_consistent_log_prob(
-        self.evaluate, pln, batch_size=2, rtol=0.1, atol=0.01)
+        self.evaluate, pln, batch_size=2,
+        num_samples=int(1e6), num_threshold=int(1e4),
+        rtol=0.1, atol=0.01)
 
   def testMeanVarianceBroadcastScalar(self):
     pln = tfd.PoissonLogNormalQuadratureCompound(

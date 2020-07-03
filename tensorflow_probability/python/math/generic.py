@@ -24,8 +24,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math.scan_associative import scan_associative
 
 
 __all__ = [
@@ -33,6 +35,7 @@ __all__ = [
     'log_cosh',
     'log_sub_exp',
     'log_combinations',
+    'log_cumsum_exp',
     'log1mexp',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
@@ -44,14 +47,16 @@ __all__ = [
 
 
 def log_combinations(n, counts, name='log_combinations'):
-  """Multinomial coefficient.
+  """Log multinomial coefficient.
 
-  Given `n` and `counts`, where `counts` has last dimension `k`, we compute
+  Given `n` and `counts`, where `counts` has last dimension `k`, we define
   the multinomial coefficient as:
 
-  ```n! / sum_i n_i!```
+  ```n! / prod_i n_i!```
 
   where `i` runs over all `k` classes.
+
+  This function computes the natural logarithm of the multinomial coefficient.
 
   Args:
     n: Floating-point `Tensor` broadcastable with `counts`. This represents `n`
@@ -61,8 +66,8 @@ def log_combinations(n, counts, name='log_combinations'):
     name: A name for this operation (optional).
 
   Returns:
-    log_combinations: `Tensor` representing the multinomial coefficient between
-      `n` and `counts`.
+    log_combinations: `Tensor` representing the log of the multinomial
+      coefficient between `n` and `counts`.
   """
   # First a bit about the number of ways counts could have come in:
   # E.g. if counts = [1, 2], then this is 3 choose 2.
@@ -76,6 +81,38 @@ def log_combinations(n, counts, name='log_combinations'):
     counts_factorial = tf.math.lgamma(counts + 1)
     redundant_permutations = tf.reduce_sum(counts_factorial, axis=-1)
     return total_permutations - redundant_permutations
+
+
+# TODO(b/154562929): Remove this once the built-in op supports XLA.
+# TODO(b/156297366): Derivatives of this function may not always be correct.
+def log_cumsum_exp(x, axis=-1, name=None):
+  """Computes log(cumsum(exp(x))).
+
+  This is a pure-TF implementation of `tf.math.cumulative_logsumexp`; unlike
+  the built-in op, it supports XLA compilation. It uses a similar algorithmic
+  technique (parallel prefix sum) as the built-in op, so it has similar numerics
+  and asymptotic performace. However, this implemenentation currently has higher
+  overhead, so it is significantly slower on smaller inputs (`n < 10000`).
+
+  Args:
+    x: the `Tensor` to sum over.
+    axis: int `Tensor` axis to sum over.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'cumulative_logsumexp'`).
+  Returns:
+    cumulative_logsumexp: `Tensor` of the same shape as `x`.
+  """
+  with tf.name_scope(name or 'cumulative_logsumexp'):
+    x = tf.convert_to_tensor(x, name='x')
+    # TODO(b/154873585) Support `axis` in scan_associative to avoid transposing.
+    def safe_logsumexp(x, y):
+      result = log_add_exp(x, y)
+      # Remove spurious `NaN`s that arise from subtracting infinities.
+      return tf.where(tf.math.is_finite(result), result, -np.inf)
+    x = dist_util.move_dimension(x, source_idx=axis, dest_idx=0)
+    return dist_util.move_dimension(scan_associative(safe_logsumexp, x),
+                                    source_idx=0,
+                                    dest_idx=axis)
 
 
 def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
@@ -372,7 +409,17 @@ def log_add_exp(x, y, name=None):
     dtype = dtype_util.common_dtype([x, y], dtype_hint=tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
     y = tf.convert_to_tensor(y, dtype=dtype, name='y')
-    return tf.maximum(x, y) + tf.math.softplus(-abs(x - y))
+
+    # The following is similar to using the standard method
+    # `tf.maximum(x, y) + tf.math.softplus(-abs(x - y))`
+    # to compute `log_add_exp`. However, both `tf.maximum` and
+    # `abs(x - y)` have discontinuities in their derivatives
+    # along `x == y`.
+    # This version ensures that the contribution of the discontinuities
+    # to the derivative all cancel leaving a continuous result without
+    # changing the domain in which the original was valid.
+    larger = tf.maximum(x, y)
+    return larger + tf.math.softplus((x - larger) + (y - larger))
 
 
 def smootherstep(x, name=None):
@@ -472,6 +519,7 @@ def log1mexp(x, name=None):
         tf.math.log1p(-tf.math.exp(-x)))
 
 
+@tf.custom_gradient
 def log_cosh(x, name=None):
   """Compute `log(cosh(x))` in a numerically stable way.
 
@@ -502,14 +550,20 @@ def log_cosh(x, name=None):
     dtype = dtype_util.common_dtype([x], dtype_hint=tf.float32)
     numpy_dtype = dtype_util.as_numpy_dtype(dtype)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
-    x = tf.math.abs(x)
-    logcosh = x + tf.math.softplus(-2 * x) - np.log(2).astype(numpy_dtype)
+    abs_x = tf.math.abs(x)
+    logcosh = abs_x + tf.math.softplus(-2 * abs_x) - np.log(2).astype(
+        numpy_dtype)
     bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
-    return tf.where(
-        x <= bound,
+    answer = tf.where(
+        abs_x <= bound,
         tf.math.exp(
-            tf.math.log(x) + tf.math.log1p(-tf.square(x) / 6.)),
+            tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
         logcosh)
+
+    # The gradient of log(cosh(x)) is tanh(x)
+    def grad(dy):
+      return dy * tf.math.tanh(x)
+    return answer, grad
 
 
 def soft_sorting_matrix(x, temperature, name=None):

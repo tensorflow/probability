@@ -99,6 +99,7 @@ class BDF(base.Solver):
       bdf_coefficients=(-0.1850, -1. / 9., -0.0823, -0.0415, 0.),
       evaluate_jacobian_lazily=False,
       use_pfor_to_compute_jacobian=True,
+      make_adjoint_solver_fn=None,
       validate_args=False,
       name='bdf',
   ):
@@ -163,6 +164,10 @@ class BDF(base.Solver):
         parallel for in computing the Jacobian when `jacobian_fn` is not
         specified.
         Default value: `True`.
+      make_adjoint_solver_fn: Callable that takes no arguments that constructs a
+        `Solver` instance. The created solver is used in the adjoint senstivity
+        analysis to compute gradients (if they are requested).
+        Default value: A callable that returns this solver.
       validate_args: Whether to validate input with asserts. If `validate_args`
         is `False` and the inputs are invalid, correct behavior is not
         guaranteed.
@@ -170,7 +175,12 @@ class BDF(base.Solver):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'bdf').
     """
-    super(BDF, self).__init__(use_pfor_to_compute_jacobian, validate_args, name)
+    super(BDF, self).__init__(
+        use_pfor_to_compute_jacobian=use_pfor_to_compute_jacobian,
+        make_adjoint_solver_fn=make_adjoint_solver_fn,
+        validate_args=validate_args,
+        name=name,
+    )
     # The default values of `rtol` and `atol` match `scipy.integrate.solve_ivp`.
     self._rtol = rtol
     self._atol = atol
@@ -239,54 +249,6 @@ class BDF(base.Solver):
     # If `solution_times` is specified as
     # `tfp.math.ode.ChosenBySolver(final_time)`, the outermost loop is skipped
     # and `solution_time` in the middle loop is replaced by `final_time`.
-
-    def assert_ops():
-      """Creates a list of assert operations."""
-      if not self._validate_args:
-        return []
-      assert_ops = []
-      if previous_solver_internal_state is not None:
-        assert_initial_state_matches_previous_solver_internal_state = (
-            tf.debugging.assert_near(
-                tf.norm(
-                    initial_state_vec -
-                    previous_solver_internal_state.backward_differences[0],
-                    np.inf),
-                0.,
-                message='`previous_solver_internal_state` does not match '
-                '`initial_state`.'))
-        assert_ops.append(
-            assert_initial_state_matches_previous_solver_internal_state)
-      if solution_times_chosen_by_solver:
-        assert_ops.append(
-            util.assert_positive(final_time - initial_time,
-                                 'final_time - initial_time'))
-      else:
-        assert_ops += [
-            util.assert_increasing(solution_times, 'solution_times'),
-            util.assert_nonnegative(solution_times[0] - initial_time,
-                                    'solution_times[0] - initial_time'),
-        ]
-      if max_num_steps is not None:
-        assert_ops.append(util.assert_positive(max_num_steps, 'max_num_steps'))
-      if max_num_newton_iters is not None:
-        assert_ops.append(
-            util.assert_positive(max_num_newton_iters, 'max_num_newton_iters'))
-      assert_ops += [
-          util.assert_positive(rtol, 'rtol'),
-          util.assert_positive(atol, 'atol'),
-          util.assert_positive(first_step_size, 'first_step_size'),
-          util.assert_positive(safety_factor, 'safety_factor'),
-          util.assert_positive(min_step_size_factor, 'min_step_size_factor'),
-          util.assert_positive(max_step_size_factor, 'max_step_size_factor'),
-          tf.Assert((max_order >= 1) & (max_order <= bdf_util.MAX_ORDER), [
-              '`max_order` must be between 1 and {}.'.format(bdf_util.MAX_ORDER)
-          ]),
-          util.assert_positive(newton_tol_factor, 'newton_tol_factor'),
-          util.assert_positive(newton_step_size_factor,
-                               'newton_step_size_factor'),
-      ]
-      return assert_ops
 
     def advance_to_solution_time(n, diagnostics, iterand, solver_internal_state,
                                  state_vec_array, time_array):
@@ -402,14 +364,14 @@ class BDF(base.Solver):
         unitary, upper = update_factorization()
         num_matrix_factorizations += 1
 
-      tol = atol + rtol * tf.abs(backward_differences[0])
+      tol = p.atol + p.rtol * tf.abs(backward_differences[0])
       newton_tol = newton_tol_factor * tf.norm(tol)
 
       [
           newton_converged, next_backward_difference, next_state_vec,
           newton_num_iters
       ] = bdf_util.newton(backward_differences, max_num_newton_iters,
-                          newton_coefficients_array.read(order), ode_fn_vec,
+                          newton_coefficients_array.read(order), p.ode_fn_vec,
                           order, step_size, time, newton_tol, unitary, upper)
       num_steps += 1
       num_ode_fn_evaluations += newton_num_iters
@@ -438,7 +400,7 @@ class BDF(base.Solver):
       # the step size.
       new_step_size = tf1.where(
           converged_and_rejected,
-          util.next_step_size(step_size, order, error_ratio, safety_factor,
+          util.next_step_size(step_size, order, error_ratio, p.safety_factor,
                               min_step_size_factor, max_step_size_factor),
           new_step_size)
       should_update_step_size = should_update_step_size | converged_and_rejected
@@ -487,7 +449,7 @@ class BDF(base.Solver):
 
       new_step_size = tf1.where(
           should_update_order_and_step_size,
-          util.next_step_size(step_size, order, error_ratio, safety_factor,
+          util.next_step_size(step_size, order, error_ratio, p.safety_factor,
                               min_step_size_factor, max_step_size_factor),
           new_step_size)
       should_update_step_size = (
@@ -517,54 +479,40 @@ class BDF(base.Solver):
     with tf.name_scope(self._name):
 
       # (2) Convert to tensors.
-      error_if_wrong_dtype = functools.partial(
-          util.error_if_not_real_or_complex, identifier='initial_state')
+      p = self._prepare_common_params(
+          ode_fn=ode_fn,
+          initial_state=initial_state,
+          initial_time=initial_time,
+      )
 
-      initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
-      tf.nest.map_structure(error_if_wrong_dtype, initial_state)
-
-      state_shape = tf.nest.map_structure(tf.shape, initial_state)
-      common_state_dtype = dtype_util.common_dtype(initial_state)
-      real_dtype = dtype_util.real_dtype(common_state_dtype)
-
-      if jacobian_fn is None and common_state_dtype.is_complex:
+      if jacobian_fn is None and p.common_state_dtype.is_complex:
         raise NotImplementedError('The BDF solver does not support automatic '
                                   'Jacobian computations for complex dtypes.')
 
       # Convert everything to operate on a single, concatenated vector form.
-      initial_state_vec = util.get_state_vec(initial_state)
-      ode_fn_vec = util.get_ode_fn_vec(ode_fn, state_shape)
       jacobian_fn_mat = util.get_jacobian_fn_mat(
           jacobian_fn,
-          ode_fn_vec,
-          state_shape,
+          p.ode_fn_vec,
+          p.state_shape,
           use_pfor=self._use_pfor_to_compute_jacobian,
-          dtype=common_state_dtype,
+          dtype=p.common_state_dtype,
       )
 
-      num_odes = tf.size(initial_state_vec)
-      # Use tf.cast instead of tf.convert_to_tensor for differentiable
-      # parameters because the tf.custom_gradient decorator converts raw floats
-      # into tf.float32, which cannot be converted to tf.float64.
-      initial_time = tf.cast(initial_time, real_dtype)
       num_solution_times = 0
       if solution_times_chosen_by_solver:
-        final_time = tf.cast(solution_times.final_time, real_dtype)
+        final_time = tf.cast(solution_times.final_time, p.real_dtype)
       else:
-        solution_times = tf.cast(solution_times, real_dtype)
+        solution_times = tf.cast(solution_times, p.real_dtype)
+        final_time = tf.reduce_max(solution_times)
         num_solution_times = tf.size(solution_times)
         solution_time_array = tf.TensorArray(
             solution_times.dtype, size=num_solution_times,
             element_shape=[]).unstack(solution_times)
         util.error_if_not_vector(solution_times, 'solution_times')
-      rtol = tf.convert_to_tensor(self._rtol, dtype=real_dtype)
-      atol = tf.convert_to_tensor(self._atol, dtype=real_dtype)
-      safety_factor = tf.convert_to_tensor(
-          self._safety_factor, dtype=real_dtype)
       min_step_size_factor = tf.convert_to_tensor(
-          self._min_step_size_factor, dtype=real_dtype)
+          self._min_step_size_factor, dtype=p.real_dtype)
       max_step_size_factor = tf.convert_to_tensor(
-          self._max_step_size_factor, dtype=real_dtype)
+          self._max_step_size_factor, dtype=p.real_dtype)
       max_num_steps = self._max_num_steps
       if max_num_steps is not None:
         max_num_steps = tf.convert_to_tensor(max_num_steps, dtype=tf.int32)
@@ -574,20 +522,13 @@ class BDF(base.Solver):
         max_num_newton_iters = tf.convert_to_tensor(
             max_num_newton_iters, dtype=tf.int32)
       newton_tol_factor = tf.convert_to_tensor(
-          self._newton_tol_factor, dtype=real_dtype)
+          self._newton_tol_factor, dtype=p.real_dtype)
       newton_step_size_factor = tf.convert_to_tensor(
-          self._newton_step_size_factor, dtype=real_dtype)
-      bdf_coefficients = tf.cast(
-          tf.concat(
-              [[0.],
-               tf.convert_to_tensor(self._bdf_coefficients, dtype=real_dtype)],
-              0), common_state_dtype)
-      util.error_if_not_vector(bdf_coefficients, 'bdf_coefficients')
+          self._newton_step_size_factor, dtype=p.real_dtype)
+      newton_coefficients, error_coefficients = self._prepare_coefficients(
+          p.common_state_dtype)
       if self._validate_args:
-        initial_time = tf.ensure_shape(initial_time, [])
-        if solution_times_chosen_by_solver:
-          final_time = tf.ensure_shape(final_time, [])
-        safety_factor = tf.ensure_shape(safety_factor, [])
+        final_time = tf.ensure_shape(final_time, [])
         min_step_size_factor = tf.ensure_shape(min_step_size_factor, [])
         max_step_size_factor = tf.ensure_shape(max_step_size_factor, [])
         if max_num_steps is not None:
@@ -597,55 +538,30 @@ class BDF(base.Solver):
           max_num_newton_iters = tf.ensure_shape(max_num_newton_iters, [])
         newton_tol_factor = tf.ensure_shape(newton_tol_factor, [])
         newton_step_size_factor = tf.ensure_shape(newton_step_size_factor, [])
-        bdf_coefficients = tf.ensure_shape(bdf_coefficients, [6])
-      newton_coefficients = 1. / (
-          (1. - bdf_coefficients) * bdf_util.RECIPROCAL_SUMS)
       newton_coefficients_array = tf.TensorArray(
           newton_coefficients.dtype,
           size=bdf_util.MAX_ORDER + 1,
           clear_after_read=False,
           element_shape=[]).unstack(newton_coefficients)
-      error_coefficients = bdf_coefficients * bdf_util.RECIPROCAL_SUMS + 1. / (
-          bdf_util.ORDERS + 1)
       error_coefficients_array = tf.TensorArray(
           error_coefficients.dtype,
           size=bdf_util.MAX_ORDER + 1,
           clear_after_read=False,
           element_shape=[]).unstack(error_coefficients)
-      first_step_size = self._first_step_size
-      if first_step_size is None:
-        first_step_size = bdf_util.first_step_size(
-            atol, error_coefficients_array.read(1), initial_state_vec,
-            initial_time, ode_fn_vec, rtol, safety_factor)
-      elif previous_solver_internal_state is not None:
-        tf.logging.warn('`first_step_size` is ignored since'
-                        '`previous_solver_internal_state` was specified.')
-      first_step_size = tf.convert_to_tensor(first_step_size, dtype=real_dtype)
-      if self._validate_args:
-        first_step_size = tf.ensure_shape(first_step_size, [])
       solver_internal_state = previous_solver_internal_state
       if solver_internal_state is None:
-        first_order_backward_difference = ode_fn_vec(
-            initial_time, initial_state_vec) * tf.cast(first_step_size,
-                                                       common_state_dtype)
-        backward_differences = tf.concat([
-            initial_state_vec[tf.newaxis, :],
-            first_order_backward_difference[tf.newaxis, :],
-            tf.zeros(
-                tf.stack([bdf_util.MAX_ORDER + 1, num_odes]),
-                dtype=common_state_dtype),
-        ], 0)
-        solver_internal_state = _BDFSolverInternalState(
-            backward_differences=backward_differences,
-            order=1,
-            step_size=first_step_size)
+        solver_internal_state = self._initialize_solver_internal_state(
+            ode_fn=ode_fn,
+            initial_state=initial_state,
+            initial_time=initial_time,
+        )
       state_vec_array = tf.TensorArray(
-          common_state_dtype,
+          p.common_state_dtype,
           size=num_solution_times,
           dynamic_size=solution_times_chosen_by_solver,
-          element_shape=initial_state_vec.get_shape())
+          element_shape=p.initial_state_vec.get_shape())
       time_array = tf.TensorArray(
-          real_dtype,
+          p.real_dtype,
           size=num_solution_times,
           dynamic_size=solution_times_chosen_by_solver,
           element_shape=tf.TensorShape([]))
@@ -655,19 +571,41 @@ class BDF(base.Solver):
           num_ode_fn_evaluations=0,
           status=0)
       iterand = _BDFIterand(
-          jacobian_mat=tf.zeros([num_odes, num_odes], dtype=common_state_dtype),
+          jacobian_mat=tf.zeros([p.num_odes, p.num_odes],
+                                dtype=p.common_state_dtype),
           jacobian_is_up_to_date=False,
           new_step_size=solver_internal_state.step_size,
           num_steps=0,
           num_steps_same_size=0,
           should_update_jacobian=True,
           should_update_step_size=False,
-          time=initial_time,
-          unitary=tf.zeros([num_odes, num_odes], dtype=common_state_dtype),
-          upper=tf.zeros([num_odes, num_odes], dtype=common_state_dtype))
+          time=p.initial_time,
+          unitary=tf.zeros([p.num_odes, p.num_odes],
+                           dtype=p.common_state_dtype),
+          upper=tf.zeros([p.num_odes, p.num_odes], dtype=p.common_state_dtype),
+      )
 
       # (3) Make non-static assertions.
-      with tf.control_dependencies(assert_ops()):
+      with tf.control_dependencies(
+          self._assert_ops(
+              previous_solver_internal_state=previous_solver_internal_state,
+              initial_state_vec=p.initial_state_vec,
+              final_time=final_time,
+              initial_time=p.initial_time,
+              solution_times=solution_times,
+              max_num_steps=max_num_steps,
+              max_num_newton_iters=max_num_newton_iters,
+              atol=p.atol,
+              rtol=p.rtol,
+              first_step_size=solver_internal_state.step_size,
+              safety_factor=p.safety_factor,
+              min_step_size_factor=min_step_size_factor,
+              max_step_size_factor=max_step_size_factor,
+              max_order=max_order,
+              newton_tol_factor=newton_tol_factor,
+              newton_step_size_factor=newton_step_size_factor,
+              solution_times_chosen_by_solver=solution_times_chosen_by_solver,
+          )):
 
         # (4) Solve up to final time.
         if solution_times_chosen_by_solver:
@@ -699,18 +637,181 @@ class BDF(base.Solver):
                             ])
 
         # (6) Return `Results` object.
-        states = util.get_state_from_vec(state_vec_array.stack(), state_shape)
+        states = util.get_state_from_vec(state_vec_array.stack(), p.state_shape)
         times = time_array.stack()
         if not solution_times_chosen_by_solver:
           times.set_shape(solution_times.get_shape())
           tf.nest.map_structure(
               lambda s, ini_s: s.set_shape(solution_times.get_shape(  # pylint: disable=g-long-lambda
-              ).concatenate(ini_s.shape)), states, initial_state)
+              ).concatenate(ini_s.shape)), states, p.initial_state)
         return base.Results(
             times=times,
             states=states,
             diagnostics=diagnostics,
             solver_internal_state=solver_internal_state)
+
+  def _initialize_solver_internal_state(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+  ):
+    p = self._prepare_common_params(
+        ode_fn=ode_fn,
+        initial_state=initial_state,
+        initial_time=initial_time,
+    )
+
+    first_step_size = self._first_step_size
+    if first_step_size is None:
+      _, error_coefficients = self._prepare_coefficients(p.common_state_dtype)
+      first_step_size = bdf_util.first_step_size(
+          p.atol, error_coefficients[1], p.initial_state_vec,
+          p.initial_time, p.ode_fn_vec, p.rtol, p.safety_factor)
+    first_step_size = tf.convert_to_tensor(first_step_size, dtype=p.real_dtype)
+    if self._validate_args:
+      first_step_size = tf.ensure_shape(first_step_size, [])
+
+    first_order_backward_difference = p.ode_fn_vec(
+        p.initial_time, p.initial_state_vec) * tf.cast(first_step_size,
+                                                       p.common_state_dtype)
+    backward_differences = tf.concat(
+        [
+            p.initial_state_vec[tf.newaxis, :],
+            first_order_backward_difference[tf.newaxis, :],
+            tf.zeros(
+                tf.stack([bdf_util.MAX_ORDER + 1, p.num_odes]),
+                dtype=p.common_state_dtype),
+        ],
+        axis=0,
+    )
+    return _BDFSolverInternalState(
+        backward_differences=backward_differences,
+        order=1,
+        step_size=first_step_size)
+
+  def _prepare_coefficients(self, dtype):
+    bdf_coefficients = tf.concat(
+        [[0.], tf.cast(self._bdf_coefficients, dtype=dtype)], 0)
+    if self._validate_args:
+      bdf_coefficients = tf.ensure_shape(bdf_coefficients, [6])
+    util.error_if_not_vector(bdf_coefficients, 'bdf_coefficients')
+    newton_coefficients = 1. / (
+        (1. - bdf_coefficients) * bdf_util.RECIPROCAL_SUMS)
+    error_coefficients = bdf_coefficients * bdf_util.RECIPROCAL_SUMS + 1. / (
+        bdf_util.ORDERS + 1)
+
+    return newton_coefficients, error_coefficients
+
+  def _prepare_common_params(self, ode_fn, initial_state, initial_time):
+    error_if_wrong_dtype = functools.partial(
+        util.error_if_not_real_or_complex, identifier='initial_state')
+
+    initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
+    tf.nest.map_structure(error_if_wrong_dtype, initial_state)
+
+    state_shape = tf.nest.map_structure(tf.shape, initial_state)
+    common_state_dtype = dtype_util.common_dtype(initial_state)
+    real_dtype = dtype_util.real_dtype(common_state_dtype)
+    # Use tf.cast instead of tf.convert_to_tensor for differentiable
+    # parameters because the tf.custom_gradient decorator converts raw floats
+    # into tf.float32, which cannot be converted to tf.float64.
+    initial_time = tf.cast(initial_time, real_dtype)
+    if self._validate_args:
+      initial_time = tf.ensure_shape(initial_time, [])
+
+    rtol = tf.convert_to_tensor(self._rtol, dtype=real_dtype)
+    atol = tf.convert_to_tensor(self._atol, dtype=real_dtype)
+    safety_factor = tf.convert_to_tensor(
+        self._safety_factor, dtype=real_dtype)
+
+    if self._validate_args:
+      safety_factor = tf.ensure_shape(safety_factor, [])
+
+    # Convert everything to operate on a single, concatenated vector form.
+    initial_state_vec = util.get_state_vec(initial_state)
+    ode_fn_vec = util.get_ode_fn_vec(ode_fn, state_shape)
+    num_odes = tf.size(initial_state_vec)
+
+    return util.Bunch(
+        initial_state=initial_state,
+        initial_time=initial_time,
+        common_state_dtype=common_state_dtype,
+        real_dtype=real_dtype,
+        rtol=rtol,
+        atol=atol,
+        safety_factor=safety_factor,
+        state_shape=state_shape,
+        initial_state_vec=initial_state_vec,
+        ode_fn_vec=ode_fn_vec,
+        num_odes=num_odes,
+    )
+
+  def _assert_ops(
+      self,
+      previous_solver_internal_state,
+      initial_state_vec,
+      final_time,
+      initial_time,
+      solution_times,
+      max_num_steps,
+      max_num_newton_iters,
+      atol,
+      rtol,
+      first_step_size,
+      safety_factor,
+      min_step_size_factor,
+      max_step_size_factor,
+      max_order,
+      newton_tol_factor,
+      newton_step_size_factor,
+      solution_times_chosen_by_solver,
+  ):
+    """Creates a list of assert operations."""
+    if not self._validate_args:
+      return []
+    assert_ops = []
+    if previous_solver_internal_state is not None:
+      assert_initial_state_matches_previous_solver_internal_state = (
+          tf.debugging.assert_near(
+              tf.norm(
+                  initial_state_vec -
+                  previous_solver_internal_state.backward_differences[0],
+                  np.inf),
+              0.,
+              message='`previous_solver_internal_state` does not match '
+              '`initial_state`.'))
+      assert_ops.append(
+          assert_initial_state_matches_previous_solver_internal_state)
+    assert_ops.append(
+        util.assert_positive(final_time - initial_time,
+                             'final_time - initial_time'))
+    if not solution_times_chosen_by_solver:
+      assert_ops += [
+          util.assert_increasing(solution_times, 'solution_times'),
+          util.assert_nonnegative(solution_times[0] - initial_time,
+                                  'solution_times[0] - initial_time'),
+      ]
+    if max_num_steps is not None:
+      assert_ops.append(util.assert_positive(max_num_steps, 'max_num_steps'))
+    if max_num_newton_iters is not None:
+      assert_ops.append(
+          util.assert_positive(max_num_newton_iters, 'max_num_newton_iters'))
+    assert_ops += [
+        util.assert_positive(rtol, 'rtol'),
+        util.assert_positive(atol, 'atol'),
+        util.assert_positive(first_step_size, 'first_step_size'),
+        util.assert_positive(safety_factor, 'safety_factor'),
+        util.assert_positive(min_step_size_factor, 'min_step_size_factor'),
+        util.assert_positive(max_step_size_factor, 'max_step_size_factor'),
+        tf.Assert((max_order >= 1) & (max_order <= bdf_util.MAX_ORDER), [
+            '`max_order` must be between 1 and {}.'.format(bdf_util.MAX_ORDER)
+        ]),
+        util.assert_positive(newton_tol_factor, 'newton_tol_factor'),
+        util.assert_positive(newton_step_size_factor,
+                             'newton_step_size_factor'),
+    ]
+    return assert_ops
 
 
 class _BDFDiagnostics(

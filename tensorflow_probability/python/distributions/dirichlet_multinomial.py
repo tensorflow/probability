@@ -27,9 +27,9 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -266,7 +266,8 @@ class DirichletMultinomial(distribution.Distribution):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
-    seed = SeedStream(seed, 'dirichlet_multinomial')
+    gamma_seed, multinomial_seed = samplers.split_seed(
+        seed, salt='dirichlet_multinomial')
 
     concentration = tf.convert_to_tensor(self._concentration)
     total_count = tf.convert_to_tensor(self._total_count)
@@ -279,13 +280,13 @@ class DirichletMultinomial(distribution.Distribution):
         name='alpha')
 
     unnormalized_logits = tf.math.log(
-        tf.random.gamma(
+        samplers.gamma(
             shape=[n],
             alpha=alpha,
             dtype=self.dtype,
-            seed=seed()))
+            seed=gamma_seed))
     x = multinomial.draw_sample(
-        1, k, unnormalized_logits, n_draws, self.dtype, seed())
+        1, k, unnormalized_logits, n_draws, self.dtype, multinomial_seed)
     final_shape = tf.concat(
         [[n], self._batch_shape_tensor(concentration, total_count), [k]], 0)
     return tf.reshape(x, final_shape)

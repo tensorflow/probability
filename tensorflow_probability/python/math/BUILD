@@ -36,6 +36,11 @@ multi_substrate_py_library(
     name = "math",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":minimize",
+        ":sparse",
+        "//tensorflow_probability/python/math/ode",
+    ],
     deps = [
         ":custom_gradient",
         ":diag_jacobian",
@@ -45,13 +50,13 @@ multi_substrate_py_library(
         ":linalg",
         ":minimize",
         ":numeric",
-        ":random_ops",
         ":root_search",
         ":scan_associative",
         ":sparse",
         ":special",
         "//tensorflow_probability/python/math/ode",
         "//tensorflow_probability/python/math/psd_kernels",
+        "//tensorflow_probability/python/random",
     ],
 )
 
@@ -87,6 +92,7 @@ multi_substrate_py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
+        ":scan_associative",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
@@ -96,7 +102,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "generic_test",
-    size = "small",
+    size = "medium",
     srcs = ["generic_test.py"],
     deps = [
         # absl/testing:parameterized dep,
@@ -104,6 +110,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -170,6 +177,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -209,6 +217,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "minimize_test",
     size = "small",
@@ -250,18 +259,6 @@ multi_substrate_py_test(
     ],
 )
 
-multi_substrate_py_library(
-    name = "random_ops",
-    srcs = [
-        "random_ops.py",
-    ],
-    srcs_version = "PY2AND3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:samplers",
-    ],
-)
-
 multi_substrate_py_test(
     name = "random_ops_test",
     size = "small",
@@ -292,6 +289,7 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["diag_jacobian_test.py"],
     jax_size = "medium",
+    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -337,6 +335,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "sparse_test",
     size = "small",
@@ -364,7 +363,7 @@ multi_substrate_py_test(
     name = "scan_associative_test",
     size = "medium",
     srcs = ["scan_associative_test.py"],
-    jax_tags = ["notap"],
+    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     shard_count = 4,
     srcs_version = "PY2AND3",
@@ -393,9 +392,8 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "special_test",
-    size = "small",
+    size = "medium",
     srcs = ["special_test.py"],
-    jax_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

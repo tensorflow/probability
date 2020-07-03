@@ -35,15 +35,24 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability.python.experimental.substrates.numpy as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.internal.backend import numpy as numpy_backend
+from tensorflow_probability.python.internal.backend import numpy as nptf
+from tensorflow_probability.python.internal.backend.numpy import functional_ops as np_pfor
+from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
 
 
 ALLOW_NAN = False
 ALLOW_INFINITY = False
 
 JAX_MODE = False
+NUMPY_MODE = not JAX_MODE
+
+# pylint is unable to handle @hps.composite (e.g. complains "No value for
+# argument 'batch_shape' in function call"), so disable this lint for the file.
+
+# pylint: disable=no-value-for-parameter
 
 
 class Kwargs(dict):
@@ -71,8 +80,10 @@ class TestCase(dict):
     super(TestCase, self).__init__(
         testcase_name='_' + name.replace('.', '_'),
         tensorflow_function=_getattr(tf, name),
-        numpy_function=_getattr(numpy_backend,
-                                name.replace('random.', 'random.stateless_')),
+        numpy_function=_getattr(
+            nptf,
+            name.replace('random.', 'random.stateless_'
+                        ).replace('random.stateless_gamma', 'random.gamma')),
         strategy_list=strategy_list,
         **kwargs)
 
@@ -128,11 +139,22 @@ def fft_shapes(fft_dim):
 
 @hps.composite
 def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
-                 as_tuple=True, batch_shape=(), unique=False):
-  if elements is None:
-    elements = floats()
+                 as_tuple=True, batch_shape=(), unique=False,
+                 allow_nan=ALLOW_NAN):
   if dtype is None:
     dtype = np.float64
+  if elements is None:
+    if dtype in (np.float32, np.float64):
+      if allow_nan:
+        elements = floats(min_value=None, max_value=None, allow_nan=allow_nan)
+      else:
+        elements = floats()
+    elif dtype in (np.int32, np.int64):
+      elements = integers()
+    elif dtype in (np.complex64, np.complex128):
+      elements = complex_numbers()
+    else:
+      raise ValueError('Unexpected dtype: {}'.format(dtype))
   shape = tuple(batch_shape) + draw(shape)
 
   ensure_array = lambda x: onp.array(x, dtype=dtype)
@@ -153,9 +175,12 @@ single_arrays = functools.partial(n_same_shape, n=1, as_tuple=False)
 
 
 @hps.composite
-def array_axis_tuples(draw, strategy=None, elements=None):
+def array_axis_tuples(draw, strategy=None, elements=None, dtype=None,
+                      allow_nan=ALLOW_NAN):
   x = draw(strategy or single_arrays(shape=shapes(min_dims=1),
-                                     elements=elements))
+                                     elements=elements,
+                                     dtype=dtype,
+                                     allow_nan=allow_nan))
   rank = len(x.shape)
   axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
@@ -226,7 +251,7 @@ def pd_matrices(draw, eps=1.):
 
 @hps.composite
 def nonsingular_matrices(draw):
-  mat = draw(pd_matrices())  # pylint: disable=no-value-for-parameter
+  mat = draw(pd_matrices())
   signs = draw(
       hnp.arrays(
           mat.dtype,
@@ -294,18 +319,15 @@ def uniform_params(draw):
 def gamma_params():
   def dict_to_params(d):
     return (d['shape'],  # sample shape
-            d['params'][0].astype(d['dtype'].as_numpy_dtype),  # alpha
-            (d['params'][1].astype(d['dtype'].as_numpy_dtype)  # beta (or None)
+            d['params'][0].astype(d['dtype']),  # alpha
+            (d['params'][1].astype(d['dtype'])  # beta (or None)
              if d['include_beta'] else None),
             d['dtype'])  # dtype
   return hps.fixed_dictionaries(
       dict(shape=shapes(),
-           # hps.composite confuses pylint w/ the draw parameter...
-           # pylint: disable=no-value-for-parameter
            params=n_same_shape(n=2, elements=positive_floats()),
-           # pylint: enable=no-value-for-parameter
            include_beta=hps.booleans(),
-           dtype=hps.sampled_from([tf.float32, tf.float64]))
+           dtype=hps.sampled_from([np.float32, np.float64]))
       ).map(dict_to_params)  # dtype
 
 
@@ -414,6 +436,43 @@ def gather_nd_params(draw):
 
 
 @hps.composite
+def repeat_params(draw):
+  input_array = draw(single_arrays())
+  rank = input_array.ndim
+  low, high = -rank, rank - 1
+  low, high = min(low, high), max(low, high)
+  axis = draw(hps.one_of(hps.just(None), hps.integers(low, high)))
+  if draw(hps.booleans()):
+    repeats = draw(hps.integers(1, 20))
+    if draw(hps.booleans()):
+      repeats = np.array([repeats])
+    return input_array, repeats, axis
+  if rank < 1:
+    repeats_shape = draw(hps.one_of(hps.just(()), hps.just((1,))))
+  else:
+    repeats_shape = (input_array.shape[axis] if axis is not None
+                     else np.size(input_array),)
+  repeats = draw(hnp.arrays(dtype=np.int32, shape=repeats_shape,
+                            elements=hps.integers(1, 20)))
+  return input_array, repeats, axis
+
+
+@hps.composite
+def linspace_params(draw):
+  shape = draw(shapes())
+  arg_shapes = draw(
+      tfp_hps.broadcasting_shapes(shape, 2).map(tensorshapes_to_tuples))
+  dtype = draw(hps.sampled_from([np.int32, np.int64,
+                                 np.float32, np.float64,
+                                 np.complex64, np.complex128]))
+  start = draw(single_arrays(shape=hps.just(arg_shapes[0]), dtype=dtype))
+  stop = draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype))
+  num = draw(hps.integers(0, 13))
+  axis = draw(hps.integers(-len(shape) - 1, len(shape)))
+  return Kwargs(start=start, stop=stop, num=num, axis=axis)
+
+
+@hps.composite
 def searchsorted_params(draw):
   sorted_array_shape = shapes(min_dims=1)
   sorted_array = draw(single_arrays(shape=sorted_array_shape))
@@ -424,6 +483,25 @@ def searchsorted_params(draw):
       batch_shape=sorted_array.shape[:-1]))
   search_side = draw(hps.one_of(hps.just('left'), hps.just('right')))
   return sorted_array, values, search_side
+
+
+@hps.composite
+def segment_ids(draw, n):
+  lengths = []
+  rsum = 0
+  while rsum < n:
+    lengths.append(draw(hps.integers(1, n-rsum)))
+    rsum += lengths[-1]
+  return np.repeat(np.arange(len(lengths)), lengths)
+
+
+@hps.composite
+def segment_params(draw, shape=shapes(min_dims=1), dtype=None, elements=None,
+                   batch_shape=(), unique=False):
+  a = draw(single_arrays(shape=shape, dtype=dtype, elements=elements,
+                         batch_shape=batch_shape, unique=unique))
+  ids = draw(segment_ids(a.shape[0]))
+  return (a, ids)
 
 
 @hps.composite
@@ -455,6 +533,13 @@ def histogram_fixed_width_bins_params(draw):
 
 
 @hps.composite
+def histogram_fixed_width_params(draw):
+  values, [value_min, value_max], nbins = draw(
+      histogram_fixed_width_bins_params())
+  return values, [value_min, max(value_max, value_min+.1)], nbins
+
+
+@hps.composite
 def sparse_xent_params(draw):
   num_classes = draw(hps.integers(1, 6))
   batch_shape = draw(shapes(min_dims=1))
@@ -476,7 +561,7 @@ def sparse_xent_params(draw):
 def xent_params(draw):
   num_classes = draw(hps.integers(1, 6))
   batch_shape = draw(shapes(min_dims=1))
-  labels = batched_probabilities(  # pylint:disable=no-value-for-parameter
+  labels = batched_probabilities(
       batch_shape=batch_shape, num_classes=num_classes)
   logits = single_arrays(
       batch_shape=batch_shape,
@@ -485,6 +570,21 @@ def xent_params(draw):
   return draw(
       hps.fixed_dictionaries(dict(
           labels=labels, logits=logits)).map(Kwargs))
+
+
+def _svd_post_process(vals):
+  # SVDs are not unique, so reconstruct input to test consistency (b/154538680).
+
+  # create_uv = False
+  if not isinstance(vals, tuple):
+    return vals
+  # create_uv = True
+  s, u, v = (np.array(x) for x in vals)
+  return np.matmul(
+      u,
+      s[..., None] *
+      # Vectorized matrix transpose.
+      np.swapaxes(v, -2, -1))
 
 
 # __Currently untested:__
@@ -503,8 +603,6 @@ def xent_params(draw):
 
 
 # TODO(jamieas): add tests for these functions.
-
-# pylint: disable=no-value-for-parameter
 
 NUMPY_TEST_CASES = [
 
@@ -532,12 +630,12 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=2),
                             dtype=np.float32,
                             elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-4, rtol=1e-4),
+             atol=1e-3, rtol=1e-3),
     TestCase('signal.rfft3d',
              [single_arrays(shape=fft_shapes(fft_dim=3),
                             dtype=np.float32,
                             elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-3, rtol=1e-3),
+             atol=1e-2, rtol=2e-3),
     TestCase('signal.ifft',
              [single_arrays(shape=fft_shapes(fft_dim=1),
                             dtype=np.complex64,
@@ -557,17 +655,17 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=1),
                             dtype=np.complex64,
                             elements=complex_numbers(max_magnitude=1e3))],
-             atol=2e-4, rtol=2e-4),
+             atol=3e-4, rtol=3e-4),
     TestCase('signal.irfft2d',
              [single_arrays(shape=fft_shapes(fft_dim=2),
                             dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
+                            elements=complex_numbers(max_magnitude=5e2))],
              atol=2e-4, rtol=2e-4),
     TestCase('signal.irfft3d',
              [single_arrays(shape=fft_shapes(fft_dim=3),
                             dtype=np.complex64,
                             elements=complex_numbers(max_magnitude=1e3))],
-             atol=2e-4, rtol=2e-4),
+             atol=4e-4, rtol=4e-4),
 
     # ArgSpec(args=['a', 'b', 'transpose_a', 'transpose_b', 'adjoint_a',
     #               'adjoint_b', 'a_is_sparse', 'b_is_sparse', 'name'],
@@ -588,7 +686,7 @@ NUMPY_TEST_CASES = [
         'math.polygamma', [
             hps.tuples(hps.integers(0, 10).map(float), positive_floats()),
         ],
-        jax_disabled=True),
+        disabled=JAX_MODE),
 
     # ArgSpec(args=['arr', 'weights', 'minlength',
     #               'maxlength', 'dtype', 'name'],
@@ -605,6 +703,14 @@ NUMPY_TEST_CASES = [
         matmul_compatible_pairs(
             x_strategy=pd_matrices().map(np.linalg.cholesky))
     ]),
+
+    # ArgSpec(args=['tensor', 'full_matrices', 'compute_uv', 'name'],
+    #         varargs=None,
+    #         keywords=None,
+    #         defaults=(False, True, None))
+    TestCase('linalg.svd',
+             [single_arrays(shape=shapes(min_dims=2))],
+             post_processor=_svd_post_process),
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -640,7 +746,8 @@ NUMPY_TEST_CASES = [
     TestCase('math.real',
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [pd_matrices()]),
-    TestCase('linalg.lu', [nonsingular_matrices()]),
+    TestCase('linalg.lu', [nonsingular_matrices()], rtol=1e-4,
+             disabled=NUMPY_MODE and six.PY2),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
     TestCase('raw_ops.MatrixDiagPartV2', [
         hps.fixed_dictionaries(dict(
@@ -679,15 +786,26 @@ NUMPY_TEST_CASES = [
                 elements=hps.booleans()))
     ]),
     TestCase('math.reduce_logsumexp', [array_axis_tuples()]),
-    TestCase('math.reduce_max', [array_axis_tuples()]),
+    TestCase('math.reduce_max', [array_axis_tuples(allow_nan=True)]),
     TestCase('math.reduce_mean', [array_axis_tuples()]),
-    TestCase('math.reduce_min', [array_axis_tuples()]),
-    TestCase('math.reduce_prod', [array_axis_tuples()]),
+    TestCase('math.reduce_min', [array_axis_tuples(allow_nan=True)]),
+    TestCase('math.reduce_prod', [array_axis_tuples(),
+                                  array_axis_tuples(dtype=np.int32)]),
     TestCase('math.reduce_std',
              [array_axis_tuples(elements=floats(-1e6, 1e6))]),
-    TestCase('math.reduce_sum', [array_axis_tuples()]),
+    TestCase('math.reduce_sum', [array_axis_tuples(),
+                                 array_axis_tuples(dtype=np.int32)]),
     TestCase('math.reduce_variance',
              [array_axis_tuples(elements=floats(-1e6, 1e6))]),
+
+    TestCase('math.segment_max', [segment_params()]),
+    TestCase('math.segment_mean',
+             [segment_params()],
+             # need jax.numpy.bincount
+             disabled=JAX_MODE),
+    TestCase('math.segment_min', [segment_params()]),
+    TestCase('math.segment_prod', [segment_params()]),
+    TestCase('math.segment_sum', [segment_params()]),
 
     # ArgSpec(args=['inputs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -768,12 +886,12 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.atanh', [single_arrays(elements=floats(-1., 1.))]),
     TestCase(
         'math.bessel_i0', [single_arrays(elements=floats(-50., 50.))],
-        jax_disabled=True),
+        disabled=JAX_MODE),
     TestCase(
         'math.bessel_i0e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase(
         'math.bessel_i1', [single_arrays(elements=floats(-50., 50.))],
-        jax_disabled=True),
+        disabled=JAX_MODE),
     TestCase(
         'math.bessel_i1e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase('math.ceil', [single_arrays()]),
@@ -893,11 +1011,17 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     # Array ops.
     TestCase('gather', [gather_params()]),
     TestCase('gather_nd', [gather_nd_params()]),
+    # TODO(leben): Fix bug in jax.numpy.repeat(array(0), 1, 0).
+    TestCase('repeat', [repeat_params()],
+             disabled=JAX_MODE),
     TestCase('searchsorted', [searchsorted_params()]),
+    TestCase('linspace', [linspace_params()]),
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),
 
     # Misc
+    TestCase('histogram_fixed_width',
+             [histogram_fixed_width_params()]),
     TestCase('histogram_fixed_width_bins',
              [histogram_fixed_width_bins_params()]),
 ]
@@ -911,67 +1035,265 @@ def _maybe_convert_to_tensors(args):
       args)
 
 
+CONVERT_TO_TENSOR_TESTS = [
+    # bool tests
+    dict(testcase_name='bool',
+         value=True, out_dtype=nptf.bool),
+    dict(testcase_name='bool_with_int32_dtype',
+         value=True, out_dtype=nptf.int32, dtype=nptf.int32),
+    dict(testcase_name='bool_with_int64_dtype',
+         value=True, out_dtype=nptf.int64, dtype=nptf.int64),
+    dict(testcase_name='bool_with_float32_dtype',
+         value=True, out_dtype=nptf.float32, dtype=nptf.float32),
+    dict(testcase_name='bool_with_float64_dtype',
+         value=True, out_dtype=nptf.float64, dtype=nptf.float64),
+    dict(testcase_name='bool_with_complex64_dtype_should_error',
+         value=True, dtype=nptf.complex64, error=TypeError),
+    dict(testcase_name='bool_with_complex64_hint',
+         value=True, out_dtype=nptf.bool, dtype_hint=nptf.complex64),
+    # int tests
+    dict(testcase_name='int',
+         value=1, out_dtype=nptf.int32),
+    dict(testcase_name='int_with_float32_dtype',
+         value=1, out_dtype=nptf.float32, dtype=nptf.float32),
+    # int can be cast into other types
+    dict(testcase_name='int_with_float32_hint',
+         value=1, out_dtype=nptf.float32, dtype_hint=nptf.float32),
+    dict(testcase_name='int64',
+         value=2 ** 63 - 1, out_dtype=nptf.int64),
+    dict(testcase_name='int64_to_int32_should_underflow',
+         value=2 ** 63 - 1, dtype=np.int32, out_dtype=nptf.int32, out_value=-1),
+    dict(testcase_name='int_with_complex64_dtype',
+         value=1, out_dtype=nptf.complex64, dtype=nptf.complex64),
+    dict(testcase_name='int_with_complex64_hint',
+         value=1, out_dtype=nptf.complex64, dtype_hint=nptf.complex64),
+    # float tests
+    dict(testcase_name='float',
+         value=1., out_dtype=nptf.float32),
+    dict(testcase_name='float_with_float64_dtype',
+         value=1., out_dtype=nptf.float64, dtype=nptf.float64),
+    # float can be cast into complex types but not int types
+    dict(testcase_name='float_with_complex64_dtype',
+         value=1., out_dtype=nptf.complex64, dtype=nptf.complex64),
+    dict(testcase_name='float_with_complex64_dtype_hint',
+         value=1., out_dtype=nptf.complex64, dtype_hint=nptf.complex64),
+    dict(testcase_name='float_with_complex128_dtype',
+         value=1., out_dtype=nptf.complex128, dtype=nptf.complex128),
+    dict(testcase_name='float_to_bool_dtype_should_error',
+         value=1., dtype=nptf.bool, error=TypeError),
+    dict(testcase_name='float_to_int32_dtype_should_error',
+         value=1., dtype=nptf.int32, error=TypeError),
+    dict(testcase_name='float_to_int32_dtype_hint',
+         value=1., out_dtype=nptf.float32, dtype_hint=nptf.int32),
+    dict(testcase_name='float_to_int64_dtype_should_error',
+         value=1., dtype=nptf.int32, error=TypeError),
+    dict(testcase_name='float_with_int32_hint',
+         value=1., out_dtype=nptf.float32, dtype_hint=nptf.int32),
+    # complex can be cast into complex types but not other types
+    dict(testcase_name='complex',
+         value=1 + 0j, out_dtype=nptf.complex128),
+    dict(testcase_name='complex_with_complex64_dtype',
+         value=1 + 0j, out_dtype=nptf.complex64, dtype=nptf.complex64),
+    dict(testcase_name='complex_with_bool_dtype_should_error',
+         value=1 + 0j, dtype=nptf.bool, error=TypeError),
+    dict(testcase_name='complex_with_bool_hint_should_error',
+         value=1 + 0j, out_dtype=nptf.complex128, dtype_hint=nptf.bool),
+    dict(testcase_name='complex_with_float32_dtype_should_error',
+         value=1 + 0j, dtype=nptf.float32, error=TypeError),
+    dict(testcase_name='complex_with_float32',
+         value=1 + 0j, out_dtype=nptf.complex128, dtype_hint=nptf.float32),
+    dict(testcase_name='complex_with_int32_dtype_should_error',
+         value=1 + 0j, dtype=nptf.int32, error=TypeError),
+    dict(testcase_name='complex_with_int32_hint',
+         value=1 + 0j, out_dtype=nptf.complex128, dtype_hint=nptf.int32),
+    # Empty iterables should be float32 by default
+    dict(testcase_name='empty_list',
+         value=[], out_dtype=nptf.float32),
+    dict(testcase_name='empty_list_with_float64_dtype',
+         value=[], out_dtype=nptf.float64, dtype=nptf.float64),
+    dict(testcase_name='empty_list_with_int32_hint',
+         value=[], out_dtype=nptf.int32, dtype_hint=nptf.int32),
+    dict(testcase_name='empty_tuple',
+         value=(), out_dtype=nptf.float32),
+    dict(testcase_name='empty_tuple_with_float64_dtype',
+         value=(), out_dtype=nptf.float64, dtype=nptf.float64),
+    dict(testcase_name='empty_tuple_with_int32_hint',
+         value=(), out_dtype=nptf.int32, dtype_hint=nptf.int32),
+    # Iterables with contents should use dtypes of contents
+    dict(testcase_name='list_of_ints',
+         value=[1], out_dtype=nptf.int32),
+    dict(testcase_name='nested_list_of_ints',
+         value=[[1]], out_dtype=nptf.int32),
+    dict(testcase_name='nested_list_of_bools',
+         value=[[True]], out_dtype=nptf.bool),
+    dict(testcase_name='nested_list_of_floats',
+         value=[[1.]], out_dtype=nptf.float32),
+    dict(testcase_name='list_of_ints_with_int32_dtype',
+         value=[1], out_dtype=nptf.int32, dtype=nptf.int32),
+    dict(testcase_name='list_of_ints_with_int32_hint',
+         value=[1], out_dtype=nptf.int32, dtype_hint=nptf.int32),
+    dict(testcase_name='list_of_ints_with_float32_dtype',
+         value=[1], out_dtype=nptf.float32, dtype=nptf.float32),
+    dict(testcase_name='list_of_ints_with_float32_hint',
+         value=[1], out_dtype=nptf.float32, dtype_hint=nptf.float32),
+    dict(testcase_name='list_of_ints_with_complex128_dtype',
+         value=[1], out_dtype=nptf.complex128, dtype=nptf.complex128),
+    dict(testcase_name='list_of_ints_with_complex128_hint',
+         value=[1], out_dtype=nptf.complex128, dtype_hint=nptf.complex128),
+    dict(testcase_name='list_of_floats',
+         value=[1.], out_dtype=nptf.float32),
+    dict(testcase_name='list_of_floats_with_int32_dtype_should_error',
+         value=[1.], dtype=nptf.int32, error=TypeError),
+    dict(testcase_name='list_of_floats_with_int32_hint',
+         value=[1.], out_dtype=nptf.float32, dtype_hint=nptf.int32),
+    dict(testcase_name='list_of_int_bool',
+         value=[1, True], out_dtype=nptf.int32),
+    dict(testcase_name='list_of_bool_int_should_error',
+         value=[True, 1], error=ValueError),
+    dict(testcase_name='list_of_int_bool_with_int32_dtype',
+         value=[1, True], dtype=nptf.int32, out_dtype=nptf.int32),
+    dict(testcase_name='list_of_int_bool_with_bool_dtype_should_error',
+         value=[1, True], dtype=nptf.bool, error=TypeError),
+    dict(testcase_name='list_of_int_float',
+         value=[1, 2.], out_dtype=nptf.float32),
+    dict(testcase_name='list_of_int_float_with_int32_dtype_should_error',
+         value=[1, 2.], dtype=nptf.int32, error=TypeError),
+    dict(testcase_name='list_of_int_float_with_int32_hint',
+         value=[1, 2.], out_dtype=nptf.float32, dtype_hint=nptf.int32),
+    dict(testcase_name='list_of_float_int_with_int32_dtype_should_error',
+         value=[1., 2], dtype=nptf.int32, error=TypeError),
+    dict(testcase_name='list_of_float_int_with_int32_hint',
+         value=[1., 2], out_dtype=nptf.float32, dtype_hint=nptf.int32),
+    # List of complex is more strict than list float and int
+    dict(testcase_name='list_of_complex_and_bool_should_error',
+         value=[1 + 2j, True], error=ValueError),
+    dict(testcase_name='list_of_bool_and_complex_should_error',
+         value=[True, 1 + 2j], error=ValueError),
+    dict(testcase_name='list_of_complex_and_float_should_error',
+         value=[1 + 2j, 1.], error=ValueError),
+    dict(testcase_name='list_of_float_and_complex_should_error',
+         value=[1., 1 + 2j], error=ValueError),
+    dict(testcase_name='list_of_complex_and_int_should_error',
+         value=[1 + 2j, 1], error=ValueError),
+    dict(testcase_name='list_of_int_and_complex_should_error',
+         value=[1, 1 + 2j], error=ValueError),
+    # Convert tensors to tensors
+    dict(testcase_name='int32_tensor',
+         value=1, in_dtype=nptf.int32, out_dtype=nptf.int32),
+    dict(testcase_name='int32_tensor_with_int32_dtype',
+         value=1, in_dtype=nptf.int32, dtype=nptf.int32, out_dtype=nptf.int32),
+    dict(testcase_name='int32_tensor_with_int64_hint',
+         value=1, in_dtype=nptf.int32, dtype_hint=nptf.int32,
+         out_dtype=nptf.int32),
+    dict(testcase_name='int32_tensor_with_float64_hint',
+         value=1, in_dtype=nptf.int32, dtype_hint=nptf.int32,
+         out_dtype=nptf.int32),
+    # Convert registered objects
+    dict(testcase_name='dimension',
+         value=nptf.compat.v1.Dimension(1), out_dtype=nptf.int32),
+    dict(testcase_name='dimension_with_int64_dtype',
+         value=nptf.compat.v1.Dimension(1), dtype=nptf.int64,
+         out_dtype=nptf.int64),
+    dict(testcase_name='dimension_with_float32_dtype_should_error',
+         value=nptf.compat.v1.Dimension(1), dtype=nptf.float32,
+         error=TypeError),
+    dict(testcase_name='dimension_with_float32_hint',
+         value=nptf.compat.v1.Dimension(1), dtype_hint=nptf.float32,
+         out_dtype=nptf.int32),
+    dict(testcase_name='empty_tensorshape',
+         value=nptf.TensorShape([]), out_dtype=nptf.int32),
+    dict(testcase_name='empty_tensorshape_with_float32_dtype_should_error',
+         value=nptf.TensorShape([]), dtype=nptf.float32, error=TypeError),
+    dict(testcase_name='tensorshape',
+         value=nptf.TensorShape((1, 2)), out_dtype=nptf.int32),
+    dict(testcase_name='tensorshape_with_float32_dtype_should_error',
+         value=nptf.TensorShape((1, 2)), dtype=nptf.float32, error=TypeError),
+    dict(testcase_name='tensorshape_with_large_dimension_should_be_int64',
+         value=nptf.TensorShape([2 ** 31]), out_dtype=nptf.int64),
+    dict(testcase_name=('tensorshape_with_large_dimension_with_int32'
+                        '_dtype_should_error'),
+         value=nptf.TensorShape([2 ** 31]), dtype=nptf.int32, error=ValueError)
+]
+
+if JAX_MODE:
+  CONVERT_TO_TENSOR_TESTS += [
+      # Tests for converting onp arrays to tensors
+      dict(testcase_name='float32',
+           value=onp.float32(1.), out_dtype=nptf.float32),
+      dict(testcase_name='float32_with_int32_dtype',
+           value=onp.float32(1.), dtype=nptf.int32, out_dtype=nptf.int32),
+      dict(testcase_name='float32_with_int32_hint',
+           value=onp.float64(1.), dtype_hint=nptf.int32, out_dtype=nptf.int32),
+      dict(testcase_name='empty_ndarray',
+           value=onp.array([]), out_dtype=nptf.float64),
+      dict(testcase_name='empty_float32_ndarray',
+           value=onp.array([], dtype=onp.float32), out_dtype=nptf.float32),
+      dict(testcase_name='empty_float64_ndarray_with_int32_dtype',
+           value=onp.array([], dtype=onp.float64), out_dtype=nptf.float32,
+           dtype=nptf.float32),
+      # NumPy arrays get cast
+      dict(testcase_name='float64_ndarray_to_int32',
+           value=onp.array([1], dtype=onp.float64), out_dtype=nptf.int32,
+           dtype=nptf.int32),
+      dict(testcase_name='complex64_ndarray_to_int32',
+           value=onp.array([1], dtype=onp.complex64), out_dtype=nptf.int32,
+           dtype=nptf.int32),
+      dict(testcase_name='complex128_ndarray_to_float32',
+           value=onp.array([1], dtype=onp.complex128), out_dtype=nptf.float32,
+           dtype=nptf.float32),
+      # JAX will error when trying to change dtypes of tensors
+      dict(testcase_name='int32_tensor_with_int64_dtype_should_error',
+           value=1, in_dtype=nptf.int32, dtype=nptf.int64, error=TypeError),
+      dict(testcase_name='int32_tensor_with_float64_dtype_should_error',
+           value=1, in_dtype=nptf.int32, dtype=nptf.float64, error=TypeError),
+  ]
+else:
+  CONVERT_TO_TENSOR_TESTS += [
+      # NumPy should not error when trying to change dtypes of tensors
+      dict(testcase_name='int32_tensor_with_int64_dtype_should_not_error',
+           value=1, in_dtype=nptf.int32, dtype=nptf.int64,
+           out_dtype=nptf.int64),
+      dict(testcase_name='int32_tensor_with_float64_dtype_should_not_error',
+           value=1, in_dtype=nptf.int32, dtype=nptf.float64,
+           out_dtype=nptf.float64),
+  ]
+
+
 class NumpyTest(test_util.TestCase):
 
-  def _base_test_convert_to_tensor(self, nmpy):
-    convert_to_tensor = numpy_backend.convert_to_tensor
-    self.assertEqual(
-        nmpy.complex64,
-        convert_to_tensor(nmpy.complex64(1 + 2j), dtype_hint=tf.int32).dtype)
-    self.assertEqual(
-        nmpy.complex64,
-        convert_to_tensor(nmpy.complex64(1 + 2j), dtype_hint=tf.float64).dtype)
-    self.assertEqual(nmpy.float64,
-                     convert_to_tensor(1., dtype_hint=tf.int32).dtype)
-    self.assertEqual(
-        nmpy.int32, convert_to_tensor(1, dtype_hint=tf.int32).dtype)
-    self.assertEqual(nmpy.float32,
-                     convert_to_tensor(1, dtype_hint=tf.float32).dtype)
-    self.assertEqual(nmpy.complex64,
-                     convert_to_tensor(1., dtype_hint=tf.complex64).dtype)
-    self.assertEqual(
-        nmpy.int64, convert_to_tensor(1, dtype_hint=tf.int64).dtype)
-    self.assertEqual(
-        nmpy.int32,
-        convert_to_tensor(nmpy.int32(False), dtype_hint=tf.bool).dtype)
+  @parameterized.named_parameters(CONVERT_TO_TENSOR_TESTS)
+  def test_convert_to_tensor(self, value=None, out_value=None, out_dtype=None,
+                             in_dtype=None, dtype=None, dtype_hint=None,
+                             error=None):
+    if in_dtype:
+      value = nptf.convert_to_tensor(value, dtype=in_dtype)
+    if not error:
+      out = nptf.convert_to_tensor(value, dtype=dtype, dtype_hint=dtype_hint)
+      if out_dtype:
+        self.assertEqual(out_dtype, out.dtype)
+      if out_value is not None:
+        self.assertEqual(out_value, out)
+    else:
+      with self.assertRaises(error):
+        nptf.convert_to_tensor(value, dtype=dtype, dtype_hint=dtype_hint)
 
-  def test_convert_to_tensor(self):
-    self._base_test_convert_to_tensor(np)
+  def test_concat_infers_dtype(self):
+    self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)
+    self.assertEqual(np.float32, nptf.concat([[], [1]], 0).dtype)
 
-  def test_convert_to_tensor_numpy_array(self):
+  def test_concat_ignores_onp_dtype(self):
     if not JAX_MODE:
-      self.skipTest('Check non-device arrays in JAX.')
-    self._base_test_convert_to_tensor(onp)
+      self.skipTest('Test only applies to JAX backend.')
+    self.assertEqual(
+        nptf.float32, nptf.concat([onp.zeros(1), nptf.zeros(1)], 0).dtype)
 
-  def test_convert_to_tensor_scalar_default(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
-    self.assertEqual(np.complex128, convert_to_tensor(1. + 2j).dtype)
-    self.assertEqual(np.float32, convert_to_tensor(1.).dtype)
-    self.assertEqual(np.int32, convert_to_tensor(1).dtype)
+  def test_reduce_logsumexp_errors_on_int_dtype(self):
+    with self.assertRaises(TypeError):
+      nptf.reduce_logsumexp(nptf.convert_to_tensor([1, 2, 3], dtype=nptf.int32))
 
-  def test_convert_to_tensor_dimension(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
-    shape = tf1.Dimension(1)
-
-    tensor_shape = convert_to_tensor(shape)
-    self.assertNotIsInstance(tensor_shape, tf1.Dimension)
-
-  def test_convert_to_tensor_tensorshape(self):
-    convert_to_tensor = numpy_backend.convert_to_tensor
-    shape = tf.TensorShape((1, 2))
-
-    tensor_shape = convert_to_tensor(shape)
-    for dim in tensor_shape:
-      self.assertNotIsInstance(dim, tf1.Dimension)
-
-    shape = tf.TensorShape((1, 2, 3))[:2]
-    tensor_shape = convert_to_tensor(shape)
-
-    for dim in tensor_shape:
-      self.assertNotIsInstance(dim, tf1.Dimension)
-
-  @test_util.numpy_disable_gradient_test
   def test_while_loop_gradients(self):
+    if not JAX_MODE:
+      self.skipTest('Cannot take gradients in NumPy.')
 
     def _fn(x):
 
@@ -981,12 +1303,130 @@ class NumpyTest(test_util.TestCase):
       def _body_fn(i, val):
         return i + 1, val + 1.
 
-      return numpy_backend.while_loop(
+      return nptf.while_loop(
           cond=_cond_fn, body=_body_fn, loop_vars=(0, x),
           maximum_iterations=5)[1]
 
     _, grad = tfp.math.value_and_gradient(_fn, 0.)
     self.assertIsNotNone(grad)
+
+  def test_scan_no_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(lambda x, y: x + y, elems)),
+        nptf.scan(lambda x, y: x + y, elems))
+
+  def test_scan_with_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(lambda x, y: x + y, elems, initializer=7)),
+        nptf.scan(lambda x, y: x + y, elems, initializer=7))
+
+  def test_scan_with_struct(self):
+    elems = np.arange(5).astype(np.int32)
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y, x[1] - y), elems, initializer=(7, 3))),
+        nptf.scan(lambda x, y: (x[0] + y, x[1] - y), elems, initializer=(7, 3)))
+
+  def test_scan_with_struct_elems(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = (np.int32([7, 8]), np.int32([9, 1]))
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init)),
+        nptf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init))
+
+  def test_scan_with_struct_elems_reverse(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = (np.int32([7, 8]), np.int32([9, 1]))
+    self.assertAllEqual(
+        self.evaluate(tf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init,
+            reverse=True)),
+        nptf.scan(
+            lambda x, y: (x[0] + y[0], x[1] - y[1]), elems, initializer=init,
+            reverse=True))
+
+  def test_foldl_no_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    fn = lambda x, y: x + y
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems)),
+        nptf.foldl(fn, elems))
+
+  def test_foldl_initializer(self):
+    elems = np.arange(5).astype(np.int32)
+    fn = lambda x, y: x + y
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems, initializer=7)),
+        nptf.foldl(fn, elems, initializer=7))
+
+  def test_foldl_struct(self):
+    elems = np.arange(5).astype(np.int32)
+    fn = lambda x, y: (x[0] + y, x[1] - y)
+    init = (0, 0)
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems, initializer=init)),
+        nptf.foldl(fn, elems, initializer=init))
+
+  def test_foldl_struct_mismatched(self):
+    elems = (np.arange(3).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = np.zeros_like(elems[1][0])
+    fn = lambda x, y_z: x + y_z[0] - y_z[1]
+    with self.assertRaisesRegexp(ValueError, r'.*size.*'):
+      nptf.foldl(fn, elems, initializer=init)
+
+  def test_foldl_struct_in_single_out(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = np.zeros_like(elems[1][0])
+    fn = lambda x, y_z: x + y_z[0] - y_z[1]
+    self.assertAllEqual(
+        self.evaluate(tf.foldl(fn, elems, initializer=init)),
+        nptf.foldl(fn, elems, initializer=init))
+
+  def test_foldl_struct_in_alt_out(self):
+    elems = (np.arange(5).astype(np.int32),
+             np.arange(10).astype(np.int32).reshape(5, 2))
+    init = dict(a=np.int32(0),
+                b=np.zeros_like(elems[1][0]),
+                c=np.zeros_like(elems[1][0]))
+    fn = lambda x, y_z: dict(a=x['a'] + y_z[0], b=x['b'] + y_z[1], c=y_z[1])
+    self.assertAllEqualNested(
+        self.evaluate(tf.foldl(fn, elems, initializer=init)),
+        nptf.foldl(fn, elems, initializer=init))
+
+  def test_pfor(self):
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(lambda x: tf.ones([]), 7)),
+        np_pfor.pfor(lambda x: nptf.ones([]), 7))
+
+  def test_pfor_with_closure(self):
+    val = np.arange(7.)[:, np.newaxis]
+    tf_val = tf.constant(val)
+    def tf_fn(x):
+      return tf.gather(tf_val, x)**2
+    def np_fn(x):
+      return nptf.gather(val, x)**2
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        np_pfor.pfor(np_fn, 7))
+
+  def test_pfor_with_closure_multi_out(self):
+    val = np.arange(7.)[:, np.newaxis]
+    tf_val = tf.constant(val)
+    def tf_fn(x):
+      return tf.gather(tf_val, x)**2, tf.gather(tf_val, x)
+    def np_fn(x):
+      return nptf.gather(val, x)**2, nptf.gather(val, x)
+    self.assertAllEqual(
+        self.evaluate(tf_pfor.pfor(tf_fn, 7)),
+        np_pfor.pfor(np_fn, 7))
 
   def evaluate(self, tensors):
     if tf.executing_eagerly():
@@ -1022,11 +1462,12 @@ class NumpyTest(test_util.TestCase):
                       strategy_list,
                       atol=1e-5,
                       rtol=1e-5,
-                      jax_disabled=False,
+                      disabled=False,
                       assert_shape_only=False,
+                      post_processor=None,
                       jax_kwargs=lambda: {}):
-    if jax_disabled and JAX_MODE:
-      self.skipTest('Test is disabled for JAX')
+    if disabled:
+      self.skipTest('Test is disabled.')
     for strategy in strategy_list:
       @hp.settings(deadline=None,
                    max_examples=10,
@@ -1048,6 +1489,15 @@ class NumpyTest(test_util.TestCase):
 
         kwargs.update(jax_kwargs() if JAX_MODE else {})
         numpy_value = np_fn(*args, **kwargs)
+        if post_processor is not None:
+          numpy_value = post_processor(numpy_value)
+          tensorflow_value = post_processor(tensorflow_value)
+
+        def assert_same_dtype(x, y):
+          self.assertEqual(dtype_util.as_numpy_dtype(x.dtype),
+                           dtype_util.as_numpy_dtype(y.dtype))
+        tf.nest.map_structure(assert_same_dtype, tensorflow_value, numpy_value)
+
         if assert_shape_only:
 
           def assert_same_shape(x, y):

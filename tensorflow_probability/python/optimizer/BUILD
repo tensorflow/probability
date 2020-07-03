@@ -31,6 +31,17 @@ multi_substrate_py_library(
     name = "optimizer",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":bfgs",
+        ":bfgs_utils",
+        ":differential_evolution",
+        ":lbfgs",
+        ":nelder_mead",
+        ":proximal_hessian_sparse",
+        ":sgld",
+        ":variational_sgd",
+        "//tensorflow_probability/python/optimizer/convergence_criteria",
+    ],
     deps = [
         ":bfgs",
         ":differential_evolution",
@@ -58,8 +69,6 @@ multi_substrate_py_test(
     name = "sgld_test",
     size = "medium",
     srcs = ["sgld_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,

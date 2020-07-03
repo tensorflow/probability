@@ -18,18 +18,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
+import contextlib
+import importlib
+import logging
+import types
+
 import numpy as np
 
-from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
-from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import random_ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 
 __all__ = [
     'parameterized_truncated_normal',
-    'prevent_gradient'
+    'prevent_gradient',
+    'remove_undocumented',
 ]
 
 
@@ -72,8 +75,72 @@ def _parameterized_truncated_normal(shape, means=0., stddevs=1.,
 
   raise NotImplementedError
 
+
+def remove_undocumented(module_name, allowed_exception_list=None,  # pylint: disable=unused-argument
+                        doc_string_modules=None):  # pylint: disable=unused-argument
+  pass
+
+
+def GraphOrParentsInXlaContext(*args, **kwargs):  # pylint: disable=invalid-name
+  del args, kwargs
+  return True
+
+
+def numpy_text(tensor, is_repr=False):
+  if is_repr:
+    return repr(tensor)
+  return str(tensor)
+
+
+@contextlib.contextmanager
+def eager_mode():
+  yield
+
+
+class LazyLoader(types.ModuleType):
+  """Reimplementation of TF's LazyLoader."""
+
+  def __init__(self, local_name, parent_module_globals, name, warning=None):  # pylint: disable=super-on-old-class
+    self._local_name = local_name
+    self._parent_module_globals = parent_module_globals
+    self._warning = warning
+
+    super(LazyLoader, self).__init__(name)
+
+  def _load(self):
+    """Load the module and insert it into the parent's globals."""
+    # Import the target module and insert it into the parent's namespace
+    module = importlib.import_module(self.__name__)
+    self._parent_module_globals[self._local_name] = module
+
+    # Emit a warning if one was specified
+    if self._warning:
+      logging.warning(self._warning)
+      # Make sure to only warn once.
+      self._warning = None
+
+    # Update this object's dict so that if someone keeps a reference to the
+    #   LazyLoader, lookups are efficient (__getattr__ is only called on lookups
+    #   that fail).
+    self.__dict__.update(module.__dict__)
+
+    return module
+
+  def __getattr__(self, item):
+    module = self._load()
+    return getattr(module, item)
+
+  def __dir__(self):
+    module = self._load()
+    return dir(module)
+
+
+def max_error(*args, **kwargs):
+  del args, kwargs
+  raise NotImplementedError
+
 parameterized_truncated_normal = utils.copy_docstring(
-    random_ops.parameterized_truncated_normal,
+    'random_ops.parameterized_truncated_normal',
     _parameterized_truncated_normal)
 
 
@@ -81,5 +148,5 @@ def _prevent_gradient(input, message='', name=None):  # pylint: disable=unused-a
   raise NotImplementedError
 
 prevent_gradient = utils.copy_docstring(
-    array_ops.prevent_gradient,
+    'array_ops.prevent_gradient',
     _prevent_gradient)

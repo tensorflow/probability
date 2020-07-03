@@ -196,13 +196,22 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     # Eliminate cached classes, forcing breakage on load.
     clsid_registry.clear()
     with self.assertRaisesRegexp(
-        ValueError, r'For non-builtin.*call `as_composite` before'):
+        ValueError, r'For user-defined.*decorated.*register_composite'):
       tf.saved_model.load(os.path.join(path, 'saved_model1'))
 
     tfp.experimental.as_composite(Normal(0, 1))
     # Now warmed-up, loading should work.
     m2 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
     self.evaluate(m2.make_dist().sample())
+
+    # Eliminate cached classes again, but now register Normal as if it had been
+    # decorated from the beginning.
+    clsid_registry.clear()
+    self.assertEqual(Normal, tfp.experimental.register_composite(Normal))
+
+    # Loading should work again.
+    m3 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
+    self.evaluate(m3.make_dist().sample())
 
   def test_not_implemented(self):
     with self.assertRaisesRegexp(NotImplementedError,

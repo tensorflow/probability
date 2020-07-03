@@ -23,6 +23,7 @@ import decorator
 import numpy as np
 import numpy as onp  # Avoid jax rewrite  # pylint: disable=reimported
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
@@ -41,6 +42,14 @@ from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-t
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 JAX_MODE = False
+
+# Enable converting TF TensorShape and Dimension into np.array. This allows TF
+# code to pass TensorShapes into prefer_static functions. We can also re-use the
+# nptf methods.
+nptf.register_tensor_conversion_function(
+    tf1.Dimension, nptf.ops._convert_dimension_to_tensor)  # pylint: disable=protected-access
+nptf.register_tensor_conversion_function(
+    tf.TensorShape, nptf.ops._convert_tensorshape_to_tensor)  # pylint: disable=protected-access
 
 
 def _prefer_static(original_fn, static_fn):
@@ -398,21 +407,35 @@ def is_numpy(x):
 # The following functions only work in numpy if the inputs' *values are known
 # statically*. Often (e.g., above) we dont need static values, just static
 # properties.
+abs = _prefer_static(tf.abs, nptf.abs)  # pylint: disable=redefined-builtin
 add = _prefer_static(tf.add, nptf.add)
+argmax = _prefer_static(tf.math.argmax, nptf.math.argmax)
+argmin = _prefer_static(tf.math.argmin, nptf.math.argmin)
 argsort = _prefer_static(tf.argsort, nptf.argsort)
+broadcast_to = _prefer_static(tf.broadcast_to, nptf.broadcast_to)
 cast = _prefer_static(tf.cast, nptf.cast)
+ceil = _prefer_static(tf.math.ceil, nptf.math.ceil)
 concat = _prefer_static(tf.concat, nptf.concat)
+cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
+cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)
+expm1 = _prefer_static(tf.math.expm1, nptf.math.expm1)
+floor = _prefer_static(tf.math.floor, nptf.math.floor)
 gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)
+is_finite = _prefer_static(tf.math.is_finite, nptf.math.is_finite)
+is_inf = _prefer_static(tf.math.is_inf, nptf.math.is_inf)
+is_nan = _prefer_static(tf.math.is_nan, nptf.math.is_nan)
 less = _prefer_static(tf.less, nptf.less)
 log = _prefer_static(tf.math.log, nptf.math.log)
+log1p = _prefer_static(tf.math.log1p, nptf.math.log1p)
 logical_and = _prefer_static(tf.logical_and, nptf.logical_and)
 logical_not = _prefer_static(tf.logical_not, nptf.logical_not)
 logical_or = _prefer_static(tf.logical_or, nptf.logical_or)
 maximum = _prefer_static(tf.maximum, nptf.maximum)
 minimum = _prefer_static(tf.minimum, nptf.minimum)
+nextafter = _prefer_static(tf.math.nextafter, nptf.math.nextafter)
 one_hot = _prefer_static(tf.one_hot, nptf.one_hot)
 ones = _prefer_static(tf.ones, nptf.ones)
 pad = _prefer_static(tf.pad, nptf.pad)
@@ -424,6 +447,8 @@ reduce_min = _prefer_static(tf.reduce_min, nptf.reduce_min)
 reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
+round = _prefer_static(tf.math.round, nptf.math.round)  # pylint: disable=redefined-builtin
+rsqrt = _prefer_static(tf.math.rsqrt, nptf.math.rsqrt)
 sort = _prefer_static(tf.sort, nptf.sort)
 split = _prefer_static(tf.split, nptf.split)
 sqrt = _prefer_static(tf.sqrt, nptf.sqrt)
@@ -434,6 +459,7 @@ tensor_scatter_nd_sub = _prefer_static(
     tf.tensor_scatter_nd_sub, nptf.tensor_scatter_nd_sub)
 tensor_scatter_nd_update = _prefer_static(
     tf.tensor_scatter_nd_update, nptf.tensor_scatter_nd_update)
+top_k = _prefer_static(tf.math.top_k, nptf.math.top_k)
 unique = _prefer_static(tf.unique, nptf.unique)
 unstack = _prefer_static(tf.unstack, nptf.unstack)
 where = _prefer_static(tf.where, nptf.where)

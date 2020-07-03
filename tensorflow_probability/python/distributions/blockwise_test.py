@@ -61,9 +61,9 @@ class BlockwiseTest(test_util.TestCase):
     y = d.log_prob(x)
     x_, y_ = self.evaluate([x, y])
     self.assertEqual((2, 1, 4 + 2), x_.shape)
-    self.assertIs(tf.float32, x.dtype)
+    self.assertDTypeEqual(x, np.float32)
     self.assertEqual((2, 1), y_.shape)
-    self.assertIs(tf.float32, y.dtype)
+    self.assertDTypeEqual(y, np.float32)
 
     self.assertAllClose(
         np.zeros((6,), dtype=np.float32), self.evaluate(d.mean()))
@@ -84,9 +84,9 @@ class BlockwiseTest(test_util.TestCase):
     y = d.log_prob(x)
     x_, y_ = self.evaluate([x, y])
     self.assertEqual((2, 1, 2 + 1 + 1 + 1), x_.shape)
-    self.assertIs(tf.float32, x.dtype)
+    self.assertDTypeEqual(x, np.float32)
     self.assertEqual((2, 1), y_.shape)
-    self.assertIs(tf.float32, y.dtype)
+    self.assertDTypeEqual(y, np.float32)
 
   def testSampleReproducible(self):
     Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
@@ -99,9 +99,12 @@ class BlockwiseTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(model)
     d = tfd.Blockwise(joint, validate_args=True)
+    seed = test_util.test_seed()
 
-    x = d.sample([2, 1], seed=_set_seed(42))
-    y = d.sample([2, 1], seed=_set_seed(42))
+    tf.random.set_seed(seed)
+    x = d.sample([2, 1], seed=seed)
+    tf.random.set_seed(seed)
+    y = d.sample([2, 1], seed=seed)
     x_, y_ = self.evaluate([x, y])
     self.assertAllClose(x_, y_)
 

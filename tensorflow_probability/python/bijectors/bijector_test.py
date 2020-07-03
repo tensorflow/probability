@@ -210,11 +210,7 @@ class BijectorCachingTest(test_util.TestCase):
     # Call forward and forward_log_det_jacobian one-by-one (not together).
     y = forward_only_bijector.forward(x)
     _ = forward_only_bijector.forward_log_det_jacobian(x, event_ndims=0)
-    if tf.executing_eagerly():
-      self.assertIsNot(y, forward_only_bijector.forward(x))
-    else:
-      self.assertIs(y, forward_only_bijector.forward(x))
-
+    self.assertIs(y, forward_only_bijector.forward(x))
     # Now, everything should be cached if the argument `is y`, so these are ok.
     forward_only_bijector.inverse(y)
     forward_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
@@ -233,10 +229,7 @@ class BijectorCachingTest(test_util.TestCase):
     # Call inverse and inverse_log_det_jacobian one-by-one (not together).
     x = inverse_only_bijector.inverse(y)
     _ = inverse_only_bijector.inverse_log_det_jacobian(y, event_ndims=0)
-    if tf.executing_eagerly():
-      self.assertIsNot(x, inverse_only_bijector.inverse(y))
-    else:
-      self.assertIs(x, inverse_only_bijector.inverse(y))
+    self.assertIs(x, inverse_only_bijector.inverse(y))
 
     # Now, everything should be cached if the argument `is x`.
     inverse_only_bijector.forward(x)
@@ -251,7 +244,7 @@ class BijectorCachingTest(test_util.TestCase):
 
     # We tolerate leaking tensor references in graph mode only.
     expected_live = 1 if tf.executing_eagerly() else niters
-    self.assertEqual(expected_live, len(bijector._from_x))
+    self.assertEqual(expected_live, len(bijector._cache.forward))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -351,6 +344,10 @@ class BijectorLDJCachingTest(test_util.TestCase):
 class NumpyArrayCaching(test_util.TestCase):
 
   def test_caches(self):
+    # We need to call convert_to_tensor on outputs to make sure scalar
+    # outputs from the numpy backend are wrapped correctly. We could just
+    # directly wrap numpy scalars with np.array, but it would look pretty
+    # out of place, considering that the numpy backend is still private.
     if mock is None:
       return
 
@@ -365,14 +362,16 @@ class NumpyArrayCaching(test_util.TestCase):
       with mock.patch.object(tf, 'exp', return_value=y_):
         y = b.forward(x_)
         self.assertIsInstance(y, np.ndarray)
-        self.assertAllEqual([x_], [k() for k in b._from_x.keys()])
+        self.assertAllEqual([x_],
+                            [k() for k in b._cache.forward.weak_keys()])
 
     with mock.patch.object(tf, 'convert_to_tensor', return_value=y_):
       with mock.patch.object(tf.math, 'log', return_value=x_):
         x = b.inverse(y_)
         self.assertIsInstance(x, np.ndarray)
         self.assertIs(x, b.inverse(y))
-        self.assertAllEqual([y_], [k() for k in b._from_y.keys()])
+        self.assertAllEqual([y_],
+                            [k() for k in b._cache.inverse.weak_keys()])
 
     yt_ = y_.T
     xt_ = x_.T
@@ -386,12 +385,14 @@ class NumpyArrayCaching(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class TfModuleTest(test_util.TestCase):
 
+  @test_util.jax_disable_variable_test
   def test_variable_tracking(self):
     x = tf.Variable(1.)
     b = ForwardOnlyBijector(scale=x, validate_args=True)
     self.assertIsInstance(b, tf.Module)
     self.assertEqual((x,), b.trainable_variables)
 
+  @test_util.jax_disable_variable_test
   def test_gradient(self):
     x = tf.Variable(1.)
     b = InverseOnlyBijector(scale=x, validate_args=True)

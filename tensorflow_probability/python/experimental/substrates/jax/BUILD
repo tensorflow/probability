@@ -19,6 +19,7 @@ licenses(["notice"])  # Apache 2.0
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
+        "//discussion/fun_mcmc:__subpackages__",
     ],
 )
 
@@ -30,11 +31,14 @@ py_library(
     deps = [
         "//tensorflow_probability/python/experimental/substrates/jax/bijectors",
         "//tensorflow_probability/python/experimental/substrates/jax/distributions",
+        "//tensorflow_probability/python/experimental/substrates/jax/experimental",
         "//tensorflow_probability/python/experimental/substrates/jax/internal",
         "//tensorflow_probability/python/experimental/substrates/jax/stats",
         "//tensorflow_probability/python/experimental/substrates/jax/util",
         "//tensorflow_probability/python/internal/backend",
+        "//tensorflow_probability/python/math:math.jax",
         "//tensorflow_probability/python/mcmc:mcmc.jax",
         "//tensorflow_probability/python/optimizer:optimizer.jax",
+        "//tensorflow_probability/python/random:random.jax",
     ],
 )

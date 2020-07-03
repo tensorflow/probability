@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -29,8 +31,17 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
+
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls won't trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*mixture',
+                        append=True)  # Don't override user-set filters.
 
 
 class Mixture(distribution.Distribution):
@@ -143,7 +154,14 @@ class Mixture(distribution.Distribution):
                                                    d.batch_shape):
           raise ValueError(
               'components[{}] batch shape must be compatible with cat '
-              'shape and other component batch shapes'.format(di))
+              'shape and other component batch shapes ({} vs {})'.format(
+                  di, static_batch_shape, d.batch_shape))
+        if not tensorshape_util.is_compatible_with(static_event_shape,
+                                                   d.event_shape):
+          raise ValueError(
+              'components[{}] event shape must be compatible with other '
+              'component event shapes ({} vs {})'.format(
+                  di, static_event_shape, d.event_shape))
         static_event_shape = tensorshape_util.merge_with(
             static_event_shape, d.event_shape)
         static_batch_shape = tensorshape_util.merge_with(
@@ -275,6 +293,12 @@ class Mixture(distribution.Distribution):
     return mixture_log_cdf
 
   def _sample_n(self, n, seed=None):
+    seeds = samplers.split_seed(seed, n=self.num_components + 1, salt='Mixture')
+    try:
+      seed_stream = SeedStream(seed, salt='Mixture')
+    except TypeError as e:  # Can happen for Tensor seed.
+      seed_stream = None
+      seed_stream_err = e
     if self._use_static_graph:
       # This sampling approach is almost the same as the approach used by
       # `MixtureSameFamily`. The differences are due to having a list of
@@ -282,11 +306,27 @@ class Mixture(distribution.Distribution):
       # random seed management that is consistent with the non-static code
       # path.
       samples = []
-      cat_samples = self.cat.sample(n, seed=seed)
-      stream = SeedStream(seed, salt='Mixture')
+      cat_samples = self.cat.sample(n, seed=seeds[0])
 
       for c in range(self.num_components):
-        samples.append(self.components[c].sample(n, seed=stream()))
+        try:
+          samples.append(self.components[c].sample(n, seed=seeds[c + 1]))
+          if seed_stream is not None:
+            seed_stream()
+        except TypeError as e:
+          if ('Expected int for argument' not in str(e) and
+              TENSOR_SEED_MSG_PREFIX not in str(e)):
+            raise
+          if seed_stream is None:
+            raise seed_stream_err
+          msg = (
+              'Falling back to stateful sampling for `components[{}]` {} of '
+              'type `{}`. Please update to use `tf.random.stateless_*` RNGs. '
+              'This fallback may be removed after 20-Aug-2020. ({})')
+          warnings.warn(msg.format(c, self.components[c].name,
+                                   type(self.components[c]),
+                                   str(e)))
+          samples.append(self.components[c].sample(n, seed=seed_stream()))
       stack_axis = -1 - tensorshape_util.rank(self._static_event_shape)
       x = tf.stack(samples, axis=stack_axis)  # [n, B, k, E]
       npdt = dtype_util.as_numpy_dtype(x.dtype)
@@ -303,7 +343,7 @@ class Mixture(distribution.Distribution):
     n = tf.convert_to_tensor(n, name='n')
     static_n = tf.get_static_value(n)
     n = int(static_n) if static_n is not None else n
-    cat_samples = self.cat.sample(n, seed=seed)
+    cat_samples = self.cat.sample(n, seed=seeds[0])
 
     static_samples_shape = cat_samples.shape
     if tensorshape_util.is_fully_defined(static_samples_shape):
@@ -364,12 +404,28 @@ class Mixture(distribution.Distribution):
         num_partitions=self.num_components)
     samples_class = [None for _ in range(self.num_components)]
 
-    stream = SeedStream(seed, salt='Mixture')
-
     for c in range(self.num_components):
       n_class = tf.size(partitioned_samples_indices[c])
-      samples_class_c = self.components[c].sample(
-          n_class, seed=stream())
+      try:
+        samples_class_c = self.components[c].sample(
+            n_class, seed=seeds[c + 1])
+        if seed_stream is not None:
+          seed_stream()
+      except TypeError as e:
+        if ('Expected int for argument' not in str(e) and
+            TENSOR_SEED_MSG_PREFIX not in str(e)):
+          raise
+        if seed_stream is None:
+          raise seed_stream_err
+        msg = (
+            'Falling back to stateful sampling for `components[{}]` {} of '
+            'type `{}`. Please update to use `tf.random.stateless_*` RNGs. '
+            'This fallback may be removed after 20-Aug-2020. ({})')
+        warnings.warn(msg.format(c, self.components[c].name,
+                                 type(self.components[c]),
+                                 str(e)))
+        samples_class_c = self.components[c].sample(
+            n_class, seed=seed_stream())
 
       if event_shape is None:
         batch_ndims = prefer_static.rank_from_shape(batch_shape)

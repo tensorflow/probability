@@ -38,6 +38,16 @@ class RandomTest(test_util.TestCase):
       self.assertAllEqual(seed1, seed2)
 
   @test_util.substrate_disable_stateful_random_test
+  def test_sanitize_then_split_equivalent_split_int(self):
+    seed = test_util.test_seed()
+    sanitized = samplers.sanitize_seed(seed, salt='please pass the')
+    s1 = samplers.split_seed(sanitized, n=3)
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
+    s2 = samplers.split_seed(seed, n=3, salt='please pass the')
+    self.assertAllAssertsNested(self.assertAllEqual, s1, s2)
+
+  @test_util.substrate_disable_stateful_random_test
   def test_sanitize_none(self):
     seed1 = samplers.sanitize_seed(seed=None)
     seed2 = samplers.sanitize_seed(seed=None)
@@ -82,34 +92,37 @@ class RandomTest(test_util.TestCase):
            kwargs=dict(shape=[2])),
       dict(testcase_name='_poisson',
            sampler=samplers.poisson,
-           kwargs=dict(shape=[2, 3], lam=[1.5, 5.5, 8.5]),
-           tf_kwargs=dict(shape=[2], lam=[1.5, 5.5, 8.5])),
+           kwargs=dict(shape=[2, 3], lam=[1.5, 5.5, 8.5])),
+      dict(testcase_name='_poisson_scalar',
+           sampler=samplers.poisson,
+           kwargs=dict(shape=[], lam=[1.5, 5.5, 8.5])),
       dict(testcase_name='_shuffle',
            sampler=samplers.shuffle,
            kwargs=dict(value=list(range(10)))),
       dict(testcase_name='_uniform',
            sampler=samplers.uniform,
            kwargs=dict(shape=[2])))
-  def test_sampler(self, sampler, kwargs, tf_kwargs=None):
-    tf_kwargs = kwargs if tf_kwargs is None else kwargs
+  def test_sampler(self, sampler, kwargs):
     s1 = sampler(seed=(1, 2), **kwargs)
     s2 = sampler(seed=(1, 2), **kwargs)
     self.assertAllEqual(s1, s2)
+    self.verify_tf_behavior_match(sampler, kwargs)
 
-    # Avoid testing these scenarios for numpy, jax, where we don't support
+  @test_util.substrate_disable_stateful_random_test
+  def verify_tf_behavior_match(self, sampler, kwargs):
+    # We don't test these scenarios for numpy, jax, where we don't support
     # stateful sampling.
-    if hasattr(tf.random, sampler.__name__):
-      s1 = sampler(seed=123, **kwargs)
-      s2 = sampler(seed=123, **kwargs)
-      tf_sampler = getattr(tf.random, sampler.__name__)
-      tf_s1 = tf_sampler(seed=123, **kwargs)
-      tf_s2 = tf_sampler(seed=123, **kwargs)
-      if tf.executing_eagerly():
-        self.assertNotAllEqual(s1, s2)
-        self.assertNotAllEqual(tf_s1, tf_s2)
-      else:
-        self.assertAllEqual(s1, s2)
-        self.assertAllEqual(tf_s1, tf_s2)
+    s1 = sampler(seed=123, **kwargs)
+    s2 = sampler(seed=123, **kwargs)
+    tf_sampler = getattr(tf.random, sampler.__name__)
+    tf_s1 = tf_sampler(seed=123, **kwargs)
+    tf_s2 = tf_sampler(seed=123, **kwargs)
+    if tf.executing_eagerly():
+      self.assertNotAllEqual(s1, s2)
+      self.assertNotAllEqual(tf_s1, tf_s2)
+    else:
+      self.assertAllEqual(s1, s2)
+      self.assertAllEqual(tf_s1, tf_s2)
 
 
 if __name__ == '__main__':

@@ -26,8 +26,8 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -222,23 +222,23 @@ class Zipf(distribution.Distribution):
     power = tf.convert_to_tensor(self.power)
     shape = tf.concat([[n], tf.shape(power)], axis=0)
 
-    has_seed = seed is not None
-    seed = SeedStream(seed, salt='zipf')
+    seed = samplers.sanitize_seed(seed, salt='zipf')
 
     minval_u = self._hat_integral(0.5, power=power) + 1.
     maxval_u = self._hat_integral(
         dtype_util.max(tf.int64) - 0.5, power=power)
 
-    def loop_body(should_continue, k):
+    def loop_body(should_continue, k, seed):
       """Resample the non-accepted points."""
+      u_seed, next_seed = samplers.split_seed(seed)
       # The range of U is chosen so that the resulting sample K lies in
       # [0, tf.int64.max). The final sample, if accepted, is K + 1.
-      u = tf.random.uniform(
+      u = samplers.uniform(
           shape,
           minval=minval_u,
           maxval=maxval_u,
           dtype=power.dtype,
-          seed=seed())
+          seed=u_seed)
 
       # Sample the point X from the continuous density h(x) \propto x^(-power).
       x = self._hat_integral_inverse(u, power=power)
@@ -263,16 +263,16 @@ class Zipf(distribution.Distribution):
       accept = (u <= self._hat_integral(k + .5, power=power) + tf.exp(
           self._log_prob(k + 1, power=power)))
 
-      return [should_continue & (~accept), k]
+      return [should_continue & (~accept), k, next_seed]
 
-    should_continue, samples = tf.while_loop(
+    should_continue, samples, _ = tf.while_loop(
         cond=lambda should_continue, *ignore: tf.reduce_any(should_continue),
         body=loop_body,
         loop_vars=[
             tf.ones(shape, dtype=tf.bool),  # should_continue
             tf.zeros(shape, dtype=power.dtype),  # k
+            seed,  # seed
         ],
-        parallel_iterations=1 if has_seed else 10,
         maximum_iterations=self.sample_maximum_iterations,
     )
     samples = samples + 1.

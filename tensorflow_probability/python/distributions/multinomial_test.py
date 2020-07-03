@@ -16,12 +16,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import unittest
+
 # Dependency imports
+from absl.testing import parameterized
+import hypothesis as hp
+from hypothesis import strategies as hps
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
+from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -190,6 +198,12 @@ class MultinomialTest(test_util.TestCase):
     self.evaluate(pmf)
     self.assertEqual((4, 3), pmf.shape)
 
+  def testPmfZeros(self):
+    dist = tfd.Multinomial(1000, probs=[0.7, 0.0, 0.3], validate_args=True)
+    x = [489, 0, 511]
+    dist2 = tfd.Binomial(1000, probs=0.7)
+    self.assertAllClose(dist2.log_prob(x[0]), dist.log_prob(x), rtol=1e-5)
+
   def testMultinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
@@ -241,6 +255,9 @@ class MultinomialTest(test_util.TestCase):
     self.assertEqual((6, 3, 3, 3), covariance2.shape)
 
   def testCovarianceFromSampling(self):
+    if tf.executing_eagerly():
+      raise unittest.SkipTest(
+          'testCovarianceFromSampling is too slow to test in Eager mode')
     # We will test mean, cov, var, stddev on a Multinomial constructed via
     # broadcast between alpha, n.
     theta = np.array([[1., 2, 3],
@@ -249,7 +266,7 @@ class MultinomialTest(test_util.TestCase):
     n = np.array([[10., 9.], [8., 7.], [6., 5.]], dtype=np.float32)
     # batch_shape=[3, 2], event_shape=[3]
     dist = tfd.Multinomial(n, theta, validate_args=True)
-    x = dist.sample(int(1000e3), seed=test_util.test_seed())
+    x = dist.sample(int(100e3), seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean[tf.newaxis, ...]
     sample_cov = tf.reduce_mean(
@@ -276,10 +293,10 @@ class MultinomialTest(test_util.TestCase):
         dist.variance(),
         dist.stddev(),
     ])
-    self.assertAllClose(sample_mean_, analytic_mean, atol=0.01, rtol=0.01)
-    self.assertAllClose(sample_cov_, analytic_cov, atol=0.01, rtol=0.01)
-    self.assertAllClose(sample_var_, analytic_var, atol=0.01, rtol=0.01)
-    self.assertAllClose(sample_stddev_, analytic_stddev, atol=0.01, rtol=0.01)
+    self.assertAllClose(sample_mean_, analytic_mean, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_cov_, analytic_cov, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_var_, analytic_var, atol=0.1, rtol=0.1)
+    self.assertAllClose(sample_stddev_, analytic_stddev, atol=0.1, rtol=0.1)
 
   def testSampleUnbiasedNonScalarBatch(self):
     dist = tfd.Multinomial(
@@ -315,7 +332,7 @@ class MultinomialTest(test_util.TestCase):
         total_count=5.,
         logits=tf.math.log(2. * self._rng.rand(4).astype(np.float32)),
         validate_args=True)
-    n = int(5e3)
+    n = int(3e4)
     x = dist.sample(n, seed=test_util.test_seed())
     sample_mean = tf.reduce_mean(x, axis=0)
     x_centered = x - sample_mean  # Already transposed to [n, 2].
@@ -337,6 +354,58 @@ class MultinomialTest(test_util.TestCase):
     self.assertAllEqual([4, 4], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
+
+  def propSampleCorrectMarginals(
+      self, dist, special_class, under_hypothesis=False):
+    # Property: When projected on one class, multinomial should sample the
+    # binomial distribution.
+    seed = test_util.test_seed()
+    num_samples = 120000
+    needed = self.evaluate(st.min_num_samples_for_dkwm_cdf_test(
+        0.02, false_fail_rate=1e-9, false_pass_rate=1e-9))
+    self.assertGreater(num_samples, needed)
+    samples = dist.sample(num_samples, seed=seed)
+    successes = samples[..., special_class]
+    prob_success = dist._probs_parameter_no_checks()[..., special_class]
+    if under_hypothesis:
+      hp.note('Expected probability of success {}'.format(prob_success))
+      hp.note('Successes obtained {}'.format(successes))
+    expected_dist = tfd.Binomial(dist.total_count, probs=prob_success)
+    self.evaluate(st.assert_true_cdf_equal_by_dkwm(
+        successes, expected_dist.cdf,
+        st.left_continuous_cdf_discrete_distribution(expected_dist),
+        false_fail_rate=1e-9))
+
+  @parameterized.parameters(
+      (50., [0.25, 0.25, 0.25, 0.25], 2),
+      ([0., 1., 25., 100.], [0., 0.1, 0.35, 0.55], 0),
+      ([0., 1., 25., 100.], [0., 0.1, 0.35, 0.55], 1),
+      ([0., 1., 25., 100.], [0., 0.1, 0.35, 0.55], 2),
+  )
+  def testSampleCorrectMarginals(self, total_counts, probs, index):
+    if tf.executing_eagerly():
+      raise unittest.SkipTest(
+          'testSampleCorrectMarginals is too slow to test in Eager mode')
+    dist = tfd.Multinomial(total_counts, probs=probs)
+    self.propSampleCorrectMarginals(dist, index)
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def manual_testSampleCorrectMarginalsWithHypothesis(self, data):
+    # You probably want --test_timeout=300 for this one
+    dist = data.draw(dhps.distributions(dist_name='Multinomial'))
+    special_class = data.draw(
+        hps.sampled_from(range(dist._probs_parameter_no_checks().shape[-1])))
+    # TODO(axch): Drawing the test seed inside the property will interact poorly
+    # with --vary_seed under Hypothesis, because the seed will change as
+    # Hypothesis tries to shrink failing examples.  It would be better to
+    # compute the test seed outside the test method somehow, so each example
+    # gets the same one.
+    # TODO(axch): Not sure how to think about the false positive rate of this
+    # test.  Hypothesis will try an adversarial search to make the statistical
+    # assertion fail, which seems like a multiple comparisons problem with a
+    # combinatorially large space of alternatives?
+    self.propSampleCorrectMarginals(dist, special_class, under_hypothesis=True)
 
   def testNotReparameterized(self):
     if tf1.control_flow_v2_enabled():

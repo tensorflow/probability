@@ -18,12 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v2 as tf
-
-from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import v1
 from tensorflow_probability.python.internal.backend.numpy import v2
-from tensorflow_probability.python.internal.backend.numpy.ops import dimension_value
+from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import dimension_value
 
 
 __all__ = [
@@ -38,5 +35,3 @@ __all__ = [
 
 
 function = v2.function
-
-del tf, utils

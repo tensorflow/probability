@@ -47,6 +47,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "missing_values_util_test",
     size = "small",
@@ -72,6 +73,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "util_test",
     size = "small",

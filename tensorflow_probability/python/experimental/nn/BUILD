@@ -58,6 +58,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "affine_layers_test",
     size = "small",
@@ -86,6 +87,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "convolutional_layers_test",
     size = "small",
@@ -113,6 +115,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "convolutional_transpose_layers_test",
     size = "small",
@@ -135,6 +138,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "layers_test",
     size = "small",
@@ -160,8 +164,8 @@ py_library(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/math:random_ops",
         "//tensorflow_probability/python/monte_carlo:expectation",
+        "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )

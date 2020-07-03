@@ -16,7 +16,7 @@
 
 Note:
   If duplicate or spurious docs are generated (e.g. internal names), consider
-  blacklisting them via the `private_map` argument below.
+  blocklisting them via the `private_map` argument below.
 """
 
 

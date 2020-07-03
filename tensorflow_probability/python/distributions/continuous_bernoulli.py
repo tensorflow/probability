@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -170,7 +171,7 @@ class ContinuousBernoulli(distribution.Distribution):
     probs = self._probs_parameter_no_checks()
     cut_probs = self._cut_probs(probs)
     new_shape = tf.concat([[n], tf.shape(cut_probs)], axis=0)
-    uniform = tf.random.uniform(new_shape, seed=seed, dtype=cut_probs.dtype)
+    uniform = samplers.uniform(new_shape, seed=seed, dtype=cut_probs.dtype)
     sample = self._quantile(uniform, probs)
     return tf.cast(sample, self.dtype)
 

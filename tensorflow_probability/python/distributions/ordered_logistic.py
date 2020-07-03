@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -279,7 +280,7 @@ class OrderedLogistic(distribution.Distribution):
     # given sampling scheme.
     logits = tf.reshape(
         self.categorical_log_probs(), [-1, self._num_categories()])
-    draws = tf.random.categorical(logits, n, dtype=self.dtype, seed=seed)
+    draws = samplers.categorical(logits, n, dtype=self.dtype, seed=seed)
     return tf.reshape(
         tf.transpose(draws),
         shape=tf.concat([[n], self._batch_shape_tensor()], axis=0))

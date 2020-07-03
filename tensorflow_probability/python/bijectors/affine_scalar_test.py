@@ -165,6 +165,7 @@ class _AffineScalarBijectorTest(object):
         eval_func=self.evaluate)
 
   @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_gradient_test
   def testVariableGradients(self):
     b = tfb.AffineScalar(
         shift=tf.Variable(1.),

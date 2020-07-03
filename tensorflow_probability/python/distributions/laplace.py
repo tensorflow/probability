@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 
@@ -157,7 +158,7 @@ class Laplace(distribution.Distribution):
     # exists only at zero; here we need the smallest usable number larger than
     # -1, i.e., `-1 + eps/2`.
     dt = dtype_util.as_numpy_dtype(self.dtype)
-    uniform_samples = tf.random.uniform(
+    uniform_samples = samplers.uniform(
         shape=shape,
         minval=np.nextafter(dt(-1.), dt(1.)),
         maxval=1.,

@@ -88,6 +88,16 @@ class BincountTest(test_util.TestCase):
     self.assertAllClose(counts_0_, counts_[:, 0])
     self.assertAllClose(counts_1_, counts_[:, 1])
 
+  def test_2d_array_unequal_rows(self):
+    # test concatenating row-wise bincount results of are unequal length
+    arr = tf.constant([[0, 1],
+                       [1, 2]])
+    target = tf.constant([[1, 0],
+                          [1, 1],
+                          [0, 1]])
+    result = tfp.stats.count_integers(arr, axis=1)
+    self.assertAllEqual(self.evaluate(target), self.evaluate(result))
+
 
 @test_util.test_all_tf_execution_regimes
 class FindBinsTest(test_util.TestCase):
@@ -615,7 +625,7 @@ class PercentileTestWithLinearInterpolation(
     # Since `x` is evenly distributed between 0 and 100, the percentiles are as
     # well.
     self.assertAllClose(50.1234, sample_pct)
-    self.assertAllClose(1, d_sample_pct_dq)
+    self.assertAllClose(1, d_sample_pct_dq, atol=5e-6)
 
   def test_grads_at_sample_pts_with_yes_preserve_gradients(self):
     dist = tfp.distributions.Normal(np.float64(0), np.float64(1))
@@ -675,7 +685,7 @@ class PercentileTestWithLinearInterpolation(
     # Since `x` is evenly distributed between 0 and 100, the percentiles are as
     # well.
     self.assertAllClose(50.1234, sample_pct)
-    self.assertAllClose(1, d_sample_pct_dq)
+    self.assertAllClose(1, d_sample_pct_dq, atol=5e-6)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -720,6 +730,15 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
       self.assertAllEqual((), pct.shape)
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
+  def test_one_dim_numpy_docs_example(self):
+    x = [[10.0, 7.0, 4.0], [3.0, 2.0, 1.0]]
+    for q in [0, 10.1, 25.1, 49.9, 50.0, 50.1, 50.01, 89, 100]:
+      expected_percentile = np.percentile(
+          x, q=q, interpolation=self._interpolation)
+      pct = tfp.stats.percentile(x, q=q, interpolation=self._interpolation)
+      self.assertAllEqual((), pct.shape)
+      self.assertAllClose(expected_percentile, self.evaluate(pct))
+
   def test_invalid_interpolation_raises(self):
     x = [1., 5., 3., 2., 4.]
     with self.assertRaisesRegexp(ValueError, 'interpolation'):
@@ -744,7 +763,8 @@ class PercentileTestWithNearestInterpolation(test_util.TestCase):
     # So this test only passes if we use double for the percentile indices.
     # If float is used, it fails with InvalidArgumentError about an index out of
     # bounds.
-    x = tf.linspace(0., 3e7, num=int(3e7))
+    # TODO(davmre): change `num` back to `int(3e7)` once linspace doesn't break.
+    x = tf.linspace(0., 3e7, num=int(3e7) + 2)
     minval = tfp.stats.percentile(x, q=0, validate_args=True,
                                   interpolation=self._interpolation)
     self.assertAllEqual(0, self.evaluate(minval))

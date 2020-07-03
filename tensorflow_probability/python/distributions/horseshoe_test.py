@@ -20,6 +20,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import scipy.stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -34,7 +35,7 @@ class _HorseshoeTest(object):
 
   def _test_param_shapes(self, sample_shape, expected):
     param_shapes = tfd.Horseshoe.param_shapes(sample_shape)
-    scale_shape = param_shapes["scale"]
+    scale_shape = param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = self._test_param(np.ones(self.evaluate(scale_shape)))
     self.assertAllEqual(
@@ -45,7 +46,7 @@ class _HorseshoeTest(object):
 
   def _test_param_static_shapes(self, sample_shape, expected):
     param_shapes = tfd.Horseshoe.param_static_shapes(sample_shape)
-    scale_shape = param_shapes["scale"]
+    scale_shape = param_shapes['scale']
     self.assertEqual(expected, scale_shape)
 
   def _test_batch_shapes(self, dist, tensor):
@@ -108,8 +109,7 @@ class _HorseshoeTest(object):
         [template * s for s in np.linspace(2.5, 3.5, 11, dtype=self.dtype)],
         axis=-1)
     scale_mle = self._scale_mle(sample, scale_candidates)
-    self.assertAllClose(
-        scale, self.evaluate(scale_mle), atol=1e-2)
+    self.assertAllClose(scale, self.evaluate(scale_mle), rtol=.15)
 
     expected_shape = tf.TensorShape([n]).concatenate(
         tf.TensorShape(self.evaluate(dist.batch_shape_tensor())))
@@ -120,8 +120,8 @@ class _HorseshoeTest(object):
     self.assertAllEqual(expected_shape_static, sample.shape)
 
   def testNegativeScaleFails(self):
-    with self.assertRaisesOpError("Condition x > 0 did not hold"):
-      dist = tfd.Horseshoe(scale=[self.dtype(-5)], validate_args=True, name="G")
+    with self.assertRaisesOpError('Condition x > 0 did not hold'):
+      dist = tfd.Horseshoe(scale=[self.dtype(-5)], validate_args=True, name='G')
       self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testHorseshoeShape(self):
@@ -145,41 +145,52 @@ class _HorseshoeTest(object):
     http://faculty.chicagobooth.edu/nicholas.polson/research/papers/Horse.pdf
 
     """
-    scale = self._test_param([.5, .8, 1.0, 2.0, 3.0])
-    x = self._test_param(np.logspace(-8, 8, 9).reshape((-1, 1)))
+    scale_np = np.array([.5, .8, 1.0, 2.0, 3.0])
+    x_np = np.logspace(-8, 8, 9).reshape((-1, 1))
+    scale = self._test_param(scale_np)
+    x = self._test_param(x_np)
     horseshoe = tfd.Horseshoe(scale=scale, validate_args=True)
 
     log_pdf = horseshoe.log_prob(x)
     self._test_batch_shapes(horseshoe, log_pdf[0])
 
     k = 1 / np.sqrt(2 * np.pi**3)
-    upper_bound = tf.math.log(
-        k * tf.math.log1p(2 / (x / scale)**2)) - tf.math.log(scale)
-    lower_bound = tf.math.log(
-        k / 2 * tf.math.log1p(4 / (x / scale)**2)) - tf.math.log(scale)
+    upper_bound = np.log(
+        k * np.log1p(2. / (x_np / scale_np) ** 2.)) - np.log(scale_np)
+    lower_bound = np.log(
+        k / 2. * np.log1p(4. / (x_np / scale_np) ** 2.)) - np.log(scale_np)
 
     tolerance = 1e-5
     self.assertAllInRange(
-        self.evaluate(log_pdf), self.evaluate(lower_bound - tolerance),
-        self.evaluate(upper_bound + tolerance))
+        self.evaluate(log_pdf),
+        lower_bound - tolerance,
+        upper_bound + tolerance)
 
-  def testHorseshoeLogPDFWithMonteCarlo(self):
-    scale = self._test_param([.5, .8, 1.0, 2.0, 3.0])
+  def testHorseshoeLogPDFWithQuadrature(self):
+    scale_np = np.array([.5, .8, 1.0, 2.0, 3.0])
+    scale = self._test_param(scale_np)
     horseshoe = tfd.Horseshoe(scale=scale, validate_args=True)
-    x = self._test_param(np.linspace(.1, 10.1, 11).reshape((-1, 1)))
-    horseshoe_log_pdf = self.evaluate(horseshoe.log_prob(x))
-    num_mc_samples = int(1.5e6)
-    seed = test_util.test_seed(hardcoded_seed=23145, set_eager_seed=False)
-    sigmas = tf.reshape(scale, [-1, 1]) * tfd.HalfCauchy(
-        self.dtype(0.), self.dtype(1.)).sample(num_mc_samples, seed=seed)
-    monte_carlo_horseshoe = tfd.MixtureSameFamily(
-        tfd.Categorical(logits=self._test_param(np.zeros(num_mc_samples))),
-        tfd.Normal(self.dtype(0.), sigmas))
-    mc_log_pdf = self.evaluate(monte_carlo_horseshoe.log_prob(x))
-    print("horseshoe_log_pdf:\n{}".format(horseshoe_log_pdf))
-    print("MC_log_pdf:\n{}".format(mc_log_pdf))
-    self.assertAllClose(mc_log_pdf, horseshoe_log_pdf, atol=0.01)
+    x = np.linspace(.1, 10.1, 11)
+    horseshoe_log_pdf = self.evaluate(horseshoe.log_prob(
+        self._test_param(x.reshape((-1, 1)))))
 
+    # Now use quadrature to estimate the log_prob. This is
+    def log_prob_at_x(x, global_shrinkage):
+      def integrand(z):
+        return (np.exp(scipy.stats.halfcauchy.logpdf(z, loc=0, scale=1) +
+                       scipy.stats.norm.logpdf(
+                           x, loc=0, scale=global_shrinkage * z)))
+      return scipy.integrate.quad(integrand, 0., np.inf)[0]
+
+    log_probs_quad = []
+    for p in x:
+      log_probs_quad.append([])
+      for s in scale_np:
+        log_probs_quad[-1].append(log_prob_at_x(p, s))
+    log_probs_quad = np.log(log_probs_quad)
+    self.assertAllClose(log_probs_quad, horseshoe_log_pdf, atol=0.01)
+
+  @test_util.numpy_disable_gradient_test
   def testHorseshoeLogPDFGradient(self):
     scale = self.dtype(2.3)
     x = self._test_param(np.linspace(0.1, 10.1, 11))
@@ -266,5 +277,5 @@ class HorseshoeTestDynamicShapeFloat64(test_util.TestCase, _HorseshoeTest):
   use_static_shape = False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

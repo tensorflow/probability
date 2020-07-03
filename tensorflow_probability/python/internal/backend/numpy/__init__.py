@@ -25,6 +25,7 @@ from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
+from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy import nn
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
@@ -38,11 +39,11 @@ from tensorflow_probability.python.internal.backend.numpy import test_lib as tes
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.dtype import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.functional_ops import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import TensorShape
 from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 Assert = debugging.Assert

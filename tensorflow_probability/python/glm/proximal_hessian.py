@@ -29,6 +29,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.glm import fisher_scoring
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 
@@ -204,8 +205,9 @@ def fit_sparse_one_step(model_matrix,
       updates is `maximum_full_sweeps * tf.size(model_coefficients_start)`.
   """
   with tf.name_scope(name or 'fit_sparse_one_step'):
-    predicted_linear_response = sparse_or_dense_matvecmul(
-        model_matrix, model_coefficients_start)
+    predicted_linear_response = (
+        fisher_scoring.compute_predicted_linear_response(
+            model_matrix, model_coefficients_start))
     g, h_middle = _grad_neg_log_likelihood_and_fim(
         model_matrix, predicted_linear_response, response, model)
 
@@ -314,7 +316,7 @@ def fit_sparse(model_matrix,
             d, seed=42)
     radius = np.sqrt(2.)
     model_coefficients *= radius / tf.linalg.norm(model_coefficients)
-    mask = tf.random_shuffle(tf.range(d)) < tf.to_int32(0.5 * tf.to_float(d))
+    mask = tf.random.shuffle(tf.range(d)) < tf.to_int32(0.5 * tf.to_float(d))
     model_coefficients = tf.where(mask, model_coefficients,
                                   tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
@@ -448,7 +450,9 @@ def fit_sparse(model_matrix,
   with tf.name_scope(name or 'fit_sparse'):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _grad_neg_log_likelihood_and_fim_fn(x):
-      predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)
+      predicted_linear_response = (
+          fisher_scoring.compute_predicted_linear_response(
+              model_matrix, x))
       g, h_middle = _grad_neg_log_likelihood_and_fim(
           model_matrix, predicted_linear_response, response, model)
       return g, model_matrix, h_middle
@@ -473,14 +477,15 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
     tolerance,
     l1_regularizer,
     l2_regularizer=None,
-    maximum_iterations=None,
+    maximum_iterations=1,
     maximum_full_sweeps_per_iteration=1,
     learning_rate=None,
     name=None):
   with tf.name_scope(name or 'fit_sparse_exact_hessian'):
     # TODO(b/111922388): Include dispersion and offset parameters.
     def _neg_log_likelihood(x):
-      predicted_linear_response = sparse_or_dense_matvecmul(model_matrix, x)
+      predicted_linear_response = (
+          fisher_scoring.compute_predicted_linear_response(model_matrix, x))
       log_probs = model.log_prob(response, predicted_linear_response)
       return -log_probs
 

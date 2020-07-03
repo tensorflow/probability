@@ -37,6 +37,11 @@ py_library(
     deps = [
         ":elliptical_slice_sampler",
         ":nuts_autobatching",
+        ":particle_filter",
+        ":particle_filter_augmentation",
+        ":sample_sequential_monte_carlo",
+        ":sequential_monte_carlo_kernel",
+        ":weighted_resampling",
         # tensorflow dep,
     ],
 )
@@ -48,12 +53,13 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal",
-        "//tensorflow_probability/python/util",
     ],
 )
 
+# py2and3
 py_test(
     name = "elliptical_slice_sampler_test",
     size = "large",
@@ -79,6 +85,7 @@ py_library(
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",
+        "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -98,6 +105,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "nuts_test",
     size = "medium",
@@ -111,6 +119,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "nuts_test_gpu",
     srcs = ["nuts_test.py"],
@@ -125,5 +134,194 @@ py_test(
     deps = [
         ":nuts_testlib",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "nuts_xla_test_cpu",
+    size = "large",
+    srcs = ["nuts_xla_test.py"],
+    args = ["--test_device=cpu"],
+    main = "nuts_xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+# py2and3
+py_test(
+    name = "nuts_xla_test_gpu",
+    size = "large",
+    srcs = ["nuts_xla_test.py"],
+    args = ["--test_device=gpu"],
+    main = "nuts_xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "particle_filter",
+    srcs = ["particle_filter.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":sequential_monte_carlo_kernel",
+        ":weighted_resampling",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "particle_filter_test",
+    size = "large",
+    srcs = ["particle_filter_test.py"],
+    deps = [
+        ":particle_filter",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "particle_filter_augmentation",
+    srcs = ["particle_filter_augmentation.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+# py2and3
+py_test(
+    name = "particle_filter_augmentation_test",
+    size = "medium",
+    srcs = ["particle_filter_augmentation_test.py"],
+    deps = [
+        ":particle_filter_augmentation",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "sample_sequential_monte_carlo",
+    srcs = ["sample_sequential_monte_carlo.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":weighted_resampling",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "sample_sequential_monte_carlo_test",
+    size = "medium",
+    timeout = "long",
+    srcs = ["sample_sequential_monte_carlo_test.py"],
+    shard_count = 2,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "sequential_monte_carlo_kernel",
+    srcs = ["sequential_monte_carlo_kernel.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":weighted_resampling",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "sequential_monte_carlo_kernel_test",
+    size = "medium",
+    srcs = ["sequential_monte_carlo_kernel_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "weighted_resampling",
+    srcs = ["weighted_resampling.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "weighted_resampling_test",
+    size = "medium",
+    srcs = ["weighted_resampling_test.py"],
+    shard_count = 2,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )

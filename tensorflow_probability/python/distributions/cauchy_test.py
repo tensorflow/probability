@@ -432,6 +432,55 @@ class CauchyTest(test_util.TestCase):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
         self.evaluate(d.mean())
 
+  def testCauchyCauchyKLWithAnalytic(self):
+    batch_size = 6
+    mu_a = np.array([3.0] * batch_size)
+    gamma_a = np.array([1.0, 2.0, 3.0, 1.5, 2.5, 3.5])
+    mu_b = np.array([-3.0] * batch_size)
+    gamma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+
+    c_a = tfd.Cauchy(loc=mu_a, scale=gamma_a, validate_args=True)
+    c_b = tfd.Cauchy(loc=mu_b, scale=gamma_b, validate_args=True)
+
+    kl = tfd.kl_divergence(c_a, c_b)
+    reverse_kl = tfd.kl_divergence(c_b, c_a)
+    kl_val = self.evaluate(kl)
+    reverse_kl_val = self.evaluate(reverse_kl)
+
+    kl_expected = np.log(
+        (gamma_a + gamma_b)**2 + (mu_a - mu_b)**2
+        ) - np.log(4. * gamma_a * gamma_b)
+
+    self.assertEqual(kl.shape, (batch_size,))
+
+    # The Cauchy KL is symmetric
+    self.assertAllClose(kl_val, kl_expected)
+    self.assertAllClose(reverse_kl_val, kl_expected)
+
+  def testCauchyCauchyKLWithMC(self):
+    batch_size = 6
+    mu_a = np.array([3.0] * batch_size)
+    gamma_a = np.array([1.0, 2.0, 3.0, 1.5, 2.5, 3.5])
+    mu_b = np.array([-3.0] * batch_size)
+    gamma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+
+    c_a = tfd.Cauchy(loc=mu_a, scale=gamma_a, validate_args=True)
+    c_b = tfd.Cauchy(loc=mu_b, scale=gamma_b, validate_args=True)
+
+    kl = tfd.kl_divergence(c_a, c_b)
+    reverse_kl = tfd.kl_divergence(c_b, c_a)
+    kl_val = self.evaluate(kl)
+    reverse_kl_val = self.evaluate(reverse_kl)
+
+    x = c_a.sample(int(1e5), seed=test_util.test_seed())
+    kl_sample = tf.reduce_mean(c_a.log_prob(x) - c_b.log_prob(x), axis=0)
+    kl_sample_val = self.evaluate(kl_sample)
+
+    self.assertEqual(kl.shape, (batch_size,))
+
+    # The Cauchy KL is symmetric
+    self.assertAllClose(kl_val, kl_sample_val, atol=0.0, rtol=1e-2)
+    self.assertAllClose(reverse_kl_val, kl_sample_val, atol=0.0, rtol=1e-2)
 
 if __name__ == '__main__':
   tf.test.main()

@@ -84,6 +84,7 @@ def get_differing_dims(a, b):
 
 
 class SimpleStepSizeAdaptationResults(
+    mcmc_util.PrettyNamedTupleMixin,
     collections.namedtuple(
         'SimpleStepSizeAdaptationResults',
         [
@@ -330,7 +331,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
     """Return `dict` of ``__init__`` arguments and their values."""
     return self._parameters
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     with tf.name_scope(mcmc_util.make_name(
         self.name, 'simple_step_size_adaptation', 'one_step')):
       # Set the step_size.
@@ -339,8 +340,9 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
           previous_kernel_results.new_step_size)
 
       # Step the inner kernel.
+      inner_kwargs = {} if seed is None else dict(seed=seed)
       new_state, new_inner_results = self.inner_kernel.one_step(
-          current_state, inner_results)
+          current_state, inner_results, **inner_kwargs)
 
       # Get the new step size.
       log_accept_prob = self.log_accept_prob_getter_fn(new_inner_results)

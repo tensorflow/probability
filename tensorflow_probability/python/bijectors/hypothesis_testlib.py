@@ -152,8 +152,14 @@ def bijector_supports():
           BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'FillTriangular':
-          BijectorSupport(
-              Support.VECTOR_SIZE_TRIANGULAR, Support.MATRIX_LOWER_TRIL),
+          BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
+                          Support.MATRIX_LOWER_TRIL),
+      'FrechetCDF':  # The domain is parameter dependent.
+          BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
+      'GeneralizedExtremeValueCDF':  # The domain is parameter dependent.
+          BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
+      'GompertzCDF':
+          BijectorSupport(Support.SCALAR_POSITIVE, Support.SCALAR_IN_0_1),
       'GumbelCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Identity':
@@ -170,18 +176,18 @@ def bijector_supports():
       'KumaraswamyCDF':
           BijectorSupport(Support.SCALAR_IN_0_1, Support.SCALAR_IN_0_1),
       'Log':
-          BijectorSupport(
-              Support.SCALAR_POSITIVE, Support.SCALAR_UNCONSTRAINED),
+          BijectorSupport(Support.SCALAR_POSITIVE,
+                          Support.SCALAR_UNCONSTRAINED),
       'Log1p':
-          BijectorSupport(
-              Support.SCALAR_GT_NEG1, Support.SCALAR_UNCONSTRAINED),
-
+          BijectorSupport(Support.SCALAR_GT_NEG1, Support.SCALAR_UNCONSTRAINED),
       'MatrixInverseTriL':
           BijectorSupport(Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE,
                           Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'MatvecLU':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
+      'MoyalCDF':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'NormalCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
       'Ordered':
@@ -190,9 +196,7 @@ def bijector_supports():
       'Permute':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
-      'PowerTransform':
-          # The domain is dependent on the `power` parameter of PowerTransform,
-          # hence is handled in the test harness.
+      'PowerTransform':  # The domain is parameter dependent.
           BijectorSupport(Support.OTHER, Support.SCALAR_POSITIVE),
       'RationalQuadraticSpline':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
@@ -220,8 +224,13 @@ def bijector_supports():
       'Shift':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'ShiftedGompertzCDF':
+          BijectorSupport(Support.SCALAR_POSITIVE, Support.SCALAR_IN_0_1),
       'Sigmoid':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
+      'Sinh':
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
+                          Support.SCALAR_UNCONSTRAINED),
       'SinhArcsinh':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
@@ -247,8 +256,7 @@ def bijector_supports():
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_IN_NEG1_1),
       'TransformDiagonal':
-          BijectorSupport(Support.MATRIX_UNCONSTRAINED,
-                          Support.OTHER),
+          BijectorSupport(Support.MATRIX_UNCONSTRAINED, Support.OTHER),
       'Transpose':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
@@ -386,4 +394,24 @@ def power_transform_constraint(power):
     if power == 0:
       return x
     return tf.math.softplus(x) - 1. / power
+  return constrain
+
+
+def frechet_constraint(loc):
+  """Maps `s` to [loc, inf)."""
+  def constrain(x):
+    return loc + tf.math.softplus(x)
+  return constrain
+
+
+def gev_constraint(loc, scale, conc):
+  """Maps `s` to support based on `loc`, `scale` and `conc`."""
+  def constrain(x):
+    c = tf.convert_to_tensor(conc)
+    endpoint = loc - scale / c
+    return tf.where(c > 0.,
+                    tf.math.softplus(x) + endpoint,
+                    tf.where(
+                        tf.equal(0., c),
+                        x, endpoint - tf.math.softplus(x)))
   return constrain

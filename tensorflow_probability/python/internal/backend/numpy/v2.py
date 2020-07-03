@@ -20,8 +20,6 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow.compat.v2 as tf
-
 # pylint: disable=unused-import
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import bitwise
@@ -29,6 +27,7 @@ from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
+from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy import nn
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math
@@ -41,28 +40,38 @@ from tensorflow_probability.python.internal.backend.numpy import test_lib as tes
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.dtype import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.functional_ops import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import TensorShape
 from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops import TensorArray
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 # pylint: enable=unused-import
+
+
+JAX_MODE = False
 
 
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
               experimental_relax_shapes=False, experimental_compile=None):  # pylint: disable=unused-argument
   """Dummy version of `tf.function`."""
+  transform = lambda fn: fn
+  if experimental_compile:
+    if JAX_MODE:
+      from jax import jit  # pylint: disable=g-import-not-at-top
+      transform = jit
+    else:
+      raise NotImplementedError('Could not find compiler: Numpy only.')
   # This code path is for the `foo = tf.function(foo, ...)` use case.
   if func is not None:
-    return func
+    return transform(func)
   # This code path is for the following use case:
   #   @tf.function(...)
   #   def foo(...):
   #      ...
   # This case is equivalent to `foo = tf.function(...)(foo)`.
-  return lambda inner_function: inner_function
+  return transform
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -72,10 +81,10 @@ compat = collections.namedtuple('compat', 'dimension_value')(
     lambda dim: None if dim is None else int(dim))
 
 function = utils.copy_docstring(
-    tf.function,
+    'tf.function',
     _function)
 
 eye = linalg.eye
 matmul = linalg.matmul
 
-del collections, tf, utils
+del collections, utils

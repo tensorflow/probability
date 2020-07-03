@@ -547,6 +547,9 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
       self.assertAllEqual(batch_shape, self.evaluate(dist.batch_shape_tensor()))
       self.assertAllClose(probs, self.evaluate(dist.prob([0, 0])))
 
+  @test_util.jax_disable_test_missing_functionality('Gradient tape not '
+                                                    'supported in JAX backend')
+  @test_util.numpy_disable_gradient_test
   def testSliceSequencePreservesOrigVarGradLinkage(self):
     mu = self._rng.rand(4, 3, 1)
     mu = tf.Variable(mu)

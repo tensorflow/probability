@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import prefer_static
 
 
@@ -319,6 +320,13 @@ class FFJORD(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  def _setup_cache(self):
+    """Overrides the bijector cache to update attrs on forward/inverse."""
+    return cache_util.BijectorCache(
+        forward_impl=self._augmented_forward,
+        inverse_impl=self._augmented_inverse,
+        cache_type=cache_util.CachedDirectedFunctionWithGreedyAttrs)
+
   def _solve_ode(self, ode_fn, state):
     """Solves the initial value problem defined by `ode_fn`.
 
@@ -345,7 +353,7 @@ class FFJORD(bijector.Bijector):
         self._state_time_derivative_fn, x.shape, self._dtype)
     augmented_x = (x, tf.zeros(shape=x.shape, dtype=self._dtype))
     y, fldj = self._solve_ode(augmented_ode_fn, augmented_x)
-    return y, fldj
+    return y, {'ildj': -fldj, 'fldj': fldj}
 
   def _augmented_inverse(self, y):
     """Computes inverse and inverse_log_det_jacobian transformations."""
@@ -353,7 +361,7 @@ class FFJORD(bijector.Bijector):
         self._inv_state_time_derivative_fn, y.shape, self._dtype)
     augmented_y = (y, tf.zeros(shape=y.shape, dtype=self._dtype))
     x, ildj = self._solve_ode(augmented_inv_ode_fn, augmented_y)
-    return x, ildj
+    return x, {'ildj': ildj, 'fldj': -ildj}
 
   def _forward(self, x):
     y, _ = self._augmented_forward(x)
@@ -364,86 +372,17 @@ class FFJORD(bijector.Bijector):
     return x
 
   def _forward_log_det_jacobian(self, x):
-    _, fldj = self._augmented_forward(x)
-    return fldj
+    cached = self._cache.forward.attributes(x)
+    # If LDJ isn't in the cache, call forward once.
+    if 'fldj' not in cached:
+      _, attrs = self._augmented_forward(x)
+      cached.update(attrs)
+    return cached['fldj']
 
   def _inverse_log_det_jacobian(self, y):
-    _, ildj = self._augmented_inverse(y)
-    return ildj
-
-# TODO(b/144163984) Simultaneous computation of x, y, ildj in bijector class.
-  def _call_forward(self, x, name, **kwargs):
-    """Wraps call to _forward and adds caching of ildj."""
-    with self._name_and_control_scope(name):
-      x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
-      self._maybe_assert_dtype(x)
-      mapping = self._lookup(x=x, kwargs=kwargs)
-      if mapping.y is not None:
-        return mapping.y
-      y, fldj = self._augmented_forward(x)
-      mapping = mapping.merge(y=y, ildj=-fldj)
-      self._cache_by_y(mapping)
-      if not tf.executing_eagerly():
-        self._cache_by_x(mapping)
-      return mapping.y
-
-  def _call_inverse(self, y, name, **kwargs):
-    """Wraps call to _inverse and adds caching of ildj."""
-    with self._name_and_control_scope(name):
-      y = tf.convert_to_tensor(y, dtype_hint=self.dtype, name='y')
-      self._maybe_assert_dtype(y)
-      mapping = self._lookup(y=y, kwargs=kwargs)
-      if mapping.x is not None:
-        return mapping.x
-      x, ildj = self._augmented_inverse(y)
-      mapping = mapping.merge(x=x, ildj=ildj)
-      self._cache_by_x(mapping)
-      if not tf.executing_eagerly():
-        self._cache_by_y(mapping)
-      return mapping.x
-
-  def _compute_unreduced_ildj_with_caching(
-      self, x, y, tensor_to_use, use_inverse_ldj_fn, kwargs):
-    """Helper for computing ILDJ, with extra caching of x and y.
-
-    Does not do the 'reduce' step which is necessary in some cases; this is left
-    to the caller.
-
-    Args:
-      x: a `Tensor`, the pre-Bijector transform value at whose post-Bijector
-        transform value the ILDJ is to be computed. Can be `None` as long as
-        `y` is not `None`. This method only uses the value for cache
-        lookup/updating.
-      y: a `Tensor`, a point in the output space of the Bijector's `forward`
-        transformation, at whose value the ILDJ is to be computed. Can be
-        `None` as long as `x` is not `None`. This method only uses the value
-        for cache lookup/updating.
-      tensor_to_use: a `Tensor`, the one to actually pass to the chosen compute
-        function (`_inverse_log_det_jacobian` or `_forward_log_det_jacobian`).
-        It is presumed that the caller has already figured out what input to use
-        (it will either be the x or y value corresponding to the location where
-        we are computing the ILDJ).
-      use_inverse_ldj_fn: Python `bool`, if `True`, will use the
-        `_inverse_log_det_jacobian` to compute ILDJ; else, will use
-        `_forward_log_det_jacobian`.
-      kwargs: dictionary of keyword args that will be passed to calls to to
-        `_inverse_log_det_jacobian` or `_forward_log_det_jacobian`, as well as
-        for lookup/updating of the result in the cache.
-
-    Returns:
-      ildj: the (un-reduce_sum'ed) value of the ILDJ at the specified input
-        location. Also updates the cache as needed.
-    """
-    mapping = self._lookup(x=x, y=y, kwargs=kwargs)
-    if mapping.ildj is not None:
-      return mapping.ildj
-
-    if use_inverse_ldj_fn:
-      x, ildj = self._augmented_inverse(tensor_to_use)
-    else:
-      y, fldj = self._augmented_forward(tensor_to_use)
-      ildj = -fldj
-
-    mapping = mapping.merge(x=x, y=y, ildj=ildj)
-    self._cache_update(mapping)
-    return ildj
+    cached = self._cache.inverse.attributes(y)
+    # If LDJ isn't in the cache, call inverse once.
+    if 'ildj' not in cached:
+      _, attrs = self._augmented_inverse(y)
+      cached.update(attrs)
+    return cached['ildj']

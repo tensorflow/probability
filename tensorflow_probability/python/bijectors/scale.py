@@ -44,7 +44,8 @@ class Scale(bijector.Bijector):
   """
 
   def __init__(self,
-               scale,
+               scale=None,
+               log_scale=None,
                validate_args=False,
                name='scale'):
     """Instantiates the `Scale` bijector.
@@ -55,17 +56,35 @@ class Scale(bijector.Bijector):
     Y = g(X) = scale * X
     ```
 
+    Alternatively, you can specify `log_scale` instead of `scale` for slighly
+    better numerics with tiny scales. Note that when using `log_scale` it is
+    currently impossible to specify a negative scale.
+
     Args:
       scale: Floating-point `Tensor`.
+      log_scale: Floating-point `Tensor`. Logarithm of the scale. If this is set
+        to `None`, no scale is applied. This should not be set if `scale` is
+        set.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
+
+    Raises:
+      ValueError: If both `scale` and `log_scale` are specified.
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
+      dtype = dtype_util.common_dtype(
+          [scale, log_scale], dtype_hint=tf.float32)
+
+      if scale is not None and log_scale is not None:
+        raise ValueError('At most one of `scale` and `log_scale` should be '
+                         'specified')
+
       self._scale = tensor_util.convert_nonref_to_tensor(
           scale, dtype=dtype, name='scale')
+      self._log_scale = tensor_util.convert_nonref_to_tensor(
+          log_scale, dtype=dtype, name='log_scale')
 
       super(Scale, self).__init__(
           forward_min_event_ndims=0,
@@ -80,17 +99,37 @@ class Scale(bijector.Bijector):
     """The `scale` term in `Y = scale * X`."""
     return self._scale
 
+  @property
+  def log_scale(self):
+    """The `log_scale` term in `Y = exp(log_scale) * X`."""
+    return self._log_scale
+
   def _is_increasing(self):
+    if self.scale is None:
+      return True
     return self.scale > 0
 
   def _forward(self, x):
-    return x * self.scale
+    y = tf.identity(x)
+    if self.scale is not None:
+      y = y * self.scale
+    if self.log_scale is not None:
+      y = y * tf.exp(self.log_scale)
+    return y
 
   def _inverse(self, y):
-    return y / self.scale
+    x = tf.identity(y)
+    if self.scale is not None:
+      x = x / self.scale
+    if self.log_scale is not None:
+      x = x * tf.exp(-self.log_scale)
+    return x
 
   def _forward_log_det_jacobian(self, x):
-    return tf.math.log(tf.abs(self.scale))
+    if self.log_scale is not None:
+      return self.log_scale
+    elif self.scale is not None:
+      return tf.math.log(tf.abs(self.scale))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

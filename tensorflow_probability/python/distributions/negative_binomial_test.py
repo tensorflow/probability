@@ -22,6 +22,7 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
@@ -72,6 +73,15 @@ class NegativeBinomialTest(test_util.TestCase):
     with self.assertRaisesOpError('`probs` has components greater than 1.'):
       negbinom = tfd.NegativeBinomial(5., probs=invalid_ps, validate_args=True)
       self.evaluate(negbinom.sample(seed=test_util.test_seed()))
+
+  def testZeroP(self):
+    prob = 0.
+    negbinom = tfd.NegativeBinomial(
+        total_count=3., probs=prob, validate_args=True)
+    self.assertAllClose(prob, self.evaluate(negbinom.probs))
+    self.assertAllClose(0., negbinom.prob(3))
+    self.assertAllClose(1., negbinom.prob(0))
+    self.assertAllClose(0., negbinom.log_prob(0))
 
   def testInvalidNegativeCount(self):
     invalid_rs = [-3., 0., -2.,]
@@ -265,10 +275,15 @@ class NegativeBinomialTest(test_util.TestCase):
     logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
     self.assertAllClose(
         *self.evaluate([-logit(d.prob(0.)), d.logits_parameter()]),
-        atol=0, rtol=1e-4)
+        atol=1e-5, rtol=1e-4)
     self.assertAllClose(
         *self.evaluate([1. - d.prob(0.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
+
+  @test_util.numpy_disable_gradient_test
+  def testGradientOfLogProbEvaluates(self):
+    self.evaluate(tfp.math.value_and_gradient(
+        tfd.NegativeBinomial(0.1, 0.).log_prob, [0.1]))
 
 
 @test_util.test_all_tf_execution_regimes

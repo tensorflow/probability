@@ -44,10 +44,12 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/util",
     ],
 )
 
+# py2and3
 py_test(
     name = "distribution_tensor_coercible_test",
     size = "small",
@@ -71,6 +73,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "tensor_tuple_test",
     size = "small",

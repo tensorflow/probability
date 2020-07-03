@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -30,8 +31,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -233,16 +234,16 @@ class Beta(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    seed = SeedStream(seed, 'beta')
+    seed1, seed2 = samplers.split_seed(seed, salt='beta')
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
     shape = self._batch_shape_tensor(concentration1, concentration0)
     expanded_concentration1 = tf.broadcast_to(concentration1, shape)
     expanded_concentration0 = tf.broadcast_to(concentration0, shape)
-    gamma1_sample = tf.random.gamma(
-        shape=[n], alpha=expanded_concentration1, dtype=self.dtype, seed=seed())
-    gamma2_sample = tf.random.gamma(
-        shape=[n], alpha=expanded_concentration0, dtype=self.dtype, seed=seed())
+    gamma1_sample = samplers.gamma(
+        shape=[n], alpha=expanded_concentration1, dtype=self.dtype, seed=seed1)
+    gamma2_sample = samplers.gamma(
+        shape=[n], alpha=expanded_concentration0, dtype=self.dtype, seed=seed2)
     beta_sample = gamma1_sample / (gamma1_sample + gamma2_sample)
     return beta_sample
 
@@ -275,8 +276,7 @@ class Beta(distribution.Distribution):
             tf.math.xlog1py(concentration0 - 1., -x))
 
   def _log_normalization(self, concentration1, concentration0):
-    return (tf.math.lgamma(concentration1) + tf.math.lgamma(concentration0) -
-            tf.math.lgamma(concentration1 + concentration0))
+    return tfp_math.lbeta(concentration1, concentration0)
 
   def _entropy(self):
     concentration1 = tf.convert_to_tensor(self.concentration1)

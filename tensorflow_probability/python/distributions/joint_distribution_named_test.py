@@ -585,6 +585,40 @@ class JointDistributionNamedTest(test_util.TestCase):
     for item in [forward_event_shape_tensors, inverse_event_shape_tensors]:
       self.assertSetEqual(set(self.evaluate(item).keys()), set(d.model.keys()))
 
+  def test_sample_kwargs(self):
+    joint = tfd.JointDistributionNamed(
+        dict(
+            a=tfd.Normal(0., 1.),
+            b=lambda a: tfd.Normal(a, 1.),
+            c=lambda a, b: tfd.Normal(a + b, 1.)))
+
+    seed = test_util.test_seed()
+    tf.random.set_seed(seed)
+    samples = joint.sample(seed=seed, a=1.)
+    # Check the first value is actually 1.
+    self.assertEqual(1., self.evaluate(samples['a']))
+
+    # Check the sample is reproducible using the `value` argument.
+    tf.random.set_seed(seed)
+    samples_named = joint.sample(seed=seed, value={'a': 1.})
+    self.assertAllEqual(self.evaluate(samples), self.evaluate(samples_named))
+
+    # Make sure to throw an exception if strange keywords are passed.
+    expected_error = (
+        'Found unexpected keyword arguments. Distribution names are\n'
+        'a, b, c\n'
+        'but received\n'
+        'z\n'
+        'These names were invalid:\n'
+        'z')
+    with self.assertRaisesRegex(ValueError, expected_error):
+      joint.sample(z=2.)
+
+    # Raise if value and keywords are passed.
+    with self.assertRaisesRegex(
+        ValueError, r'Supplied both `value` and keyword arguments .*'):
+      joint.sample(a=1., value={'a': 1})
+
 
 if __name__ == '__main__':
   tf.test.main()

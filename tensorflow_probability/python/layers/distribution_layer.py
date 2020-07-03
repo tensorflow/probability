@@ -25,7 +25,7 @@ import io
 import pickle
 
 # Dependency imports
-from cloudpickle import CloudPickler
+from cloudpickle.cloudpickle import CloudPickler
 import numpy as np
 import six
 import tensorflow.compat.v2 as tf
@@ -47,7 +47,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import variational_gaussian_process as variational_gaussian_process_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
-from tensorflow_probability.python.layers.internal import tensor_tuple as tensor_tuple
+from tensorflow_probability.python.layers.internal import tensor_tuple
 from tensorflow.python.keras.utils import tf_utils as keras_tf_utils  # pylint: disable=g-direct-tensorflow-import
 
 

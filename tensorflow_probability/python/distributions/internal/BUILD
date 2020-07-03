@@ -57,7 +57,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["statistical_testing_test.py"],
     jax_size = "medium",
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
@@ -97,6 +96,7 @@ py_binary(
     ],
 )
 
+# py2and3
 py_test(
     name = "correlation_matrix_volumes_test",
     size = "small",

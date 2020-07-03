@@ -216,18 +216,6 @@ py_library(
 )
 
 py_library(
-    name = "tfp_xla_test_case",
-    testonly = 1,
-    srcs = ["tfp_xla_test_case.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        ":xla",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
     name = "xla",
     srcs = ["xla.py"],
     srcs_version = "PY2AND3",
@@ -236,6 +224,50 @@ py_library(
     ],
 )
 
+# py2and3
+py_test(
+    name = "virtual_machine_test_cpu",
+    size = "medium",
+    srcs = ["virtual_machine_test.py"],
+    args = ["--test_device=cpu"],
+    main = "virtual_machine_test.py",
+    shard_count = 10,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        "//tensorflow_probability/python/experimental/auto_batching:numpy_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:test_programs",
+        "//tensorflow_probability/python/experimental/auto_batching:tf_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:virtual_machine",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+# py2and3
+py_test(
+    name = "virtual_machine_test_gpu",
+    size = "medium",
+    srcs = ["virtual_machine_test.py"],
+    args = ["--test_device=gpu"],
+    main = "virtual_machine_test.py",
+    shard_count = 10,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        "//tensorflow_probability/python/experimental/auto_batching:numpy_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:test_programs",
+        "//tensorflow_probability/python/experimental/auto_batching:tf_backend",
+        "//tensorflow_probability/python/experimental/auto_batching:virtual_machine",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+# py2and3
 py_test(
     name = "instructions_test",
     size = "small",
@@ -248,6 +280,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "numpy_backend_test",
     size = "small",
@@ -264,6 +297,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "tf_backend_test",
     size = "large",
@@ -281,6 +315,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "lowering_test",
     size = "small",
@@ -297,6 +332,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "allocation_strategy_test",
     size = "small",
@@ -311,6 +347,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "stackless_test",
     size = "small",
@@ -326,6 +363,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "stack_optimization_test",
     size = "small",
@@ -338,6 +376,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "type_inference_test",
     size = "small",
@@ -359,6 +398,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "dsl_test",
     size = "small",
@@ -378,6 +418,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "frontend_test",
     size = "small",

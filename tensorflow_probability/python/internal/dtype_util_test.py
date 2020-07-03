@@ -24,9 +24,13 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
+
+
+JAX_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -66,8 +70,8 @@ class DtypeUtilTest(test_util.TestCase):
     # Only test Edward2 if it's able to be imported (not possible in jax/numpy
     # modes).
     try:
-      from tensorflow_probability.python.experimental import edward2 as ed  # pylint: disable=g-import-not-at-top
-    except ImportError:
+      ed = tfp.experimental.edward2
+    except AttributeError:
       self.skipTest('No edward2 module present in jax/numpy modes.')
     # As in tensorflow_probability github issue #221
     x = ed.Dirichlet(np.ones(3, dtype='float64'))
@@ -91,6 +95,59 @@ class DtypeUtilTest(test_util.TestCase):
   )
   def testMax(self, dtype, expected_maxval):
     self.assertEqual(dtype_util.max(dtype), expected_maxval)
+
+  @parameterized.parameters(
+      ([1], None, None),
+      ([1], tf.float32, None),
+      ([1], None, tf.float32),
+      ([1], tf.float32, tf.float64),
+      (np.int64, None, None),
+      (np.int64, None, tf.float32),
+      (np.int64, tf.float32, None),
+      (np.int64, tf.float32, tf.float64),
+      (tf.int64, None, None),
+      (tf.int64, None, tf.float32),
+      (tf.float32, tf.float32, None),
+      (tf.float32, tf.float32, tf.float64))
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='`convert_to_tensor` respects array dtypes in numpy backend.')
+  def testConvertToDtype(self, tensor_or_dtype, dtype, dtype_hint):
+    if np.issctype(tensor_or_dtype):
+      example_tensor = np.zeros([], tensor_or_dtype)
+    elif isinstance(tensor_or_dtype, tf.DType):
+      example_tensor = tf.zeros([], tensor_or_dtype)
+    else:
+      example_tensor = tensor_or_dtype
+
+    # Try with the original argument.
+    self.assertEqual(
+        tf.convert_to_tensor(example_tensor, dtype, dtype_hint).dtype,
+        dtype_util.convert_to_dtype(tensor_or_dtype, dtype, dtype_hint))
+    # Try with a concrete value.
+    self.assertEqual(
+        tf.convert_to_tensor(example_tensor, dtype, dtype_hint).dtype,
+        dtype_util.convert_to_dtype(example_tensor, dtype, dtype_hint))
+
+  @parameterized.parameters(
+      (tf.int64, tf.float32, None),
+      (tf.int64, tf.float32, tf.float64))
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      disable_jax=True,
+      reason='`convert_to_tensor` only raises in TF mode.')
+  def testConvertToDTypeRaises(self, tensor_or_dtype, dtype, dtype_hint):
+    if np.issctype(tensor_or_dtype):
+      example_tensor = np.zeros([], tensor_or_dtype)
+    elif isinstance(tensor_or_dtype, tf.DType):
+      example_tensor = tf.zeros([], tensor_or_dtype)
+    else:
+      example_tensor = tensor_or_dtype
+
+    with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
+      dtype_util.convert_to_dtype(tensor_or_dtype, dtype, dtype_hint)
+    with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
+      dtype_util.convert_to_dtype(example_tensor, dtype, dtype_hint)
 
 
 @test_util.test_all_tf_execution_regimes

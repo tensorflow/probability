@@ -30,10 +30,13 @@ py_library(
     deps = [
         "//tensorflow_probability/python/experimental/substrates/numpy/bijectors",
         "//tensorflow_probability/python/experimental/substrates/numpy/distributions",
+        "//tensorflow_probability/python/experimental/substrates/numpy/experimental",
         "//tensorflow_probability/python/experimental/substrates/numpy/internal",
         "//tensorflow_probability/python/experimental/substrates/numpy/stats",
         "//tensorflow_probability/python/experimental/substrates/numpy/util",
         "//tensorflow_probability/python/internal/backend",
+        "//tensorflow_probability/python/math:math.numpy",
         "//tensorflow_probability/python/mcmc:mcmc.numpy",
+        "//tensorflow_probability/python/random:random.numpy",
     ],
 )

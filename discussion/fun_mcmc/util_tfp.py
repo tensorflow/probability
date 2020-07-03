@@ -21,8 +21,6 @@ from __future__ import print_function
 
 import functools
 
-import tensorflow.compat.v2 as tf
-
 from discussion.fun_mcmc import backend
 from discussion.fun_mcmc import fun_mcmc_lib
 from typing import Any, Optional, Tuple
@@ -31,13 +29,12 @@ tf = backend.tf
 tfp = backend.tfp
 util = backend.util
 
-tfb = tfp.bijectors
-
 
 def bijector_to_transform_fn(
-    bijector: fun_mcmc_lib.BijectorNest,
-    state_structure: Any,
-    batch_ndims: fun_mcmc_lib.IntTensor = 0) -> fun_mcmc_lib.TransitionOperator:
+    bijector: 'fun_mcmc_lib.BijectorNest',
+    state_structure: 'Any',
+    batch_ndims: 'fun_mcmc_lib.IntTensor' = 0
+) -> 'fun_mcmc_lib.TransitionOperator':
   """Creates a TransitionOperator that transforms the state using a bijector.
 
   The returned operator has the following signature:
@@ -46,8 +43,6 @@ def bijector_to_transform_fn(
     (*args, **kwargs) ->
       transformed_state, [(), forward_ldj]
   ```
-  Note that currently it is forbidden to pass both `args` and `kwargs` to the
-  wrapper.
 
   It also has an `inverse` property that contains the inverse transformation.
 
@@ -70,30 +65,30 @@ def bijector_to_transform_fn(
     transform_fn: The created transformation.
   """
 
-  def transform_fn(bijector, *args, **kwargs):
+  def transform_fn(bijector, state_structure, *args, **kwargs):
     """Transport map implemented via the bijector."""
-    if args and kwargs:
-      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
-                       'this wrapper.')
-    if kwargs:
-      args = kwargs
-    # Use state_structure to recover the structure of args that has been lossily
-    # transmitted via *args and **kwargs.
-    state = util.unflatten_tree(state_structure, util.flatten_tree(args))
+    state = fun_mcmc_lib.recover_state_from_args(args, kwargs, state_structure)
 
     value = util.map_tree_up_to(bijector, lambda b, x: b(x), bijector, state)
-    ldj = sum(
-        util.flatten_tree(
-            util.map_tree_up_to(
-                bijector, lambda b, x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
-                    x, event_ndims=tf.rank(x) - batch_ndims), bijector, state)))
+    ldj_parts = util.map_tree_up_to(
+        bijector,
+        lambda b, x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
+            x,
+            event_ndims=util.map_tree(lambda x: tf.rank(x) - batch_ndims, x)),
+        bijector,
+        state)
+    ldj = sum(util.flatten_tree(ldj_parts))
 
     return value, ((), ldj)
 
-  inverse_bijector = util.map_tree(tfb.Invert, bijector)
+  inverse_bijector = util.map_tree(tfp.bijectors.Invert, bijector)
 
-  forward_transform_fn = functools.partial(transform_fn, bijector)
-  inverse_transform_fn = functools.partial(transform_fn, inverse_bijector)
+  forward_transform_fn = functools.partial(transform_fn, bijector,
+                                           state_structure)
+  inverse_transform_fn = functools.partial(
+      transform_fn, inverse_bijector,
+      util.map_tree_up_to(bijector, lambda b, s: b.forward_dtype(s), bijector,
+                          state_structure))
 
   forward_transform_fn.inverse = inverse_transform_fn
   inverse_transform_fn.inverse = forward_transform_fn
@@ -102,8 +97,9 @@ def bijector_to_transform_fn(
 
 
 def transition_kernel_wrapper(
-    current_state: fun_mcmc_lib.FloatNest, kernel_results: Optional[Any],
-    kernel: tfp.mcmc.TransitionKernel) -> Tuple[fun_mcmc_lib.FloatNest, Any]:
+    current_state: 'fun_mcmc_lib.FloatNest', kernel_results: 'Optional[Any]',
+    kernel: 'tfp.mcmc.TransitionKernel'
+) -> 'Tuple[fun_mcmc_lib.FloatNest, Any]':
   """Wraps a `tfp.mcmc.TransitionKernel` as a `TransitionOperator`.
 
   Args:

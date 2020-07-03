@@ -18,8 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import itertools
+
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import six
 import tensorflow.compat.v1 as tf1
@@ -27,7 +30,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python.bijectors.masked_autoregressive import _gen_mask
+from tensorflow_probability.python.bijectors import masked_autoregressive
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -115,7 +118,8 @@ class GenMaskTest(test_util.TestCase):
          [1, 0, 0, 0],
          [1, 1, 0, 0],
          [1, 1, 0, 0]])
-    mask = _gen_mask(num_blocks=3, n_in=4, n_out=6, mask_type="exclusive")
+    mask = masked_autoregressive._gen_mask(
+        num_blocks=3, n_in=4, n_out=6, mask_type="exclusive")
     self.assertAllEqual(expected_mask, mask)
 
   def test346Inclusive(self):
@@ -126,8 +130,159 @@ class GenMaskTest(test_util.TestCase):
          [1, 1, 0, 0],
          [1, 1, 1, 0],
          [1, 1, 1, 0]])
-    mask = _gen_mask(num_blocks=3, n_in=4, n_out=6, mask_type="inclusive")
+    mask = masked_autoregressive._gen_mask(
+        num_blocks=3, n_in=4, n_out=6, mask_type="inclusive")
     self.assertAllEqual(expected_mask, mask)
+
+
+class MakeDenseAutoregressiveMasksTest(test_util.TestCase):
+
+  def testRandomMade(self):
+    hidden_size = 8
+    num_hidden = 3
+    params = 2
+    event_size = 4
+
+    def random_made(x):
+      masks = masked_autoregressive._make_dense_autoregressive_masks(
+          params=params,
+          event_size=event_size,
+          hidden_units=[hidden_size] * num_hidden)
+      output_sizes = [hidden_size] * num_hidden
+      input_size = event_size
+      for (mask, output_size) in zip(masks, output_sizes):
+        mask = tf.cast(mask, tf.float32)
+        x = tf.matmul(
+            x,
+            np.random.randn(input_size, output_size).astype(np.float32) * mask)
+        x = tf.nn.relu(x)
+        input_size = output_size
+      x = tf.matmul(
+          x,
+          np.random.randn(input_size, params * event_size).astype(np.float32) *
+          masks[-1])
+      x = tf.reshape(x, [-1, event_size, params])
+      return x
+
+    y = random_made(tf.zeros([1, event_size]))
+    self.assertEqual([1, event_size, params], y.shape)
+
+  def testLeftToRight(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order="left-to-right",
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 0, 0],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+    ], masks[2])
+
+  def testRandom(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order="random",
+        hidden_degrees="random",
+        seed=1)
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 0, 1, 1],
+        [0, 0, 0, 0],
+        [1, 1, 1, 1],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 0, 1, 1],
+        [1, 1, 1, 1],
+        [1, 0, 1, 1],
+        [1, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 0, 0],
+        [1, 1, 1, 1, 0, 0],
+        [0, 0, 1, 1, 0, 0],
+        [0, 0, 1, 1, 0, 0],
+    ], masks[2])
+
+  def testRightToLeft(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[4, 4],
+        input_order=list(reversed(range(1, 4))),
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [0, 0, 0, 0],
+        [0, 0, 1, 1],
+        [1, 1, 1, 1],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 1, 1, 0, 0],
+        [1, 1, 0, 0, 0, 0],
+        [1, 1, 0, 0, 0, 0],
+    ], masks[2])
+
+  def testUneven(self):
+    masks = masked_autoregressive._make_dense_autoregressive_masks(
+        params=2,
+        event_size=3,
+        hidden_units=[5, 3],
+        input_order="left-to-right",
+        hidden_degrees="equal")
+
+    self.assertLen(masks, 3)
+    self.assertAllEqual([
+        [1, 1, 1, 1, 1],
+        [0, 0, 0, 1, 1],
+        [0, 0, 0, 0, 0],
+    ], masks[0])
+
+    self.assertAllEqual([
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+    ], masks[1])
+
+    self.assertAllEqual([
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 1, 1, 1, 1],
+        [0, 0, 0, 0, 1, 1],
+    ], masks[2])
 
 
 @test_util.test_all_tf_execution_regimes
@@ -664,6 +819,95 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     self.assertAllEqual((7, channels, width * height),
                         distribution.sample(7).shape)
     self.assertAllEqual((n,), distribution.log_prob(reshaped_images).shape)
+
+
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class ConditionalTests(test_util.TestCase):
+
+  def test_conditional_missing_event_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`event_shape` must be provided when `conditional` is True"):
+
+      tfb.AutoregressiveNetwork(
+          params=2, conditional=True, conditional_event_shape=[4])
+
+  def test_conditional_missing_conditional_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_event_shape` must be provided when `conditional` is True"
+    ):
+
+      tfb.AutoregressiveNetwork(params=2, conditional=True, event_shape=[4])
+
+  def test_conditional_incorrect_layers(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_input_layers` must be \"first_layers\" or \"all_layers\""
+    ):
+
+      tfb.AutoregressiveNetwork(
+          params=2,
+          conditional=True,
+          event_shape=[4],
+          conditional_event_shape=[4],
+          conditional_input_layers="non-existent-option")
+
+  def test_conditional_false_with_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_event_shape` passed but `conditional` is set to False."):
+
+      tfb.AutoregressiveNetwork(params=2, conditional_event_shape=[4])
+
+  def test_conditional_wrong_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "Parameter `conditional_event_shape` must describe a rank-1 shape"):
+
+      tfb.AutoregressiveNetwork(
+          params=2,
+          conditional=True,
+          event_shape=[4],
+          conditional_event_shape=[10, 4])
+
+  def test_conditional_missing_tensor(self):
+    with self.assertRaisesRegexp(
+        ValueError, "`conditional_input` must be passed as a named argument"):
+
+      made = tfb.AutoregressiveNetwork(
+          params=2,
+          event_shape=[4],
+          conditional=True,
+          conditional_event_shape=[6])
+
+      made(np.random.normal(0, 1, (1, 4)))
+
+  @parameterized.named_parameters(
+      *(("{} {}".format(ns, cs), ns, cs) for ns, cs in itertools.product(
+          [[3], [1, 3], [2, 3], [1, 2, 3], [2, 1, 3], [2, 2, 3]],
+          [[4], [1, 4], [2, 4], [1, 2, 4], [2, 1, 4], [2, 2, 4]],
+      )))
+  def test_conditional_broadcasting(self, input_shape, cond_shape):
+    made = tfb.AutoregressiveNetwork(
+        params=2,
+        event_shape=[3],
+        conditional=True,
+        conditional_event_shape=[4])
+
+    made_shape = tf.shape(
+        made(tf.ones(input_shape), conditional_input=tf.ones(cond_shape)))
+    broadcast_shape = tf.concat(
+        [
+            tf.broadcast_dynamic_shape(cond_shape[:-1], input_shape[:-1]),
+            input_shape[-1:]
+        ],
+        axis=0,
+    )
+    self.assertAllEqual(
+        self.evaluate(tf.concat([broadcast_shape, [2]], axis=0)), made_shape)
 
 
 del _MaskedAutoregressiveFlowTest

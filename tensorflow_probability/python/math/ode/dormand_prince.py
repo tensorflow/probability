@@ -93,6 +93,7 @@ class DormandPrince(base.Solver):
       min_step_size_factor=0.1,
       max_step_size_factor=10.,
       max_num_steps=None,
+      make_adjoint_solver_fn=None,
       validate_args=False,
       name='dormand_prince',
   ):
@@ -130,6 +131,10 @@ class DormandPrince(base.Solver):
         number of steps allowed (including rejected steps). If unspecified,
         there is no upper bound on the number of steps.
         Default value: `None`.
+      make_adjoint_solver_fn: Callable that takes no arguments that constructs a
+        `Solver` instance. The created solver is used in the adjoint senstivity
+        analysis to compute gradients (if they are requested).
+        Default value: A callable that returns this solver.
       validate_args: Whether to validate input with asserts. If `validate_args`
         is `False` and the inputs are invalid, correct behavior is not
         guaranteed.
@@ -137,7 +142,12 @@ class DormandPrince(base.Solver):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'dormand_prince').
     """
-    super(DormandPrince, self).__init__(True, validate_args, name)
+    super(DormandPrince, self).__init__(
+        use_pfor_to_compute_jacobian=True,
+        make_adjoint_solver_fn=make_adjoint_solver_fn,
+        validate_args=validate_args,
+        name=name,
+    )
     # The default values of `rtol` and `atol` match `scipy.integrate.solve_ivp`.
     self._rtol = rtol
     self._atol = atol
@@ -166,61 +176,46 @@ class DormandPrince(base.Solver):
     solution_times_by_solver = isinstance(solution_times, base.ChosenBySolver)
 
     with tf.name_scope(self._name):
-      # (2) Convert to tensors, determined dtypes.
-      get_dtype = lambda x: x.dtype
-      error_if_wrong_dtype = functools.partial(
-          util.error_if_not_real_or_complex, identifier='initial_state')
+      # (2) Convert to tensors, determine dtypes.
+      p = self._prepare_common_params(initial_state, initial_time)
 
-      initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
-      tf.nest.map_structure(error_if_wrong_dtype, initial_state)
-
-      state_dtypes = tf.nest.map_structure(get_dtype, initial_state)
-      common_state_dtype = dtype_util.common_dtype(initial_state)
-      real_dtype = dtype_util.real_dtype(common_state_dtype)
-
-      initial_time = tf.cast(initial_time, real_dtype)
       max_num_steps = self._max_num_steps
       max_ode_fn_evals = self._max_num_steps
       if max_num_steps is not None:
         max_num_steps = tf.convert_to_tensor(max_num_steps, dtype=tf.int32)
         max_ode_fn_evals = max_num_steps * self.ODE_FN_EVALS_PER_STEP
-      step_size = tf.convert_to_tensor(self._first_step_size, dtype=real_dtype)
-      rtol = tf.convert_to_tensor(tf.cast(self._rtol, real_dtype))
-      atol = tf.convert_to_tensor(tf.cast(self._atol, real_dtype))
-      safety = tf.convert_to_tensor(self._safety_factor, dtype=real_dtype)
+      step_size = tf.convert_to_tensor(
+          self._first_step_size, dtype=p.real_dtype)
+      rtol = tf.convert_to_tensor(tf.cast(self._rtol, p.real_dtype))
+      atol = tf.convert_to_tensor(tf.cast(self._atol, p.real_dtype))
+      safety = tf.convert_to_tensor(self._safety_factor, dtype=p.real_dtype)
       # Use i(d)factor notation for increasing and decreasing factors.
       ifactor, dfactor = self._max_step_size_factor, self._min_step_size_factor
-      ifactor = tf.convert_to_tensor(ifactor, dtype=real_dtype)
-      dfactor = tf.convert_to_tensor(dfactor, dtype=real_dtype)
+      ifactor = tf.convert_to_tensor(ifactor, dtype=p.real_dtype)
+      dfactor = tf.convert_to_tensor(dfactor, dtype=p.real_dtype)
 
       solver_internal_state = previous_solver_internal_state
       if solver_internal_state is None:
-        initial_derivative = ode_fn(initial_time, initial_state)
-        initial_derivative = tf.nest.map_structure(tf.convert_to_tensor,
-                                                   initial_derivative)
-        solver_internal_state = _RungeKuttaSolverInternalState(
-            current_state=initial_state,
-            current_derivative=initial_derivative,
-            last_step_start=initial_time,
-            current_time=initial_time,
-            step_size=step_size,
-            interpolating_coefficients=[initial_state] * self.ORDER
+        solver_internal_state = self._initialize_solver_internal_state(
+            ode_fn=ode_fn,
+            initial_state=p.initial_state,
+            initial_time=p.initial_time,
         )
 
       num_solution_times = 0
       if solution_times_by_solver:
-        final_time = tf.cast(solution_times.final_time, real_dtype)
+        final_time = tf.cast(solution_times.final_time, p.real_dtype)
         times_array = tf.TensorArray(
-            real_dtype,
+            p.real_dtype,
             size=num_solution_times,
             dynamic_size=True,
             element_shape=tf.TensorShape([]))
       else:
-        solution_times = tf.cast(solution_times, real_dtype)
+        solution_times = tf.cast(solution_times, p.real_dtype)
         util.error_if_not_vector(solution_times, 'solution_times')
         num_solution_times = tf.size(solution_times)
         times_array = tf.TensorArray(
-            real_dtype,
+            p.real_dtype,
             size=num_solution_times,
             dynamic_size=False,
             element_shape=[]).unstack(solution_times)
@@ -228,10 +223,10 @@ class DormandPrince(base.Solver):
       solutions_arrays = [
           tf.TensorArray(dtype=component_dtype, size=num_solution_times,
                          dynamic_size=solution_times_by_solver)
-          for component_dtype in tf.nest.flatten(state_dtypes)
+          for component_dtype in tf.nest.flatten(p.state_dtypes)
       ]
       solutions_arrays = tf.nest.pack_sequence_as(
-          initial_state, solutions_arrays)
+          p.initial_state, solutions_arrays)
 
       rk_step = functools.partial(
           self._step,
@@ -252,8 +247,8 @@ class DormandPrince(base.Solver):
 
       assert_ops = self._assert_ops(
           ode_fn=ode_fn,
-          initial_time=initial_time,
-          initial_state=initial_state,
+          initial_time=p.initial_time,
+          initial_state=p.initial_state,
           solution_times=solution_times,
           previous_solver_state=previous_solver_internal_state,
           rtol=rtol,
@@ -302,6 +297,49 @@ class DormandPrince(base.Solver):
             states=states,
             diagnostics=diagnostics,
             solver_internal_state=solver_internal_state)
+
+  def _initialize_solver_internal_state(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+  ):
+    p = self._prepare_common_params(initial_state, initial_time)
+
+    initial_derivative = ode_fn(p.initial_time, p.initial_state)
+    initial_derivative = tf.nest.map_structure(tf.convert_to_tensor,
+                                               initial_derivative)
+    step_size = tf.convert_to_tensor(self._first_step_size, dtype=p.real_dtype)
+
+    return _RungeKuttaSolverInternalState(
+        current_state=p.initial_state,
+        current_derivative=initial_derivative,
+        last_step_start=p.initial_time,
+        current_time=p.initial_time,
+        step_size=step_size,
+        interpolating_coefficients=[p.initial_state] * self.ORDER,
+    )
+
+  def _prepare_common_params(self, initial_state, initial_time):
+    get_dtype = lambda x: x.dtype
+    error_if_wrong_dtype = functools.partial(
+        util.error_if_not_real_or_complex, identifier='initial_state')
+
+    initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
+    tf.nest.map_structure(error_if_wrong_dtype, initial_state)
+
+    state_dtypes = tf.nest.map_structure(get_dtype, initial_state)
+    common_state_dtype = dtype_util.common_dtype(initial_state)
+    real_dtype = dtype_util.real_dtype(common_state_dtype)
+
+    initial_time = tf.cast(initial_time, real_dtype)
+
+    return util.Bunch(
+        initial_state=initial_state,
+        state_dtypes=state_dtypes,
+        real_dtype=real_dtype,
+        initial_time=initial_time,
+    )
 
   def _step(
       self,

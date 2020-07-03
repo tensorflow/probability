@@ -29,16 +29,16 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -50,10 +50,8 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
   """Returns a batch of points chosen uniformly from the unit hypersphere."""
   # This works because the Gaussian distribution is spherically symmetric.
   # raw shape: shape + [dimension]
-  raw = normal.Normal(
-      loc=dtype_util.as_numpy_dtype(dtype)(0),
-      scale=dtype_util.as_numpy_dtype(dtype)(1)).sample(
-          tf.concat([shape, [dimension]], axis=0), seed=seed())
+  raw = samplers.normal(
+      shape=tf.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
   unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
   return unit_norm
 
@@ -98,7 +96,10 @@ def sample_lkj(
     raise ValueError(
         'Cannot sample negative-dimension correlation matrices.')
   # Notation below: B is the batch shape, i.e., tf.shape(concentration)
-  seed = SeedStream(seed, 'sample_lkj')
+
+  # We need 1 seed for beta corr12, and 2 per loop iter.
+  num_seeds = 1 + 2 * max(0, dimension - 2)
+  seeds = list(samplers.split_seed(seed, n=num_seeds, salt='sample_lkj'))
   with tf.name_scope('sample_lkj' or name):
     concentration = tf.convert_to_tensor(concentration)
     if not dtype_util.is_floating(concentration.dtype):
@@ -122,7 +123,7 @@ def sample_lkj(
 
     # This is the correlation coefficient between the first two dimensions.
     # This is also `r` in reference [1].
-    corr12 = 2. * beta_dist.sample(seed=seed()) - 1.
+    corr12 = 2. * beta_dist.sample(seed=seeds.pop()) - 1.
 
     # Below we construct the Cholesky of the initial 2x2 correlation matrix,
     # which is of the form:
@@ -147,13 +148,14 @@ def sample_lkj(
       norm = beta.Beta(
           concentration1=n/2.,
           concentration0=beta_conc
-      ).sample(seed=seed())
+      ).sample(seed=seeds.pop())
       # distance shape: B + [1] for broadcast
       distance = tf.sqrt(norm)[..., tf.newaxis]
       # direction is u in reference [1].
       # direction shape: B + [n]
       direction = _uniform_unit_norm(
-          n, concentration_shape, concentration.dtype, seed)
+          n, concentration_shape, concentration.dtype,
+          seed=seeds.pop())
       # raw_correlation is w in reference [1].
       raw_correlation = distance * direction  # shape: B + [n]
 
@@ -186,6 +188,7 @@ def sample_lkj(
       chol_result = tf.concat(
           [chol_result, new_row[..., tf.newaxis, :]], axis=-2)
 
+    assert not seeds, 'Did not use all seeds: ' + len(seeds)
     if cholesky_space:
       return chol_result
 
@@ -421,9 +424,9 @@ class LKJ(distribution.Distribution):
       ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
         ans = ans + logpi * (k / 2.)
-        ans = ans + tf.math.lgamma(concentration +
-                                   (self.dimension - 1 - k) / 2.)
-        ans = ans - tf.math.lgamma(concentration + (self.dimension - 1) / 2.)
+        effective_concentration = concentration + (self.dimension - 1 - k) / 2.
+        ans = ans + tfp_math.log_gamma_difference(
+            k / 2., effective_concentration)
       return ans
 
   def _mean(self):
@@ -490,17 +493,21 @@ class LKJ(distribution.Distribution):
       assertions.append(assert_util.assert_less_equal(
           dtype_util.as_numpy_dtype(x.dtype)(-1),
           x,
-          message='Correlations must be >= -1.'))
+          message='Correlations must be >= -1.',
+          summarize=30))
       assertions.append(assert_util.assert_less_equal(
           x,
           dtype_util.as_numpy_dtype(x.dtype)(1),
-          message='Correlations must be <= 1.'))
+          message='Correlations must be <= 1.',
+          summarize=30))
       assertions.append(assert_util.assert_near(
           tf.linalg.diag_part(x),
           dtype_util.as_numpy_dtype(x.dtype)(1),
-          message='Self-correlations must be = 1.'))
+          message='Self-correlations must be = 1.',
+          summarize=30))
       assertions.append(assert_util.assert_near(
           x,
           tf.linalg.matrix_transpose(x),
-          message='Correlation matrices must be symmetric.'))
+          message='Correlation matrices must be symmetric.',
+          summarize=30))
     return assertions

@@ -292,7 +292,7 @@ class JointDistribution(distribution_lib.Distribution):
                      if sample_shape else None)))
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
-                           name='sample_distributions'):
+                           name='sample_distributions', **kwargs):
     """Generate samples and the (random) distributions.
 
     Note that a call to `sample()` without arguments will generate a single
@@ -306,6 +306,10 @@ class JointDistribution(distribution_lib.Distribution):
         Default value: `None` (i.e., draw a sample from each distribution).
       name: name prepended to ops created by this function.
         Default value: `"sample_distributions"`.
+      **kwargs: This is an alternative to passing a `value`, and achieves the
+        same effect. Named arguments will be used to parameterize other
+        dependent ("downstream") distribution-making functions. If a `value`
+        argument is also provided, raises a ValueError.
 
     Returns:
       distributions: a `tuple` of `Distribution` instances for each of
@@ -314,7 +318,8 @@ class JointDistribution(distribution_lib.Distribution):
         for each of `distribution_fn`.
     """
     with self._name_and_control_scope(name):
-      ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
+      ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
+                                                    **kwargs)
       return self._model_unflatten(ds), self._model_unflatten(xs)
 
   def log_prob_parts(self, value, name='log_prob_parts'):
@@ -392,9 +397,21 @@ class JointDistribution(distribution_lib.Distribution):
                 'other dependent ("downstream") distribution-making functions. '
                 'Using `None` for any element will trigger a sample from the '
                 'corresponding distribution. Default value: `None` '
-                '(i.e., draw a sample from each distribution).')})
-  def _sample_n(self, sample_shape, seed, value=None):
-    _, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
+                '(i.e., draw a sample from each distribution).'),
+      '**kwargs:': ('This is an alternative to passing a `value`, and achieves '
+                    'the same effect. Named arguments will be used to '
+                    'parameterize other dependent ("downstream") '
+                    'distribution-making functions. See `value` for more '
+                    'details. If a `value` argument is also provided, raises '
+                    'a `ValueError`.')})
+  def _sample_n(self, sample_shape, seed, value=None, **kwargs):
+    if value is not None and kwargs:
+      keywords = ', '.join(map(str, kwargs))
+      raise ValueError('Supplied both `value` and keyword arguments to '
+                       'parameterize sampling. Supplied keywords were: '
+                       '{}'.format(keywords))
+    _, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
+                                                 **kwargs)
     return self._model_unflatten(xs)
 
   def _map_measure_over_dists(self, attr, value):
@@ -409,7 +426,26 @@ class JointDistribution(distribution_lib.Distribution):
     return (getattr(d, attr)() for d in dists)
 
   def _call_flat_sample_distributions(
-      self, sample_shape=(), seed=None, value=None):
+      self, sample_shape=(), seed=None, value=None, **kwargs):
+    if (value is None) and kwargs:
+      names = self._flat_resolve_names()
+      kwargs.update({k: kwargs.get(k) for k in names})  # In place update
+      value, unmatched_kwargs = _resolve_value_from_args(
+          [],
+          kwargs,
+          dtype=self.dtype,
+          flat_names=names,
+          model_flatten_fn=self._model_flatten,
+          model_unflatten_fn=self._model_unflatten)
+      if unmatched_kwargs:
+        join = lambda args: ', '.join(str(j) for j in args)
+        kwarg_names = join(k for k, v in kwargs.items() if v is not None)
+        dist_name_str = join(names)
+        unmatched_str = join(unmatched_kwargs)
+        raise ValueError(
+            'Found unexpected keyword arguments. Distribution names '
+            'are\n{}\nbut received\n{}\nThese names were '
+            'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
     if value is not None:
       value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
@@ -487,10 +523,13 @@ class JointDistribution(distribution_lib.Distribution):
   # tactically implement the `_call_sample_n` redirector.  We don't want to
   # override the public level because then tfp.layers can't take generic
   # `Distribution.sample` as argument for the `convert_to_tensor_fn` parameter.
-  def _call_sample_n(self, sample_shape, seed, name, value=None):
+  def _call_sample_n(self, sample_shape, seed, name, value=None, **kwargs):
     with self._name_and_control_scope(name):
       return self._sample_n(
-          sample_shape, seed=seed() if callable(seed) else seed, value=value)
+          sample_shape,
+          seed=seed() if callable(seed) else seed,
+          value=value,
+          **kwargs)
 
   def _default_event_space_bijector(self):
     return _DefaultJointBijector(self)
@@ -670,68 +709,76 @@ class _DefaultJointBijector(bijector_lib.Bijector):
         for (bijector, input_shape) in zip(support_bijectors, input_shapes)]
     return self._jd._model_unflatten(output_shapes)
 
-  def forward(self, values):
-    values = self._jd._model_flatten(values)
-    self._check_inputs_not_none(values)
+  def forward(self, values, name=None):
+    with tf.name_scope(name or 'forward'):
+      values = self._jd._model_flatten(values)
+      self._check_inputs_not_none(values)
 
-    def bijector_fn(bijector, value):
-      y = bijector.forward(value)
-      return y, y
+      def bijector_fn(bijector, value):
+        y = bijector.forward(value)
+        return y, y
 
-    out = self._evaluate_bijector(bijector_fn, values)
-    return self._jd._model_unflatten(out)
+      out = self._evaluate_bijector(bijector_fn, values)
+      return self._jd._model_unflatten(out)
 
-  def inverse(self, values):
-    self._check_inputs_not_none(values)
-    values = self._jd._model_flatten(values)
+  def inverse(self, values, name=None):
+    with tf.name_scope(name or 'inverse'):
+      self._check_inputs_not_none(values)
+      values = self._jd._model_flatten(values)
 
-    def bijector_fn(bijector, value):
-      x = bijector.inverse(value)
-      return x, value
+      def bijector_fn(bijector, value):
+        x = bijector.inverse(value)
+        return x, value
 
-    out = self._evaluate_bijector(bijector_fn, values)
-    return self._jd._model_unflatten(out)
+      out = self._evaluate_bijector(bijector_fn, values)
+      return self._jd._model_unflatten(out)
 
-  def forward_log_det_jacobian(self, values, event_ndims):
-    self._check_inputs_not_none(values)
-    values = self._jd._model_flatten(values)
-    event_ndims = self._jd._model_flatten(event_ndims)
+  def forward_log_det_jacobian(self, values, event_ndims, name=None):
+    with tf.name_scope(name or 'forward_log_det_jacobian'):
+      self._check_inputs_not_none(values)
+      values = self._jd._model_flatten(values)
+      event_ndims = self._jd._model_flatten(event_ndims)
 
-    def bijector_fn(bijector, value):
-      x, event_ndims = value
-      y = bijector.forward(x)
-      fldj = bijector.forward_log_det_jacobian(x, event_ndims)
-      return fldj, y
+      def bijector_fn(bijector, value):
+        x, event_ndims = value
+        y = bijector.forward(x)
+        fldj = bijector.forward_log_det_jacobian(x, event_ndims)
+        return fldj, y
 
-    fldjs = self._evaluate_bijector(bijector_fn, list(zip(values, event_ndims)))
-    return sum(fldjs)
+      fldjs = self._evaluate_bijector(bijector_fn,
+                                      list(zip(values, event_ndims)))
+      return sum(fldjs)
 
-  def inverse_log_det_jacobian(self, values, event_ndims):
-    self._check_inputs_not_none(values)
-    values = self._jd._model_flatten(values)
-    event_ndims = self._jd._model_flatten(event_ndims)
+  def inverse_log_det_jacobian(self, values, event_ndims, name=None):
+    with tf.name_scope(name or 'inverse_log_det_jacobian'):
+      self._check_inputs_not_none(values)
+      values = self._jd._model_flatten(values)
+      event_ndims = self._jd._model_flatten(event_ndims)
 
-    def bijector_fn(bijector, value):
-      y, event_ndims = value
-      ildj = bijector.inverse_log_det_jacobian(y, event_ndims)
-      return ildj, y
+      def bijector_fn(bijector, value):
+        y, event_ndims = value
+        ildj = bijector.inverse_log_det_jacobian(y, event_ndims)
+        return ildj, y
 
-    ildjs = self._evaluate_bijector(bijector_fn, list(zip(values, event_ndims)))
-    return sum(ildjs)
+      ildjs = self._evaluate_bijector(bijector_fn,
+                                      list(zip(values, event_ndims)))
+      return sum(ildjs)
   # pylint: enable=protected-access
 
   # TODO(b/148485931): Fix bijector caching.
   def forward_event_shape(self, input_shapes):
     return self._event_shapes(input_shapes, 'forward_event_shape')
 
-  def forward_event_shape_tensor(self, input_shapes):
-    self._check_inputs_not_none(input_shapes)
-    return self._event_shapes(input_shapes, 'forward_event_shape_tensor')
+  def forward_event_shape_tensor(self, input_shapes, name=None):
+    with tf.name_scope(name or 'forward_event_shape_tensor'):
+      self._check_inputs_not_none(input_shapes)
+      return self._event_shapes(input_shapes, 'forward_event_shape_tensor')
 
   def inverse_event_shape(self, output_shapes):
     return self._event_shapes(output_shapes, 'inverse_event_shape')
 
-  def inverse_event_shape_tensor(self, output_shapes):
-    self._check_inputs_not_none(output_shapes)
-    return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
+  def inverse_event_shape_tensor(self, output_shapes, name=None):
+    with tf.name_scope('inverse_event_shape_tensor'):
+      self._check_inputs_not_none(output_shapes)
+      return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
 

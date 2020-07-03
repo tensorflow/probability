@@ -25,10 +25,12 @@ import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import shift as shift_bijector
-from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import shift as shift_lib
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 
@@ -313,7 +315,13 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
             shift, log_scale = tf.unstack(params, num=2, axis=-1)
           else:
             shift, log_scale = params
-          return shift_bijector.Shift(shift=shift)(scale_bijector.Scale(scale=log_scale))
+
+          bijectors = []
+          if shift is not None:
+            bijectors.append(shift_lib.Shift(shift))
+          if log_scale is not None:
+            bijectors.append(scale_lib.Scale(tf.exp(log_scale)))
+          return chain.Chain(bijectors)
 
         bijector_fn = _bijector_fn
 
@@ -807,6 +815,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   def __init__(self,
                params,
                event_shape=None,
+               conditional=False,
+               conditional_event_shape=None,
+               conditional_input_layers='all_layers',
                hidden_units=None,
                input_order='left-to-right',
                hidden_degrees='equal',
@@ -831,6 +842,17 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
         only rank-1 shapes are supported.  That is, event_shape must be a single
         integer.  If not specified, the event shape is inferred when this layer
         is first called or built.
+      conditional: Python boolean describing whether to add conditional inputs.
+      conditional_event_shape: Python `list`-like of positive integers (or a
+        single int), specifying the shape of the conditional input to this layer
+        (without the batch dimensions). This must be specified if `conditional`
+        is `True`.
+      conditional_input_layers: Python `str` describing how to add conditional
+        parameters to the autoregressive network. When "all_layers" the
+        conditional input will be combined with the network at every layer,
+        whilst "first_layer" combines the conditional input only at the first
+        layer which is then passed through the network
+        autoregressively. Default: 'all_layers'.
       hidden_units: Python `list`-like of non-negative integers, specifying
         the number of units in each hidden layer.
       input_order: Order of degrees to the input units: 'random',
@@ -867,6 +889,11 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
     self._params = params
     self._event_shape = _list(event_shape) if event_shape is not None else None
+    self._conditional = conditional
+    self._conditional_event_shape = (
+        _list(conditional_event_shape)
+        if conditional_event_shape is not None else None)
+    self._conditional_layers = conditional_input_layers
     self._hidden_units = hidden_units if hidden_units is not None else []
     self._input_order_param = input_order
     self._hidden_degrees = hidden_degrees
@@ -886,8 +913,29 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       self._event_ndims = len(self._event_shape)
 
       if self._event_ndims != 1:
-        raise ValueError('Parameter `event_shape` must describe a rank-1 shape.'
-                         ' `event_shape: {!r}`'.format(event_shape))
+        raise ValueError('Parameter `event_shape` must describe a rank-1 '
+                         'shape. `event_shape: {!r}`'.format(event_shape))
+
+    if self._conditional:
+      if self._event_shape is None:
+        raise ValueError('`event_shape` must be provided when '
+                         '`conditional` is True')
+      if self._conditional_event_shape is None:
+        raise ValueError('`conditional_event_shape` must be provided when '
+                         '`conditional` is True')
+      self._conditional_size = self._conditional_event_shape[-1]
+      self._conditional_ndims = len(self._conditional_event_shape)
+      if self._conditional_ndims != 1:
+        raise ValueError('Parameter `conditional_event_shape` must describe a '
+                         'rank-1 shape')
+      if not ((self._conditional_layers == 'first_layer') or
+              (self._conditional_layers == 'all_layers')):
+        raise ValueError('`conditional_input_layers` must be '
+                         '"first_layers" or "all_layers"')
+    else:
+      if self._conditional_event_shape is not None:
+        raise ValueError('`conditional_event_shape` passed but `conditional` '
+                         'is set to False.')
 
     # To be built in `build`.
     self._input_order = None
@@ -910,29 +958,23 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
     # Construct the masks.
     self._input_order = _create_input_order(
-        self._event_size, self._input_order_param)
-    self._masks = _create_masks(_create_degrees(
-        input_size=self._event_size,
+        self._event_size,
+        self._input_order_param,
+    )
+    self._masks = _make_dense_autoregressive_masks(
+        params=self._params,
+        event_size=self._event_size,
         hidden_units=self._hidden_units,
         input_order=self._input_order,
-        hidden_degrees=self._hidden_degrees))
+        hidden_degrees=self._hidden_degrees,
+    )
 
-    # In the final layer, we will produce `self._params` outputs for each of the
-    # `self._event_size` inputs to `AutoregressiveNetwork`.  But `masks[-1]` has
-    # shape `[self._hidden_units[-1], self._event_size]`.  Thus, we need to
-    # expand the mask to `[hidden_units[-1], event_size * self._params]` such
-    # that all units for the same input are masked identically.  In particular,
-    # we tile the mask so the j-th element of `tf.unstack(output, axis=-1)` is a
-    # tensor of the j-th parameter/unit for each input.
-    #
-    # NOTE: Other orderings of the output could be faster -- should benchmark.
-    self._masks[-1] = np.reshape(
-        np.tile(self._masks[-1][..., tf.newaxis], [1, 1, self._params]),
-        [self._masks[-1].shape[0], self._event_size * self._params])
-
-    self._network = tf.keras.Sequential([
-        tf.keras.layers.InputLayer((self._event_size,), dtype=self.dtype)
-    ])
+    outputs = [tf.keras.Input((self._event_size,), dtype=self.dtype)]
+    inputs = outputs[0]
+    if self._conditional:
+      conditional_input = tf.keras.Input((self._conditional_size,),
+                                         dtype=self.dtype)
+      inputs = [inputs, conditional_input]
 
     # Input-to-hidden, hidden-to-hidden, and hidden-to-output layers:
     #  [..., self._event_size] -> [..., self._hidden_units[0]].
@@ -940,9 +982,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     #  [..., self._hidden_units[-1]] -> [..., event_size * self._params].
     layer_output_sizes = self._hidden_units + [self._event_size * self._params]
     for k in range(len(self._masks)):
-      self._network.add(tf.keras.layers.Dense(
+      autoregressive_output = tf.keras.layers.Dense(
           layer_output_sizes[k],
-          activation=self._activation if k + 1 < len(self._masks) else None,
+          activation=None,
           use_bias=self._use_bias,
           kernel_initializer=_make_masked_initializer(
               self._masks[k], self._kernel_initializer),
@@ -952,21 +994,79 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
           kernel_constraint=_make_masked_constraint(
               self._masks[k], self._kernel_constraint),
           bias_constraint=self._bias_constraint,
-          dtype=self.dtype))
-
+          dtype=self.dtype)(outputs[-1])
+      if (self._conditional and
+          ((self._conditional_layers == 'all_layers') or
+           ((self._conditional_layers == 'first_layer') and (k == 0)))):
+        conditional_output = tf.keras.layers.Dense(
+            layer_output_sizes[k],
+            activation=None,
+            use_bias=False,
+            kernel_initializer=self._kernel_initializer,
+            bias_initializer=None,
+            kernel_regularizer=self._kernel_regularizer,
+            bias_regularizer=None,
+            kernel_constraint=self._kernel_constraint,
+            bias_constraint=None,
+            dtype=self.dtype)(conditional_input)
+        outputs.append(tf.keras.layers.Add()([
+            autoregressive_output,
+            conditional_output]))
+      else:
+        outputs.append(autoregressive_output)
+      if k + 1 < len(self._masks):
+        outputs.append(
+            tf.keras.layers.Activation(self._activation)
+            (outputs[-1]))
+    self._network = tf.keras.models.Model(
+        inputs=inputs,
+        outputs=outputs[-1])
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
 
-  def call(self, x):
-    """See tfkl.Layer.call."""
+  def call(self, x, conditional_input=None):
+    """Transforms the inputs and returns the outputs.
+
+    Suppose `x` has shape `batch_shape + event_shape` and `conditional_input`
+    has shape `conditional_batch_shape + conditional_event_shape`. Then, the
+    output shape is:
+    `broadcast(batch_shape, conditional_batch_shape) + event_shape + [params]`.
+
+    Also see `tfkl.Layer.call` for some generic discussion about Layer calling.
+
+    Args:
+      x: A `Tensor`. Primary input to the layer.
+      conditional_input: A `Tensor. Conditional input to the layer. This is
+        required iff the layer is conditional.
+
+    Returns:
+      y: A `Tensor`. The output of the layer. Note that the leading dimensions
+         follow broadcasting rules described above.
+    """
     with tf.name_scope(self.name or 'AutoregressiveNetwork_call'):
       x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
-      input_shape = tf.shape(x)
       # TODO(b/67594795): Better support for dynamic shapes.
+      input_shape = ps.shape(x)
       if tensorshape_util.rank(x.shape) == 1:
         x = x[tf.newaxis, ...]
+      if self._conditional:
+        if conditional_input is None:
+          raise ValueError('`conditional_input` must be passed as a named '
+                           'argument')
+        conditional_input = tf.convert_to_tensor(
+            conditional_input, dtype=self.dtype, name='conditional_input')
+        conditional_batch_shape = ps.shape(conditional_input)[:-1]
+        if tensorshape_util.rank(conditional_input.shape) == 1:
+          conditional_input = conditional_input[tf.newaxis, ...]
+        x = [x, conditional_input]
+        output_shape = ps.concat(
+            [ps.broadcast_shape(conditional_batch_shape,
+                                input_shape[:-1]),
+             input_shape[-1:]], axis=0)
+      else:
+        output_shape = input_shape
       return tf.reshape(self._network(x),
-                        tf.concat([input_shape, [self._params]], axis=0))
+                        tf.concat([output_shape, [self._params]], axis=0))
 
   def compute_output_shape(self, input_shape):
     """See tfkl.Layer.compute_output_shape."""
@@ -981,6 +1081,110 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     return self._params
 
 
+def _make_dense_autoregressive_masks(
+    params,
+    event_size,
+    hidden_units,
+    input_order='left-to-right',
+    hidden_degrees='equal',
+    seed=None,
+):
+  """Creates masks for use in dense MADE [Germain et al. (2015)][1] networks.
+
+  See the documentation for `AutoregressiveNetwork` for the theory and
+  application of MADE networks. This function lets you construct your own dense
+  MADE networks by applying the returned masks to each dense layer. E.g. a
+  consider an autoregressive network that takes `event_size`-dimensional vectors
+  and produces `params`-parameters per input, with `num_hidden` hidden layers,
+  with `hidden_size` hidden units each.
+
+  ```python
+  def random_made(x):
+    masks = tfb._make_dense_autoregressive_masks(
+        params=params,
+        event_size=event_size,
+        hidden_units=[hidden_size] * num_hidden)
+    output_sizes = [hidden_size] * num_hidden
+    input_size = event_size
+    for (mask, output_size) in zip(masks, output_sizes):
+      mask = tf.cast(mask, tf.float32)
+      x = tf.matmul(x, tf.random.normal([input_size, output_size]) * mask)
+      x = tf.nn.relu(x)
+      input_size = output_size
+    x = tf.matmul(
+        x,
+        tf.random.normal([input_size, params * event_size]) * masks[-1])
+    x = tf.reshape(x, [-1, event_size, params])
+    return x
+
+  y = random_made(tf.zeros([1, event_size]))
+  assert [1, event_size, params] == y.shape
+  ```
+
+  Each mask is a Numpy boolean array. All masks have the shape `[input_size,
+  output_size]`. For example, if we `hidden_units` is a list of two integers,
+  the mask shapes will be: `[event_size, hidden_units[0]], [hidden_units[0],
+  hidden_units[1]], [hidden_units[1], params * event_size]`.
+
+  You can extend this example with trainable parameters and constraints if
+  necessary.
+
+  Args:
+    params: Python integer specifying the number of parameters to output
+      per input.
+    event_size: Python integer specifying the shape of the input to this layer.
+    hidden_units: Python `list`-like of non-negative integers, specifying
+      the number of units in each hidden layer.
+    input_order: Order of degrees to the input units: 'random', 'left-to-right',
+      'right-to-left', or an array of an explicit order. For example,
+      'left-to-right' builds an autoregressive model
+      p(x) = p(x1) p(x2 | x1) ... p(xD | x<D).
+    hidden_degrees: Method for assigning degrees to the hidden units:
+      'equal', 'random'. If 'equal', hidden units in each layer are allocated
+      equally (up to a remainder term) to each degree. Default: 'equal'.
+    seed: If not `None`, seed to use for 'random' `input_order` and
+      `hidden_degrees`.
+
+  Returns:
+    masks: A list of masks that should be applied the dense matrices of
+      individual densely connected layers in the MADE network. Each mask is a
+      Numpy boolean array.
+
+  #### References
+
+  [1]: Mathieu Germain, Karol Gregor, Iain Murray, and Hugo Larochelle. MADE:
+       Masked Autoencoder for Distribution Estimation. In _International
+       Conference on Machine Learning_, 2015. https://arxiv.org/abs/1502.03509
+  """
+  if seed is None:
+    input_order_seed = None
+    degrees_seed = None
+  else:
+    input_order_seed, degrees_seed = onp.random.RandomState(seed).randint(
+        2**31, size=2)
+  input_order = _create_input_order(
+      event_size, input_order, seed=input_order_seed)
+  masks = _create_masks(_create_degrees(
+      input_size=event_size,
+      hidden_units=hidden_units,
+      input_order=input_order,
+      hidden_degrees=hidden_degrees,
+      seed=degrees_seed))
+  # In the final layer, we will produce `params` outputs for each of the
+  # `event_size` inputs.  But `masks[-1]` has shape `[hidden_units[-1],
+  # event_size]`.  Thus, we need to expand the mask to `[hidden_units[-1],
+  # event_size * params]` such that all units for the same input are masked
+  # identically.  In particular, we tile the mask so the j-th element of
+  # `tf.unstack(output, axis=-1)` is a tensor of the j-th parameter/unit for
+  # each input.
+  #
+  # NOTE: Other orderings of the output could be faster -- should benchmark.
+  masks[-1] = np.reshape(
+      np.tile(masks[-1][..., tf.newaxis], [1, 1, params]),
+      [masks[-1].shape[0], event_size * params])
+  return masks
+
+
 def _list(xs):
   """Convert the given argument to a list."""
   try:
@@ -989,7 +1193,7 @@ def _list(xs):
     return [xs]
 
 
-def _create_input_order(input_size, input_order='left-to-right'):
+def _create_input_order(input_size, input_order='left-to-right', seed=None):
   """Returns a degree vectors for the input."""
   if isinstance(input_order, six.string_types):
     if input_order == 'left-to-right':
@@ -997,10 +1201,14 @@ def _create_input_order(input_size, input_order='left-to-right'):
     elif input_order == 'right-to-left':
       return np.arange(start=input_size, stop=0, step=-1)
     elif input_order == 'random':
-      ret = np.arange(start=1, stop=input_size + 1)
-      onp.random.shuffle(ret)
+      ret = onp.arange(start=1, stop=input_size + 1)
+      if seed is None:
+        rng = onp.random
+      else:
+        rng = onp.random.RandomState(seed)
+      rng.shuffle(ret)
       return ret
-  elif np.all(np.sort(input_order) == np.arange(1, input_size + 1)):
+  elif np.all(np.sort(np.array(input_order)) == np.arange(1, input_size + 1)):
     return np.array(input_order)
 
   raise ValueError('Invalid input order: "{}".'.format(input_order))
@@ -1009,7 +1217,8 @@ def _create_input_order(input_size, input_order='left-to-right'):
 def _create_degrees(input_size,
                     hidden_units=None,
                     input_order='left-to-right',
-                    hidden_degrees='equal'):
+                    hidden_degrees='equal',
+                    seed=None):
   """Returns a list of degree vectors, one for each input and hidden layer.
 
   A unit with degree d can only receive input from units with degree < d. Output
@@ -1027,6 +1236,7 @@ def _create_degrees(input_size,
     hidden_degrees: Method for assigning degrees to the hidden units:
       'equal', 'random'.  If 'equal', hidden units in each layer are allocated
       equally (up to a remainder term) to each degree.  Default: 'equal'.
+    seed: If not `None`, use as a seed for the 'random' hidden_degrees.
 
   Raises:
     ValueError: invalid input order.
@@ -1041,11 +1251,15 @@ def _create_degrees(input_size,
   for units in hidden_units:
     if isinstance(hidden_degrees, six.string_types):
       if hidden_degrees == 'random':
+        if seed is None:
+          rng = onp.random
+        else:
+          rng = onp.random.RandomState(seed)
         # samples from: [low, high)
         degrees.append(
-            onp.random.randint(low=min(np.min(degrees[-1]), input_size - 1),
-                               high=input_size,
-                               size=units))
+            rng.randint(low=min(np.min(degrees[-1]), input_size - 1),
+                        high=input_size,
+                        size=units))
       elif hidden_degrees == 'equal':
         min_degree = min(np.min(degrees[-1]), input_size - 1)
         degrees.append(np.maximum(

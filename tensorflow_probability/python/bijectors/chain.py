@@ -121,25 +121,25 @@ class Chain(bijector.Bijector):
 
   * Forward:
 
-   ```python
-   exp = Exp()
-   softplus = Softplus()
-   Chain([exp, softplus]).forward(x)
-   = exp.forward(softplus.forward(x))
-   = tf.exp(tf.log(1. + tf.exp(x)))
-   = 1. + tf.exp(x)
-   ```
+    ```python
+    exp = Exp()
+    softplus = Softplus()
+    Chain([exp, softplus]).forward(x)
+    = exp.forward(softplus.forward(x))
+    = tf.exp(tf.log(1. + tf.exp(x)))
+    = 1. + tf.exp(x)
+    ```
 
   * Inverse:
 
-   ```python
-   exp = Exp()
-   softplus = Softplus()
-   Chain([exp, softplus]).inverse(y)
-   = softplus.inverse(exp.inverse(y))
-   = tf.log(tf.exp(tf.log(y)) - 1.)
-   = tf.log(y - 1.)
-   ```
+    ```python
+    exp = Exp()
+    softplus = Softplus()
+    Chain([exp, softplus]).inverse(y)
+    = softplus.inverse(exp.inverse(y))
+    = tf.log(tf.exp(tf.log(y)) - 1.)
+    = tf.log(y - 1.)
+    ```
 
   """
 

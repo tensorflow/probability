@@ -21,8 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import numpy_array
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import l2_normalize
@@ -62,13 +60,10 @@ def _sigmoid_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-a
 
 
 def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-argument
-    _sentinel=None,
-    labels=None,
-    logits=None,
+    labels,
+    logits,
     name=None):
   """Sparse Softmax cross entropy with logits."""
-  if _sentinel is not None:
-    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
   labels_shape = labels.shape
   num_classes = logits.shape[-1]
   logits = np.reshape(logits, [-1, num_classes])
@@ -86,14 +81,11 @@ def _sparse_softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,u
 
 
 def _softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-argument
-    _sentinel=None,
-    labels=None,
-    logits=None,
+    labels,
+    logits,
     axis=-1,
     name=None):
   """Softmax cross entropy with logits."""
-  if _sentinel is not None:
-    raise ValueError('Pass in `label` and `logits` parameters as kwargs')
   cost = -np.sum(
       np.where(labels == 0, np.zeros_like(labels),
                labels * (logits - reduce_logsumexp(
@@ -105,7 +97,7 @@ def _softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-a
 # --- Begin Public Functions --------------------------------------------------
 
 l2_normalize = utils.copy_docstring(
-    tf.nn.l2_normalize,
+    'tf.nn.l2_normalize',
     l2_normalize)
 
 
@@ -121,25 +113,25 @@ def _moments(x, axes, shift=None, keepdims=False, name=None):  # pylint: disable
   return (mean, variance)
 
 moments = utils.copy_docstring(
-    tf.nn.moments,
+    'tf.nn.moments',
     _moments)
 
 
 relu = utils.copy_docstring(
-    tf.nn.relu,
-    lambda features, name=None: np.max(features, 0))
+    'tf.nn.relu',
+    lambda features, name=None: np.maximum(features, 0))
 
 
 sigmoid_cross_entropy_with_logits = utils.copy_docstring(
-    tf.nn.sigmoid_cross_entropy_with_logits,
+    'tf.nn.sigmoid_cross_entropy_with_logits',
     _sigmoid_cross_entropy_with_logits)
 
 
 sparse_softmax_cross_entropy_with_logits = utils.copy_docstring(
-    tf.nn.sparse_softmax_cross_entropy_with_logits,
+    'tf.nn.sparse_softmax_cross_entropy_with_logits',
     _sparse_softmax_cross_entropy_with_logits)
 
 
 softmax_cross_entropy_with_logits = utils.copy_docstring(
-    tf.nn.softmax_cross_entropy_with_logits,
+    'tf.nn.softmax_cross_entropy_with_logits',
     _softmax_cross_entropy_with_logits)

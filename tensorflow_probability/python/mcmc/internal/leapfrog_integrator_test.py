@@ -33,9 +33,6 @@ class LeapfrogIntegratorTest(test_util.TestCase):
     self._shape_param = 5.
     self._rate_param = 10.
 
-    tf.random.set_seed(10003)
-    np.random.seed(10003)
-
   def assertAllFinite(self, x):
     self.assertAllEqual(np.ones_like(x).astype(bool), np.isfinite(x))
 

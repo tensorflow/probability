@@ -75,6 +75,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "bdf_util_test",
     size = "small",
@@ -101,6 +102,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "runge_kutta_util_test",
     size = "small",
@@ -124,6 +126,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "ode_test",
     size = "large",
@@ -138,6 +141,47 @@ py_test(
     ],
 )
 
+# py2and3
+py_test(
+    name = "xla_test_cpu",
+    srcs = ["xla_test.py"],
+    args = ["--test_device=cpu"],
+    main = "xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+    ],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+# py2and3
+py_test(
+    name = "xla_test_gpu",
+    srcs = ["xla_test.py"],
+    args = ["--test_device=gpu"],
+    main = "xla_test.py",
+    shard_count = 1,
+    tags = [
+        "nozapfhahn",
+        "requires-gpu-nvidia",
+    ],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
 py_library(
     name = "util",
     srcs = ["util.py"],
@@ -148,6 +192,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "util_test",
     size = "small",

@@ -45,10 +45,14 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math:linalg",
     ],
 )
 
+# py2and3
 py_test(
     name = "fisher_scoring_test",
     size = "small",
@@ -66,11 +70,15 @@ py_library(
     srcs = ["proximal_hessian.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":fisher_scoring",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/math:linalg",
     ],
 )
 
+# py2and3
 py_test(
     name = "proximal_hessian_test",
     size = "medium",
@@ -92,9 +100,12 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
+# py2and3
 py_test(
     name = "family_test",
     size = "small",

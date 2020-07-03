@@ -22,6 +22,7 @@ import functools
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import binomial
 from tensorflow_probability.python.distributions import distribution
@@ -30,8 +31,8 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'BetaBinomial',
@@ -220,10 +221,12 @@ class BetaBinomial(distribution.Distribution):
   def _params_list_as_tensors(self):
     return [tf.convert_to_tensor(p) for p in self._params_list()]
 
-  def _batch_shape_tensor(self):
+  def _batch_shape_tensor(self, params=None):
+    if params is None:
+      params = self._params_list()
     return functools.reduce(
         prefer_static.broadcast_shape,
-        [prefer_static.shape(t) for t in self._params_list()])
+        [prefer_static.shape(t) for t in params])
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,
@@ -236,25 +239,27 @@ class BetaBinomial(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    seed_stream = SeedStream(seed, 'beta_binomial')
+    beta_seed, binomial_seed = samplers.split_seed(seed, salt='beta_binomial')
 
-    total_count, concentration1, concentration0 = self._params_list_as_tensors()
+    params = self._params_list_as_tensors()
+    batch_shape = self._batch_shape_tensor(params=params)
+    total_count, concentration1, concentration0 = params
 
-    batch_shape_tensor = self.batch_shape_tensor()
     probs = beta.Beta(
-        tf.broadcast_to(concentration1, batch_shape_tensor),
+        tf.broadcast_to(concentration1, batch_shape),
         concentration0,
         validate_args=self.validate_args).sample(
-            n, seed=seed_stream())
+            n, seed=beta_seed)
     return binomial.Binomial(
         total_count, probs=probs,
-        validate_args=self.validate_args).sample(seed=seed_stream())
+        validate_args=self.validate_args).sample(seed=binomial_seed)
 
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)
   def _log_prob(self, counts):
     n, c1, c0 = self._params_list_as_tensors()
-    return (_log_combinations(n, counts) +
-            _log_beta(c1 + counts, n + c0 - counts) - _log_beta(c1, c0))
+    return (_log_combinations(n, counts)
+            + tfp_math.lbeta(c1 + counts, n + c0 - counts)
+            - tfp_math.lbeta(c1, c0))
 
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)
   def _prob(self, counts):
@@ -312,10 +317,4 @@ class BetaBinomial(distribution.Distribution):
 
 def _log_combinations(n, k):
   """Computes log(Gamma(n+1) / (Gamma(k+1) * Gamma(n-k+1))."""
-  return (
-      tf.math.lgamma(n + 1) - tf.math.lgamma(k + 1) - tf.math.lgamma(n - k + 1))
-
-
-def _log_beta(x, y):
-  """Computes log(Gamma(x) * Gamma(y) / Gamma(x+y))."""
-  return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
+  return -tfp_math.lbeta(k + 1, n - k + 1) - tf.math.log(n + 1)

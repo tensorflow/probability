@@ -26,8 +26,9 @@ from scipy import special as sp_special
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+
+from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
 
 
 tfd = tfp.distributions
@@ -70,20 +71,20 @@ class ReduceWeightedLogSumExp(test_util.TestCase):
       m = np.squeeze(m, axis=axis)
     return m + np.log(sgn * sum_), sgn
 
+  @test_util.numpy_disable_gradient_test
   def testNoWeights(self):
     logx_ = np.array([[0., -1, 1000.],
                       [0, 1, -1000.],
                       [-5, 0, 5]])
     logx = tf.constant(logx_)
-    with tf.GradientTape() as tape:
-      tape.watch(logx)
-      expected = tf.reduce_logsumexp(logx, axis=-1)
-    grad_expected = tape.gradient(expected, logx)
-    with tf.GradientTape() as tape:
-      tape.watch(logx)
-      actual, actual_sgn = tfp.math.reduce_weighted_logsumexp(
-          logx, axis=-1, return_sign=True)
-    grad_actual = tape.gradient(actual, logx)
+    expected = tf.reduce_logsumexp(logx, axis=-1)
+    grad_expected, _ = tfp.math.value_and_gradient(
+        lambda logx: tf.reduce_logsumexp(logx, axis=-1), logx)
+    actual, actual_sgn = tfp.math.reduce_weighted_logsumexp(
+        logx, axis=-1, return_sign=True)
+    grad_actual, _ = tfp.math.value_and_gradient(
+        lambda logx: tfp.math.reduce_weighted_logsumexp(logx, axis=-1),
+        logx)
     [
         actual_,
         actual_sgn_,
@@ -316,7 +317,91 @@ class SoftplusInverseTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class LogAddExp(test_util.TestCase):
+class LogCumsumExpTests(test_util.TestCase):
+
+  def _testCumulativeLogSumExp(self, x, axis=0):
+    result_naive = tf.cumsum(tf.exp(x), axis=axis)
+    result_fused = tf.exp(tfp.math.log_cumsum_exp(x, axis=axis))
+    self.assertAllClose(result_naive, result_fused)
+
+  def testMinusInfinity(self):
+    x = np.log([0., 0., 1., 1., 1., 1., 0., 0.])
+    self._testCumulativeLogSumExp(x)
+
+  def test1D(self):
+    x = np.arange(10) / 10.0 - 0.5
+    self._testCumulativeLogSumExp(x)
+
+  def test2D(self):
+    x = np.reshape(np.arange(20) / 20.0 - 0.5, (2, 10))
+    for axis in (-2, -1, 0, 1):
+      self._testCumulativeLogSumExp(x, axis=axis)
+
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      'Relies on Tensorflow gradient_checker')
+  def testGradient(self):
+    x = np.arange(10) / 10.0 - 0.5
+    x = tf.convert_to_tensor(x, dtype=tf.float64)
+    grad_naive_theoretical, _ = gradient_checker_v2.compute_gradient(
+        lambda y: tf.cumsum(tf.exp(y)), [x])
+    grad_fused_theoretical, _ = gradient_checker_v2.compute_gradient(
+        lambda y: tf.exp(tfp.math.log_cumsum_exp(y)),
+        [x])
+    self.assertAllClose(grad_fused_theoretical, grad_naive_theoretical)
+
+  def test1DLarge(self):
+    # This test ensures that the operation is correct even when the naive
+    # implementation would overflow.
+    x = tf.convert_to_tensor(np.arange(20) * 20.0, dtype=tf.float32)
+    result_fused = self.evaluate(tfp.math.log_cumsum_exp(x))
+    result_map = self.evaluate(tf.map_fn(
+        lambda i: tf.reduce_logsumexp(x[:i + 1]),
+        tf.range(tf.shape(x)[0]),
+        dtype=x.dtype))
+    self.assertAllClose(result_fused, result_map)
+
+  @parameterized.named_parameters(
+      ('not_compiled', False),
+      ('xla_compiled', True))
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      '`GradientTape` does not have `jacobian` method')
+  def testGradientAtMinusInf(self, xla_compile):
+    # This ensures that cumulative sums involving `-np.inf` behave
+    # correctly even when compiled with XLA.
+    x = tf.constant([1., -np.inf, -np.inf, 4., 5., 6., 7., 8.])
+    @tf.function(experimental_compile=xla_compile)
+    def compute_jacobian(x):
+      with tf.GradientTape() as g:
+        g.watch(x)
+        y = tfp.math.log_cumsum_exp(x)
+      return g.jacobian(y, x)
+    # The rows of the Jacobian of `log_cumsum_exp` are given by
+    # `tf.math.softmax`.
+    rows = [tf.concat([tf.math.softmax(x[:i + 1]),
+                       tf.zeros([7 - i])], axis=0)
+            for i in range(8)]
+    expected_jacobian = tf.stack(rows, axis=0)
+    jacobian = compute_jacobian(x)
+    self.assertAllClose(jacobian, expected_jacobian, atol=1e-7)
+
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      '`GradientTape` does not have `jacobian` method')
+  def testGradientCumsumViaLogCumsumExp(self):
+    # Regression test for b/156297366.
+    x = tf.constant([1., 2., 3., 4.])
+    with tf.GradientTape(persistent=True) as g:
+      g.watch(x)
+      z = tf.exp(tfp.math.log_cumsum_exp(tf.math.log(x)))
+    expected_gradients = tfp.math.fill_triangular(tf.ones(4 * (4 + 1) // 2))
+    gradients = g.jacobian(z, x)
+    self.assertAllClose(gradients, expected_gradients, atol=1e-7)
+
+
+@test_util.test_all_tf_execution_regimes
+class LogAddExpTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_small(self):
@@ -344,6 +429,17 @@ class LogAddExp(test_util.TestCase):
         tfp.math.value_and_gradient(tfp.math.log_add_exp, [x, y]))
     self.assertAllClose([1000., 1000.], z, atol=0., rtol=1e-5)
     self.assertAllEqual(1. - np.eye(2), g)
+
+  @test_util.numpy_disable_gradient_test
+  def test_equal_arguments(self):
+    # The standard way to compute `log_add_exp` makes use of
+    # the subexpression `abs(x - y)` which has a discontinuous
+    # gradient at `x == y`.
+    x = np.log(np.arange(1, 21, dtype=np.float32))
+    z, g = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.log_add_exp, [x, x]))
+    self.assertAllClose(np.log(2.0) + x, z, atol=0., rtol=1e-5)
+    self.assertAllClose(g, np.full([2, 20], 0.5))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -446,6 +542,12 @@ class LogCoshTest(test_util.TestCase):
     x = np.logspace(1., 2., 100)
     self.assertAllClose(
         np.log(np.cosh(x)), self.evaluate(tfp.math.log_cosh(x)))
+
+  @test_util.numpy_disable_gradient_test
+  def testLogCoshGrad(self):
+    x = np.linspace(-30., 30., 100)
+    err = self.compute_max_gradient_error(tfp.math.log_cosh, [x])
+    self.assertLess(err, 1e-6)
 
 
 @test_util.test_all_tf_execution_regimes

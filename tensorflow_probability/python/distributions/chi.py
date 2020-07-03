@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
@@ -108,7 +109,7 @@ class Chi(transformed_distribution.TransformedDistribution):
   def _mean(self, df=None):
     df = tf.convert_to_tensor(self.df if df is None else df)
     return np.sqrt(2.) * tf.exp(
-        tf.math.lgamma(0.5 * (df + 1.)) - tf.math.lgamma(0.5 * df))
+        -tfp_math.log_gamma_difference(0.5, 0.5 * df))
 
   def _variance(self):
     df = tf.convert_to_tensor(self.df)

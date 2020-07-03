@@ -332,22 +332,25 @@ class CategoricalTest(test_util.TestCase):
                         self.evaluate(dist.entropy()),
                         atol=0, rtol=1e-5)
 
+  @test_util.numpy_disable_gradient_test
   def testEntropyGradient(self):
-    with tf.GradientTape(persistent=True) as tape:
-      logits = tf.constant([[1., 2., 3.], [2., 5., 1.]])
-      tape.watch(logits)
 
+    def true_entropy_fn(logits):
       probabilities = tf.math.softmax(logits)
       log_probabilities = tf.math.log_softmax(logits)
-      true_entropy = -tf.reduce_sum(probabilities * log_probabilities, axis=-1)
+      return -tf.reduce_sum(probabilities * log_probabilities, axis=-1)
 
+    def categorical_entropy_fn(logits):
       categorical_distribution = tfd.Categorical(
-          probs=probabilities, validate_args=True)
-      categorical_entropy = categorical_distribution.entropy()
+          logits=logits, validate_args=True)
+      return categorical_distribution.entropy()
 
     # works
-    true_entropy_g = tape.gradient(true_entropy, logits)
-    categorical_entropy_g = tape.gradient(categorical_entropy, logits)
+    logits = tf.constant([[1., 2., 3.], [2., 5., 1.]])
+    true_entropy, true_entropy_g = tfp.math.value_and_gradient(
+        true_entropy_fn, [logits])
+    categorical_entropy, categorical_entropy_g = tfp.math.value_and_gradient(
+        categorical_entropy_fn, [logits])
 
     res = self.evaluate({'true_entropy': true_entropy,
                          'categorical_entropy': categorical_entropy,
@@ -400,6 +403,7 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllClose(
         [0.4**2 + 0.6**2], [prob_val[:, :, :, 1].mean()], atol=1e-2)
 
+  @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
       'JAX does not return None for gradients.')
   def testNotReparameterized(self):

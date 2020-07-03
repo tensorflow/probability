@@ -30,7 +30,6 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 class DummyMatrixTransform(tfb.Bijector):
@@ -711,6 +710,8 @@ class ScalarToMultiTest(test_util.TestCase):
                     5, seed=test_util.test_seed(),
                     bijector_kwargs={'z': z}))), z)
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX only has static shapes.')
   def testVectorDynamicShapeOverrideWithMutation(self):
     batch_shape = tf.Variable([4], shape=tf.TensorShape(None), dtype=tf.int32)
     d = tfd.TransformedDistribution(
@@ -738,6 +739,8 @@ class ScalarToMultiTest(test_util.TestCase):
       with self.assertRaisesOpError('must have non-negative elements'):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.jax_disable_test_missing_functionality(
+      'JAX only has static shapes.')
   def testNonScalarDynamicShapeOverrideWithMutation(self):
     loc = tf.Variable(3., shape=tf.TensorShape(None))
     base_dist = tfd.Normal(loc=loc, scale=1.)
@@ -813,11 +816,15 @@ class ExcessiveConcretizationTest(test_util.TestCase):
         batch_shape=batch_shape,
         validate_args=True)
 
-    for method in ('mean', 'sample', 'entropy', 'event_shape_tensor',
+    for method in ('mean', 'entropy', 'event_shape_tensor',
                    'batch_shape_tensor'):
       with tfp_hps.assert_no_excessive_var_usage(
           method, max_permissible=self.max_permissible[method]):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage(
+        'sample', max_permissible=self.max_permissible['sample']):
+      dist.sample(seed=test_util.test_seed())
 
     for method in ('log_prob', 'prob'):
       with tfp_hps.assert_no_excessive_var_usage(
@@ -876,58 +883,6 @@ class ExcessiveConcretizationTestUnknownShape(ExcessiveConcretizationTest):
     }
 
     self.shape = tf.TensorShape(None)
-
-
-# TODO(emilyaf): Check in `Split` bijector and remove this.
-class ToySplit(tfb.Bijector):
-
-  def __init__(self, size_splits):
-    self._size_splits = size_splits
-    self._flat_size_splits = tf.nest.flatten(size_splits)
-    super(ToySplit, self).__init__(
-        forward_min_event_ndims=1,
-        inverse_min_event_ndims=0,
-        is_constant_jacobian=True)
-
-  @property
-  def size_splits(self):
-    return self._size_splits
-
-  def forward(self, x):
-    return tf.nest.pack_sequence_as(
-        self.size_splits, tf.split(x, self._flat_size_splits, axis=-1))
-
-  def inverse(self, y):
-    return tf.concat(tf.nest.flatten(y), axis=-1)
-
-  def forward_dtype(self, dtype):
-    return tf.nest.map_structure(lambda _: dtype, self.size_splits)
-
-  def inverse_dtype(self, dtype):
-    flat_dtype = tf.nest.flatten(dtype)
-    if any(d != flat_dtype[0] for d in flat_dtype):
-      raise ValueError('All dtypes must be equivalent.')
-    return flat_dtype[0]
-
-  def forward_event_shape(self, x):
-    return tf.nest.map_structure(lambda k: tf.TensorShape([k]),
-                                 self.size_splits)
-
-  def inverse_event_shape(self, y):
-    return tf.TensorShape(sum(self._flat_size_splits))
-
-  def forward_event_shape_tensor(self, x):
-    return tf.nest.map_structure(lambda k: tf.convert_to_tensor([k]),
-                                 self.size_splits)
-
-  def inverse_event_shape_tensor(self, y):
-    return tf.reduce_sum(self._flat_size_splits)[..., tf.newaxis]
-
-  def forward_log_det_jacobian(self, x, event_ndims):
-    return tf.constant(0., dtype=tf.float32)
-
-  def inverse_log_det_jacobian(self, y, event_ndims):
-    return tf.constant(0., dtype=tf.float32)
 
 
 # TODO(emilyaf): Check in `ZipMap` bijector and remove this.
@@ -995,15 +950,17 @@ class ToyZipMap(tfb.Bijector):
 
 
 @test_util.test_all_tf_execution_regimes
-class JointBijectorsTest(test_util.TestCase):
+class MultipartBijectorsTest(test_util.TestCase):
 
   @parameterized.named_parameters(
-      {'testcase_name': 'list',
-       'split_sizes': [1, 3, 2]},
-      {'testcase_name': 'dict',
-       'split_sizes': {'a': 1, 'b': 3, 'c': 2}})
-  def test_transform_parts_to_vector(self, split_sizes):
+      {'testcase_name': 'split_sizes_known',
+       'known_split_sizes': [1, 3, 2]},
+      {'testcase_name': 'split_size_unknown',
+       'known_split_sizes': [1, -1, 2]}
+      )
+  def test_transform_parts_to_vector(self, known_split_sizes):
     batch_shape = [4, 2]
+    true_split_sizes = [1, 3, 2]
 
     # Create a joint distribution with parts of the specified sizes.
     seed = test_util.test_seed_stream()
@@ -1012,14 +969,11 @@ class JointBijectorsTest(test_util.TestCase):
             loc=tf.random.normal(batch_shape + [size], seed=seed()),
             scale_diag=tf.exp(
                 tf.random.normal(batch_shape + [size], seed=seed()))),
-        split_sizes)
-    if isinstance(split_sizes, dict):
-      base_dist = tfd.JointDistributionNamed(component_dists)
-    else:
-      base_dist = tfd.JointDistributionSequential(component_dists)
+        true_split_sizes)
+    base_dist = tfd.JointDistributionSequential(component_dists)
 
     # Transform to a vector-valued distribution by concatenating the parts.
-    bijector = tfb.Invert(ToySplit(split_sizes))
+    bijector = tfb.Invert(tfb.Split(known_split_sizes, axis=-1))
 
     with self.assertRaisesRegexp(ValueError, 'Overriding the batch shape'):
       tfd.TransformedDistribution(base_dist, bijector, batch_shape=[3])
@@ -1028,12 +982,9 @@ class JointBijectorsTest(test_util.TestCase):
       tfd.TransformedDistribution(base_dist, bijector, event_shape=[3])
 
     concat_dist = tfd.TransformedDistribution(base_dist, bijector)
-
-    concat_event_size = self.evaluate(
-        tf.reduce_sum(tf.nest.flatten(split_sizes)))
-    self.assertAllEqual(concat_dist.event_shape, [concat_event_size])
+    self.assertAllEqual(concat_dist.event_shape, [sum(true_split_sizes)])
     self.assertAllEqual(self.evaluate(concat_dist.event_shape_tensor()),
-                        [concat_event_size])
+                        [sum(true_split_sizes)])
     self.assertAllEqual(concat_dist.batch_shape, batch_shape)
     self.assertAllEqual(self.evaluate(concat_dist.batch_shape_tensor()),
                         batch_shape)
@@ -1065,29 +1016,30 @@ class JointBijectorsTest(test_util.TestCase):
     self.assertAllEqual(y.shape, y_sampled.shape)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'list',
-       'split_sizes': [1, 3, 2]},
-      {'testcase_name': 'dict',
-       'split_sizes': {'a': 1, 'bc': {'b': 3, 'c': 2}}},)
-  def test_transform_vector_to_parts(self, split_sizes):
+      {'testcase_name': 'split_sizes_known',
+       'known_split_sizes': [1, 3, 2]},
+      {'testcase_name': 'split_size_unknown',
+       'known_split_sizes': [1, -1, 2]}
+      )
+  def test_transform_vector_to_parts(self, known_split_sizes):
     batch_shape = [4, 2]
-    base_event_size = tf.reduce_sum(tf.nest.flatten(split_sizes))
+    true_split_sizes = [1, 3, 2]
+
+    base_event_size = sum(true_split_sizes)
     base_dist = tfd.MultivariateNormalDiag(
         loc=tf.random.normal(
             batch_shape + [base_event_size], seed=test_util.test_seed()),
         scale_diag=tf.exp(tf.random.normal(
             batch_shape + [base_event_size], seed=test_util.test_seed())))
 
-    bijector = ToySplit(split_sizes)
+    bijector = tfb.Split(known_split_sizes, axis=-1)
     split_dist = tfd.TransformedDistribution(base_dist, bijector)
 
-    expected_event_shape = tf.nest.map_structure(
-        lambda s: np.array([s]), split_sizes)
-    output_event_shape = nest.map_structure_up_to(
-        split_dist.dtype, np.array, split_dist.event_shape)
-    self.assertAllEqualNested(output_event_shape, expected_event_shape)
-    self.assertAllEqualNested(self.evaluate(split_dist.event_shape_tensor()),
-                              expected_event_shape)
+    expected_event_shape = [np.array([s]) for s in true_split_sizes]
+    output_event_shape = [np.array(s) for s in split_dist.event_shape]
+    self.assertAllEqual(output_event_shape, expected_event_shape)
+    self.assertAllEqual(self.evaluate(split_dist.event_shape_tensor()),
+                        expected_event_shape)
     self.assertAllEqual(split_dist.batch_shape, batch_shape)
     self.assertAllEqual(self.evaluate(split_dist.batch_shape_tensor()),
                         batch_shape)
@@ -1117,9 +1069,7 @@ class JointBijectorsTest(test_util.TestCase):
     # Test that `.sample()` works and returns a result of the expected structure
     # and shape.
     y_sampled = split_dist.sample(sample_shape, seed=test_util.test_seed())
-    self.assertAllEqualNested(
-        tf.nest.map_structure(lambda x: x.shape, y),
-        tf.nest.map_structure(lambda x: x.shape, y_sampled))
+    self.assertAllEqual([x.shape for x in y], [x.shape for x in y_sampled])
 
     # Test that `batch_shape` override works and does not affect the event shape
     base_dist = tfd.Independent(
@@ -1128,9 +1078,9 @@ class JointBijectorsTest(test_util.TestCase):
     override_batch_shape = [5, 2]
     split_dist_batch_override = tfd.TransformedDistribution(
         base_dist, bijector, batch_shape=override_batch_shape)
-    self.assertAllEqualNested(
+    self.assertAllEqual(
         split_dist_batch_override.event_shape, expected_event_shape)
-    self.assertAllEqualNested(
+    self.assertAllEqual(
         self.evaluate(split_dist_batch_override.event_shape_tensor()),
         expected_event_shape)
     self.assertAllEqual(split_dist_batch_override.batch_shape,
@@ -1144,9 +1094,9 @@ class JointBijectorsTest(test_util.TestCase):
     base_dist = tfd.Normal(0., [2., 1.])
     split_dist_event_override = tfd.TransformedDistribution(
         base_dist, bijector, event_shape=override_event_shape)
-    self.assertAllEqualNested(
+    self.assertAllEqual(
         split_dist_event_override.event_shape, expected_event_shape)
-    self.assertAllEqualNested(
+    self.assertAllEqual(
         self.evaluate(split_dist_event_override.event_shape_tensor()),
         expected_event_shape)
     self.assertAllEqual(
@@ -1172,8 +1122,9 @@ class JointBijectorsTest(test_util.TestCase):
     component_dists = tf.nest.map_structure(
         lambda size, batch_shape: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
             loc=tf.random.normal(batch_shape + [size], seed=seed()),
-            scale_diag=tf.exp(
-                tf.random.normal(batch_shape + [size], seed=seed()))),
+            scale_diag=tf.random.uniform(
+                minval=1., maxval=2.,
+                shape=batch_shape + [size], seed=seed())),
         split_sizes, dist_batch_shape)
     if isinstance(split_sizes, dict):
       base_dist = tfd.JointDistributionNamed(component_dists)
@@ -1182,7 +1133,10 @@ class JointBijectorsTest(test_util.TestCase):
 
     # Transform the distribution by applying a separate bijector to each part.
     bijectors = [tfb.Exp(),
-                 tfb.Scale(tf.random.normal(bijector_batch_shape, seed=seed())),
+                 tfb.Scale(
+                     tf.random.uniform(
+                         minval=1., maxval=2.,
+                         shape=bijector_batch_shape, seed=seed())),
                  tfb.Reshape([2, 1])]
     bijector = ToyZipMap(tf.nest.pack_sequence_as(split_sizes, bijectors))
 

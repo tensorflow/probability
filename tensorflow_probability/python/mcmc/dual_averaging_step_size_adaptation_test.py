@@ -29,6 +29,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_like_step_size_getter_fn
 
 
 _INITIAL_T = 10.0
@@ -41,14 +42,6 @@ _UPDATE_M02 = 9.642897  # err = -0.02
 _UPDATE_M01 = 9.819825  # err = -0.01
 _UPDATE_0 = 10.  # err = 0
 _UPDATE_01 = 10.183481  # err = +0.01
-
-
-def _set_seed(seed):
-  """Helper which uses graph seed if using eager."""
-  # TODO(b/68017812): Deprecate once eager correctly supports seed.
-  if tf.executing_eagerly():
-    return None
-  return seed
 
 
 FakeMHKernelResults = collections.namedtuple(
@@ -67,7 +60,7 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
         store_parameters_in_results=store_parameters_in_results,
     )
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     new_state, new_accepted_results = self.parameters['inner_kernel'].one_step(
         current_state, previous_kernel_results.accepted_results)
     return new_state, previous_kernel_results._replace(
@@ -273,10 +266,10 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
             (_INITIAL_T + 1.) * _EXPLORATION_SHRINKAGE))
     self.assertAllClose(expected, step_size)
 
-  @parameterized.parameters((-1., '`target_accept_prob` must be > 0.'),
-                            (0., '`target_accept_prob` must be > 0.'),
+  @parameterized.parameters((-1., r'`target_accept_prob` must be > 0.'),
+                            (0., r'`target_accept_prob` must be > 0.'),
                             (0.999, None),
-                            (1., '`target_accept_prob` must be < 1.'))
+                            (1., r'`target_accept_prob` must be < 1.'))
   def testTargetAcceptanceProbChecks(self, target_accept_prob, message):
 
     def _impl():
@@ -290,13 +283,12 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
       self.evaluate(kernel.bootstrap_results(tf.zeros(2)))
 
     if message:
-      with self.assertRaisesRegexp(tf.errors.InvalidArgumentError, message):
+      with self.assertRaisesOpError(message):
         _impl()
     else:
       _impl()
 
   def testExample(self):
-    tf.random.set_seed(test_util.test_seed())
     target_dist = tfd.JointDistributionSequential([
         tfd.Normal(0., 1.5),
         tfd.Independent(
@@ -310,22 +302,151 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     kernel = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda *args: target_dist.log_prob(args),
         num_leapfrog_steps=2,
-        step_size=target_dist.stddev(),
-        seed=_set_seed(test_util.test_seed()))
+        step_size=target_dist.stddev())
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-        inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
+        inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8),
+        # Cast to int32.  Not necessary for operation since we cast internally
+        # to a float type.  This is done to check that we are able to pass in
+        # integer types (since they are the natural type for this).
+        step_count_smoothing=tf.cast(10, tf.int32)
+    )
 
+    seed_stream = test_util.test_seed_stream()
     _, log_accept_ratio = tfp.mcmc.sample_chain(
         num_results=num_results,
         num_burnin_steps=num_burnin_steps,
-        current_state=target_dist.sample(num_chains),
+        current_state=target_dist.sample(num_chains, seed=seed_stream()),
         kernel=kernel,
-        trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
+        trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio,
+        seed=seed_stream())
 
-    p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
-        tf.minimum(log_accept_ratio, 0.)))
+    p_accept = tf.reduce_mean(tf.math.exp(tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
+
+  def testShrinkageTargetDefaultsTo10xStepSize(self):
+    target_dist = tfd.Normal(0., 1.)
+
+    # Choose an initial_step_size that is too big.  We will make it even bigger
+    # during the initial adaptation steps by using carefully selected
+    # shrinkage parameters.
+    initial_step_size = 2.5
+    expected_final_step_size = 1.5
+
+    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_dist.log_prob,
+        # Small num_leapfrog_steps, to ensure stability even though we're doing
+        # extreme stuff with the step size.
+        num_leapfrog_steps=3,
+        step_size=initial_step_size)
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        inner_kernel=hmc_kernel,
+        num_adaptation_steps=500,
+        step_count_smoothing=5.,
+        target_accept_prob=0.75,
+        shrinkage_target=None,  # Default
+        # Huge exploration_shrinkage moves us close to the shrinkage_target.
+        exploration_shrinkage=1.,   # Default is 0.05, so this is huge.
+    )
+
+    def trace_fn(_, pkr):
+      return (pkr.log_shrinkage_target,
+              pkr.inner_results.log_accept_ratio,
+              hmc_like_step_size_getter_fn(pkr))
+
+    stream = test_util.test_seed_stream()
+    _, (log_shrinkage_target, log_accept_ratio,
+        step_size) = tfp.mcmc.sample_chain(
+            num_results=500,
+            num_burnin_steps=0,
+            current_state=target_dist.sample(64, seed=stream()),
+            kernel=kernel,
+            trace_fn=trace_fn,
+            seed=stream(),
+        )
+
+    log_shrinkage_target, log_accept_ratio, step_size = self.evaluate((
+        log_shrinkage_target, log_accept_ratio, step_size))
+
+    self.assertAllClose(
+        10 * initial_step_size * np.ones_like(log_shrinkage_target),
+        np.exp(log_shrinkage_target))
+
+    # Verify that we adapted as desired.
+    p_accept = np.mean(np.exp(np.minimum(log_accept_ratio[-250:], 0.)))
+    self.assertAllClose(0.75, p_accept, atol=0.15)
+
+    self.assertAllClose(expected_final_step_size, step_size[-1], atol=0.5)
+
+    # We start out at the initial_step_size.
+    self.assertAllClose(initial_step_size, step_size[0])
+
+    # The default shrinkage_target = 10 x initial_step_size, so our
+    # first few step sizes will be large.
+    self.assertAllGreater(step_size[1], 8 * initial_step_size)
+    self.assertAllGreater(step_size[2], 5 * initial_step_size)
+    self.assertAllGreater(step_size[3], 3 * initial_step_size)
+
+  def testShrinkageTargetSetVeryLowMeansIntialStepSizeIsSmall(self):
+    target_dist = tfd.Normal(0., 1.)
+
+    expected_final_step_size = 1.5
+    initial_step_size = expected_final_step_size
+    shrinkage_target_kwarg = 0.1
+
+    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_dist.log_prob,
+        # Small num_leapfrog_steps, to ensure stability even though we're doing
+        # extreme stuff with the step size.
+        num_leapfrog_steps=3,
+        step_size=initial_step_size)
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        inner_kernel=hmc_kernel,
+        num_adaptation_steps=500,
+        step_count_smoothing=15.,
+        target_accept_prob=0.75,
+        shrinkage_target=shrinkage_target_kwarg,
+        # Huge exploration_shrinkage moves us close to the shrinkage_target.
+        exploration_shrinkage=1.,
+    )
+
+    def trace_fn(_, pkr):
+      return (pkr.log_shrinkage_target,
+              pkr.inner_results.log_accept_ratio,
+              hmc_like_step_size_getter_fn(pkr))
+
+    stream = test_util.test_seed_stream()
+    _, (log_shrinkage_target, log_accept_ratio, step_size) = (
+        tfp.mcmc.sample_chain(
+            num_results=500,
+            num_burnin_steps=0,
+            current_state=target_dist.sample(64, seed=stream()),
+            kernel=kernel,
+            trace_fn=trace_fn,
+            seed=stream(),
+        ))
+
+    log_shrinkage_target, log_accept_ratio, step_size = self.evaluate((
+        log_shrinkage_target, log_accept_ratio, step_size))
+
+    self.assertAllClose(
+        shrinkage_target_kwarg * np.ones_like(log_shrinkage_target),
+        np.exp(log_shrinkage_target))
+
+    # Verify that we adapted as desired.
+    p_accept = np.mean(np.exp(np.minimum(log_accept_ratio[-250:], 0.)))
+    self.assertAllClose(0.75, p_accept, atol=0.15)
+
+    self.assertAllClose(expected_final_step_size, step_size[-1], atol=0.5)
+
+    # We start out at the initial_step_size.
+    self.assertAllClose(initial_step_size, step_size[0])
+
+    # step_size stays close to shrinkage_target for a bit, even though we
+    # eventually drift away to expected_final_step_size.
+    self.assertAllClose(step_size[1], shrinkage_target_kwarg, rtol=0.15)
+    self.assertAllClose(step_size[2], shrinkage_target_kwarg, rtol=0.15)
+    self.assertAllClose(step_size[3], shrinkage_target_kwarg, rtol=0.15)
 
   def testIsCalibrated(self):
     test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
@@ -398,9 +519,11 @@ class DualAveragingStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
         num_adaptation_steps=1,
         validate_args=True)
 
+    seed_stream = test_util.test_seed_stream()
     kernel_results = kernel.bootstrap_results(state)
     for _ in range(2):
-      _, kernel_results = kernel.one_step(state, kernel_results)
+      _, kernel_results = kernel.one_step(state, kernel_results,
+                                          seed=seed_stream())
 
     step_size = self.evaluate(
         kernel_results.inner_results.accepted_results.step_size)
@@ -428,9 +551,11 @@ class TfFunctionTest(test_util.TestCase):
     adaptive_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=100)
 
+    seed_stream = test_util.test_seed_stream()
     init = tf.constant([0.0, 0.0])
     extra = adaptive_kernel.bootstrap_results(init)
-    tf.function(lambda: adaptive_kernel.one_step(init, extra))()
+    tf.function(
+        lambda: adaptive_kernel.one_step(init, extra, seed=seed_stream()))()
 
 
 if __name__ == '__main__':

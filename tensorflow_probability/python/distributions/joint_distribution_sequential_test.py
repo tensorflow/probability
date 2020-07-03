@@ -661,6 +661,40 @@ class JointDistributionSequentialTest(test_util.TestCase):
           self.evaluate(
               bijectors[i].inverse_event_shape_tensor(event_shapes[i])))
 
+  def test_sample_kwargs(self):
+    joint = tfd.JointDistributionSequential([
+        tfd.Normal(0., 1.),
+        lambda a: tfd.Normal(a, 1.),
+        lambda b, a: tfd.Normal(a + b, 1.)
+    ])
+
+    seed = test_util.test_seed()
+    tf.random.set_seed(seed)
+    samples = joint.sample(seed=seed, a=1.)
+    # Check the first value is actually 1.
+    self.assertEqual(1., self.evaluate(samples[0]))
+
+    # Check the sample is reproducible using the `value` argument.
+    tf.random.set_seed(seed)
+    samples_tuple = joint.sample(seed=seed, value=[1., None, None])
+    self.assertAllEqual(self.evaluate(samples), self.evaluate(samples_tuple))
+
+    # Make sure to throw an exception if strange keywords are passed.
+    expected_error = (
+        'Found unexpected keyword arguments. Distribution names are\n'
+        'a, b, x\n'
+        'but received\n'
+        'z\n'
+        'These names were invalid:\n'
+        'z')
+    with self.assertRaisesRegex(ValueError, expected_error):
+      joint.sample(z=2.)
+
+    # Also raise if value and keywords are passed
+    with self.assertRaisesRegex(
+        ValueError, r'Supplied both `value` and keyword arguments .*'):
+      joint.sample(a=1., value=[1., None, None])
+
 
 class ResolveDistributionNamesTest(test_util.TestCase):
 

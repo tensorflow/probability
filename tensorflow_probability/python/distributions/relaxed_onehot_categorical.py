@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -257,7 +258,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
         [[n],
          self._batch_shape_tensor(temperature=temperature, logits=logits),
          self._event_shape_tensor(logits=logits)], 0)
-    uniform = tf.random.uniform(
+    uniform = samplers.uniform(
         shape=uniform_shape,
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,

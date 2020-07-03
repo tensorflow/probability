@@ -23,19 +23,21 @@ import collections
 # Dependency imports
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import floor
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import truediv
+from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
 from tensorflow_probability.python.internal.backend.numpy.ops import clip_by_value
 from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
 
 
 __all__ = [
     'argsort',
+    'histogram_fixed_width',
     'histogram_fixed_width_bins',
     'is_tensor',
+    'print',
     'sort',
     'tensor_scatter_nd_add',
     'tensor_scatter_nd_sub',
@@ -65,7 +67,15 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
   return np.argsort(values, axis, kind='stable' if stable else 'quicksort')
 
 
-def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=tf.int32,
+def _histogram_fixed_width(values, value_range, nbins=100, dtype=np.int32,
+                           name=None):
+  """Numpy implementation of `tf.histogram_fixed_width`."""
+  del name
+  return np.histogram(values, bins=nbins, range=value_range)[0].astype(
+      utils.numpy_dtype(dtype))
+
+
+def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=np.int32,
                                 name=None):
   """Numpy implementation of `tf.histogram_fixed_width_bins`."""
   del name
@@ -76,6 +86,16 @@ def _histogram_fixed_width_bins(values, value_range, nbins=100, dtype=tf.int32,
   indices = clip_by_value(indices, 0, nbins_float - 1).astype(
       utils.numpy_dtype(dtype))
   return indices
+
+
+def _print(*inputs, **kwargs):
+  print_args = {}
+  if 'output_stream' in kwargs:
+    print_args['file'] = kwargs['output_stream']
+  for k in ('sep', 'end'):
+    if k in kwargs:
+      print_args[k] = kwargs[k]
+  return builtin_print(*inputs, **print_args)
 
 
 def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable=unused-argument
@@ -95,6 +115,9 @@ def _sort(values, axis=-1, direction='ASCENDING', name=None):  # pylint: disable
 # TODO(b/140685491): Add unit-test.
 def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_add`."""
+  indices = _convert_to_tensor(indices)
+  tensor = _convert_to_tensor(tensor)
+  updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
     import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
@@ -106,6 +129,9 @@ def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disa
 # TODO(b/140685491): Add unit-test.
 def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_sub`."""
+  indices = _convert_to_tensor(indices)
+  tensor = _convert_to_tensor(tensor)
+  updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
     import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
@@ -117,6 +143,9 @@ def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disa
 # TODO(b/140685491): Add unit-test.
 def _tensor_scatter_nd_update(tensor, indices, updates, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.tensor_scatter_nd_update`."""
+  indices = _convert_to_tensor(indices)
+  tensor = _convert_to_tensor(tensor)
+  updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
     import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
@@ -129,11 +158,11 @@ _UniqueOutput = collections.namedtuple('UniqueOutput', ['y', 'idx'])
 
 
 # TODO(b/140685491): Add unit-test.
-def _unique(x, out_idx=tf.int32, name=None):  # pylint: disable=unused-argument
+def _unique(x, out_idx=np.int32, name=None):  # pylint: disable=unused-argument
   """Numpy implementation of `tf.unique`."""
   x = np.array(x)
   if len(x.shape) != 1:
-    raise tf.errors.InvalidArgumentError('unique expects a 1D vector.')
+    raise errors.InvalidArgumentError('unique expects a 1D vector.')
   y, idx = np.unique(x,
                      return_index=True,
                      return_inverse=False,
@@ -146,29 +175,40 @@ def _unique(x, out_idx=tf.int32, name=None):  # pylint: disable=unused-argument
 # --- Begin Public Functions --------------------------------------------------
 
 argsort = utils.copy_docstring(
-    tf.argsort,
+    'tf.argsort',
     _argsort)
 
+histogram_fixed_width = utils.copy_docstring(
+    'tf.histogram_fixed_width',
+    _histogram_fixed_width)
+
 histogram_fixed_width_bins = utils.copy_docstring(
-    tf.histogram_fixed_width_bins,
+    'tf.histogram_fixed_width_bins',
     _histogram_fixed_width_bins)
 
+builtin_print = print
+
+# pylint: disable=redefined-builtin
+print = utils.copy_docstring(
+    'tf.print',
+    _print)
+
 sort = utils.copy_docstring(
-    tf.sort,
+    'tf.sort',
     _sort)
 
 tensor_scatter_nd_add = utils.copy_docstring(
-    tf.tensor_scatter_nd_add,
+    'tf.tensor_scatter_nd_add',
     _tensor_scatter_nd_add)
 
 tensor_scatter_nd_sub = utils.copy_docstring(
-    tf.tensor_scatter_nd_sub,
+    'tf.tensor_scatter_nd_sub',
     _tensor_scatter_nd_sub)
 
 tensor_scatter_nd_update = utils.copy_docstring(
-    tf.tensor_scatter_nd_update,
+    'tf.tensor_scatter_nd_update',
     _tensor_scatter_nd_update)
 
 unique = utils.copy_docstring(
-    tf.unique,
+    'tf.unique',
     _unique)

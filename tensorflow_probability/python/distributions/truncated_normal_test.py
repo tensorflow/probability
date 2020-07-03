@@ -61,6 +61,7 @@ def scipy_trunc_norm_dist(loc, scale, low, high):
 class _TruncatedNormalTestCase(test_util.TestCase):
 
   def setUp(self):
+    super(_TruncatedNormalTestCase, self).setUp()
     self._rng = np.random.RandomState(42)
 
   def assertAllGreaterEqual(self, a, b):
@@ -291,11 +292,10 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
 
   @parameterized.parameters((np.float32), (np.float64))
   def testReparametrizable(self, dtype=np.float32):
-    loc = tf.Variable(dtype(0.1))
-    scale = tf.Variable(dtype(1.1))
-    low = tf.Variable(dtype(-10.0))
-    high = tf.Variable(dtype(5.0))
-    self.evaluate([v.initializer for v in (loc, scale, low, high)])
+    loc = dtype(0.1)
+    scale = dtype(1.1)
+    low = dtype(-10.0)
+    high = dtype(5.0)
 
     def f(loc, scale, low, high):
       dist = tfd.TruncatedNormal(
@@ -327,13 +327,12 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
   )
   def testGradientsFx(self, dtype, fn_name):
     if not tf.executing_eagerly(): return
-    loc = tf.Variable(dtype(0.1))
-    scale = tf.Variable(dtype(3.0))
-    low = tf.Variable(dtype(-10.0))
-    high = tf.Variable(dtype(5.0))
+    loc = dtype(0.1)
+    scale = dtype(3.0)
+    low = dtype(-10.0)
+    high = dtype(5.0)
 
-    x = np.array([-1.0, 0.01, 0.1, 1., 4.9]).astype(dtype)
-    self.evaluate([v.initializer for v in (loc, scale, low, high)])
+    x = np.array([-1.0, 0.01, 0.1, 1., 4.9]).astype(dtype).reshape((5, 1))
 
     def f(loc, scale):
       dist = tfd.TruncatedNormal(
@@ -349,12 +348,10 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
                         ('entropy', 'mean', 'variance', 'mode'))
   )
   def testGradientsNx(self, dtype, fn_name):
-    loc = tf.Variable(dtype(0.1))
-    scale = tf.Variable(dtype(3.0))
-    low = tf.Variable(dtype(-10.0))
-    high = tf.Variable(dtype(5.0))
-
-    self.evaluate([v.initializer for v in (loc, scale, low, high)])
+    loc = dtype(0.1)
+    scale = dtype(3.0)
+    low = dtype(-10.0)
+    high = dtype(5.0)
 
     def f(loc, scale):
       dist = tfd.TruncatedNormal(
@@ -451,9 +448,10 @@ class TruncatedNormalTestCompareWithNormal(_TruncatedNormalTestCase):
 
   def testEntropy(self, loc, scale):
     truncated_dist, normal_dist = self.constructDists(loc, scale)
-    self.assertEqual(
+    self.assertAllClose(
         self.evaluate(truncated_dist.entropy()),
-        self.evaluate(normal_dist.entropy()))
+        self.evaluate(normal_dist.entropy()),
+        rtol=1e-6, atol=1e-6)
 
   def testSampling(self, loc, scale):
     n = 1000000
@@ -522,6 +520,8 @@ class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
     sp_dist = scipy_trunc_norm_dist(loc, scale, low, high)
     return tf_dist, sp_dist
 
+  @test_util.jax_disable_test_missing_functionality(
+      'In JAX, truncated_normal samples can fall outside the support.')
   def testSampling(self, loc, scale, low, high):
     n = int(1000000)
     tf_dist, sp_dist = self.constructDists(loc, scale, low, high)

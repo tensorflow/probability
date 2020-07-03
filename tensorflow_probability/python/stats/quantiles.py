@@ -111,6 +111,8 @@ def count_integers(arr,
     # Thus, flat_arr is not totally flat, it just has the dims in ~axis
     # flattened.
     flat_arr = _move_dims_to_flat_end(arr, not_axis, arr_ndims, right_end=False)
+    minlength = minlength if minlength is not None else tf.reduce_max(arr) + 1
+    maxlength = maxlength if maxlength is not None else tf.reduce_max(arr) + 1
 
     # tf.map_fn over dim 0.
     if weights is None:
@@ -123,7 +125,8 @@ def count_integers(arr,
             maxlength=maxlength,
             dtype=dtype)
 
-      flat_counts = tf.map_fn(one_bincount, elems=flat_arr, dtype=dtype)
+      flat_counts = tf.map_fn(one_bincount, elems=flat_arr,
+                              fn_output_signature=dtype)
     else:
       weights = tf.convert_to_tensor(weights, name='weights')
       _get_static_ndims(weights, expect_static=True, expect_ndims=arr_ndims)
@@ -140,7 +143,8 @@ def count_integers(arr,
             dtype=dtype)
 
       flat_counts = tf.map_fn(
-          one_bincount, elems=[flat_arr, flat_weights], dtype=weights.dtype)
+          one_bincount, elems=[flat_arr, flat_weights],
+          fn_output_signature=weights.dtype)
 
     # flat_counts.shape = [prod(~axis), K], because map_fn stacked on axis 0.
     # bincount needs to have the K bins in axis 0, so transpose...
@@ -211,7 +215,7 @@ def find_bins(x,
   Cut `x` into its deciles
 
   ```python
-  x = tf.random_uniform(shape=(100, 200))
+  x = tf.random.uniform(shape=(100, 200))
   decile_edges = tfp.stats.quantiles(x, num_quantiles=10)
   bins = tfp.stats.find_bins(x, edges=decile_edges)
   bins.shape
@@ -341,7 +345,7 @@ def histogram(x,
   ```python
   # x.shape = [1000, 2]
   # x[:, 0] ~ Uniform(0, 1), x[:, 1] ~ Uniform(1, 2).
-  x = tf.stack([tf.random_uniform([1000]), 1 + tf.random_uniform([1000])],
+  x = tf.stack([tf.random.uniform([1000]), 1 + tf.random.uniform([1000])],
                axis=-1)
 
   # edges ==> bins [0, 0.5), [0.5, 1.0), [1.0, 1.5), [1.5, 2.0].
@@ -546,25 +550,22 @@ def percentile(x,
       axis = _make_static_axis_non_negative_list(axis, x_ndims)
       y = _move_dims_to_flat_end(x, axis, x_ndims, right_end=True)
 
-    frac_at_q_or_above = 1. - q / 100.
+    frac_at_q_or_below = q / 100.
 
-    # Sort everything, not just the top 'k' entries, which allows multiple calls
-    # to sort only once (under the hood) and use CSE.
-    sorted_y = _sort_tensor(y)
+    # Sort (in ascending order) everything which allows multiple calls to sort
+    # only once (under the hood) and use CSE.
+    sorted_y = tf.sort(y, axis=-1, direction='ASCENDING')
 
     d = tf.cast(tf.shape(y)[-1], tf.float64)
 
     def _get_indices(interp_type):
       """Get values of y at the indices implied by interp_type."""
-      # Note `lower` <--> ceiling.  Confusing, huh?  Due to the fact that
-      # _sort_tensor sorts highest to lowest, tf.ceil corresponds to the higher
-      # index, but the lower value of y!
       if interp_type == 'lower':
-        indices = tf.math.ceil((d - 1) * frac_at_q_or_above)
+        indices = tf.math.floor((d - 1) * frac_at_q_or_below)
       elif interp_type == 'higher':
-        indices = tf.floor((d - 1) * frac_at_q_or_above)
+        indices = tf.math.ceil((d - 1) * frac_at_q_or_below)
       elif interp_type == 'nearest':
-        indices = tf.round((d - 1) * frac_at_q_or_above)
+        indices = tf.round((d - 1) * frac_at_q_or_below)
       # d - 1 will be distinct from d in int32, but not necessarily double.
       # So clip to avoid out of bounds errors.
       return tf.clip_by_value(
@@ -581,8 +582,8 @@ def percentile(x,
       # Copy-paste of docstring on interpolation:
       # linear: i + (j - i) * fraction, where fraction is the fractional part
       # of the index surrounded by i and j.
-      larger_y_idx = _get_indices('lower')
-      exact_idx = (d - 1) * frac_at_q_or_above
+      larger_y_idx = _get_indices('higher')
+      exact_idx = (d - 1) * frac_at_q_or_below
       if preserve_gradients:
         # If q corresponds to a point in x, we will initially have
         # larger_y_idx == smaller_y_idx.
@@ -594,8 +595,8 @@ def percentile(x,
         larger_y_idx = tf.minimum(smaller_y_idx + 1, tf.shape(y)[-1] - 1)
         fraction = tf.cast(larger_y_idx, tf.float64) - exact_idx
       else:
-        smaller_y_idx = _get_indices('higher')
-        fraction = tf.math.ceil((d - 1) * frac_at_q_or_above) - exact_idx
+        smaller_y_idx = _get_indices('lower')
+        fraction = tf.math.ceil((d - 1) * frac_at_q_or_below) - exact_idx
 
       fraction = tf.cast(fraction, y.dtype)
       gathered_y = (
@@ -894,10 +895,3 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
     full_shape = tf.concat(
         [other_shape, [-1]] if right_end else [[-1], other_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)
-
-
-def _sort_tensor(tensor):
-  """Use `top_k` to sort a `Tensor` along the last dimension."""
-  sorted_, _ = tf.math.top_k(tensor, k=tf.shape(tensor)[-1])
-  tensorshape_util.set_shape(sorted_, tensor.shape)
-  return sorted_

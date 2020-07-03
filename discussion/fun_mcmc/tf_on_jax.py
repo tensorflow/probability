@@ -147,26 +147,41 @@ def _range(*args, **kwargs):
     return onp.arange(*args, **kwargs)
 
 
+@_impl()
+def _eye(num_rows, num_columns=None, batch_shape=None, dtype=np.float32):
+  """Implements tf.eye."""
+  x = np.eye(num_rows, num_columns).astype(dtype)
+  if batch_shape is not None:
+    x = np.broadcast_to(x, tuple(batch_shape) + x.shape)
+  return x
+
+
 _impl(name='add_n')(sum)
 _impl(['nn'], name='softmax')(stax.softmax)
 _impl(name='custom_gradient')(jax.custom_gradient)
 
 tf.newaxis = None
 
+_impl_np()(np.exp)
 _impl_np()(np.einsum)
 _impl_np()(np.float32)
+_impl_np()(np.float64)
 _impl_np()(np.int32)
 _impl_np()(np.maximum)
 _impl_np()(np.minimum)
 _impl_np()(np.ones)
+_impl_np()(np.ones_like)
 _impl_np()(np.reshape)
 _impl_np()(np.shape)
+_impl_np()(np.size)
 _impl_np()(np.sqrt)
 _impl_np()(np.where)
 _impl_np()(np.zeros)
 _impl_np()(np.zeros_like)
+_impl_np(['math'])(np.ceil)
 _impl_np(['math'])(np.log)
 _impl_np(['math'])(np.sqrt)
+_impl_np(['math'], name='is_finite')(np.isfinite)
 _impl_np(['math'], name='pow')(np.power)
 _impl_np(['math'], name='reduce_prod')(np.prod)
 _impl_np(['math'], name='reduce_variance')(np.var)

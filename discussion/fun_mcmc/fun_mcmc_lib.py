@@ -38,12 +38,12 @@ from __future__ import print_function
 
 import collections
 import functools
+import typing
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 import numpy as np
 
 from discussion.fun_mcmc import backend
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 tf = backend.tf
 tfp = backend.tfp
@@ -92,6 +92,7 @@ __all__ = [
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
     'RandomWalkMetropolisState',
+    'recover_state_from_args',
     'reparameterize_potential_fn',
     'running_approximate_auto_covariance_init',
     'running_approximate_auto_covariance_step',
@@ -111,7 +112,7 @@ __all__ = [
     'simple_dual_averages_step',
     'SimpleDualAveragesExtra',
     'SimpleDualAveragesState',
-    'spliting_integrator_step',
+    'splitting_integrator_step',
     'State',
     'trace',
     'transform_log_prob_fn',
@@ -144,19 +145,20 @@ GradFn = Union[Callable[[TensorNest], Tuple[TensorNest, TensorNest]],
                Callable[..., Tuple[TensorNest, TensorNest]]]
 
 
-def _trace_extra(state: State, extra: TensorNest) -> TensorNest:
+def _trace_extra(state: 'State', extra: 'TensorNest') -> 'TensorNest':
   del state
   return extra
 
 
 def trace(
-    state: State,
-    fn: TransitionOperator,
-    num_steps: IntTensor,
-    trace_fn: Callable[[State, TensorNest], TensorNest] = _trace_extra,
-    trace_mask: BooleanNest = True,
-    parallel_iterations: int = 10,
-) -> Tuple[State, TensorNest]:
+    state: 'State',
+    fn: 'TransitionOperator',
+    num_steps: 'IntTensor',
+    trace_fn: 'Callable[[State, TensorNest], TensorNest]' = _trace_extra,
+    trace_mask: 'BooleanNest' = True,
+    unroll: 'bool' = False,
+    parallel_iterations: 'int' = 10,
+) -> 'Tuple[State, TensorNest]':
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
 
   Args:
@@ -175,6 +177,9 @@ def trace(
       `trace_fn` where the mask leaf is `False`, those subtrees are merely
       propagated, and their corresponding subtrees in `traces` correspond to
       their final value.
+    unroll: Whether to unroll the loop. This can occasionally lead to improved
+      performance at the cost of increasing the XLA optimization time. Only
+      works if `num_steps` is statically known.
     parallel_iterations: Number of iterations of the while loop to run in
       parallel.
 
@@ -254,13 +259,14 @@ def trace(
       state=state,
       fn=wrapper,
       num_steps=num_steps,
+      unroll=unroll,
       parallel_iterations=parallel_iterations,
   )
 
   return state, combine_trace(untraced, traced)
 
 
-def _tree_repr(tree: Any) -> Text:
+def _tree_repr(tree: 'Any') -> 'Text':
   """Utility to get a string representation of the the structure of `tree`."""
 
   class _LeafSentinel(object):
@@ -271,10 +277,20 @@ def _tree_repr(tree: Any) -> Text:
   return str(util.map_tree(lambda _: _LeafSentinel(), tree))
 
 
+def _is_namedtuple_like(x):
+  """Helper which returns `True` if input is `collections.namedtuple`-like."""
+  try:
+    for fn in getattr(x, '_fields'):
+      _ = getattr(x, fn)
+    return True
+  except AttributeError:
+    return False
+
+
 def call_fn(
-    fn: TransitionOperator,
-    args: Union[Tuple[Any], Mapping[Text, Any], Any],
-) -> Any:
+    fn: 'TransitionOperator',
+    args: 'Union[Tuple[Any], Mapping[Text, Any], Any]',
+) -> 'Any':
   """Calls a function with `args`.
 
   If `args` is a sequence, `fn` is called like `fn(*args)`. If `args` is a
@@ -288,20 +304,63 @@ def call_fn(
     ret: Return value of `fn`.
   """
   if isinstance(
-      args, collections.Sequence) and not mcmc_util.is_namedtuple_like(args):
-    args = args  # type: Tuple[Any]
+      args, collections.Sequence) and not _is_namedtuple_like(args):
     return fn(*args)
   elif isinstance(args, collections.Mapping):
-    args = args  # type: Mapping[str, Any]
     return fn(**args)
   else:
     return fn(args)
 
 
+def recover_state_from_args(args: 'Sequence[Any]',
+                            kwargs: 'Mapping[Text, Any]',
+                            state_structure: 'Any') -> 'Any':
+  """Attempts to recover the state that was transmitted via *args, **kwargs."""
+  orig_args = args
+  if isinstance(state_structure, collections.Mapping):
+    state = type(state_structure)()
+    # Mappings can be ordered and not ordered, and this information is lost when
+    # passed via **kwargs. We iterate using the reference structure order so we
+    # can reconstruct it. For unordered mappings the order doesn't matter. We
+    # specifically don't use any sort of explicit sorting here, as that would
+    # destroy the order of orderered mappings.
+    for k in state_structure.keys():
+      # This emulates the positional argument passing.
+      if args:
+        state[k] = args[0]
+        args = args[1:]
+      else:
+        if k not in kwargs:
+          raise ValueError(
+              ('Missing \'{}\' from kwargs.\nargs=\n{}\nkwargs=\n{}\n'
+               'state_structure=\n{}').format(k, orig_args, kwargs,
+                                              _tree_repr(state_structure)))
+        state[k] = kwargs[k]
+    return state
+  elif (isinstance(state_structure, collections.Sequence) and
+        not _is_namedtuple_like(state_structure)):
+    # Sadly, we have no way of inferring the state index from kwargs, so we
+    # disallow them.
+    # TODO(siege): We could support length-1 sequences in principle.
+    if kwargs:
+      raise ValueError('This wrapper does not accept keyword arguments for a '
+                       'sequence-like state structure=\n{}'.format(
+                           _tree_repr(state_structure)))
+    return type(state_structure)(args)
+  elif args:
+    return args[0]
+  elif kwargs:
+    return next(iter(kwargs.values()))
+  else:
+    # Must be the case that the state_structure is actually empty.
+    assert not state_structure
+    return state_structure
+
+
 def call_potential_fn(
-    fn: PotentialFn,
-    args: Union[Tuple[Any], Mapping[Text, Any], Any],
-) -> Tuple['tf.Tensor', Any]:
+    fn: 'PotentialFn',
+    args: 'Union[Tuple[Any], Mapping[Text, Any], Any]',
+) -> 'Tuple[tf.Tensor, Any]':
   """Calls a transition operator with `args`.
 
   `fn` must fulfill the `PotentialFn` contract:
@@ -339,9 +398,9 @@ def call_potential_fn(
 
 
 def call_transition_operator(
-    fn: TransitionOperator,
-    args: State,
-) -> Tuple[State, TensorNest]:
+    fn: 'TransitionOperator',
+    args: 'State',
+) -> 'Tuple[State, TensorNest]':
   """Calls a transition operator with `args`.
 
   `fn` must fulfill the `TransitionOperator` contract:
@@ -400,9 +459,9 @@ def call_transition_operator(
 
 
 def call_transport_map(
-    fn: TransportMap,
-    args: State,
-) -> Tuple[State, TensorNest]:
+    fn: 'TransportMap',
+    args: 'State',
+) -> 'Tuple[State, TensorNest]':
   """Calls a transport map with `args`.
 
   `fn` must fulfill the `TransportMap` contract:
@@ -441,9 +500,9 @@ def call_transport_map(
 
 
 def call_transport_map_with_ldj(
-    fn: TransitionOperator,
-    args: State,
-) -> Tuple[State, TensorNest, TensorNest]:
+    fn: 'TransitionOperator',
+    args: 'State',
+) -> 'Tuple[State, TensorNest, TensorNest]':
   """Calls `fn` and returns the log-det jacobian to `fn`'s first output.
 
   Args:
@@ -463,8 +522,8 @@ def call_transport_map_with_ldj(
 
 
 def call_potential_fn_with_grads(
-    fn: PotentialFn, args: Union[Tuple[Any], Mapping[Text, Any], Any]
-) -> Tuple['tf.Tensor', TensorNest, TensorNest]:
+    fn: 'PotentialFn', args: 'Union[Tuple[Any], Mapping[Text, Any], Any]'
+) -> 'Tuple[tf.Tensor, TensorNest, TensorNest]':
   """Calls `fn` and returns the gradients with respect to `fn`'s first output.
 
   Args:
@@ -483,7 +542,8 @@ def call_potential_fn_with_grads(
   return util.value_and_grad(wrapper, args)
 
 
-def maybe_broadcast_structure(from_structure: Any, to_structure: Any) -> Any:
+def maybe_broadcast_structure(from_structure: 'Any',
+                              to_structure: 'Any') -> 'Any':
   """Maybe broadcasts `from_structure` to `to_structure`.
 
   If `from_structure` is a singleton, it is tiled to match the structure of
@@ -505,12 +565,12 @@ def maybe_broadcast_structure(from_structure: Any, to_structure: Any) -> Any:
 
 
 def reparameterize_potential_fn(
-    potential_fn: PotentialFn,
-    transport_map_fn: TransportMap,
-    init_state: State = None,
-    state_structure: Any = None,
-    track_volume: bool = True,
-) -> Tuple[PotentialFn, Optional[State]]:
+    potential_fn: 'PotentialFn',
+    transport_map_fn: 'TransportMap',
+    init_state: 'State' = None,
+    state_structure: 'Any' = None,
+    track_volume: 'bool' = True,
+) -> 'Tuple[PotentialFn, Optional[State]]':
   """Performs a change of variables of a potential function.
 
   This takes a potential function and creates a new potential function that now
@@ -528,8 +588,6 @@ def reparameterize_potential_fn(
       transformed_potential, [original_space_state, potential_extra,
                               transport_map_fn_extra]
   ```
-  Note that currently it is forbidden to pass both `args` and `kwargs` to the
-  wrapper.
 
   You can also pass `init_state` in the original space and this function will
   return the inverse transformed state as the 2nd return value. This requires
@@ -563,17 +621,10 @@ def reparameterize_potential_fn(
 
   def wrapper(*args, **kwargs):
     """Transformed wrapper."""
-    if args and kwargs:
-      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
-                       'this wrapper.')
-    if kwargs:
-      args = kwargs
-
-    real_state_structure = state_structure if init_state is None else init_state
-    # Use state_structure to recover the structure of args that has been lossily
-    # transmitted via *args and **kwargs.
-    transformed_state = util.unflatten_tree(real_state_structure,
-                                            util.flatten_tree(args))
+    real_state_structure = (
+        state_structure if state_structure is not None else init_state)
+    transformed_state = recover_state_from_args(args, kwargs,
+                                                real_state_structure)
 
     if track_volume:
       state, map_extra, ldj = call_transport_map_with_ldj(
@@ -598,9 +649,9 @@ def reparameterize_potential_fn(
   return wrapper, transformed_state
 
 
-def transform_log_prob_fn(log_prob_fn: PotentialFn,
-                          bijector: BijectorNest,
-                          init_state: State = None) -> Any:
+def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
+                          bijector: 'BijectorNest',
+                          init_state: 'State' = None) -> 'Any':
   """Transforms a log-prob function using a bijector.
 
   This takes a log-prob function and creates a new log-prob function that now
@@ -613,8 +664,6 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
     (*args, **kwargs) ->
       transformed_space_state, [original_space_state, original_log_prob_extra]
   ```
-  Note that currently it is forbidden to pass both `args` and `kwargs` to the
-  wrapper.
 
   For convenience you can also pass the initial state (in the original space),
   and this function will return the inverse transformed state as the 2nd return
@@ -637,15 +686,7 @@ def transform_log_prob_fn(log_prob_fn: PotentialFn,
     """Transformed wrapper."""
     bijector_ = bijector
 
-    if args and kwargs:
-      raise ValueError('It is forbidden to pass both `args` and `kwargs` to '
-                       'this wrapper.')
-    if kwargs:
-      args = kwargs
-    # Use bijector_ to recover the structure of args that has been lossily
-    # transmitted via *args and **kwargs.
-    args = util.unflatten_tree(bijector_, util.flatten_tree(args))
-
+    args = recover_state_from_args(args, kwargs, bijector_)
     args = util.map_tree(lambda x: 0. + x, args)
 
     original_space_args = util.map_tree(lambda b, x: b.forward(x), bijector_,
@@ -677,14 +718,14 @@ IntegratorStep = Callable[[IntegratorStepState], Tuple[IntegratorStepState,
                                                        IntegratorStepExtras]]
 
 
-def spliting_integrator_step(
-    integrator_step_state: IntegratorStepState,
-    step_size: FloatTensor,
-    target_log_prob_fn: PotentialFn,
-    kinetic_energy_fn: PotentialFn,
-    coefficients: Sequence[FloatTensor],
-    forward: bool = True,
-) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+def splitting_integrator_step(
+    integrator_step_state: 'IntegratorStepState',
+    step_size: 'FloatTensor',
+    target_log_prob_fn: 'PotentialFn',
+    kinetic_energy_fn: 'PotentialFn',
+    coefficients: 'Sequence[FloatTensor]',
+    forward: 'bool' = True,
+) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
   """Symmetric symplectic integrator `TransitionOperator`.
 
   This implementation is based on Hamiltonian splitting, with the splits
@@ -757,11 +798,11 @@ def spliting_integrator_step(
 
 
 def leapfrog_step(
-    integrator_step_state: IntegratorStepState,
-    step_size: FloatTensor,
-    target_log_prob_fn: PotentialFn,
-    kinetic_energy_fn: PotentialFn,
-) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+    integrator_step_state: 'IntegratorStepState',
+    step_size: 'FloatTensor',
+    target_log_prob_fn: 'PotentialFn',
+    kinetic_energy_fn: 'PotentialFn',
+) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
   """Leapfrog integrator `TransitionOperator`.
 
   Args:
@@ -776,7 +817,7 @@ def leapfrog_step(
     integrator_step_extras: IntegratorStepExtras.
   """
   coefficients = [0.5, 1., 0.5]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -785,11 +826,11 @@ def leapfrog_step(
 
 
 def ruth4_step(
-    integrator_step_state: IntegratorStepState,
-    step_size: FloatTensor,
-    target_log_prob_fn: PotentialFn,
-    kinetic_energy_fn: PotentialFn,
-) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+    integrator_step_state: 'IntegratorStepState',
+    step_size: 'FloatTensor',
+    target_log_prob_fn: 'PotentialFn',
+    kinetic_energy_fn: 'PotentialFn',
+) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
   """Ruth 4th order integrator `TransitionOperator`.
 
   See [1] for details.
@@ -813,7 +854,7 @@ def ruth4_step(
   c = 2**(1. / 3)
   coefficients = (1. / (2 - c)) * np.array([0.5, 1., 0.5 - 0.5 * c, -c])
   coefficients = list(coefficients) + list(reversed(coefficients))[1:]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -822,11 +863,11 @@ def ruth4_step(
 
 
 def blanes_3_stage_step(
-    integrator_step_state: IntegratorStepState,
-    step_size: FloatTensor,
-    target_log_prob_fn: PotentialFn,
-    kinetic_energy_fn: PotentialFn,
-) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+    integrator_step_state: 'IntegratorStepState',
+    step_size: 'FloatTensor',
+    target_log_prob_fn: 'PotentialFn',
+    kinetic_energy_fn: 'PotentialFn',
+) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
   """Blanes 3 stage integrator `TransitionOperator`.
 
   This integrator has second order. See [1] for details and [2] for further
@@ -856,7 +897,7 @@ def blanes_3_stage_step(
   b1 = 0.29619504261
   coefficients = [a1, b1, 0.5 - a1, 1. - 2. * b1]
   coefficients = coefficients + list(reversed(coefficients))[1:]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -865,11 +906,11 @@ def blanes_3_stage_step(
 
 
 def blanes_4_stage_step(
-    integrator_step_state: IntegratorStepState,
-    step_size: FloatTensor,
-    target_log_prob_fn: PotentialFn,
-    kinetic_energy_fn: PotentialFn,
-) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+    integrator_step_state: 'IntegratorStepState',
+    step_size: 'FloatTensor',
+    target_log_prob_fn: 'PotentialFn',
+    kinetic_energy_fn: 'PotentialFn',
+) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
   """Blanes 4 stage integrator `TransitionOperator`.
 
   See [1] for details. This integrator likely has second order.
@@ -896,7 +937,7 @@ def blanes_4_stage_step(
   b1 = 0.191667800
   coefficients = [a1, b1, a2, 0.5 - b1, 1. - 2. * (a1 + a2)]
   coefficients = coefficients + list(reversed(coefficients))[1:]
-  return spliting_integrator_step(
+  return splitting_integrator_step(
       integrator_step_state,
       step_size,
       target_log_prob_fn,
@@ -905,12 +946,12 @@ def blanes_4_stage_step(
 
 
 def mclachlan_optimal_4th_order_step(
-    integrator_step_state: IntegratorStepState,
-    step_size: FloatTensor,
-    target_log_prob_fn: PotentialFn,
-    kinetic_energy_fn: PotentialFn,
-    forward: BooleanTensor,
-) -> Tuple[IntegratorStepState, IntegratorStepExtras]:
+    integrator_step_state: 'IntegratorStepState',
+    step_size: 'FloatTensor',
+    target_log_prob_fn: 'PotentialFn',
+    kinetic_energy_fn: 'PotentialFn',
+    forward: 'BooleanTensor',
+) -> 'Tuple[IntegratorStepState, IntegratorStepExtras]':
   """4th order integrator for Hamiltonians with a quadratic kinetic energy.
 
   See [1] for details. Note that this integrator step is not reversible, so for
@@ -950,7 +991,7 @@ def mclachlan_optimal_4th_order_step(
   coefficients = [b1, a1, b2, a2, b3, a3, b4, a4]
 
   def _step(direction):
-    return spliting_integrator_step(
+    return splitting_integrator_step(
         integrator_step_state,
         step_size,
         target_log_prob_fn,
@@ -971,11 +1012,11 @@ MetropolisHastingsExtra = collections.namedtuple('MetropolisHastingsExtra',
 
 
 def metropolis_hastings_step(
-    current_state: State,
-    proposed_state: State,
-    energy_change: FloatTensor,
-    log_uniform: FloatTensor = None,
-    seed=None) -> Tuple[State, MetropolisHastingsExtra]:
+    current_state: 'State',
+    proposed_state: 'State',
+    energy_change: 'FloatTensor',
+    log_uniform: 'FloatTensor' = None,
+    seed=None) -> 'Tuple[State, MetropolisHastingsExtra]':
   """Metropolis-Hastings step.
 
   This probabilistically chooses between `current_state` and `proposed_state`
@@ -1018,9 +1059,9 @@ def metropolis_hastings_step(
 MomentumSampleFn = Callable[[Any], State]
 
 
-def gaussian_momentum_sample(state_spec: TensorSpecNest = None,
-                             state: State = None,
-                             seed=None) -> State:
+def gaussian_momentum_sample(state_spec: 'TensorSpecNest' = None,
+                             state: 'State' = None,
+                             seed=None) -> 'State':
   """Generates a sample from a Gaussian (Normal) momentum distribution.
 
   One of `state` or `state_spec` need to be specified to obtain the correct
@@ -1057,7 +1098,7 @@ def gaussian_momentum_sample(state_spec: TensorSpecNest = None,
 
 
 def make_gaussian_kinetic_energy_fn(
-    chain_ndims: IntTensor) -> Callable[..., Tuple['tf.Tensor', TensorNest]]:
+    chain_ndims: 'IntTensor') -> 'Callable[..., Tuple[tf.Tensor, TensorNest]]':
   """Returns a function that computes the kinetic energy of a state.
 
   Args:
@@ -1095,8 +1136,8 @@ HamiltonianMonteCarloExtra = collections.namedtuple(
 
 
 def hamiltonian_monte_carlo_init(
-    state: TensorNest,
-    target_log_prob_fn: PotentialFn) -> HamiltonianMonteCarloState:
+    state: 'TensorNest',
+    target_log_prob_fn: 'PotentialFn') -> 'HamiltonianMonteCarloState':
   """Initializes the `HamiltonianMonteCarloState`.
 
   Args:
@@ -1106,26 +1147,30 @@ def hamiltonian_monte_carlo_init(
   Returns:
     hmc_state: State of the `hamiltonian_monte_carlo` `TransitionOperator`.
   """
-  target_log_prob, state_extra, state_grads = call_potential_fn_with_grads(
-      target_log_prob_fn, util.map_tree(tf.convert_to_tensor, state))
+  state = util.map_tree(tf.convert_to_tensor, state)
+  target_log_prob, state_extra, state_grads = util.map_tree(
+      tf.convert_to_tensor,
+      call_potential_fn_with_grads(target_log_prob_fn, state),
+  )
   return HamiltonianMonteCarloState(state, state_grads, target_log_prob,
                                     state_extra)
 
 
 def hamiltonian_monte_carlo(
-    hmc_state: HamiltonianMonteCarloState,
-    target_log_prob_fn: PotentialFn,
-    step_size: Any = None,
-    num_integrator_steps: IntTensor = None,
-    momentum: State = None,
-    kinetic_energy_fn: PotentialFn = None,
-    momentum_sample_fn: MomentumSampleFn = None,
-    integrator_trace_fn: Callable[[IntegratorStepState, IntegratorStepExtras],
-                                  TensorNest] = lambda *args: (),
-    log_uniform: FloatTensor = None,
+    hmc_state: 'HamiltonianMonteCarloState',
+    target_log_prob_fn: 'PotentialFn',
+    step_size: 'Any' = None,
+    num_integrator_steps: 'IntTensor' = None,
+    momentum: 'State' = None,
+    kinetic_energy_fn: 'PotentialFn' = None,
+    momentum_sample_fn: 'MomentumSampleFn' = None,
+    integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
+    'TensorNest]' = lambda *args: (),
+    log_uniform: 'FloatTensor' = None,
     integrator_fn=None,
+    unroll_integrator: 'bool' = False,
     seed=None,
-) -> Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]:
+) -> 'Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]':
   """Hamiltonian Monte Carlo `TransitionOperator`.
 
   #### Example
@@ -1179,6 +1224,9 @@ def hamiltonian_monte_carlo(
       [0, 1], used for the MH accept/reject step.
     integrator_fn: Integrator to use for the HMC dynamics. Uses a
       `hamiltonian_integrator` with `leapfrog_step` by default.
+    unroll_integrator: Whether to unroll the loop in the integrator. Only works
+      if `num_integrator_steps` is statically known. Ignored if
+      `integrator_fn` is specified.
     seed: For reproducibility.
 
   Returns:
@@ -1209,6 +1257,7 @@ def hamiltonian_monte_carlo(
             target_log_prob_fn=target_log_prob_fn,
             kinetic_energy_fn=kinetic_energy_fn),
         kinetic_energy_fn=kinetic_energy_fn,
+        unroll=unroll_integrator,
         integrator_trace_fn=integrator_trace_fn)
 
   if momentum is None:
@@ -1238,7 +1287,7 @@ def hamiltonian_monte_carlo(
       log_uniform=log_uniform,
       seed=seed)
 
-  hmc_state = hmc_state  # type: HamiltonianMonteCarloState
+  hmc_state = typing.cast(HamiltonianMonteCarloState, hmc_state)
   return hmc_state, HamiltonianMonteCarloExtra(
       is_accepted=mh_extra.is_accepted,
       proposed_hmc_state=proposed_state,
@@ -1257,13 +1306,14 @@ IntegratorExtras = collections.namedtuple(
 
 
 def hamiltonian_integrator(
-    int_state: IntegratorState,
-    num_steps: IntTensor,
-    integrator_step_fn: IntegratorStep,
-    kinetic_energy_fn: PotentialFn,
-    integrator_trace_fn: Callable[[IntegratorStepState, IntegratorStepExtras],
-                                  TensorNest] = lambda *args: (),
-) -> Tuple[IntegratorState, IntegratorExtras]:
+    int_state: 'IntegratorState',
+    num_steps: 'IntTensor',
+    integrator_step_fn: 'IntegratorStep',
+    kinetic_energy_fn: 'PotentialFn',
+    integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
+    'TensorNest]' = lambda *args: (),
+    unroll: 'bool' = False,
+) -> 'Tuple[IntegratorState, IntegratorExtras]':
   """Intergrates a discretized set of Hamiltonian equations.
 
   This function will use the passed `integrator_step_fn` to evolve the system
@@ -1279,6 +1329,9 @@ def hamiltonian_integrator(
     integrator_step_fn: Instance of `IntegratorStep`.
     kinetic_energy_fn: Function to compute the kinetic energy from momentums.
     integrator_trace_fn: Trace function for the integrator.
+    unroll: Whether to unroll the loop in the integrator. Only works if
+      `num_integrator_steps` is statically known. Ignored if `integrator_fn` is
+      specified.
 
   Returns:
     integrator_state: `IntegratorState`
@@ -1337,7 +1390,9 @@ def hamiltonian_integrator(
       integrator_wrapper_state,
       integrator_wrapper,
       max_num_steps,
-      trace_fn=integrator_trace_wrapper_fn)
+      trace_fn=integrator_trace_wrapper_fn,
+      unroll=unroll,
+  )
 
   proposed_energy = (-integrator_step_extra.target_log_prob +
                      integrator_step_extra.kinetic_energy)
@@ -1360,10 +1415,10 @@ def hamiltonian_integrator(
   return state, extra
 
 
-def sign_adaptation(control: FloatNest,
-                    output: FloatTensor,
-                    set_point: FloatTensor,
-                    adaptation_rate: FloatTensor = 0.01) -> FloatNest:
+def sign_adaptation(control: 'FloatNest',
+                    output: 'FloatTensor',
+                    set_point: 'FloatTensor',
+                    adaptation_rate: 'FloatTensor' = 0.01) -> 'FloatNest':
   """A function to do simple sign-based control of a variable.
 
   ```
@@ -1429,7 +1484,7 @@ AdamState = collections.namedtuple('AdamState', 'state, m, v, t')
 AdamExtra = collections.namedtuple('AdamExtra', 'loss, loss_extra, grads')
 
 
-def adam_init(state: FloatNest) -> AdamState:
+def adam_init(state: 'FloatNest') -> 'AdamState':
   state = util.map_tree(tf.convert_to_tensor, state)
   return AdamState(
       state=state,
@@ -1438,12 +1493,12 @@ def adam_init(state: FloatNest) -> AdamState:
       t=tf.constant(0, dtype=tf.int32))
 
 
-def adam_step(adam_state: AdamState,
-              loss_fn: PotentialFn,
-              learning_rate: FloatNest,
-              beta_1: FloatNest = 0.9,
-              beta_2: FloatNest = 0.999,
-              epsilon: FloatNest = 1e-8) -> Tuple[AdamState, AdamExtra]:
+def adam_step(adam_state: 'AdamState',
+              loss_fn: 'PotentialFn',
+              learning_rate: 'FloatNest',
+              beta_1: 'FloatNest' = 0.9,
+              beta_2: 'FloatNest' = 0.999,
+              epsilon: 'FloatNest' = 1e-8) -> 'Tuple[AdamState, AdamExtra]':
   """Perform one step of the Adam optimization method.
 
   Args:
@@ -1476,16 +1531,20 @@ def adam_step(adam_state: AdamState,
   beta_1 = maybe_broadcast_structure(beta_1, state)
   beta_2 = maybe_broadcast_structure(beta_2, state)
   epsilon = maybe_broadcast_structure(epsilon, state)
-  t = tf.cast(adam_state.t + 1, tf.float32)
+  t = adam_state.t + 1
 
   def _one_part(state, g, m, v, learning_rate, beta_1, beta_2, epsilon):
-    lr_t = learning_rate * (
-        tf.math.sqrt(1. - tf.math.pow(beta_2, t)) /
-        (1. - tf.math.pow(beta_1, t)))
+    """Updates one part of the state."""
+    t_f = tf.cast(t, state.dtype)
+    beta_1 = tf.convert_to_tensor(beta_1, state.dtype)
+    beta_2 = tf.convert_to_tensor(beta_2, state.dtype)
+    learning_rate = learning_rate * (
+        tf.math.sqrt(1. - tf.math.pow(beta_2, t_f)) /
+        (1. - tf.math.pow(beta_1, t_f)))
 
     m_t = beta_1 * m + (1. - beta_1) * g
     v_t = beta_2 * v + (1. - beta_2) * tf.square(g)
-    state = state - lr_t * m_t / (tf.math.sqrt(v_t) + epsilon)
+    state = state - learning_rate * m_t / (tf.math.sqrt(v_t) + epsilon)
     return state, m_t, v_t
 
   loss, loss_extra, grads = call_potential_fn_with_grads(loss_fn, state)
@@ -1508,9 +1567,9 @@ GradientDescentExtra = collections.namedtuple('GradientDescentExtra',
 
 
 def gradient_descent_step(
-    gd_state: GradientDescentState, loss_fn: PotentialFn,
-    learning_rate: FloatNest
-) -> Tuple[GradientDescentState, GradientDescentExtra]:
+    gd_state: 'GradientDescentState', loss_fn: 'PotentialFn',
+    learning_rate: 'FloatNest'
+) -> 'Tuple[GradientDescentState, GradientDescentExtra]':
   """Perform a step of regular gradient descent.
 
   Args:
@@ -1548,7 +1607,8 @@ RandomWalkMetropolisExtra = collections.namedtuple(
 
 
 def random_walk_metropolis_init(
-    state: State, target_log_prob_fn: PotentialFn) -> RandomWalkMetropolisState:
+    state: 'State',
+    target_log_prob_fn: 'PotentialFn') -> 'RandomWalkMetropolisState':
   """Initializes the `RandomWalkMetropolisState`.
 
   Args:
@@ -1567,11 +1627,11 @@ def random_walk_metropolis_init(
 
 
 def random_walk_metropolis(
-    rwm_state: RandomWalkMetropolisState,
-    target_log_prob_fn: PotentialFn,
-    proposal_fn: TransitionOperator,
-    log_uniform: FloatTensor = None,
-    seed=None) -> Tuple[RandomWalkMetropolisState, RandomWalkMetropolisExtra]:
+    rwm_state: 'RandomWalkMetropolisState',
+    target_log_prob_fn: 'PotentialFn',
+    proposal_fn: 'TransitionOperator',
+    log_uniform: 'FloatTensor' = None,
+    seed=None) -> 'Tuple[RandomWalkMetropolisState, RandomWalkMetropolisExtra]':
   """Random Walk Metropolis Hastings `TransitionOperator`.
 
   The `proposal_fn` takes in the current state, and must return a proposed
@@ -1626,7 +1686,7 @@ def random_walk_metropolis(
       is_accepted=mh_extra.is_accepted,
   )
 
-  rwm_state = rwm_state  # type: RandomWalkMetropolisState
+  rwm_state = typing.cast(RandomWalkMetropolisState, rwm_state)
   return rwm_state, rwm_extra
 
 
@@ -1634,8 +1694,8 @@ RunningVarianceState = collections.namedtuple('RunningVarianceState',
                                               'num_points, mean, variance')
 
 
-def running_variance_init(shape: IntTensor,
-                          dtype: DTypeNest) -> RunningVarianceState:
+def running_variance_init(shape: 'IntTensor',
+                          dtype: 'DTypeNest') -> 'RunningVarianceState':
   """Initializes the `RunningVarianceState`.
 
   Args:
@@ -1648,16 +1708,20 @@ def running_variance_init(shape: IntTensor,
   return RunningVarianceState(
       num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
       mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
-      variance=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
+      # The initial value of variance is discarded upon the first update, but
+      # setting it to something reasonable (ones) is convenient in case the
+      # state is read before an update.
+      variance=util.map_tree_up_to(dtype, tf.ones, shape, dtype),
   )
 
 
 def running_variance_step(
-    state: RunningVarianceState,
-    vec: FloatNest,
-    axis: Union[int, List[int]] = None,
-    window_size: IntNest = None,
-) -> Tuple[RunningVarianceState, Tuple[()]]:
+    state: 'RunningVarianceState',
+    vec: 'FloatNest',
+    axis: 'Union[int, List[int]]' = None,
+    window_size: 'IntNest' = None,
+) -> 'Tuple[RunningVarianceState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningVarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1672,6 +1736,8 @@ def running_variance_step(
   Note that this produces a biased estimate of variance, for simplicity. If the
   unbiased estimate is required, compute it as follows: `state.variance *
   state.num_points / (state.num_points - 1)`.
+
+  The algorithm is adapted from [1].
 
   Args:
     state: `RunningVarianceState`.
@@ -1689,40 +1755,35 @@ def running_variance_step(
   Returns:
     state: `RunningVarianceState`.
     extra: Empty tuple.
+
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
   """
 
   def _one_part(vec, mean, variance, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
-    # pyformat: disable
-    # These are derived by using the definition of variance for N and N + 1
-    # points, and then identifying the previous terms/simplifying.
+
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
-      new_variance = (
-          num_points_f * (num_points_f + additional_points_f) * variance +
-          num_points_f * tf.square(centered_vec)) / (
-              tf.square(num_points_f + additional_points_f))
+      vec_mean = vec
+      vec_variance = tf.zeros_like(variance)
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      new_variance = (
-          num_points_f * (num_points_f + additional_points_f) * variance +
-          num_points_f * tf.reduce_sum(tf.square(centered_vec), axis) -
-          tf.square(tf.reduce_sum(vec, axis)) + additional_points_f *
-          tf.reduce_sum(tf.square(vec), axis)) / (
-              tf.square(num_points_f + additional_points_f))
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    # pyformat: enable
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+      vec_variance = tf.math.reduce_variance(vec, axis)
+    mean_diff = vec_mean - mean
+    mean_diff_sq = tf.square(mean_diff)
+    variance_diff = vec_variance - variance
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
+    new_variance = (
+        variance + variance_diff * weight + weight *
+        (1. - weight) * mean_diff_sq)
     return new_mean, new_variance, num_points + additional_points
 
   new_mean_variance_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1745,8 +1806,8 @@ RunningCovarianceState = collections.namedtuple('RunningCovarianceState',
                                                 'num_points, mean, covariance')
 
 
-def running_covariance_init(shape: IntTensor,
-                            dtype: DTypeNest) -> RunningCovarianceState:
+def running_covariance_init(shape: 'IntTensor',
+                            dtype: 'DTypeNest') -> 'RunningCovarianceState':
   """Initializes the `RunningCovarianceState`.
 
   Args:
@@ -1760,27 +1821,27 @@ def running_covariance_init(shape: IntTensor,
       num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
       mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
       covariance=util.map_tree_up_to(
+          # The initial value of covariance is discarded upon the first update,
+          # but setting it to something reasonable (the identity matrix) is
+          # convenient in case the state is read before an update.
           dtype,
-          lambda shape, dtype: tf.zeros(  # pylint: disable=g-long-lambda
-              tf.concat(
-                  [
-                      tf.convert_to_tensor(shape),
-                      tf.convert_to_tensor(shape[-1:]),
-                  ],
-                  axis=0,
-              ),
-              dtype=dtype),
+          lambda shape, dtype: tf.eye(  # pylint: disable=g-long-lambda
+              shape[-1],
+              batch_shape=shape[:-1],
+              dtype=dtype,
+          ),
           shape,
           dtype),
   )
 
 
 def running_covariance_step(
-    state: RunningCovarianceState,
-    vec: FloatTensor,
-    axis: Union[int, List[int]] = None,
-    window_size: IntNest = None,
-) -> Tuple[RunningCovarianceState, Tuple[()]]:
+    state: 'RunningCovarianceState',
+    vec: 'FloatTensor',
+    axis: 'Union[int, List[int]]' = None,
+    window_size: 'IntNest' = None,
+) -> 'Tuple[RunningCovarianceState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningCovarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1800,6 +1861,8 @@ def running_covariance_step(
   the unbiased estimate is required, compute it as follows: `state.covariance *
   state.num_points / (state.num_points - 1)`.
 
+  The algorithm is adapted from [1].
+
   Args:
     state: `RunningCovarianceState`.
     vec: A Tensor to incorporate into the variance estimate.
@@ -1816,45 +1879,35 @@ def running_covariance_step(
   Returns:
     state: `RunningCovarianceState`.
     extra: Empty tuple.
-  """
 
-  def _outer(x):
-    res = tf.einsum('...i,...j->...ij', x, x)
-    return res
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
+  """
 
   def _one_part(vec, mean, covariance, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
-
-    # pyformat: disable
-    # These are derived by using the definition of covariance for N and N + 1
-    # points, and then identifying the previous terms/simplifying.
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
-      new_covariance = (
-          num_points_f * (num_points_f + additional_points_f) * covariance +
-          num_points_f * _outer(centered_vec)) / (
-              tf.square(num_points_f + additional_points_f))
+      vec_mean = vec
+      vec_covariance = tf.zeros_like(covariance)
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      new_covariance = (
-          num_points_f * (num_points_f + additional_points_f) * covariance +
-          num_points_f * tf.reduce_sum(_outer(centered_vec), axis) -
-          _outer(tf.reduce_sum(vec, axis)) + additional_points_f *
-          tf.reduce_sum(_outer(vec), axis)) / (
-              tf.square(num_points_f + additional_points_f))
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    # pyformat: enable
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+      vec_covariance = tfp.stats.covariance(vec, sample_axis=axis)
+    mean_diff = vec_mean - mean
+    mean_diff_sq = (
+        mean_diff[..., :, tf.newaxis] * mean_diff[..., tf.newaxis, :])
+    covariance_diff = vec_covariance - covariance
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
+    new_covariance = (
+        covariance + covariance_diff * weight + weight *
+        (1. - weight) * mean_diff_sq)
     return new_mean, new_covariance, num_points + additional_points
 
   new_mean_covariance_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1878,7 +1931,8 @@ RunningMeanState = collections.namedtuple('RunningMeanState',
                                           'num_points, mean')
 
 
-def running_mean_init(shape: IntTensor, dtype: DTypeNest) -> RunningMeanState:
+def running_mean_init(shape: 'IntTensor',
+                      dtype: 'DTypeNest') -> 'RunningMeanState':
   """Initializes the `RunningMeanState`.
 
   Args:
@@ -1895,11 +1949,12 @@ def running_mean_init(shape: IntTensor, dtype: DTypeNest) -> RunningMeanState:
 
 
 def running_mean_step(
-    state: RunningMeanState,
-    vec: FloatTensor,
-    axis: Union[int, List[int]] = None,
-    window_size: IntNest = None,
-) -> Tuple[RunningMeanState, Tuple[()]]:
+    state: 'RunningMeanState',
+    vec: 'FloatTensor',
+    axis: 'Union[int, List[int]]' = None,
+    window_size: 'IntNest' = None,
+) -> 'Tuple[RunningMeanState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningMeanState`.
 
   As a computational convenience, this allows computing both independent
@@ -1909,6 +1964,8 @@ def running_mean_step(
   - vec shape: [3, 4], axis=0 -> mean shape: [4]
   - vec shape: [3, 4], axis=1 -> mean shape: [3]
   - vec shape: [3, 4], axis=[0, 1] -> mean shape: []
+
+  The algorithm is adapted from [1].
 
   Args:
     state: `RunningMeanState`.
@@ -1926,26 +1983,27 @@ def running_mean_step(
   Returns:
     state: `RunningMeanState`.
     extra: Empty tuple.
+
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
   """
 
   def _one_part(vec, mean, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
+      vec_mean = vec
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.math.reduce_prod(tf.gather(vec_shape, axis))
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+    mean_diff = vec_mean - mean
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
     return new_mean, num_points + additional_points
 
   new_mean_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1966,7 +2024,7 @@ class PotentialScaleReductionState(RunningVarianceState):
 
 
 def potential_scale_reduction_init(shape,
-                                   dtype) -> PotentialScaleReductionState:
+                                   dtype) -> 'PotentialScaleReductionState':
   """Initializes `PotentialScaleReductionState`.
 
   Args:
@@ -1983,8 +2041,8 @@ def potential_scale_reduction_init(shape,
 
 
 def potential_scale_reduction_step(
-    state: PotentialScaleReductionState,
-    sample) -> Tuple[PotentialScaleReductionState, Tuple[()]]:
+    state: 'PotentialScaleReductionState',
+    sample) -> 'Tuple[PotentialScaleReductionState, Tuple[()]]':
   """Updates `PotentialScaleReductionState`.
 
   This computes the 'potential scale reduction' statistic from [1]. Note that
@@ -2017,8 +2075,8 @@ def potential_scale_reduction_step(
 
 
 def potential_scale_reduction_extract(
-    state: PotentialScaleReductionState,
-    independent_chain_ndims: IntNest = 1) -> FloatNest:
+    state: 'PotentialScaleReductionState',
+    independent_chain_ndims: 'IntNest' = 1) -> 'FloatNest':
   """Extracts the 'potential scale reduction' statistic.
 
   Args:
@@ -2063,11 +2121,11 @@ RunningApproximateAutoCovarianceState = collections.namedtuple(
 
 
 def running_approximate_auto_covariance_init(
-    max_lags: int,
-    state_shape: IntTensor,
-    dtype: DTypeNest,
-    axis: Union[int, List[int]] = None,
-) -> RunningApproximateAutoCovarianceState:
+    max_lags: 'int',
+    state_shape: 'IntTensor',
+    dtype: 'DTypeNest',
+    axis: 'Union[int, List[int]]' = None,
+) -> 'RunningApproximateAutoCovarianceState':
   """Initializes `RunningApproximateAutoCovarianceState`.
 
   Args:
@@ -2112,10 +2170,10 @@ def running_approximate_auto_covariance_init(
 
 
 def running_approximate_auto_covariance_step(
-    state: RunningApproximateAutoCovarianceState,
-    vec: TensorNest,
-    axis: Union[int, List[int]] = None,
-) -> Tuple[RunningApproximateAutoCovarianceState, Tuple[()]]:
+    state: 'RunningApproximateAutoCovarianceState',
+    vec: 'TensorNest',
+    axis: 'Union[int, List[int]]' = None,
+) -> 'Tuple[RunningApproximateAutoCovarianceState, Tuple[()]]':
   """Updates `RunningApproximateAutoCovarianceState`.
 
   This computes a running auto-covariance of a sequence using a biased
@@ -2177,6 +2235,7 @@ def running_approximate_auto_covariance_step(
       )
     num_steps = tf.reshape(num_steps, steps_shape)
 
+    # TODO(siege): Simplify this to look like running_variance_step.
     # pyformat: disable
     if axis is None:
       additional_points = 1
@@ -2228,9 +2287,9 @@ def running_approximate_auto_covariance_step(
 
 
 def make_surrogate_loss_fn(
-    grad_fn: GradFn = None,
+    grad_fn: 'GradFn' = None,
     loss_value: 'tf.Tensor' = 0.,
-) -> Any:
+) -> 'Any':
   """Creates a surrogate loss function with specified gradients.
 
   This wrapper converts `grad_fn` with signature `state -> grad, extra` which
@@ -2287,9 +2346,9 @@ SimpleDualAveragesExtra = collections.namedtuple('SimpleDualAveragesExtra',
 
 
 def simple_dual_averages_init(
-    state: FloatNest,
-    grad_mean_smoothing_steps: IntNest = 0,
-) -> SimpleDualAveragesState:
+    state: 'FloatNest',
+    grad_mean_smoothing_steps: 'IntNest' = 0,
+) -> 'SimpleDualAveragesState':
   """Initialize Simple Dual Averages state.
 
   Note that the `state` argument only affects the initial value read from the
@@ -2320,11 +2379,11 @@ def simple_dual_averages_init(
 
 
 def simple_dual_averages_step(
-    sda_state: SimpleDualAveragesState,
-    loss_fn: PotentialFn,
-    shrink_weight: FloatNest,
-    shrink_point: State = 0.,
-) -> Tuple[SimpleDualAveragesState, SimpleDualAveragesExtra]:
+    sda_state: 'SimpleDualAveragesState',
+    loss_fn: 'PotentialFn',
+    shrink_weight: 'FloatNest',
+    shrink_point: 'State' = 0.,
+) -> 'Tuple[SimpleDualAveragesState, SimpleDualAveragesExtra]':
   """Performs one step of the Simple Dual Averages algorithm [1].
 
   This function implements equation 3.4 from [1], with the following choices:
@@ -2358,7 +2417,6 @@ def simple_dual_averages_step(
   """
   state = sda_state.state
   step = sda_state.step
-  step_f = tf.cast(step, tf.float32)
   shrink_point = maybe_broadcast_structure(shrink_point, state)
   shrink_weight = maybe_broadcast_structure(shrink_weight, state)
 
@@ -2367,6 +2425,8 @@ def simple_dual_averages_step(
   grad_rms, _ = running_mean_step(sda_state.grad_running_mean_state, grads)
 
   def _one_part(shrink_point, shrink_weight, grad_running_mean):
+    shrink_point = tf.convert_to_tensor(shrink_point, grad_running_mean.dtype)
+    step_f = tf.cast(step, grad_running_mean.dtype)
     return shrink_point - tf.sqrt(step_f) / shrink_weight * grad_running_mean
 
   state = util.map_tree(_one_part, shrink_point, shrink_weight, grad_rms.mean)

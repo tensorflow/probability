@@ -18,12 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
+import collections
+import functools
 import numpy as np
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import dtype
 from tensorflow_probability.python.internal.backend.numpy import ops
 
 
@@ -34,8 +34,6 @@ __all__ = [
     # 'case',
     # 'dynamic_partition',
     # 'dynamic_stitch',
-    # 'map_fn',
-    # 'scan',
 ]
 
 
@@ -56,12 +54,11 @@ def _cond_jax(pred, true_fn=None, false_fn=None, name=None):  # pylint: disable=
   return lax.cond(pred, None, overridden_true_fn, None, overridden_false_fn)
 
 
-def _cond(pred, true_fn=None, false_fn=None, name=None):
-  del name
+def _cond(pred, true_fn=None, false_fn=None, name=None):  # pylint: disable=unused-argument
   return true_fn() if pred else false_fn()
 
 
-def _no_op(_):
+def _no_op(name=None):  # pylint: disable=unused-argument
   pass
 
 
@@ -115,16 +112,137 @@ def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-na
         override_cond_fn, override_body_fn, (np.array(0), loop_vars))[1]
 
 
+def _case_create_default_action(predicates, actions):
+  """Creates default action for a list of actions and their predicates.
+
+  It uses the input actions to select an arbitrary as default and makes sure
+  that corresponding predicates have valid values.
+  Args:
+    predicates: a list of bool scalar tensors
+    actions: a list of callable objects which return tensors.
+  Returns:
+    a callable
+  """
+  k = len(predicates) - 1  # could pick any
+  action = actions[k]
+  other_predicates, other_actions = predicates[:k], actions[:k]
+
+  def default_action():
+    return action()
+
+  return default_action, other_predicates, other_actions
+
+
+def _case_verify_and_canonicalize_args(pred_fn_pairs, exclusive, name,
+                                       allow_python_preds):
+  """Verifies input arguments for the case function.
+
+  Args:
+    pred_fn_pairs: Dict or list of pairs of a boolean scalar tensor, and a
+      callable which returns a list of tensors.
+    exclusive: True iff at most one predicate is allowed to evaluate to `True`.
+    name: A name for the case operation.
+    allow_python_preds: if true, pred_fn_pairs may contain Python bools in
+      addition to boolean Tensors
+  Raises:
+    TypeError: If `pred_fn_pairs` is not a list/dictionary.
+    TypeError: If `pred_fn_pairs` is a list but does not contain 2-tuples.
+    TypeError: If `fns[i]` is not callable for any i, or `default` is not
+               callable.
+  Returns:
+    a tuple <list of scalar bool tensors, list of callables>.
+  """
+  del name
+  if not isinstance(pred_fn_pairs, (list, tuple, dict)):
+    raise TypeError('fns must be a list, tuple, or dict')
+
+  if isinstance(pred_fn_pairs, collections.OrderedDict):
+    pred_fn_pairs = pred_fn_pairs.items()
+  elif isinstance(pred_fn_pairs, dict):
+    # No name to sort on in eager mode. Use dictionary traversal order,
+    # which is nondeterministic in versions of Python < 3.6
+    if not exclusive:
+      raise ValueError('Unordered dictionaries are not supported for the '
+                       '`pred_fn_pairs` argument when `exclusive=False` and '
+                       'eager mode is enabled.')
+    pred_fn_pairs = list(pred_fn_pairs.items())
+  for pred_fn_pair in pred_fn_pairs:
+    if not isinstance(pred_fn_pair, tuple) or len(pred_fn_pair) != 2:
+      raise TypeError('Each entry in pred_fn_pairs must be a 2-tuple')
+    pred, fn = pred_fn_pair
+
+    if ops.is_tensor(pred):
+      if pred.dtype != dtype.bool:
+        raise TypeError('pred must be Tensor of type bool: %s' % pred.name)
+    elif not allow_python_preds:
+      raise TypeError('pred must be a Tensor, got: %s' % pred)
+    elif not isinstance(pred, bool):
+      raise TypeError('pred must be a Tensor or bool, got: %s' % pred)
+
+    if not callable(fn):
+      raise TypeError('fn for pred %s must be callable.' % pred.name)
+
+  predicates, actions = zip(*pred_fn_pairs)
+  return predicates, actions
+
+
+def _case_helper(cond_fn,
+                 pred_fn_pairs,
+                 default,
+                 exclusive,
+                 name,
+                 allow_python_preds=False,
+                 **cond_kwargs):
+  """Implementation of case that allows for different cond functions.
+
+  Args:
+    cond_fn: method that has signature and semantics of `cond` above.
+    pred_fn_pairs: Dict or list of pairs of a boolean scalar tensor, and a
+      callable which returns a list of tensors.
+    default: Optional callable that returns a list of tensors.
+    exclusive: True iff at most one predicate is allowed to evaluate to `True`.
+    name: A name for this operation (optional).
+    allow_python_preds: if true, pred_fn_pairs may contain Python bools in
+      addition to boolean Tensors
+    **cond_kwargs: keyword arguments that will be passed to `cond_fn`.
+  Returns:
+    The tensors returned by the first pair whose predicate evaluated to True, or
+    those returned by `default` if none does.
+  Raises:
+    TypeError: If `pred_fn_pairs` is not a list/dictionary.
+    TypeError: If `pred_fn_pairs` is a list but does not contain 2-tuples.
+    TypeError: If `fns[i]` is not callable for any i, or `default` is not
+               callable.
+  """
+  predicates, actions = _case_verify_and_canonicalize_args(
+      pred_fn_pairs, exclusive, name, allow_python_preds)
+  if default is None:
+    default, predicates, actions = _case_create_default_action(
+        predicates, actions)
+  fn = default
+  # To eval conditions in direct order we create nested conditions in reverse:
+  #   cond_fn(c[0], true_fn=.., false_fn=cond_fn(c[1], ...))
+  for predicate, action in reversed(list(zip(predicates, actions))):
+    fn = functools.partial(
+        cond_fn, predicate, true_fn=action, false_fn=fn, **cond_kwargs)
+  return fn()
+
+
+def with_dependencies(deps, value):
+  del deps
+  return value
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 cond = utils.copy_docstring(
-    tf.cond,
+    'tf.cond',
     _cond_jax if JAX_MODE else _cond)
 
 no_op = utils.copy_docstring(
-    tf.no_op,
+    'tf.no_op',
     _no_op)
 
 while_loop = utils.copy_docstring(
-    tf.while_loop,
+    'tf.while_loop',
     _while_loop_jax if JAX_MODE else _while_loop)

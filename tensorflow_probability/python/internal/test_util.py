@@ -19,15 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
+import functools
 import os
-import sys
 import unittest
 
-from absl import app
 from absl import flags
 from absl import logging
 from absl.testing import parameterized
 import numpy as np
+# Reimporting numpy to prevent the reference to onp.random from being rewritten
+# for the Jax backend, while allowing rewrites of other numpy references.
+import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -45,6 +47,7 @@ __all__ = [
     'numpy_disable_gradient_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
+    'disable_test_for_backend',
     'test_all_tf_execution_regimes',
     'test_graph_and_eager_modes',
     'test_graph_mode_only',
@@ -57,6 +60,9 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+NUMPY_MODE = False
+
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
@@ -65,11 +71,6 @@ flags.DEFINE_bool('vary_seed', False,
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
                      'Takes precedence over --vary-seed when both appear.'))
-
-# Unlike bazel, `pytest` doesn't invoke `tf.test.run()` (which parses flags), so
-# for external developers using pytest we just parse the flags directly.
-if 'pytest' in sys.modules:
-  app._register_and_parse_flags_with_usage()  # pylint: disable=protected-access
 
 
 class TestCase(tf.test.TestCase, parameterized.TestCase):
@@ -148,7 +149,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     if overall_exception:
       final_msg += str(overall_exception)
       raise AssertionError(final_msg)
-    elif exceptions_with_paths:
+    if exceptions_with_paths:
       for i, one_structure in enumerate(structure):
         final_msg += 'Structure {}:\n{}\n\n'.format(i, one_structure)
       final_msg += 'Exceptions:\n\n'
@@ -175,6 +176,28 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         b,
         check_types=check_types,
         msg='AllEqualNested failed')
+
+  def assertAllCloseNested(
+      self, a, b, rtol=1e-06, atol=1e-06, check_types=False):
+    """Assert that analogous entries in two nested structures have near values.
+
+    Args:
+      a: A nested structure.
+      b: A nested structure.
+      rtol: scalar relative tolerance.
+        Default value: `1e-6`.
+      atol: scalar absolute tolerance.
+        Default value: `1e-6`.
+      check_types: If `True`, types of sequences are checked as well, including
+        the keys of dictionaries. If `False`, for example a list and a tuple of
+        objects may be equivalent.
+    """
+    self.assertAllAssertsNested(
+        lambda x, y: self.assertAllClose(x, y, rtol=rtol, atol=atol),
+        a,
+        b,
+        check_types=check_types,
+        msg='AllCloseNested failed')
 
   def assertAllFinite(self, a):
     """Assert that all entries in a `Tensor` are finite.
@@ -205,6 +228,14 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     is_negative_inf = np.isneginf(self._GetNdArray(a))
     all_true = np.ones_like(is_negative_inf, dtype=np.bool)
     self.assertAllEqual(all_true, is_negative_inf)
+
+  def assertNotAllZero(self, a):
+    """Assert that all entries in a `Tensor` are nonzero.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as nonzero.
+    """
+    self.assertNotAllEqual(a, tf.nest.map_structure(tf.zeros_like, a))
 
   def assertAllNan(self, a):
     """Assert that every entry in a `Tensor` is NaN.
@@ -272,6 +303,8 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       err: the maximum error between all components of the numeric and
       autodiff'ed gradients.
     """
+    if JAX_MODE:
+      return _compute_max_gradient_error_jax(f, args, delta)
     def _compute_error():
       return gradient_checker_v2.max_error(
           *gradient_checker_v2.compute_gradient(f, x=args, delta=delta))
@@ -281,6 +314,72 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       # Make sure there's a global default session in graph mode.
       with self.test_session():
         return _compute_error()
+
+  def skip_if_no_xla(self):
+    try:
+      tf.function(lambda: tf.constant(0), experimental_compile=True)()
+    except (tf.errors.UnimplementedError, NotImplementedError) as e:
+      if 'Could not find compiler' in str(e):
+        self.skipTest('XLA not available')
+
+  def make_input(self, number):
+    """Create inputs with varied dtypes and static or dynamic shape.
+
+    Helper to run tests with different dtypes and both statically defined and
+    not statically defined shapes. This helper wraps the inputs to a
+    distribution, typically a python literal or numpy array. It will then
+    attach shapes and dtypes as specified by the test class's `dtype` and
+    `use_static_shape` attributes.
+
+    Note: `tf.Variables` are used to represent inputs which don't have
+    statically defined shapes, as well as fp64 inputs with statically defined
+    shapes. For fp32 with statically defined shapes, inputs are wrapped with
+    `tf.convert_to_tensor`.
+
+    Args:
+      number: Input value(s), typically python literal, list, or numpy array.
+
+    Returns:
+      output: Tensor or Variable with new dtype and shape.
+    """
+    try:
+      num_shape = number.shape
+    except AttributeError:
+      num_shape = None
+    target_shape = num_shape if self.use_static_shape else None
+    if self.dtype in [np.float64, tf.float64] or not self.use_static_shape:
+      output = tf.Variable(number, dtype=self.dtype, shape=target_shape,)
+      self.evaluate(output.initializer)
+    elif self.dtype in [np.float32, tf.float32] and self.use_static_shape:
+      output = tf.convert_to_tensor(number, dtype=self.dtype)
+    else:
+      raise TypeError('Only float32 and float64 supported, got',
+                      str(self.dtype))
+    return output
+
+if JAX_MODE:
+  from jax import jacrev  # pylint: disable=g-import-not-at-top
+  from jax import vmap  # pylint: disable=g-import-not-at-top
+
+  def _compute_max_gradient_error_jax(f, xs, scale=1e-3):
+    f_jac = jacrev(f, argnums=range(len(xs)))
+    theoretical_jacobian = f_jac(*xs)
+    numerical_jacobian = [_compute_numerical_jacobian_jax(f, xs, i, scale)
+                          for i in range(len(xs))]
+    return np.max(np.array(
+        [np.max(np.abs(a - b))
+         for (a, b) in zip(theoretical_jacobian, numerical_jacobian)]))
+
+  def _compute_numerical_jacobian_jax(f, xs, i, scale=1e-3):
+    dtype_i = xs[i].dtype
+    shape_i = xs[i].shape
+    size_i = np.product(shape_i, dtype=np.int32)
+    def grad_i(d):
+      return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
+              - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
+    ret = vmap(grad_i, out_axes=-1)(
+        np.eye(size_i, dtype=dtype_i).reshape((size_i,) + shape_i))
+    return np.reshape(ret, ret.shape[:-1] + shape_i)
 
 
 @contextlib.contextmanager
@@ -307,13 +406,12 @@ def _tf_function_mode_context(tf_function_mode):
     raise ValueError(
         'Only allowable values for tf_function_mode_context are "" '
         'and "no_tf_function"; but got "{}"'.format(tf_function_mode))
-  original_mode = tf.config.experimental_functions_run_eagerly()
+  original_mode = tf.config.functions_run_eagerly()
   try:
-    tf.config.experimental_run_functions_eagerly(tf_function_mode ==
-                                                 'no_tf_function')
+    tf.config.run_functions_eagerly(tf_function_mode == 'no_tf_function')
     yield
   finally:
-    tf.config.experimental_run_functions_eagerly(original_mode)
+    tf.config.run_functions_eagerly(original_mode)
 
 
 class EagerGraphCombination(test_combinations.TestCombination):
@@ -445,7 +543,12 @@ def test_graph_mode_only(test_class_or_method=None):
     decorator: A generated TF `test_combinations` decorator, or if
     `test_class_or_method` is not `None`, the generated decorator applied to
     that function.
+  Raises:
+    SkipTest: Raised when not running in the TF backend.
   """
+  if JAX_MODE or NUMPY_MODE:
+    raise unittest.SkipTest('Ignoring TF Graph Mode tests in non-TF backends.')
+
   decorator = test_combinations.generate(
       test_combinations.combine(mode=['graph']),
       test_combinations=[EagerGraphCombination()])
@@ -455,19 +558,25 @@ def test_graph_mode_only(test_class_or_method=None):
   return decorator
 
 
-JAX_MODE = False
+def is_numpy_not_jax_mode():
+  return NUMPY_MODE and not JAX_MODE
 
 
-def numpy_disable_gradient_test(test_fn):
+def numpy_disable_gradient_test(test_fn_or_reason, reason=None):
   """Disable a gradient-using test when using the numpy backend."""
 
-  if JAX_MODE:
-    return test_fn
+  if not callable(test_fn_or_reason):
+    if reason is not None:
+      raise ValueError('Unexpected test_fn: {}'.format(test_fn_or_reason))
+    return functools.partial(numpy_disable_gradient_test,
+                             reason=test_fn_or_reason)
 
-  def new_test(self, *args, **kwargs):
-    if tf.Variable == ops.NumpyVariable:
-      self.skipTest('gradient-using test disabled for numpy')
-    return test_fn(self, *args, **kwargs)
+  if not NUMPY_MODE:
+    return test_fn_or_reason
+
+  def new_test(self, *args, **kwargs):  # pylint: disable=unused-argument
+    self.skipTest('gradient-using test disabled for numpy{}'.format(
+        ': {}'.format(reason) if reason else ''))
 
   return new_test
 
@@ -554,6 +663,24 @@ def tf_tape_safety_test(test_fn):
   return new_test
 
 
+def disable_test_for_backend(disable_numpy=False,
+                             disable_jax=False,
+                             reason=None):
+  """Disable a test for backends with a specified reason."""
+  if not (disable_numpy or disable_jax):
+    raise ValueError('One of `disable_numpy` or `disable_jax` must be true.')
+  if not reason:
+    raise ValueError('`reason` must be specified.')
+
+  def decor(test_fn_or_class):
+    if not ((disable_numpy and is_numpy_not_jax_mode()) or
+            (disable_jax and JAX_MODE)):
+      return test_fn_or_class
+    return unittest.skip(reason)(test_fn_or_class)
+
+  return decor
+
+
 def test_seed(hardcoded_seed=None,
               set_eager_seed=True,
               sampler_type='stateful'):
@@ -609,6 +736,10 @@ def test_seed(hardcoded_seed=None,
     logging.warning('Using seed %s', answer)
   elif hardcoded_seed is not None:
     answer = hardcoded_seed
+    if JAX_MODE and np.shape(answer) == (2,):
+      # Workaround for test_seed(hardcoded_seed=test_seed()), which can happen
+      # e.g. with the run_test_sample_consistent_log_prob methods above.
+      answer = answer[-1]
   else:
     answer = 17
   if sampler_type == 'stateless' or JAX_MODE:
@@ -658,6 +789,41 @@ def test_seed_stream(salt='Salt of the Earth', hardcoded_seed=None):
       arguments or command line flags.
   """
   return SeedStream(test_seed(hardcoded_seed), salt=salt)
+
+
+def test_np_rng(hardcoded_seed=None):
+  """Returns a command-line-controllable Numpy PRNG for unit tests.
+
+  When seeding unit-test PRNGs, we want:
+
+  - The seed to be fixed to an arbitrary value most of the time, so the test
+    doesn't flake even if its failure probability is noticeable.
+
+  - To switch to different seeds per run when using --runs_per_test to measure
+    the test's failure probability.
+
+  - To set the seed to a specific value when reproducing a low-probability event
+    (e.g., debugging a crash that only some seeds trigger).
+
+  To those ends, this function returns a `np.random.RandomState` seeded with
+  `test_seed` (which see).  The latter respects the command line flags
+  `--fixed_seed=<seed>` and `--vary_seed` (Boolean, default False).
+  `--vary_seed` uses system entropy to produce unpredictable seeds.
+  `--fixed_seed` takes precedence over `--vary_seed` when both are present.
+
+  Args:
+    hardcoded_seed: Optional Python value.  The seed to use if both the
+      `--vary_seed` and `--fixed_seed` flags are unset.  This should usually be
+      unnecessary, since a test should pass with any seed.
+
+  Returns:
+    rng: A `np.random.RandomState` instance seeded with 17, unless otherwise
+      specified by arguments or command line flags.
+  """
+  raw_seed = test_seed(hardcoded_seed=hardcoded_seed)
+  # Jax backend doesn't have the random module; but it shouldn't be needed,
+  # because this helper should only be used to generate test data.
+  return onp.random.RandomState(seed=raw_seed % 2**32)
 
 
 def floats_near(target, how_many, dtype=np.float32):

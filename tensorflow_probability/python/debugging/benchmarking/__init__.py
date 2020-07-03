@@ -26,6 +26,7 @@ from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function 
 from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function import RUNTIME_EAGER
 from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function import RUNTIME_FUNCTION
 from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function import RUNTIME_XLA
+from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function import RUNTIME_XLA_AUTOCLUSTER
 
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     "RUNTIME_EAGER",
     "RUNTIME_FUNCTION",
     "RUNTIME_XLA",
+    "RUNTIME_XLA_AUTOCLUSTER",
     "HARDWARE_CPU",
     "HARDWARE_GPU",
     "BenchmarkTfFunctionConfig",

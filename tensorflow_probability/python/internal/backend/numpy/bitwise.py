@@ -18,22 +18,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Dependency imports
 import numpy as np
-
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 __all__ = [
+    'bitwise_xor',
     'left_shift',
 ]
 
 
 bitwise_xor = utils.copy_docstring(
-    tf.bitwise.bitwise_xor,
+    'tf.bitwise.bitwise_xor',
     lambda x, y, name=None: np.bitwise_xor(x, y))  # pylint: disable=unused-argument
 
 left_shift = utils.copy_docstring(
-    tf.bitwise.left_shift,
+    'tf.bitwise.left_shift',
     lambda x, y, name=None: np.left_shift(x, y))  # pylint: disable=unused-argument

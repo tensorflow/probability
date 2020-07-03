@@ -113,14 +113,20 @@ class StatisticalTestingTest(test_util.TestCase):
     # A batch of sorted samples with nontrivial repetition.
     # There are repetitions across batch members, which should not
     # confuse the CDF computation.
-    # Shape: [batch_size, num_samples]
-    samples = np.array([[1, 1, 2, 2],
-                        [1, 2, 3, 4],
-                        [1, 3, 3, 3]])
+    # Shape: [num_samples, batch_size]
+    samples = np.array([[1, 1, 1],
+                        [1, 2, 3],
+                        [2, 3, 3],
+                        [2, 4, 3]])
     expected_low_cdf_values = np.array(
         [[0, 0, 0.5, 0.5],
          [0, 0.25, 0.5, 0.75],
          [0, 0.25, 0.25, 0.25]])
+    expected_low_cdf_values = np.array(
+        [[0, 0, 0],
+         [0, 0.25, 0.25],
+         [0.5, 0.5, 0.25],
+         [0.5, 0.75, 0.25]])
     low_empirical_cdfs = self.evaluate(
         st.empirical_cdfs(samples, samples, continuity='left'))
     self.assertAllEqual(expected_low_cdf_values, low_empirical_cdfs)
@@ -128,15 +134,21 @@ class StatisticalTestingTest(test_util.TestCase):
         [[0.5, 0.5, 1, 1],
          [0.25, 0.5, 0.75, 1],
          [0.25, 1, 1, 1]])
+    expected_high_cdf_values = np.array(
+        [[0.5, 0.25, 0.25],
+         [0.5, 0.5, 1],
+         [1, 0.75, 1],
+         [1, 1, 1]])
     high_empirical_cdfs = self.evaluate(
         st.empirical_cdfs(samples, samples, continuity='right'))
     self.assertAllEqual(expected_high_cdf_values, high_empirical_cdfs)
 
   @parameterized.parameters(np.float32, np.float64)
   def test_kolmogorov_smirnov_distance(self, dtype):
-    samples = [[1, 1, 2, 2],
-               [1, 2, 3, 4],
-               [1, 3, 3, 3]]
+    samples = np.array([[1, 1, 1],
+                        [1, 2, 3],
+                        [2, 3, 3],
+                        [2, 4, 3]])
     samples = tf.convert_to_tensor(value=samples, dtype=dtype)
     def cdf(x):
       ones = tf.ones_like(x)
@@ -151,10 +163,8 @@ class StatisticalTestingTest(test_util.TestCase):
       answer = tf1.where(x <= 2, 0.3 * ones, answer)
       answer = tf1.where(x <= 1, 0.1 * ones, answer)
       return tf1.where(x <= 0, 0 * ones, answer)
-    # Unlike empirical_cdfs, the samples Tensor must come in iid across the
-    # leading dimension.
     obtained = self.evaluate(st.kolmogorov_smirnov_distance(
-        tf.transpose(a=samples), cdf, left_continuous_cdf=left_continuous_cdf))
+        samples, cdf, left_continuous_cdf=left_continuous_cdf))
     self.assertAllClose([0.4, 0.25, 0.35], obtained, atol=1e-7)
 
   @parameterized.parameters(np.float32, np.float64)

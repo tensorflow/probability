@@ -18,17 +18,60 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
 from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import vectorization_util
 
 
 @test_util.test_all_tf_execution_regimes
 class VectorizationTest(test_util.TestCase):
+
+  def test_iid_sample_stateful(self):
+
+    # Random fn using stateful samplers.
+    def fn(key1, key2, seed=None):
+      return [tfd.Normal(0., 1.).sample([3, 2], seed=seed),
+              {key1: tfd.Poisson([1., 2., 3., 4.]).sample(seed=seed + 1),
+               key2: tfd.LogNormal(0., 1.).sample(seed=seed + 2)}]
+    sample = self.evaluate(
+        fn('a', key2='b', seed=test_util.test_seed(sampler_type='stateful')))
+
+    sample_shape = [6, 1]
+    iid_fn = vectorization_util.iid_sample(fn, sample_shape=sample_shape)
+    iid_sample = self.evaluate(iid_fn('a', key2='b', seed=42))
+
+    # Check that we did not get repeated samples.
+    first_sampled_vector = iid_sample[0].flatten()
+    self.assertAllGreater(
+        (first_sampled_vector[1:] - first_sampled_vector[0])**2, 1e-6)
+
+    expected_iid_shapes = tf.nest.map_structure(
+        lambda x: np.concatenate([sample_shape, x.shape], axis=0), sample)
+    iid_shapes = tf.nest.map_structure(lambda x: x.shape, iid_sample)
+    self.assertAllEqualNested(expected_iid_shapes, iid_shapes)
+
+  def test_iid_sample_stateless(self):
+
+    sample_shape = [6]
+    iid_fn = vectorization_util.iid_sample(
+        tf.random.stateless_normal, sample_shape=sample_shape)
+
+    warnings.simplefilter('always')
+    with warnings.catch_warnings(record=True) as triggered:
+      samples = iid_fn([], seed=test_util.test_seed(sampler_type='stateless'))
+      self.assertTrue(
+          any('may be quite slow' in str(warning.message)
+              for warning in triggered))
+
+    # Check that we did not get repeated samples.
+    samples_ = self.evaluate(samples)
+    self.assertAllGreater((samples_[1:] - samples_[0])**2, 1e-6)
 
   def test_docstring_example(self):
     add = lambda a, b: a + b
@@ -117,6 +160,34 @@ class VectorizationTest(test_util.TestCase):
         self.evaluate(vectorized_matvec(
             self.maybe_static(tf.zeros([5]), is_static=False),
             self.maybe_static(tf.zeros([2, 1, 5]), is_static=False)))
+
+  def test_can_escape_vectorization_with_none_ndims(self):
+
+    # Suppose the original fn supports `None` as an input.
+    fn = lambda x, y: (tf.reduce_sum(x, axis=0), y[0] if y is not None else y)
+
+    polymorphic_fn = vectorization_util.make_rank_polymorphic(
+        fn, core_ndims=[1, None])
+    rx, ry = polymorphic_fn([[1., 2., 4.], [3., 5., 7.]], None)
+    self.assertAllEqual(rx.shape, [2])
+    self.assertIsNone(ry)
+
+    single_arg_polymorphic_fn = vectorization_util.make_rank_polymorphic(
+        lambda y: fn(tf.convert_to_tensor([1., 2., 3.]), y), core_ndims=None)
+    rx, ry = self.evaluate(single_arg_polymorphic_fn(
+        tf.convert_to_tensor([[1., 3.], [2., 4.]])))
+    self.assertAllEqual(ry, [1., 3.])
+
+  def test_docstring_example_passing_fn_arg(self):
+    def apply_binop(fn, a, b):
+      return fn(a, b)
+    apply_binop_to_vector_and_scalar = vectorization_util.make_rank_polymorphic(
+        apply_binop, core_ndims=(None, 1, 0))
+    r = self.evaluate(apply_binop_to_vector_and_scalar(
+        lambda a, b: a * b, tf.constant([1., 2.]), tf.constant([3., 4., 5.])))
+    self.assertAllEqual(r, np.array(
+        [[3., 6.], [4., 8.], [5., 10.]], dtype=np.float32))
+
 
 if __name__ == '__main__':
   tf.test.main()

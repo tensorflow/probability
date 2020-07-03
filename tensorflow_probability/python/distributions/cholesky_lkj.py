@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import correlation_cholesky as correlation_cholesky_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import lkj
@@ -248,9 +249,9 @@ class CholeskyLKJ(distribution.Distribution):
       ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
         ans = ans + logpi * (k / 2.)
-        ans = ans + tf.math.lgamma(concentration +
-                                   (self.dimension - 1 - k) / 2.)
-        ans = ans - tf.math.lgamma(concentration + (self.dimension - 1) / 2.)
+        effective_concentration = concentration + (self.dimension - 1 - k) / 2.
+        ans = ans + tfp_math.log_gamma_difference(
+            k / 2., effective_concentration)
       return ans
 
   def _default_event_space_bijector(self):

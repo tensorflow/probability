@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v1 as tf1
@@ -281,11 +283,11 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def testDeterministicSampling(self):
     seed = test_util.test_seed()
-    tf.random.set_seed(seed)
     dist = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(logits=[0., 0.]),
         components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]),
         validate_args=True)
+    tf.random.set_seed(seed)
     sample_1 = self.evaluate(dist.sample([100], seed=seed))
     tf.random.set_seed(seed)
     sample_2 = self.evaluate(dist.sample([100], seed=seed))
@@ -335,9 +337,12 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     # once, and thus incur no extra reads/concretizations of parameters.
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'mean', 'sample'):
+                   'mean'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):
         getattr(dist, method)()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=2):
+      dist.sample(seed=test_util.test_seed())
 
     for method in ('log_prob', 'prob'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):
@@ -524,6 +529,64 @@ class MixtureSameFamilyTestStatic64(
     test_util.TestCase):
   use_static_shape = True
   dtype = np.float64
+
+
+class SamplerBackwardCompatibilityTest(test_util.TestCase):
+
+  def testStatefulComponentDist(self):
+
+    class StatefulNormal(tfd.Distribution):
+
+      def __init__(self, loc):
+        self._loc = tf.convert_to_tensor(loc)
+        super(StatefulNormal, self).__init__(
+            dtype=tf.float32, reparameterization_type=tfd.FULLY_REPARAMETERIZED,
+            validate_args=False, allow_nan_stats=False)
+
+      def _batch_shape(self):
+        return self._loc.shape
+
+      def _event_shape(self):
+        return []
+
+      def _sample_n(self, n, seed=None):
+        return self._loc + tf.random.normal(
+            tf.concat([[n], tf.shape(self._loc)], axis=0), seed=seed)
+
+    mix = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(logits=[0., 0]),
+        components_distribution=StatefulNormal(loc=[1., 2]))
+    with warnings.catch_warnings(record=True) as triggered:
+      self.evaluate(mix.sample())
+    self.assertTrue(
+        any('Falling back to stateful sampling for `components_distribution`'
+            in str(warning.message) for warning in triggered))
+
+  def testStatefulMixtureDist(self):
+
+    class StatefulCategorical(tfd.Distribution):
+
+      def __init__(self, logits):
+        self._logits = tf.convert_to_tensor(logits)
+        super(StatefulCategorical, self).__init__(
+            dtype=tf.int32, reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=False, allow_nan_stats=False)
+
+      def _event_shape(self):
+        return []
+
+      def _sample_n(self, n, seed=None):
+        return tf.random.categorical([self._logits], n, seed=seed)[0]
+
+    mix = tfd.MixtureSameFamily(
+        mixture_distribution=StatefulCategorical(logits=[0., 0]),
+        components_distribution=tfd.Normal(loc=[1., 2], scale=1))
+    with warnings.catch_warnings(record=True) as triggered:
+      self.evaluate(mix.sample())
+    self.assertTrue(
+        any('Falling back to stateful sampling for `mixture_distribution`'
+            in str(warning.message) for warning in triggered))
+
 
 if __name__ == '__main__':
   tf.test.main()

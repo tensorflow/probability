@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import abc
 import collections
+import functools
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -29,7 +30,6 @@ from tensorflow_probability.python.math.ode import runge_kutta_util as rk_util
 from tensorflow_probability.python.math.ode import util
 
 # TODO(b/138303336): Support MATLAB-style events.
-# TODO(b/138303018): Support nested structure state.
 
 __all__ = [
     'ChosenBySolver',
@@ -43,10 +43,18 @@ __all__ = [
 class Solver(object):
   """Base class for an ODE solver."""
 
-  def __init__(self, use_pfor_to_compute_jacobian, validate_args, name):
+  def __init__(self, use_pfor_to_compute_jacobian, make_adjoint_solver_fn,
+               validate_args, name):
     self._use_pfor_to_compute_jacobian = use_pfor_to_compute_jacobian
     self._validate_args = validate_args
     self._name = name
+    if make_adjoint_solver_fn is None:
+      make_adjoint_solver_fn = lambda: self
+    self._make_adjoint_solver_fn = make_adjoint_solver_fn
+
+  @property
+  def name(self):
+    return self._name
 
   def solve(
       self,
@@ -58,6 +66,7 @@ class Solver(object):
       jacobian_sparsity=None,
       batch_ndims=None,
       previous_solver_internal_state=None,
+      constants=None,
   ):
     """Solves an initial value problem.
 
@@ -65,12 +74,15 @@ class Solver(object):
     condition:
 
     ```none
-    dy/dt(t) = ode_fn(t, y(t))
+    dy/dt(t) = ode_fn(t, y(t), **constants)
     y(initial_time) = initial_state
     ```
 
     Here, `t` (also called time) is a scalar float `Tensor` and `y(t)` (also
     called the state at time `t`) is an N-D float or complex `Tensor`.
+    `constants` is are values that are constant with respect to time. Passing
+    the constants here rather than just closing over them in `ode_fn` is only
+    necessary if you want gradients with respect to these values.
 
     ### Example
 
@@ -90,15 +102,16 @@ class Solver(object):
     y1 = results.states[1]  # == dot(matrix_exp(A * t1), y_init)
     ```
 
-    Using instead `solution_times=tfp.math.ode.ChosenBySolver(final_time=1.)`
-    yields the state at various times between `t_init` and `final_time` chosen
-    automatically by the solver. In this case, `results.states[i]` is the state
-    at time `results.times[i]`.
+    If the exact solution times are not important, it can be much
+    more efficient to let the solver choose them using
+    `solution_times=tfp.math.ode.ChosenBySolver(final_time=1.)`.
+    This yields the state at various times between `t_init` and `final_time`,
+    in which case `results.states[i]` is the state at time `results.times[i]`.
 
-    #### Gradient
+    #### Gradients
 
-    The gradient of the result is computed using the adjoint sensitivity method
-    described in [Chen et al. (2018)][1].
+    The gradients are computed using the adjoint sensitivity method described in
+    [Chen et al. (2018)][1].
 
     ```python
     grad = tf.gradients(y1, y0) # == dot(e, J)
@@ -106,15 +119,52 @@ class Solver(object):
     # e = [1, ..., 1] is the row vector of ones.
     ```
 
+    This is not capable of computing gradients with respect to values closed
+    over by `ode_fn`, e.g., in the example above:
+
+    ```python
+    def ode_fn(t, y):
+      return tf.linalg.matvec(A, y)
+
+    with tf.GradientTape() as tape:
+      tape.watch(A)
+      results = tfp.math.ode.BDF().solve(ode_fn, t_init, y_init,
+                                         solution_times=[t0, t1])
+    tape.gradient(results.states, A)  # Undefined!
+    ```
+
+    There are two options to get the gradients flowing through these values:
+
+    1. Use `tf.Variable` for these values.
+    2. Pass the values in explicitly using the `constants` argument:
+
+    ```python
+    def ode_fn(t, y, A):
+      return tf.linalg.matvec(A, y)
+
+    with tf.GradientTape() as tape:
+      tape.watch(A)
+      results = tfp.math.ode.BDF().solve(ode_fn, t_init, y_init,
+                                         solution_times=[t0, t1],
+                                         constants={'A': A})
+    tape.gradient(results.states, A)  # Fine.
+    ```
+
+    By default, this uses the same solver for the augmented ODE. This can be
+    controlled via `make_adjoint_solver_fn`.
+
     #### References
 
     [1]: Chen, Tian Qi, et al. "Neural ordinary differential equations."
          Advances in Neural Information Processing Systems. 2018.
 
     Args:
-      ode_fn: Function of the form `ode_fn(t, y)`. The input `t` is a scalar
-        float `Tensor`. The input `y` and output are both `Tensor`s with the
-        same shape and `dtype` as `initial_state`.
+      ode_fn: Function of the form `ode_fn(t, y, **constants)`. The input `t` is
+        a scalar float `Tensor`. The input `y` and output are both `Tensor`s
+        with the same shape and `dtype` as `initial_state`. `constants` is are
+        values that are constant with respect to time. Passing the constants
+        here rather than just closing over them in `ode_fn` is only necessary if
+        you want gradients with respect to these values.
       initial_time: Scalar float `Tensor` specifying the initial time.
       initial_state: N-D float or complex `Tensor` specifying the initial state.
         The `dtype` of `initial_state` must be complex for problems with
@@ -148,29 +198,45 @@ class Solver(object):
       previous_solver_internal_state: Optional solver-specific argument used to
         warm-start this invocation of `solve`.
         Default value: `None`.
+      constants: Optional dictionary with string keys and values being (possibly
+        nested) float `Tensor`s. These represent values that are constant with
+        respect to time. Specifying these here allows the adjoint sentitivity
+        method to compute gradients of the results with respect to these values.
 
     Returns:
       Object of type `Results`.
     """
+    if constants is None:
+      constants = {}
     input_state_structure = initial_state
+    constant_state_structure = constants
+    flat_initial_state = tf.nest.flatten(initial_state)
+    flat_constants = tf.nest.flatten(constants)
+    num_state_components = len(flat_initial_state)
 
     @tf.custom_gradient
-    def gradient_helper(*flat_initial_state_components):
-      """Inner method that restricts gradient to initial state components."""
-      flat_initial_state = list(flat_initial_state_components)
-      flat_initial_state = [tf.convert_to_tensor(c) for c in flat_initial_state]
+    def gradient_helper(*flat_initial_state_and_constants):
+      """Restricts gradient to initial state components and constants."""
+      flat_initial_state_and_constants = [
+          tf.convert_to_tensor(c) for c in flat_initial_state_and_constants
+      ]
+      flat_initial_state = (
+          flat_initial_state_and_constants[:num_state_components])
+      flat_constants = flat_initial_state_and_constants[num_state_components:]
       initial_state = tf.nest.pack_sequence_as(
           input_state_structure, flat_initial_state)
+      constants = tf.nest.pack_sequence_as(
+          constant_state_structure, flat_constants)
 
       results = self._solve(
-          ode_fn,
-          initial_time,
-          initial_state,
-          solution_times,
-          jacobian_fn,
-          jacobian_sparsity,
-          batch_ndims,
-          previous_solver_internal_state,
+          ode_fn=functools.partial(ode_fn, **constants),
+          initial_time=initial_time,
+          initial_state=initial_state,
+          solution_times=solution_times,
+          jacobian_fn=jacobian_fn,
+          jacobian_sparsity=jacobian_sparsity,
+          batch_ndims=batch_ndims,
+          previous_solver_internal_state=previous_solver_internal_state,
       )
       results = Results(
           times=tf.stop_gradient(results.times),
@@ -182,6 +248,7 @@ class Solver(object):
 
       def grad_fn(*dresults, **kwargs):
         """Adjoint sensitivity method to compute gradients."""
+        adjoint_solver = self._make_adjoint_solver_fn()
         dresults = tf.nest.pack_sequence_as(results, dresults)
         dstates = dresults.states
         # The signature grad_fn(*dresults, variables=None) is not valid Python 2
@@ -207,13 +274,14 @@ class Solver(object):
           num_result_times = tf.size(result_times)
 
           # First two components correspond to reverse and adjoint states.
-          # the last component is adjoint state for variables.
+          # the last two component is adjoint state for variables and constants.
           terminal_augmented_state = tuple([
               rk_util.nest_constant(initial_state, 0.0),
               rk_util.nest_constant(initial_state, 0.0),
               tuple(
                   rk_util.nest_constant(variable, 0.0) for variable in variables
-              )
+              ),
+              rk_util.nest_constant(constants, 0.0),
           ])
 
           # The XLA compiler does not compile code which slices/indexes using
@@ -228,6 +296,7 @@ class Solver(object):
           result_state_arrays = [
               tf.TensorArray(  # pylint: disable=g-complex-comprehension
                   dtype=component.dtype, size=num_result_times - 1,
+                  clear_after_read=False,
                   element_shape=component.shape[1:]).unstack(component)
               for component in tf.nest.flatten(results.states)
           ]
@@ -236,6 +305,7 @@ class Solver(object):
           dresult_state_arrays = [
               tf.TensorArray(  # pylint: disable=g-complex-comprehension
                   dtype=component.dtype, size=num_result_times - 1,
+                  clear_after_read=False,
                   element_shape=component.shape[1:]).unstack(component)
               for component in tf.nest.flatten(dstates)
           ]
@@ -247,21 +317,25 @@ class Solver(object):
 
             Describes a differential equation that evolves the augmented state
             backwards in time to compute gradients using the adjoint method.
-            Augmented state consists of 3 components `(state, adjoint_state,
-            vars)` all evaluated at time `backward_time`:
+            Augmented state consists of 4 components `(state, adjoint_state,
+            vars, constants)` all evaluated at time `backward_time`:
 
             state: represents the solution of user provided `ode_fn`. The
               structure coincides with the `initial_state`.
-            adjoint_state: represents the solution of adjoint sensitivity
+            adjoint_state: represents the solution of the adjoint sensitivity
               differential equation as discussed below. Has the same structure
               and shape as `state`.
-            vars: represent the solution of the adjoint equation for variable
-              gradients. Represented as a `Tuple(Tensor, ...)` with as many
-              tensors as there are `variables`.
+            variables: represent the solution of the adjoint equation for
+              variable gradients. Represented as a `Tuple(Tensor, ...)` with as
+              many tensors as there are `variables` variable outside this
+              function.
+            constants: represent the solution of the adjoint equation for
+              constant gradients. Has the same structure and shape as
+              `constants` variable outside this function.
 
-            Adjoint sensitivity equation describes the gradient of the solution
-            with respect to the value of the solution at previous time t. Its
-            dynamics are given by
+            The adjoint sensitivity equation describes the gradient of the
+            solution with respect to the value of the solution at a previous
+            time t. Its dynamics are given by
             d/dt[adj(t)] = -1 * adj(t) @ jacobian(ode_fn(t, z), z)
             Which is computed as:
             d/dt[adj(t)]_i = -1 * sum_j(adj(t)_j * d/dz_i[ode_fn(t, z)_j)]
@@ -270,7 +344,7 @@ class Solver(object):
             removing gradient from it.
 
             Adjoint equation for the gradient with respect to every
-            `tf.Variable` theta follows:
+            `tf.Variable` and constant theta follows:
             d/dt[grad_theta(t)] = -1 * adj(t) @ jacobian(ode_fn(t, z), theta)
             = -1 * d/d theta_i[sum_j(no_grad_adj_j * ode_fn(t, z)_j)]
 
@@ -285,17 +359,19 @@ class Solver(object):
                 derivative of the `adjoint_state` component.
               adjoint_variables_ode: Structure of `Tensor`s equal to backwards
                 time derivative of the `vars` component.
+              adjoint_constants_ode: Structure of `Tensor`s equal to backwards
+                time derivative of the `constants` component.
             """
             # The negative signs disappears after the change of variables.
             # The ODE solver cannot handle the case initial_time > final_time
             # and hence a change of variables backward_time = -time is used.
             time = -backward_time
-            state, adjoint_state, _ = augmented_state
+            state, adjoint_state, _, _ = augmented_state
 
+            # TODO(b/152464477): Doesn't work reliably in TF1.
             with tf.GradientTape() as tape:
-              tape.watch(variables)
-              tape.watch(state)
-              derivatives = ode_fn(time, state)
+              tape.watch([variables, state, constants])
+              derivatives = ode_fn(time, state, **constants)
               adjoint_no_grad = tf.nest.map_structure(
                   tf.stop_gradient, adjoint_state)
               negative_derivatives = rk_util.weighted_sum([-1.0], [derivatives])
@@ -308,57 +384,95 @@ class Solver(object):
               adjoint_dot_derivatives = tf.squeeze(
                   tf.add_n(tf.nest.flatten(adjoint_dot_derivatives)))
 
-            adjoint_ode, adjoint_variables_ode = tape.gradient(
-                adjoint_dot_derivatives, (state, tuple(variables)),
-                unconnected_gradients=tf.UnconnectedGradients.ZERO)
-            return negative_derivatives, adjoint_ode, adjoint_variables_ode
+            (adjoint_ode, adjoint_variables_ode,
+             adjoint_constants_ode) = tape.gradient(
+                 adjoint_dot_derivatives, (state, tuple(variables), constants),
+                 unconnected_gradients=tf.UnconnectedGradients.ZERO)
+            return (negative_derivatives, adjoint_ode, adjoint_variables_ode,
+                    adjoint_constants_ode)
 
-          def reverse_to_result_time(n, augmented_state, _):
+          def make_augmented_state(n, prev_augmented_state):
+            """Constructs the augmented state for step `n`."""
+            (_, adjoint_state, adjoint_variable_state,
+             adjoint_constant_state) = prev_augmented_state
+            initial_state = _read_solution_components(
+                result_state_arrays,
+                input_state_structure,
+                n - 1,
+            )
+            initial_adjoint = _read_solution_components(
+                dresult_state_arrays,
+                input_state_structure,
+                n - 1,
+            )
+            initial_adjoint_state = rk_util.weighted_sum(
+                [1.0, 1.0], [adjoint_state, initial_adjoint])
+            augmented_state = (
+                initial_state,
+                initial_adjoint_state,
+                adjoint_variable_state,
+                adjoint_constant_state,
+            )
+            return augmented_state
+
+          def reverse_to_result_time(n, augmented_state, solver_internal_state,
+                                     _):
             """Integrates the augmented system backwards in time."""
             lower_bound_of_integration = result_time_array.read(n)
             upper_bound_of_integration = result_time_array.read(n - 1)
-            _, adjoint_state, adjoint_variable_state = augmented_state
-            initial_state = _read_solution_components(
-                result_state_arrays, input_state_structure, n - 1)
-            initial_adjoint = _read_solution_components(
-                dresult_state_arrays, input_state_structure, n - 1)
-            initial_adjoint_state = rk_util.weighted_sum(
-                [1.0, 1.0], [adjoint_state, initial_adjoint])
-            initial_augmented_state = (
-                initial_state, initial_adjoint_state, adjoint_variable_state)
+            initial_augmented_state = make_augmented_state(n, augmented_state)
             # TODO(b/138304303): Allow the user to specify the Hessian of
             # `ode_fn` so that we can get the Jacobian of the adjoint system.
             # TODO(b/143624114): Support higher order derivatives.
-            augmented_results = self._solve(
+            solver_internal_state = (
+                adjoint_solver._adjust_solver_internal_state_for_state_jump(  # pylint: disable=protected-access
+                    ode_fn=augmented_ode_fn,
+                    initial_time=-lower_bound_of_integration,
+                    initial_state=initial_augmented_state,
+                    previous_solver_internal_state=solver_internal_state,
+                    previous_state=augmented_state,
+                ))
+            augmented_results = adjoint_solver.solve(
                 ode_fn=augmented_ode_fn,
                 initial_time=-lower_bound_of_integration,
                 initial_state=initial_augmented_state,
                 solution_times=[-upper_bound_of_integration],
-                batch_ndims=batch_ndims
+                batch_ndims=batch_ndims,
+                previous_solver_internal_state=solver_internal_state,
             )
             # Results added an extra time dim of size 1, squeeze it.
             select_result = lambda x: tf.squeeze(x, [0])
             result_state = augmented_results.states
             result_state = tf.nest.map_structure(select_result, result_state)
             status = augmented_results.diagnostics.status
-            return n - 1, result_state, status
+            return (n - 1, result_state,
+                    augmented_results.solver_internal_state, status)
 
-          _, augmented_state, _ = tf.while_loop(
-              lambda n, _, status: (n >= 1) & tf.equal(status, 0),
-              reverse_to_result_time,
-              (num_result_times - 1, terminal_augmented_state, 0),
-              back_prop=False
+          initial_n = num_result_times - 1
+          solver_internal_state = adjoint_solver._initialize_solver_internal_state(  # pylint: disable=protected-access
+              ode_fn=augmented_ode_fn,
+              initial_time=result_time_array.read(initial_n),
+              initial_state=make_augmented_state(initial_n,
+                                                 terminal_augmented_state),
           )
-          _, adjoint_state, adjoint_variables = augmented_state
-          return adjoint_state, list(adjoint_variables)
+
+          _, augmented_state, _, _ = tf.while_loop(
+              lambda n, _as, _sis, status: (n >= 1) & tf.equal(status, 0),
+              reverse_to_result_time,
+              (initial_n, terminal_augmented_state, solver_internal_state, 0),
+              back_prop=False,
+          )
+          (_, adjoint_state, adjoint_variables,
+           adjoint_constants) = augmented_state
+          return (tf.nest.flatten(adjoint_state) +
+                  tf.nest.flatten(adjoint_constants), list(adjoint_variables))
 
       return results, grad_fn
 
     # TODO(b/140760650): We must use a resource-using variable scope, otherwise
     # custom_gradient will complain even if there are no variables in `ode_fn`.
-    flat_initial_state = tf.nest.flatten(initial_state)
     with tf1.variable_scope(tf1.get_variable_scope(), use_resource=True):
-      return gradient_helper(*flat_initial_state)
+      return gradient_helper(*(flat_initial_state + flat_constants))
 
   @abc.abstractmethod
   def _solve(
@@ -374,6 +488,33 @@ class Solver(object):
   ):
     """Abstract method called by `solve`; to be implemented by child classes."""
     pass
+
+  @abc.abstractmethod
+  def _initialize_solver_internal_state(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+  ):
+    """Initializes the solver internal state."""
+    pass
+
+  def _adjust_solver_internal_state_for_state_jump(
+      self,
+      ode_fn,
+      initial_time,
+      initial_state,
+      previous_solver_internal_state,
+      previous_state,
+  ):
+    """Adjust the previous internal state in response to a state jump."""
+    del previous_solver_internal_state
+    del previous_state
+    return self._initialize_solver_internal_state(
+        ode_fn=ode_fn,
+        initial_time=initial_time,
+        initial_state=initial_state,
+    )
 
 
 class Results(

@@ -314,7 +314,14 @@ class QuantizedDistribution(distributions.Distribution):
 
   @distribution_util.AppendDocstring(_log_prob_note)
   def _log_prob(self, y):
-    if not hasattr(self.distribution, '_log_cdf'):
+    # Changes of mass are only at the integers, so we must use tf.floor in our
+    # computation of log_cdf/log_sf.  Floor now, since
+    # tf.floor(y - 1) can incur unwanted rounding near powers of two, but
+    # tf.floor(y) - 1 can't.
+    y = tf.floor(y)
+
+    if not (hasattr(self.distribution, '_log_cdf') or
+            hasattr(self.distribution, '_cdf')):
       raise NotImplementedError(
           '`log_prob` not implemented unless the base distribution implements '
           '`log_cdf`')
@@ -358,6 +365,12 @@ class QuantizedDistribution(distributions.Distribution):
 
   @distribution_util.AppendDocstring(_prob_note)
   def _prob(self, y):
+    # Changes of mass are only at the integers, so we must use tf.floor in our
+    # computation of log_cdf/log_sf.  Floor now, since
+    # tf.floor(y - 1) can incur unwanted rounding near powers of two, but
+    # tf.floor(y) - 1 can't.
+    y = tf.floor(y)
+
     if not hasattr(self.distribution, '_cdf'):
       raise NotImplementedError(
           '`prob` not implemented unless the base distribution implements '

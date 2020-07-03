@@ -113,13 +113,13 @@ class ContinuousBernoulliTest(test_util.TestCase):
     invalid_probs = [1.01, 2.0]
     for prob in invalid_probs:
       with self.assertRaisesOpError(
-          "probs has components greater than 1"):
+          'probs has components greater than 1'):
         dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
     invalid_probs = [-0.01, -3.0]
     for prob in invalid_probs:
-      with self.assertRaisesOpError("probs has components less than 0"):
+      with self.assertRaisesOpError('probs has components less than 0'):
         dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
@@ -499,14 +499,17 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
       return
     with self.assertRaisesRegexp(
         (ValueError, tf.errors.InvalidArgumentError),
-        "Index out of range.*input has only 4 dims"):
+        'Index out of range.*input has only 4 dims'):
       check(make_slicer[19, tf.newaxis, 2, ..., :, 0, 4])
     with self.assertRaisesRegexp(
         (ValueError, tf.errors.InvalidArgumentError),
-        "slice index.*out of bounds",
+        'slice index.*out of bounds',
     ):
       check(make_slicer[..., 2, :])  # ...,1,5 -> 2 is oob.
 
+  @test_util.jax_disable_test_missing_functionality('Gradient tape not '
+                                                    'supported in JAX backend')
+  @test_util.numpy_disable_gradient_test
   def testSliceSequencePreservesOrigVarGradLinkage(self):
     logits = tf.Variable(
         tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()))
@@ -521,6 +524,9 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
         self.assertGreater(
             self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
 
+  @test_util.jax_disable_test_missing_functionality('Gradient tape not '
+                                                    'supported in JAX backend')
+  @test_util.numpy_disable_gradient_test
   def testSliceThenCopyPreservesOrigVarGradLinkage(self):
     logits = tf.Variable(
         tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()))
@@ -528,17 +534,17 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
     dist = tfd.ContinuousBernoulli(logits=logits, validate_args=True)
     dist = dist[:5]
     with tf.GradientTape() as tape:
-      dist = dist.copy(name="contbern2")
+      dist = dist.copy(name='contbern2')
       lp = dist.log_prob(0.1)
     dlpdlogits = tape.gradient(lp, logits)
-    self.assertIn("contbern2", dist.name)
+    self.assertIn('contbern2', dist.name)
     self.assertIsNotNone(dlpdlogits)
     self.assertGreater(self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
     with tf.GradientTape() as tape:
       dist = dist[:3]
       lp = dist.log_prob(0)
     dlpdlogits = tape.gradient(lp, logits)
-    self.assertIn("contbern2", dist.name)
+    self.assertIn('contbern2', dist.name)
     self.assertIsNotNone(dlpdlogits)
     self.assertGreater(self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
 
@@ -547,26 +553,26 @@ class ContinuousBernoulliSlicingTest(test_util.TestCase):
         tf.random.normal([20, 3, 1, 5], seed=test_util.test_seed()),
         shape=None)
     dist = tfd.ContinuousBernoulli(
-        logits=logits, name="cb1", validate_args=True)
-    self.assertIn("cb1", dist.name)
-    dist = dist.copy(name="cb2")
-    self.assertIn("cb2", dist.name)
+        logits=logits, name='cb1', validate_args=True)
+    self.assertIn('cb1', dist.name)
+    dist = dist.copy(name='cb2')
+    self.assertIn('cb2', dist.name)
 
   def testSliceCopyOverrideNameSliceAgainCopyOverrideLogitsSliceAgain(self):
-    seed_stream = test_util.test_seed_stream("slice_continuous_bernoulli")
+    seed_stream = test_util.test_seed_stream('slice_continuous_bernoulli')
     logits = tf.random.normal([20, 3, 2, 5], seed=seed_stream())
     dist = tfd.ContinuousBernoulli(
-        logits=logits, name="cb1", validate_args=True)
-    self.assertIn("cb1", dist.name)
-    dist = dist[:10].copy(name="cb2")
+        logits=logits, name='cb1', validate_args=True)
+    self.assertIn('cb1', dist.name)
+    dist = dist[:10].copy(name='cb2')
     self.assertAllEqual((10, 3, 2, 5), dist.batch_shape)
-    self.assertIn("cb2", dist.name)
-    dist = dist.copy(name="cb3")[..., 1]
+    self.assertIn('cb2', dist.name)
+    dist = dist.copy(name='cb3')[..., 1]
     self.assertAllEqual((10, 3, 2), dist.batch_shape)
-    self.assertIn("cb3", dist.name)
+    self.assertIn('cb3', dist.name)
     dist = dist.copy(logits=tf.random.normal([2], seed=seed_stream()))
     self.assertAllEqual((2,), dist.batch_shape)
-    self.assertIn("cb3", dist.name)
+    self.assertIn('cb3', dist.name)
 
   def testDocstrSliceExample(self):
     # batch shape [3, 5, 7, 9]
@@ -604,5 +610,5 @@ class ContinuousBernoulliFromVariableTest(test_util.TestCase):
     self.assertAllNotNone(g)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

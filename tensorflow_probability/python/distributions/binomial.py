@@ -21,18 +21,20 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import batched_rejection_sampler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math.random_ops import random_rademacher
 
 
 _binomial_sample_note = """
@@ -71,7 +73,9 @@ def _bdtr(k, n, p):
 
 
 def _log_concave_rejection_sampler(
-    log_concave_distribution,
+    mode,
+    prob_fn,
+    dtype,
     sample_shape=(),
     distribution_minimum=None,
     distribution_maximum=None,
@@ -88,17 +92,16 @@ def _log_concave_rejection_sampler(
   1979)][1].
 
   Args:
-   log_concave_distribution: An object satisfying TensorFlow Probability shape
-      semantics [(Dillon et al., 2017)][2] and having `mode` and `prob` methods.
-      The caller is responsible for ensuring that discreteness and log-concavity
-      hold.
+    mode: Tensor, the mode[s] of the [batch of] distribution[s].
+    prob_fn: Python callable, counts -> prob(counts).
+    dtype: DType of the generated samples.
     sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-    distribution_minimum: Tensor of type `distribution.dtype`. The minimum value
+    distribution_minimum: Tensor of type `dtype`. The minimum value
       taken by the distribution. The `prob` method will only be called on values
       greater than equal to the specified minimum. The shape must broadcast with
       the batch shape of the distribution. If unspecified, the domain is treated
       as unbounded below.
-    distribution_maximum: Tensor of type `distribution.dtype`. The maximum value
+    distribution_maximum: Tensor of type `dtype`. The maximum value
       taken by the distribution. See `distribution_minimum` for details.
     seed: Python integer or `Tensor` instance, for seeding PRNG.
 
@@ -113,14 +116,10 @@ def _log_concave_rejection_sampler(
   [2] Dillon et al. TensorFlow Distributions. 2017.
       https://arxiv.org/abs/1711.10604
   """
-  dtype = log_concave_distribution.dtype
-
-  mode = tf.stop_gradient(log_concave_distribution.mode())
   mode = tf.broadcast_to(
-      mode,
-      tf.concat((sample_shape, prefer_static.shape(mode)), axis=0))
+      mode, tf.concat([sample_shape, prefer_static.shape(mode)], axis=0))
 
-  mode_height = log_concave_distribution.prob(mode)
+  mode_height = prob_fn(mode)
   mode_shape = prefer_static.shape(mode)
 
   top_width = 1. + mode_height / 2.  # w in ref [1].
@@ -138,7 +137,7 @@ def _log_concave_rejection_sampler(
     (top_lobe_fractions_seed,
      exponential_samples_seed,
      top_selector_seed,
-     random_rademacher_seed) = samplers.split_seed(
+     rademacher_seed) = samplers.split_seed(
          seed, n=4, salt='log_concave_rejection_sampler_proposal')
 
     top_lobe_fractions = samplers.uniform(
@@ -157,8 +156,8 @@ def _log_concave_rejection_sampler(
 
     unsigned_offsets = tf.where(on_top_mask, top_offsets, exponential_offsets)
     offsets = tf.round(
-        random_rademacher(
-            mode_shape, seed=random_rademacher_seed, dtype=dtype) *
+        tfp_random.rademacher(
+            mode_shape, seed=rademacher_seed, dtype=dtype) *
         unsigned_offsets)
 
     potential_samples = mode + offsets
@@ -170,12 +169,89 @@ def _log_concave_rejection_sampler(
     in_range_mask = (
         (values >= distribution_minimum) & (values <= distribution_maximum))
     in_range_values = tf.where(in_range_mask, values, 0.)
-    return tf.where(in_range_mask,
-                    log_concave_distribution.prob(in_range_values), 0.)
+    return tf.where(in_range_mask, prob_fn(in_range_values), 0.)
 
   return tf.stop_gradient(
       batched_rejection_sampler.batched_rejection_sampler(
           proposal, target, seed, dtype=dtype)[0])  # Discard `num_iters`.
+
+
+def _random_binomial_cpu(
+    shape,
+    counts,
+    probs=None,
+    logits=None,
+    output_dtype=tf.float32,
+    seed=None,
+    name=None):
+  """Sample using *fast* `tf.random.stateless_binomial`."""
+  with tf.name_scope(name or 'binomial_cpu'):
+    if probs is None:
+      probs = tf.where(counts > 0, tf.math.sigmoid(logits), 0)
+    batch_shape = prefer_static.broadcast_shape(
+        prefer_static.shape(counts),
+        prefer_static.shape(probs))
+    samples = tf.random.stateless_binomial(
+        shape=tf.concat([shape, batch_shape], axis=0),
+        seed=seed, counts=counts, probs=probs, output_dtype=output_dtype)
+  return samples
+
+
+def _random_binomial_noncpu(
+    shape,
+    counts,
+    probs=None,
+    logits=None,
+    output_dtype=tf.float32,
+    seed=None,
+    name=None):
+  """Sample using XLA-friendly python-based rejection sampler."""
+  with tf.name_scope(name or 'binomial_noncpu'):
+    dist = Binomial(total_count=counts, logits=logits, probs=probs)
+    samples = _log_concave_rejection_sampler(
+        dist.mode(), prob_fn=dist.prob, dtype=dist.dtype, sample_shape=shape,
+        distribution_minimum=tf.zeros((), dtype=dist.dtype),
+        distribution_maximum=counts, seed=seed)
+    samples = tf.cast(samples, output_dtype)
+  return samples
+
+
+# tf.function required to access Grappler's implementation_selector.
+@tf.function(autograph=False)
+def _random_binomial(
+    shape,
+    counts,
+    probs=None,
+    logits=None,
+    output_dtype=tf.float32,
+    seed=None,
+    name=None):
+  """Sample a binomial, CPU specialized to stateless_binomial.
+
+  Args:
+    shape: Shape of the full sample output. Trailing dims should match the
+      broadcast shape of `counts` with `probs|logits`.
+    counts: Batch of total_count.
+    probs: Batch of p(success).
+    logits: Batch of log-odds(success).
+    output_dtype: DType of samples.
+    seed: int or Tensor seed.
+    name: Optional name for related ops.
+
+  Returns:
+    samples: Samples from binomial distributions.
+    runtime_used_for_sampling: One of `implementation_selection._RUNTIME_*`.
+  """
+  with tf.name_scope(name or 'random_binomial'):
+    seed = samplers.sanitize_seed(seed)
+    shape = tf.convert_to_tensor(shape, dtype_hint=tf.int32, name='shape')
+    params = dict(shape=shape, counts=counts, probs=probs, logits=logits,
+                  output_dtype=output_dtype, seed=seed, name=name)
+    sampler_impl = implementation_selection.implementation_selecting(
+        fn_name='binomial',
+        default_fn=_random_binomial_noncpu,
+        cpu_fn=_random_binomial_cpu)
+    return sampler_impl(**params)
 
 
 class Binomial(distribution.Distribution):
@@ -250,7 +326,7 @@ class Binomial(distribution.Distribution):
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
-               name='Binomial'):
+               name=None):
     """Initialize a batch of Binomial distributions.
 
     Args:
@@ -281,7 +357,7 @@ class Binomial(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError(
           'Construct `Binomial` with `probs` or `logits`, but not both.')
-    with tf.name_scope(name) as name:
+    with tf.name_scope(name or 'Binomial') as name:
       dtype = dtype_util.common_dtype([total_count, logits, probs], tf.float32)
       self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, dtype=dtype, name='total_count')
@@ -333,9 +409,11 @@ class Binomial(distribution.Distribution):
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _log_prob(self, counts):
-    logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
-    unnorm = _log_unnormalized_prob(logits, counts, total_count)
+    if self._logits is not None:
+      unnorm = _log_unnormalized_prob_logits(self._logits, counts, total_count)
+    else:
+      unnorm = _log_unnormalized_prob_probs(self._probs, counts, total_count)
     norm = _log_normalization(counts, total_count)
     return unnorm - norm
 
@@ -344,24 +422,36 @@ class Binomial(distribution.Distribution):
     return tf.exp(self._log_prob(counts))
 
   def _cdf(self, counts):
-    probs = self._probs_parameter_no_checks()
+    total_count = tf.convert_to_tensor(self.total_count)
+    probs = self._probs_parameter_no_checks(total_count=total_count)
     probs, counts = _maybe_broadcast(probs, counts)
 
-    return _bdtr(k=counts, n=tf.convert_to_tensor(self.total_count), p=probs)
+    return _bdtr(k=counts, n=total_count, p=probs)
 
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _sample_n(self, n, seed=None):
-    return _log_concave_rejection_sampler(
-        self, [n], tf.zeros((), dtype=self.dtype), self.total_count, seed)
+    seed = samplers.sanitize_seed(seed, salt='binomial')
+    return _random_binomial(
+        shape=tf.convert_to_tensor([n]),
+        counts=tf.convert_to_tensor(self._total_count),
+        probs=(None if self._probs is None else
+               tf.convert_to_tensor(self._probs)),
+        logits=(None if self._logits is None else
+                tf.convert_to_tensor(self._logits)),
+        output_dtype=self.dtype,
+        seed=seed)[0]
 
-  def _mean(self, probs=None):
+  def _mean(self, probs=None, total_count=None):
+    if total_count is None:
+      total_count = tf.convert_to_tensor(self._total_count)
     if probs is None:
-      probs = self._probs_parameter_no_checks()
-    return self._total_count * probs
+      probs = self._probs_parameter_no_checks(total_count=total_count)
+    return total_count * probs
 
   def _variance(self):
-    probs = self._probs_parameter_no_checks()
-    return self._mean(probs) * (1. - probs)
+    total_count = tf.convert_to_tensor(self._total_count)
+    probs = self._probs_parameter_no_checks(total_count=total_count)
+    return self._mean(probs=probs, total_count=total_count) * (1. - probs)
 
   @distribution_util.AppendDocstring(
       """Note that when `(1 + total_count) * probs` is an integer, there are
@@ -370,10 +460,9 @@ class Binomial(distribution.Distribution):
       larger of the two modes.""")
   def _mode(self):
     total_count = tf.convert_to_tensor(self._total_count)
+    probs = self._probs_parameter_no_checks(total_count=total_count)
     return tf.math.minimum(
-        total_count,
-        tf.floor(
-            (1. + total_count) * self._probs_parameter_no_checks()))
+        total_count, tf.floor((1. + total_count) * probs))
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
@@ -391,10 +480,16 @@ class Binomial(distribution.Distribution):
     with self._name_and_control_scope(name or 'probs_parameter'):
       return self._probs_parameter_no_checks()
 
-  def _probs_parameter_no_checks(self):
+  def _probs_parameter_no_checks(self, total_count=None):
     if self._logits is None:
-      return tf.identity(self._probs)
-    return tf.math.sigmoid(self._logits)
+      probs = tf.identity(self._probs)
+    else:
+      probs = tf.math.sigmoid(self._logits)
+    # Suppress potentially nasty probs like `nan` b/c they don't matter where
+    # total_count == 0.
+    if total_count is None:
+      total_count = self.total_count
+    return tf.where(total_count > 0, probs, 0)
 
   def _default_event_space_bijector(self):
     return
@@ -441,16 +536,25 @@ class Binomial(distribution.Distribution):
     return assertions
 
 
-def _log_unnormalized_prob(logits, counts, total_count):
-  """Log unnormalized probability."""
+def _log_unnormalized_prob_logits(logits, counts, total_count):
+  """Log unnormalized probability from logits."""
+  logits = tf.convert_to_tensor(logits)
   return (-tf.math.multiply_no_nan(tf.math.softplus(-logits), counts) -
           tf.math.multiply_no_nan(
               tf.math.softplus(logits), total_count - counts))
 
 
+def _log_unnormalized_prob_probs(probs, counts, total_count):
+  """Log unnormalized probability from probs."""
+  probs = tf.convert_to_tensor(probs)
+  return (tf.math.multiply_no_nan(tf.math.log(probs), counts) +
+          tf.math.multiply_no_nan(
+              tf.math.log1p(-probs), total_count - counts))
+
+
 def _log_normalization(counts, total_count):
-  return (tf.math.lgamma(1. + total_count - counts) +
-          tf.math.lgamma(1. + counts) - tf.math.lgamma(1. + total_count))
+  return (tfp_math.lbeta(1. + counts, 1. + total_count - counts) +
+          tf.math.log(1. + total_count))
 
 
 def _maybe_broadcast(a, b):

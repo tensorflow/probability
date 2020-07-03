@@ -22,6 +22,7 @@ from __future__ import print_function
 # Distributions:
 from tensorflow_probability.python.distributions.autoregressive import Autoregressive
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
+from tensorflow_probability.python.distributions.bates import Bates
 from tensorflow_probability.python.distributions.bernoulli import Bernoulli
 from tensorflow_probability.python.distributions.beta import Beta
 from tensorflow_probability.python.distributions.beta_binomial import BetaBinomial
@@ -46,6 +47,7 @@ from tensorflow_probability.python.distributions.gamma import Gamma
 from tensorflow_probability.python.distributions.gamma_gamma import GammaGamma
 from tensorflow_probability.python.distributions.gaussian_process import GaussianProcess
 from tensorflow_probability.python.distributions.gaussian_process_regression_model import GaussianProcessRegressionModel
+from tensorflow_probability.python.distributions.generalized_normal import GeneralizedNormal
 from tensorflow_probability.python.distributions.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
@@ -57,6 +59,7 @@ from tensorflow_probability.python.distributions.horseshoe import Horseshoe
 from tensorflow_probability.python.distributions.independent import Independent
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
+from tensorflow_probability.python.distributions.johnson_su import JohnsonSU
 from tensorflow_probability.python.distributions.joint_distribution import JointDistribution
 from tensorflow_probability.python.distributions.joint_distribution_coroutine import JointDistributionCoroutine
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionCoroutineAutoBatched
@@ -69,10 +72,12 @@ from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.lkj import LKJ
 from tensorflow_probability.python.distributions.logistic import Logistic
+from tensorflow_probability.python.distributions.loglogistic import LogLogistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.logitnormal import LogitNormal
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
+from tensorflow_probability.python.distributions.moyal import Moyal
 from tensorflow_probability.python.distributions.multinomial import Multinomial
 from tensorflow_probability.python.distributions.multivariate_student_t import MultivariateStudentTLinearOperator
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
@@ -90,6 +95,7 @@ from tensorflow_probability.python.distributions.pixel_cnn import PixelCNN
 from tensorflow_probability.python.distributions.plackett_luce import PlackettLuce
 from tensorflow_probability.python.distributions.poisson import Poisson
 from tensorflow_probability.python.distributions.poisson_lognormal import PoissonLogNormalQuadratureCompound
+from tensorflow_probability.python.distributions.power_spherical import PowerSpherical
 from tensorflow_probability.python.distributions.probit_bernoulli import ProbitBernoulli
 from tensorflow_probability.python.distributions.quantized_distribution import QuantizedDistribution
 from tensorflow_probability.python.distributions.relaxed_bernoulli import RelaxedBernoulli
@@ -97,6 +103,7 @@ from tensorflow_probability.python.distributions.relaxed_onehot_categorical impo
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
+from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
@@ -104,15 +111,16 @@ from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
-from tensorflow_probability.python.distributions.vector_diffeomixture import VectorDiffeomixture
 from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
+from tensorflow_probability.python.distributions.weibull import Weibull
 from tensorflow_probability.python.distributions.wishart import WishartLinearOperator
 from tensorflow_probability.python.distributions.wishart import WishartTriL
 from tensorflow_probability.python.distributions.zipf import Zipf
 
 # Utilities/Other:
+from tensorflow_probability.python.distributions.joint_distribution_util import independent_joint_distribution_from_structure
 from tensorflow_probability.python.distributions.kullback_leibler import RegisterKL
 from tensorflow_probability.python.distributions.kullback_leibler import kl_divergence
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import mvn_conjugate_linear_update
@@ -120,8 +128,6 @@ from tensorflow_probability.python.distributions.normal_conjugate_posteriors imp
 from tensorflow_probability.python.distributions.normal_conjugate_posteriors import normal_conjugates_known_scale_predictive
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_gauss_hermite
 from tensorflow_probability.python.distributions.poisson_lognormal import quadrature_scheme_lognormal_quantiles
-from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_gauss_hermite
-from tensorflow_probability.python.distributions.vector_diffeomixture import quadrature_scheme_softmaxnormal_quantiles
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import NOT_REPARAMETERIZED
 from tensorflow_probability.python.internal.reparameterization import ReparameterizationType
@@ -146,6 +152,7 @@ __all__ = [
     'Distribution',
     'Autoregressive',
     'BatchReshape',
+    'Bates',
     'Bernoulli',
     'Beta',
     'BetaBinomial',
@@ -165,6 +172,7 @@ __all__ = [
     'Gamma',
     'GammaGamma',
     'InverseGaussian',
+    'GeneralizedNormal',
     'GeneralizedPareto',
     'Geometric',
     'GaussianProcess',
@@ -178,6 +186,7 @@ __all__ = [
     'Horseshoe',
     'Independent',
     'InverseGamma',
+    'JohnsonSU',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionCoroutineAutoBatched',
@@ -190,8 +199,10 @@ __all__ = [
     'Laplace',
     'LKJ',
     'Logistic',
+    'LogLogistic',
     'LogNormal',
     'LogitNormal',
+    'Moyal',
     'NegativeBinomial',
     'Normal',
     'PixelCNN',
@@ -200,6 +211,7 @@ __all__ = [
     'ProbitBernoulli',
     'Sample',
     'SinhArcsinh',
+    'SphericalUniform',
     'StudentT',
     'StudentTProcess',
     'Triangular',
@@ -214,9 +226,9 @@ __all__ = [
     'Dirichlet',
     'DirichletMultinomial',
     'Multinomial',
-    'VectorDiffeomixture',
     'VonMises',
     'VonMisesFisher',
+    'Weibull',
     'WishartLinearOperator',
     'WishartTriL',
     'TransformedDistribution',
@@ -229,16 +241,16 @@ __all__ = [
     'Pareto',
     'PERT',
     'PlackettLuce',
+    'PowerSpherical',
     'RelaxedBernoulli',
     'RelaxedOneHotCategorical',
     'Zipf',
     'kl_divergence',
     'RegisterKL',
+    'independent_joint_distribution_from_structure',
     'mvn_conjugate_linear_update',
     'normal_conjugates_known_scale_posterior',
     'normal_conjugates_known_scale_predictive',
-    'quadrature_scheme_softmaxnormal_gauss_hermite',
-    'quadrature_scheme_softmaxnormal_quantiles',
     'quadrature_scheme_lognormal_gauss_hermite',
     'quadrature_scheme_lognormal_quantiles',
 ]
