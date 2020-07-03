@@ -221,7 +221,7 @@ class RealNVP(bijector_lib.Bijector):
         def _bijector_fn(x0, input_depth, **condition_kwargs):
           shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
                                                     **condition_kwargs)
-          return shift_bijector.Shift(shift=shift)(scale_bijector.Scale(scale=log_scale))
+          return shift_bijector.Shift(shift=shift)(scale_bijector.Scale(log_scale=log_scale))
 
         bijector_fn = _bijector_fn
 

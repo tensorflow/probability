@@ -320,7 +320,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
           if shift is not None:
             bijectors.append(shift_lib.Shift(shift))
           if log_scale is not None:
-            bijectors.append(scale_lib.Scale(tf.exp(log_scale)))
+            bijectors.append(scale_lib.Scale(log_scale=log_scale))
           return chain.Chain(bijectors)
 
         bijector_fn = _bijector_fn
