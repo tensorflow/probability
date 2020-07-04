@@ -1320,10 +1320,3 @@ class Bijector(tf.Module):
     """
     return ()
 
-
-import copy
-l = Exp()
-v = tf.Variable(1.0)
-f = l.forward(v)
-l_cpy = copy.deepcopy(l)
-print("end")

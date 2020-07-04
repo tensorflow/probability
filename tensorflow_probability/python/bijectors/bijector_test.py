@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import mock
 import numpy as np
+from copy import deepcopy
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -401,6 +402,22 @@ class TfModuleTest(test_util.TestCase):
     g = tape.gradient(loss, b.trainable_variables)
     self.evaluate(tf1.global_variables_initializer())
     self.assertEqual((-1.,), self.evaluate(g))
+
+
+@test_util.test_all_tf_execution_regimes
+class BijectorDeepcopyTest(test_util.TestCase):
+
+  def test_bijector_deepcopy(self):
+    x = tf.constant(1.1)
+    b = ForwardOnlyBijector(scale=x, validate_args=True)
+
+    # Put the forward result into the cache
+    x_fwd = self.evaluate(b.forward(x))
+    self.assertEqual(1, len(b._cache.forward))
+    b_copy = deepcopy(b)
+    self.assertIsInstance(b_copy, ForwardOnlyBijector)
+    self.assertEqual(len(b_copy._cache.forward), 0)
+    self.assertEqual(x_fwd, self.evaluate(b_copy.forward(x)))
 
 
 class _ConditionalBijector(tfb.Bijector):
