@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import abc
 import contextlib
+from copy import deepcopy
 
 # Dependency imports
 import numpy as np
@@ -514,7 +515,7 @@ class Bijector(tf.Module):
 
     # Setup caching after everything else is done.
     self._cache = self._setup_cache()
-
+  
   def _setup_cache(self):
     """Defines the cache for this bijector."""
     # Wrap forward/inverse with getters so instance methods can be patched.
@@ -589,6 +590,24 @@ class Bijector(tf.Module):
     # `parameters = dict(locals())`.
     return {k: v for k, v in self._parameters.items()
             if not k.startswith('__') and k != 'self'}
+
+  def __deepcopy__(self, memo):
+    """
+    """
+    if memo is None:
+      memo = {}
+    cls = self.__class__
+    self_copy = cls.__new__(cls)
+    memo[id(self_copy)] = self_copy
+    for attr_name, attr_value in self.__dict__.items():
+      if attr_name == "_cache":
+        cache = self_copy._setup_cache()
+        memo[id(cache)] = cache
+        new_attr_value = cache
+      else:
+        new_attr_value = deepcopy(attr_value, memo)
+      setattr(self_copy, attr_name, new_attr_value)
+    return self_copy
 
   def __call__(self, value, name=None, **kwargs):
     """Applies or composes the `Bijector`, depending on input type.
@@ -1300,3 +1319,11 @@ class Bijector(tf.Module):
         graph dependencies.
     """
     return ()
+
+
+import copy
+l = Exp()
+v = tf.Variable(1.0)
+f = l.forward(v)
+l_cpy = copy.deepcopy(l)
+print("end")
