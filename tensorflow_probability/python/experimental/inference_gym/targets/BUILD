@@ -38,8 +38,13 @@ multi_substrate_py_library(
         ":banana",
         ":bayesian_model",
         ":ill_conditioned_gaussian",
+        ":item_response_theory",
+        ":log_gaussian_cox_process",
         ":logistic_regression",
+        ":model",
+        ":neals_funnel",
         ":sparse_logistic_regression",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
     ],
 )
 
@@ -47,7 +52,7 @@ multi_substrate_py_library(
     name = "banana",
     srcs = ["banana.py"],
     deps = [
-        ":bayesian_model",
+        ":model",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
@@ -58,6 +63,7 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "banana_test",
     srcs = ["banana_test.py"],
+    jax_tags = ["omni_fail"],
     deps = [
         ":banana",
         # tensorflow dep,
@@ -71,6 +77,7 @@ multi_substrate_py_library(
     srcs = ["bayesian_model.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:ground_truth_encoding",
     ],
 )
 
@@ -89,7 +96,7 @@ multi_substrate_py_library(
     name = "ill_conditioned_gaussian",
     srcs = ["ill_conditioned_gaussian.py"],
     deps = [
-        ":bayesian_model",
+        ":model",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
@@ -109,19 +116,74 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
-    name = "logistic_regression",
-    srcs = ["logistic_regression.py"],
+    name = "item_response_theory",
+    srcs = ["item_response_theory.py"],
     deps = [
         ":bayesian_model",
+        ":model",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "item_response_theory_test",
+    size = "large",
+    srcs = ["item_response_theory_test.py"],
+    deps = [
+        ":item_response_theory",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "log_gaussian_cox_process",
+    srcs = ["log_gaussian_cox_process.py"],
+    deps = [
+        ":bayesian_model",
+        ":model",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth:synthetic_log_gaussian_cox_process",  # buildcleaner: keep
+        "//tensorflow_probability/python/math/psd_kernels",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "log_gaussian_cox_process_test",
+    size = "large",
+    srcs = ["log_gaussian_cox_process_test.py"],
+    deps = [
+        ":log_gaussian_cox_process",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "logistic_regression",
+    srcs = ["logistic_regression.py"],
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth:german_credit_numeric_logistic_regression",  # buildcleaner: keep
     ],
 )
 
 multi_substrate_py_test(
     name = "logistic_regression_test",
+    size = "large",
     srcs = ["logistic_regression_test.py"],
     deps = [
         ":logistic_regression",
@@ -129,6 +191,50 @@ multi_substrate_py_test(
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "model",
+    srcs = ["model.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:ground_truth_encoding",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "model_test",
+    srcs = ["model_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "neals_funnel",
+    srcs = ["neals_funnel.py"],
+    deps = [
+        ":model",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "neals_funnel_test",
+    srcs = ["neals_funnel_test.py"],
+    deps = [
+        ":neals_funnel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -137,22 +243,25 @@ multi_substrate_py_library(
     srcs = ["sparse_logistic_regression.py"],
     deps = [
         ":bayesian_model",
+        ":model",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth:german_credit_numeric_sparse_logistic_regression",  # buildcleaner: keep
     ],
 )
 
 multi_substrate_py_test(
     name = "sparse_logistic_regression_test",
+    size = "large",
     srcs = ["sparse_logistic_regression_test.py"],
-    jax_size = "medium",
     deps = [
         ":sparse_logistic_regression",
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

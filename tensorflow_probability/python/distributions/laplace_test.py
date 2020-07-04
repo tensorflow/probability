@@ -218,6 +218,7 @@ class LaplaceTest(test_util.TestCase):
         atol=0.)
     self.assertTrue(self._kstest(loc_v, scale_v, sample_values))
 
+  @test_util.numpy_disable_gradient_test
   def testLaplaceFullyReparameterized(self):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)

@@ -29,6 +29,8 @@ import jax.numpy as np
 __all__ = [
     'assert_same_shallow_tree',
     'flatten_tree',
+    'inverse_fn',
+    'make_tensor_seed',
     'map_tree',
     'map_tree_up_to',
     'random_categorical',
@@ -37,6 +39,7 @@ __all__ = [
     'split_seed',
     'trace',
     'value_and_grad',
+    'value_and_ldj',
 ]
 
 
@@ -78,19 +81,28 @@ def value_and_grad(fn, args):
   return output, extra, grad
 
 
+def make_tensor_seed(seed):
+  """Converts a seed to a `Tensor` seed."""
+  if seed is None:
+    raise ValueError('seed must not be None when using JAX')
+  return np.asarray(seed, np.uint32)
+
+
 def split_seed(seed, count):
   """Splits a seed into `count` seeds."""
-  return random.split(seed, count)
+  return random.split(make_tensor_seed(seed), count)
 
 
 def random_uniform(shape, dtype, seed):
   """Generates a sample from uniform distribution over [0., 1)."""
-  return random.uniform(shape=tuple(shape), dtype=dtype, key=seed)
+  return random.uniform(
+      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed))
 
 
 def random_normal(shape, dtype, seed):
   """Generates a sample from a standard normal distribution."""
-  return random.normal(shape=tuple(shape), dtype=dtype, key=seed)
+  return random.normal(
+      shape=tuple(shape), dtype=dtype, key=make_tensor_seed(seed))
 
 
 def _searchsorted(a, v):
@@ -117,7 +129,8 @@ def random_categorical(logits, num_samples, seed):
   probs = stax.softmax(logits)
   cum_sum = np.cumsum(probs, axis=-1)
 
-  eta = random.uniform(seed, (num_samples,) + cum_sum.shape[:-1])
+  eta = random.uniform(
+      make_tensor_seed(seed), (num_samples,) + cum_sum.shape[:-1])
   cum_sum = np.broadcast_to(cum_sum, (num_samples,) + cum_sum.shape)
 
   flat_cum_sum = cum_sum.reshape([-1, cum_sum.shape[-1]])
@@ -125,7 +138,7 @@ def random_categorical(logits, num_samples, seed):
   return jax.vmap(_searchsorted)(flat_cum_sum, flat_eta).reshape(eta.shape).T
 
 
-def trace(state, fn, num_steps, **_):
+def trace(state, fn, num_steps, unroll, **_):
   """Implementation of `trace` operator, without the calling convention."""
   # We need the shapes and dtypes of the outputs of `fn`.
   _, untraced_spec, traced_spec = jax.eval_shape(
@@ -143,8 +156,22 @@ def trace(state, fn, num_steps, **_):
           'Cannot trace values when `num_steps` is not statically known. Pass '
           'False to `trace_mask` or return an empty structure (e.g. `()`) as '
           'the extra output.')
+    if unroll:
+      raise ValueError(
+          'Cannot unroll when `num_steps` is not statically known.')
 
-  if use_scan:
+  if unroll:
+    traced_lists = map_tree(lambda _: [], traced_spec)
+    untraced = untraced_init
+    for _ in range(num_steps):
+      state, untraced, traced_element = fn(state)
+      map_tree_up_to(traced_spec, lambda l, e: l.append(e), traced_lists,
+                     traced_element)
+    # Using asarray instead of stack to handle empty arrays correctly.
+    traced = map_tree_up_to(traced_spec,
+                            lambda l, s: np.asarray(l, dtype=s.dtype),
+                            traced_lists, traced_spec)
+  elif use_scan:
 
     def wrapper(state_untraced, _):
       state, _ = state_untraced
@@ -175,3 +202,81 @@ def trace(state, fn, num_steps, **_):
         (state, untraced_init, trace_arrays),
     )
   return state, untraced, traced
+
+
+# TODO(siege): This is WIP, probably to be replaced by JAX's budding inverse
+# function support.
+def value_and_ldj(fn, args):
+  """Compute the value and log-det jacobian of function evaluated at args.
+
+  This assumes that `fn`'s `extra` output is a 2-tuple, where the first element
+  is arbitrary and the the last element is the log determinant of the jacobian
+  of the transformation.
+
+  Args:
+    fn: Function to evaluate.
+    args: Arguments to `fn`.
+
+  Returns:
+    ret: First output of `fn`.
+    extra: Second output of `fn`.
+    ldj: Log-det jacobian of `fn`.
+
+  #### Example
+
+  ```python
+  def scale_by_two(x):
+    # Return x unchanged as the extra output for illustrative purposes.
+    return 2 * x, (x, np.log(2))
+
+  y, y_extra, y_ldj = value_and_ldj(scale_by_2, 3.)
+  assert y == 6
+  assert y_extra == 3
+  assert y_ldj == np.log(2)
+  ```
+
+  """
+  value, (extra, ldj) = fn(args)
+  return value, (extra, ldj), ldj
+
+
+def inverse_fn(fn):
+  """Compute the inverse of a function.
+
+  This assumes that `fn` has a field called `inverse` which contains the inverse
+  of the function.
+
+  Args:
+    fn: Function to invert.
+
+  Returns:
+    inverse: Inverse of `fn`.
+
+  #### Example
+
+  ```python
+  def scale_by_two(x):
+    # Return x unchanged as the extra output for illustrative purposes.
+    return 2 * x, (x, np.log(2))
+
+  def scale_by_half(x):
+    return x / 2, (x, -np.log(2))
+
+  scale_by_two.inverse = scale_by_half
+  scale_by_half.inverse = scale_by_two
+
+  y, y_extra, y_ldj = value_and_ldj(scale_by_2, 3.)
+  assert y == 6
+  assert y_extra == 3
+  assert y_ldj == np.log(2)
+
+  inv_scale_by_2 = inverse_fn(scale_by_2)
+  assert inv_scale_by_2 == scale_by_half
+
+  x, x_extra, x_ldj = value_and_ldj(inv_scale_by_2, 4.)
+  assert x == 2
+  assert x_extra == 4
+  assert x_ldj == -np.log(2)
+  ```
+  """
+  return fn.inverse

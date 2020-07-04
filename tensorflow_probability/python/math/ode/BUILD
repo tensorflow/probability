@@ -75,6 +75,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "bdf_util_test",
     size = "small",
@@ -101,6 +102,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "runge_kutta_util_test",
     size = "small",
@@ -124,6 +126,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "ode_test",
     size = "large",
@@ -138,6 +141,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "xla_test_cpu",
     srcs = ["xla_test.py"],
@@ -157,6 +161,7 @@ py_test(
     ],
 )
 
+# py2and3
 py_test(
     name = "xla_test_gpu",
     srcs = ["xla_test.py"],
@@ -187,6 +192,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "util_test",
     size = "small",

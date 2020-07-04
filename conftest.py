@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Blacklist for pytest."""
+"""Blocklist for pytest."""
 
 from absl import app
 

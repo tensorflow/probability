@@ -444,7 +444,7 @@ def impute_missing_values(model,
   ```python
   # Impute missing values
   imputed_series_distribution = tfp.sts.impute_missing_values(
-    model, observed_time_series)
+    model, observed_time_series, parameter_samples=parameter_samples)
   print('imputed means and stddevs: ',
         imputed_series_distribution.mean(),
         imputed_series_distribution.stddev())

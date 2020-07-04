@@ -491,10 +491,15 @@ def expected_calibration_error_quantiles(
           tf.where(keep, pred_log_prob, tf.constant(-np.inf, dtype)),
           axis=axis)
       return total_hit, log_total_pred_prob, total_count
-    bucket_total_hit, bucket_log_total_pred_prob, bucket_count = tf.map_fn(
-        fn=_fn,
-        elems=tf.range(num_buckets, dtype=bucket.dtype),
-        fn_output_signature=(dtype,)*3)
+
+    # On the following line, we use vectorized_map instead of map_fn not for
+    # efficiency reasons but because at the time of writing, map_fn doesn't
+    # work correctly on the JAX substrate.  Specifically, it does not like that
+    # _fn returns a tuple.
+    bucket_total_hit, bucket_log_total_pred_prob, bucket_count = (
+        tf.vectorized_map(
+            fn=_fn,
+            elems=tf.range(num_buckets, dtype=bucket.dtype)))
     n = tf.maximum(bucket_count, 1.)
     bucket_accuracy = bucket_total_hit / n
     bucket_confidence = tf.math.exp(bucket_log_total_pred_prob - tf.math.log(n))

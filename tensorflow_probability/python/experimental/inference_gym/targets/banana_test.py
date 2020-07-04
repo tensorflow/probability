@@ -35,7 +35,11 @@ class BananaTest(test_util.InferenceGymTestCase):
     """
     model = banana.Banana(ndims=3)
     self.validate_log_prob_and_transforms(
-        model, sample_transformation_shapes=dict(identity=[3]))
+        model,
+        sample_transformation_shapes=dict(identity=[3]),
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True,
+    )
 
   def testMC(self):
     """Checks true samples from the model against the ground truth."""

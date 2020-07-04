@@ -25,13 +25,15 @@ from jax.config import config as jax_config
 import numpy as np
 import tensorflow.compat.v2 as real_tf
 
-from discussion import fun_mcmc
-from discussion.fun_mcmc import backend
+from discussion.fun_mcmc import backend_jax
+from discussion.fun_mcmc import backend_tf
+from discussion.fun_mcmc import using_jax as fun_mcmc_jax
+from discussion.fun_mcmc import using_tensorflow as fun_mcmc_tf
 
-tf = backend.tf
-tfp = backend.tfp
-util = backend.util
-util_tfp = fun_mcmc.util_tfp
+tf = backend_tf.tf
+tfp = backend_tf.tfp
+util = backend_tf.util
+fun_mcmc = fun_mcmc_tf
 
 real_tf.enable_v2_behavior()
 jax_config.update('jax_enable_x64', True)
@@ -76,7 +78,14 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
 
   def setUp(self):
     super(UtilTFPTestTensorFlow32, self).setUp()
-    backend.set_backend(backend.TENSORFLOW, backend.MANUAL_TRANSFORMS)
+    global tf
+    global tfp
+    global util
+    global fun_mcmc
+    tf = backend_tf.tf
+    tfp = backend_tf.tfp
+    util = backend_tf.util
+    fun_mcmc = fun_mcmc_tf
 
   @property
   def _dtype(self):
@@ -99,7 +108,8 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
         return True
 
     def kernel(state, pkr):
-      return util_tfp.transition_kernel_wrapper(state, pkr, TestKernel())
+      return fun_mcmc.util_tfp.transition_kernel_wrapper(
+          state, pkr, TestKernel())
 
     state = {'x': self._constant(0.), 'y': self._constant(1.)}
     kr = 1.
@@ -127,7 +137,7 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
         tf.ones([2, 1], dtype=self._dtype),
         tf.ones([2, 2], dtype=self._dtype)
     ]
-    transform_fn = util_tfp.bijector_to_transform_fn(
+    transform_fn = fun_mcmc.util_tfp.bijector_to_transform_fn(
         bijectors, state_structure=state, batch_ndims=1)
 
     fwd, (_, fwd_ldj1), fwd_ldj2 = fun_mcmc.call_transport_map_with_ldj(
@@ -146,7 +156,7 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(true_fwd_ldj, fwd_ldj1)
     self.assertAllClose(true_fwd_ldj, fwd_ldj2)
 
-    inverse_transform_fn = backend.util.inverse_fn(transform_fn)
+    inverse_transform_fn = util.inverse_fn(transform_fn)
     inv, (_, inv_ldj1), inv_ldj2 = fun_mcmc.call_transport_map_with_ldj(
         inverse_transform_fn, state)
     self.assertAllClose(
@@ -161,7 +171,7 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
   def testBijectorToTransformFnMulti(self):
     bijector = DupBijector()
     state = tf.ones([1, 2], dtype=self._dtype)
-    transform_fn = util_tfp.bijector_to_transform_fn(
+    transform_fn = fun_mcmc.util_tfp.bijector_to_transform_fn(
         bijector, state_structure=state, batch_ndims=1)
 
     fwd, (_, fwd_ldj1), fwd_ldj2 = fun_mcmc.call_transport_map_with_ldj(
@@ -171,7 +181,7 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(0., fwd_ldj1)
     self.assertAllClose(0., fwd_ldj2)
 
-    inverse_transform_fn = backend.util.inverse_fn(transform_fn)
+    inverse_transform_fn = util.inverse_fn(transform_fn)
     inv, (_, inv_ldj1), inv_ldj2 = fun_mcmc.call_transport_map_with_ldj(
         inverse_transform_fn, [
             tf.ones([1, 2], dtype=self._dtype),
@@ -186,7 +196,14 @@ class UtilTFPTestJAX32(UtilTFPTestTensorFlow32):
 
   def setUp(self):
     super(UtilTFPTestJAX32, self).setUp()
-    backend.set_backend(backend.JAX, backend.MANUAL_TRANSFORMS)
+    global tf
+    global tfp
+    global util
+    global fun_mcmc
+    tf = backend_jax.tf
+    tfp = backend_jax.tfp
+    util = backend_jax.util
+    fun_mcmc = fun_mcmc_jax
 
 
 class UtilTFPTestTensorFlow64(UtilTFPTestTensorFlow32):

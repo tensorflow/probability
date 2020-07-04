@@ -51,11 +51,19 @@ class PoissonTest(test_util.TestCase):
     self.assertEqual(poisson.event_shape, tf.TensorShape([]))
 
   def testInvalidLam(self):
-    invalid_lams = [-.01, 0., -2.]
+    invalid_lams = [-.01, -1., -2.]
     for lam in invalid_lams:
-      with self.assertRaisesOpError('Argument `rate` must be positive.'):
+      with self.assertRaisesOpError('Argument `rate` must be non-negative.'):
         poisson = self._make_poisson(rate=lam)
         self.evaluate(poisson.rate_parameter())
+
+  def testZeroLam(self):
+    lam = 0.
+    poisson = tfd.Poisson(rate=lam, validate_args=True)
+    self.assertAllClose(lam, self.evaluate(poisson.rate))
+    self.assertAllClose(0., poisson.prob(3))
+    self.assertAllClose(1., poisson.prob(0))
+    self.assertAllClose(0., poisson.log_prob(0))
 
   def testPoissonLogPmfDiscreteMatchesScipy(self):
     batch_size = 12
@@ -333,19 +341,19 @@ class PoissonTest(test_util.TestCase):
     self.assertLen(grad, 1)
     self.assertAllNotNone(grad)
 
-  def testAssertsPositiveRate(self):
+  def testAssertsNonNegativeRate(self):
     rate = tf.Variable([1., 2., -3.])
     self.evaluate(rate.initializer)
-    with self.assertRaisesOpError('Argument `rate` must be positive.'):
+    with self.assertRaisesOpError('Argument `rate` must be non-negative.'):
       dist = self._make_poisson(rate=rate, validate_args=True)
       self.evaluate(dist.sample(seed=test_util.test_seed()))
 
-  def testAssertsPositiveRateAfterMutation(self):
+  def testAssertsNonNegativeRateAfterMutation(self):
     rate = tf.Variable([1., 2., 3.])
     self.evaluate(rate.initializer)
     dist = self._make_poisson(rate=rate, validate_args=True)
     self.evaluate(dist.mean())
-    with self.assertRaisesOpError('Argument `rate` must be positive.'):
+    with self.assertRaisesOpError('Argument `rate` must be non-negative.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
         self.evaluate(dist.sample(seed=test_util.test_seed()))
 
@@ -367,10 +375,10 @@ class PoissonLogRateTest(PoissonTest):
   def testInvalidLam(self):
     pass
 
-  def testAssertsPositiveRate(self):
+  def testAssertsNonNegativeRate(self):
     pass
 
-  def testAssertsPositiveRateAfterMutation(self):
+  def testAssertsNonNegativeRateAfterMutation(self):
     pass
 
   # The gradient is not tracked through tf.math.log(rate) in _make_poisson(),

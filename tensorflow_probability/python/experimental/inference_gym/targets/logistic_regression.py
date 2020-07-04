@@ -26,6 +26,7 @@ from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.experimental.inference_gym.internal import data
 from tensorflow_probability.python.experimental.inference_gym.targets import bayesian_model
+from tensorflow_probability.python.experimental.inference_gym.targets import model
 
 __all__ = [
     'GermanCreditNumericLogisticRegression',
@@ -40,13 +41,15 @@ def _add_bias(features):
 class LogisticRegression(bayesian_model.BayesianModel):
   """Bayesian logistic regression with a Gaussian prior."""
 
-  def __init__(self,
-               train_features,
-               train_labels,
-               test_features=None,
-               test_labels=None,
-               name='logistic_regression',
-               pretty_name='Logistic Regression'):
+  def __init__(
+      self,
+      train_features,
+      train_labels,
+      test_features=None,
+      test_labels=None,
+      name='logistic_regression',
+      pretty_name='Logistic Regression',
+  ):
     """Construct the logistic regression model.
 
     Args:
@@ -68,25 +71,28 @@ class LogisticRegression(bayesian_model.BayesianModel):
         `None` or not both specified.
     """
     with tf.name_scope(name):
+      train_features = tf.convert_to_tensor(train_features, tf.float32)
       train_features = _add_bias(train_features)
       train_labels = tf.convert_to_tensor(train_labels)
       num_features = int(train_features.shape[1])
 
-      root = tfd.JointDistributionCoroutine.Root
-      zero = tf.zeros(num_features)
-      one = tf.ones(num_features)
+      self._prior_dist = tfd.Sample(tfd.Normal(0., 1.), num_features)
 
-      def model_fn(features):
-        weights = yield root(tfd.Independent(tfd.Normal(zero, one), 1))
+      def log_likelihood_fn(weights, features, labels, reduce_sum=True):
+        """The log_likelihood function."""
         logits = tf.einsum('nd,...d->...n', features, weights)
-        yield tfd.Independent(tfd.Bernoulli(logits=logits), 1)
+        log_likelihood = tfd.Bernoulli(logits=logits).log_prob(labels)
+        if reduce_sum:
+          return tf.reduce_sum(log_likelihood, [-1])
+        else:
+          return log_likelihood
 
-      train_joint_dist = tfd.JointDistributionCoroutine(
-          functools.partial(model_fn, features=train_features))
+      self._train_log_likelihood_fn = functools.partial(
+          log_likelihood_fn, features=train_features, labels=train_labels)
 
       sample_transformations = {
           'identity':
-              bayesian_model.BayesianModel.SampleTransformation(
+              model.Model.SampleTransformation(
                   fn=lambda params: params,
                   pretty_name='Identity',
               )
@@ -97,52 +103,37 @@ class LogisticRegression(bayesian_model.BayesianModel):
                          'test_labels={}'.format(test_features, test_labels))
 
       if test_features is not None and test_labels is not None:
+        test_features = tf.convert_to_tensor(test_features, tf.float32)
         test_features = _add_bias(test_features)
         test_labels = tf.convert_to_tensor(test_labels)
-        test_joint_dist = tfd.JointDistributionCoroutine(
-            functools.partial(model_fn, features=test_features))
-
-        def _get_label_dist(weights):
-          # TODO(b/150897904): The seed does nothing since the model is fully
-          # conditioned.
-          distributions, _ = test_joint_dist.sample_distributions(
-              value=[weights, test_labels], seed=42)
-          return distributions[-1]
+        test_log_likelihood_fn = functools.partial(
+            log_likelihood_fn, features=test_features, labels=test_labels)
 
         sample_transformations['test_nll'] = (
-            bayesian_model.BayesianModel.SampleTransformation(
-                fn=lambda weights: -(  # pylint: disable=g-long-lambda
-                    _get_label_dist(weights).log_prob(test_labels)),
+            model.Model.SampleTransformation(
+                fn=test_log_likelihood_fn,
                 pretty_name='Test NLL',
             ))
         sample_transformations['per_example_test_nll'] = (
-            bayesian_model.BayesianModel.SampleTransformation(
-                fn=lambda weights: -(  # pylint: disable=g-long-lambda
-                    _get_label_dist(weights).distribution.log_prob(test_labels)
-                ),
+            model.Model.SampleTransformation(
+                fn=functools.partial(test_log_likelihood_fn, reduce_sum=False),
                 pretty_name='Per-example Test NLL',
             ))
 
-    self._train_joint_dist = train_joint_dist
-    self._train_labels = train_labels
-
     super(LogisticRegression, self).__init__(
         default_event_space_bijector=tfb.Identity(),
-        event_shape=train_joint_dist.event_shape[0],
-        dtype=train_joint_dist.dtype[0],
+        event_shape=self._prior_dist.event_shape,
+        dtype=self._prior_dist.dtype,
         name=name,
         pretty_name=pretty_name,
         sample_transformations=sample_transformations,
     )
 
-  def _joint_distribution(self):
-    return self._train_joint_dist
+  def _prior_distribution(self):
+    return self._prior_dist
 
-  def _evidence(self):
-    return self._train_labels
-
-  def _unnormalized_log_prob(self, value):
-    return self.joint_distribution().log_prob([value, self.evidence()])
+  def log_likelihood(self, value):
+    return self._train_log_likelihood_fn(value)
 
 
 class GermanCreditNumericLogisticRegression(LogisticRegression):
@@ -160,7 +151,6 @@ class GermanCreditNumericLogisticRegression(LogisticRegression):
     del dataset['test_features']
     del dataset['test_labels']
     super(GermanCreditNumericLogisticRegression, self).__init__(
-        name='german_credit_logistic_regression',
+        name='german_credit_numeric_logistic_regression',
         pretty_name='German Credit Numeric Logistic Regression',
-        **dataset
-    )
+        **dataset)

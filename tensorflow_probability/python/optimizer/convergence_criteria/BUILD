@@ -15,7 +15,11 @@
 # Description:
 #   Convergence criteria for optimizations.
 
-# [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_test",
+    "multi_substrate_py_library",
+)
 
 package(
     default_visibility = [
@@ -27,7 +31,7 @@ licenses(["notice"])  # Apache 2.0
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "convergence_criteria",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
@@ -40,7 +44,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "convergence_criterion",
     srcs = ["convergence_criterion.py"],
     srcs_version = "PY2AND3",
@@ -50,7 +54,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "loss_not_decreasing",
     srcs = ["loss_not_decreasing.py"],
     srcs_version = "PY2AND3",
@@ -61,7 +65,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "successive_gradients_are_uncorrelated",
     srcs = ["successive_gradients_are_uncorrelated.py"],
     srcs_version = "PY2AND3",
@@ -72,10 +76,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "loss_not_decreasing_test",
     size = "medium",
     srcs = ["loss_not_decreasing_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -84,10 +90,12 @@ py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "successive_gradients_are_uncorrelated_test",
     size = "medium",
     srcs = ["successive_gradients_are_uncorrelated_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,

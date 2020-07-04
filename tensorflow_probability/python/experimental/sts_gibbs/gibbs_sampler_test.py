@@ -50,6 +50,7 @@ class GibbsSamplerTests(test_util.TestCase):
                         missing_prob=0,
                         true_noise_scale=0.1,
                         true_level_scale=0.04,
+                        prior_class=tfd.InverseGamma,
                         dtype=tf.float32):
     seed = test_util.test_seed(sampler_type='stateless')
     (design_seed,
@@ -80,10 +81,10 @@ class GibbsSamplerTests(test_util.TestCase):
         design_matrix=design_matrix,
         weights_prior=tfd.Normal(loc=tf.cast(0., dtype),
                                  scale=tf.cast(10.0, dtype)),
-        level_variance_prior=tfd.InverseGamma(
+        level_variance_prior=prior_class(
             concentration=tf.cast(0.01, dtype),
             scale=tf.cast(0.01 * 0.01, dtype)),
-        observation_noise_variance_prior=tfd.InverseGamma(
+        observation_noise_variance_prior=prior_class(
             concentration=tf.cast(0.01, dtype),
             scale=tf.cast(0.01 * 0.01, dtype)))
     return model, time_series, is_missing
@@ -100,8 +101,7 @@ class GibbsSamplerTests(test_util.TestCase):
         model, tfp.sts.MaskedTimeSeries(
             observed_time_series[..., :num_observed_steps, tf.newaxis],
             is_missing[..., :num_observed_steps]),
-        num_results=5, num_warmup_steps=10,
-        seed=seed, compile_steps_with_xla=False)
+        num_results=5, num_warmup_steps=10, seed=seed)
     predictive_dist = gibbs_sampler.one_step_predictive(
         model, samples, num_forecast_steps=num_forecast_steps,
         thin_every=1)
@@ -125,23 +125,24 @@ class GibbsSamplerTests(test_util.TestCase):
       self, dtype, use_xla):
     if not tf.executing_eagerly():
       return
-    seed = test_util.test_seed()
+    seed = test_util.test_seed(sampler_type='stateless')
     model, observed_time_series, is_missing = self._build_test_model(
-        num_timesteps=5, batch_shape=[3])
+        num_timesteps=5,
+        batch_shape=[3],
+        prior_class=gibbs_sampler.XLACompilableInverseGamma)
 
-    samples = gibbs_sampler.fit_with_gibbs_sampling(
-        model, tfp.sts.MaskedTimeSeries(
-            observed_time_series[..., tf.newaxis], is_missing),
-        num_results=4, num_warmup_steps=1, seed=seed,
-        compile_steps_with_xla=use_xla)
+    @tf.function(experimental_compile=use_xla)
+    def do_sampling(observed_time_series, is_missing):
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          model, tfp.sts.MaskedTimeSeries(
+              observed_time_series, is_missing),
+          num_results=4, num_warmup_steps=1, seed=seed)
+    samples = do_sampling(observed_time_series[..., tf.newaxis], is_missing)
     predictive_dist = gibbs_sampler.one_step_predictive(
         model, samples, thin_every=1)
 
     # Test that the seeded calculation gives the same result on multiple runs.
-    samples2 = gibbs_sampler.fit_with_gibbs_sampling(
-        model, tfp.sts.MaskedTimeSeries(observed_time_series, is_missing),
-        num_results=4, num_warmup_steps=1, seed=seed,
-        compile_steps_with_xla=use_xla)
+    samples2 = do_sampling(observed_time_series[..., tf.newaxis], is_missing)
     predictive_dist2 = gibbs_sampler.one_step_predictive(
         model, samples2, thin_every=1)
 
@@ -231,14 +232,14 @@ class GibbsSamplerTests(test_util.TestCase):
         observation_noise_scale=observation_noise_scale,
         level_scale=level_scale)
 
-    resample_level = gibbs_sampler._build_resample_level_fn(
-        initial_state_prior, is_missing=is_missing)
     posterior_means, posterior_covs = ssm.posterior_marginals(
         observed_residuals[..., tf.newaxis], mask=is_missing)
-    level_samples = resample_level(
+    level_samples = gibbs_sampler._resample_level(
         observed_residuals=observed_residuals,
         level_scale=level_scale,
         observation_noise_scale=observation_noise_scale,
+        initial_state_prior=initial_state_prior,
+        is_missing=is_missing,
         sample_shape=10000,
         seed=level_seed)
 
@@ -251,8 +252,7 @@ class GibbsSamplerTests(test_util.TestCase):
 
   def test_sampled_scale_follows_correct_distribution(self):
     strm = test_util.test_seed_stream()
-    prior_concentration = 0.1
-    prior_scale = 0.1
+    prior = tfd.InverseGamma(concentration=0.1, scale=0.1)
 
     num_timesteps = 100
     observed_samples = tf.random.normal([2, num_timesteps], seed=strm()) * 3.
@@ -262,15 +262,14 @@ class GibbsSamplerTests(test_util.TestCase):
     # InverseGamma distribution.
     posterior_scale_samples = parallel_for.pfor(
         lambda i: gibbs_sampler._resample_scale(  # pylint: disable=g-long-lambda
-            prior_concentration=prior_concentration,
-            prior_scale=prior_scale,
+            prior=prior,
             observed_residuals=observed_samples,
             is_missing=is_missing,
             seed=strm()), 10000)
 
-    concentration = prior_concentration + tf.reduce_sum(
+    concentration = prior.concentration + tf.reduce_sum(
         1 - tf.cast(is_missing, tf.float32), axis=-1)/2.
-    scale = prior_scale + tf.reduce_sum(
+    scale = prior.scale + tf.reduce_sum(
         (observed_samples * tf.cast(~is_missing, tf.float32))**2, axis=-1)/2.
     posterior_scale_samples_, concentration_, scale_ = self.evaluate(
         (posterior_scale_samples, concentration, scale))

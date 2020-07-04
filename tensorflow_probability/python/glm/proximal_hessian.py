@@ -316,7 +316,7 @@ def fit_sparse(model_matrix,
             d, seed=42)
     radius = np.sqrt(2.)
     model_coefficients *= radius / tf.linalg.norm(model_coefficients)
-    mask = tf.random_shuffle(tf.range(d)) < tf.to_int32(0.5 * tf.to_float(d))
+    mask = tf.random.shuffle(tf.range(d)) < tf.to_int32(0.5 * tf.to_float(d))
     model_coefficients = tf.where(mask, model_coefficients,
                                   tf.zeros_like(model_coefficients))
     model_matrix = tfd.Normal(
@@ -477,7 +477,7 @@ def _fit_sparse_exact_hessian(  # pylint: disable = missing-docstring
     tolerance,
     l1_regularizer,
     l2_regularizer=None,
-    maximum_iterations=None,
+    maximum_iterations=1,
     maximum_full_sweeps_per_iteration=1,
     learning_rate=None,
     name=None):

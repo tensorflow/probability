@@ -18,8 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
+import collections
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
@@ -116,6 +115,7 @@ __all__ = [
     'pow',
     'real',
     'reciprocal',
+    'reciprocal_no_nan',
     'reduce_all',
     'reduce_any',
     # 'reduce_euclidean_norm',
@@ -247,13 +247,13 @@ def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
     result = result[tuple(slices)]
   return result
 
-_cumprod = functools.partial(_cumop, np.cumprod, initial_value=1.)
-_cumsum = functools.partial(_cumop, np.cumsum, initial_value=0.)
+_cumprod = utils.partial(_cumop, np.cumprod, initial_value=1.)
+_cumsum = utils.partial(_cumop, np.cumsum, initial_value=0.)
 
 
 def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=unused-argument
   x = _convert_to_tensor(x)
-  return x / np.linalg.norm(x, ord=2, axis=axis, keepdims=True)
+  return x / np.linalg.norm(x, ord=2, axis=_astuple(axis), keepdims=True)
 
 
 def _lbeta(x, name=None):  # pylint: disable=unused-argument
@@ -341,6 +341,11 @@ def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
 def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
   """Computes `log(sum(exp(input_tensor))) along the specified axis."""
   input_tensor = _convert_to_tensor(input_tensor)
+  dtype = input_tensor.dtype
+  if not (np.issubdtype(dtype, np.floating)
+          or np.issubdtype(dtype, np.complexfloating)):
+    # Match TF error
+    raise TypeError('Input must be either real or complex')
   try:
     return scipy_special.logsumexp(
         input_tensor, axis=_astuple(axis), keepdims=keepdims)
@@ -353,6 +358,10 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
     return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
 
 
+# Match the TF return type for top_k.
+TopK = collections.namedtuple('TopKV2', ['values', 'indices'])
+
+
 def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argument,redefined-builtin,missing-docstring
   # This currently ignores sorted=False. However, this should be safe since
   # call sites that don't invoke sorted=True will assume results are unsorted
@@ -360,18 +369,20 @@ def _top_k(input, k=1, sorted=True, name=None):  # pylint: disable=unused-argume
   input = _convert_to_tensor(input)
   if JAX_MODE:
     # JAX automatically returns values in sorted order.
-    return jax.lax.top_k(input, k)
+    return TopK(*jax.lax.top_k(input, k))
   n = int(input.shape[-1] - 1)
   # For the values, we sort the negative entries and choose the smallest ones
   # and negate. This is equivalent to choosing the largest entries
+  values = -np.sort(-input, axis=-1)[..., :k]
   # For the indices, we could argsort and reverse the entries and choose the
   # first k entries. However, this does not work in the case of ties, since the
   # first index a value occurs at is preferred. Thus we also reverse the input
   # to ensure the last tied value becomes first, and subtract this off from the
   # last index since the list is reversed.
-  return (-np.sort(-input, axis=-1)[..., :k],
-          (n - (np.argsort(input[..., ::-1],
-                           kind='stable', axis=-1)[..., ::-1]))[..., :k])
+  indices = (
+      n - (np.argsort(input[..., ::-1], kind='stable', axis=-1)[..., ::-1])
+      )[..., :k].astype(np.int32)
+  return TopK(values, indices)
 
 
 def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
@@ -626,15 +637,15 @@ lgamma = utils.copy_docstring(
 
 log = utils.copy_docstring(
     'tf.math.log',
-    lambda x, name=None: np.log(x))
+    lambda x, name=None: np.log(_convert_to_tensor(x)))
 
 log1p = utils.copy_docstring(
     'tf.math.log1p',
-    lambda x, name=None: np.log1p(x))
+    lambda x, name=None: np.log1p(_convert_to_tensor(x)))
 
 log_sigmoid = utils.copy_docstring(
     'tf.math.log_sigmoid',
-    lambda x, name=None: -_softplus(-x))
+    lambda x, name=None: -_softplus(-_convert_to_tensor(x)))
 
 log_softmax = utils.copy_docstring(
     'tf.math.log_softmax',
@@ -753,7 +764,8 @@ not_equal = utils.copy_docstring(
 
 polygamma = utils.copy_docstring(
     'tf.math.polygamma',
-    lambda a, x, name=None: scipy_special.polygamma(a, x))
+    lambda a, x, name=None: scipy_special.polygamma(a, x).astype(  # pylint: disable=unused-argument,g-long-lambda
+        utils.common_dtype([a, x], dtype_hint=np.float32)))
 
 polyval = utils.copy_docstring(
     'tf.math.polyval',
@@ -772,19 +784,33 @@ reciprocal = utils.copy_docstring(
     lambda x, name=None: np.reciprocal(x))
 
 
+def _reciprocal_no_nan(x, name=None):  # pylint: disable=unused-argument
+  x_is_zero = np.equal(x, 0.)
+  safe_x = np.where(x_is_zero, 1., x)
+  return np.where(x_is_zero, 0., np.reciprocal(safe_x))
+
+
+reciprocal_no_nan = utils.copy_docstring(
+    'tf.math.reciprocal_no_nan', _reciprocal_no_nan)
+
+
 def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # pylint: disable=unused-argument
-                     include_dtype_kwarg=False):
+                     include_dtype_kwarg=False, replace_nan=None):
   input_tensor = _convert_to_tensor(input_tensor)
+  if replace_nan is not None and np.issubdtype(input_tensor.dtype, np.floating):
+    input_tensor = np.where(np.isnan(input_tensor),
+                            np.asarray(replace_nan, dtype=input_tensor.dtype),
+                            input_tensor)
   kwargs = dict(dtype=input_tensor.dtype) if include_dtype_kwarg else {}
   return op(input_tensor, axis=_astuple(axis), keepdims=keepdims, **kwargs)
 
 reduce_all = utils.copy_docstring(
     'tf.math.reduce_all',
-    functools.partial(_apply_reduction, np.all))
+    utils.partial(_apply_reduction, np.all))
 
 reduce_any = utils.copy_docstring(
     'tf.math.reduce_any',
-    functools.partial(_apply_reduction, np.any))
+    utils.partial(_apply_reduction, np.any))
 
 # reduce_euclidean_norm = utils.copy_docstring(
 #     'tf.math.reduce_euclidean_norm',
@@ -797,31 +823,31 @@ reduce_logsumexp = utils.copy_docstring(
 
 reduce_max = utils.copy_docstring(
     'tf.math.reduce_max',
-    functools.partial(_apply_reduction, np.max))
+    utils.partial(_apply_reduction, np.max, replace_nan=-float('inf')))
 
 reduce_mean = utils.copy_docstring(
     'tf.math.reduce_mean',
-    functools.partial(_apply_reduction, np.mean, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.mean, include_dtype_kwarg=True))
 
 reduce_min = utils.copy_docstring(
     'tf.math.reduce_min',
-    functools.partial(_apply_reduction, np.min))
+    utils.partial(_apply_reduction, np.min, replace_nan=float('inf')))
 
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',
-    functools.partial(_apply_reduction, np.prod, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.prod, include_dtype_kwarg=True))
 
 reduce_std = utils.copy_docstring(
     'tf.math.reduce_std',
-    functools.partial(_apply_reduction, np.std, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.std, include_dtype_kwarg=True))
 
 reduce_sum = utils.copy_docstring(
     'tf.math.reduce_sum',
-    functools.partial(_apply_reduction, np.sum, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.sum, include_dtype_kwarg=True))
 
 reduce_variance = utils.copy_docstring(
     'tf.math.reduce_variance',
-    functools.partial(_apply_reduction, np.var, include_dtype_kwarg=True))
+    utils.partial(_apply_reduction, np.var, include_dtype_kwarg=True))
 
 rint = utils.copy_docstring(
     'tf.math.rint',

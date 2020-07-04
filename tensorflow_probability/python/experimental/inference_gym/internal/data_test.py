@@ -44,6 +44,28 @@ class DataTest(test_util.InferenceGymTestCase):
     self.assertAllClose(
         np.ones([24]), dataset['test_features'].std(0), atol=0.3)
 
+  def testSyntheticItemResponseTheory(self):
+    num_train_points = int(0.75 * 30012)
+    num_test_points = 30012 - num_train_points
+
+    dataset = data.synthetic_item_response_theory(train_fraction=0.75)
+
+    self.assertEqual((num_train_points,), dataset['train_student_ids'].shape)
+    self.assertEqual((num_train_points,), dataset['train_question_ids'].shape)
+    self.assertEqual((num_train_points,), dataset['train_correct'].shape)
+    self.assertEqual((num_test_points,), dataset['test_student_ids'].shape)
+    self.assertEqual((num_test_points,), dataset['test_question_ids'].shape)
+    self.assertEqual((num_test_points,), dataset['test_correct'].shape)
+
+  def testSyntheticLogGaussianCoxModel(self):
+    num_train_points = 100
+
+    dataset = data.synthetic_log_gaussian_cox_process()
+
+    self.assertEqual((num_train_points, 2), dataset['train_locations'].shape)
+    self.assertEqual((num_train_points,), dataset['train_extents'].shape)
+    self.assertEqual((num_train_points,), dataset['train_counts'].shape)
+
 
 if __name__ == '__main__':
   tf.test.main()

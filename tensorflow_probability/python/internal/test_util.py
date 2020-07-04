@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
+import functools
 import os
 import unittest
 
@@ -46,6 +47,7 @@ __all__ = [
     'numpy_disable_gradient_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
+    'disable_test_for_backend',
     'test_all_tf_execution_regimes',
     'test_graph_and_eager_modes',
     'test_graph_mode_only',
@@ -59,7 +61,7 @@ __all__ = [
 
 
 JAX_MODE = False
-
+NUMPY_MODE = False
 
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
@@ -175,6 +177,28 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         check_types=check_types,
         msg='AllEqualNested failed')
 
+  def assertAllCloseNested(
+      self, a, b, rtol=1e-06, atol=1e-06, check_types=False):
+    """Assert that analogous entries in two nested structures have near values.
+
+    Args:
+      a: A nested structure.
+      b: A nested structure.
+      rtol: scalar relative tolerance.
+        Default value: `1e-6`.
+      atol: scalar absolute tolerance.
+        Default value: `1e-6`.
+      check_types: If `True`, types of sequences are checked as well, including
+        the keys of dictionaries. If `False`, for example a list and a tuple of
+        objects may be equivalent.
+    """
+    self.assertAllAssertsNested(
+        lambda x, y: self.assertAllClose(x, y, rtol=rtol, atol=atol),
+        a,
+        b,
+        check_types=check_types,
+        msg='AllCloseNested failed')
+
   def assertAllFinite(self, a):
     """Assert that all entries in a `Tensor` are finite.
 
@@ -204,6 +228,14 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     is_negative_inf = np.isneginf(self._GetNdArray(a))
     all_true = np.ones_like(is_negative_inf, dtype=np.bool)
     self.assertAllEqual(all_true, is_negative_inf)
+
+  def assertNotAllZero(self, a):
+    """Assert that all entries in a `Tensor` are nonzero.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as nonzero.
+    """
+    self.assertNotAllEqual(a, tf.nest.map_structure(tf.zeros_like, a))
 
   def assertAllNan(self, a):
     """Assert that every entry in a `Tensor` is NaN.
@@ -290,6 +322,40 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       if 'Could not find compiler' in str(e):
         self.skipTest('XLA not available')
 
+  def make_input(self, number):
+    """Create inputs with varied dtypes and static or dynamic shape.
+
+    Helper to run tests with different dtypes and both statically defined and
+    not statically defined shapes. This helper wraps the inputs to a
+    distribution, typically a python literal or numpy array. It will then
+    attach shapes and dtypes as specified by the test class's `dtype` and
+    `use_static_shape` attributes.
+
+    Note: `tf.Variables` are used to represent inputs which don't have
+    statically defined shapes, as well as fp64 inputs with statically defined
+    shapes. For fp32 with statically defined shapes, inputs are wrapped with
+    `tf.convert_to_tensor`.
+
+    Args:
+      number: Input value(s), typically python literal, list, or numpy array.
+
+    Returns:
+      output: Tensor or Variable with new dtype and shape.
+    """
+    try:
+      num_shape = number.shape
+    except AttributeError:
+      num_shape = None
+    target_shape = num_shape if self.use_static_shape else None
+    if self.dtype in [np.float64, tf.float64] or not self.use_static_shape:
+      output = tf.Variable(number, dtype=self.dtype, shape=target_shape,)
+      self.evaluate(output.initializer)
+    elif self.dtype in [np.float32, tf.float32] and self.use_static_shape:
+      output = tf.convert_to_tensor(number, dtype=self.dtype)
+    else:
+      raise TypeError('Only float32 and float64 supported, got',
+                      str(self.dtype))
+    return output
 
 if JAX_MODE:
   from jax import jacrev  # pylint: disable=g-import-not-at-top
@@ -340,13 +406,12 @@ def _tf_function_mode_context(tf_function_mode):
     raise ValueError(
         'Only allowable values for tf_function_mode_context are "" '
         'and "no_tf_function"; but got "{}"'.format(tf_function_mode))
-  original_mode = tf.config.experimental_functions_run_eagerly()
+  original_mode = tf.config.functions_run_eagerly()
   try:
-    tf.config.experimental_run_functions_eagerly(tf_function_mode ==
-                                                 'no_tf_function')
+    tf.config.run_functions_eagerly(tf_function_mode == 'no_tf_function')
     yield
   finally:
-    tf.config.experimental_run_functions_eagerly(original_mode)
+    tf.config.run_functions_eagerly(original_mode)
 
 
 class EagerGraphCombination(test_combinations.TestCombination):
@@ -481,7 +546,7 @@ def test_graph_mode_only(test_class_or_method=None):
   Raises:
     SkipTest: Raised when not running in the TF backend.
   """
-  if JAX_MODE or (tf.Variable == ops.NumpyVariable):
+  if JAX_MODE or NUMPY_MODE:
     raise unittest.SkipTest('Ignoring TF Graph Mode tests in non-TF backends.')
 
   decorator = test_combinations.generate(
@@ -493,16 +558,25 @@ def test_graph_mode_only(test_class_or_method=None):
   return decorator
 
 
-def numpy_disable_gradient_test(test_fn):
+def is_numpy_not_jax_mode():
+  return NUMPY_MODE and not JAX_MODE
+
+
+def numpy_disable_gradient_test(test_fn_or_reason, reason=None):
   """Disable a gradient-using test when using the numpy backend."""
 
-  if JAX_MODE:
-    return test_fn
+  if not callable(test_fn_or_reason):
+    if reason is not None:
+      raise ValueError('Unexpected test_fn: {}'.format(test_fn_or_reason))
+    return functools.partial(numpy_disable_gradient_test,
+                             reason=test_fn_or_reason)
 
-  def new_test(self, *args, **kwargs):
-    if tf.Variable == ops.NumpyVariable:
-      self.skipTest('gradient-using test disabled for numpy')
-    return test_fn(self, *args, **kwargs)
+  if not NUMPY_MODE:
+    return test_fn_or_reason
+
+  def new_test(self, *args, **kwargs):  # pylint: disable=unused-argument
+    self.skipTest('gradient-using test disabled for numpy{}'.format(
+        ': {}'.format(reason) if reason else ''))
 
   return new_test
 
@@ -587,6 +661,24 @@ def tf_tape_safety_test(test_fn):
     return test_fn(self, *args, **kwargs)
 
   return new_test
+
+
+def disable_test_for_backend(disable_numpy=False,
+                             disable_jax=False,
+                             reason=None):
+  """Disable a test for backends with a specified reason."""
+  if not (disable_numpy or disable_jax):
+    raise ValueError('One of `disable_numpy` or `disable_jax` must be true.')
+  if not reason:
+    raise ValueError('`reason` must be specified.')
+
+  def decor(test_fn_or_class):
+    if not ((disable_numpy and is_numpy_not_jax_mode()) or
+            (disable_jax and JAX_MODE)):
+      return test_fn_or_class
+    return unittest.skip(reason)(test_fn_or_class)
+
+  return decor
 
 
 def test_seed(hardcoded_seed=None,

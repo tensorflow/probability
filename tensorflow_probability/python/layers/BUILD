@@ -60,6 +60,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "conv_variational_test",
     size = "medium",
@@ -89,6 +90,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "dense_variational_test",
     size = "medium",
@@ -114,6 +116,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "dense_variational_v2_test",
     size = "small",
@@ -152,6 +155,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "distribution_layer_test",
     size = "medium",
@@ -176,6 +180,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "initializers_test",
     size = "small",
@@ -198,6 +203,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "masked_autoregressive_test",
     size = "small",
@@ -236,6 +242,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "variable_input_test",
     size = "small",
@@ -258,6 +265,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "weight_norm_test",
     size = "small",

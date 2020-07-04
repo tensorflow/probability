@@ -18,8 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import itertools
+
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import six
 import tensorflow.compat.v1 as tf1
@@ -816,6 +819,95 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     self.assertAllEqual((7, channels, width * height),
                         distribution.sample(7).shape)
     self.assertAllEqual((n,), distribution.log_prob(reshaped_images).shape)
+
+
+@test_util.numpy_disable_test_missing_functionality("Keras")
+@test_util.jax_disable_test_missing_functionality("Keras")
+@test_util.test_all_tf_execution_regimes
+class ConditionalTests(test_util.TestCase):
+
+  def test_conditional_missing_event_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`event_shape` must be provided when `conditional` is True"):
+
+      tfb.AutoregressiveNetwork(
+          params=2, conditional=True, conditional_event_shape=[4])
+
+  def test_conditional_missing_conditional_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_event_shape` must be provided when `conditional` is True"
+    ):
+
+      tfb.AutoregressiveNetwork(params=2, conditional=True, event_shape=[4])
+
+  def test_conditional_incorrect_layers(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_input_layers` must be \"first_layers\" or \"all_layers\""
+    ):
+
+      tfb.AutoregressiveNetwork(
+          params=2,
+          conditional=True,
+          event_shape=[4],
+          conditional_event_shape=[4],
+          conditional_input_layers="non-existent-option")
+
+  def test_conditional_false_with_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "`conditional_event_shape` passed but `conditional` is set to False."):
+
+      tfb.AutoregressiveNetwork(params=2, conditional_event_shape=[4])
+
+  def test_conditional_wrong_shape(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "Parameter `conditional_event_shape` must describe a rank-1 shape"):
+
+      tfb.AutoregressiveNetwork(
+          params=2,
+          conditional=True,
+          event_shape=[4],
+          conditional_event_shape=[10, 4])
+
+  def test_conditional_missing_tensor(self):
+    with self.assertRaisesRegexp(
+        ValueError, "`conditional_input` must be passed as a named argument"):
+
+      made = tfb.AutoregressiveNetwork(
+          params=2,
+          event_shape=[4],
+          conditional=True,
+          conditional_event_shape=[6])
+
+      made(np.random.normal(0, 1, (1, 4)))
+
+  @parameterized.named_parameters(
+      *(("{} {}".format(ns, cs), ns, cs) for ns, cs in itertools.product(
+          [[3], [1, 3], [2, 3], [1, 2, 3], [2, 1, 3], [2, 2, 3]],
+          [[4], [1, 4], [2, 4], [1, 2, 4], [2, 1, 4], [2, 2, 4]],
+      )))
+  def test_conditional_broadcasting(self, input_shape, cond_shape):
+    made = tfb.AutoregressiveNetwork(
+        params=2,
+        event_shape=[3],
+        conditional=True,
+        conditional_event_shape=[4])
+
+    made_shape = tf.shape(
+        made(tf.ones(input_shape), conditional_input=tf.ones(cond_shape)))
+    broadcast_shape = tf.concat(
+        [
+            tf.broadcast_dynamic_shape(cond_shape[:-1], input_shape[:-1]),
+            input_shape[-1:]
+        ],
+        axis=0,
+    )
+    self.assertAllEqual(
+        self.evaluate(tf.concat([broadcast_shape, [2]], axis=0)), made_shape)
 
 
 del _MaskedAutoregressiveFlowTest

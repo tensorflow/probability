@@ -35,6 +35,8 @@ py_library(
         "//tensorflow_probability/python/experimental/substrates/numpy/stats",
         "//tensorflow_probability/python/experimental/substrates/numpy/util",
         "//tensorflow_probability/python/internal/backend",
+        "//tensorflow_probability/python/math:math.numpy",
         "//tensorflow_probability/python/mcmc:mcmc.numpy",
+        "//tensorflow_probability/python/random:random.numpy",
     ],
 )

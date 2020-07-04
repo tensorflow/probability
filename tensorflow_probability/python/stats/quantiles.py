@@ -111,6 +111,8 @@ def count_integers(arr,
     # Thus, flat_arr is not totally flat, it just has the dims in ~axis
     # flattened.
     flat_arr = _move_dims_to_flat_end(arr, not_axis, arr_ndims, right_end=False)
+    minlength = minlength if minlength is not None else tf.reduce_max(arr) + 1
+    maxlength = maxlength if maxlength is not None else tf.reduce_max(arr) + 1
 
     # tf.map_fn over dim 0.
     if weights is None:
@@ -213,7 +215,7 @@ def find_bins(x,
   Cut `x` into its deciles
 
   ```python
-  x = tf.random_uniform(shape=(100, 200))
+  x = tf.random.uniform(shape=(100, 200))
   decile_edges = tfp.stats.quantiles(x, num_quantiles=10)
   bins = tfp.stats.find_bins(x, edges=decile_edges)
   bins.shape
@@ -343,7 +345,7 @@ def histogram(x,
   ```python
   # x.shape = [1000, 2]
   # x[:, 0] ~ Uniform(0, 1), x[:, 1] ~ Uniform(1, 2).
-  x = tf.stack([tf.random_uniform([1000]), 1 + tf.random_uniform([1000])],
+  x = tf.stack([tf.random.uniform([1000]), 1 + tf.random.uniform([1000])],
                axis=-1)
 
   # edges ==> bins [0, 0.5), [0.5, 1.0), [1.0, 1.5), [1.5, 2.0].

@@ -38,17 +38,22 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
+JAX_MODE = False
 
 ##############################################################
 ### BEGIN STATIC CONFIGURATION ###############################
@@ -70,64 +75,104 @@ __all__ = [
     'NoUTurnSampler',
 ]
 
-NUTSKernelResults = collections.namedtuple('NUTSKernelResults', [
-    'target_log_prob',
-    'grads_target_log_prob',
-    'momentum_state_memory',
-    'step_size',
-    'log_accept_ratio',
-    'leapfrogs_taken',  # How many leapfrogs each chain has taken this step
-    'is_accepted',
-    'reach_max_depth',
-    'has_divergence',
-    'energy',
-])
 
-MomentumStateSwap = collections.namedtuple('MomentumStateSwap', [
-    'momentum_swap',
-    'state_swap',
-])
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*nuts',
+                        append=True)  # Don't override user-set filters.
 
-OneStepMetaInfo = collections.namedtuple('OneStepMetaInfo', [
-    'log_slice_sample',
-    'init_energy',
-    'write_instruction',
-    'read_instruction',
-])
 
-TreeDoublingState = collections.namedtuple('TreeDoublingState', [
-    'momentum',
-    'state',
-    'target',
-    'target_grad_parts',
-])
+class NUTSKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'NUTSKernelResults',
+        [
+            'target_log_prob',
+            'grads_target_log_prob',
+            'momentum_state_memory',
+            'step_size',
+            'log_accept_ratio',
+            'leapfrogs_taken',  # How many leapfrogs each chain took this step.
+            'is_accepted',
+            'reach_max_depth',
+            'has_divergence',
+            'energy',
+            'seed',
+        ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
 
-TreeDoublingStateCandidate = collections.namedtuple(
-    'TreeDoublingStateCandidate', [
-        'state',
-        'target',
-        'target_grad_parts',
-        'energy',
-        'weight',
-    ])
 
-TreeDoublingMetaState = collections.namedtuple(
-    'TreeDoublingMetaState',
-    [
-        'candidate_state',  # A namedtuple of TreeDoublingStateCandidate
-        'is_accepted',
-        'momentum_sum',     # Sum of momentum of the current tree for
-                            # generalized U turn criteria
-        'energy_diff_sum',  # Sum over all states explored within the subtree of
-                            # Metropolis acceptance probabilities
-                            # exp(min(0, H' - H0)), where H0 is the negative
-                            # energy of the initial state and H' is the negative
-                            # energy of a state explored in the subtree.
-                            # TODO(b/150152798): Do sum in log-space.
-        'leapfrog_count',   # How many leapfrogs each chain has taken
-        'continue_tree',
-        'not_divergence',
-    ])
+class MomentumStateSwap(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('MomentumStateSwap',
+                           ['momentum_swap', 'state_swap'])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
+
+
+class OneStepMetaInfo(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('OneStepMetaInfo',
+                           ['log_slice_sample',
+                            'init_energy',
+                            'write_instruction',
+                            'read_instruction',
+                           ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
+
+
+class TreeDoublingState(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('TreeDoublingState',
+                           ['momentum',
+                            'state',
+                            'target',
+                            'target_grad_parts',
+                            ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
+
+
+class TreeDoublingStateCandidate(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'TreeDoublingStateCandidate',
+        [
+            'state',
+            'target',
+            'target_grad_parts',
+            'energy',
+            'weight',
+        ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
+
+
+class TreeDoublingMetaState(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'TreeDoublingMetaState',
+        [
+            'candidate_state',  # A namedtuple of TreeDoublingStateCandidate.
+            'is_accepted',
+            'momentum_sum',     # Sum of momentum of the current tree for
+                                # generalized U turn criteria.
+            'energy_diff_sum',  # Sum over all states explored within the
+                                # subtree of Metropolis acceptance probabilities
+                                # exp(min(0, H' - H0)), where H0 is the negative
+                                # energy of the initial state and H' is the
+                                # negative energy of a state explored in the
+                                # subtree.
+                                # TODO(b/150152798): Do sum in log-space.
+            'leapfrog_count',   # How many leapfrogs each chain has taken.
+            'continue_tree',
+            'not_divergence',
+        ])):
+  """Internal state and diagnostics for No-U-Turn Sampler."""
+  __slots__ = ()
 
 
 class NoUTurnSampler(TransitionKernel):
@@ -162,6 +207,9 @@ class NoUTurnSampler(TransitionKernel):
   _arXiv preprint arXiv:1701.02434_, 2018. https://arxiv.org/abs/1701.02434
   """
 
+  @deprecation.deprecated_args(
+      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
+      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -195,9 +243,8 @@ class NoUTurnSampler(TransitionKernel):
         trajectory length implied by max_tree_depth. Defaults to 1.
       parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
-        Note that if you set the seed to have deterministic output you should
-        also set `parallel_iterations` to 1.
-      seed: Python integer to seed the random number generator.
+      seed: Python integer to seed the random number generator. Deprecated, pass
+        seed to `tfp.mcmc.sample_chain`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'nuts_kernel').
     """
@@ -293,7 +340,17 @@ class NoUTurnSampler(TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    # TODO(b/159636942): Clean up after 2020-09-20.
+    if seed is not None:
+      start_trajectory_seed, loop_seed = samplers.split_seed(
+          seed, salt='nuts.one_step')
+    else:
+      if self._seed_stream.original_seed is not None:
+        warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
+      start_trajectory_seed, loop_seed = samplers.split_seed(
+          self._seed_stream(), salt='nuts.one_step')
+
     with tf.name_scope(self.name + '.one_step'):
       unwrap_state_list = not tf.nest.is_nested(current_state)
       if unwrap_state_list:
@@ -304,7 +361,8 @@ class NoUTurnSampler(TransitionKernel):
           init_momentum,
           init_energy,
           log_slice_sample
-      ] = self._start_trajectory_batched(current_state, current_target_log_prob)
+      ] = self._start_trajectory_batched(current_state, current_target_log_prob,
+                                         seed=start_trajectory_seed)
 
       def _copy(v):
         return v * ps.ones(
@@ -358,19 +416,21 @@ class NoUTurnSampler(TransitionKernel):
           read_instruction=read_instruction
           )
 
-      _, _, new_step_metastate = tf.while_loop(
-          cond=lambda iter_, state, metastate: (  # pylint: disable=g-long-lambda
+      _, _, _, new_step_metastate = tf.while_loop(
+          cond=lambda iter_, seed, state, metastate: (  # pylint: disable=g-long-lambda
               (iter_ < self.max_tree_depth) &
               tf.reduce_any(metastate.continue_tree)),
-          body=lambda iter_, state, metastate: self.loop_tree_doubling(  # pylint: disable=g-long-lambda
+          body=lambda iter_, seed, state, metastate: self._loop_tree_doubling(  # pylint: disable=g-long-lambda
               previous_kernel_results.step_size,
               previous_kernel_results.momentum_state_memory,
               current_step_meta_info,
               iter_,
               state,
-              metastate),
+              metastate,
+              seed),
           loop_vars=(
               tf.zeros([], dtype=tf.int32, name='iter'),
+              loop_seed,
               initial_step_state,
               initial_step_metastate),
           parallel_iterations=self.parallel_iterations,
@@ -392,7 +452,8 @@ class NoUTurnSampler(TransitionKernel):
           is_accepted=new_step_metastate.is_accepted,
           reach_max_depth=new_step_metastate.continue_tree,
           has_divergence=~new_step_metastate.not_divergence,
-          energy=new_step_metastate.candidate_state.energy
+          energy=new_step_metastate.candidate_state.energy,
+          seed=samplers.zeros_seed() if seed is None else seed,
       )
 
       result_state = new_step_metastate.candidate_state.state
@@ -457,19 +518,20 @@ class NoUTurnSampler(TransitionKernel):
           has_divergence=tf.zeros_like(current_target_log_prob,
                                        dtype=tf.bool,
                                        name='has_divergence'),
-          energy=compute_hamiltonian(current_target_log_prob, dummy_momentum)
+          energy=compute_hamiltonian(current_target_log_prob, dummy_momentum),
+          # Allow room for one_step's seed.
+          seed=samplers.zeros_seed(),
       )
 
-  def _start_trajectory_batched(self, state, target_log_prob):
+  def _start_trajectory_batched(self, state, target_log_prob, seed):
     """Computations needed to start a trajectory."""
     with tf.name_scope('start_trajectory_batched'):
-      seed_stream = SeedStream(
-          self._seed_stream, salt='start_trajectory_batched')
+      seeds = samplers.split_seed(seed, n=len(state) + 1)
       momentum = [
-          tf.random.normal(  # pylint: disable=g-complex-comprehension
+          samplers.normal(  # pylint: disable=g-complex-comprehension
               shape=ps.shape(x),
               dtype=x.dtype,
-              seed=seed_stream()) for x in state
+              seed=seeds[i]) for (i, x) in enumerate(state)
       ]
       init_energy = compute_hamiltonian(target_log_prob, momentum)
 
@@ -480,25 +542,29 @@ class NoUTurnSampler(TransitionKernel):
       # momentum)) and compute log u. For numerical stability, we perform this
       # in log space where log u = log (u' * p(...)) = log u' + log
       # p(...) and u' ~ Uniform(0, 1).
-      log_slice_sample = tf.math.log1p(-tf.random.uniform(
+      log_slice_sample = tf.math.log1p(-samplers.uniform(
           shape=ps.shape(init_energy),
           dtype=init_energy.dtype,
-          seed=seed_stream()))
+          seed=seeds[len(state)]))
       return momentum, init_energy, log_slice_sample
 
-  def loop_tree_doubling(self, step_size, momentum_state_memory,
-                         current_step_meta_info, iter_, initial_step_state,
-                         initial_step_metastate):
+  def _loop_tree_doubling(self, step_size, momentum_state_memory,
+                          current_step_meta_info, iter_, initial_step_state,
+                          initial_step_metastate, seed):
     """Main loop for tree doubling."""
     with tf.name_scope('loop_tree_doubling'):
+      (direction_seed,
+       subtree_seed,
+       acceptance_seed,
+       next_seed) = samplers.split_seed(seed, n=4)
       batch_shape = ps.shape(current_step_meta_info.init_energy)
       direction = tf.cast(
-          tf.random.uniform(
+          samplers.uniform(
               shape=batch_shape,
               minval=0,
               maxval=2,
               dtype=tf.int32,
-              seed=self._seed_stream()),
+              seed=direction_seed),
           dtype=tf.bool)
 
       tree_start_states = tf.nest.map_structure(
@@ -537,7 +603,8 @@ class NoUTurnSampler(TransitionKernel):
           tree_start_states,
           initial_step_metastate.continue_tree,
           initial_step_metastate.not_divergence,
-          momentum_state_memory)
+          momentum_state_memory,
+          seed=subtree_seed)
 
       last_candidate_state = initial_step_metastate.candidate_state
 
@@ -563,10 +630,10 @@ class NoUTurnSampler(TransitionKernel):
           tf.math.is_nan(log_accept_thresh),
           tf.zeros([], log_accept_thresh.dtype),
           log_accept_thresh)
-      u = tf.math.log1p(-tf.random.uniform(
+      u = tf.math.log1p(-samplers.uniform(
           shape=batch_shape,
           dtype=log_accept_thresh.dtype,
-          seed=self._seed_stream()))
+          seed=acceptance_seed))
       is_sample_accepted = u <= log_accept_thresh
 
       choose_new_state = is_sample_accepted & continue_tree_final
@@ -663,7 +730,7 @@ class NoUTurnSampler(TransitionKernel):
           leapfrog_count=(initial_step_metastate.leapfrog_count +
                           leapfrogs_taken))
 
-      return iter_ + 1, new_step_state, new_step_metastate
+      return iter_ + 1, next_seed, new_step_state, new_step_metastate
 
   def _build_sub_tree(self,
                       directions,
@@ -673,7 +740,9 @@ class NoUTurnSampler(TransitionKernel):
                       initial_state,
                       continue_tree,
                       not_divergence,
-                      momentum_state_memory):
+                      momentum_state_memory,
+                      seed,
+                      name=None):
     with tf.name_scope('build_sub_tree'):
       batch_shape = ps.shape(current_step_meta_info.init_energy)
       # We never want to select the inital state
@@ -696,6 +765,7 @@ class NoUTurnSampler(TransitionKernel):
                                       name='energy_diff_sum')
       [
           _,
+          _,
           energy_diff_tree_sum,
           momentum_tree_cumsum,
           leapfrogs_taken,
@@ -705,20 +775,21 @@ class NoUTurnSampler(TransitionKernel):
           final_not_divergence,
           momentum_state_memory,
       ] = tf.while_loop(
-          cond=lambda iter_, energy_diff_sum, init_momentum_cumsum,  # pylint: disable=g-long-lambda
+          cond=lambda iter_, seed, energy_diff_sum, init_momentum_cumsum,  # pylint: disable=g-long-lambda
                       leapfrogs_taken, state, state_c, continue_tree,
                       not_divergence, momentum_state_memory: (
                           (iter_ < nsteps) & tf.reduce_any(continue_tree)),
-          body=lambda iter_, energy_diff_sum, init_momentum_cumsum,  # pylint: disable=g-long-lambda
+          body=lambda iter_, seed, energy_diff_sum, init_momentum_cumsum,  # pylint: disable=g-long-lambda
                       leapfrogs_taken, state, state_c, continue_tree,
                       not_divergence, momentum_state_memory: (
                           self._loop_build_sub_tree(
                               directions, integrator, current_step_meta_info,
                               iter_, energy_diff_sum, init_momentum_cumsum,
                               leapfrogs_taken, state, state_c, continue_tree,
-                              not_divergence, momentum_state_memory)),
+                              not_divergence, momentum_state_memory, seed)),
           loop_vars=(
               tf.zeros([], dtype=tf.int32, name='iter'),
+              seed,
               energy_diff_sum,
               init_momentum_cumsum,
               tf.zeros(batch_shape, dtype=TREE_COUNT_DTYPE),
@@ -753,8 +824,10 @@ class NoUTurnSampler(TransitionKernel):
                            candidate_tree_state,
                            continue_tree_previous,
                            not_divergent_previous,
-                           momentum_state_memory):
+                           momentum_state_memory,
+                           seed):
     """Base case in tree doubling."""
+    acceptance_seed, next_seed = samplers.split_seed(seed)
     with tf.name_scope('loop_build_sub_tree'):
       # Take one leapfrog step in the direction v and check divergence
       [
@@ -839,10 +912,10 @@ class NoUTurnSampler(TransitionKernel):
             is_valid,
             -tf.math.log(tf.cast(weight_sum, dtype=tf.float32)),
             tf.constant(-np.inf, dtype=tf.float32))
-      u = tf.math.log1p(-tf.random.uniform(
+      u = tf.math.log1p(-samplers.uniform(
           shape=batch_shape,
           dtype=log_accept_thresh.dtype,
-          seed=self._seed_stream()))
+          seed=acceptance_seed))
       is_sample_accepted = u <= log_accept_thresh
 
       next_candidate_tree_state = TreeDoublingStateCandidate(
@@ -886,6 +959,7 @@ class NoUTurnSampler(TransitionKernel):
 
       return (
           iter_ + 1,
+          next_seed,
           energy_diff_sum,
           momentum_cumsum,
           leapfrogs_taken,
@@ -925,13 +999,11 @@ def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
         log_prob_rank)
     return left_current_index + 1, no_u_turns_current & no_u_turns_last
 
-  # Note that we dont need to set parallel_iterations arg in the while_loop
-  # below as there is no random Ops in `_get_left_state_and_check_u_turn`.
   _, no_u_turns_within_tree = tf.while_loop(
-      cond=lambda i, no_u_turn: ((i < tf.gather(read_indexes, 1)) &  # pylint: disable=g-long-lambda
+      cond=lambda i, no_u_turn: ((i < read_indexes[1]) &  # pylint: disable=g-long-lambda
                                  tf.reduce_any(no_u_turn)),
       body=_get_left_state_and_check_u_turn,
-      loop_vars=(tf.gather(read_indexes, 0), no_u_turns_within_tree))
+      loop_vars=(read_indexes[0], no_u_turns_within_tree))
   return no_u_turns_within_tree
 
 

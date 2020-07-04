@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import softmax as _softmax
 
 
@@ -68,6 +69,11 @@ def _bcast_shape(base_shape, args):
 
 def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
+  invalid_count = (np.int64(counts) < 0) != (counts < 0)
+  if np.any(invalid_count):
+    raise ValueError('int64 overflow: {} -> {}'.format(
+        counts[np.where(invalid_count)],
+        np.int64(counts)[np.where(invalid_count)]))
   probs = np.where(counts > 0, probs, 0)
   samps = rng.binomial(np.int64(counts), np.float64(probs), shape)
   return samps.astype(utils.numpy_dtype(output_dtype))
@@ -220,12 +226,16 @@ def _uniform(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   """Numpy uniform random sampler."""
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([minval, maxval], dtype_hint=dtype)
+  if minval is not None:
+    minval = ops.convert_to_tensor(minval, dtype=dtype)
+  if maxval is not None:
+    maxval = ops.convert_to_tensor(maxval, dtype=dtype)
   if np.issubdtype(dtype, np.integer):
     if maxval is None:
       if minval is None:
-        return rng.random_integers(
-            np.iinfo(dtype).min, np.iinfo(dtype).max, size=shape).astype(dtype)
+        return rng.randint(
+            np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape
+            ).astype(dtype)
       raise ValueError('Must provide maxval for integer sampling')
     return rng.randint(low=minval, high=maxval, size=shape, dtype=dtype)
   maxval = 1 if maxval is None else maxval
@@ -251,7 +261,7 @@ def _uniform_jax(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
     return jaxrand.randint(key=seed, shape=shape, minval=minval, maxval=maxval,
                            dtype=dtype)
   else:
-    maxval = dtype(1) if maxval is None else maxval
+    maxval = ops.convert_to_tensor(1, dtype) if maxval is None else maxval
     shape = _bcast_shape(shape, [minval, maxval])
     # We must match ranks, as lax.max refuses to broadcast different-rank args.
     minval = minval + np.zeros([1] * final_rank, dtype=dtype)

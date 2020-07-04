@@ -284,12 +284,12 @@ transitions.
 
 ```python
 num_samples = 10000  # number of events to approximate posterior
-qw2 = tf.nn.softplus(tf.random_normal([units[2], units[1]]))  # initial state
-qw1 = tf.nn.softplus(tf.random_normal([units[1], units[0]]))
-qw0 = tf.nn.softplus(tf.random_normal([units[0], feature_size]))
-qz2 = tf.nn.softplus(tf.random_normal([data_size, units[2]]))
-qz1 = tf.nn.softplus(tf.random_normal([data_size, units[1]]))
-qz0 = tf.nn.softplus(tf.random_normal([data_size, units[0]]))
+qw2 = tf.nn.softplus(tf.random.normal([units[2], units[1]]))  # initial state
+qw1 = tf.nn.softplus(tf.random.normal([units[1], units[0]]))
+qw0 = tf.nn.softplus(tf.random.normal([units[0], feature_size]))
+qz2 = tf.nn.softplus(tf.random.normal([data_size, units[2]]))
+qz1 = tf.nn.softplus(tf.random.normal([data_size, units[1]]))
+qz0 = tf.nn.softplus(tf.random.normal([data_size, units[0]]))
 
 log_joint = ed.make_log_joint_fn(deep_exponential_family)
 

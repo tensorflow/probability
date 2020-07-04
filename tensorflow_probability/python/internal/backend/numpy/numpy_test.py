@@ -35,6 +35,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability.python.experimental.substrates.numpy as tfp
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
@@ -46,6 +47,7 @@ ALLOW_NAN = False
 ALLOW_INFINITY = False
 
 JAX_MODE = False
+NUMPY_MODE = not JAX_MODE
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
 # argument 'batch_shape' in function call"), so disable this lint for the file.
@@ -137,15 +139,19 @@ def fft_shapes(fft_dim):
 
 @hps.composite
 def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
-                 as_tuple=True, batch_shape=(), unique=False):
+                 as_tuple=True, batch_shape=(), unique=False,
+                 allow_nan=ALLOW_NAN):
   if dtype is None:
     dtype = np.float64
   if elements is None:
     if dtype in (np.float32, np.float64):
-      elements = floats()
+      if allow_nan:
+        elements = floats(min_value=None, max_value=None, allow_nan=allow_nan)
+      else:
+        elements = floats()
     elif dtype in (np.int32, np.int64):
       elements = integers()
-    elif dtype in (np.complex64,):
+    elif dtype in (np.complex64, np.complex128):
       elements = complex_numbers()
     else:
       raise ValueError('Unexpected dtype: {}'.format(dtype))
@@ -169,10 +175,12 @@ single_arrays = functools.partial(n_same_shape, n=1, as_tuple=False)
 
 
 @hps.composite
-def array_axis_tuples(draw, strategy=None, elements=None, dtype=None):
+def array_axis_tuples(draw, strategy=None, elements=None, dtype=None,
+                      allow_nan=ALLOW_NAN):
   x = draw(strategy or single_arrays(shape=shapes(min_dims=1),
                                      elements=elements,
-                                     dtype=dtype))
+                                     dtype=dtype,
+                                     allow_nan=allow_nan))
   rank = len(x.shape)
   axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
@@ -450,6 +458,21 @@ def repeat_params(draw):
 
 
 @hps.composite
+def linspace_params(draw):
+  shape = draw(shapes())
+  arg_shapes = draw(
+      tfp_hps.broadcasting_shapes(shape, 2).map(tensorshapes_to_tuples))
+  dtype = draw(hps.sampled_from([np.int32, np.int64,
+                                 np.float32, np.float64,
+                                 np.complex64, np.complex128]))
+  start = draw(single_arrays(shape=hps.just(arg_shapes[0]), dtype=dtype))
+  stop = draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype))
+  num = draw(hps.integers(0, 13))
+  axis = draw(hps.integers(-len(shape) - 1, len(shape)))
+  return Kwargs(start=start, stop=stop, num=num, axis=axis)
+
+
+@hps.composite
 def searchsorted_params(draw):
   sorted_array_shape = shapes(min_dims=1)
   sorted_array = draw(single_arrays(shape=sorted_array_shape))
@@ -607,12 +630,12 @@ NUMPY_TEST_CASES = [
              [single_arrays(shape=fft_shapes(fft_dim=2),
                             dtype=np.float32,
                             elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=2e-4, rtol=2e-4),
+             atol=1e-3, rtol=1e-3),
     TestCase('signal.rfft3d',
              [single_arrays(shape=fft_shapes(fft_dim=3),
                             dtype=np.float32,
                             elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-3, rtol=1e-3),
+             atol=1e-2, rtol=2e-3),
     TestCase('signal.ifft',
              [single_arrays(shape=fft_shapes(fft_dim=1),
                             dtype=np.complex64,
@@ -663,7 +686,7 @@ NUMPY_TEST_CASES = [
         'math.polygamma', [
             hps.tuples(hps.integers(0, 10).map(float), positive_floats()),
         ],
-        jax_disabled=True),
+        disabled=JAX_MODE),
 
     # ArgSpec(args=['arr', 'weights', 'minlength',
     #               'maxlength', 'dtype', 'name'],
@@ -723,7 +746,8 @@ NUMPY_TEST_CASES = [
     TestCase('math.real',
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [pd_matrices()]),
-    TestCase('linalg.lu', [nonsingular_matrices()]),
+    TestCase('linalg.lu', [nonsingular_matrices()], rtol=1e-4,
+             disabled=NUMPY_MODE and six.PY2),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
     TestCase('raw_ops.MatrixDiagPartV2', [
         hps.fixed_dictionaries(dict(
@@ -762,9 +786,9 @@ NUMPY_TEST_CASES = [
                 elements=hps.booleans()))
     ]),
     TestCase('math.reduce_logsumexp', [array_axis_tuples()]),
-    TestCase('math.reduce_max', [array_axis_tuples()]),
+    TestCase('math.reduce_max', [array_axis_tuples(allow_nan=True)]),
     TestCase('math.reduce_mean', [array_axis_tuples()]),
-    TestCase('math.reduce_min', [array_axis_tuples()]),
+    TestCase('math.reduce_min', [array_axis_tuples(allow_nan=True)]),
     TestCase('math.reduce_prod', [array_axis_tuples(),
                                   array_axis_tuples(dtype=np.int32)]),
     TestCase('math.reduce_std',
@@ -778,7 +802,7 @@ NUMPY_TEST_CASES = [
     TestCase('math.segment_mean',
              [segment_params()],
              # need jax.numpy.bincount
-             jax_disabled=True),
+             disabled=JAX_MODE),
     TestCase('math.segment_min', [segment_params()]),
     TestCase('math.segment_prod', [segment_params()]),
     TestCase('math.segment_sum', [segment_params()]),
@@ -862,12 +886,12 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.atanh', [single_arrays(elements=floats(-1., 1.))]),
     TestCase(
         'math.bessel_i0', [single_arrays(elements=floats(-50., 50.))],
-        jax_disabled=True),
+        disabled=JAX_MODE),
     TestCase(
         'math.bessel_i0e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase(
         'math.bessel_i1', [single_arrays(elements=floats(-50., 50.))],
-        jax_disabled=True),
+        disabled=JAX_MODE),
     TestCase(
         'math.bessel_i1e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase('math.ceil', [single_arrays()]),
@@ -989,8 +1013,9 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('gather_nd', [gather_nd_params()]),
     # TODO(leben): Fix bug in jax.numpy.repeat(array(0), 1, 0).
     TestCase('repeat', [repeat_params()],
-             jax_disabled=True),
+             disabled=JAX_MODE),
     TestCase('searchsorted', [searchsorted_params()]),
+    TestCase('linspace', [linspace_params()]),
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),
 
@@ -1262,8 +1287,13 @@ class NumpyTest(test_util.TestCase):
     self.assertEqual(
         nptf.float32, nptf.concat([onp.zeros(1), nptf.zeros(1)], 0).dtype)
 
-  @test_util.numpy_disable_gradient_test
+  def test_reduce_logsumexp_errors_on_int_dtype(self):
+    with self.assertRaises(TypeError):
+      nptf.reduce_logsumexp(nptf.convert_to_tensor([1, 2, 3], dtype=nptf.int32))
+
   def test_while_loop_gradients(self):
+    if not JAX_MODE:
+      self.skipTest('Cannot take gradients in NumPy.')
 
     def _fn(x):
 
@@ -1432,12 +1462,12 @@ class NumpyTest(test_util.TestCase):
                       strategy_list,
                       atol=1e-5,
                       rtol=1e-5,
-                      jax_disabled=False,
+                      disabled=False,
                       assert_shape_only=False,
                       post_processor=None,
                       jax_kwargs=lambda: {}):
-    if jax_disabled and JAX_MODE:
-      self.skipTest('Test is disabled for JAX')
+    if disabled:
+      self.skipTest('Test is disabled.')
     for strategy in strategy_list:
       @hp.settings(deadline=None,
                    max_examples=10,
@@ -1462,6 +1492,12 @@ class NumpyTest(test_util.TestCase):
         if post_processor is not None:
           numpy_value = post_processor(numpy_value)
           tensorflow_value = post_processor(tensorflow_value)
+
+        def assert_same_dtype(x, y):
+          self.assertEqual(dtype_util.as_numpy_dtype(x.dtype),
+                           dtype_util.as_numpy_dtype(y.dtype))
+        tf.nest.map_structure(assert_same_dtype, tensorflow_value, numpy_value)
+
         if assert_shape_only:
 
           def assert_same_shape(x, y):

@@ -24,9 +24,8 @@ import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
-from tensorflow_probability.python.internal.backend.numpy import tensor_shape
+from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 import wrapt
-from tensorflow.python.ops.unconnected_gradients import UnconnectedGradients  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'bitcast',
@@ -97,6 +96,8 @@ def _broadcast_static_shape(shape_x, shape_y):
 def _broadcast_dynamic_shape(shape_x, shape_y):
   """Reimplements `tf.broadcast_dynamic_shape` in JAX/NumPy."""
   return convert_to_tensor(_broadcast_static_shape(shape_x, shape_y))
+
+broadcast_shape = _broadcast_static_shape
 
 
 def _constant(value, dtype=None, shape=None, name='Const'):  # pylint: disable=unused-argument
@@ -315,7 +316,8 @@ class GradientTape(object):
   """tf.GradientTape stub."""
 
   def __init__(self, persistent=False, watch_accessed_variables=True):  # pylint: disable=unused-argument
-    pass
+    raise NotImplementedError('GradientTape not currently supported in JAX and '
+                              'NumPy backends.')
 
   def __enter__(self):
     return self
@@ -327,13 +329,13 @@ class GradientTape(object):
     pass
 
   def gradient(self, target, sources, output_gradients=None,  # pylint: disable=unused-argument
-               unconnected_gradients=UnconnectedGradients.NONE):  # pylint: disable=unused-argument
-    return sources
+               unconnected_gradients=None):  # pylint: disable=unused-argument
+    raise NotImplementedError
 
   def batch_jacobian(self, target, source,  # pylint: disable=unused-argument
-                     unconnected_gradients=UnconnectedGradients.NONE,  # pylint: disable=unused-argument
+                     unconnected_gradients=None,  # pylint: disable=unused-argument
                      parallel_iterations=None, experimental_use_pfor=True):  # pylint: disable=unused-argument
-    return source
+    raise NotImplementedError
 
 bitcast = utils.copy_docstring(
     'tf.bitcast',

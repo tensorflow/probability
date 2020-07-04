@@ -32,7 +32,8 @@ REQUIRED_PACKAGES = [
     'numpy >= 1.13.3',
     'decorator',
     'cloudpickle == 1.3',  # TODO(b/155109696): Unpin cloudpickle version.
-    'gast >= 0.3.2'  # For autobatching
+    'gast >= 0.3.2',  # For autobatching
+    'dm-tree'  # For NumPy/JAX backends (hence, also for prefer_static)
 ]
 
 if '--release' in sys.argv:

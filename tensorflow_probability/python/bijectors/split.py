@@ -35,13 +35,13 @@ __all__ = [
 
 
 class Split(bijector.Bijector):
-  """Split a `Tensor` event into a nested structure.
+  """Split a `Tensor` event along an axis into a list of `Tensor`s.
 
   Example Use:
 
   ```python
   split = tfb.Split(
-      split_sizes=[4, 1, 3],
+      num_or_size_splits=[4, 1, 3],
       axis=-1
     )
   y = split.forward(tf.zeros([5, 6, 8]))
@@ -210,8 +210,8 @@ class Split(bijector.Bijector):
 
     Returns:
       forward_event_shape: A list of (possibly unknown) `TensorShape`s
-        indicating event-portion shape after applying `forward`. The list is of
-        the same length as `split_sizes`.
+        indicating event-portion shape after applying `forward`. The length of
+        the list is equal to the number of splits.
     """
     self._validate_input_shape(input_shape)
     if tensorshape_util.rank(input_shape) is None:
@@ -268,8 +268,8 @@ class Split(bijector.Bijector):
 
     Returns:
       forward_event_shape_tensor: A list of `Tensor`, `int32` vectors indicating
-        event-portion shape after applying `forward`. The list is of the same
-        length as `split_sizes`.
+        event-portion shape after applying `forward`. The length of the list is
+        equal to the number of splits.
     """
     with self._name_and_control_scope(name):
       input_shape = tf.convert_to_tensor(
@@ -321,8 +321,8 @@ class Split(bijector.Bijector):
 
     Args:
       output_shapes: An iterable of `Tensor`, `int32` vectors indicating
-        event-shapes passed into `inverse` function. The iterable must be of the
-        same length as `split_sizes`.
+        event-shapes passed into `inverse` function. The length of the iterable
+        must be equal to the number of splits.
       name: Name to give to the op.
 
     Returns:
@@ -361,8 +361,8 @@ class Split(bijector.Bijector):
 
     Args:
       output_shapes: Iterable of `TensorShape`s indicating the event shapes
-        passed into `inverse` function. The iterable must be of the same length
-        as `split_sizes`.
+        passed into `inverse` function. The length of the iterable must be equal
+        to the number of splits.
 
     Returns:
       inverse_event_shape_tensor: `TensorShape` indicating event-portion shape

@@ -28,6 +28,7 @@ from tensorflow_probability.python import math
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import monte_carlo
 from tensorflow_probability.python import optimizer
+from tensorflow_probability.python import random
 from tensorflow_probability.python import stats
 from tensorflow_probability.python import sts
 from tensorflow_probability.python import util
@@ -51,6 +52,7 @@ _allowed_symbols = [
     'mcmc',
     'monte_carlo',
     'optimizer',
+    'random',
     'stats',
     'sts',
     'util',

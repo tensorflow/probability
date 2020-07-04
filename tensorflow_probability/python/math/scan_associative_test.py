@@ -15,6 +15,7 @@
 """Tests for parallel calculation of prefix sums."""
 
 import collections
+import functools
 import operator
 
 import numpy as np
@@ -88,7 +89,8 @@ class _ScanAssociativeTest(test_util.TestCase):
     self.assertAllClose(result.second, [0., 10., 30.])
 
   def test_supports_structured_elems_complex(self):
-    data = self.evaluate(tfd.Uniform(-1., 1.).sample(2**4))
+    data = self.evaluate(tfd.Uniform(-1., 1.).sample(
+        2**4, seed=test_util.test_seed()))
     mean_, variance_ = self.evaluate((
         tf.reduce_mean(data),
         tf.math.reduce_variance(data)))
@@ -118,9 +120,9 @@ class _ScanAssociativeTest(test_util.TestCase):
   def test_can_scan_tensors_of_different_rank(self):
     num_elems = 2**4
     elems0 = self.evaluate(tfd.Uniform(-1., 1.).sample(
-        sample_shape=[num_elems]))
+        sample_shape=[num_elems], seed=test_util.test_seed()))
     elems1 = self.evaluate(tfd.Uniform(-1., 1.).sample(
-        sample_shape=[num_elems, 1]))
+        sample_shape=[num_elems, 1], seed=test_util.test_seed()))
 
     def extended_add(a, b):
       return (a[0] + b[0], a[1] + b[1])
@@ -152,8 +154,10 @@ class _ScanAssociativeTest(test_util.TestCase):
     self.assertAllClose(dz_dx, (n + k + 1) * (n - k))
 
   def test_inconsistent_lengths_raise_error(self):
-    elems0 = self.evaluate(tfd.Uniform(-1., 1.).sample([10]))
-    elems1 = self.evaluate(tfd.Uniform(-1., 1.).sample([9]))
+    elems0 = self.evaluate(
+        tfd.Uniform(-1., 1.).sample([10], seed=test_util.test_seed()))
+    elems1 = self.evaluate(
+        tfd.Uniform(-1., 1.).sample([9], seed=test_util.test_seed()))
 
     def extended_add(a, b):
       return (a[0] + b[0], a[1] + b[1])
@@ -167,7 +171,8 @@ class _ScanAssociativeTest(test_util.TestCase):
           validate_args=True))
 
   def test_max_allowed_size(self):
-    elems = self.evaluate(tfd.Uniform(-1., 1.).sample([511]))
+    elems = self.evaluate(tfd.Uniform(-1., 1.).sample(
+        [511], seed=test_util.test_seed()))
 
     result = self.evaluate(tfp.math.scan_associative(
         operator.add,
@@ -180,7 +185,8 @@ class _ScanAssociativeTest(test_util.TestCase):
         atol=1e-4)
 
   def test_min_disallowed_size(self):
-    elems = self.evaluate(tfd.Uniform(-1., 1.).sample([512]))
+    elems = self.evaluate(
+        tfd.Uniform(-1., 1.).sample([512], seed=test_util.test_seed()))
 
     with self.assertRaisesRegexp(
         Exception, 'Input `Tensor`s must have first axis dimension less than'):
@@ -198,8 +204,13 @@ class ScanAssociativeTestStatic(_ScanAssociativeTest):
   def test_cumulative_sum_with_xla(self):
     elems = self._maybe_static(tf.range(0, 2**4 - 1, dtype=tf.int64))
 
-    xla_scan = tf.function(experimental_compile=True)(tfp.math.scan_associative)
-    result = xla_scan(operator.add, elems)
+    # JAX jit expects arguments to functions to be DeviceArrays. Thus we
+    # curry `scan_associative` so that the resulting function takes in `Tensors`
+    # or `DeviceArrays`.
+
+    xla_scan = tf.function(experimental_compile=True)(
+        functools.partial(tfp.math.scan_associative, operator.add))
+    result = xla_scan(elems)
 
     self.assertAllEqual(
         self.evaluate(result),

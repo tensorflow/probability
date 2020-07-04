@@ -25,7 +25,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -56,13 +56,18 @@ def  _right_pad_with_ones(x, target_rank):
                [target_rank - tf.rank(x)], dtype=target_rank.dtype)], axis=0))
 
 
-EllipticalSliceSamplerKernelResults = collections.namedtuple(
-    'EllipticalSliceSamplerKernelResults',
-    [
-        'log_likelihood',  # For "next_state".
-        'angle',  # Angle previous state was rotated by.
-        'normal_samples',  # Normal samples used to generate the next state.
-    ])
+class EllipticalSliceSamplerKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'EllipticalSliceSamplerKernelResults',
+        [
+            'log_likelihood',  # For "next_state".
+            'angle',  # Angle previous state was rotated by.
+            'normal_samples',  # Normal samples used to generate the next state.
+            'seed',  # The seed used by `one_step`.
+        ])):
+  """Internal state and diagnostics for Elliptical slice sampling."""
+  __slots__ = ()
 
 
 class EllipticalSliceSampler(kernel_base.TransitionKernel):
@@ -142,11 +147,12 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
         log_likelihood_fn=log_likelihood_fn,
         seed=1234)
 
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=int(3e5),
         current_state=dtype(1),
         kernel=kernel,
         num_burnin_steps=1000,
+        trace_fn=None,
         parallel_iterations=1)  # For determinism.
 
     sample_mean = tf.reduce_mean(samples, axis=0)
@@ -170,7 +176,6 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
   def __init__(self,
                normal_sampler_fn,
                log_likelihood_fn,
-               seed=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -181,7 +186,6 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
       log_likelihood_fn: Python callable which takes an argument like
         `current_state` (or `*current_state` if it is a list) and returns its
         (possibly unnormalized) log-likelihood.
-      seed: Python integer to seed the random number generator.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'slice_sampler_kernel').
 
@@ -192,12 +196,9 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
-    self._seed_stream = tfp_util.SeedStream(
-        seed, salt='elliptical_slice_sampler')
     self._parameters = dict(
         normal_sampler_fn=normal_sampler_fn,
         log_likelihood_fn=log_likelihood_fn,
-        seed=seed,
         name=name)
 
   @property
@@ -207,10 +208,6 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
   @property
   def log_likelihood_fn(self):
     return self._parameters['log_likelihood_fn']
-
-  @property
-  def seed(self):
-    return self._parameters['seed']
 
   @property
   def name(self):
@@ -225,7 +222,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Runs one iteration of the Elliptical Slice Sampler.
 
     Args:
@@ -236,6 +233,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
+      seed: Optional seed, for reproducible sampling.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)
@@ -247,12 +245,9 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
     Raises:
       TypeError: if `not log_likelihood.dtype.is_floating`.
     """
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(self.name, 'elliptical_slice', 'one_step'),
-        values=[self._seed_stream,
-                current_state,
-                previous_kernel_results.log_likelihood]):
-      with tf.compat.v1.name_scope('initialize'):
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'elliptical_slice', 'one_step')):
+      with tf.name_scope('initialize'):
         [
             init_state_parts,
             init_log_likelihood
@@ -261,22 +256,25 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
             current_state,
             previous_kernel_results.log_likelihood)
 
-      normal_samples = self.normal_sampler_fn(self._seed_stream())  # pylint: disable=not-callable
+      seed = samplers.sanitize_seed(seed)  # Unsalted, for kernel results.
+      normal_seed, u_seed, angle_seed, loop_seed = samplers.split_seed(
+          seed, n=4, salt='elliptical_slice_sampler')
+      normal_samples = self.normal_sampler_fn(normal_seed)  # pylint: disable=not-callable
       normal_samples = list(normal_samples) if mcmc_util.is_list_like(
           normal_samples) else [normal_samples]
-      u = tf.random.uniform(
+      u = samplers.uniform(
           shape=tf.shape(init_log_likelihood),
-          seed=self._seed_stream(),
+          seed=u_seed,
           dtype=init_log_likelihood.dtype.base_dtype,
       )
       threshold = init_log_likelihood + tf.math.log(u)
 
-      starting_angle = tf.random.uniform(
+      starting_angle = samplers.uniform(
           shape=tf.shape(init_log_likelihood),
           minval=0.,
           maxval=2 * np.pi,
           name='angle',
-          seed=self._seed_stream(),
+          seed=angle_seed,
           dtype=init_log_likelihood.dtype.base_dtype,
       )
       starting_angle_min = starting_angle - 2 * np.pi
@@ -287,37 +285,40 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
       starting_log_likelihood = self.log_likelihood_fn(*starting_state_parts)  # pylint: disable=not-callable
 
       def chain_not_done(
+          seed,
           angle,
           angle_min,
           angle_max,
           current_state_parts,
           current_log_likelihood):
-        del angle, angle_min, angle_max, current_state_parts
+        del seed, angle, angle_min, angle_max, current_state_parts
         return tf.reduce_any(current_log_likelihood < threshold)
 
       def sample_next_angle(
+          seed,
           angle,
           angle_min,
           angle_max,
           current_state_parts,
           current_log_likelihood):
         """Slice sample a new angle, and rotate init_state by that amount."""
+        angle_seed, next_seed = samplers.split_seed(seed)
         chain_not_done = current_log_likelihood < threshold
         # Box in on angle. Only update angles for which we haven't generated a
         # point that beats the threshold.
         angle_min = tf.where(
-            tf.math.logical_and(angle < 0, chain_not_done),
+            (angle < 0) & chain_not_done,
             angle,
             angle_min)
         angle_max = tf.where(
-            tf.math.logical_and(angle >= 0, chain_not_done),
+            (angle >= 0) & chain_not_done,
             angle,
             angle_max)
-        new_angle = tf.random.uniform(
+        new_angle = samplers.uniform(
             shape=tf.shape(current_log_likelihood),
             minval=angle_min,
             maxval=angle_max,
-            seed=self._seed_stream(),
+            seed=angle_seed,
             dtype=angle.dtype.base_dtype
         )
         angle = tf.where(chain_not_done, new_angle, angle)
@@ -333,6 +334,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
           new_state_parts.append(new_state_part)
 
         return (
+            next_seed,
             angle,
             angle_min,
             angle_max,
@@ -341,6 +343,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
         )
 
       [
+          _,
           next_angle,
           _,
           _,
@@ -350,6 +353,7 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
           cond=chain_not_done,
           body=sample_next_angle,
           loop_vars=[
+              loop_seed,
               starting_angle,
               starting_angle_min,
               starting_angle_max,
@@ -364,14 +368,13 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
               log_likelihood=next_log_likelihood,
               angle=next_angle,
               normal_samples=normal_samples,
+              seed=seed,
           ),
       ]
 
   def bootstrap_results(self, init_state):
-    with tf.compat.v1.name_scope(
-        name=mcmc_util.make_name(
-            self.name, 'elliptical_slice', 'bootstrap_results'),
-        values=[init_state]):
+    with tf.name_scope(mcmc_util.make_name(
+        self.name, 'elliptical_slice', 'bootstrap_results')):
       if not mcmc_util.is_list_like(init_state):
         init_state = [init_state]
       init_state = [tf.convert_to_tensor(x) for x in init_state]
@@ -379,7 +382,8 @@ class EllipticalSliceSampler(kernel_base.TransitionKernel):
       return EllipticalSliceSamplerKernelResults(
           log_likelihood=init_log_likelihood,
           angle=tf.zeros_like(init_log_likelihood),
-          normal_samples=[tf.zeros_like(x) for x in init_state]
+          normal_samples=[tf.zeros_like(x) for x in init_state],
+          seed=samplers.zeros_seed(),
       )
 
 

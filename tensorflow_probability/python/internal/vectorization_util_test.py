@@ -18,17 +18,60 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
 from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import vectorization_util
 
 
 @test_util.test_all_tf_execution_regimes
 class VectorizationTest(test_util.TestCase):
+
+  def test_iid_sample_stateful(self):
+
+    # Random fn using stateful samplers.
+    def fn(key1, key2, seed=None):
+      return [tfd.Normal(0., 1.).sample([3, 2], seed=seed),
+              {key1: tfd.Poisson([1., 2., 3., 4.]).sample(seed=seed + 1),
+               key2: tfd.LogNormal(0., 1.).sample(seed=seed + 2)}]
+    sample = self.evaluate(
+        fn('a', key2='b', seed=test_util.test_seed(sampler_type='stateful')))
+
+    sample_shape = [6, 1]
+    iid_fn = vectorization_util.iid_sample(fn, sample_shape=sample_shape)
+    iid_sample = self.evaluate(iid_fn('a', key2='b', seed=42))
+
+    # Check that we did not get repeated samples.
+    first_sampled_vector = iid_sample[0].flatten()
+    self.assertAllGreater(
+        (first_sampled_vector[1:] - first_sampled_vector[0])**2, 1e-6)
+
+    expected_iid_shapes = tf.nest.map_structure(
+        lambda x: np.concatenate([sample_shape, x.shape], axis=0), sample)
+    iid_shapes = tf.nest.map_structure(lambda x: x.shape, iid_sample)
+    self.assertAllEqualNested(expected_iid_shapes, iid_shapes)
+
+  def test_iid_sample_stateless(self):
+
+    sample_shape = [6]
+    iid_fn = vectorization_util.iid_sample(
+        tf.random.stateless_normal, sample_shape=sample_shape)
+
+    warnings.simplefilter('always')
+    with warnings.catch_warnings(record=True) as triggered:
+      samples = iid_fn([], seed=test_util.test_seed(sampler_type='stateless'))
+      self.assertTrue(
+          any('may be quite slow' in str(warning.message)
+              for warning in triggered))
+
+    # Check that we did not get repeated samples.
+    samples_ = self.evaluate(samples)
+    self.assertAllGreater((samples_[1:] - samples_[0])**2, 1e-6)
 
   def test_docstring_example(self):
     add = lambda a, b: a + b

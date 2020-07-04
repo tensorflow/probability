@@ -138,14 +138,14 @@ class DirichletTest(test_util.TestCase):
     alpha = [[1., 2], [2., 3]]
     x = [[.5, .5]]
     pdf = tfd.Dirichlet(alpha).prob(x)
-    self.assertAllClose([1., 3. / 2], self.evaluate(pdf))
+    self.assertAllClose([1., 3. / 2], self.evaluate(pdf), rtol=1e-5)
     self.assertAllEqual([2], pdf.shape)
 
   def testPdfXStretchedInBroadcastWhenLowerRank(self):
     alpha = [[1., 2], [2., 3]]
     x = [.5, .5]
     pdf = tfd.Dirichlet(alpha).prob(x)
-    self.assertAllClose([1., 3. / 2], self.evaluate(pdf))
+    self.assertAllClose([1., 3. / 2], self.evaluate(pdf), rtol=1e-5)
     self.assertAllEqual([2], pdf.shape)
 
   def testMean(self):
@@ -248,12 +248,14 @@ class DirichletTest(test_util.TestCase):
             sp_stats.beta(a=1., b=2.).cdf)[0],
         0.01)
 
+  @test_util.numpy_disable_gradient_test
   def testDirichletFullyReparameterized(self):
     alpha = tf.constant([1.0, 2.0, 3.0])
     _, grad_alpha = tfp.math.value_and_gradient(
         lambda a: tfd.Dirichlet(a).sample(  # pylint: disable=g-long-lambda
             100, seed=test_util.test_seed()), alpha)
     self.assertIsNotNone(grad_alpha)
+    self.assertNotAllZero(grad_alpha)
 
   def testDirichletDirichletKL(self):
     conc1 = np.array([[1., 2., 3., 1.5, 2.5, 3.5],

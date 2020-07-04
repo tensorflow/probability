@@ -36,6 +36,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "benchmarks_test",
     size = "medium",
@@ -63,6 +64,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "gibbs_sampler_test",
     size = "medium",

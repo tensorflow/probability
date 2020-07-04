@@ -29,8 +29,6 @@ from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import SparseLinearRegression
 from tensorflow_probability.python.sts import Sum
 
-from tensorflow.python.platform import test
-
 tfl = tf.linalg
 
 
@@ -119,7 +117,8 @@ class _LinearRegressionTest(test_util.TestCase):
     # Build a model with scalar Exponential(1.) prior.
     linear_regression = LinearRegression(
         design_matrix=design_matrix,
-        weights_prior=tfd.Exponential(rate=self._build_placeholder(1.)))
+        weights_prior=tfd.Exponential(
+            rate=self._build_placeholder(np.ones(batch_shape))))
 
     # Check that the prior is broadcast to match the shape of the weights.
     weights = linear_regression.parameters[0]
@@ -233,4 +232,4 @@ del _LinearRegressionTest  # Don't try to run base class tests.
 del _SparseLinearRegressionTest  # Don't try to run base class tests.
 
 if __name__ == "__main__":
-  test.main()
+  tf.test.main()

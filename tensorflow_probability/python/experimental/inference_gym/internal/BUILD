@@ -24,6 +24,7 @@ load(
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
+        "//tools/inference_gym_ground_truth:__subpackages__",
     ],
 )
 
@@ -35,7 +36,26 @@ multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     deps = [
+        ":array_to_source",
         ":data",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "array_to_source",
+    srcs = ["array_to_source.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "array_to_source_test",
+    srcs = ["array_to_source_test.py"],
+    deps = [
+        ":array_to_source",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -45,6 +65,7 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal/datasets",
     ],
 )
 
@@ -61,6 +82,26 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "ground_truth_encoding",
+    srcs = ["ground_truth_encoding.py"],
+    deps = [
+        ":array_to_source",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "ground_truth_encoding_test",
+    srcs = ["ground_truth_encoding_test.py"],
+    deps = [
+        ":ground_truth_encoding",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "test_util",
     testonly = True,
     srcs = ["test_util.py"],
@@ -68,6 +109,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

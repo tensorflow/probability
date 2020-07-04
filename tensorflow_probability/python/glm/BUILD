@@ -52,6 +52,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "fisher_scoring_test",
     size = "small",
@@ -77,6 +78,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "proximal_hessian_test",
     size = "medium",
@@ -103,6 +105,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "family_test",
     size = "small",

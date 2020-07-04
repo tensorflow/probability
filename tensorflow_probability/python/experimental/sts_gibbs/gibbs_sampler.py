@@ -71,7 +71,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import sts
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
@@ -87,6 +86,15 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 # is currently enforced by construction in `build_gibbs_fittable_model`.
 GibbsSamplerState = collections.namedtuple('GibbsSamplerState', [
     'observation_noise_scale', 'level_scale', 'weights', 'level', 'seed'])
+
+
+# TODO(b/151571025): revert to `tfd.InverseGamma` once its sampler is XLA-able.
+class XLACompilableInverseGamma(tfd.InverseGamma):
+
+  def _sample_n(self, n, seed=None):
+    return 1. / tfd.Gamma(
+        concentration=self.concentration,
+        rate=self.scale).sample(n, seed=seed)
 
 
 def build_model_for_gibbs_fitting(observed_time_series,
@@ -168,7 +176,6 @@ def fit_with_gibbs_sampling(model,
                             observed_time_series,
                             num_results=2000,
                             num_warmup_steps=200,
-                            compile_steps_with_xla=False,
                             initial_state=None,
                             seed=None):
   """Fits parameters for an STS model using Gibbs sampling."""
@@ -201,20 +208,16 @@ def fit_with_gibbs_sampling(model,
         level=tf.zeros_like(observed_time_series),
         seed=None)  # Set below.
 
-  if seed and isinstance(seed, six.integer_types):
+  if isinstance(seed, six.integer_types):
     tf.random.set_seed(seed)
 
   # Always use the passed-in `seed` arg, ignoring any seed in the initial state.
-  seeded_state = initial_state._asdict()
-  seeded_state['seed'] = samplers.sanitize_seed(
-      seed, salt='initial_GibbsSamplerState')
-  initial_state = GibbsSamplerState(**seeded_state)
+  initial_state = initial_state._replace(
+      seed=samplers.sanitize_seed(seed, salt='initial_GibbsSamplerState'))
 
-  sampler_loop_body = _build_sampler_loop_body(
-      model, observed_time_series, is_missing,
-      compile_steps_with_xla=compile_steps_with_xla,
-      seed=seed)  # This is still an `int` seed, because the InverseGamma
-                  # sampler currently requires stateful semantics.
+  sampler_loop_body = _build_sampler_loop_body(model,
+                                               observed_time_series,
+                                               is_missing)
 
   samples = tf.scan(sampler_loop_body,
                     np.arange(num_warmup_steps + num_results),
@@ -379,67 +382,59 @@ def _resample_weights(design_matrix, target_residuals, observation_noise_scale,
   return weights_mean + sampled_weights
 
 
-# `resample_level` requires an explicit builder function because the compiled
-# code can only accept `Tensor` arguments, but we need to pass in the
-# initial state prior which is a tfd.Distribution.
-def _build_resample_level_fn(initial_state_prior,
-                             is_missing=None,
-                             compile_with_xla=False):
-  """Builds a method to sample the latent level from its Gibbs posterior."""
+def _resample_level(observed_residuals,
+                    level_scale,
+                    observation_noise_scale,
+                    initial_state_prior,
+                    is_missing=None,
+                    sample_shape=(),
+                    seed=None):
+  """Uses Durbin-Koopman sampling to resample the latent level.
 
-  @tf.function(autograph=False, experimental_compile=compile_with_xla)
-  def resample_level(observed_residuals,
-                     level_scale,
-                     observation_noise_scale,
-                     sample_shape=(),
-                     seed=None):
-    """Uses Durbin-Koopman sampling to resample the latent level.
+  Durbin-Koopman sampling [1] is an efficient algorithm to sample from the
+  posterior latents of a linear Gaussian state space model. This method
+  implements the algorithm, specialized to the case of a one-dimensional
+  latent local level model.
 
-    Durbin-Koopman sampling [1] is an efficient algorithm to sample from the
-    posterior latents of a linear Gaussian state space model. This method
-    implements the algorithm, specialized to the case of a one-dimensional
-    latent local level model.
+  [1] Durbin, J. and Koopman, S.J. (2002) A simple and efficient simulation
+      smoother for state space time series analysis.
 
-    [1] Durbin, J. and Koopman, S.J. (2002) A simple and efficient simulation
-        smoother for state space time series analysis.
+  Args:
+    observed_residuals: Float `Tensor` of shape `[..., num_observations]`,
+      specifying the centered observations `(x - loc)`.
+    level_scale: Float scalar `Tensor` (may contain batch dimensions)
+      specifying the standard deviation of the level random walk steps.
+    observation_noise_scale: Float scalar `Tensor` (may contain batch
+      dimensions) specifying the standard deviation of the observation noise.
+    initial_state_prior: instance of `tfd.MultivariateNormalLinearOperator`.
+    is_missing: Optional `bool` `Tensor` missingness mask.
+    sample_shape: Optional `int` `Tensor` shape of samples to draw.
+    seed: `int` `Tensor` of shape `[2]` controlling stateless sampling.
+  Returns:
+    level: Float `Tensor` resampled latent level, of shape
+      `[..., num_timesteps]`, where `...` concatenates the sample shape
+      with any batch shape from `observed_time_series`.
+  """
 
-    Args:
-      observed_residuals: Float `Tensor` of shape `[..., num_observations]`,
-        specifying the centered observations `(x - loc)`.
-      level_scale: Float scalar `Tensor` (may contain batch dimensions)
-        specifying the standard deviation of the level random walk steps.
-      observation_noise_scale: Float scalar `Tensor` (may contain batch
-        dimensions) specifying the standard deviation of the observation noise.
-      sample_shape: Optional `int` `Tensor` shape of samples to draw.
-      seed: `int` `Tensor` of shape `[2]` controlling stateless sampling.
-    Returns:
-      level: Float `Tensor` resampled latent level, of shape
-        `[..., num_timesteps]`, where `...` concatenates the sample shape
-        with any batch shape from `observed_time_series`.
-    """
-
-    num_timesteps = prefer_static.shape(observed_residuals)[-1]
-    ssm = sts.LocalLevelStateSpaceModel(
-        num_timesteps=num_timesteps,
-        initial_state_prior=initial_state_prior,
-        observation_noise_scale=observation_noise_scale,
-        level_scale=level_scale)
-    return ssm.posterior_sample(observed_residuals[..., tf.newaxis],
-                                sample_shape=sample_shape,
-                                mask=is_missing,
-                                seed=seed)[..., 0]
-
-  return resample_level
+  num_timesteps = prefer_static.shape(observed_residuals)[-1]
+  ssm = sts.LocalLevelStateSpaceModel(
+      num_timesteps=num_timesteps,
+      initial_state_prior=initial_state_prior,
+      observation_noise_scale=observation_noise_scale,
+      level_scale=level_scale)
+  return ssm.posterior_sample(observed_residuals[..., tf.newaxis],
+                              sample_shape=sample_shape,
+                              mask=is_missing,
+                              seed=seed)[..., 0]
 
 
-def _resample_scale(prior_concentration, prior_scale,
-                    observed_residuals, is_missing=None, seed=None):
+def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
   """Samples a scale parameter from its conditional posterior.
 
   We assume the conjugate InverseGamma->Normal model:
 
   ```
-  scale ~ Sqrt(InverseGamma(prior_concentration, prior_scale))
+  scale ~ Sqrt(InverseGamma(prior.concentration, prior.scale))
   for i in [1, ..., num_observations]:
     x[i] ~ Normal(loc, scale)
   ```
@@ -447,10 +442,7 @@ def _resample_scale(prior_concentration, prior_scale,
   in which `loc` is known, and return a sample from `p(scale | x)`.
 
   Args:
-    prior_concentration: Float `Tensor` concentration parameter of the
-      InverseGamma prior distribution.
-    prior_scale: Float `Tensor` scale parameter of the InverseGamma prior
-      distribution.
+    prior: Prior distribution as a `tfd.InverseGamma` instance.
     observed_residuals: Float `Tensor` of shape `[..., num_observations]`,
       specifying the centered observations `(x - loc)`.
     is_missing: Optional `bool` `Tensor` of shape `[..., num_observations]`. A
@@ -469,18 +461,16 @@ def _resample_scale(prior_concentration, prior_scale,
                                   observed_residuals)
     num_observations -= num_missing
 
-  variance_posterior = tfd.InverseGamma(
-      concentration=prior_concentration + num_observations / 2.,
-      scale=prior_scale + tf.reduce_sum(
+  variance_posterior = type(prior)(
+      concentration=prior.concentration + num_observations / 2.,
+      scale=prior.scale + tf.reduce_sum(
           tf.square(observed_residuals), axis=-1) / 2.)
   return tf.sqrt(variance_posterior.sample(seed=seed))
 
 
 def _build_sampler_loop_body(model,
                              observed_time_series,
-                             is_missing=None,
-                             compile_steps_with_xla=False,
-                             seed=None):
+                             is_missing=None):
   """Builds a Gibbs sampler for the given model and observed data.
 
   Args:
@@ -490,9 +480,6 @@ def _build_sampler_loop_body(model,
       `[..., num_timesteps]`.
     is_missing: Optional `bool` `Tensor` of shape `[..., num_timesteps]`. A
       `True` value indicates that the observation for that timestep is missing.
-    compile_steps_with_xla: Optional Python `bool`. If `True`, XLA compilation
-      is used to accelerate sampling steps when supported.
-    seed: Optional `Python` `int` seed controlling the sampled values.
   Returns:
     sampler_loop_body: Python callable that performs a single cycle of Gibbs
       sampling. Its first argument is a `GibbsSamplerState`, and it returns a
@@ -523,44 +510,19 @@ def _build_sampler_loop_body(model,
   num_observed_steps = prefer_static.shape(observed_time_series)[-1]
   design_matrix = _get_design_matrix(model).to_dense()[:num_observed_steps]
 
-  # Compile the functions that sample from Gibbs conditional posteriors.
-  # In principle, we should XLA-compile the entire loop body or even the entire
-  # `fit_with_gibbs_sampling` loop. However, XLA can't currently compile the
-  # gamma sampling op inside `_resample_scale` (b/141253568), so for now we
-  # leave that method uncompiled but compile the other two sampling steps.
-  # Empirically, the vast majority of sampling time is spent in
-  # `resample_level`, so compiling it gives us most of the wins.
-  # TODO(davmre): Wrap the entire sampling loop in `tf.function` while still
-  #  XLA-compiling these pieces as appropriate.
-  # TODO(b/141253568): XLA-compile the entire sampling loop.
-  compiled_resample_level = _build_resample_level_fn(
-      initial_state_prior=level_component.initial_state_prior,
-      is_missing=is_missing,
-      compile_with_xla=compile_steps_with_xla)
-  compiled_resample_weights = tf.function(
-      _resample_weights, autograph=False,
-      experimental_compile=compile_steps_with_xla)
-  compiled_resample_scale = tf.function(
-      _resample_scale, autograph=False,
-      experimental_compile=False)
-
   # Untransform scale priors -> variance priors by reaching thru Sqrt bijector.
   level_scale_variance_prior = level_scale_param.prior.distribution
   observation_noise_variance_prior = observation_noise_param.prior.distribution
-
-  # InverseGamma samplers are currently stateful, so we only need (and want)
-  # a single seed for each, shared across loop iterations.
-  strm = tfp_util.SeedStream(seed, salt='_sampler_loop_body')
-  observation_noise_scale_seed = strm()
-  level_scale_seed = strm()
 
   def sampler_loop_body(previous_sample, _):
     """Runs one sampler iteration, resampling all model variables."""
 
     (weights_seed,
      level_seed,
+     observation_noise_scale_seed,
+     level_scale_seed,
      loop_seed) = samplers.split_seed(
-         previous_sample.seed, n=3, salt='sampler_loop_body')
+         previous_sample.seed, n=5, salt='sampler_loop_body')
 
     # We encourage a reasonable initialization by sampling the weights first,
     # so at the first step they are regressed directly against the observed
@@ -569,7 +531,7 @@ def _build_sampler_loop_body(model,
     # the regression weights, because the level can represent arbitrary
     # variation, while the weights are limited to representing variation in the
     # subspace given by the design matrix.
-    weights = compiled_resample_weights(
+    weights = _resample_weights(
         design_matrix=design_matrix,
         target_residuals=(observed_time_series - previous_sample.level),
         observation_noise_scale=previous_sample.observation_noise_scale,
@@ -579,22 +541,22 @@ def _build_sampler_loop_body(model,
 
     regression_residuals = observed_time_series - tf.linalg.matvec(
         design_matrix, weights)
-    level = compiled_resample_level(
+    level = _resample_level(
         observed_residuals=regression_residuals,
         level_scale=previous_sample.level_scale,
         observation_noise_scale=previous_sample.observation_noise_scale,
+        initial_state_prior=level_component.initial_state_prior,
+        is_missing=is_missing,
         seed=level_seed)
 
     # Estimate level scale from the empirical changes in level.
-    level_scale = compiled_resample_scale(
-        prior_scale=level_scale_variance_prior.scale,
-        prior_concentration=level_scale_variance_prior.concentration,
+    level_scale = _resample_scale(
+        prior=level_scale_variance_prior,
         observed_residuals=level[..., 1:] - level[..., :-1],
         is_missing=None, seed=level_scale_seed)
     # Estimate noise scale from the residuals.
-    observation_noise_scale = compiled_resample_scale(
-        prior_scale=observation_noise_variance_prior.scale,
-        prior_concentration=observation_noise_variance_prior.concentration,
+    observation_noise_scale = _resample_scale(
+        prior=observation_noise_variance_prior,
         observed_residuals=regression_residuals - level,
         is_missing=is_missing, seed=observation_noise_scale_seed)
 

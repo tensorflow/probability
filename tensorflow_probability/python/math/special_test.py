@@ -18,14 +18,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 from absl.testing import parameterized
 import numpy as np
+from scipy import constants as scipy_constants
 from scipy import special as scipy_special
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.special import _compute_general_continued_fraction
 
 
 def _w0(z):
@@ -38,6 +42,243 @@ def _w0(z):
 
   # This is a complex valued return value.
   return scipy_special.lambertw(z, k=0)
+
+
+class RoundExponentialBumpFunctionTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testValueOnSupportInterior(self, dtype):
+    # round_exponential_bump_function(x) = 0 for x right at the edge of the
+    # support, e.g. x = -0.999.  This is expected, due to the exponential and
+    # division.
+    x = tf.convert_to_tensor([
+        -0.9925,
+        -0.5,
+        0.,
+        0.5,
+        0.9925
+    ], dtype=dtype)
+    y = tfp_math.round_exponential_bump_function(x)
+
+    self.assertDTypeEqual(y, dtype)
+
+    y_ = self.evaluate(y)
+
+    self.assertAllFinite(y_)
+
+    # round_exponential_bump_function(0) = 1.
+    self.assertAllClose(1., y_[2])
+
+    # round_exponential_bump_function(x) > 0 for |x| < 1.
+    self.assertAllGreater(y_, 0)
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testGradientOnSupportInterior(self, dtype):
+    # round_exponential_bump_function(x) = 0 for x right at the edge of the
+    # support, e.g. x = -0.999.  This is expected, due to the exponential and
+    # division.
+    x = tf.convert_to_tensor([
+        -0.9925,
+        -0.5,
+        0.,
+        0.5,
+        0.9925
+    ], dtype=dtype)
+
+    _, dy_dx = tfp_math.value_and_gradient(
+        tfp_math.round_exponential_bump_function, x)
+
+    self.assertDTypeEqual(dy_dx, dtype)
+
+    dy_dx_ = self.evaluate(dy_dx)
+
+    # grad[round_exponential_bump_function](0) = 0
+    self.assertEqual(0., dy_dx_[2])
+    self.assertAllFinite(dy_dx_)
+
+    # Increasing on (-1, 0), decreasing on (0, 1).
+    self.assertAllGreater(dy_dx_[:2], 0)
+    self.assertAllLess(dy_dx_[-2:], 0)
+
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testValueOutsideAndOnEdgeOfSupport(self, dtype):
+    finfo = np.finfo(dtype)
+    x = tf.convert_to_tensor([
+        # Sqrt(finfo.max)**2 = finfo.max < Inf, so
+        # round_exponential_bump_function == 0 here.
+        -np.sqrt(finfo.max),
+        # -2 is just outside the support, so round_exponential_bump_function
+        # should == 0.
+        -2.,
+        # -1 is on boundary of support, so round_exponential_bump_function
+        # should == 0.
+        # The gradient should also equal 0.
+        -1.,
+        1.,
+        2.0,
+        np.sqrt(finfo.max),
+    ],
+                             dtype=dtype)
+    y = tfp_math.round_exponential_bump_function(x)
+
+    self.assertDTypeEqual(y, dtype)
+
+    y_ = self.evaluate(y)
+
+    # We hard-set y to 0 outside support.
+    self.assertAllFinite(y_)
+    self.assertAllEqual(y_, np.zeros((6,)))
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      ("float32", np.float32),
+      ("float64", np.float64),
+  )
+  def testGradientOutsideAndOnEdgeOfSupport(self, dtype):
+    finfo = np.finfo(dtype)
+    x = tf.convert_to_tensor([
+        # Sqrt(finfo.max)**2 = finfo.max < Inf, so
+        # round_exponential_bump_function == 0 here.
+        -np.sqrt(finfo.max),
+        # -2 is just outside the support, so round_exponential_bump_function
+        # should == 0.
+        -2.,
+        # -1 is on boundary of support, so round_exponential_bump_function
+        # should == 0.
+        # The gradient should also equal 0.
+        -1.,
+        1.,
+        2.0,
+        np.sqrt(finfo.max),
+    ],
+                             dtype=dtype)
+    _, dy_dx = tfp_math.value_and_gradient(
+        tfp_math.round_exponential_bump_function, x)
+
+    self.assertDTypeEqual(dy_dx, dtype)
+
+    dy_dx_ = self.evaluate(dy_dx)
+
+    # Since x is outside the support, the gradient is zero.
+    self.assertAllEqual(dy_dx_, np.zeros((6,)))
+
+
+class BesselTest(test_util.TestCase):
+
+  def testContinuedFraction(self):
+    # Check that the simplest continued fraction returns the golden ratio.
+    self.assertAllClose(
+        self.evaluate(
+            _compute_general_continued_fraction(
+                100, [], partial_numerator_fn=lambda _: 1.)),
+        scipy_constants.golden - 1.)
+
+    # Check the continued fraction constant is returned.
+    cf_constant_denominators = scipy_special.i1(2.) / scipy_special.i0(2.)
+
+    self.assertAllClose(
+        self.evaluate(
+            _compute_general_continued_fraction(
+                100,
+                [],
+                partial_denominator_fn=lambda i: i,
+                tolerance=1e-5)),
+        cf_constant_denominators, rtol=1e-5)
+
+    cf_constant_numerators = np.sqrt(2 / (np.e * np.pi)) / (
+        scipy_special.erfc(np.sqrt(0.5))) - 1.
+
+    # Check that we can specify dtype and tolerance.
+    self.assertAllClose(
+        self.evaluate(
+            _compute_general_continued_fraction(
+                100, [], partial_numerator_fn=lambda i: i,
+                tolerance=1e-5,
+                dtype=tf.float64)),
+        cf_constant_numerators, rtol=1e-5)
+
+  def VerifyBesselIvRatio(self, v, z, rtol):
+    bessel_iv_ratio, v, z = self.evaluate([
+        tfp.math.bessel_iv_ratio(v, z), v, z])
+    # Use ive to avoid nans.
+    scipy_ratio = scipy_special.ive(v, z) / scipy_special.ive(v - 1., z)
+    self.assertAllClose(bessel_iv_ratio, scipy_ratio, rtol=rtol)
+
+  def testBesselIvRatioVAndZSmall(self):
+    seed_stream = test_util.test_seed_stream()
+    z = tf.random.uniform([int(1e5)], seed=seed_stream())
+    v = tf.random.uniform([int(1e5)], seed=seed_stream())
+    # When both values are small, both the scipy ratio and
+    # the computation become numerically unstable.
+    # Anecdotally (when comparing to mpmath) the computation is more often
+    # 'right' compared to the naive ratio.
+    self.VerifyBesselIvRatio(v, z, rtol=2e-4)
+
+  def testBesselIvRatioVAndZMedium(self):
+    seed_stream = test_util.test_seed_stream()
+    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    self.VerifyBesselIvRatio(v, z, rtol=1e-6)
+
+  def testBesselIvRatioVAndZLarge(self):
+    seed_stream = test_util.test_seed_stream()
+    # Use 50 as a cap. It's been observed that for v > 50, that
+    # the scipy ratio can be quite wrong compared to mpmath.
+    z = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream())
+    v = tf.random.uniform([int(1e5)], 10., 50., seed=seed_stream())
+
+    # For large v, z, scipy can return NaN values. Filter those out.
+    bessel_iv_ratio, v, z = self.evaluate([
+        tfp.math.bessel_iv_ratio(v, z), v, z])
+    # Use ive to avoid nans.
+    scipy_ratio = scipy_special.ive(v, z) / scipy_special.ive(v - 1., z)
+    # Exclude zeros and NaN's from scipy. This can happen because the
+    # individual function computations may zero out, and thus cause issues
+    # in the ratio.
+    safe_scipy_values = np.where(
+        ~np.isnan(scipy_ratio) & (scipy_ratio != 0.))
+
+    self.assertAllClose(
+        bessel_iv_ratio[safe_scipy_values],
+        scipy_ratio[safe_scipy_values],
+        # We need to set a high rtol as the scipy computation is numerically
+        # unstable.
+        rtol=1e-5)
+
+  def testBesselIvRatioVLessThanZ(self):
+    seed_stream = test_util.test_seed_stream()
+    z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    # Make v randomly less than z
+    v = z * tf.random.uniform([int(1e5)], 0.1, 0.5, seed=seed_stream())
+    self.VerifyBesselIvRatio(v, z, rtol=1e-6)
+
+  def testBesselIvRatioVGreaterThanZ(self):
+    seed_stream = test_util.test_seed_stream()
+    v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
+    # Make z randomly less than v
+    z = v * tf.random.uniform([int(1e5)], 0.1, 0.5, seed=seed_stream())
+    self.VerifyBesselIvRatio(v, z, rtol=1e-6)
+
+  @test_util.numpy_disable_gradient_test
+  @test_util.jax_disable_test_missing_functionality(
+      "Relies on Tensorflow gradient_checker")
+  def testBesselIvRatioGradient(self):
+    v = tf.constant([0.5, 1., 10., 20.])[..., tf.newaxis]
+    x = tf.constant([0.1, 0.5, 0.9, 1., 12., 14., 22.])
+
+    err = self.compute_max_gradient_error(
+        functools.partial(tfp_math.bessel_iv_ratio, v), [x])
+    self.assertLess(err, 2e-4)
 
 
 class SpecialTest(test_util.TestCase):
@@ -126,8 +367,11 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(naive_64, sophisticated_64, atol=1e-6, rtol=4e-4)
     # Check that we don't lose accuracy in single precision, at least relative
     # to ourselves.
-    self.assertAllClose(sophisticated, sophisticated_64, atol=1e-8, rtol=1e-6)
+    atol = 1e-8
+    rtol = 1e-6
+    self.assertAllClose(sophisticated, sophisticated_64, atol=atol, rtol=rtol)
 
+  @test_util.numpy_disable_gradient_test
   def testLogGammaDifferenceGradient(self):
     def simple_difference(x, y):
       return tf.math.lgamma(y) - tf.math.lgamma(x + y)
@@ -144,6 +388,7 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(gx, simple_gx)
     self.assertAllClose(gy, simple_gy)
 
+  @test_util.numpy_disable_gradient_test
   def testLogGammaDifferenceGradientBroadcasting(self):
     def simple_difference(x, y):
       return tf.math.lgamma(y) - tf.math.lgamma(x + y)
@@ -169,11 +414,13 @@ class SpecialTest(test_util.TestCase):
     #   by DiDonato and Morris 1988
     # - Could be that tf.math.lgamma is less accurate than scipy
     # - Could be that scipy evaluates in 64 bits internally
+    atol = 1e-7
     rtol = 1e-5
     self.assertAllClose(
         scipy_special.betaln(x, y), tfp_math.lbeta(x, y),
-        atol=1e-7, rtol=rtol)
+        atol=atol, rtol=rtol)
 
+  @test_util.numpy_disable_gradient_test
   def testLogBetaGradient(self):
     def simple_lbeta(x, y):
       return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
@@ -188,6 +435,7 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(gx, simple_gx)
     self.assertAllClose(gy, simple_gy)
 
+  @test_util.numpy_disable_gradient_test
   def testLogBetaGradientBroadcasting(self):
     def simple_lbeta(x, y):
       return tf.math.lgamma(x) + tf.math.lgamma(y) - tf.math.lgamma(x + y)
@@ -207,6 +455,7 @@ class SpecialTest(test_util.TestCase):
     y = tf.constant([3., 4.], dtype=dtype)
     result = tfp_math.lbeta(x, y)
     self.assertEqual(result.dtype, dtype)
+
 
 if __name__ == "__main__":
   tf.test.main()

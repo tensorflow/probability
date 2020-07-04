@@ -38,12 +38,12 @@ from __future__ import print_function
 
 import collections
 import functools
+import typing
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 import numpy as np
 
 from discussion.fun_mcmc import backend
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Text, Tuple, Union
 
 tf = backend.tf
 tfp = backend.tfp
@@ -92,6 +92,7 @@ __all__ = [
     'random_walk_metropolis_init',
     'RandomWalkMetropolisExtra',
     'RandomWalkMetropolisState',
+    'recover_state_from_args',
     'reparameterize_potential_fn',
     'running_approximate_auto_covariance_init',
     'running_approximate_auto_covariance_step',
@@ -155,6 +156,7 @@ def trace(
     num_steps: 'IntTensor',
     trace_fn: 'Callable[[State, TensorNest], TensorNest]' = _trace_extra,
     trace_mask: 'BooleanNest' = True,
+    unroll: 'bool' = False,
     parallel_iterations: 'int' = 10,
 ) -> 'Tuple[State, TensorNest]':
   """`TransitionOperator` that runs `fn` repeatedly and traces its outputs.
@@ -175,6 +177,9 @@ def trace(
       `trace_fn` where the mask leaf is `False`, those subtrees are merely
       propagated, and their corresponding subtrees in `traces` correspond to
       their final value.
+    unroll: Whether to unroll the loop. This can occasionally lead to improved
+      performance at the cost of increasing the XLA optimization time. Only
+      works if `num_steps` is statically known.
     parallel_iterations: Number of iterations of the while loop to run in
       parallel.
 
@@ -254,6 +259,7 @@ def trace(
       state=state,
       fn=wrapper,
       num_steps=num_steps,
+      unroll=unroll,
       parallel_iterations=parallel_iterations,
   )
 
@@ -269,6 +275,16 @@ def _tree_repr(tree: 'Any') -> 'Text':
       return '.'
 
   return str(util.map_tree(lambda _: _LeafSentinel(), tree))
+
+
+def _is_namedtuple_like(x):
+  """Helper which returns `True` if input is `collections.namedtuple`-like."""
+  try:
+    for fn in getattr(x, '_fields'):
+      _ = getattr(x, fn)
+    return True
+  except AttributeError:
+    return False
 
 
 def call_fn(
@@ -288,11 +304,9 @@ def call_fn(
     ret: Return value of `fn`.
   """
   if isinstance(
-      args, collections.Sequence) and not mcmc_util.is_namedtuple_like(args):
-    args = args  # type: Tuple[Any]
+      args, collections.Sequence) and not _is_namedtuple_like(args):
     return fn(*args)
   elif isinstance(args, collections.Mapping):
-    args = args  # type: Mapping[str, Any]
     return fn(**args)
   else:
     return fn(args)
@@ -324,7 +338,7 @@ def recover_state_from_args(args: 'Sequence[Any]',
         state[k] = kwargs[k]
     return state
   elif (isinstance(state_structure, collections.Sequence) and
-        not mcmc_util.is_namedtuple_like(state_structure)):
+        not _is_namedtuple_like(state_structure)):
     # Sadly, we have no way of inferring the state index from kwargs, so we
     # disallow them.
     # TODO(siege): We could support length-1 sequences in principle.
@@ -1154,6 +1168,7 @@ def hamiltonian_monte_carlo(
     'TensorNest]' = lambda *args: (),
     log_uniform: 'FloatTensor' = None,
     integrator_fn=None,
+    unroll_integrator: 'bool' = False,
     seed=None,
 ) -> 'Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]':
   """Hamiltonian Monte Carlo `TransitionOperator`.
@@ -1209,6 +1224,9 @@ def hamiltonian_monte_carlo(
       [0, 1], used for the MH accept/reject step.
     integrator_fn: Integrator to use for the HMC dynamics. Uses a
       `hamiltonian_integrator` with `leapfrog_step` by default.
+    unroll_integrator: Whether to unroll the loop in the integrator. Only works
+      if `num_integrator_steps` is statically known. Ignored if
+      `integrator_fn` is specified.
     seed: For reproducibility.
 
   Returns:
@@ -1239,6 +1257,7 @@ def hamiltonian_monte_carlo(
             target_log_prob_fn=target_log_prob_fn,
             kinetic_energy_fn=kinetic_energy_fn),
         kinetic_energy_fn=kinetic_energy_fn,
+        unroll=unroll_integrator,
         integrator_trace_fn=integrator_trace_fn)
 
   if momentum is None:
@@ -1268,7 +1287,7 @@ def hamiltonian_monte_carlo(
       log_uniform=log_uniform,
       seed=seed)
 
-  hmc_state = hmc_state  # type: HamiltonianMonteCarloState
+  hmc_state = typing.cast(HamiltonianMonteCarloState, hmc_state)
   return hmc_state, HamiltonianMonteCarloExtra(
       is_accepted=mh_extra.is_accepted,
       proposed_hmc_state=proposed_state,
@@ -1293,6 +1312,7 @@ def hamiltonian_integrator(
     kinetic_energy_fn: 'PotentialFn',
     integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
     'TensorNest]' = lambda *args: (),
+    unroll: 'bool' = False,
 ) -> 'Tuple[IntegratorState, IntegratorExtras]':
   """Intergrates a discretized set of Hamiltonian equations.
 
@@ -1309,6 +1329,9 @@ def hamiltonian_integrator(
     integrator_step_fn: Instance of `IntegratorStep`.
     kinetic_energy_fn: Function to compute the kinetic energy from momentums.
     integrator_trace_fn: Trace function for the integrator.
+    unroll: Whether to unroll the loop in the integrator. Only works if
+      `num_integrator_steps` is statically known. Ignored if `integrator_fn` is
+      specified.
 
   Returns:
     integrator_state: `IntegratorState`
@@ -1367,7 +1390,9 @@ def hamiltonian_integrator(
       integrator_wrapper_state,
       integrator_wrapper,
       max_num_steps,
-      trace_fn=integrator_trace_wrapper_fn)
+      trace_fn=integrator_trace_wrapper_fn,
+      unroll=unroll,
+  )
 
   proposed_energy = (-integrator_step_extra.target_log_prob +
                      integrator_step_extra.kinetic_energy)
@@ -1661,7 +1686,7 @@ def random_walk_metropolis(
       is_accepted=mh_extra.is_accepted,
   )
 
-  rwm_state = rwm_state  # type: RandomWalkMetropolisState
+  rwm_state = typing.cast(RandomWalkMetropolisState, rwm_state)
   return rwm_state, rwm_extra
 
 
@@ -1683,7 +1708,10 @@ def running_variance_init(shape: 'IntTensor',
   return RunningVarianceState(
       num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
       mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
-      variance=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
+      # The initial value of variance is discarded upon the first update, but
+      # setting it to something reasonable (ones) is convenient in case the
+      # state is read before an update.
+      variance=util.map_tree_up_to(dtype, tf.ones, shape, dtype),
   )
 
 
@@ -1693,6 +1721,7 @@ def running_variance_step(
     axis: 'Union[int, List[int]]' = None,
     window_size: 'IntNest' = None,
 ) -> 'Tuple[RunningVarianceState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningVarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1707,6 +1736,8 @@ def running_variance_step(
   Note that this produces a biased estimate of variance, for simplicity. If the
   unbiased estimate is required, compute it as follows: `state.variance *
   state.num_points / (state.num_points - 1)`.
+
+  The algorithm is adapted from [1].
 
   Args:
     state: `RunningVarianceState`.
@@ -1724,41 +1755,35 @@ def running_variance_step(
   Returns:
     state: `RunningVarianceState`.
     extra: Empty tuple.
+
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
   """
 
   def _one_part(vec, mean, variance, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
-    # pyformat: disable
-    # These are derived by using the definition of variance for N and N + 1
-    # points, and then identifying the previous terms/simplifying.
+
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
-      new_variance = (
-          num_points_f * (num_points_f + additional_points_f) * variance +
-          num_points_f * tf.square(centered_vec)) / (
-              tf.square(num_points_f + additional_points_f))
+      vec_mean = vec
+      vec_variance = tf.zeros_like(variance)
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.cast(
-          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      new_variance = (
-          num_points_f * (num_points_f + additional_points_f) * variance +
-          num_points_f * tf.reduce_sum(tf.square(centered_vec), axis) -
-          tf.square(tf.reduce_sum(vec, axis)) + additional_points_f *
-          tf.reduce_sum(tf.square(vec), axis)) / (
-              tf.square(num_points_f + additional_points_f))
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    # pyformat: enable
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+      vec_variance = tf.math.reduce_variance(vec, axis)
+    mean_diff = vec_mean - mean
+    mean_diff_sq = tf.square(mean_diff)
+    variance_diff = vec_variance - variance
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
+    new_variance = (
+        variance + variance_diff * weight + weight *
+        (1. - weight) * mean_diff_sq)
     return new_mean, new_variance, num_points + additional_points
 
   new_mean_variance_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1796,16 +1821,15 @@ def running_covariance_init(shape: 'IntTensor',
       num_points=util.map_tree(lambda _: tf.zeros([], tf.int32), dtype),
       mean=util.map_tree_up_to(dtype, tf.zeros, shape, dtype),
       covariance=util.map_tree_up_to(
+          # The initial value of covariance is discarded upon the first update,
+          # but setting it to something reasonable (the identity matrix) is
+          # convenient in case the state is read before an update.
           dtype,
-          lambda shape, dtype: tf.zeros(  # pylint: disable=g-long-lambda
-              tf.concat(
-                  [
-                      tf.convert_to_tensor(shape),
-                      tf.convert_to_tensor(shape[-1:]),
-                  ],
-                  axis=0,
-              ),
-              dtype=dtype),
+          lambda shape, dtype: tf.eye(  # pylint: disable=g-long-lambda
+              shape[-1],
+              batch_shape=shape[:-1],
+              dtype=dtype,
+          ),
           shape,
           dtype),
   )
@@ -1817,6 +1841,7 @@ def running_covariance_step(
     axis: 'Union[int, List[int]]' = None,
     window_size: 'IntNest' = None,
 ) -> 'Tuple[RunningCovarianceState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningCovarianceState`.
 
   As a computational convenience, this allows computing both independent
@@ -1836,6 +1861,8 @@ def running_covariance_step(
   the unbiased estimate is required, compute it as follows: `state.covariance *
   state.num_points / (state.num_points - 1)`.
 
+  The algorithm is adapted from [1].
+
   Args:
     state: `RunningCovarianceState`.
     vec: A Tensor to incorporate into the variance estimate.
@@ -1852,46 +1879,35 @@ def running_covariance_step(
   Returns:
     state: `RunningCovarianceState`.
     extra: Empty tuple.
-  """
 
-  def _outer(x):
-    res = tf.einsum('...i,...j->...ij', x, x)
-    return res
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
+  """
 
   def _one_part(vec, mean, covariance, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
-
-    # pyformat: disable
-    # These are derived by using the definition of covariance for N and N + 1
-    # points, and then identifying the previous terms/simplifying.
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
-      new_covariance = (
-          num_points_f * (num_points_f + additional_points_f) * covariance +
-          num_points_f * _outer(centered_vec)) / (
-              tf.square(num_points_f + additional_points_f))
+      vec_mean = vec
+      vec_covariance = tf.zeros_like(covariance)
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.cast(
-          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      new_covariance = (
-          num_points_f * (num_points_f + additional_points_f) * covariance +
-          num_points_f * tf.reduce_sum(_outer(centered_vec), axis) -
-          _outer(tf.reduce_sum(vec, axis)) + additional_points_f *
-          tf.reduce_sum(_outer(vec), axis)) / (
-              tf.square(num_points_f + additional_points_f))
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    # pyformat: enable
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+      vec_covariance = tfp.stats.covariance(vec, sample_axis=axis)
+    mean_diff = vec_mean - mean
+    mean_diff_sq = (
+        mean_diff[..., :, tf.newaxis] * mean_diff[..., tf.newaxis, :])
+    covariance_diff = vec_covariance - covariance
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
+    new_covariance = (
+        covariance + covariance_diff * weight + weight *
+        (1. - weight) * mean_diff_sq)
     return new_mean, new_covariance, num_points + additional_points
 
   new_mean_covariance_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -1938,6 +1954,7 @@ def running_mean_step(
     axis: 'Union[int, List[int]]' = None,
     window_size: 'IntNest' = None,
 ) -> 'Tuple[RunningMeanState, Tuple[()]]':
+  # pylint: disable=line-too-long
   """Updates the `RunningMeanState`.
 
   As a computational convenience, this allows computing both independent
@@ -1947,6 +1964,8 @@ def running_mean_step(
   - vec shape: [3, 4], axis=0 -> mean shape: [4]
   - vec shape: [3, 4], axis=1 -> mean shape: [3]
   - vec shape: [3, 4], axis=[0, 1] -> mean shape: []
+
+  The algorithm is adapted from [1].
 
   Args:
     state: `RunningMeanState`.
@@ -1964,27 +1983,27 @@ def running_mean_step(
   Returns:
     state: `RunningMeanState`.
     extra: Empty tuple.
+
+  #### References
+
+  [1]: https://notmatthancock.github.io/2017/03/23/simple-batch-stat-updates.html
   """
 
   def _one_part(vec, mean, num_points):
     """Updates a single part."""
     vec = tf.convert_to_tensor(vec, mean.dtype)
-    broadcast_mean = mean
-    if axis is not None:
-      for a in util.flatten_tree(axis):
-        broadcast_mean = tf.expand_dims(broadcast_mean, a)
-    centered_vec = vec - broadcast_mean
-    num_points_f = tf.cast(num_points, vec.dtype)
     if axis is None:
-      additional_points = 1
-      additional_points_f = 1
+      vec_mean = vec
     else:
-      vec_shape = tf.shape(vec)
-      additional_points = tf.cast(
-          tf.math.reduce_prod(tf.gather(vec_shape, axis)), num_points.dtype)
-      additional_points_f = tf.cast(additional_points, vec.dtype)
-      centered_vec = tf.reduce_sum(centered_vec, axis)
-    new_mean = mean + centered_vec / (num_points_f + additional_points_f)
+      vec_mean = tf.reduce_mean(vec, axis)
+    mean_diff = vec_mean - mean
+
+    additional_points = tf.size(vec) // tf.size(mean)
+    additional_points_f = tf.cast(additional_points, vec.dtype)
+    num_points_f = tf.cast(num_points, vec.dtype)
+    weight = additional_points_f / (num_points_f + additional_points_f)
+
+    new_mean = mean + mean_diff * weight
     return new_mean, num_points + additional_points
 
   new_mean_num_points = util.map_tree(_one_part, vec, state.mean,
@@ -2216,6 +2235,7 @@ def running_approximate_auto_covariance_step(
       )
     num_steps = tf.reshape(num_steps, steps_shape)
 
+    # TODO(siege): Simplify this to look like running_variance_step.
     # pyformat: disable
     if axis is None:
       additional_points = 1

@@ -46,6 +46,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "im2row_test",
     size = "medium",
@@ -68,6 +69,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "random_variable_test",
     size = "medium",

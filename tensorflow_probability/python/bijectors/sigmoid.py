@@ -74,6 +74,10 @@ class Sigmoid(bijector.Bijector):
   a sigmoid that is shifted and scaled along the output axis. This is
   implemented as `high * g(X) + low * g(-X)`, which is more numerically
   stable than direct shifting and scaling.
+
+  Specifically, `low + (high - low) * g(X)` can sometimes evalaute
+  to slightly larger than `high`, which would trigger assertions
+  elsewhere.  The formula `high * g(X) + low * g(-X)` doesn't do that.
   """
 
   def __init__(self, low=None, high=None, validate_args=False, name='sigmoid'):

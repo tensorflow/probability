@@ -22,6 +22,7 @@ import collections
 
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -31,9 +32,13 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
 
-def _maybe_seed(s):
-  if tf.executing_eagerly():
-    return tf.random.set_seed(s)
+JAX_MODE = False
+
+
+def _maybe_seed(s, sampler_type='stateful'):
+  if tf.executing_eagerly() and not JAX_MODE and sampler_type != 'stateless':
+    tf.random.set_seed(s)
+    return None
   return s
 
 
@@ -43,9 +48,6 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
   def setUp(self):
     self._shape_param = 5.
     self._rate_param = 10.
-
-    tf.random.set_seed(10003)
-    np.random.seed(10003)
 
   def _log_gamma_log_prob(self, x, event_dims=()):
     """Computes unnormalized log-pdf of a log-gamma random variable.
@@ -86,18 +88,14 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
             inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
                 target_log_prob_fn=tlp_fn,
                 step_size=0.5,
-                num_leapfrog_steps=2,
-                seed=_maybe_seed(make_kernel.seed())),
+                num_leapfrog_steps=2),
             bijector=tfb.Identity())
     else:
       def make_kernel(tlp_fn):
         return tfp.mcmc.HamiltonianMonteCarlo(
             target_log_prob_fn=tlp_fn,
             step_size=0.5,
-            num_leapfrog_steps=2,
-            seed=_maybe_seed(make_kernel.seed()))
-
-    make_kernel.seed = tfp.util.SeedStream('make_kernel', 45)
+            num_leapfrog_steps=2)
 
     _, ais_weights, _ = tfp.mcmc.sample_annealed_importance_chain(
         num_steps=num_steps,
@@ -105,7 +103,7 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
         target_log_prob_fn=target_log_prob,
         current_state=init,
         make_kernel_fn=make_kernel,
-        parallel_iterations=1)
+        seed=test_util.test_seed())
 
     # We have three calls because the calculation of `ais_weights` entails
     # another call to the `convex_combined_log_prob_fn`. We could refactor
@@ -177,7 +175,10 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
     self._ais_gets_correct_log_normalizer_wrapper(
         1, use_transformed_kernel=True)
 
-  def testSampleAIChainSeedReproducibleWorksCorrectly(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='_stateless', sampler_type='stateless'),
+      dict(testcase_name='_stateful', sampler_type='stateful'))
+  def testSampleAIChainSeedReproducibleWorksCorrectly(self, sampler_type):
     independent_chain_ndims = 1
     x = np.random.rand(4, 3, 2)
 
@@ -189,26 +190,26 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
       event_dims = tf.range(independent_chain_ndims, tf.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
+    seed = test_util.test_seed()
     def make_kernel(tlp_fn):
       return tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=tlp_fn,
           step_size=0.5,
-          num_leapfrog_steps=2,
-          seed=_maybe_seed(53))
+          num_leapfrog_steps=2)
 
     ais_kwargs = dict(
         num_steps=200,
         proposal_log_prob_fn=proposal_log_prob,
         target_log_prob_fn=target_log_prob,
         current_state=x,
-        make_kernel_fn=make_kernel,
-        parallel_iterations=1)
+        make_kernel_fn=make_kernel)
 
+    seed = test_util.test_seed(sampler_type=sampler_type)
     _, ais_weights0, _ = tfp.mcmc.sample_annealed_importance_chain(
-        **ais_kwargs)
+        seed=_maybe_seed(seed, sampler_type=sampler_type), **ais_kwargs)
 
     _, ais_weights1, _ = tfp.mcmc.sample_annealed_importance_chain(
-        **ais_kwargs)
+        seed=_maybe_seed(seed, sampler_type=sampler_type), **ais_kwargs)
 
     ais_weights0_, ais_weights1_ = self.evaluate([
         ais_weights0, ais_weights1])

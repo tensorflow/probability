@@ -20,7 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.internal.backend.numpy import v1
 from tensorflow_probability.python.internal.backend.numpy import v2
-from tensorflow_probability.python.internal.backend.numpy.tensor_shape import dimension_value
+from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import dimension_value
 
 
 __all__ = [

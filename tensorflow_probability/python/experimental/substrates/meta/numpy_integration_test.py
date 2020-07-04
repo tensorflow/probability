@@ -22,8 +22,7 @@ from absl.testing import absltest
 
 import numpy as np
 
-import tensorflow_probability as tfp
-tfp = tfp.experimental.substrates.numpy
+from tensorflow_probability.python.experimental.substrates import numpy as tfp
 
 tfb = tfp.bijectors
 tfd = tfp.distributions

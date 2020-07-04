@@ -69,10 +69,13 @@ def base_equal(a, b):
 def common_dtype(args_list, dtype_hint=None):
   """Returns explict dtype from `args_list` if there is one."""
   dtype = None
+  seen = []
   for a in tf.nest.flatten(args_list):
     if hasattr(a, 'dtype') and a.dtype:
       dt = as_numpy_dtype(a.dtype)
+      seen.append(dt)
     else:
+      seen.append(None)
       continue
     if dtype is None:
       dtype = dt
@@ -81,8 +84,35 @@ def common_dtype(args_list, dtype_hint=None):
         dtype = (np.ones([2], dtype) + np.ones([2], dt)).dtype
       else:
         raise TypeError(
-            'Found incompatible dtypes, {} and {}.'.format(dtype, dt))
+            'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
+                dtype, dt, seen))
   return dtype_hint if dtype is None else base_dtype(dtype)
+
+
+def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):
+  """Get a dtype from a list/tensor/dtype using convert_to_tensor semantics."""
+  if tensor_or_dtype is None:
+    return dtype or dtype_hint
+
+  # Tensorflow dtypes need to be typechecked
+  if tf.is_tensor(tensor_or_dtype):
+    dt = base_dtype(tensor_or_dtype.dtype)
+  elif isinstance(tensor_or_dtype, tf.DType):
+    dt = base_dtype(tensor_or_dtype)
+  # Numpy dtypes defer to dtype/dtype_hint
+  elif isinstance(tensor_or_dtype, np.ndarray):
+    dt = base_dtype(dtype or dtype_hint or tensor_or_dtype.dtype)
+  elif np.issctype(tensor_or_dtype):
+    dt = base_dtype(dtype or dtype_hint or tensor_or_dtype)
+  else:
+    # If this is a Python object, call `convert_to_tensor` and grab the dtype.
+    # Note that this will add ops in graph-mode; we may want to consider
+    # other ways to handle this case.
+    dt = tf.convert_to_tensor(tensor_or_dtype, dtype, dtype_hint).dtype
+
+  if not SKIP_DTYPE_CHECKS and dtype and not base_equal(dtype, dt):
+    raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
+  return dt
 
 
 def is_bool(dtype):

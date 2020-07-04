@@ -233,6 +233,7 @@ class InverseGammaTest(test_util.TestCase):
         atol=.15)
     self.assertTrue(self._kstest(alpha_v, beta_v, sample_values))
 
+  @test_util.numpy_disable_gradient_test
   def testInverseGammaFullyReparameterized(self):
     alpha = tf.constant(4.0)
     beta = tf.constant(3.0)

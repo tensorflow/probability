@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Implements special functions in TensorFlow.
-
-"""
+"""Implements special functions in TensorFlow."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -29,12 +27,335 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
+    'bessel_iv_ratio',
+    'round_exponential_bump_function',
     'lambertw',
     'lambertw_winitzki_approx',
     'log_gamma_correction',
     'log_gamma_difference',
     'lbeta',
 ]
+
+
+def _compute_general_continued_fraction(
+    max_iterations,
+    numerator_denominator_args_list,
+    tolerance=None,
+    partial_numerator_fn=None,
+    partial_denominator_fn=None,
+    dtype=tf.float32,
+    name=None):
+  """Compute a general continued fraction.
+
+  Given at least one of `partial_numerator_fn` and `partial_denominator_fn`,
+  compute the continued fraction associated with it via the forward recurrence.
+
+  Let `a_i = partial_numerator_fn` and `b_i = partial_denominator_fn`. Then,
+  this evaluates the infinite continued fraction:
+
+  ```result = a_1 / (b_1 + a_2 / (b_2 + a_3 / (b_3 .....)```.
+
+  If `partial_numerator_fn` or `partial_denominator_fn` are not given, then
+  `a_i` (respectively `b_i`) are assumed to be 1. However one must be given.
+
+  NOTE: Use this with caution. Forward recursion doesn't have numerical
+  stability guarantees, compared to backward recursion.
+
+
+  Args:
+    max_iterations: Integer `Tensor` specifying the maximum number of terms to
+      use.
+    numerator_denominator_args_list: Arguments to pass in to
+      `partial_numerator_fn` and `partial_denominator_fn`.
+    tolerance: Float `Tensor` specifying the maximum acceptable tolerance
+      between convergents. If unset, convergence is dictated by the number
+      of iterations.
+      Default value: `None`.
+    partial_numerator_fn: Python callable that takes in as its first argument
+      the current iteration count (an integer >= 1), and a list of *args, and
+      returns a `Tensor`. These are used as partial numerators for the
+      continued fraction.
+      Default value: `None`.
+    partial_denominator_fn: Python callable that takes in as its first argument
+      the current iteration count (an integer >= 1), and a list of *args, and
+      returns a `Tensor`. These are used as partial denominators for the
+      continued fraction.
+      Default value: `None`.
+    dtype: The default dtype of the continued fraction. Default: `float32`.
+    name: A name for the operation (optional).
+      Default value: `None` (i.e., 'continued_fraction').
+
+  Returns:
+    Continued fraction computed to `max_iterations` iterations and/or
+    up to absolute error `tolerance`.
+
+  #### References
+  [1]: Walter Gautschi and Josef Slavik. On the Computation of Modified
+       Bessel Function Ratios. http://www.jstor.com/stable/2006491
+  """
+  with tf.name_scope(name or 'continued_fraction'):
+    dtype = dtype_util.common_dtype(
+        numerator_denominator_args_list, dtype)
+
+    if (partial_numerator_fn is None) and (partial_denominator_fn is None):
+      raise ValueError('Expect one of `partial_numerator_fn` and '
+                       '`partial_denominator_fn` to be set.')
+
+    def _continued_fraction_one_step(
+        unused_should_stop,
+        numerator,
+        previous_numerator,
+        denominator,
+        previous_denominator,
+        iteration_count):
+      partial_denominator = 1.
+      if partial_denominator_fn:
+        partial_denominator = partial_denominator_fn(
+            iteration_count, *numerator_denominator_args_list)
+      new_numerator = partial_denominator * numerator
+      new_denominator = partial_denominator * denominator
+
+      partial_numerator = 1.
+      if partial_numerator_fn:
+        partial_numerator = partial_numerator_fn(
+            iteration_count, *numerator_denominator_args_list)
+      new_numerator = new_numerator + partial_numerator * previous_numerator
+      new_denominator = (
+          new_denominator + partial_numerator * previous_denominator)
+
+      should_stop_next = iteration_count > max_iterations
+
+      if tolerance is not None:
+        # We can use a more efficient computation when the partial numerators
+        # are 1.
+        if partial_numerator_fn is None:
+          # We now want to compute to relative error between the fraction at
+          # this iteration, vs. the previous iteration.
+          # Let h_i be the numerator and k_i the denominator, and a_i be the
+          # i-th term.
+          # h_i / k_i - h_{i-1} / k_{i-1} =
+          # (h_i * k_{i - 1} - h_{i - 1} * k_i) / (k_i * k_{i - 1}) =
+          # ((a_i h_{i - 1} + h_{i - 2}) * k_{i - 1} -
+          # (a_i k_{i - 1} + k_{i - 2}) * h_{i - 1}) / (k_i * k_{i - 1}) =
+          # -(h_{i - 1} * k_{i - 2} - h_{i - 2} * k_{i - 1}) / (k_i * k_{i - 1})
+          # This suggests we should prove something about the numerator
+          # inductively, and indeed
+          # (h_i * k_{i - 1} - h_{i - 1} * k_i) = (-1)**i
+          delta = tf.math.reciprocal(new_denominator * denominator)
+        # We actually need to compute the difference of fractions.
+        else:
+          delta = new_numerator / new_denominator - numerator / denominator
+
+        converged = tf.math.abs(delta) <= tolerance
+        should_stop_next = tf.reduce_all(converged) | should_stop_next
+      return (should_stop_next,
+              new_numerator,
+              numerator,
+              new_denominator,
+              denominator,
+              iteration_count + 1.)
+
+    # This is to infer the correct shape of tensors
+    if partial_denominator_fn:
+      term = partial_denominator_fn(1., *numerator_denominator_args_list)
+    else:
+      term = partial_numerator_fn(1., *numerator_denominator_args_list)
+
+    zeroth_numerator = tf.ones_like(term, dtype=dtype)
+    zeroth_denominator = tf.zeros_like(term, dtype=dtype)
+    first_numerator = tf.zeros_like(term, dtype=dtype)
+    first_denominator = tf.ones_like(term, dtype=dtype)
+
+    results = tf.while_loop(
+        cond=lambda stop, *_: ~stop,
+        body=_continued_fraction_one_step,
+        loop_vars=(
+            False,
+            first_numerator,
+            zeroth_numerator,
+            first_denominator,
+            zeroth_denominator,
+            tf.cast(1., dtype=dtype)))
+    return results[1] / results[3]
+
+
+@tf.custom_gradient
+def bessel_iv_ratio(v, z, name=None):
+  """Computes `I_{v} (z) / I_{v - 1} (z)` in a numerically stable way.
+
+  Let I(v, z) be the modified bessel function of the first kind. This computes
+  the ratio of I(v, z) / I(v - 1, z). This can be more numerically stable
+  and faster than computing the ratio directly.
+
+  This uses a continued fraction approximation attributed to Gauss for
+  computing this quantity in the limit where z <= v, and a continued fraction
+  approximation attributed to Perron for z > v.
+
+  Args:
+    v: value for which `I_{v}(z) / I_{v - 1}(z)` should be computed. Expect
+      v > 0.
+    z: value for which `I_{v}(z) / I_{v - 1}(z)` should be computed. Expect
+      z > 0.
+    name: A name for the operation (optional).
+      Default value: `None` (i.e., 'bessel_iv_ratio').
+
+  Returns:
+    I(v, z) / I(v - 1, z).
+
+  #### References
+  [1]: Walter Gautschi and Josef Slavik. On the Computation of Modified
+       Bessel Function Ratios. http://www.jstor.com/stable/2006491
+  """
+  with tf.name_scope(name or 'bessel_iv_ratio'):
+    dtype = dtype_util.common_dtype([v, z], tf.float32)
+    v = tf.convert_to_tensor(v, dtype=dtype)
+    z = tf.convert_to_tensor(z, dtype=dtype)
+
+    np_finfo = np.finfo(dtype_util.as_numpy_dtype(dtype))
+    tolerance = tf.cast(np_finfo.resolution, dtype=dtype)
+
+    safe_to_use_perron = z > v
+
+    def gauss_term_fn(iteration_count, v, z):
+      """Terms for the Gauss continued fraction."""
+      return tf.math.square(z) / 4. / (
+          (v + iteration_count - 1) * (v + iteration_count))
+
+    # The Gauss continued fraction converges faster for z < v.
+    # For z > v, set z to something much less than v.
+    safe_z_less_v = tf.where(safe_to_use_perron, v / 1000., z)
+
+    # We use forward recurrence for the Gauss continued fraction.
+    # This is so that we can do early termination.
+    # There are a few reasons why this doesn't overflow:
+    # * All partial numerators / denominators are positive.
+    # * Partial numerators approach zero as 1 / n**2, where
+    #   n is the iteration count.
+    # * All partial numerators are less than 1.
+    # Combined with the recurrence, this ensures no overflow.
+    # as the number of iterations -> infinity.
+    gauss_cf = _compute_general_continued_fraction(
+        # Use a max of 200 steps. Almost always we will be much less
+        # than this.
+        200, [v, safe_z_less_v], tolerance=tolerance,
+        partial_numerator_fn=gauss_term_fn)
+    # Add the zeroth term for the Gauss continued fraction.
+    gauss_cf = tf.math.reciprocal((1. + gauss_cf) * 2. * v / z)
+
+    # For the Perron CF we use the backward recurrence. This is because
+    # generally the backward recurrence is more numerically stable
+    # than forward recurrence, especially with negative terms.
+    # We use a flat 50 steps. Anecdotally, for z > v, convergence is
+    # much faster than that.
+
+    # The Perron continued fraction converges much faster for z >> v.
+    # For z < v, set z to something much greater than v.
+    safe_z_greater_v = tf.where(~safe_to_use_perron, 1000. * v, z)
+
+    def perron_term_fn(iteration_count, v, z):
+      """Terms for the Perron continued fraction."""
+      return -0.5 * z * (v + iteration_count - 0.5) / (
+          (v + z + (iteration_count - 1.) / 2.) *
+          (v + z + iteration_count / 2.))
+
+    total_perron_iteration_count = 50
+
+    def _backward_cf_one_step(iteration_count, cf):
+      cf = perron_term_fn(
+          total_perron_iteration_count - iteration_count,
+          v, safe_z_greater_v) / (1. + cf)
+      return [iteration_count + 1., cf]
+
+    # For the Perron CF, we omit the first numerator because it
+    # has a different form.
+
+    _, perron_cf = tf.while_loop(
+        cond=lambda i, _: i < total_perron_iteration_count - 1,
+        body=_backward_cf_one_step,
+        # Use 50 iterations. Empirically, the Perron continued fraction
+        # converges much faster than this.
+        loop_vars=[tf.cast(0., dtype=dtype), tf.zeros_like(safe_z_greater_v)])
+    first_term = -0.5 * z * (v + 0.5) / ((v + z / 2.) * (v + z + 0.5))
+
+    perron_cf = first_term / (1. + perron_cf)
+
+    # Add the zeroth term for the Perron continued fraction.
+    perron_zeroth_term = (z + 2 * v) / z
+    perron_cf = tf.math.reciprocal(perron_zeroth_term * (1. + perron_cf))
+    result = tf.where(safe_to_use_perron, perron_cf, gauss_cf)
+
+    def grad(dy):
+      """Computes the derivative of the ratio elementwise with respect to z.
+
+      For shorthand, let `I(v) = I(v, z)`, `R(v) = I(v, z) / I(v - 1, z)`
+
+      ```
+      R'(v) = (I'(v)I(v - 1) - I(v)I'(v - 1)) / I(v - 1) ** 2
+             = 0.5 * ((I(v - 1) + I(v + 1))I(v - 1) - I(v)(
+                  I(v) + I(v - 2))) / I(v - 1) ** 2
+             = 0.5 * (1. + I(v + 1) / I(v - 1) - (I(v) / I(v - 1)) ** 2 - (
+                  I(v) / I(v - 1)) * (I(v - 2) / I(v - 1)))
+             = 0.5 * (1. + R(v + 1) * R(v) - R(v) ** 2 - R(v) / R(v - 1))
+             = 0.5 * (1. + R(v) * (R(v + 1) - R(v) - 1. / R(v - 1)))
+      ```
+      To avoid computing R(v - 1) when v <= 1 (which is not valid),
+      we can rewrite `I(v - 2) = 2 (v - 1) / z * I(v - 1) + I(v)`.
+      Thus the last term becomes:
+      ```
+      -1. / R(v - 1) = -I(v - 2) / I(v - 1) = -2 (v - 1) / z - R(v)
+      ```
+
+      Args:
+        dy: A Tensor with type `float32` or `float64`.
+
+      Returns:
+        A Tensor with same shape and dtype as `z`.
+      """
+      grad_z = 0.5 * (1. + result * (
+          bessel_iv_ratio(v + 1., z) - 2. * result - 2. * (v - 1) / z)) * dy
+
+      # We don't have an easily computable gradient with respect to v at the
+      # moment, so ignore that for now.
+      _, grad_z = _fix_gradient_for_broadcasting(
+          v, z, tf.ones_like(grad_z), grad_z)
+      return None, grad_z
+
+    return result, grad
+
+
+def round_exponential_bump_function(x, name=None):
+  r"""Function supported on [-1, 1], smooth on the real line, with a round top.
+
+  Define
+
+  ```
+  f(x) := exp(-1 / (1 - x**2)) * exp(1), for x in (-1, 1)
+  f(x) := 0, for |x| >= 1.
+  ```
+
+  One can show that f(x)...
+
+  * is C^\infty on the real line.
+  * is supported on [-1, 1].
+  * is equal to 1 at x = 0.
+  * is strictly increasing on (-1, 0).
+  * is strictly decreasing on (0, 1).
+  * has gradient = 0 at 0.
+
+  See [Bump Function](https://en.wikipedia.org/wiki/Bump_function)
+
+  Args:
+    x: Floating-point Tensor.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    y: Tensor of same shape and dtype as `x`.
+  """
+  with tf.name_scope(name or 'round_exponential_bump_function'):
+    x = tf.convert_to_tensor(x, name='x')
+    one_m_x2 = 1 - x**2
+    y = tf.math.exp(1. - tf.math.reciprocal_no_nan(one_m_x2))
+    return tf.where(one_m_x2 > 0., y, 0.)
 
 
 def lambertw_winitzki_approx(z, name=None):

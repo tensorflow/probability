@@ -106,6 +106,10 @@ class VonMisesFisher(distribution.Distribution):
   NOTE: Currently only n in {2, 3, 4, 5} are supported. For n=5 some numerical
   instability can occur for low concentrations (<.01).
 
+  NOTE: `mean_direction` is not in general the mean of the distribution. For
+  spherical distributions, the mean is generally not in the support of the
+  distribution.
+
   #### Examples
 
   A single instance of a vMF distribution is defined by a mean direction (or
@@ -149,9 +153,8 @@ class VonMisesFisher(distribution.Distribution):
     Args:
       mean_direction: Floating-point `Tensor` with shape [B1, ... Bn, D].
         A unit vector indicating the mode of the distribution, or the
-        unit-normalized direction of the mean. (This is *not* in general the
-        mean of the distribution; the mean is not generally in the support of
-        the distribution.) NOTE: `D` is currently restricted to <= 5.
+        unit-normalized direction of the mean. NOTE: `D` is currently
+        restricted to <= 5.
       concentration: Floating-point `Tensor` having batch shape [B1, ... Bn]
         broadcastable with `mean_direction`. The level of concentration of
         samples around the `mean_direction`. `concentration=0` indicates a
@@ -273,7 +276,7 @@ class VonMisesFisher(distribution.Distribution):
   # [1]: https://ieeexplore.ieee.org/document/7347705/
 
   def _sample_control_dependencies(self, samples):
-    """Check counts for proper shape, values, then return tensor version."""
+    """Check samples for proper shape and whether samples are unit vectors."""
     inner_sample_dim = samples.shape[-1]
     event_size = self.event_shape[-1]
     shape_msg = ('Samples must have innermost dimension matching that of '

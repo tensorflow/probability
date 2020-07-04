@@ -76,7 +76,7 @@ def logistic_regression(features):
   return outcomes
 
 num_features = 10
-features = tf.random_normal([100, num_features])
+features = tf.random.normal([100, num_features])
 outcomes = logistic_regression(features)
 
 # Execute the model program, returning a sample np.ndarray of shape (100,).
@@ -184,8 +184,8 @@ and output rv `outcomes` to its known values.
 import tensorflow_probability as tfp
 
 # Set up training data.
-features = tf.random_normal([100, 55])
-outcomes = tf.random_uniform([100], minval=0, maxval=2, dtype=tf.int32)
+features = tf.random.normal([100, 55])
+outcomes = tf.random.uniform([100], minval=0, maxval=2, dtype=tf.int32)
 
 # Pass target log-probability function to MCMC transition kernel.
 log_joint = ed.make_log_joint_fn(logistic_regression)
@@ -203,7 +203,7 @@ hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
     num_leapfrog_steps=5)
 states, kernel_results = tfp.mcmc.sample_chain(
     num_results=1000,
-    current_state=[tf.random_normal([55]), tf.random_normal([])],
+    current_state=[tf.random.normal([55]), tf.random.normal([])],
     kernel=hmc_kernel,
     num_burnin_steps=500)
 

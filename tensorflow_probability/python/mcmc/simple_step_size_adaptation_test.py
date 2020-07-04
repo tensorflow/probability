@@ -266,7 +266,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=0.1),
         # Just over the target_accept_prob.
-        log_accept_ratio=tf.stack(tf.math.log(0.76)))
+        log_accept_ratio=tf.math.log(0.76))
     kernel = FakeWrapperKernel(kernel)
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         kernel,
@@ -328,10 +328,10 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
 
     self.assertAllClose([0.1 * _RATE, 0.2 / _RATE], step_size)
 
-  @parameterized.parameters((-1., '`target_accept_prob` must be > 0.'),
-                            (0., '`target_accept_prob` must be > 0.'),
+  @parameterized.parameters((-1., r'`target_accept_prob` must be > 0.'),
+                            (0., r'`target_accept_prob` must be > 0.'),
                             (0.999, None),
-                            (1., '`target_accept_prob` must be < 1.'))
+                            (1., r'`target_accept_prob` must be < 1.'))
   def testTargetAcceptanceProbChecks(self, target_accept_prob, message):
 
     def _impl():
@@ -345,7 +345,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
       self.evaluate(kernel.bootstrap_results(tf.zeros(2)))
 
     if message:
-      with self.assertRaisesRegexp(tf.errors.InvalidArgumentError, message):
+      with self.assertRaisesOpError(message):
         _impl()
     else:
       _impl()
@@ -362,8 +362,8 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
 @test_util.test_graph_and_eager_modes()
 class SimpleStepSizeAdaptationExampleTest(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test('HMC')
   def test_example(self):
-    tf.random.set_seed(test_util.test_seed())
     target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
     num_results = 500
@@ -373,8 +373,7 @@ class SimpleStepSizeAdaptationExampleTest(test_util.TestCase):
     kernel = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
-        step_size=step_size,
-        seed=_set_seed(test_util.test_seed()))
+        step_size=step_size)
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
 
@@ -385,7 +384,8 @@ class SimpleStepSizeAdaptationExampleTest(test_util.TestCase):
           num_burnin_steps=num_burnin_steps,
           current_state=tf.zeros(num_chains),
           kernel=kernel,
-          trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio)
+          trace_fn=lambda _, pkr: pkr.inner_results.log_accept_ratio,
+          seed=test_util.test_seed())
       return log_accept_ratio
 
     log_accept_ratio = do_sampling()

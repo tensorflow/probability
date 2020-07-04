@@ -29,13 +29,16 @@ from jax.config import config as jax_config
 import numpy as np
 import tensorflow.compat.v2 as real_tf
 
-from discussion import fun_mcmc
-from discussion.fun_mcmc import backend
+from discussion.fun_mcmc import backend_jax
+from discussion.fun_mcmc import backend_tf
+from discussion.fun_mcmc import using_jax as fun_mcmc_jax
+from discussion.fun_mcmc import using_tensorflow as fun_mcmc_tf
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tf = backend.tf
-tfp = backend.tfp
-util = backend.util
+tf = backend_tf.tf
+tfp = backend_tf.tfp
+util = backend_tf.util
+fun_mcmc = fun_mcmc_tf
 
 real_tf.enable_v2_behavior()
 jax_config.update('jax_enable_x64', True)
@@ -136,10 +139,17 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
 
   def setUp(self):
     super(FunMCMCTestTensorFlow32, self).setUp()
-    backend.set_backend(backend.TENSORFLOW, backend.MANUAL_TRANSFORMS)
+    global tf
+    global tfp
+    global util
+    global fun_mcmc
+    tf = backend_tf.tf
+    tfp = backend_tf.tfp
+    util = backend_tf.util
+    fun_mcmc = fun_mcmc_tf
 
   def _make_seed(self, seed):
-    return seed
+    return util.make_tensor_seed(seed)
 
   @property
   def _dtype(self):
@@ -148,34 +158,55 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
   def _constant(self, value):
     return tf.constant(value, self._dtype)
 
-  def testTraceSingle(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceSingle(self, unroll):
 
     def fun(x):
       return x + 1., 2 * x
 
     x, e_trace = fun_mcmc.trace(
-        state=0., fn=fun, num_steps=5, trace_fn=lambda _, xp1: xp1)
+        state=0.,
+        fn=fun,
+        num_steps=5,
+        trace_fn=lambda _, xp1: xp1,
+        unroll=unroll)
 
     self.assertAllEqual(5., x)
     self.assertAllEqual([0., 2., 4., 6., 8.], e_trace)
 
-  def testTraceNested(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceNested(self, unroll):
 
     def fun(x, y):
       return (x + 1., y + 2.), ()
 
     (x, y), (x_trace, y_trace) = fun_mcmc.trace(
-        state=(0., 0.), fn=fun, num_steps=5, trace_fn=lambda xy, _: xy)
+        state=(0., 0.),
+        fn=fun,
+        num_steps=5,
+        trace_fn=lambda xy, _: xy,
+        unroll=unroll)
 
     self.assertAllEqual(5., x)
     self.assertAllEqual(10., y)
     self.assertAllEqual([1., 2., 3., 4., 5.], x_trace)
     self.assertAllEqual([2., 4., 6., 8., 10.], y_trace)
 
-  def testTraceTrace(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceTrace(self, unroll):
 
     def fun(x):
-      return fun_mcmc.trace(x, lambda x: (x + 1., x + 1.), 2, trace_mask=False)
+      return fun_mcmc.trace(
+          x, lambda x: (x + 1., x + 1.), 2, trace_mask=False, unroll=unroll)
 
     x, trace = fun_mcmc.trace(0., fun, 2)
     self.assertAllEqual(4., x)
@@ -190,20 +221,24 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     x = trace_n(5)
     self.assertAllEqual(5, x)
 
-  def testTraceMask(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testTraceMask(self, unroll):
 
     def fun(x):
       return x + 1, (2 * x, 3 * x)
 
     x, (trace_1, trace_2) = fun_mcmc.trace(
-        state=0, fn=fun, num_steps=3, trace_mask=(True, False))
+        state=0, fn=fun, num_steps=3, trace_mask=(True, False), unroll=unroll)
 
     self.assertAllEqual(3, x)
     self.assertAllEqual([0, 2, 4], trace_1)
     self.assertAllEqual(6, trace_2)
 
     x, (trace_1, trace_2) = fun_mcmc.trace(
-        state=0, fn=fun, num_steps=3, trace_mask=False)
+        state=0, fn=fun, num_steps=3, trace_mask=False, unroll=unroll)
 
     self.assertAllEqual(3, x)
     self.assertAllEqual(4, trace_1)
@@ -258,8 +293,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
       ('Dict0', (), {}, {}),
   )
   def testRecoverStateFromArgs(self, args, kwargs, state_structure):
-    state = fun_mcmc.fun_mcmc_lib.recover_state_from_args(
-        args, kwargs, state_structure)
+    state = fun_mcmc.recover_state_from_args(args, kwargs, state_structure)
     self.assertEqual(type(state_structure), type(state))
     self.assertAllEqual(state_structure, state)
 
@@ -277,8 +311,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     state_structure = collections.OrderedDict([('c', 1), ('b', 2), ('a', 3)])
     with self.assertRaisesRegexp(ValueError,
                                  'Missing \'{}\' from kwargs.'.format(missing)):
-      fun_mcmc.fun_mcmc_lib.recover_state_from_args(args, kwargs,
-                                                    state_structure)
+      fun_mcmc.recover_state_from_args(args, kwargs, state_structure)
 
   @parameterized.named_parameters(
       ('Tuple1', {
@@ -290,7 +323,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
   )
   def testRecoverStateFromArgsNoKwargs(self, kwargs, state_structure):
     with self.assertRaisesRegexp(ValueError, 'This wrapper does not'):
-      fun_mcmc.fun_mcmc_lib.recover_state_from_args((), kwargs, state_structure)
+      fun_mcmc.recover_state_from_args((), kwargs, state_structure)
 
   def testBroadcastStructure(self):
     struct = fun_mcmc.maybe_broadcast_structure(1, [1, 2])
@@ -412,13 +445,19 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
   # The +1's here are because we initialize the `state_grads` at 1, which
   # require an extra call to `target_log_prob_fn`.
   @parameterized.named_parameters(
-      ('Leapfrog', fun_mcmc.leapfrog_step, 1 + 1),
-      ('Ruth4', fun_mcmc.ruth4_step, 3 + 1),
-      ('Blanes3', fun_mcmc.blanes_3_stage_step, 3 + 1),
-      ('McLachlan4Fwd', _fwd_mclachlan_optimal_4th_order_step, 4 + 1, 9),
-      ('McLachlan4Rev', _rev_mclachlan_optimal_4th_order_step, 4 + 1, 9),
+      ('Leapfrog', lambda: fun_mcmc.leapfrog_step, 1 + 1),
+      ('Ruth4', lambda: fun_mcmc.ruth4_step, 3 + 1),
+      ('Blanes3', lambda: fun_mcmc.blanes_3_stage_step, 3 + 1),
+      ('McLachlan4Fwd', lambda: _fwd_mclachlan_optimal_4th_order_step, 4 + 1,
+       9),
+      ('McLachlan4Rev', lambda: _rev_mclachlan_optimal_4th_order_step, 4 + 1,
+       9),
   )
-  def testIntegratorStep(self, method, num_tlp_calls, num_tlp_calls_jax=None):
+  def testIntegratorStep(self,
+                         method_fn,
+                         num_tlp_calls,
+                         num_tlp_calls_jax=None):
+    method = method_fn()
 
     tlp_call_counter = [0]
 
@@ -595,7 +634,11 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(
         util.flatten_tree(proposed), util.flatten_tree(accepted))
 
-  def testBasicHMC(self):
+  @parameterized.named_parameters(
+      ('Unrolled', True),
+      ('NotUnrolled', False),
+  )
+  def testBasicHMC(self, unroll):
     step_size = self._constant(0.2)
     num_steps = 2000
     num_leapfrog_steps = 10
@@ -609,22 +652,17 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           (x - base_mean) / base_scale), -1), ()
 
     def kernel(hmc_state, seed):
-      if not self._is_on_jax:
-        hmc_seed = _test_seed()
-      else:
-        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_seed, seed = util.split_seed(seed, 2)
       hmc_state, _ = fun_mcmc.hamiltonian_monte_carlo(
           hmc_state,
           step_size=step_size,
           num_integrator_steps=num_leapfrog_steps,
           target_log_prob_fn=target_log_prob_fn,
+          unroll_integrator=unroll,
           seed=hmc_seed)
       return (hmc_state, seed), hmc_state.state
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -670,10 +708,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
 
     # pylint: disable=g-long-lambda
     def kernel(hmc_state, seed):
-      if not self._is_on_jax:
-        hmc_seed = _test_seed()
-      else:
-        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_seed, seed = util.split_seed(seed, 2)
       hmc_state, _ = fun_mcmc.hamiltonian_monte_carlo(
           hmc_state,
           step_size=step_size,
@@ -682,10 +717,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           seed=hmc_seed)
       return (hmc_state, seed), hmc_state.state_extra[0]
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -795,10 +827,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           orig_target_log_prob_fn, bijector, state)
 
       def kernel(hmc_state, step_size_state, step, seed):
-        if not self._is_on_jax:
-          hmc_seed = _test_seed()
-        else:
-          hmc_seed, seed = util.split_seed(seed, 2)
+        hmc_seed, seed = util.split_seed(seed, 2)
         hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
             hmc_state,
             step_size=tf.exp(step_size_state.state),
@@ -834,10 +863,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           4096, seed=self._make_seed(_test_seed()))
       return chain, log_accept_ratio_trace, true_samples
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
     chain, log_accept_ratio_trace, true_samples = computation(state, seed)
 
     log_accept_ratio_trace = log_accept_ratio_trace[num_adapt_steps:]
@@ -1003,10 +1029,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
       return tf.cast(proposal, x.dtype), ((), proposed_logits - current_logits)
 
     def kernel(rwm_state, seed):
-      if not self._is_on_jax:
-        rwm_seed = _test_seed()
-      else:
-        rwm_seed, seed = util.split_seed(seed, 2)
+      rwm_seed, seed = util.split_seed(seed, 2)
       rwm_state, rwm_extra = fun_mcmc.random_walk_metropolis(
           rwm_state,
           target_log_prob_fn=target_log_prob_fn,
@@ -1014,10 +1037,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           seed=rwm_seed)
       return (rwm_state, seed), rwm_extra
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -1261,10 +1281,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
         return tf.reduce_sum(lp, -1), ()
 
     def kernel(hmc_state, raac_state, seed):
-      if not self._is_on_jax:
-        hmc_seed = _test_seed()
-      else:
-        hmc_seed, seed = util.split_seed(seed, 2)
+      hmc_seed, seed = util.split_seed(seed, 2)
       hmc_state, hmc_extra = fun_mcmc.hamiltonian_monte_carlo(
           hmc_state,
           step_size=step_size,
@@ -1275,10 +1292,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
           raac_state, hmc_state.state, axis=aggregation)
       return (hmc_state, raac_state, seed), hmc_extra
 
-    if not self._is_on_jax:
-      seed = _test_seed()
-    else:
-      seed = self._make_seed(_test_seed())
+    seed = self._make_seed(_test_seed())
 
     # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
     # for the jit to do anything.
@@ -1385,7 +1399,14 @@ class FunMCMCTestJAX32(FunMCMCTestTensorFlow32):
 
   def setUp(self):
     super(FunMCMCTestJAX32, self).setUp()
-    backend.set_backend(backend.JAX, backend.MANUAL_TRANSFORMS)
+    global tf
+    global tfp
+    global util
+    global fun_mcmc
+    tf = backend_jax.tf
+    tfp = backend_jax.tfp
+    util = backend_jax.util
+    fun_mcmc = fun_mcmc_jax
 
   def _make_seed(self, seed):
     return jax_random.PRNGKey(seed)

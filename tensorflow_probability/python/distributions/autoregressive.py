@@ -18,14 +18,25 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls won't trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*autoregressive',
+                        append=True)  # Don't override user-set filters.
 
 
 class Autoregressive(distribution.Distribution):
@@ -79,10 +90,9 @@ class Autoregressive(distribution.Distribution):
   def _normal_fn(event_size):
     n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
-    affine = tfb.Affine(
-        scale_tril=tfp.math.fill_triangular(0.25 * p))
+    affine = tfb.ScaleTriL(tfp.math.fill_triangular(0.25 * p))
     def _fn(samples):
-      scale = tf.exp(affine.forward(samples))
+      scale = tf.exp(affine(samples))
       return tfd.Independent(
           tfd.Normal(loc=0., scale=scale, validate_args=True),
           reinterpreted_batch_ndims=1)
@@ -125,7 +135,7 @@ class Autoregressive(distribution.Distribution):
         `tfd.Distribution`-like instance from a `Tensor` (e.g.,
         `sample0`). The function must respect the 'autoregressive property',
         i.e., there exists a permutation of event such that each coordinate is a
-        diffeomorphic function of on preceding coordinates.
+        diffeomorphic function of only preceding coordinates.
       sample0: Initial input to `distribution_fn`; used to
         build the distribution in `__init__` which in turn specifies this
         distribution's properties, e.g., `event_shape`, `batch_shape`, `dtype`.
@@ -150,7 +160,8 @@ class Autoregressive(distribution.Distribution):
     with tf.name_scope(name) as name:
       self._distribution_fn = distribution_fn
       self._sample0 = tensor_util.convert_nonref_to_tensor(sample0)
-      self._num_steps = tensor_util.convert_nonref_to_tensor(num_steps)
+      self._num_steps = tensor_util.convert_nonref_to_tensor(
+          num_steps, dtype_hint=tf.int32)
 
       # We need to call `distribution_fn` once here to determine the `dtype`
       # and `reparameterization_type` of this distribution.  We don't otherwise
@@ -258,18 +269,36 @@ class Autoregressive(distribution.Distribution):
       if num_steps_static is None:
         num_steps = tf.reduce_prod(distribution0.event_shape_tensor())
 
-    seed = SeedStream(seed, salt='Autoregressive')()
-    samples = distribution0.sample(n, seed=seed)
+    stateless_seed = samplers.sanitize_seed(seed, salt='Autoregressive')
+    stateful_seed = None
+    try:
+      samples = distribution0.sample(n, seed=stateless_seed)
+      is_stateful_sampler = False
+    except TypeError as e:
+      if ('Expected int for argument' not in str(e) and
+          TENSOR_SEED_MSG_PREFIX not in str(e)):
+        raise
+      msg = (
+          'Falling back to stateful sampling for `distribution_fn(sample0)` of '
+          'type `{}`. Please update to use `tf.random.stateless_*` RNGs. '
+          'This fallback may be removed after 20-Aug-2020. ({})')
+      warnings.warn(msg.format(distribution0.name,
+                               type(distribution0),
+                               str(e)))
+      stateful_seed = SeedStream(seed, salt='Autoregressive')()
+      samples = distribution0.sample(n, seed=stateful_seed)
+      is_stateful_sampler = True
+
+    seed = stateful_seed if is_stateful_sampler else stateless_seed
+
     if num_steps_static is not None:
       for _ in range(num_steps_static):
         # pylint: disable=not-callable
         samples = self.distribution_fn(samples).sample(seed=seed)
     else:
-      samples = tf.foldl(
-          # pylint: disable=not-callable
-          lambda s, _: self.distribution_fn(s).sample(seed=seed),
-          elems=tf.range(0, num_steps),
-          initializer=samples)
+      # pylint: disable=not-callable
+      samples = tf.foldl(lambda s, _: self.distribution_fn(s).sample(seed=seed),
+                         elems=tf.range(0, num_steps), initializer=samples)
     return samples
 
   def _log_prob(self, value):

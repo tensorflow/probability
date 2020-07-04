@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
+import warnings
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
@@ -92,6 +94,23 @@ def _test_capture_normal_sample_outputs():
   tfd.Normal.sample = _capturing_normal_sample
   yield data_container
   tfd.Normal.sample = true_normal_sample
+
+
+@contextlib.contextmanager
+def _test_capture_categorical_sample_outputs():
+  """Use monkey-patching to capture the output of an Normal sample."""
+  data_container = []
+  true_categorical_sample = tfd.Categorical.sample
+
+  def _capturing_categorical_sample(
+      self, sample_shape=(), seed=None, name='sample', **kwargs):
+    samples = true_categorical_sample(self, sample_shape, seed, name, **kwargs)
+    data_container.append(samples)
+    return samples
+
+  tfd.Categorical.sample = _capturing_categorical_sample
+  yield data_container
+  tfd.Categorical.sample = true_categorical_sample
 
 
 def make_univariate_mixture(batch_shape, num_components, use_static_graph):
@@ -521,11 +540,14 @@ class MixtureTest(test_util.TestCase):
         num_components=num_components,
         use_static_graph=self.use_static_graph)
     n = 4
+    seed = test_util.test_seed()
     with _test_capture_normal_sample_outputs() as component_samples:
-      samples = dist.sample(n, seed=test_util.test_seed())
+      with _test_capture_categorical_sample_outputs() as cat_samples:
+        samples = dist.sample(n, seed=seed)
+    self.assertLen(cat_samples, 1)
+    cat_samples = cat_samples[0]
     self.assertEqual(samples.dtype, tf.float32)
     self.assertEqual((4,), samples.shape)
-    cat_samples = dist.cat.sample(n, seed=test_util.test_seed())
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((4,), sample_values.shape)
@@ -587,12 +609,12 @@ class MixtureTest(test_util.TestCase):
     n = 4
     seed = test_util.test_seed()
     with _test_capture_mvndiag_sample_outputs() as component_samples:
-      tf.random.set_seed(seed)
-      samples = dist.sample(n, seed=seed)
+      with _test_capture_categorical_sample_outputs() as cat_samples:
+        samples = dist.sample(n, seed=seed)
+    self.assertLen(cat_samples, 1)
+    cat_samples = cat_samples[0]
     self.assertEqual(samples.dtype, tf.float32)
     self.assertEqual((4, 2), samples.shape)
-    tf.random.set_seed(seed)
-    cat_samples = dist.cat.sample(n, seed=seed)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((4, 2), sample_values.shape)
@@ -615,12 +637,12 @@ class MixtureTest(test_util.TestCase):
     n = 4
     seed = test_util.test_seed()
     with _test_capture_normal_sample_outputs() as component_samples:
-      tf.random.set_seed(seed)
-      samples = dist.sample(n, seed=seed)
+      with _test_capture_categorical_sample_outputs() as cat_samples:
+        samples = dist.sample(n, seed=seed)
+    self.assertLen(cat_samples, 1)
+    cat_samples = cat_samples[0]
     self.assertEqual(samples.dtype, tf.float32)
     self.assertEqual((4, 2, 3), samples.shape)
-    tf.random.set_seed(seed)
-    cat_samples = dist.cat.sample(n, seed=seed)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((4, 2, 3), sample_values.shape)
@@ -655,15 +677,15 @@ class MixtureTest(test_util.TestCase):
     n = 5
     seed = test_util.test_seed()
     with _test_capture_mvndiag_sample_outputs() as component_samples:
-      tf.random.set_seed(seed)
-      samples = dist.sample(n, seed=seed)
+      with _test_capture_categorical_sample_outputs() as cat_samples:
+        samples = dist.sample(n, seed=seed)
+    self.assertLen(cat_samples, 1)
+    cat_samples = cat_samples[0]
     self.assertEqual(samples.dtype, tf.float32)
     if fully_known_batch_shape:
       self.assertEqual((5, 2, 3, 4), samples.shape)
     else:
       self.assertEqual([5, None, 3, 4], tensorshape_util.as_list(samples.shape))
-    tf.random.set_seed(seed)
-    cat_samples = dist.cat.sample(n, seed=seed)
     sample_values, cat_sample_values, dist_sample_values = self.evaluate(
         [samples, cat_samples, component_samples])
     self.assertEqual((5, 2, 3, 4), sample_values.shape)
@@ -1019,6 +1041,46 @@ class MixtureBenchmark(tf.test.Benchmark):
 
 class MixtureStaticSampleBenchmark(MixtureBenchmark):
   use_static_graph = True
+
+
+class SamplerBackwardCompatibilityTest(test_util.TestCase):
+  """Since `cat` must be tfd.Categorical, we check only components."""
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_static_graph', use_static_graph=True),
+      dict(testcase_name='_nonstatic_graph', use_static_graph=False))
+  @test_util.jax_disable_test_missing_functionality('stateful random')
+  @test_util.numpy_disable_test_missing_functionality('stateful random')
+  def testStatefulComponentDist(self, use_static_graph):
+
+    class StatefulNormal(tfd.Distribution):
+
+      def __init__(self, loc):
+        self._loc = tf.convert_to_tensor(loc)
+        super(StatefulNormal, self).__init__(
+            dtype=tf.float32, reparameterization_type=tfd.FULLY_REPARAMETERIZED,
+            validate_args=False, allow_nan_stats=False)
+
+      def _batch_shape(self):
+        return self._loc.shape
+
+      def _event_shape(self):
+        return []
+
+      def _sample_n(self, n, seed=None):
+        return self._loc + tf.random.normal(
+            tf.concat([[n], tf.shape(self._loc)], axis=0), seed=seed)
+
+    mix = tfd.Mixture(
+        cat=tfd.Categorical(logits=[0., 0]),
+        components=[tfd.HalfNormal(scale=2.),
+                    StatefulNormal(loc=3.)],
+        use_static_graph=use_static_graph)
+    with warnings.catch_warnings(record=True) as triggered:
+      self.evaluate(mix.sample(seed=test_util.test_seed()))
+    self.assertTrue(
+        any('Falling back to stateful sampling for `components[1]`'
+            in str(warning.message) for warning in triggered))
 
 
 if __name__ == '__main__':

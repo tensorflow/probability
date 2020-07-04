@@ -23,7 +23,6 @@ from __future__ import print_function
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
@@ -775,8 +774,10 @@ class _HiddenMarkovModelTest(
     transition_matrix_permuted = tf.transpose(
         tf.gather(tf.transpose(transition_matrix), inverse_permutations),
         perm=[0, 2, 1])
-    transition_matrix_permuted = tf1.batch_gather(transition_matrix_permuted,
-                                                  inverse_permutations)
+    transition_matrix_permuted = tf.gather(
+        transition_matrix_permuted,
+        inverse_permutations,
+        batch_dims=1)
 
     observations = tf.constant([1, 0, 3, 1, 3, 0, 2, 1, 2, 1, 3, 0, 0, 1, 1, 2])
 
@@ -791,7 +792,7 @@ class _HiddenMarkovModelTest(
     inferred_states = model.posterior_mode(observations)
     expected_states = [0, 1, 2, 0, 2, 1, 2, 0, 2, 0, 2, 0, 1, 2, 0, 1]
     expected_states_permuted = tf.transpose(
-        tf1.batch_gather(
+        tf.gather(
             tf.transpose(permutations)[..., tf.newaxis],
             expected_states)[..., 0])
     self.assertAllEqual(inferred_states, expected_states_permuted)

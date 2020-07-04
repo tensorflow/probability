@@ -63,7 +63,7 @@ class MaskedTimeSeries(collections.namedtuple('MaskedTimeSeries',
 
   ```
   observed_time_series = tfp.sts.MaskedTimeSeries(
-    time_series=tf.random_normal([3, 4, 5]),
+    time_series=tf.random.normal([3, 4, 5]),
     is_missing=[True, False, False, True, False])
   ```
 

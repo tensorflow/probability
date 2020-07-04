@@ -250,7 +250,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
     latent_rates = yield Root(tfd.Independent(
       tfd.Normal(loc=logit_locs, scale=tf.nn.softplus(logit_softplus_scales)),
       reinterpreted_batch_ndims=1))
-    y = yield tfd.VectorDeterministic(y)
+    y = yield tfd.VectorDeterministic(observed_counts)
   q = tfd.JointDistributionCoroutine(variational_model_fn)
   ```
 

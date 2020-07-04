@@ -38,6 +38,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "logeinsumexp_test",
     size = "medium",
@@ -78,6 +79,7 @@ py_library(
     ],
 )
 
+# py2and3
 py_test(
     name = "marginalizable_test",
     size = "medium",

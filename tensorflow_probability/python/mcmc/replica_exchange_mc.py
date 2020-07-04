@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -26,73 +27,90 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc import random_walk_metropolis
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
-# pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import array_ops
-# pylint: enable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'ReplicaExchangeMC',
     'default_swap_proposal_fn',
 ]
 
-ReplicaExchangeMCKernelResults = collections.namedtuple(
-    # All tensors `x` with shape [num_replica, ...] are "ordered", meaning
-    # x[k,...] holds values for replica `k`.
-    'ReplicaExchangeMCKernelResults',
-    [
-        # List-like of [num_replica] + batch_shape Tensor (or list thereof)
-        # holding state parts for all replicas, after swaps.
-        # This will be state parts, *even* if the chain is working with states.
-        'post_swap_replica_states',
 
-        # Kernel results for replicas, before any swaps.
-        'pre_swap_replica_results',
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*replica_exchange_mc',
+                        append=True)  # Don't override user-set filters.
 
-        # Kernel results for replicas, after swaps.
-        # Some fields are updated, and some removed!
-        # The theme is to update whatever is necessary to to obtain correct
-        # state swaps, and remove fields that are ambiguous (e.g.
-        # proposed_results inside Metropolis KR).
-        'post_swap_replica_results',
 
-        # Shape [num_replica, num_replica] + batch_shape boolean Tensor where
-        # is_swap_proposed[i, j, ...] == True indicates a swap between
-        # replicas `i` and `j` has been proposed.
-        # Note is_swap_proposed[i, i, ...] == True indicates no move is
-        # proposed for replica `i`.
-        # TODO(b/144166689) Consider whether it may be better to make the user
-        # compute this post-sampling rather than in kernel results.
-        'is_swap_proposed',
+class ReplicaExchangeMCKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        # All tensors `x` with shape [num_replica, ...] are "ordered", meaning
+        # x[k,...] holds values for replica `k`.
+        'ReplicaExchangeMCKernelResults',
+        [
+            # List-like of [num_replica] + batch_shape Tensor (or list thereof)
+            # holding state parts for all replicas, after swaps.
+            # This will be state parts, *even* if the chain is working with
+            # states.
+            'post_swap_replica_states',
 
-        # Similar to is_swap_proposed.
-        # is_swap_accepted[i, j, ...] indicates a swap between replicas
-        # `i` and `j` was accepted.
-        'is_swap_accepted',
+            # Kernel results for replicas, before any swaps.
+            'pre_swap_replica_results',
 
-        # Shape [num_replica - 1] + batch_shape boolean vectors equal to the
-        # first lower sub-diagonal of is_swap_proposed.
-        # is_swap_proposed_adjacent[k, ...] == True just when an swap is
-        # proposed between replicas `k` and `k+1`.
-        # This is sufficient to track swaps in the common (and default)
-        # case where swaps are between adjacent replicas only.
-        'is_swap_proposed_adjacent',
-        'is_swap_accepted_adjacent',
+            # Kernel results for replicas, after swaps.
+            # Some fields are updated, and some removed!
+            # The theme is to update whatever is necessary to to obtain correct
+            # state swaps, and remove fields that are ambiguous (e.g.
+            # proposed_results inside Metropolis KR).
+            'post_swap_replica_results',
 
-        # The inverse_temperatures used to calculate these results. (Other
-        # TransitionKernels which want to intercept the inverse_temperatures
-        # should rewrite this field.)  Shape [num_replica].
-        'inverse_temperatures',
+            # Shape [num_replica, num_replica] + batch_shape boolean Tensor
+            # where is_swap_proposed[i, j, ...] == True indicates a swap between
+            # replicas `i` and `j` has been proposed.
+            # Note is_swap_proposed[i, i, ...] == True indicates no move is
+            # proposed for replica `i`.
+            # TODO(b/144166689) Consider whether it may be better to make the
+            # user compute this post-sampling rather than in kernel results.
+            'is_swap_proposed',
 
-        # Shape [num_replica] + batch_shape permutation used to propose
-        # swaps.
-        'swaps',
-    ])
+            # Similar to is_swap_proposed.
+            # is_swap_accepted[i, j, ...] indicates a swap between replicas
+            # `i` and `j` was accepted.
+            'is_swap_accepted',
+
+            # Shape [num_replica - 1] + batch_shape boolean vectors equal to the
+            # first lower sub-diagonal of is_swap_proposed.
+            # is_swap_proposed_adjacent[k, ...] == True just when an swap is
+            # proposed between replicas `k` and `k+1`.
+            # This is sufficient to track swaps in the common (and default)
+            # case where swaps are between adjacent replicas only.
+            'is_swap_proposed_adjacent',
+            'is_swap_accepted_adjacent',
+
+            # The inverse_temperatures used to calculate these results. (Other
+            # TransitionKernels which want to intercept the inverse_temperatures
+            # should rewrite this field.)  Shape [num_replica].
+            'inverse_temperatures',
+
+            # Shape [num_replica] + batch_shape permutation used to propose
+            # swaps.
+            'swaps',
+
+            # Random seed for this step.
+            'seed',
+        ])):
+  """Internal state and diagnostics for Replica Exchange MC."""
+  __slots__ = ()
 
 
 def default_swap_proposal_fn(prob_swap, name=None):
@@ -140,7 +158,8 @@ def default_swap_proposal_fn(prob_swap, name=None):
   def adjacent_swaps(num_replica, batch_shape=(), seed=None):
     """Make random shuffle using only one time swaps."""
     with tf.name_scope(name or 'adjacent_swaps'):
-      seed = SeedStream(seed, salt='random_adjacent_shuffle')
+      parity_seed, proposal_seed = samplers.split_seed(
+          seed, salt='random_adjacent_shuffle')
       # u selects parity.  E.g.,
       #  u==True ==>  [0, 2, 1, 4, 3] like swaps
       #  u==False ==> [1, 0, 3, 2, 4] like swaps
@@ -149,7 +168,7 @@ def default_swap_proposal_fn(prob_swap, name=None):
       # So special case num_replica==2, forcing u==False in this case.
       u_shape = prefer_static.concat((
           tf.ones(1, dtype=tf.int32), tf.cast(batch_shape, tf.int32)), axis=0)
-      u = tf.random.uniform(u_shape, seed=seed()) < 0.5
+      u = samplers.uniform(u_shape, seed=parity_seed) < 0.5
       u = tf.where(num_replica > 2, u, False)
 
       x = mcmc_util.left_justified_expand_dims_to(
@@ -160,7 +179,7 @@ def default_swap_proposal_fn(prob_swap, name=None):
       # TODO(b/142689785): Consider using tf.cond and returning an empty list
       # then in REMC consider using a tf.cond for short-circuiting.
       return tf.where(
-          tf.random.uniform(batch_shape, seed=seed()) < prob_swap, y, x)
+          samplers.uniform(batch_shape, seed=proposal_seed) < prob_swap, y, x)
 
   return adjacent_swaps
 
@@ -269,10 +288,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   #  [len(inverse_temperatures)] + target.event_shape
   step_size = 0.5 / tf.reshape(tf.sqrt(inverse_temperatures), shape=(4, 1))
 
-  def make_kernel_fn(target_log_prob_fn, seed):
+  def make_kernel_fn(target_log_prob_fn):
     return tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
-        seed=seed, step_size=step_size, num_leapfrog_steps=3)
+        step_size=step_size, num_leapfrog_steps=3)
 
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
@@ -301,6 +320,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
        https://arxiv.org/abs/physics/0508111
   """
 
+  @deprecation.deprecated_args(
+      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
+      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                inverse_temperatures,
@@ -319,14 +341,16 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         replica. The leftmost dimension is the `num_replica` and the
         second dimension through the rightmost can provide different temperature
         to different batch members, doing a left-justified broadcast.
-      make_kernel_fn: Python callable which takes target_log_prob_fn and seed
-        args and returns a TransitionKernel instance.
+      make_kernel_fn: Python callable which takes a `target_log_prob_fn`
+        arg and returns a `tfp.mcmc.TransitionKernel` instance. Passing a
+        function taking `(target_log_prob_fn, seed)` deprecated but supported
+        until 2020-09-20.
       swap_proposal_fn: Python callable which take a number of replicas, and
         returns `swaps`, a shape `[num_replica] + batch_shape` `Tensor`, where
         axis 0 indexes a permutation of `{0,..., num_replica-1}`, designating
         replicas to swap.
-      seed: Python integer to seed the random number generator.
-        Default value: `None` (i.e., no seed).
+      seed: Python integer to seed the random number generator. Deprecated, pass
+        seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -381,7 +405,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Takes one step of the TransitionKernel.
 
     Args:
@@ -390,6 +414,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made within the
         previous call to this function (or as returned by `bootstrap_results`).
+      seed: Optional, a seed for reproducible sampling.
 
     Returns:
       next_state: `Tensor` or Python `list` of `Tensor`s representing the
@@ -398,6 +423,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         `Tensor`s representing internal calculations made within this function.
         This inculdes replica states.
     """
+
     # The code below propagates one step states of shape
     #  [n_replica] + batch_shape + event_shape.
     #
@@ -423,18 +449,55 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           previous_kernel_results.inverse_temperatures,
           name='inverse_temperatures')
 
-      inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
-          _make_replica_target_log_prob_fn(
-              self.target_log_prob_fn,
-              inverse_temperatures),
-          self._seed_stream())
+      target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
+          self.target_log_prob_fn,
+          inverse_temperatures)
+      # Seed handling complexity is due to users possibly expecting an old-style
+      # stateful seed to be passed to `self.make_kernel_fn`, and no seed
+      # expected by `kernel.one_step`.
+      # In other words:
+      # - We try `make_kernel_fn` without a seed first; this is the future. The
+      #   kernel will receive a seed later, as part of `one_step`.
+      # - If the user code doesn't like that (Python complains about a missing
+      #   required argument), we warn and fall back to the previous behavior.
+      try:
+        inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
+            target_log_prob_for_inner_kernel)
+      except TypeError as e:
+        if 'argument' not in str(e):
+          raise
+        warnings.warn(
+            'The `seed` argument to `ReplicaExchangeMC`s `make_kernel_fn` is '
+            'deprecated. `TransitionKernel` instances now receive seeds via '
+            '`one_step`.')
+        inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
+            target_log_prob_for_inner_kernel, self._seed_stream())
 
+      # Now that we've constructed the TransitionKernel instance:
+      # - If we were given a seed, we sanitize it to stateless and pass along
+      #   to `kernel.one_step`. If it doesn't like that, we crash and propagate
+      #   the error.  Rationale: The contract is stateless sampling given
+      #   seed, and doing otherwise would not meet it.
+      # - If not given a seed, we don't pass one along. This avoids breaking
+      #   underlying kernels lacking a `seed` arg on `one_step`.
+      # TODO(b/159636942): Clean up after 2020-09-20.
+      if seed is not None:
+        seed = samplers.sanitize_seed(seed)
+        inner_seed, swap_seed, logu_seed = samplers.split_seed(
+            seed, n=3, salt='remc_one_step')
+        inner_kwargs = dict(seed=inner_seed)
+      else:
+        if self._seed_stream.original_seed is not None:
+          warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
+        inner_kwargs = {}
+        swap_seed, logu_seed = samplers.split_seed(self._seed_stream())
       [
           pre_swap_replica_states,
           pre_swap_replica_results,
       ] = inner_kernel.one_step(
           previous_kernel_results.post_swap_replica_states,
-          previous_kernel_results.post_swap_replica_results)
+          previous_kernel_results.post_swap_replica_results,
+          **inner_kwargs)
 
       pre_swap_replica_target_log_prob = _get_field(
           # These are tempered log probs (have been divided by temperature).
@@ -461,7 +524,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       # batch member.  Of course some batch members may accept and some reject.
       swaps = tf.cast(
           self.swap_proposal_fn(  # pylint: disable=not-callable
-              num_replica, batch_shape=batch_shape, seed=self._seed_stream()),
+              num_replica, batch_shape=batch_shape, seed=swap_seed),
           dtype=tf.int32)
       null_swaps = mcmc_util.left_justified_expand_dims_like(
           tf.range(num_replica, dtype=swaps.dtype), swaps)
@@ -503,9 +566,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       # Produce Log[Uniform] draws that are identical at swapped indices.
       log_uniform = tf.math.log(
-          tf.random.uniform(shape=replica_and_batch_shape,
-                            dtype=dtype,
-                            seed=self._seed_stream()))
+          samplers.uniform(shape=replica_and_batch_shape,
+                           dtype=dtype,
+                           seed=logu_seed))
       anchor_swaps = tf.minimum(swaps, null_swaps)
       log_uniform = mcmc_util.index_remapping_gather(log_uniform, anchor_swaps)
 
@@ -566,6 +629,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           # `tf.Variable`.
           inverse_temperatures=previous_kernel_results.inverse_temperatures,
           swaps=swaps,
+          seed=samplers.zeros_seed() if seed is None else seed,
       )
 
       return states, post_swap_kernel_results
@@ -607,11 +671,30 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           for x in init_state
       ]
 
-      inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
-          _make_replica_target_log_prob_fn(
-              self.target_log_prob_fn,
-              inverse_temperatures),
-          self._seed_stream())
+      target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
+          self.target_log_prob_fn,
+          inverse_temperatures)
+      # Seed handling complexity is due to users possibly expecting an old-style
+      # stateful seed to be passed to `self.make_kernel_fn`.
+      # In other words:
+      # - We try `make_kernel_fn` without a seed first; this is the future. The
+      #   kernel will receive a seed later, as part of `one_step`.
+      # - If the user code doesn't like that (Python complains about a missing
+      #   required argument), we fall back to the previous behavior and warn.
+      try:
+        inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
+            target_log_prob_for_inner_kernel)
+      except TypeError as e:
+        if 'argument' not in str(e):
+          raise
+        warnings.warn(
+            'The second (`seed`) argument to `ReplicaExchangeMC`s '
+            '`make_kernel_fn` is deprecated. `TransitionKernel` instances now '
+            'receive seeds via `bootstrap_results` and `one_step`. This '
+            'fallback may become an error 2020-09-20.')
+        inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
+            target_log_prob_for_inner_kernel, self._seed_stream())
+
       replica_results = inner_kernel.bootstrap_results(replica_states)
 
       pre_swap_replica_target_log_prob = _get_field(
@@ -650,6 +733,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           is_swap_accepted_adjacent=_sub_diag(is_swap_accepted),
           inverse_temperatures=self.inverse_temperatures,
           swaps=swaps,
+          seed=samplers.zeros_seed(),
       )
 
 
@@ -821,7 +905,7 @@ def _sub_diag(nonmatrix):
     # In fact, non-static shape breaks matrix_diag_part_v2, so we must raise
     # this message now.
     # See http://b/138403336 for the TF issue tracker.
-    if not nonmatrix.shape[:2].is_fully_defined():
+    if not tensorshape_util.is_fully_defined(nonmatrix.shape[:2]):
       raise ValueError(
           '`inverse_temperatures did not have statically defined shape, '
           'which breaks tracking of is_swap_{proposed,accepted}.  '
@@ -844,8 +928,8 @@ def _sub_diag(nonmatrix):
     else:
       # Get first sub-diagonal.  `padding_value` is not used (since matrix is
       # square), but is required for the API since this is raw gen_array_ops.
-      matrix_sub_diag = array_ops.matrix_diag_part_v2(
-          distribution_util.rotate_transpose(nonmatrix, shift=-2),
+      matrix_sub_diag = tf.raw_ops.MatrixDiagPartV2(
+          input=distribution_util.rotate_transpose(nonmatrix, shift=-2),
           k=tf.convert_to_tensor(-1, dtype=tf.int32),
           padding_value=tf.cast(0.0, dtype=nonmatrix.dtype))
 

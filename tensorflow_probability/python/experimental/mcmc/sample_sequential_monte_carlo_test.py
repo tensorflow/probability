@@ -20,7 +20,6 @@ from __future__ import print_function
 
 
 import functools
-import os
 
 # Dependency imports
 from absl.testing import parameterized
@@ -200,13 +199,13 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         dtype)
 
     hyper_mean = tf.cast(0, dtype)
-    hyper_scale = tf.cast(10, dtype)
+    hyper_scale = tf.cast(2.5, dtype)
     # Generate model prior_log_prob_fn and likelihood_log_prob_fn.
     prior_jd = tfd.JointDistributionSequential([
         tfd.Normal(loc=hyper_mean, scale=hyper_scale),
         tfd.Normal(loc=hyper_mean, scale=hyper_scale),
         tfd.Normal(loc=hyper_mean, scale=hyper_scale),
-        tfd.HalfNormal(scale=tf.cast(1., dtype)),
+        tfd.HalfNormal(scale=tf.cast(.5, dtype)),
         tfd.Uniform(low=tf.cast(0, dtype), high=.5),
     ], validate_args=True)
 
@@ -231,11 +230,11 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         tfb.Identity(),
         tfb.Identity(),
         tfb.Identity(),
-        tfb.Exp(),
+        tfb.Softplus(),
         tfb.Sigmoid(tf.constant(0., dtype), .5),
     ]
     make_transform_hmc_kernel_fn = gen_make_transform_hmc_kernel_fn(
-        unconstraining_bijectors, num_leapfrog_steps=10)
+        unconstraining_bijectors, num_leapfrog_steps=5)
 
     @tf.function(autograph=False, experimental_compile=True)
     def run_smc():
@@ -249,7 +248,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
           make_kernel_fn=make_transform_hmc_kernel_fn,
           tuning_fn=functools.partial(simple_heuristic_tuning,
                                       optimal_accept=.6),
-          min_num_steps=10,
+          min_num_steps=5,
           parallel_iterations=1,
           seed=seed)
 
@@ -259,7 +258,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         n_stage, b0, b1, mu_out, sigma_out, weight
     ) = self.evaluate((n_stage, b0, b1, mu_out, sigma_out, weight))
 
-    self.assertTrue(n_stage, 15)
+    self.assertTrue(n_stage, 10)
 
     # Compare the SMC posterior with the result from a calibrated HMC.
     self.assertAllClose(tf.reduce_mean(b0), 0.016, atol=0.005, rtol=0.005)
@@ -274,8 +273,4 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  # TODO(b/130689556) XLA's default fastmath config makes tests unstable.
-  os.environ['XLA_FLAGS'] = (os.environ.get('XLA_FLAGS', '') +
-                             ' --xla_cpu_fast_math_honor_nans=true'
-                             ' --xla_cpu_fast_math_honor_infs=true')
   tf.test.main()

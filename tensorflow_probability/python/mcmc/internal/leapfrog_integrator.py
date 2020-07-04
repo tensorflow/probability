@@ -54,7 +54,7 @@ class LeapfrogIntegrator(object):
     """Computes the integration.
 
     Args:
-      momentum_parts: Python `list` of `Tensor`s representing momentume for each
+      momentum_parts: Python `list` of `Tensor`s representing momentum for each
         state part.
       state_parts: Python `list` of `Tensor`s which collectively representing
         the state.
@@ -269,7 +269,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
       # Scale", https://arxiv.org/abs/1810.04449.
 
       half_next_momentum_parts = [
-          v + 0.5 * tf.cast(eps, v.dtype) * tf.cast(g, v.dtype)
+          v + tf.cast(0.5 * eps, v.dtype) * tf.cast(g, v.dtype)
           for v, eps, g
           in zip(momentum_parts, self.step_sizes, target_grad_parts)]
 
@@ -292,7 +292,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
           ])
 
       next_momentum_parts = [
-          v - 0.5 * tf.cast(eps, v.dtype) * tf.cast(g, v.dtype)  # pylint: disable=g-complex-comprehension
+          v - tf.cast(0.5 * eps, v.dtype) * tf.cast(g, v.dtype)  # pylint: disable=g-complex-comprehension
           for v, eps, g
           in zip(next_half_next_momentum_parts,
                  self.step_sizes,

@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 # Dependency imports
 
 import numpy as np
@@ -53,7 +55,7 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
     return _fn
 
   def testSampleAndLogProbConsistency(self):
-    batch_shape = []
+    batch_shape = np.int32([])
     event_size = 2
     batch_event_shape = np.concatenate([batch_shape, [event_size]], axis=0)
     sample0 = tf.zeros(batch_event_shape)
@@ -61,8 +63,6 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
         scale_tril=self._random_scale_tril(event_size), validate_args=True)
     ar = tfd.Autoregressive(
         self._normal_fn(affine), sample0, validate_args=True)
-    if tf.executing_eagerly():
-      return
     self.run_test_sample_consistent_log_prob(
         self.evaluate,
         ar,
@@ -71,6 +71,31 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
         center=0.,
         rtol=0.01,
         seed=test_util.test_seed())
+
+  @test_util.jax_disable_test_missing_functionality('seedless sampling')
+  def testSampleIndependenceWithoutSeedBug(self):
+    # Under eager, there was a bug where subsequent samples for position 0 would
+    # be erroneously independent of the first sample when a seed was not
+    # provided.
+
+    # A pithy example: A simple 1-Markov autoregressive sequence for which the
+    # first frame is either 0 or 1 with equal probability and all subsequent
+    # frames copy the previous frame. Thus the overall sequence-level
+    # distribution is 0000 with probability 0.5 and 1111 with probability 0.5.
+    def distribution_fn(sample):
+      num_frames = sample.shape[-1]
+      mask = tf.one_hot(0, num_frames)[:, tf.newaxis]
+      probs = tf.roll(tf.one_hot(sample, 3), shift=1, axis=-2)
+      probs = probs * (1.0 - mask) + tf.convert_to_tensor([0.5, 0.5, 0]) * mask
+      return tfd.Independent(tfd.Categorical(probs=probs),
+                             reinterpreted_batch_ndims=1)
+
+    ar = tfd.Autoregressive(distribution_fn,
+                            sample0=tf.constant([2, 2, 2, 2]),
+                            num_steps=4)
+    samps = self.evaluate(ar.sample(10))
+    for s in samps:
+      self.assertIn(np.mean(s), (0., 1.), msg=str(s))
 
   def testCompareToBijector(self):
     """Demonstrates equivalence between TD, Bijector approach and AR dist."""
@@ -244,6 +269,54 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
 
     self.assertLen(grad, 3)
     self.assertAllNotNone(grad)
+
+
+class SamplerBackwardCompatibilityTest(test_util.TestCase):
+
+  @test_util.jax_disable_test_missing_functionality('stateful samplers')
+  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
+  def testStatefulDistFn(self):
+
+    class StatefulNormal(tfd.Distribution):
+
+      def __init__(self, loc):
+        self._loc = tf.convert_to_tensor(loc)
+        super(StatefulNormal, self).__init__(
+            dtype=tf.float32, reparameterization_type=tfd.FULLY_REPARAMETERIZED,
+            validate_args=False, allow_nan_stats=False)
+
+      def _batch_shape(self):
+        return self._loc.shape
+
+      def _event_shape(self):
+        return []
+
+      def _sample_n(self, n, seed=None):
+        return self._loc + tf.random.normal(
+            tf.concat([[n], tf.shape(self._loc)], axis=0), seed=seed)
+
+    def dist_fn(s):
+      return StatefulNormal(loc=s)
+
+    ar = tfd.Autoregressive(
+        dist_fn,
+        sample0=tfd.Normal(0., 1.).sample(7, seed=test_util.test_seed()),
+        num_steps=7)
+
+    with warnings.catch_warnings(record=True) as triggered:
+      self.evaluate(ar.sample(seed=test_util.test_seed()))
+    self.assertTrue(
+        any('Falling back to stateful sampling for `distribution_fn(sample0)`'
+            in str(warning.message) for warning in triggered))
+
+    num_steps = tf.Variable(9)
+    self.evaluate(num_steps.initializer)
+    with warnings.catch_warnings(record=True) as triggered:
+      self.evaluate(ar.copy(num_steps=num_steps).sample(
+          seed=test_util.test_seed()))
+    self.assertTrue(
+        any('Falling back to stateful sampling for `distribution_fn(sample0)`'
+            in str(warning.message) for warning in triggered))
 
 
 if __name__ == '__main__':

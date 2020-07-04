@@ -176,6 +176,7 @@ class ParetoTest(test_util.TestCase):
         self.evaluate(cdf),
         self._scipy_pareto(concentration_v, scale_v).cdf(x))
 
+  @test_util.numpy_disable_gradient_test
   def testParetoPDFGradientZeroOutsideSupport(self):
     scale = tf.constant(1.)
     concentration = tf.constant(3.)
@@ -187,6 +188,7 @@ class ParetoTest(test_util.TestCase):
                 tfd.Pareto(concentration, scale, validate_args=False).prob,
                 x)[1]), 0.)
 
+  @test_util.numpy_disable_gradient_test
   def testParetoCDFGradientZeroOutsideSupport(self):
     scale = tf.constant(1.)
     concentration = tf.constant(3.)

@@ -497,6 +497,9 @@ class BernoulliSlicingTest(test_util.TestCase):
                                  'slice index.*out of bounds'):
       check(make_slicer[..., 2, :])  # ...,1,5 -> 2 is oob.
 
+  @test_util.jax_disable_test_missing_functionality('Gradient tape not '
+                                                    'supported in JAX backend')
+  @test_util.numpy_disable_gradient_test
   def testSliceSequencePreservesOrigVarGradLinkage(self):
     logits = tf.Variable(samplers.normal(
         [20, 3, 1, 5], seed=test_util.test_seed()))
@@ -511,6 +514,9 @@ class BernoulliSlicingTest(test_util.TestCase):
       self.assertGreater(
           self.evaluate(tf.reduce_sum(tf.abs(dlpdlogits))), 0)
 
+  @test_util.jax_disable_test_missing_functionality('Gradient tape not '
+                                                    'supported in JAX backend')
+  @test_util.numpy_disable_gradient_test
   def testSliceThenCopyPreservesOrigVarGradLinkage(self):
     logits = tf.Variable(
         samplers.normal([20, 3, 1, 5], seed=test_util.test_seed()))

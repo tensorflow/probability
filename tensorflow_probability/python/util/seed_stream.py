@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import hashlib
 
+import tensorflow.compat.v2 as tf
+
 
 __all__ = [
     'SeedStream',
@@ -27,6 +29,8 @@ __all__ = [
 
 
 JAX_MODE = False
+
+TENSOR_SEED_MSG_PREFIX = 'Unexpected Tensor/ndarray seed'
 
 
 class SeedStream(object):
@@ -46,8 +50,8 @@ class SeedStream(object):
 
   ```python
   def broken_beta(shape, alpha, beta, seed):
-    x = tf.random_gamma(shape, alpha, seed=seed)
-    y = tf.random_gamma(shape, beta, seed=seed)
+    x = tf.random.gamma(shape, alpha, seed=seed)
+    y = tf.random.gamma(shape, beta, seed=seed)
     return x / (x + y)
   ```
 
@@ -91,8 +95,8 @@ class SeedStream(object):
   ```python
   def random_beta(shape, alpha, beta, seed):        # (a)
     seed = SeedStream(seed, salt="random_beta")     # (b)
-    x = tf.random_gamma(shape, alpha, seed=seed())  # (c)
-    y = tf.random_gamma(shape, beta, seed=seed())   # (c)
+    x = tf.random.gamma(shape, alpha, seed=seed())  # (c)
+    y = tf.random.gamma(shape, beta, seed=seed())   # (c)
     return x / (x + y)
   ```
 
@@ -131,12 +135,12 @@ class SeedStream(object):
   ```python
   def tfp_foo(seed):
     seed = SeedStream(seed, salt="")
-    foo_stuff = tf.random_normal(seed=seed())
+    foo_stuff = tf.random.normal(seed=seed())
     ...
 
   def tfp_bar(seed):
     seed = SeedStream(seed, salt="")
-    bar_stuff = tf.random_normal(seed=seed())
+    bar_stuff = tf.random.normal(seed=seed())
     ...
 
   def client_baz(seed):
@@ -168,9 +172,10 @@ class SeedStream(object):
     """Initializes a `SeedStream`.
 
     Args:
-      seed: Any Python object convertible to string, supplying the
-        initial entropy.  If `None`, operations seeded with seeds
-        drawn from this `SeedStream` will follow TensorFlow semantics
+      seed: Any Python object convertible to string, with the exception of
+        Tensor objects, which are reserved for stateless sampling semantics.
+        The seed supplies the initial entropy.  If `None`, operations seeded
+        with seeds drawn from this `SeedStream` will follow TensorFlow semantics
         for not being seeded.
       salt: Any Python object convertible to string, supplying
         auxiliary entropy.  Must be unique across the Distributions
@@ -181,6 +186,9 @@ class SeedStream(object):
     if JAX_MODE and isinstance(self._seed, int):
       import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
       self._seed = jaxrand.PRNGKey(self._seed)
+    if not JAX_MODE:
+      if tf.is_tensor(self._seed):
+        raise TypeError('{}: {}'.format(TENSOR_SEED_MSG_PREFIX, self._seed))
     self._salt = salt
     self._counter = 0
 

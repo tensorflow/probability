@@ -26,7 +26,6 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
@@ -137,12 +136,6 @@ class LinearRegression(StructuralTimeSeries):
 
   """
 
-  @deprecation.deprecated(
-      '2020-06-01', 'Previously, the batch shape of `weights_prior` was '
-      'overridden to equal the batch shape of the design matrix when '
-      '`weights_prior.event_shape` is scalar. This behavior is deprecated, '
-      'and `weights_prior` must be defined with the desired batch shape (see '
-      'note on batch shapes in the constructor docstring).')
   def __init__(self,
                design_matrix,
                weights_prior=None,
@@ -174,13 +167,10 @@ class LinearRegression(StructuralTimeSeries):
         an instance of `tf.linalg.LinearOperator`.
       weights_prior: `tfd.Distribution` representing a prior over the regression
         weights. Must have event shape `[num_features]` and batch shape
-        broadcastable to the design matrix's `batch_shape`. Alternately,
-        `event_shape` may be scalar (`[]`), in which case the prior is
-        internally broadcast as `TransformedDistribution(weights_prior,
-        tfb.Identity(), event_shape=[num_features],
-        batch_shape=design_matrix.batch_shape)`. If `None`,
-        defaults to `StudentT(df=5, loc=0., scale=10.)`, a weakly-informative
-        prior loosely inspired by the [Stan prior choice recommendations](
+        broadcastable to the design matrix's `batch_shape`. If `None`, defaults
+        to `Sample(StudentT(df=5, loc=0., scale=10.), num_features])`, a
+        weakly-informative prior loosely inspired by the
+        [Stan prior choice recommendations](
         https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations).
         Default value: `None`.
       name: the name of this model component.
@@ -200,21 +190,18 @@ class LinearRegression(StructuralTimeSeries):
 
       # Default to a weakly-informative StudentT(df=5, 0., 10.) prior.
       if weights_prior is None:
-        weights_prior = tfd.StudentT(
-            df=5,
-            loc=tf.zeros([], dtype=design_matrix.dtype),
-            scale=10 * tf.ones([], dtype=design_matrix.dtype))
-      # Sugar: if prior is static scalar, broadcast it to a default shape.
-      if weights_prior.event_shape.ndims == 0:
         if design_matrix.batch_shape.is_fully_defined():
           design_matrix_batch_shape_ = design_matrix.batch_shape
         else:
           design_matrix_batch_shape_ = design_matrix.batch_shape_tensor()
-        weights_prior = tfd.TransformedDistribution(
-            weights_prior,
-            bijector=tfb.Identity(),
-            batch_shape=design_matrix_batch_shape_,
-            event_shape=[num_features])
+        weights_prior = tfd.StudentT(
+            df=5,
+            loc=tf.zeros(
+                design_matrix_batch_shape_, dtype=design_matrix.dtype),
+            scale=10 * tf.ones([], dtype=design_matrix.dtype))
+      # Sugar: if prior is static scalar, lift it to a prior on feature vectors.
+      if weights_prior.event_shape.ndims == 0:
+        weights_prior = tfd.Sample(weights_prior, sample_shape=[num_features])
 
       tf.debugging.assert_same_float_dtype([design_matrix, weights_prior])
 

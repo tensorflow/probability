@@ -174,6 +174,10 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           name=name)
 
   @property
+  def _require_root(self):
+    return True
+
+  @property
   def model(self):
     return self._model_coroutine
 
@@ -236,7 +240,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     gen = self._model_coroutine()
     index = 0
     d = next(gen)
-    if not isinstance(d, self.Root):
+    if self._require_root and not isinstance(d, self.Root):
       raise ValueError('First distribution yielded by coroutine must '
                        'be wrapped in `Root`.')
     try:
@@ -245,8 +249,18 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
         ds.append(actual_distribution)
         if (value is not None and len(value) > index and
             value[index] is not None):
-          seed()
-          next_value = value[index]
+          seed()  # Ensure reproducibility even when xs are (partially) set.
+
+          def convert_tree_to_tensor(x, dtype_hint):
+            return tf.convert_to_tensor(x, dtype_hint=dtype_hint)
+
+          # This signature does not allow kwarg names. Applies
+          # `convert_to_tensor` on the next value.
+          next_value = nest.map_structure_up_to(
+              ds[-1].dtype,  # shallow_tree
+              convert_tree_to_tensor,  # func
+              value[index],  # x
+              ds[-1].dtype)  # dtype_hint
         else:
           next_value = actual_distribution.sample(
               sample_shape=sample_shape if isinstance(d, self.Root) else (),

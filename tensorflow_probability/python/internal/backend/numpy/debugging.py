@@ -59,6 +59,7 @@ def skip_assert_for_tracers(f):
   def wrapped(*args, **kwargs):
     if any(isinstance(arg, jax_core.Tracer) for arg
            in args + tuple(kwargs.values())):
+      print('skip assert ' + f.__name__)
       return None
     return f(*args, **kwargs)
   return wrapped
@@ -146,8 +147,8 @@ def _assert_non_positive(x, summarize=None, message=None, name=None):
       x, np.less_equal, '<=', summarize=summarize, message=message, name=name)
 
 
-def _assert_rank(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _assert_rank(x, rank, message=None, name=None):  # pylint: disable=unused-argument
+  return _assert_equal(x=len(np.shape(x)), y=rank, message=message)
 
 
 def _assert_scalar(*_, **__):  # pylint: disable=unused-argument
@@ -159,8 +160,18 @@ def _assert_integer(*_, **__):  # pylint: disable=unused-argument
 
 
 @skip_assert_for_tracers
-def _assert_near(*_, **__):  # pylint: disable=unused-argument
-  pass
+def _assert_near(x, y, rtol=None, atol=None,
+                 message=None, summarize=None, name=None):  # pylint: disable=unused-argument
+  """Raises an error if abs(x - y) > atol + rtol * abs(y)."""
+  del summarize
+  del name
+  x = convert_to_tensor(x)
+  y = convert_to_tensor(y)
+  rtol = rtol if rtol else 10 * np.finfo(x.dtype).eps
+  atol = atol if atol else 10 * np.finfo(x.dtype).eps
+  if np.any(np.abs(x - y) > atol + rtol * np.abs(y)):
+    raise ValueError('x = {} and y = {} are not equal to tolerance rtol = {}, '
+                     'atol = {} {}'.format(x, y, rtol, atol, message or ''))
 
 
 @skip_assert_for_tracers

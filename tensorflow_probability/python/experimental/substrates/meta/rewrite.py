@@ -26,6 +26,7 @@ from absl import flags
 
 flags.DEFINE_boolean('numpy_to_jax', False,
                      'Whether or not to rewrite numpy imports to jax.numpy')
+flags.DEFINE_list('omit_deps', [], 'List of build deps being omitted.')
 
 FLAGS = flags.FLAGS
 
@@ -42,53 +43,91 @@ TF_REPLACEMENTS = {
         'import tensorflow_probability as tfp; '
         'tfp = tfp.experimental.substrates.numpy',
     'from tensorflow.python.framework import tensor_shape':
-        ('from tensorflow_probability.python.internal.backend.numpy '
+        ('from tensorflow_probability.python.internal.backend.numpy.gen '
          'import tensor_shape'),
+    'from tensorflow.python.framework import ops':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import ops'),
+    'from tensorflow.python.framework import tensor_util':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import ops'),
+    'from tensorflow.python.util import':
+        'from tensorflow_probability.python.internal.backend.numpy import',
+    'from tensorflow.python.util.all_util':
+        'from tensorflow_probability.python.internal.backend.numpy.private',
     'from tensorflow.python.ops.linalg':
-        'from tensorflow_probability.python.internal.backend.numpy',
+        'from tensorflow_probability.python.internal.backend.numpy.gen',
     'from tensorflow.python.ops import parallel_for':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import functional_ops as parallel_for',
+    'from tensorflow.python.ops import control_flow_ops':
+        'from tensorflow_probability.python.internal.backend.numpy '
+        'import control_flow as control_flow_ops',
+    'from tensorflow.python.eager import context':
+        'from tensorflow_probability.python.internal.backend.numpy '
+        'import private',
+    ('from tensorflow.python.client '
+     'import pywrap_tf_session as c_api'):
+        'pass',
+    ('from tensorflow.python '
+     'import pywrap_tensorflow as c_api'):
+        'pass'
 }
 
 DISABLED_BY_PKG = {
-    'bijectors':
-        ('scale_matvec_lu', 'real_nvp'),
-    'distributions':
-        ('internal.moving_stats',),
-    'math':
-        ('ode', 'minimize', 'sparse'),
-    'mcmc':
-        ('nuts', 'sample_annealed_importance', 'sample_halton_sequence',
-         'slice_sampler_kernel'),
-    'optimizer': ('bfgs', 'bfgs_utils', 'differential_evolution', 'lbfgs',
-                  'nelder_mead', 'proximal_hessian_sparse', 'sgld',
-                  'variational_sgd', 'convergence_criteria'),
     'experimental':
         ('auto_batching', 'composite_tensor', 'edward2', 'linalg',
          'marginalize', 'mcmc', 'nn', 'sequential', 'substrates', 'vi'),
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
-        'optimizer', 'stats', 'util')
-INTERNALS = ('assert_util', 'batched_rejection_sampler', 'distribution_util',
-             'dtype_util', 'hypothesis_testlib', 'implementation_selection',
-             'nest_util', 'prefer_static', 'samplers', 'special_math',
-             'tensor_util', 'tensorshape_util', 'test_combinations',
-             'test_util')
+        'optimizer', 'random', 'stats', 'util')
+INTERNALS = (
+    'assert_util',
+    'batched_rejection_sampler',
+    'cache_util',
+    'distribution_util',
+    'dtype_util',
+    'hypothesis_testlib',
+    'implementation_selection',
+    'monte_carlo',
+    'name_util',
+    'nest_util',
+    'prefer_static',
+    'samplers',
+    'special_math',
+    'tensor_util',
+    'tensorshape_util',
+    'test_combinations',
+    'test_util',
+    'vectorization_util'
+)
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')
 
-PRIVATE_TF_PKGS = ('array_ops', 'random_ops')
+PRIVATE_TF_PKGS = ('array_ops', 'control_flow_util', 'gradient_checker_v2',
+                   'numpy_text', 'random_ops')
 
 
 def main(argv):
 
+  disabled_by_pkg = dict(DISABLED_BY_PKG)
+  for dep in FLAGS.omit_deps:
+    pkg = dep.split('/python/')[1].split(':')[0].replace('/', '.')
+    lib = dep.split(':')[1]
+    if pkg.endswith('.{}'.format(lib)):
+      pkg = pkg.replace('.{}'.format(lib), '')
+      disabled_by_pkg.setdefault(pkg, ())
+      disabled_by_pkg[pkg] += (lib,)
+    else:
+      disabled_by_pkg.setdefault(pkg, ())
+      disabled_by_pkg[pkg] += (lib,)
+
   replacements = collections.OrderedDict(TF_REPLACEMENTS)
-  for pkg, disabled in DISABLED_BY_PKG.items():
+  for pkg, disabled in disabled_by_pkg.items():
     replacements.update({
-        'from tensorflow_probability.python.{}.{}'.format(pkg, item):
-        '# from tensorflow_probability.python.{}.{}'.format(pkg, item)
+        'from tensorflow_probability.python.{}.{} '.format(pkg, item):
+        '# from tensorflow_probability.python.{}.{} '.format(pkg, item)
         for item in disabled
     })
     replacements.update({
@@ -110,6 +149,12 @@ def main(argv):
       'tensorflow_probability.python import {}'.format(lib):
       'tensorflow_probability.python.{} import _numpy as {}'.format(lib, lib)
       for lib in LIBS
+  })
+  replacements.update({
+      '._numpy.inference_gym.targets.ground_truth':
+          '.inference_gym.targets.ground_truth._numpy',
+      '._numpy.inference_gym.internal.datasets':
+          '.inference_gym.internal.datasets._numpy',
   })
   replacements.update({
       '._numpy import inference_gym':
@@ -175,6 +220,13 @@ def main(argv):
       ' as {}'.format(private)
       for private in PRIVATE_TF_PKGS
   })
+  replacements.update({
+      'tensorflow.python.framework.ops import {}'.format(
+          private):
+      'tensorflow_probability.python.internal.backend.numpy import private'
+      ' as {}'.format(private)
+      for private in PRIVATE_TF_PKGS
+  })
   # pylint: enable=g-complex-comprehension
 
   # TODO(bjp): Delete this block after TFP uses stateless samplers.
@@ -197,22 +249,34 @@ def main(argv):
           '# @six.add_metaclass(TensorMetaClass)',
   })
 
-  contents = open(argv[1]).read()
-  if '__init__.py' in argv[1]:
+  filename = argv[1]
+  contents = open(filename).read()
+  if '__init__.py' in filename:
     # Comment out items from __all__.
-    for pkg, disabled in DISABLED_BY_PKG.items():
+    for pkg, disabled in disabled_by_pkg.items():
       for item in disabled:
+        def disable_all(name):
+          replacements.update({
+              '"{}"'.format(name): '# "{}"'.format(name),
+              '\'{}\''.format(name): '# \'{}\''.format(name),
+          })
+        if 'from tensorflow_probability.python.{} import {}'.format(
+            pkg, item) in contents:
+          disable_all(item)
         for segment in contents.split(
             'from tensorflow_probability.python.{}.{} import '.format(
                 pkg, item)):
-          disabled_name = segment.split('\n')[0]
-          replacements.update({
-              '"{}"'.format(disabled_name): '# "{}"'.format(disabled_name),
-              '\'{}\''.format(disabled_name): '# \'{}\''.format(disabled_name),
-          })
+          disable_all(segment.split('\n')[0])
 
   for find, replace in replacements.items():
     contents = contents.replace(find, replace)
+
+  disabler = 'JAX_DISABLE' if FLAGS.numpy_to_jax else 'NUMPY_DISABLE'
+  lines = contents.split('\n')
+  for i, l in enumerate(lines):
+    if disabler in l:
+      lines[i] = '# {}'.format(l)
+  contents = '\n'.join(lines)
 
   if not FLAGS.numpy_to_jax:
     contents = contents.replace('NUMPY_MODE = False', 'NUMPY_MODE = True')

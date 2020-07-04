@@ -62,21 +62,74 @@ for recommended test setup.
 Unit tests ensure new features (a) work correctly and (b) guard against future
 breaking changes (thus lower maintenance costs).
 
-To run existing unit-tests on CPU, use the command:
+### Setup
 
+#### `bazel`
+
+We use [`bazel`](https://bazel.build/) to manage building, packaging, and
+testing TFP. You'll need to install `bazel` before running our tests (we have
+recently added some experimental support for running some tests with pytest, but
+for a variety of reasons this will probably never work 100%). See instructions
+[here](https://docs.bazel.build/versions/3.2.0/install-os-x.html) on installing
+`bazel`.
+
+#### `virtualenv`
+
+We strongly recommend running unit tests in an active
+[virtualenv](https://virtualenv.pypa.io/en/latest/). Doing so requires some
+extra bazel flags, so we created a wrapper script, which we suggest using. An
+example invocation (presumed to run from the root of the TFP repo:
+
+#### Helper scripts
 
 ```shell
-bazel test --copt=-O3 --copt=-march=native //tensorflow_probability/...
+# Run all TFP tests.
+./testing/tfp_test.sh //tensorflow_probability/...
 ```
 
-from the root of the `tensorflow_probability` repository. To run tests on GPU,
-you just need to ensure the GPU-enabled version of TensorFlow is installed.
-However, you will also need to include the flag `--jobs=1`, since by default
-Bazel will run many tests in parallel, and each one will try to claim all the
-GPU memory:
+```shell
+# Run one TFP test
+tfp_test //tensorflow_probability/python/distributions:joint_distribution_coroutine_test
+```
+
+See comments at the top of the script for more info.
+
+For convenience, also consider sourcing the following script to alias `tfp_test`
+to the above script:
 
 ```shell
-bazel test --jobs=1 --copt=-O3 --copt=-march=native //tensorflow_probability/...
+source ./testing/define_testing_alias.sh
+# Run all TFP tests.
+tfp_test //tensorflow_probability/...
+```
+
+#### Dependencies
+
+To run the unit tests, you'll need several packages installed (again, we
+strongly recommend you work in a virtualenv). We include a script to do this for
+you, which also does some sanity checks on the environtment:
+
+```shell
+./testing/install_test_dependencies.sh
+```
+
+See the
+[header comments in that script](https://github.com/tensorflow/probability/blob/master/testing/install_test_dependencies.sh)
+for more details.
+
+### Additional considerations
+
+As of early 2020, tensorflow and tf-nightly include GPU support by default,
+which means if you have a GPU installed and run tests with the default
+`tf-nightly` pip package, tests will try to run using the GPU. To avoid this,
+the dependency install script installs tf-nightly-cpu by default. If you *want*
+to run tests on the GPU, you can use pass --enable_gpu flag to
+`testing/install_test_dependencies.sh`. In this case, you will also need to
+include the flag `--jobs=1`, since by default Bazel will run many tests in
+parallel, and each one will try to claim all the GPU memory:
+
+```shell
+tfp_test --jobs=1 //tensorflow_probability/...
 ```
 
 

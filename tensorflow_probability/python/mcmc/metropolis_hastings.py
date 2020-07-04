@@ -25,9 +25,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -41,16 +43,23 @@ warnings.filterwarnings('always',
                         module='tensorflow_probability.*metropolis_hastings',
                         append=True)  # Don't override user-set filters.
 
-MetropolisHastingsKernelResults = collections.namedtuple(
-    'MetropolisHastingsKernelResults',
-    [
-        'accepted_results',
-        'is_accepted',
-        'log_accept_ratio',
-        'proposed_state',
-        'proposed_results',
-        'extra',
-    ])
+
+class MetropolisHastingsKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'MetropolisHastingsKernelResults',
+        [
+            'accepted_results',
+            'is_accepted',
+            'log_accept_ratio',
+            'proposed_state',
+            'proposed_results',
+            'extra',
+            'seed',
+        ])
+    ):
+  """Internal state and diagnostics for MH."""
+  __slots__ = ()
 
 
 class MetropolisHastings(kernel_base.TransitionKernel):
@@ -116,6 +125,9 @@ class MetropolisHastings(kernel_base.TransitionKernel):
 
   """
 
+  @deprecation.deprecated_args(
+      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
+      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self, inner_kernel, seed=None, name=None):
     """Instantiates this object.
 
@@ -124,7 +136,8 @@ class MetropolisHastings(kernel_base.TransitionKernel):
         `collections.namedtuple` `kernel_results` and which contains a
         `target_log_prob` member and optionally a `log_acceptance_correction`
         member.
-      seed: Python integer to seed the random number generator.
+      seed: Python integer to seed the random number generator. Deprecated, pass
+        seed to `tfp.mcmc.sample_chain`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., "mh_kernel").
 
@@ -163,7 +176,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return True
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Takes one step of the TransitionKernel.
 
     Args:
@@ -172,6 +185,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made within the
         previous call to this function (or as returned by `bootstrap_results`).
+      seed: Optional, a seed for reproducible sampling.
 
     Returns:
       next_state: `Tensor` or Python `list` of `Tensor`s representing the
@@ -183,14 +197,25 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       ValueError: if `inner_kernel` results doesn't contain the member
         "target_log_prob".
     """
+    # TODO(b/159636942): Clean up after 2020-09-20.
+    if seed is not None:
+      seed = samplers.sanitize_seed(seed)  # preserve for kernel results
+      proposal_seed, acceptance_seed = samplers.split_seed(seed)
+    else:
+      if self._seed_stream.original_seed is not None:
+        warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
+      acceptance_seed = samplers.sanitize_seed(self._seed_stream())
+
     with tf.name_scope(mcmc_util.make_name(self.name, 'mh', 'one_step')):
       # Take one inner step.
+      inner_kwargs = {} if seed is None else dict(seed=proposal_seed)
       [
           proposed_state,
           proposed_results,
       ] = self.inner_kernel.one_step(
           current_state,
-          previous_kernel_results.accepted_results)
+          previous_kernel_results.accepted_results,
+          **inner_kwargs)
 
       if (not has_target_log_prob(proposed_results) or
           not has_target_log_prob(previous_kernel_results.accepted_results)):
@@ -216,11 +241,11 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       # I.e., u < min(1, accept_ratio),  where u ~ Uniform[0,1)
       #       ==> log(u) < log_accept_ratio
       log_uniform = tf.math.log(
-          tf.random.uniform(
+          samplers.uniform(
               shape=prefer_static.shape(proposed_results.target_log_prob),
               dtype=dtype_util.base_dtype(
                   proposed_results.target_log_prob.dtype),
-              seed=self._seed_stream()))
+              seed=acceptance_seed))
       is_accepted = log_uniform < log_accept_ratio
 
       next_state = mcmc_util.choose(
@@ -232,7 +257,12 @@ class MetropolisHastings(kernel_base.TransitionKernel):
       kernel_results = MetropolisHastingsKernelResults(
           accepted_results=mcmc_util.choose(
               is_accepted,
-              proposed_results,
+              # We strip seeds when populating `accepted_results` because unlike
+              # other kernel result fields, seeds are not a per-chain value.
+              # Thus it is impossible to choose between a previously accepted
+              # seed value and a proposed seed, since said choice would need to
+              # be made on a per-chain basis.
+              mcmc_util.strip_seeds(proposed_results),
               previous_kernel_results.accepted_results,
               name='choose_inner_results'),
           is_accepted=is_accepted,
@@ -240,6 +270,7 @@ class MetropolisHastings(kernel_base.TransitionKernel):
           proposed_state=proposed_state,
           proposed_results=proposed_results,
           extra=[],
+          seed=samplers.zeros_seed() if seed is None else seed,
       )
 
       return next_state, kernel_results
@@ -267,12 +298,15 @@ class MetropolisHastings(kernel_base.TransitionKernel):
             '"target_log_prob" must be a member of `inner_kernel` results.')
       x = pkr.target_log_prob
       return MetropolisHastingsKernelResults(
-          accepted_results=pkr,
+          # See note regarding `strip_seeds` above in `one_step`.
+          accepted_results=mcmc_util.strip_seeds(pkr),
           is_accepted=tf.ones_like(x, dtype=tf.bool),
           log_accept_ratio=tf.zeros_like(x),
           proposed_state=init_state,
           proposed_results=pkr,
           extra=[],
+          # Allow room for one_step's seed.
+          seed=samplers.zeros_seed(),
       )
 
 

@@ -151,6 +151,7 @@ def effective_sample_size(states,
       num_burnin_steps=200,
       num_results=1000,
       current_state=tf.constant([0., 0.]),
+      trace_fn=None,
       kernel=tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target.log_prob,
         step_size=0.05,
@@ -415,10 +416,11 @@ def potential_scale_reduction(chains_states,
   ==> (10, 2)
 
   # Get 1000 samples from the 10 independent chains.
-  chains_states, _ = tfp.mcmc.sample_chain(
+  chains_states = tfp.mcmc.sample_chain(
       num_burnin_steps=200,
       num_results=1000,
       current_state=initial_state,
+      trace_fn=None,
       kernel=tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target.log_prob,
           step_size=0.05,

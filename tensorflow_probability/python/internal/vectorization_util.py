@@ -19,11 +19,87 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import warnings
 
 import numpy as np
+
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.util import SeedStream
+from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
+from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
+__all__ = [
+    'iid_sample',
+    'make_rank_polymorphic'
+]
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*vectorization_util',
+                        append=True)  # Don't override user-set filters.
+
+
+def iid_sample(sample_fn, sample_shape):
+  """Lift a sampling function to one that draws multiple iid samples.
+
+  Args:
+    sample_fn: Python `callable` that returns a (possibly nested) structure of
+      `Tensor`s. May optionally take a `seed` named arg: if so, any `int`
+      seeds (for stateful samplers) are passed through directly, while any
+      pair-of-`int` seeds (for stateless samplers) are split into independent
+      seeds for each sample.
+    sample_shape: `int` `Tensor` shape of iid samples to draw.
+  Returns:
+    iid_sample_fn: Python `callable` taking the same arguments as `sample_fn`
+      and returning iid samples. Each returned `Tensor` will have shape
+      `concat([sample_shape, shape_of_original_returned_tensor])`.
+  """
+  sample_shape = distribution_util.expand_to_vector(
+      prefer_static.cast(sample_shape, np.int32), tensor_name='sample_shape')
+  n = prefer_static.cast(
+      prefer_static.reduce_prod(sample_shape), dtype=np.int32)
+
+  def unflatten(x):
+    unflattened_shape = prefer_static.cast(
+        prefer_static.concat([
+            sample_shape, prefer_static.shape(x)[1:]], axis=0),
+        dtype=np.int32)
+    return tf.reshape(x, unflattened_shape)
+
+  def iid_sample_fn(*args, **kwargs):
+    """Draws iid samples from `fn`."""
+
+    pfor_loop_body = lambda _: sample_fn(*args, **kwargs)
+
+    seed = kwargs.pop('seed', None)
+    try:  # Assume that `seed` is a valid stateful seed (Python `int`).
+      kwargs = dict(kwargs, seed=SeedStream(seed, salt='iid_sample')())
+      pfor_loop_body = lambda _: sample_fn(*args, **kwargs)
+    except TypeError as e:
+      # If a stateless seed arg is passed, split it into `n` different stateless
+      # seeds, so that we don't just get a bunch of copies of the same sample.
+      if TENSOR_SEED_MSG_PREFIX not in str(e):
+        raise
+      warnings.warn('Saw non-`int` seed {}, implying stateless sampling. '
+                    'Autovectorized functions that use stateless sampling '
+                    'may be quite slow because the current implementation '
+                    'falls back to an explicit loop. This will be fixed in the '
+                    'future. For now, you will likely see better performance '
+                    'from stateful sampling, which you can invoke by passing a'
+                    'traditional Python `int` seed.'.format(seed))
+      seed = samplers.split_seed(seed, n=n, salt='iid_sample_stateless')
+      pfor_loop_body = (
+          lambda i: sample_fn(*args, seed=tf.gather(seed, i), **kwargs))
+
+    draws = parallel_for.pfor(pfor_loop_body, n)
+    return tf.nest.map_structure(unflatten, draws, expand_composites=True)
+
+  return iid_sample_fn
 
 
 def _lock_in_non_vectorized_args(fn, arg_structure, flat_core_ndims, flat_args):
@@ -245,7 +321,8 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
         unflatten = lambda x: tf.reshape(x, prefer_static.concat([  # pylint: disable=g-long-lambda
             broadcast_batch_shape, prefer_static.shape(x)[1:]], axis=0))
         result = nest.map_structure(
-            lambda x: unflatten(x) if tf.is_tensor(x) else x, batched_result)
+            lambda x: unflatten(x) if tf.is_tensor(x) else x, batched_result,
+            expand_composites=True)
     return result
 
   return vectorized_fn

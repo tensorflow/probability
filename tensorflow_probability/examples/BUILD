@@ -56,6 +56,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "bayesian_neural_network_test",
     size = "medium",
@@ -102,6 +103,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "grammar_vae_test",
     size = "small",
@@ -143,6 +145,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "disentangled_vae_dry_run_test",
     size = "medium",
@@ -171,6 +174,7 @@ py3_test(
     ],
 )
 
+# py_test
 py3_test(
     name = "disentangled_vae_test",
     size = "medium",
@@ -214,6 +218,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "deep_exponential_family_test",
     size = "small",
@@ -259,6 +264,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "latent_dirichlet_allocation_distributions_test",
     size = "small",
@@ -300,6 +306,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "logistic_regression_test",
     size = "small",
@@ -353,6 +360,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "vae_test",
     size = "medium",
@@ -394,6 +402,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "vq_vae_test",
     size = "medium",
@@ -440,6 +449,7 @@ py_library(
     ],
 )
 
+# py_test
 py3_test(
     name = "cifar10_bnn_test",
     size = "medium",

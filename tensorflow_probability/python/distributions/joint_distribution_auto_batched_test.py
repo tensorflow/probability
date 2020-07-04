@@ -26,6 +26,7 @@ from absl.testing import parameterized
 
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -53,21 +54,21 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     models = {}
 
     def coroutine_model():
-      g = yield Root(tfd.Gamma(2, 2))
-      df = yield Root(tfd.Exponential(1.))
+      g = yield tfd.LogNormal(0., 1.)
+      df = yield tfd.Exponential(1.)
       loc = yield tfd.Sample(tfd.Normal(0, g), 20)
       yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.Gamma(2, 2),
+        tfd.LogNormal(0., 1.),
         tfd.Exponential(1.),
         lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
         lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.Gamma(2, 2)),
+        ('g', tfd.LogNormal(0., 1.)),
         ('df', tfd.Exponential(1.)),
         ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
         ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
@@ -108,21 +109,21 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      g = yield Root(tfd.Gamma(2, [2, 3.]))
-      df = yield Root(tfd.Exponential([1., 2.]))
+      g = yield tfd.LogNormal(0., [1., 2.])
+      df = yield tfd.Exponential([1., 2.])
       loc = yield tfd.Sample(tfd.Normal(0, g), 20)
       yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.Gamma(2, [2, 3.]),
+        tfd.LogNormal(0., [1., 2.]),
         tfd.Exponential([1., 2.]),
         lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
         lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.Gamma(2, [2, 3.])),
+        ('g', tfd.LogNormal(0., [1., 2.])),
         ('df', tfd.Exponential([1., 2.])),
         ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
         ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
@@ -182,7 +183,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # the batch dimensions line up.
     jd_auto_models = {}
     def coroutine_auto():
-      x = yield Root(tfd.Normal(0., scale=[1.]))
+      x = yield tfd.Normal(0., scale=[1.])
       yield tfd.Normal(x, [1., 2., 3., 4., 5.])
     jd_auto_models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_auto
     jd_auto_models[tfd.JointDistributionSequentialAutoBatched] = [
@@ -250,7 +251,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      a = yield Root(tfd.Bernoulli(probs=0.5, dtype=tf.float32))
+      a = yield tfd.Bernoulli(probs=0.5, dtype=tf.float32)
       b = yield tfd.Sample(tfd.Bernoulli(probs=0.25 + 0.5*a,
                                          dtype=tf.float32), 2)
       yield tfd.Normal(loc=a, scale=1. + b)
@@ -296,7 +297,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      a = yield Root(tfd.Bernoulli(probs=0.5, dtype=tf.float32))
+      a = yield tfd.Bernoulli(probs=0.5, dtype=tf.float32)
       b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
                               dtype=tf.float32)
       yield tfd.Normal(loc=a, scale=1. + b)
@@ -331,13 +332,56 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
+  def test_sample_with_partially_specified_value(self):
+
+    num_features = 5
+
+    def dist():
+      scale_variance = yield tfd.InverseGamma(0.5, 0.5)
+      scale_noncentered = yield tfd.Sample(tfd.HalfNormal(1.), num_features)
+      scale = scale_noncentered * scale_variance[..., None]**0.5
+      weights_noncentered = yield tfd.Sample(tfd.Normal(0., 1.), num_features)
+      yield tfd.Deterministic(weights_noncentered * scale)
+
+    joint = tfd.JointDistributionCoroutineAutoBatched(dist, validate_args=True)
+
+    value_partial_batch_dim = 4
+    value_ = (3.,
+              None,
+              None,
+              np.ones([value_partial_batch_dim, num_features]))
+    value = [None if v is None else tf.cast(v, tf.float32) for v in value_]
+
+    # The sample should keep the specified values.
+    xs = self.evaluate(joint.sample(value=value))
+    self.assertAllEqual(xs[0], value_[0]  * tf.ones_like(xs[0]))
+    self.assertAllEqual(xs[3], value_[3])
+    self.assertAllEqual(xs[1].shape, [num_features])
+    self.assertAllEqual(xs[2].shape, [num_features])
+
+    sample_shape = [6, 2]
+    samples = joint.sample(sample_shape, value=value)
+    xs = self.evaluate(samples)
+    self.assertAllEqual(xs[0], value_[0] * tf.ones_like(xs[0]))
+    self.assertAllEqual(xs[1].shape,
+                        sample_shape + [value_partial_batch_dim, num_features])
+    self.assertAllEqual(xs[3], value_[3] * tf.ones_like(xs[3]))
+
+    sample_shape_dynamic = tf1.placeholder_with_default(
+        sample_shape, shape=None)
+    samples = joint.sample(sample_shape_dynamic, value=value)
+    xs = self.evaluate(samples)
+    self.assertAllEqual(xs[0], value_[0] * tf.ones_like(xs[0]))
+    self.assertAllEqual(xs[1].shape,
+                        sample_shape + [value_partial_batch_dim, num_features])
+    self.assertAllEqual(xs[3], value_[3] * tf.ones_like(xs[3]))
+
   def test_sample_dtype_structures_output(self):
 
     num_features = 4
 
     def dist():
-      scale_variance = yield Root(
-          tfd.InverseGamma(0.5, 0.5))
+      scale_variance = yield Root(tfd.InverseGamma(0.5, 0.5))
       scale_noncentered = yield Root(
           tfd.Sample(tfd.HalfNormal(1.), num_features))
       scale = scale_noncentered * scale_variance[..., None]**0.5
@@ -353,8 +397,11 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         'weights_noncentered',
         'weights',
     ])(*([None]*4))
+    # TODO(b/139710644): Enable `use_vectorized_map` here once
+    # `sample_distributions` is supported.
     joint = tfd.JointDistributionCoroutineAutoBatched(
-        dist, sample_dtype=sample_dtype, validate_args=True)
+        dist, sample_dtype=sample_dtype, validate_args=True,
+        use_vectorized_map=False)
     self.assertAllEqual(sorted(sample_dtype._fields),
                         sorted(joint.sample(
                             seed=test_util.test_seed())._fields))
@@ -368,7 +415,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     sd = collections.namedtuple('Model', ['s', 'w'])(None, None)
 
     def dist():
-      s = yield Root(tfd.Sample(tfd.InverseGamma(2, 2), 100))
+      s = yield tfd.Sample(tfd.InverseGamma(2, 2), 100)
       yield tfd.Normal(0, s)
 
     m = tfd.JointDistributionCoroutineAutoBatched(dist, sample_dtype=sd)
@@ -406,16 +453,17 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     Reference: http://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf
     """
-
+    seed = test_util.test_seed_stream()
     # Hyperparameters.
     num_topics = 3
     num_words = 10
     avg_doc_length = 5
     u = tfd.Uniform(low=-1., high=1.)
     alpha = tfp.util.TransformedVariable(
-        u.sample([num_topics], seed=test_util.test_seed()),
+        u.sample([num_topics], seed=seed()),
         tfb.Softplus(), name='alpha')
-    beta = tf.Variable(u.sample([num_topics, num_words]), name='beta')
+    beta = tf.Variable(u.sample([num_topics, num_words],
+                                seed=seed()), name='beta')
 
     # Note near 1:1 with mathematical specification. The main distinction is the
     # use of Independent--this lets us easily aggregate multinomials across
@@ -441,11 +489,12 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
           ('z', lambda theta, n: tfd.Multinomial(total_count=n, probs=theta)),
           ('X', lambda z: tfd.Multinomial(total_count=z, logits=beta))))
 
-    lda = jd_class(model, validate_args=True)
+    # TODO(b/159842104): Enable autovectorization for Multinomial sampling.
+    lda = jd_class(model, validate_args=True, use_vectorized_map=False)
 
     # Now, let's sample some "documents" and compute the log-prob of each.
     docs_shape = [2, 4]  # That is, 8 docs in the shape of [2, 4].
-    sample = lda.sample(docs_shape, seed=test_util.test_seed())
+    sample = lda.sample(docs_shape, seed=seed())
     log_probs = lda.log_prob(sample)
     self.assertEqual(docs_shape, log_probs.shape)
 
@@ -476,21 +525,21 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      g = yield Root(tfd.Gamma(2, [2, 3.]))
-      df = yield Root(tfd.Exponential([1., 2.]))
+      g = yield tfd.LogNormal(0., [1., 2.])
+      df = yield tfd.Exponential([1., 2.])
       loc = yield tfd.Sample(tfd.Normal(0, g), 20)
       yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.Gamma(2, [2, 3.]),
+        tfd.LogNormal(0., [1., 2.]),
         tfd.Exponential([1., 2.]),
         lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
         lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.Gamma(2, [2, 3.])),
+        ('g', tfd.LogNormal(0., [1., 2.])),
         ('df', tfd.Exponential([1., 2.])),
         ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
         ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))

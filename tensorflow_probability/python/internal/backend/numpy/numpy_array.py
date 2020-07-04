@@ -187,6 +187,20 @@ def _gather_nd(  # pylint: disable=unused-argument
   return gather_nd_(params, indices)
 
 
+def _linspace(start, stop, num, name=None, axis=0):  # pylint: disable=unused-argument
+  """Match TF behavior with np.linspace."""
+  start = ops.convert_to_tensor(start)
+  # Match TF weirdness arising from truediv(int32, int32) = float64
+  if np.issubdtype(start.dtype, np.integer):
+    start = start.astype(np.float64)
+  stop = ops.convert_to_tensor(stop, dtype=start.dtype)
+  num = ops.convert_to_tensor(num, dtype_hint=np.int32)
+  if not np.issubdtype(num.dtype, np.integer):
+    raise TypeError('`num` must be an integer but got {}'.format(num.dtype))
+  num = num.astype(np.int32)
+  return np.linspace(start, stop, num, axis=axis).astype(start.dtype)
+
+
 def _one_hot(  # pylint: disable=unused-argument
     indices,
     depth,
@@ -254,6 +268,13 @@ def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument
   return tensor
 
 
+if JAX_MODE:
+  _searchsorted_vmap_sides = {
+      side: jax.vmap(functools.partial(jax.numpy.searchsorted, side=side))
+      for side in ('left', 'right')
+  }
+
+
 def _searchsorted(  # pylint: disable=unused-argument
     sorted_sequence,
     values,
@@ -261,9 +282,20 @@ def _searchsorted(  # pylint: disable=unused-argument
     out_type=np.int32,
     name=None):
   """Find indices for insertion for list to remain sorted."""
-  # JAX doesn't support searchsorted at the moment, so we do a very naive way
-  # of search sorting. We also don't use np.searchsorted in the numpy backend
-  # because it doesn't support batching.
+  if JAX_MODE:
+    try:
+      func = _searchsorted_vmap_sides[side]
+    except KeyError:
+      raise ValueError("'%s' is an invalid value for keyword 'side'" % side)
+    sorted_sequence_2d = np.reshape(sorted_sequence,
+                                    (-1, sorted_sequence.shape[-1]))
+    values_2d = np.reshape(values, (-1, values.shape[-1]))
+    if sorted_sequence_2d.shape[0] != values_2d.shape[0]:
+      raise ValueError('Leading dim_size of both tensors must match.')
+    return np.reshape(func(sorted_sequence_2d, values_2d).astype(out_type),
+                      values.shape)
+  # We don't use np.searchsorted in the numpy backend because it doesn't support
+  # batching.
   sorted_sequence = sorted_sequence[..., np.newaxis, :]
   values = values[..., :, np.newaxis]
   if side == 'left':
@@ -279,7 +311,7 @@ def _shape(input, out_type=np.int32, name=None):  # pylint: disable=redefined-bu
 
 
 def _size(input, out_type=np.int32, name=None):  # pylint: disable=redefined-builtin, unused-argument
-  return np.prod(ops.convert_to_tensor(input).shape).astype(out_type)
+  return np.asarray(np.prod(ops.convert_to_tensor(input).shape), dtype=out_type)
 
 
 builtin_slice = slice  # pylint: disable=invalid-name
@@ -343,8 +375,7 @@ reverse = utils.copy_docstring('tf.reverse', _reverse)
 
 linspace = utils.copy_docstring(
     'tf.linspace',
-    lambda start, stop, num, name=None: (  # pylint: disable=g-long-lambda
-        np.linspace(start, stop, num).astype(np.array(start).dtype)))
+    _linspace)
 
 meshgrid = utils.copy_docstring(
     'tf.meshgrid',
@@ -386,7 +417,8 @@ repeat = utils.copy_docstring(
 
 reshape = utils.copy_docstring(
     'tf.reshape',
-    lambda tensor, shape, name=None: np.reshape(tensor, shape))
+    lambda tensor, shape, name=None: np.reshape(  # pylint: disable=g-long-lambda
+        ops.convert_to_tensor(tensor), shape))
 
 roll = utils.copy_docstring(
     'tf.roll',

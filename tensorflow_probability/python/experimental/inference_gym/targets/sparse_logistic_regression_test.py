@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.inference_gym.internal import test_util
 from tensorflow_probability.python.experimental.inference_gym.targets import sparse_logistic_regression
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 def _test_dataset(num_features, num_test_points=None):
@@ -89,11 +90,32 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
         ))
     self.validate_log_prob_and_transforms(
         model,
-        sample_transformation_shapes=dict(identity={
-            'global_scale': [],
-            'local_scales': [25],
-            'unscaled_weights': [25],
-        }))
+        sample_transformation_shapes=dict(
+            identity={
+                'global_scale': [],
+                'local_scales': [25],
+                'unscaled_weights': [25],
+            },),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True,
+    )
+
+  @test_util.uses_tfds
+  @tfp_test_util.numpy_disable_gradient_test
+  def testGermanCreditHMC(self):
+    """Checks approximate samples from the model against the ground truth."""
+    model = (
+        sparse_logistic_regression.GermanCreditNumericSparseLogisticRegression(
+        ))
+
+    self.validate_ground_truth_using_hmc(
+        model,
+        num_chains=4,
+        num_steps=4000,
+        num_leapfrog_steps=40,
+        step_size=0.015,
+    )
 
 
 if __name__ == '__main__':

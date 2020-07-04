@@ -23,14 +23,14 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
-from tensorflow_probability.python.experimental.inference_gym.targets import bayesian_model
+from tensorflow_probability.python.experimental.inference_gym.targets import model
 
 __all__ = [
     'IllConditionedGaussian',
 ]
 
 
-class IllConditionedGaussian(bayesian_model.BayesianModel):
+class IllConditionedGaussian(model.Model):
   """Creates a random ill-conditioned Gaussian.
 
   The covariance matrix has eigenvalues sampled from the inverse Gamma
@@ -83,7 +83,7 @@ class IllConditionedGaussian(bayesian_model.BayesianModel):
 
     sample_transformations = {
         'identity':
-            bayesian_model.BayesianModel.SampleTransformation(
+            model.Model.SampleTransformation(
                 fn=lambda params: params,
                 pretty_name='Identity',
                 ground_truth_mean=onp.zeros(ndims),
@@ -102,14 +102,8 @@ class IllConditionedGaussian(bayesian_model.BayesianModel):
         sample_transformations=sample_transformations,
     )
 
-  def _joint_distribution(self):
-    return self._gaussian
-
-  def _evidence(self):
-    return
-
   def _unnormalized_log_prob(self, value):
-    return self.joint_distribution().log_prob(value)
+    return self._gaussian.log_prob(value)
 
   @property
   def covariance_eigenvalues(self):
@@ -132,4 +126,4 @@ class IllConditionedGaussian(bayesian_model.BayesianModel):
     Returns:
       samples: a `Tensor` with prepended dimensions `sample_shape`.
     """
-    return self.joint_distribution().sample(sample_shape, seed=seed, name=name)
+    return self._gaussian.sample(sample_shape, seed=seed, name=name)

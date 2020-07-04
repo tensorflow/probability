@@ -875,7 +875,7 @@ def rotate_transpose(x, shift, name='rotate_transpose'):
   Example:
 
   ```python
-  x = tf.random_normal([1, 2, 3, 4])  # Tensor of shape [1, 2, 3, 4].
+  x = tf.random.normal([1, 2, 3, 4])  # Tensor of shape [1, 2, 3, 4].
   rotate_transpose(x, -1).shape == [2, 3, 4, 1]
   rotate_transpose(x, -2).shape == [3, 4, 1, 2]
   rotate_transpose(x,  1).shape == [4, 1, 2, 3]
