@@ -360,8 +360,7 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "tensorshape_util_test",
     size = "small",
     srcs = ["tensorshape_util_test.py"],

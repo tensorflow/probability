@@ -1428,6 +1428,22 @@ class NumpyTest(test_util.TestCase):
         self.evaluate(tf_pfor.pfor(tf_fn, 7)),
         np_pfor.pfor(np_fn, 7))
 
+  def test_convert_variable_to_tensor(self):
+    v = nptf.Variable([0., 1., 2.], dtype=tf.float64)
+    x = nptf.convert_to_tensor(v)
+    v.assign([3., 3., 3.])
+
+    self.assertEqual(type(np.array([0.])), type(x))
+    self.assertEqual(np.float64, x.dtype)
+    self.assertAllEqual([0., 1., 2.], x)
+
+  def test_get_static_value(self):
+    x = nptf.get_static_value(nptf.zeros((3, 2), dtype=nptf.float32))
+    self.assertEqual(onp.ndarray, type(x))
+    self.assertAllEqual(onp.zeros((3, 2), dtype=np.float32), x)
+
+    self.assertIsNone(nptf.get_static_value(nptf.Variable(0.)))
+
   def evaluate(self, tensors):
     if tf.executing_eagerly():
       return self._eval_helper(tensors)

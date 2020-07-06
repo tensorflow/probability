@@ -129,7 +129,7 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   """Emulates tf.convert_to_tensor."""
   dtype = utils.numpy_dtype(dtype)
   dtype_hint = utils.numpy_dtype(dtype_hint)
-  if is_tensor(value):
+  if is_tensor(value) and not isinstance(value, Variable):
     if dtype is not None:
       # In NumPy mode, we are lenient on the dtype compatibility check because
       # some codepaths rely on flexible conversion from int/float64 to 32.
@@ -410,14 +410,22 @@ def _get_static_value_jax(tensor, partial=False):
   del partial
   if isinstance(tensor, jax.core.Tracer):
     return None
+  if isinstance(tensor, NumpyVariable):
+    return None
   if isinstance(tensor, np.ndarray):
     return onp.array(tensor)
   return tensor
 
+
+def _get_static_value_numpy(tensor, partial=False):
+  del partial
+  if isinstance(tensor, NumpyVariable):
+    return None
+  return tensor
+
 get_static_value = utils.copy_docstring(
     'tf.get_static_value',
-    _get_static_value_jax if JAX_MODE else
-    lambda tensor, partial=False: tensor)
+    _get_static_value_jax if JAX_MODE else _get_static_value_numpy)
 
 group = utils.copy_docstring(
     'tf.group',
@@ -584,6 +592,10 @@ if JAX_MODE:
   jax.core.pytype_aval_mappings[NumpyVariable] = (
       jax.core.pytype_aval_mappings[onp.ndarray])
 
+
+def _convert_variable_to_tensor(value, dtype=None):
+  return convert_to_tensor(value.__wrapped__, dtype=dtype)
+register_tensor_conversion_function(NumpyVariable, _convert_variable_to_tensor)
 
 Variable = NumpyVariable
 

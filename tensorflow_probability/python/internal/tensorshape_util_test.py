@@ -64,6 +64,23 @@ class TensorShapeUtilTestTest(test_util.TestCase):
     y = tensorshape_util.with_rank_at_least(x, 3)
     self.assertAllEqual(x, y)
 
+  def test_constant_value_as_shape(self):
+    x = np.array([1, 2, 3, 4], dtype=np.int32)
+    s = tensorshape_util.constant_value_as_shape(x)
+    self.assertIsInstance(s, tf.TensorShape)
+    self.assertAllEqual(x, s)
+
+    x = tf.Variable([3])
+    s = tensorshape_util.constant_value_as_shape(x)
+    # `s` could be `TensorShape(None)` or `TensorShape([None])`, depending on
+    # whether or not we're executing eagerly.  We could improve
+    # `constant_value_as_shape` to always return `TensorShape([None])`.
+    self.assertFalse(s.is_fully_defined())
+
+    self.assertEqual(tf.TensorShape(None),
+                     tensorshape_util.constant_value_as_shape(
+                         tf.Variable([7, 2], shape=tf.TensorShape([None]))))
+
 
 if __name__ == '__main__':
   tf.test.main()
