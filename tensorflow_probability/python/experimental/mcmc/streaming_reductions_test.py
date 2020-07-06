@@ -90,7 +90,6 @@ class StepKernelTest(test_util.TestCase):
     final_state = step_kernel(
         num_steps=2,
         current_state=init_state,
-        previous_kernel_results=TestTransitionKernelResults(0, 0),
         kernel=fake_kernel,
     )
     final_state = self.evaluate(final_state)
@@ -101,7 +100,6 @@ class StepKernelTest(test_util.TestCase):
     final_state, kernel_results = step_kernel(
         num_steps=2,
         current_state=0,
-        previous_kernel_results=TestTransitionKernelResults(0, 0),
         kernel=fake_kernel,
         return_final_kernel_results=True,
         seed=test_util.test_seed()
