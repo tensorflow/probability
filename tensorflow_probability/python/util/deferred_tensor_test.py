@@ -63,6 +63,11 @@ class DeferredTensorTest(test_util.TestCase):
           repr(x),
           '<DeferredTensor: dtype=float32, shape=[], fn=exp>')
 
+  def test_retains_trainable_variables_from_bijector(self):
+    m = tf.Variable(0., name='m')
+    x = tfp.util.DeferredTensor(1., tfb.Scale(m))
+    self.assertIn(m, x.trainable_variables)
+
   def test_variable_shape_changes(self):
     v = tf.Variable(np.zeros((3, 2, 3)), shape=tf.TensorShape((None, 2, None)))
     self.evaluate(v.initializer)

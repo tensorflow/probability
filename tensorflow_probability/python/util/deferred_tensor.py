@@ -234,12 +234,10 @@ class DeferredTensor(tf.Module):
 
     if hasattr(transform_fn, 'forward'):
       fwd_name = '"{}"'.format(transform_fn.name)
-      transform_fn = transform_fn.forward
     else:
       fwd_name = transform_fn.__name__
-
-    if not callable(transform_fn):
-      raise TypeError('Argument `transform_fn` must be `callable`.')
+      if not callable(transform_fn):
+        raise TypeError('Argument `transform_fn` must be `callable`.')
 
     super(DeferredTensor, self).__init__(name=name)
     self._pretransformed_input = pretransformed_input
@@ -261,6 +259,8 @@ class DeferredTensor(tf.Module):
   @property
   def transform_fn(self):
     """Function which characterizes the `Tensor`ization of this object."""
+    if hasattr(self._transform_fn, 'forward'):
+      return self._transform_fn.forward
     return self._transform_fn
 
   @property
