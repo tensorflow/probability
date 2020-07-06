@@ -27,6 +27,7 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_observation_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_state_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
+from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
@@ -37,6 +38,7 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
+from tensorflow_probability.python.experimental.mcmc.streaming_reductions import step_kernel
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
@@ -61,13 +63,14 @@ _allowed_symbols = [
     'make_rwmh_kernel_fn',
     'particle_filter',
     'reconstruct_trajectories',
+    'Reducer',
     'resample_deterministic_minimum_error',
     'resample_independent',
     'resample_stratified',
     'resample_systematic',
     'sample_sequential_monte_carlo',
     'simple_heuristic_tuning',
-
+    'step_kernel'
 ]
 
 remove_undocumented(__name__, _allowed_symbols)

@@ -41,6 +41,7 @@ py_library(
         ":particle_filter_augmentation",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":streaming_reductions",
         ":weighted_resampling",
         # tensorflow dep,
     ],
@@ -323,5 +324,40 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "streaming_reductions",
+    srcs = ["streaming_reductions.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_library(
+    name = "reducer",
+    srcs = ["reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # six dep,
+    ],
+)
+
+# py2and3
+py_test(
+    name = "streaming_reductions_test",
+    size = "small",
+    shard_count = 5,
+    srcs = ["streaming_reductions_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        ":reducer",
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
