@@ -109,7 +109,7 @@ class StepKernelTest(test_util.TestCase):
     self.assertEqual(kernel_results.counter_1, 2)
     self.assertEqual(kernel_results.counter_2, 4)
 
-  def testIsCalibrated(self):
+  def test_calibration_warning(self):
     with warnings.catch_warnings(record=True) as triggered:
       kernel = TestTransitionKernel(is_calibrated=False)
       tfp.mcmc.sample_chain(
