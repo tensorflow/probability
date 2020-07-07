@@ -465,6 +465,111 @@ class _PowerSphericalTest(object):
     self.VerifyPowerSphericaUniformZeroKL(dim=10)
     self.VerifyPowerSphericaUniformKL(dim=10)
 
+  def VerifyPowerSphericalVonMisesFisherZeroKL(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        shape=[5, dim],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    # Zero concentration is the same as a uniform distribution on the sphere.
+    # Check that the KL divergence is zero.
+    concentration = self.dtype(0.)
+
+    ps = tfp.distributions.PowerSpherical(
+        mean_direction=mean_direction,
+        concentration=concentration)
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction,
+        concentration=concentration)
+    true_kl = tfp.distributions.kl_divergence(ps, vmf)
+    true_kl_ = self.evaluate(true_kl)
+    self.assertAllClose(true_kl_, np.zeros_like(true_kl_), atol=1e-4)
+
+  def testInvalidPowerSphericalvMFKl(self):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction1 = tf.random.uniform(
+        shape=[5, 3],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction1 = tf.nn.l2_normalize(mean_direction1, axis=-1)
+
+    mean_direction2 = tf.random.uniform(
+        shape=[5, 4],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction2 = tf.nn.l2_normalize(mean_direction2, axis=-1)
+
+    concentration = self.dtype(0.)
+
+    ps = tfp.distributions.PowerSpherical(
+        mean_direction=mean_direction1,
+        concentration=concentration)
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction2,
+        concentration=concentration)
+    with self.assertRaisesRegexp(ValueError, 'Can not compute the KL'):
+      tfp.distributions.kl_divergence(ps, vmf)
+
+  def VerifyPowerSphericalVonMisesFisherKL(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction1 = tf.random.uniform(
+        shape=[5, dim],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction2 = tf.random.uniform(
+        shape=[5, dim],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+
+    mean_direction1 = tf.nn.l2_normalize(mean_direction1, axis=-1)
+    mean_direction2 = tf.nn.l2_normalize(mean_direction2, axis=-1)
+    concentration1 = tf.math.log(
+        tf.random.uniform(
+            shape=[2, 1],
+            minval=self.dtype(1.),
+            maxval=self.dtype(100.),
+            dtype=self.dtype,
+            seed=seed_stream()))
+    concentration2 = tf.math.log(
+        tf.random.uniform(
+            shape=[2, 1],
+            minval=self.dtype(1.),
+            maxval=self.dtype(100.),
+            dtype=self.dtype,
+            seed=seed_stream()))
+
+    ps = tfp.distributions.PowerSpherical(
+        mean_direction=mean_direction1,
+        concentration=concentration1)
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction2,
+        concentration=concentration2)
+    x = ps.sample(int(6e4), seed=test_util.test_seed())
+
+    kl_sample = tf.reduce_mean(ps.log_prob(x) - vmf.log_prob(x), axis=0)
+    true_kl = tfp.distributions.kl_divergence(ps, vmf)
+    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
+    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=7e-2)
+
+  def testKLPowerSphericalVonMisesFisherDim2(self):
+    self.VerifyPowerSphericalVonMisesFisherZeroKL(dim=2)
+    self.VerifyPowerSphericalVonMisesFisherKL(dim=2)
+
+  def testKLPowerSphericalVonMisesFisherDim3(self):
+    self.VerifyPowerSphericalVonMisesFisherZeroKL(dim=3)
+    self.VerifyPowerSphericalVonMisesFisherKL(dim=3)
+
 
 @test_util.test_all_tf_execution_regimes
 class PowerSphericalTestFloat32(

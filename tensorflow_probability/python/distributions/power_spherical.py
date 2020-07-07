@@ -32,6 +32,7 @@ from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import spherical_uniform
+from tensorflow_probability.python.distributions import von_mises_fisher
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
@@ -307,9 +308,13 @@ class PowerSpherical(distribution.Distribution):
         modified_mean)
     return householder_transform.matvec(y)
 
-  def _entropy(self):
-    concentration = tf.convert_to_tensor(self.concentration)
-    mean_direction = tf.convert_to_tensor(self.mean_direction)
+  def _entropy(self, concentration=None, mean_direction=None):
+    concentration = (
+        tf.convert_to_tensor(self.concentration) if
+        concentration is None else concentration)
+    mean_direction = (
+        tf.convert_to_tensor(self.mean_direction) if
+        mean_direction is None else mean_direction)
     event_size = tf.cast(self._event_shape_tensor(
         mean_direction=mean_direction)[-1], self.dtype)
     concentration1 = concentration + (event_size - 1.) / 2.
@@ -395,3 +400,57 @@ def _kl_power_uniform_spherical(a, b, name=None):
 
     with tf.control_dependencies(deps):
       return b.entropy() - a.entropy()
+
+
+@kullback_leibler.RegisterKL(PowerSpherical, von_mises_fisher.VonMisesFisher)
+def _kl_power_spherical_vmf(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b).
+
+  Args:
+    a: instance of a PowerSpherical distribution object.
+    b: instance of a VonMisesFisher distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_power_spherical_vmf".
+
+  Returns:
+    Batchwise KL(a || b)
+
+  Raises:
+    ValueError: If the two distributions are over spheres of different
+      dimensions.
+
+  #### References
+
+  [1] Nicola de Cao, Wilker Aziz. The Power Spherical distribution.
+      https://arxiv.org/abs/2006.04437.
+  """
+  with tf.name_scope(name or 'kl_power_spherical_vmf'):
+    msg = (
+        'Can not compute the KL divergence between a `PowerSpherical` and '
+        '`VonMisesFisher` of different dimensions.')
+    deps = []
+    if a.event_shape[-1] is not None and b.event_shape[-1] is not None:
+      if a.event_shape[-1] != b.event_shape[-1]:
+        raise ValueError(
+            (msg + 'Got {} vs. {}').format(
+                a.event_shape[-1], b.event_shape[-1]))
+    elif a.validate_args or b.validate_args:
+      deps += [assert_util.assert_equal(
+          a.event_shape_tensor()[-1], b.event_shape_tensor()[-1], message=msg)]
+
+    with tf.control_dependencies(deps):
+      a_mean_direction = tf.convert_to_tensor(a.mean_direction)
+      a_concentration = tf.convert_to_tensor(a.concentration)
+      b_mean_direction = tf.convert_to_tensor(b.mean_direction)
+      b_concentration = tf.convert_to_tensor(b.concentration)
+
+      event_size = tf.cast(a._event_shape_tensor(  # pylint:disable=protected-access
+          mean_direction=a_mean_direction)[-1], a.dtype)
+      kl = (-a._entropy(concentration=a_concentration,  # pylint:disable=protected-access
+                        mean_direction=a_mean_direction) +
+            b._log_normalization(  # pylint:disable=protected-access
+                concentration=b_concentration) -
+            a_concentration * b_concentration * tf.reduce_sum(
+                a_mean_direction * b_mean_direction, axis=-1) / (
+                    a_concentration + event_size - 1.))
+      return kl
