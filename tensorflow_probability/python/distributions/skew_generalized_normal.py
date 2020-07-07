@@ -112,7 +112,7 @@ class SkewGeneralizedNormal(Distribution):
     return tf.constant([], dtype=tf.int32)
 
   def _event_shape(self):
-    return tensor_shape.scalar()
+    return tf.TensorShape([])
 #-
   def _sample_n(self, n, seed=None):
     shape = tf.concat([[n], self.batch_shape_tensor()], 0)
@@ -163,7 +163,7 @@ class SkewGeneralizedNormal(Distribution):
     return mean * broadcast_ones
 
   def _quantile(self, p):
-    quantile_z = (1. - tf.exp(-self.peak * special_math.ndtri(p)))/self.peak
+    quantile_z = (1. - tf.exp(-self.peak * tf.math.ndtri(p)))/self.peak
     return self._inv_z(quantile_z)
 
   def _stddev(self):
@@ -187,3 +187,5 @@ class SkewGeneralizedNormal(Distribution):
     """Reconstruct input `x` from a its normalized version."""
     with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
+
+
