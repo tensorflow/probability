@@ -551,6 +551,35 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         x,
         self.evaluate(joint_bijector.forward(joint_bijector.inverse(x))))
 
+  def test_nested_joint_distributions(self):
+    batch_shape = [2, 3]
+
+    def inner_fn():
+      xy = yield tfd.JointDistributionNamedAutoBatched(
+          {'x': tfd.Normal(loc=tf.zeros(batch_shape),
+                           scale=tf.ones(batch_shape),
+                           name='x'),
+           'y': lambda x: tfd.Poisson(log_rate=x, name='y')},
+          batch_ndims=2,
+          name='xy')
+      _ = yield tfd.Normal(loc=0., scale=xy['y'], name='z')
+
+    joint = tfd.JointDistributionSequentialAutoBatched([
+        tfd.JointDistributionCoroutineAutoBatched(inner_fn,
+                                                  batch_ndims=1,
+                                                  name='a')])
+    z = joint.sample()
+
+    # Batch and event shape.
+    self.assertAllEqual(joint.batch_shape, [])
+    self.assertAllEqualNested(tf.nest.map_structure(lambda x: x.shape, z),
+                              joint.event_shape)
+
+    # Sample shape.
+    z2 = joint.sample(5)
+    lp2 = joint.log_prob(z2)
+    self.assertAllEqual(lp2.shape, [5])
+
 
 if __name__ == '__main__':
   tf.test.main()

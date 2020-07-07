@@ -82,9 +82,15 @@ class JointDistributionVmapMixin(object):
   @property
   def _single_sample_ndims(self):
     """Computes the rank of values produced by executing the base model."""
-    return [prefer_static.rank_from_shape(d.batch_shape_tensor, d.batch_shape) +
-            prefer_static.rank_from_shape(d.event_shape_tensor, d.event_shape)
-            for d in self._get_single_sample_distributions()]
+    result = []
+    for d in self._get_single_sample_distributions():
+      batch_ndims = prefer_static.rank_from_shape(d.batch_shape_tensor,
+                                                  d.batch_shape)
+      result.append(tf.nest.map_structure(
+          lambda a, b, nd=batch_ndims: nd + prefer_static.rank_from_shape(a, b),
+          d.event_shape_tensor(),
+          d.event_shape))
+    return result
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
                            name='sample_distributions'):
