@@ -338,15 +338,6 @@ py_library(
     ],
 )
 
-py_library(
-    name = "reducer",
-    srcs = ["reducer.py"],
-    srcs_version = "PY2AND3",
-    deps = [
-        # six dep,
-    ],
-)
-
 # py2and3
 py_test(
     name = "streaming_reductions_test",
@@ -356,7 +347,6 @@ py_test(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        ":reducer",
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],

@@ -27,7 +27,6 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_observation_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_state_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
-from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
@@ -63,7 +62,6 @@ _allowed_symbols = [
     'make_rwmh_kernel_fn',
     'particle_filter',
     'reconstruct_trajectories',
-    'Reducer',
     'resample_deterministic_minimum_error',
     'resample_independent',
     'resample_stratified',
