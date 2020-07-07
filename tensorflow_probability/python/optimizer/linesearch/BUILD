@@ -53,6 +53,7 @@ multi_substrate_py_test(
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
