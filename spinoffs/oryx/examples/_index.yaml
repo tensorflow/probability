@@ -14,21 +14,17 @@
 # ============================================================================
 book_path: /probability/oryx/_book.yaml
 project_path: /probability/oryx/_project.yaml
-description: A library for probabilistic programming and deep learning built on top
-of JAX.
+description: A library for probabilistic programming and deep learning built on top of JAX.
 landing_page:
   custom_css_path: /site-assets/css/style.css
   rows:
-  - heading: Oryx is a library for probabilistic programming and deep learning built on top
-of JAX.
+  - heading: Oryx is a library for probabilistic programming and deep learning built on top of JAX.
     items:
     - classname: devsite-landing-row-50
       description: >
         Oryx's approach is to expose a set of function transformations that
-        compose and integrate with JAX's existing transformations (e.g. `jit`, `grad`,
-        and `vmap`).
-
-        Installation:
+        compose and integrate with JAX's existing transformations. To install Oryx,
+        you can run:
         <pre class="devsite-terminal devsite-click-to-copy prettyprint lang-shell">
         pip install --upgrade oryx
         </pre>

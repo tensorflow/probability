@@ -27,7 +27,7 @@ upper_tabs:
     other:
     - name: Oryx
       contents:
-      - include: /probability/oryx/examples/_toc.yaml
+      - include: /probability/oryx/_toc.yaml
       - heading: API
       - include: /probability/oryx/api_docs/python/_toc.yaml
 
