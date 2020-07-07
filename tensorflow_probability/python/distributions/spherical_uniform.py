@@ -174,6 +174,22 @@ class SphericalUniform(distribution.Distribution):
         tf.math.lgamma(tf.cast(self.dimension / 2., self.dtype)))
     return tf.fill(self.batch_shape_tensor(), log_nsphere_surface_area)
 
+  def _mean(self):
+    # This can be seen due to symmetry. If (X_1, ... X_k, ..., X_n) is
+    # uniformly distributed on the sphere, then so is
+    # (X_1, ..., -X_k, ..., X_n). Thus E[X_k] = E[-X_k] = 0.
+    return tf.fill(
+        tf.concat([self.batch_shape_tensor(), [self.dimension]], axis=0),
+        tf.cast(0., self.dtype))
+
+  def _covariance(self):
+    # By a similar argument for the mean case, we can show that
+    # E[X_i X_j] = -E[X_i X_j], so the covariance terms are zero.
+    return tf.eye(
+        num_rows=self.dimension,
+        batch_shape=self.batch_shape_tensor(),
+        dtype=self.dtype) / self.dimension
+
   def _default_event_space_bijector(self):
     # TODO(b/145620027) Finalize choice of bijector.
     return chain_bijector.Chain([

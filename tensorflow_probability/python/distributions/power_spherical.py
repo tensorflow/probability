@@ -269,6 +269,26 @@ class PowerSpherical(distribution.Distribution):
     return (concentration / (
         event_size - 1. + concentration))[..., tf.newaxis] * mean_direction
 
+  def _covariance(self):
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+    concentration = tf.convert_to_tensor(self.concentration)
+
+    event_size = tf.cast(self._event_shape_tensor(
+        mean_direction=mean_direction)[0], dtype=self.dtype)
+
+    covariance = -concentration[..., tf.newaxis, tf.newaxis] * tf.linalg.matmul(
+        mean_direction[..., tf.newaxis],
+        mean_direction[..., tf.newaxis, :])
+    covariance = tf.linalg.set_diag(
+        covariance, tf.linalg.diag_part(covariance) + (
+            concentration + event_size - 1.)[..., tf.newaxis])
+
+    covariance = ((2 * concentration +  event_size - 1.)/ (
+        tf.math.square(concentration + event_size - 1.) * (
+            concentration + event_size)))[
+                ..., tf.newaxis, tf.newaxis] * covariance
+    return covariance
+
   def _sample_n(self, n, seed=None):
     mean_direction = tf.convert_to_tensor(self.mean_direction)
     concentration = tf.convert_to_tensor(self.concentration)

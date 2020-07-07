@@ -253,6 +253,44 @@ class _PowerSphericalTest(object):
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical, atol=2e-4)
 
+  def VerifyCovariance(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    num_samples = int(5e4)
+    mean_direction = tf.random.uniform(
+        shape=[5, dim],
+        minval=self.dtype(1.),
+        maxval=self.dtype(2.),
+        dtype=self.dtype,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    concentration = tf.math.log(
+        tf.random.uniform(
+            shape=[2, 1],
+            minval=self.dtype(1.),
+            maxval=self.dtype(100.),
+            dtype=self.dtype,
+            seed=seed_stream()))
+
+    ps = tfp.distributions.PowerSpherical(
+        mean_direction=mean_direction,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
+    samples = ps.sample(num_samples, seed=test_util.test_seed())
+    sample_cov = tfp.stats.covariance(samples, sample_axis=0)
+    true_cov, sample_cov = self.evaluate([
+        ps.covariance(), sample_cov])
+    self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1e-3)
+
+  def testCovarianceDim2(self):
+    self.VerifyCovariance(dim=2)
+
+  def testCovarianceDim5(self):
+    self.VerifyCovariance(dim=5)
+
+  def testCovarianceDim10(self):
+    self.VerifyCovariance(dim=10)
+
   def VerifyEntropy(self, dim):
     seed_stream = test_util.test_seed_stream()
     mean_direction = tf.random.uniform(
@@ -269,15 +307,15 @@ class _PowerSphericalTest(object):
             maxval=self.dtype(100.),
             dtype=self.dtype,
             seed=seed_stream()))
-    uniform = tfp.distributions.PowerSpherical(
+    ps = tfp.distributions.PowerSpherical(
         mean_direction=mean_direction,
         concentration=concentration,
         validate_args=True,
         allow_nan_stats=False)
-    samples = uniform.sample(int(3e4), seed=test_util.test_seed())
-    sample_entropy = -tf.reduce_mean(uniform.log_prob(samples), axis=0)
+    samples = ps.sample(int(3e4), seed=test_util.test_seed())
+    sample_entropy = -tf.reduce_mean(ps.log_prob(samples), axis=0)
     true_entropy, sample_entropy = self.evaluate([
-        uniform.entropy(), sample_entropy])
+        ps.entropy(), sample_entropy])
     self.assertAllClose(sample_entropy, true_entropy, rtol=3e-2)
 
   def testEntropyDim2(self):

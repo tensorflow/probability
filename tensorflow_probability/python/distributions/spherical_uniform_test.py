@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import test_util
 
 
@@ -101,6 +102,74 @@ class _SphericalUniformTest(object):
         validate_args=True, allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(uniform)
 
+  def VerifyMean(self, dim):
+    num_samples = int(7e4)
+    uniform = tfp.distributions.SphericalUniform(
+        batch_shape=[2, 1],
+        dimension=dim,
+        dtype=self.dtype,
+        validate_args=True,
+        allow_nan_stats=False)
+    samples = uniform.sample(num_samples, seed=test_util.test_seed())
+    sample_mean = tf.reduce_mean(samples, axis=0)
+    true_mean, sample_mean = self.evaluate([
+        uniform.mean(), sample_mean])
+    check1 = st.assert_true_mean_equal_by_dkwm(
+        samples=samples, low=-(1. + 1e-7), high=1. + 1e-7,
+        expected=true_mean, false_fail_rate=1e-6)
+    check2 = assert_util.assert_less(
+        st.min_discrepancy_of_true_means_detectable_by_dkwm(
+            num_samples,
+            low=-1.,
+            high=1.,
+            # Smaller false fail rate because of different batch sizes between
+            # these two checks.
+            false_fail_rate=1e-7,
+            false_pass_rate=1e-6),
+        # 4% relative error
+        0.08)
+    self.evaluate([check1, check2])
+
+  def testMeanDim2(self):
+    self.VerifyMean(dim=2)
+
+  def testMeanDim3(self):
+    self.VerifyMean(dim=3)
+
+  def testMeanDim5(self):
+    self.VerifyMean(dim=5)
+
+  def testMeanDim10(self):
+    self.VerifyMean(dim=10)
+
+  def VerifyCovariance(self, dim):
+    num_samples = int(6e4)
+    uniform = tfp.distributions.SphericalUniform(
+        batch_shape=[2, 1],
+        dimension=dim,
+        dtype=self.dtype,
+        validate_args=True,
+        allow_nan_stats=False)
+    samples = uniform.sample(num_samples, seed=test_util.test_seed())
+    sample_cov = tfp.stats.covariance(samples, sample_axis=0)
+    sample_variance = tfp.stats.variance(samples, sample_axis=0)
+    true_cov, sample_cov, sample_variance = self.evaluate([
+        uniform.covariance(), sample_cov, sample_variance])
+    self.assertAllClose(
+        np.ones_like(sample_variance) / dim,
+        sample_variance, rtol=2e-2)
+    # The off-diagonal entries should be close to zero.
+    self.assertAllClose(true_cov, sample_cov, rtol=1e-2, atol=4e-3)
+
+  def testCovarianceDim2(self):
+    self.VerifyCovariance(dim=2)
+
+  def testCovarianceDim5(self):
+    self.VerifyCovariance(dim=5)
+
+  def testCovarianceDim10(self):
+    self.VerifyCovariance(dim=10)
+
   def VerifyEntropy(self, dim):
     uniform = tfp.distributions.SphericalUniform(
         dimension=dim,
@@ -108,7 +177,7 @@ class _SphericalUniformTest(object):
         dtype=self.dtype,
         validate_args=True,
         allow_nan_stats=False)
-    samples = uniform.sample(int(1e4), seed=test_util.test_seed())
+    samples = uniform.sample(int(1e3), seed=test_util.test_seed())
     sample_entropy = -tf.reduce_mean(uniform.log_prob(samples), axis=0)
     true_entropy, sample_entropy = self.evaluate([
         uniform.entropy(), sample_entropy])
