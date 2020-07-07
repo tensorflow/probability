@@ -25,10 +25,13 @@ upper_tabs:
   lower_tabs:
     # Subsite tabs
     other:
-    - name: Oryx
+    - name: Guides & Tutorials
       contents:
       - include: /probability/oryx/_toc.yaml
-      - heading: API
+
+    - name: API
+      skip_translation: true
+      contents:
       - include: /probability/oryx/api_docs/python/_toc.yaml
 
 - include: /_upper_tabs_right.yaml

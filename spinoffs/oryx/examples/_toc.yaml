@@ -15,4 +15,4 @@
 toc:
 - heading: "Guide"
 - title: A Tour of Oryx
-  path: /probability/examples/a_tour_of_oryx
+  path: /probability/oryx/notebooks/a_tour_of_oryx
