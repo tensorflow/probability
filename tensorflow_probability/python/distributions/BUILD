@@ -2918,6 +2918,7 @@ multi_substrate_py_test(
     name = "power_spherical_test",
     size = "medium",
     srcs = ["power_spherical_test.py"],
+    jax_tags = ["no-oss-ci"],  # TODO(b/160734689)
     tags = ["tf1-broken"],
     deps = [
         ":power_spherical",
