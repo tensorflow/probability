@@ -550,6 +550,17 @@ def bisect(value_and_gradients_function,
 
   Corresponds to the step U3 in [Hager and Zhang (2006)][2].
 
+  Tolerates non-finite candidate right end-points.  Specifically:
+  - If f(x) = -inf, that's a minimum, so we should just jump both end-points
+    there and report success.
+  - If f(x) = nan, fail (that is, stop trying to bisect and report failure).
+  - If f(x) = +inf, that's fine, but just not an acceptable right
+    end-point, so keep bisecting.
+
+  In all of these cases, takes care to ignore the derivative, because (a) it
+  doesn't inflence the outcome, and (b) if the value is infinite, the derivative
+  should be `nan` (whether the client code arranged for that to be so or not).
+
   Args:
     value_and_gradients_function: A Python callable that accepts a real scalar
       tensor and returns a namedtuple containing the value filed `f` of the
@@ -581,14 +592,14 @@ def bisect(value_and_gradients_function,
       right: Return value of value_and_gradients_function at the right end
         point of the bracketing interval found.
   """
-  failed = ~is_finite(initial_left, initial_right)
-  needs_bisect = (initial_right.df < 0) & (initial_right.f > f_lim)
+  failed = ~is_finite(initial_left) | tf.math.is_nan(initial_right.f)
+  finished = initial_right.f <= float('-inf')
   bisect_args = _IntermediateResult(
       iteration=tf.convert_to_tensor(0),
-      stopped=failed | ~needs_bisect,
+      stopped=failed | finished | ~_needs_bisect(initial_right, f_lim),
       failed=failed,
       num_evals=tf.convert_to_tensor(0),
-      left=initial_left,
+      left=val_where(finished, initial_right, initial_left),
       right=initial_right)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)
 
@@ -603,25 +614,35 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
     """Narrow down interval to satisfy opposite slope conditions."""
     mid = value_and_gradients_function((curr.left.x + curr.right.x) / 2)
 
-    # Fail if function values at mid point are no longer finite; or left/right
-    # points are so close to it that we can't distinguish them any more.
-    failed = (curr.failed | ~is_finite(mid) |
-              tf.equal(mid.x, curr.left.x) | tf.equal(mid.x, curr.right.x))
+    # If the mid point has a value of -inf, we have found a minimum; jump
+    # both ends of the interval there and exit.
+    finished = mid.f <= float('-inf')
 
-    # If mid point has a negative slope and the function value at that point is
-    # small enough, we can use it as a new left end point to narrow down the
-    # interval. If mid point has a positive slope, then we have found a suitable
-    # right end point to bracket a minima within opposite slopes. Otherwise, the
-    # mid point has a negative slope but the function value at that point is too
-    # high to work as left end point, we are in the same situation in which we
-    # started the loop so we just update the right end point and continue.
+    # Otherwise, fail if the midpoint has a `nan` value or derivative, or if the
+    # left/right points are so close to it that we can't distinguish them any
+    # more.
+    failed = (curr.failed |
+              (~finished &
+               (_bad_nan(mid) |
+                tf.equal(mid.x, curr.left.x) |
+                tf.equal(mid.x, curr.right.x))))
+
+    # We will update only non-stopped and non-failed batch members.
     to_update = ~(curr.stopped | failed)
-    update_left = (mid.df < 0) & (mid.f <= f_lim)
-    left = val_where(to_update & update_left, mid, curr.left)
-    right = val_where(to_update & ~update_left, mid, curr.right)
 
-    # We're done when the right end point has a positive slope.
-    stopped = curr.stopped | failed | (right.df >= 0)
+    # If the mid point has a negative slope and the function value at that point
+    # is small enough, we can use it as a new left end point to narrow down the
+    # interval.  Otherwise it becomes the new right end-point.
+    update_left = (mid.df < 0) & (mid.f <= f_lim)
+    left = val_where(to_update & (update_left | finished), mid, curr.left)
+    right = val_where(to_update & (~update_left | finished), mid, curr.right)
+    # If mid point has a finite value and a positive slope, then we have found a
+    # suitable right end point to bracket a minimum within opposite slopes.
+    # Otherwise, the mid point has a negative slope but the function value at
+    # that point is too high to work as left end point (including +inf as a
+    # possibility), so we are in the same situation in which we started the
+    # loop.  We just update the right end point and continue.
+    stopped = curr.stopped | failed | finished | _is_rising(right)
 
     return [_IntermediateResult(
         iteration=curr.iteration,
@@ -634,10 +655,51 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
   # The interval needs updating if the right end point has a negative slope and
   # the value of the function at that point is too high. It is not a valid left
   # end point but along with the current left end point, it encloses another
-  # minima. The loop above tries to narrow the interval so that it satisfies the
+  # minimum. The loop above tries to narrow the interval so that it satisfies
   # opposite slope conditions.
   return tf.while_loop(
       cond=_loop_cond, body=_loop_body, loop_vars=[initial_args])[0]
+
+
+def _needs_bisect(val, f_lim):
+  """Checks whether a candidate end-point calls for bisection.
+
+  This is the case if the derivative at that point is negative, suggesting that
+  this should be a left end-point, but the function value is too high, implying
+  that it must instead be a right end-point but that it is unsuitable for secant
+  steps and requires bisection steps.
+
+  This check is careful about a +inf value, in which case the derivative is
+  ignored and we move to bisection.
+
+  Args:
+    val: A namedtuple with fields `f` and `df` holding the function value and
+      derivative at the point of interest.  May be batched.
+    f_lim: Upper bound on acceptable function values.
+
+  Returns:
+    needs_bisect: Boolean Tensor mask giving whether each end-point in the batch
+      calls for bisection.
+  """
+  return (val.f >= float('inf')) | ((val.df < 0) & (val.f > f_lim))
+
+
+def _is_rising(val):
+  """Checks that the value is finite and the derivative is positive.
+
+  This is the stopping condition for the loop U3, and the condition for U1.  The
+  check that the value is finite is necessary to ensure that the derivative is
+  meaningful.
+
+  Args:
+    val: A namedtuple with fields `f` and `df` giving the value and gradient
+      of the univariate objective, respectively.  May be batched.
+
+  Returns:
+    rising: A Boolean Tensor giving whether this point is a suitable right
+      end-point for an interval subject to secant subdivision.
+  """
+  return tf.math.is_finite(val.f) & (val.df > 0)
 
 
 def is_finite(val_1, val_2=None):
@@ -658,6 +720,13 @@ def is_finite(val_1, val_2=None):
     return val_1_finite & tf.math.is_finite(val_2.f) & tf.math.is_finite(
         val_2.df)
   return val_1_finite
+
+
+def _bad_nan(val):
+  # If the value is +-inf, nan in the derivative doesn't matter because we
+  # always know what to do.
+  bad_nan_df = tf.math.is_finite(val.f) & tf.math.is_nan(val.df)
+  return tf.math.is_nan(val.f) | bad_nan_df
 
 
 def _satisfies_wolfe(val_0,
