@@ -38,12 +38,6 @@ model = tfp.experimental.inference_gym.targets.LogGaussianCoxProcess(
 dataset = model._sample_dataset(seed=2)
 
 sources = []
-source += array_to_source.array_to_source()
-source += "\n\n"
-source += array_to_source.array_to_source()
-source += "\n\n"
-source += array_to_source.array_to_source()
-
 sources.append(
     array_to_source.array_to_source(
         'LOCATIONS', dataset['train_locations']))
