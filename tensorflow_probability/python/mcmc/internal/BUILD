@@ -91,7 +91,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "leapfrog_integrator_test",
-    size = "small",
+    size = "medium",
     srcs = ["leapfrog_integrator_test.py"],
     disabled_substrates = ["numpy"],
     deps = [
