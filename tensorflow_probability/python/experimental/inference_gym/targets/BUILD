@@ -44,6 +44,7 @@ multi_substrate_py_library(
         ":model",
         ":neals_funnel",
         ":sparse_logistic_regression",
+        ":vector_model",
         "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
     ],
 )
@@ -76,6 +77,7 @@ multi_substrate_py_library(
     name = "bayesian_model",
     srcs = ["bayesian_model.py"],
     deps = [
+        ":model",
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/inference_gym/internal:ground_truth_encoding",
     ],
@@ -262,6 +264,29 @@ multi_substrate_py_test(
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "vector_model",
+    srcs = ["vector_model.py"],
+    deps = [
+        ":model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "vector_model_test",
+    srcs = ["vector_model_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

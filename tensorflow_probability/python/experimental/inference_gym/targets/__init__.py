@@ -29,6 +29,7 @@ from tensorflow_probability.python.experimental.inference_gym.targets.model impo
 from tensorflow_probability.python.experimental.inference_gym.targets.neals_funnel import NealsFunnel
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
+from tensorflow_probability.python.experimental.inference_gym.targets.vector_model import VectorModel
 
 __all__ = [
     'Banana',
@@ -43,4 +44,5 @@ __all__ = [
     'NealsFunnel',
     'SparseLogisticRegression',
     'SyntheticItemResponseTheory',
+    'VectorModel',
 ]

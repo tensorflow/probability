@@ -51,7 +51,7 @@ for i, (name, sample_transformation) in enumerate(
   bias_sq = tf.square(
       tf.reduce_mean(transformed_samples, 0) -
       sample_transformation.ground_truth_mean)
-  ess = compute_ess(
+  ess = compute_ess(  # E.g. tfp.mcmc.effective_sample_size if using MCMC.
       transformed_samples,
       tf.square(sample_transformation.ground_truth_standard_deviation))
   plt.subplot(len(model.sample_transformations), 2, 2 * i + 1)
@@ -61,6 +61,10 @@ for i, (name, sample_transformation) in enumerate(
   plt.title('{} ess'.format(sample_transformation))
   plt.bar(np.arange(ess.shape[-1]), ess)
 ```
+
+Also, see [`VectorModel`][vector_model] which can be used to simplify the
+interface requirements for the inference method.
+
 
 ## What makes for a good Inference Gym Model?
 
@@ -129,3 +133,4 @@ See [`tools/inference_gym_ground_truth/get_ground_truth.py`][get_ground_truth].
 [logistic_regression]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/logistic_regression.py
 [irt]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/item_response_theory.py
 [gaussian]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/ill_conditioned_gaussian.py
+[vector_model]: https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/experimental/inference_gym/targets/vector_model.py
