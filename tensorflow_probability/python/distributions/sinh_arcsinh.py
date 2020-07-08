@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'SinhArcsinh',
@@ -98,11 +97,6 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   ```
   """
 
-  @deprecation.deprecated(
-      '2020-06-01', 'Previously, `distribution` was required to have scalar '
-      'batch. Because batch shape overrides to `TransformedDistribution` are '
-      'deprecated, `distribution` now must have a batch shape to which the '
-      'shapes of `loc`, `scale`, `skewness`, and `tailweight` all broadcast.')
   def __init__(self,
                loc,
                scale,
@@ -124,8 +118,10 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       tailweight:  Tailweight parameter. Default is `1.0` (unchanged tailweight)
       distribution: `tf.Distribution`-like instance. Distribution that is
         transformed to produce this distribution.
-        Default is `tfd.Normal(0., 1.)`.
-        Must be a scalar-batch, scalar-event distribution.  Typically
+        Must have a batch shape to which the shapes of `loc`, `scale`,
+        `skewness`, and `tailweight` all broadcast. Default is
+        `tfd.Normal(batch_shape, 1.)`, where `batch_shape` is the broadcasted
+        shape of the parameters. Typically
         `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
         a function of non-trainable parameters. WARNING: If you backprop through
         a `SinhArcsinh` sample and `distribution` is not
@@ -158,28 +154,24 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       self._skewness = tensor_util.convert_nonref_to_tensor(
           skewness, name='skewness', dtype=dtype)
 
-      batch_shape = distribution_util.get_broadcast_shape(
-          self._loc, self._scale, self._tailweight, self._skewness)
-
       # Recall, with Z a random variable,
       #   Y := loc + scale * F(Z),
       #   F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight ) * C
       #   C := 2 / F_0(2)
       #   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
       if distribution is None:
-        # TODO(b/151180729): When `batch_shape` arg to `TransformedDistribution`
-        # is deprecated, broadcast `loc` or `scale` parameter to `batch_shape`
-        # and remove `else` condition.
+        batch_rank = tf.reduce_max([
+            distribution_util.prefer_static_rank(x)
+            for x in (self._skewness, self._tailweight, self._loc, self._scale)
+        ])
+        # TODO(b/160730249): Make `loc` a scalar `0.` and remove overridden
+        # `batch_shape` and `batch_shape_tensor` when
+        # TransformedDistribution's bijector can modify its `batch_shape`.
         distribution = normal.Normal(
-            loc=tf.zeros([], dtype=dtype),
+            loc=tf.zeros(tf.ones(batch_rank, tf.int32), dtype=dtype),
             scale=tf.ones([], dtype=dtype),
             allow_nan_stats=allow_nan_stats,
             validate_args=validate_args)
-      else:
-        asserts = distribution_util.maybe_check_scalar_distribution(
-            distribution, dtype, validate_args)
-        if asserts:
-          self._loc = distribution_util.with_dependencies(asserts, self._loc)
 
       # Make the SAS bijector, 'F'.
       f = sinh_arcsinh_bijector.SinhArcsinh(
@@ -197,7 +189,6 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       super(SinhArcsinh, self).__init__(
           distribution=distribution,
           bijector=bijector,
-          batch_shape=batch_shape,
           validate_args=validate_args,
           name=name)
       self._parameters = parameters
@@ -221,6 +212,17 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   def skewness(self):
     """Controls the skewness.  `Skewness > 0` means right skew."""
     return self._skewness
+
+  def _batch_shape(self):
+    params = [self.skewness, self.tailweight, self.loc, self.scale]
+    s_shape = params[0].shape
+    for t in params[1:]:
+      s_shape = tf.broadcast_static_shape(s_shape, t.shape)
+    return s_shape
+
+  def _batch_shape_tensor(self):
+    return distribution_util.get_broadcast_shape(
+        self.skewness, self.tailweight, self.loc, self.scale)
 
   def _default_event_space_bijector(self):
     # TODO(b/145620027) Finalize choice of bijector.

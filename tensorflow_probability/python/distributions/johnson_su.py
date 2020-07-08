@@ -202,17 +202,20 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
 
       bijector = shift(scale(sinh(norm_scale(norm_shift))))
 
-      batch_shape = distribution_util.get_broadcast_shape(
-          self._skewness, self._tailweight, self._loc, self._scale)
+      batch_rank = tf.reduce_max([
+          distribution_util.prefer_static_rank(x)
+          for x in (self._skewness, self._tailweight, self._loc, self._scale)])
 
       super(JohnsonSU, self).__init__(
+          # TODO(b/160730249): Make `loc` a scalar `0.` and remove overridden
+          # `batch_shape` and `batch_shape_tensor` when
+          # TransformedDistribution's bijector can modify its `batch_shape`.
           distribution=normal.Normal(
-              loc=tf.zeros([], dtype=dtype),
+              loc=tf.zeros(tf.ones(batch_rank, tf.int32), dtype=dtype),
               scale=tf.ones([], dtype=dtype),
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats),
           bijector=bijector,
-          batch_shape=batch_shape,
           validate_args=validate_args,
           parameters=parameters,
           name=name)
@@ -267,9 +270,19 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
 
     return tf.broadcast_to(variance, self.batch_shape_tensor())
 
-  def _parameter_control_dependencies(self, is_init):
-    assertions = super(JohnsonSU, self)._parameter_control_dependencies(is_init)
+  def _batch_shape(self):
+    params = [self.skewness, self.tailweight, self.loc, self.scale]
+    s_shape = params[0].shape
+    for t in params[1:]:
+      s_shape = tf.broadcast_static_shape(s_shape, t.shape)
+    return s_shape
 
+  def _batch_shape_tensor(self):
+    return distribution_util.get_broadcast_shape(
+        self.skewness, self.tailweight, self.loc, self.scale)
+
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
     if self.validate_args:
       if is_init != tensor_util.is_ref(self.tailweight):
         assertions.append(assert_util.assert_positive(

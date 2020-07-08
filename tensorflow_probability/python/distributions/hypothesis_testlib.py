@@ -874,16 +874,8 @@ def transformed_distributions(draw,
   hp.note('Drawing TransformedDistribution with bijector {}'.format(bijector))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
-  underlying_batch_shape = batch_shape
-  # TODO(b/151180729): Remove `batch_shape_arg` when `TransformedDistribution`
-  # shape overrides are deprecated.
-  batch_shape_arg = None
-  if draw(hps.booleans()):
-    # Use batch_shape overrides.
-    underlying_batch_shape = tf.TensorShape([])  # scalar underlying batch
-    batch_shape_arg = batch_shape
   underlyings = distributions(
-      batch_shape=underlying_batch_shape,
+      batch_shape=batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars,
       depth=depth - 1,
@@ -897,7 +889,6 @@ def transformed_distributions(draw,
   result_dist = tfd.TransformedDistribution(
       bijector=bijector,
       distribution=to_transform,
-      batch_shape=batch_shape_arg,
       validate_args=validate_args)
   if batch_shape != result_dist.batch_shape:
     msg = ('TransformedDistribution strategy generated a bad batch shape '
