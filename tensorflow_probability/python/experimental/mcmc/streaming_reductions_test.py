@@ -54,6 +54,23 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
     return self._is_calibrated
 
 
+class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
+
+  def __init__(self, is_calibrated=True, accepts_seed=True):
+    self._is_calibrated = is_calibrated
+    self._accepts_seed = accepts_seed
+
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    if seed is not None and not self._accepts_seed:
+      raise TypeError('seed arg not accepted')
+    random_next_state = tfp.random.rayleigh((1,), seed=seed)
+    return random_next_state, previous_kernel_results
+
+  @property
+  def is_calibrated(self):
+    return self._is_calibrated
+
+
 @test_util.test_all_tf_execution_regimes
 class StepKernelTest(test_util.TestCase):
 
@@ -95,20 +112,6 @@ class StepKernelTest(test_util.TestCase):
     final_state = self.evaluate(final_state)
     self.assertEqual(final_state, init_state + 2)
 
-  def test_seed(self):
-    fake_kernel = TestTransitionKernel()
-    final_state, kernel_results = step_kernel(
-        num_steps=2,
-        current_state=0,
-        kernel=fake_kernel,
-        return_final_kernel_results=True,
-        seed=test_util.test_seed()
-    )
-    final_state = self.evaluate(final_state)
-    self.assertEqual(final_state, 2)
-    self.assertEqual(kernel_results.counter_1, 2)
-    self.assertEqual(kernel_results.counter_2, 4)
-
   def test_calibration_warning(self):
     with warnings.catch_warnings(record=True) as triggered:
       kernel = TestTransitionKernel(is_calibrated=False)
@@ -121,6 +124,32 @@ class StepKernelTest(test_util.TestCase):
     self.assertTrue(
         any('supplied `TransitionKernel` is not calibrated.' in str(
             warning.message) for warning in triggered))
+
+  def test_seed_reproducibility(self):
+    first_fake_kernel = RandomTransitionKernel()
+    last_state = self.evaluate(step_kernel(
+        num_steps=1,
+        current_state=0,
+        kernel=first_fake_kernel,
+        seed=test_util.test_seed(),
+    ))
+    for num_steps in range(2, 5):
+      first_final_state = self.evaluate(step_kernel(
+          num_steps=num_steps,
+          current_state=0,
+          kernel=first_fake_kernel,
+          seed=test_util.test_seed(),
+      ))
+      second_fake_kernel = RandomTransitionKernel()
+      second_final_state = self.evaluate(step_kernel(
+          num_steps=num_steps,
+          current_state=1, # difference should be irrelevant
+          kernel=second_fake_kernel,
+          seed=test_util.test_seed(),
+      ))
+      self.assertEqual(first_final_state, second_final_state)
+      self.assertGreater(abs(first_final_state - last_state), 0.3)
+      last_state = first_final_state
 
 
 if __name__ == '__main__':

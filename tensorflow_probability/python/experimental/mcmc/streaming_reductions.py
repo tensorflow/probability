@@ -48,14 +48,16 @@ def step_kernel(
     num_steps: Integer number of Markov chain steps.
     current_state: `Tensor` or Python `list` of `Tensor`s representing the
       current state(s) of the Markov chain(s).
-    previous_kernel_results: A `Tensor` or a nested collection of `Tensor`s
-      representing internal calculations made within the previous call to this
-      function (or as returned by the kernel's `bootstrap_results` if None).
-      Default value: `None` (i.e., return of kernel.bootstrap_results)
+    previous_kernel_results: A `Tensor` or a nested collection of `Tensor`s.
+      Warm-start for the auxiliary state needed by the given `kernel`.
+      If not supplied, `step_kernel` will cold-start with
+      `kernel.bootstrap_results`.
     kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
       of the Markov chain.
     return_final_kernel_results: If `True`, then the final kernel results are
       returned alongside the chain state after `num_steps` steps are taken.
+      This can be useful to inspect the final auxiliary state, or for a later
+      warm restart.
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
     seed: Optional, a seed for reproducible sampling.
@@ -63,11 +65,11 @@ def step_kernel(
       Default value: `None` (i.e., 'mcmc_sample_chain').
 
   Returns:
-    next_state, final_kernel_results: If `return_final_kernel_results` is
-      `True`, the kernel results after `num_steps` steps will be returned
-      alongside the resultant Markov chain state.
-    next_state: Conversely, if `return_final_kernel_results` is `False`,
-      only the resultant state will be returned.
+    next_state: Markov chain state after `num_step` steps are taken, of
+      identical type as `current_state`.
+    final_kernel_results: kernel results, as supplied by `kernel.one_step` after
+      `num_step` steps are taken. This is only returned if
+      `return_final_kernel_results` is `True`.
   """
   is_seeded = seed is not None
   seed = samplers.sanitize_seed(seed, salt='mcmc.sample_chain')
@@ -96,7 +98,7 @@ def step_kernel(
         initial_loop_vars=list((seed, current_state, previous_kernel_results)),
         parallel_iterations=parallel_iterations)
 
-    # return semantics are simple enough to not warrant the need of named tuples
+    # return semantics are simple enough to not warrant the use of named tuples
     # as in `sample_chain`
     if return_final_kernel_results:
       return next_state, final_kernel_results
