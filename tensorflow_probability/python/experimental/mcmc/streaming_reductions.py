@@ -62,7 +62,7 @@ def step_kernel(
       must be a positive integer. See `tf.while_loop` for more details.
     seed: Optional, a seed for reproducible sampling.
     name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., 'mcmc_sample_chain').
+      Default value: `None` (i.e., 'mcmc_step_kernel').
 
   Returns:
     next_state: Markov chain state after `num_step` steps are taken, of
@@ -72,7 +72,10 @@ def step_kernel(
       `return_final_kernel_results` is `True`.
   """
   is_seeded = seed is not None
-  seed = samplers.sanitize_seed(seed, salt='mcmc.sample_chain')
+  if tf.executing_eagerly():
+    tf.random.set_seed(seed)
+  seed = samplers.sanitize_seed(seed, salt='experimental.mcmc.step_kernel')
+
   if not kernel.is_calibrated:
     warnings.warn('supplied `TransitionKernel` is not calibrated. Markov '
                   'chain may not converge to intended target distribution.')

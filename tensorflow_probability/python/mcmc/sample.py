@@ -308,8 +308,9 @@ def sample_chain(
        http://statweb.stanford.edu/~owen/reports/bestthinning.pdf
   """
   is_seeded = seed is not None
+  if tf.executing_eagerly():
+    tf.random.set_seed(seed)
   seed = samplers.sanitize_seed(seed, salt='mcmc.sample_chain')
-
   if not kernel.is_calibrated:
     warnings.warn('supplied `TransitionKernel` is not calibrated. Markov '
                   'chain may not converge to intended target distribution.')

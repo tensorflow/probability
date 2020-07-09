@@ -127,28 +127,29 @@ class StepKernelTest(test_util.TestCase):
 
   def test_seed_reproducibility(self):
     first_fake_kernel = RandomTransitionKernel()
+    second_fake_kernel = RandomTransitionKernel()
+    seed = test_util.test_seed()
     last_state = self.evaluate(step_kernel(
         num_steps=1,
         current_state=0,
-        kernel=first_fake_kernel,
-        seed=test_util.test_seed(),
+        kernel=RandomTransitionKernel(),
+        seed=seed,
     ))
     for num_steps in range(2, 5):
       first_final_state = self.evaluate(step_kernel(
           num_steps=num_steps,
           current_state=0,
           kernel=first_fake_kernel,
-          seed=test_util.test_seed(),
+          seed=seed,
       ))
-      second_fake_kernel = RandomTransitionKernel()
       second_final_state = self.evaluate(step_kernel(
           num_steps=num_steps,
           current_state=1, # difference should be irrelevant
           kernel=second_fake_kernel,
-          seed=test_util.test_seed(),
+          seed=seed,
       ))
       self.assertEqual(first_final_state, second_final_state)
-      self.assertGreater(abs(first_final_state - last_state), 0.3)
+      self.assertNotEqual(first_final_state, last_state)
       last_state = first_final_state
 
 
