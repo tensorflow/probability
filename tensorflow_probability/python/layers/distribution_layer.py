@@ -30,6 +30,7 @@ import numpy as np
 import six
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_lib
 from tensorflow_probability.python.bijectors import transpose as transpose_lib
 from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
@@ -1908,8 +1909,8 @@ class VariationalGaussianProcess(DistributionLambda):
               self._unconstrained_observation_noise_variance_initializer),
           dtype=self._dtype,
           name='observation_noise_variance')
-      self._unconstrained_observation_noise_variance = tf.nn.softplus(
-          unconstrained_observation_noise_variance)
+      self._unconstrained_observation_noise_variance = tfp_util.DeferredTensor(
+          unconstrained_observation_noise_variance, tf.nn.softplus)
 
     self._inducing_index_points = self.add_weight(
         name='inducing_index_points',
