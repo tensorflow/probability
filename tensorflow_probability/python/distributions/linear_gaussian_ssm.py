@@ -248,20 +248,20 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
   the marginal distribution over noisy observations as a state space model:
 
   ```python
+  tfd = tfp.distributions
   ndims = 2
   step_std = 1.0
   noise_std = 5.0
-  model = LinearGaussianStateSpaceModel(
+  model = tfd.LinearGaussianStateSpaceModel(
     num_timesteps=100,
-    transition_matrix=tfl.LinearOperatorIdentity(ndims),
+    transition_matrix=tf.linalg.LinearOperatorIdentity(ndims),
     transition_noise=tfd.MultivariateNormalDiag(
      scale_diag=step_std**2 * tf.ones([ndims])),
-    observation_matrix=tfl.LinearOperatorIdentity(ndims),
+    observation_matrix=tf.linalg.LinearOperatorIdentity(ndims),
     observation_noise=tfd.MultivariateNormalDiag(
      scale_diag=noise_std**2 * tf.ones([ndims])),
     initial_state_prior=tfd.MultivariateNormalDiag(
      scale_diag=tf.ones([ndims])))
-  )
   ```
 
   using the identity matrix for the transition and observation
@@ -275,17 +275,17 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
   # Compute the filtered posterior on latent states given observations,
   # and extract the mean and covariance for the current (final) timestep.
-  _, filtered_means, filtered_covs, _, _ = model.forward_filter(x)
-  current_location_posterior = tfd.MultivariateNormalFullCovariance(
+  _, filtered_means, filtered_covs, _, _, _, _ = model.forward_filter(x)
+  current_location_posterior = tfd.MultivariateNormalTriL(
                 loc=filtered_means[..., -1, :],
-                scale=filtered_covs[..., -1, :])
+                scale_tril=tf.linalg.cholesky(filtered_covs[..., -1, :, :]))
 
   # Run a smoothing recursion to extract posterior marginals for locations
   # at previous timesteps.
   posterior_means, posterior_covs = model.posterior_marginals(x)
-  initial_location_posterior = tfd.MultivariateNormalFullCovariance(
+  initial_location_posterior = tfd.MultivariateNormalTriL(
                 loc=posterior_means[..., 0, :],
-                scale=posterior_covs[..., 0, :])
+                scale_tril=tf.linalg.cholesky(posterior_covs[..., 0, :, :]))
   ```
 
   * TODO(davmre): show example of fitting parameters.
