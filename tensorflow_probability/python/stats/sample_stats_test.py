@@ -98,7 +98,7 @@ class _AutoCorrelationTest(object):
     self.assertAllClose(rxx, self.evaluate(auto_corr), rtol=1e-5, atol=1e-5)
 
   def test_axis_n1_center_false_max_lags_none(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.randn(2, 3, 4).astype(self.dtype)
     if self.dtype in [np.complex64]:
       x = 1j * rng.randn(2, 3, 4).astype(self.dtype)
@@ -106,7 +106,7 @@ class _AutoCorrelationTest(object):
         x, axis=-1, max_lags=None, center=False, normalize=False)
 
   def test_axis_n2_center_false_max_lags_none(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.randn(3, 4, 5).astype(self.dtype)
     if self.dtype in [np.complex64]:
       x = 1j * rng.randn(3, 4, 5).astype(self.dtype)
@@ -114,7 +114,7 @@ class _AutoCorrelationTest(object):
         x, axis=-2, max_lags=None, center=False, normalize=False)
 
   def test_axis_n1_center_false_max_lags_none_normalize_true(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.randn(2, 3, 4).astype(self.dtype)
     if self.dtype in [np.complex64]:
       x = 1j * rng.randn(2, 3, 4).astype(self.dtype)
@@ -122,7 +122,7 @@ class _AutoCorrelationTest(object):
         x, axis=-1, max_lags=None, center=False, normalize=True)
 
   def test_axis_n2_center_false_max_lags_none_normalize_true(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.randn(3, 4, 5).astype(self.dtype)
     if self.dtype in [np.complex64]:
       x = 1j * rng.randn(3, 4, 5).astype(self.dtype)
@@ -130,7 +130,7 @@ class _AutoCorrelationTest(object):
         x, axis=-2, max_lags=None, center=False, normalize=True)
 
   def test_axis_0_center_true_max_lags_none(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.randn(3, 4, 5).astype(self.dtype)
     if self.dtype in [np.complex64]:
       x = 1j * rng.randn(3, 4, 5).astype(self.dtype)
@@ -138,7 +138,7 @@ class _AutoCorrelationTest(object):
         x, axis=0, max_lags=None, center=True, normalize=False)
 
   def test_axis_2_center_true_max_lags_1(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.randn(3, 4, 5).astype(self.dtype)
     if self.dtype in [np.complex64]:
       x = 1j * rng.randn(3, 4, 5).astype(self.dtype)
@@ -148,7 +148,7 @@ class _AutoCorrelationTest(object):
   def test_axis_2_center_true_max_lags_100(self):
     # There are less than 100 elements in axis 2, so expect we get back an array
     # the same size as x, despite having asked for 100 lags.
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.randn(3, 4, 5).astype(self.dtype)
     if self.dtype in [np.complex64]:
       x = 1j * rng.randn(3, 4, 5).astype(self.dtype)
@@ -156,7 +156,7 @@ class _AutoCorrelationTest(object):
         x, axis=2, max_lags=100, center=True, normalize=False)
 
   def test_long_orthonormal_sequence_has_corr_length_0(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     l = 10000
     x = rng.randn(l).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
@@ -179,7 +179,7 @@ class _AutoCorrelationTest(object):
       # dynamic shapes, or document that this is the intended behavior.
       return
 
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # x jumps to new random value every 10 steps.  So correlation length = 10.
     x = (rng.randint(-10, 10, size=(1000, 1)) * np.ones(
         (1, 10))).ravel().astype(self.dtype)
@@ -204,7 +204,7 @@ class _AutoCorrelationTest(object):
     self.assertLess(diff[:10].max(), 0)
 
   def test_normalization(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     l = 10000
     x = 3 * rng.randn(l).astype(self.dtype)
     x_ph = tf1.placeholder_with_default(
@@ -270,7 +270,7 @@ class CovarianceTest(test_util.TestCase):
     return ((x - x.mean(axis=0)) * (y - y.mean(axis=0))).mean(axis=0)
 
   def test_batch_scalar(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # X and Y are correlated, albeit less so in the first component.
     # They both are 100 samples of 3-batch scalars.
     x = rng.randn(100, 3)
@@ -285,7 +285,7 @@ class CovarianceTest(test_util.TestCase):
       self.assertAllClose(self._np_cov_1d(x[:, i], y[:, i]), cov[i])
 
   def test_batch_vector_sampaxis0_eventaxisn1(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # X and Y are correlated, albeit less so in the first component.
     # They both are both 100 samples of 3-batch vectors in R^2.
     x = rng.randn(100, 3, 2)
@@ -311,7 +311,7 @@ class CovarianceTest(test_util.TestCase):
               self._np_cov_1d(x_i[:, m], y_i[:, n]), cov_i[m, n])
 
   def test_batch_vector_sampaxis13_eventaxis2(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # x.shape = batch, sample, event, sample
     x = rng.randn(4, 10, 2, 10)
     y = x + 0.1 * rng.randn(10, 2, 10)
@@ -339,7 +339,7 @@ class CovarianceTest(test_util.TestCase):
               self._np_cov_1d(x_i[:, m], y_i[:, n]), cov_i[m, n])
 
   def test_batch_vector_sampaxis02_eventaxis1(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # x.shape = sample, event, sample, batch
     x = rng.randn(2, 3, 4, 5)
     y = x + 0.1 * rng.randn(2, 3, 4, 5)
@@ -366,7 +366,7 @@ class CovarianceTest(test_util.TestCase):
               self._np_cov_1d(x_i[:, m], y_i[:, n]), cov_i[m, n])
 
   def test_batch_vector_sampaxis03_eventaxis12_dynamic(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # x.shape = sample, event, event, sample, batch
     x = rng.randn(2, 3, 4, 5, 6)
     y = x + 0.1 * rng.randn(2, 3, 4, 5, 6)
@@ -399,7 +399,7 @@ class CovarianceTest(test_util.TestCase):
               self._np_cov_1d(x_i[:, m], y_i[:, n]), cov_i[m, n])
 
   def test_non_contiguous_event_axis_raises(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # They both are both 100 samples of 3-batch vectors in R^2.
     x = rng.randn(100, 3, 2)
     y = x + 0.1 * rng.randn(100, 3, 2)
@@ -408,7 +408,7 @@ class CovarianceTest(test_util.TestCase):
       tfp.stats.covariance(x, y, sample_axis=1, event_axis=[0, 2])
 
   def test_overlapping_axis_raises(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # They both are both 100 samples of 3-batch vectors in R^2.
     x = rng.randn(100, 3, 2)
     y = x + 0.1 * rng.randn(100, 3, 2)
@@ -437,7 +437,7 @@ class CorrelationTest(test_util.TestCase):
     return (x * y).mean() / (sigma_x * sigma_y)
 
   def test_batch_scalar(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # X and Y are correlated, albeit less so in the first component.
     # They both are 100 samples of 3-batch scalars.
     x = rng.randn(100, 3)
@@ -452,7 +452,7 @@ class CorrelationTest(test_util.TestCase):
       self.assertAllClose(self._np_corr_1d(x[:, i], y[:, i]), corr[i])
 
   def test_diagonal_of_correlation_matrix_x_with_x_is_one(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # Some big numbers, to test stability.
     x = np.float32(1e10 * rng.randn(100, 3))
 
@@ -462,7 +462,7 @@ class CorrelationTest(test_util.TestCase):
     self.assertAllClose([1., 1., 1.], np.diag(corr))
 
   def test_batch_vector_sampaxis0_eventaxisn1(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # X and Y are correlated, albeit less so in the first component.
     # They both are both 100 samples of 3-batch vectors in R^2.
     x = rng.randn(100, 3, 2)
@@ -492,7 +492,7 @@ class CorrelationTest(test_util.TestCase):
 class CholeskyCovarianceTest(test_util.TestCase):
 
   def test_batch_vector_sampaxis1_eventaxis2(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     # x.shape = [2, 5000, 2],
     # 2-batch members, 5000 samples each, events in R^2.
     x0 = rng.randn(5000, 2)
@@ -523,7 +523,7 @@ class VarianceTest(test_util.TestCase):
   """Light test:  Most methods tested implicitly by CovarianceTest."""
 
   def test_independent_uniform_samples(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.rand(10, 10, 10)
 
     var = tfp.stats.variance(x, sample_axis=None)
@@ -544,7 +544,7 @@ class StddevTest(test_util.TestCase):
   """Light test:  Most methods tested implicitly by VarianceTest."""
 
   def test_independent_uniform_samples(self):
-    rng = np.random.RandomState(seed=test_util.test_seed())
+    rng = test_util.test_np_rng()
     x = rng.rand(10, 10, 10)
 
     stddev = tfp.stats.stddev(x, sample_axis=[1, -1])
