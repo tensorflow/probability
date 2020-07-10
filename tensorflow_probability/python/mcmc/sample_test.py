@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
+
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
 
