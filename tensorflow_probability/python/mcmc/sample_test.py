@@ -27,6 +27,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -50,6 +51,23 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
 
   def bootstrap_results(self, current_state):
     return TestTransitionKernelResults(counter_1=0, counter_2=0)
+
+  @property
+  def is_calibrated(self):
+    return self._is_calibrated
+
+
+class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
+
+  def __init__(self, is_calibrated=True, accepts_seed=True):
+    self._is_calibrated = is_calibrated
+    self._accepts_seed = accepts_seed
+
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    if seed is not None and not self._accepts_seed:
+      raise TypeError('seed arg not accepted')
+    random_next_state = tfp.random.rayleigh((), seed=seed)
+    return random_next_state, previous_kernel_results
 
   @property
   def is_calibrated(self):
@@ -308,6 +326,29 @@ class SampleChainTest(test_util.TestCase):
 
     # Checking that shape inference doesn't fail.
     sample(2)
+
+  def testSeedReproducibility(self):
+    first_fake_kernel = RandomTransitionKernel()
+    second_fake_kernel = RandomTransitionKernel()
+    seed = samplers.sanitize_seed(test_util.test_seed())
+    for num_results in range(2, 5):
+      first_final_state = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          current_state=0.,
+          kernel=first_fake_kernel,
+          seed=seed,
+      )
+      second_final_state = tfp.mcmc.sample_chain(
+          num_results=num_results,
+          current_state=1., # difference should be irrelevant
+          kernel=second_fake_kernel,
+          seed=seed,
+      )
+      first_final_state, second_final_state = self.evaluate([
+          first_final_state, second_final_state
+      ])
+      self.assertAllCloseNested(
+          first_final_state, second_final_state, rtol=1e-6)
 
 
 if __name__ == '__main__':
