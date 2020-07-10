@@ -129,32 +129,32 @@ class StepKernelTest(test_util.TestCase):
   def test_seed_reproducibility(self):
     first_fake_kernel = RandomTransitionKernel()
     second_fake_kernel = RandomTransitionKernel()
-    seed = test_util.test_seed()
-    if tf.executing_eagerly():
-      seed = samplers.sanitize_seed(test_util.test_seed())
-
-    last_state = self.evaluate(step_kernel(
+    seed = samplers.sanitize_seed(test_util.test_seed())
+    last_state_t = step_kernel(
         num_steps=1,
         current_state=0,
         kernel=RandomTransitionKernel(),
         seed=seed,
-    ))
+    )
     for num_steps in range(2, 5):
-      first_final_state = self.evaluate(step_kernel(
+      first_final_state_t = step_kernel(
           num_steps=num_steps,
           current_state=0,
           kernel=first_fake_kernel,
           seed=seed,
-      ))
-      second_final_state = self.evaluate(step_kernel(
+      )
+      second_final_state_t = step_kernel(
           num_steps=num_steps,
           current_state=1, # difference should be irrelevant
           kernel=second_fake_kernel,
           seed=seed,
-      ))
+      )
+      last_state, first_final_state, second_final_state = self.evaluate([
+          last_state_t, first_final_state_t, second_final_state_t
+      ])
       self.assertEqual(first_final_state, second_final_state)
       self.assertNotEqual(first_final_state, last_state)
-      last_state = first_final_state
+      last_state_t = first_final_state_t
 
 
 if __name__ == '__main__':
