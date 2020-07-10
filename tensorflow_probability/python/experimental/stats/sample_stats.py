@@ -40,6 +40,7 @@ RunningCovarianceState = collections.namedtuple(
 def _update_running_covariance(
     state, new_sample, event_ndims, dtype, axis
 ):
+  """Updates the streaming `state` with a `new_sample`."""
   new_sample = tf.cast(new_sample, dtype=dtype)
   if axis is not None:
     chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
@@ -64,6 +65,7 @@ def _update_running_covariance(
                   + adj_factor * all_pairwise_deltas)
 
   return type(state)(new_n, new_mean, new_comoment)
+
 
 def _batch_outer_product(target, event_ndims):
   """Calculates the batch outer product along `target`'s event dimensions.
@@ -90,7 +92,7 @@ def _batch_outer_product(target, event_ndims):
       products of `target` in the event dimensions.
   """
   assign_indices = ''.join(list(
-      map(chr, range(ord('a'), ord('a')+event_ndims*2))))
+      map(chr, range(ord('a'), ord('a') + event_ndims * 2))))
   first_indices = assign_indices[:event_ndims]
   second_indices = assign_indices[event_ndims:]
   einsum_formula = "...{},...{}->...{}".format(
@@ -99,7 +101,13 @@ def _batch_outer_product(target, event_ndims):
 
 
 class RunningCovariance(object):
+  """Holds metadata for and facilitates covariance computation.
 
+  `RunningCovariance` objects do not hold state information. That information,
+  which includes intermediate calculations, are held in a
+  `RunningCovarianceState` as returned via `initialize` and `update` method
+  calls.
+  """
   def __init__(self, shape, event_ndims=None, dtype=tf.float32):
     """A `RunningCovariance` object holds metadata for covariance computation.
 
@@ -158,12 +166,11 @@ class RunningCovariance(object):
       extra_ndims_shape = ()
     else:
       extra_ndims_shape = self.shape[-self.event_ndims:]
-    init_state = RunningCovarianceState(
+    return RunningCovarianceState(
         num_samples=tf.zeros((), dtype=self.dtype),
         mean=tf.zeros(self.shape, dtype=self.dtype),
         comoment=tf.zeros(self.shape + extra_ndims_shape, dtype=self.dtype),
     )
-    return RunningCovarianceState(**init_state._asdict())
 
   def update(self, state, new_sample, axis=None):
     """Update the `RunningCovarianceState` with a new sample.
@@ -231,6 +238,13 @@ class RunningCovariance(object):
 
 
 class RunningVariance(RunningCovariance):
+  """Holds metadata for and facilitates variance computation.
+
+  `RunningVariance` objects do not hold state information. That information,
+  which includes intermediate calculations, are held in a
+  `RunningCovarianceState` as returned via `initialize` and `update` method
+  calls.
+  """
   def __init__(self, shape=(), dtype=tf.float32):
     """A `RunningVariance` object holds metadata for variance computation.
 
