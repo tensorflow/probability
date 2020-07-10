@@ -72,8 +72,6 @@ def step_kernel(
       `return_final_kernel_results` is `True`.
   """
   is_seeded = seed is not None
-  if tf.executing_eagerly():
-    tf.random.set_seed(seed)
   seed = samplers.sanitize_seed(seed, salt='experimental.mcmc.step_kernel')
 
   if not kernel.is_calibrated:

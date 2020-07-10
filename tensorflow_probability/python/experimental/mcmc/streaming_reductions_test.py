@@ -25,6 +25,7 @@ import warnings
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.experimental.mcmc.streaming_reductions import step_kernel
 
@@ -129,6 +130,9 @@ class StepKernelTest(test_util.TestCase):
     first_fake_kernel = RandomTransitionKernel()
     second_fake_kernel = RandomTransitionKernel()
     seed = test_util.test_seed()
+    if tf.executing_eagerly():
+      seed = samplers.sanitize_seed(test_util.test_seed())
+
     last_state = self.evaluate(step_kernel(
         num_steps=1,
         current_state=0,
