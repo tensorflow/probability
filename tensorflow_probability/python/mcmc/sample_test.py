@@ -37,6 +37,7 @@ TestTransitionKernelResults = collections.namedtuple(
 
 @test_util.test_all_tf_execution_regimes
 class TestTransitionKernel(tfp.mcmc.TransitionKernel):
+  """Fake deterministic `TransitionKernel` for testing purposes"""
 
   def __init__(self, is_calibrated=True, accepts_seed=True):
     self._is_calibrated = is_calibrated
@@ -58,6 +59,11 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
 
 
 class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
+   """Fake `TransitionKernel` that randomly assigns the next state.
+
+  Regardless of the current state, the `one_step` method will always
+  randomly sample from a Reyleigh Distribution.
+  """
 
   def __init__(self, is_calibrated=True, accepts_seed=True):
     self._is_calibrated = is_calibrated
