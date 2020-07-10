@@ -45,6 +45,7 @@ py_library(
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
+        ":with_reductions",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:all_util",
     ],
@@ -384,6 +385,30 @@ py_test(
     deps = [
         ":covariance_reducer",
         ":sample",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "with_reductions",
+    srcs = ["with_reductions.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        ":sample",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "with_reductions_test",
+    shard_count = 5,
+    srcs = ["with_reductions_test.py"],
+    deps = [
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

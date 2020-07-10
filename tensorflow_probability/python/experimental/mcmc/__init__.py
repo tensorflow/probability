@@ -45,6 +45,7 @@ from tensorflow_probability.python.experimental.mcmc.weighted_resampling import 
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
+from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductions
 from tensorflow_probability.python.internal import all_util
 
 
@@ -75,7 +76,8 @@ _allowed_symbols = [
     'sample_sequential_monte_carlo',
     'simple_heuristic_tuning',
     'step_kernel',
-    'VarianceReducer'
+    'VarianceReducer',
+    'WithReductions',
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
