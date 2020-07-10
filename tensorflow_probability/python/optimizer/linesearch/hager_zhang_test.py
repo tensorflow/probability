@@ -299,6 +299,39 @@ class HagerZhangTest(test_util.TestCase):
     self.assertAlmostEqual(actual.f, results.left.f)
     self.assertAlmostEqual(actual.df, results.left.df)
 
+  def test_inf_recovery(self):
+    # This reproduces the corner case reported in b/156869514,
+    # namely finding an interval bracketing the minimum when
+    # 1. the first step doesn't bracket, and
+    # 2. interval expansion hits an infinite value
+    def fdf(x):
+      x = tf.convert_to_tensor(x)
+      f = (x - 2.0) ** 2  # Minimum at 2
+      df = 2 * (x - 2.0)
+      # Cut the function to infinity at 4.
+      return ValueAndGradient(
+          x=x,
+          f=tf.where(x > 4, float('inf'), f),
+          df=tf.where(x > 4, float('nan'), df))
+
+    # Test the default initial bracketing sequence, which is
+    # x=0, x=initial_step_size, x=expansion_param * initial_step_size
+    results = self.evaluate(
+        tfp.optimizer.linesearch.hager_zhang(
+            fdf,
+            initial_step_size=1.0,
+            expansion_param=5.0
+        ))
+    self.assertTrue(results.converged)
+    self.assertAlmostEqual(results.left.x, results.right.x)
+    val_0 = self.evaluate(fdf(0.0))
+    self.assertTrue(_is_exact_wolfe(results.left.x,
+                                    results.left.f,
+                                    results.left.df,
+                                    val_0.f,
+                                    val_0.df,
+                                    0.1,
+                                    0.9))
 
 if __name__ == '__main__':
   tf.test.main()

@@ -483,22 +483,36 @@ def bracket(value_and_gradients_function,
   """
   already_stopped = search_interval.failed | search_interval.converged
 
-  # If the slope at right end point is positive, step B1 in [2], then the given
-  # initial points already bracket a minimum.
-  bracketed = search_interval.right.df >= 0
+  # We fail if there is a nan at the right end-point that prevents us from
+  # making a decision, i.e., either a nan value or a finite value and a nan
+  # derivative.
+  failed = _bad_nan(search_interval.right)
+
+  # If the right end is -inf, we have already found a minimum.  Passing along to
+  # `_bisect` in this state will do the right thing, so just mark those as
+  # stopped.
+  finished = search_interval.right.f <= float('-inf')
+
+  # If the value at the right end is finite and the slope at right end point is
+  # positive, step B1 in [2], then the given initial points already bracket a
+  # minimum.
+  bracketed = _is_rising(search_interval.right)
 
   # Bisection is needed, step B2, if right end point almost works as a new left
   # end point but the objective value is too high.
-  needs_bisect = (
-      search_interval.right.df < 0) & (search_interval.right.f > f_lim)
+  needs_bisect = _needs_bisect(search_interval.right, f_lim)
 
   # In these three cases bracketing is already `stopped` and there is no need
-  # to perform further evaluations. Otherwise the bracketing loop is needed to
-  # expand the interval, step B3, until the conditions are met.
+  # to perform further evaluations. Otherwise, assuming there are no `nan`s,
+  # - The right-end point has a finite value,
+  # - Whose derivative is non-positive, and
+  # - Which is below `f_lim`.
+  # This is then a valid left end-point, and the bracketing loop is needed to
+  # expand the interval to the right, step B3, until the conditions are met.
   initial_args = _IntermediateResult(
       iteration=search_interval.iterations,
-      stopped=already_stopped | bracketed | needs_bisect,
-      failed=search_interval.failed,
+      stopped=already_stopped | failed | finished | bracketed | needs_bisect,
+      failed=search_interval.failed | failed,
       num_evals=search_interval.func_evals,
       left=search_interval.left,
       right=search_interval.right)
@@ -510,20 +524,22 @@ def bracket(value_and_gradients_function,
   def _loop_body(curr):
     """Main body of bracketing loop."""
     # The loop maintains the invariant that curr.stopped is true if we have
-    # either: failed, successfully bracketed, or not yet bracketed but needs
-    # bisect. On the only remaining case, step B3 in [2]. case we need to
-    # expand and update the left/right values appropriately.
+    # either: failed, successfully bracketed, or not yet bracketed but need to
+    # bisect. On the only remaining case, step B3 in [2], `curr.right` is
+    # actually a valid left end-point, and we need to expand to guess another
+    # right end-point.
     new_right = value_and_gradients_function(expansion_param * curr.right.x)
     left = val_where(curr.stopped, curr.left, curr.right)
     right = val_where(curr.stopped, curr.right, new_right)
 
     # Updated the failed, bracketed, and needs_bisect conditions.
-    failed = curr.failed | ~is_finite(right)
-    bracketed = right.df >= 0
-    needs_bisect = (right.df < 0) & (right.f > f_lim)
+    failed = curr.failed | _bad_nan(right)
+    finished = right.f <= float('-inf')
+    bracketed = _is_rising(right)
+    needs_bisect = _needs_bisect(right, f_lim)
     return [_IntermediateResult(
         iteration=curr.iteration + 1,
-        stopped=curr.stopped | failed | bracketed | needs_bisect,
+        stopped=curr.stopped | failed | finished | bracketed | needs_bisect,
         failed=failed,
         num_evals=curr.num_evals + 1,
         left=left,
@@ -532,12 +548,18 @@ def bracket(value_and_gradients_function,
   bracket_result = tf.while_loop(
       cond=_loop_cond, body=_loop_body, loop_vars=[initial_args])[0]
 
-  # For entries where bisect is still needed, mark them as not yet stopped,
-  # reset the left end point, and run `_bisect` on them.
-  needs_bisect = (
-      (bracket_result.right.df < 0) & (bracket_result.right.f > f_lim))
-  stopped = already_stopped | bracket_result.failed | ~needs_bisect
-  left = val_where(stopped, bracket_result.left, search_interval.left)
+  # Reset the input for the _bisect loop.
+  # - `stopped` is now whether `_bisect` should feel already stopped
+  # - `left` is adjusted
+  #   - to equal `right` if we already found a minimum (i.e., -inf)
+  #   - to the starting point if we're actually bisecting, per step B2
+  finished = bracket_result.right.f <= float('-inf')
+  bracketed = _is_rising(bracket_result.right)
+  needs_bisect = _needs_bisect(bracket_result.right, f_lim)
+  stopped = already_stopped | bracket_result.failed | finished | bracketed
+  left = val_where(
+      finished, bracket_result.right,
+      val_where(needs_bisect, search_interval.left, bracket_result.left))
   bisect_args = bracket_result._replace(stopped=stopped, left=left)
   return _bisect(value_and_gradients_function, bisect_args, f_lim)
 
@@ -656,7 +678,7 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
   # the value of the function at that point is too high. It is not a valid left
   # end point but along with the current left end point, it encloses another
   # minimum. The loop above tries to narrow the interval so that it satisfies
-  # opposite slope conditions.
+  # the opposite slope conditions.
   return tf.while_loop(
       cond=_loop_cond, body=_loop_body, loop_vars=[initial_args])[0]
 
