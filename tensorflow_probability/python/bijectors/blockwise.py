@@ -30,6 +30,12 @@ __all__ = [
 ]
 
 
+def _get_static_splits(splits):
+  # Convert to a static value so that one could run tf.split on TPU.
+  static_splits = tf.get_static_value(splits)
+  return splits if static_splits is None else static_splits
+
+
 class Blockwise(bijector_base.Bijector):
   """Bijector which applies a list of bijectors to blocks of a `Tensor`.
 
@@ -164,7 +170,8 @@ class Blockwise(bijector_base.Bijector):
     return ps.concat([output_shape[:-1], input_size[tf.newaxis]], -1)
 
   def _forward(self, x):
-    split_x = tf.split(x, self.block_sizes, axis=-1, num=len(self.bijectors))
+    split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
+                       num=len(self.bijectors))
     split_y = [b.forward(x_) for b, x_ in zip(self.bijectors, split_x)]
     y = tf.concat(split_y, axis=-1)
     if not self._maybe_changes_size:
@@ -172,8 +179,8 @@ class Blockwise(bijector_base.Bijector):
     return y
 
   def _inverse(self, y):
-    split_y = tf.split(
-        y, self._output_block_sizes(), axis=-1, num=len(self.bijectors))
+    split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
+                       axis=-1, num=len(self.bijectors))
     split_x = [b.inverse(y_) for b, y_ in zip(self.bijectors, split_y)]
     x = tf.concat(split_x, axis=-1)
     if not self._maybe_changes_size:
@@ -181,7 +188,8 @@ class Blockwise(bijector_base.Bijector):
     return x
 
   def _forward_log_det_jacobian(self, x):
-    split_x = tf.split(x, self.block_sizes, axis=-1, num=len(self.bijectors))
+    split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
+                       num=len(self.bijectors))
     fldjs = [
         b.forward_log_det_jacobian(x_, event_ndims=1)
         for b, x_ in zip(self.bijectors, split_x)
@@ -189,8 +197,8 @@ class Blockwise(bijector_base.Bijector):
     return sum(fldjs)
 
   def _inverse_log_det_jacobian(self, y):
-    split_y = tf.split(
-        y, self._output_block_sizes(), axis=-1, num=len(self.bijectors))
+    split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
+                       axis=-1, num=len(self.bijectors))
     ildjs = [
         b.inverse_log_det_jacobian(y_, event_ndims=1)
         for b, y_ in zip(self.bijectors, split_y)
