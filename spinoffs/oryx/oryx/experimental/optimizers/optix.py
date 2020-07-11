@@ -284,8 +284,8 @@ def apply_updates(params, updates):
 
 def gradient_descent(update, objective):
 
-  def step(params, init_key=None):
-    out, updates = jax.value_and_grad(objective)(params)
+  def step(params, *args, init_key=None):
+    out, updates = jax.value_and_grad(objective)(params, *args)
     updates = primitive.tie_in(out, update(params, updates, init_key=init_key))
     return apply_updates(params, updates)
 

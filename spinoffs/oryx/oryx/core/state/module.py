@@ -17,9 +17,11 @@
 import abc
 from typing import Any, Dict, Tuple
 
+from oryx.core import ppl
 from oryx.core import primitive
 from oryx.core import pytree
 from oryx.core.interpreters import harvest
+from oryx.core.interpreters import log_prob
 
 __all__ = [
     'VARIABLE',
@@ -161,3 +163,8 @@ class Module(pytree.Pytree, metaclass=abc.ABCMeta):
   @abc.abstractmethod
   def variables(self) -> Dict[str, Any]:
     raise NotImplementedError
+
+
+@ppl.log_prob.register(Module)
+def module_log_prob(module, *args, **kwargs):
+  return log_prob.log_prob(module, *args, **kwargs)

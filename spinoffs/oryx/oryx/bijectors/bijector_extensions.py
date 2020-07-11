@@ -123,14 +123,15 @@ def bijector_ildj_rule(incells, outcells, **params):
   done = False
   if incell.is_unknown() and not outcell.is_unknown():
     val, ildj = outcell.val, outcell.ildj
-    incells = [InverseAndILDJ(inv_func(val),
-                              ildj + ildj_func(val, np.ndim(val)))]
+    flat_incells = [InverseAndILDJ(
+        inv_func(val), ildj + ildj_func(val, np.ndim(val)))]
     done = True
+    new_outcells = outcells
   elif outcell.is_unknown() and not incell.is_unknown():
-    outcells = [InverseAndILDJ.new(forward_func(incell.val))]
+    new_outcells = [InverseAndILDJ.new(forward_func(incell.val))]
     done = True
-  new_flat_incells = flat_bijector_cells + incells
-  return const_incells + new_flat_incells, outcells, done, None
+  new_incells = flat_bijector_cells + flat_incells
+  return const_incells + new_incells, new_outcells, done, None
 inverse.custom_rules[bijector_p] = bijector_ildj_rule
 
 

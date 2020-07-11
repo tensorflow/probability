@@ -69,6 +69,8 @@ py_library(
         "//oryx/core:primitive",
         "//oryx/core:pytree",
         "//oryx/core/interpreters:harvest",
+        "//oryx/core/interpreters:log_prob",
+        "//oryx/core/ppl",
     ],
 )
 
