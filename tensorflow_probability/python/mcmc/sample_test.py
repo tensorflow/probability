@@ -62,7 +62,7 @@ class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
   """Fake `TransitionKernel` that randomly assigns the next state.
 
   Regardless of the current state, the `one_step` method will always
-  randomly sample from a Reyleigh Distribution.
+  randomly sample from a Rayleigh Distribution.
   """
 
   def __init__(self, is_calibrated=True, accepts_seed=True):
@@ -72,7 +72,7 @@ class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
   def one_step(self, current_state, previous_kernel_results, seed=None):
     if seed is not None and not self._accepts_seed:
       raise TypeError('seed arg not accepted')
-    random_next_state = tfp.random.rayleigh((), seed=seed)
+    random_next_state = tfp.random.rayleigh(current_state.shape, seed=seed)
     return random_next_state, previous_kernel_results
 
   @property
@@ -338,24 +338,23 @@ class SampleChainTest(test_util.TestCase):
     first_fake_kernel = RandomTransitionKernel()
     second_fake_kernel = RandomTransitionKernel()
     seed = samplers.sanitize_seed(test_util.test_seed())
-    for num_results in range(2, 5):
-      first_final_state = tfp.mcmc.sample_chain(
-          num_results=num_results,
-          current_state=0.,
-          kernel=first_fake_kernel,
-          seed=seed,
-      )
-      second_final_state = tfp.mcmc.sample_chain(
-          num_results=num_results,
-          current_state=1., # difference should be irrelevant
-          kernel=second_fake_kernel,
-          seed=seed,
-      )
-      first_final_state, second_final_state = self.evaluate([
-          first_final_state, second_final_state
-      ])
-      self.assertAllCloseNested(
-          first_final_state, second_final_state, rtol=1e-6)
+    first_final_state = tfp.mcmc.sample_chain(
+        num_results=5,
+        current_state=0.,
+        kernel=first_fake_kernel,
+        seed=seed,
+    )
+    second_final_state = tfp.mcmc.sample_chain(
+        num_results=5,
+        current_state=1.,  # difference should be irrelevant
+        kernel=second_fake_kernel,
+        seed=seed,
+    )
+    first_final_state, second_final_state = self.evaluate([
+        first_final_state, second_final_state
+    ])
+    self.assertAllCloseNested(
+        first_final_state, second_final_state, rtol=1e-6)
 
 
 if __name__ == '__main__':
