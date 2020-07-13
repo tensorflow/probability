@@ -311,8 +311,17 @@ class Categorical(distribution.Distribution):
     x = logits - m
     sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
     lse_logits = m[..., 0] + tf.math.log(sum_exp_x)
+    # TODO(b/161014180): Workaround to support correct gradient calculations
+    # with -inf logits.
+    is_inf_logits = tf.cast(tf.math.is_inf(logits), dtype=tf.float32)
+    is_negative_logits = tf.cast(logits < 0, dtype=tf.float32)
+    masked_logits = tf.where(
+        tf.cast((is_inf_logits * is_negative_logits), dtype=bool),
+        tf.cast(1.0, dtype=logits.dtype), logits)
+
     return lse_logits - tf.reduce_sum(
-        tf.math.multiply_no_nan(logits, tf.math.exp(x)), axis=-1) / sum_exp_x
+        tf.math.multiply_no_nan(masked_logits, tf.math.exp(x)),
+        axis=-1) / sum_exp_x
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
