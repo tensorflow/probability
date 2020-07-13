@@ -41,7 +41,7 @@ py_library(
         ":particle_filter_augmentation",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
-        ":streaming_reductions",
+        ":sample",
         ":weighted_resampling",
         # tensorflow dep,
     ],
@@ -328,8 +328,8 @@ py_test(
 )
 
 py_library(
-    name = "streaming_reductions",
-    srcs = ["streaming_reductions.py"],
+    name = "sample",
+    srcs = ["sample.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
@@ -340,10 +340,10 @@ py_library(
 
 # py2and3
 py_test(
-    name = "streaming_reductions_test",
+    name = "sample_test",
     size = "small",
     shard_count = 5,
-    srcs = ["streaming_reductions_test.py"],
+    srcs = ["sample_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

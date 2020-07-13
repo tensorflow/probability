@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.experimental.mcmc.streaming_reductions import step_kernel
+from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 
 
 TestTransitionKernelResults = collections.namedtuple(
