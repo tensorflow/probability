@@ -41,10 +41,7 @@
 # directory.
 
 virtualenv_is_active() {
-  # This is apparently the most reliable way to check whether the script is
-  # being run in a virtualenv. Source:
-  # https://stackoverflow.com/questions/1871549/determine-if-python-is-running-inside-virtualenv
-  python -c 'import sys; sys.exit(not hasattr(sys, "real_prefix"))'
+  python testing/virtualenv_is_active.py
 }
 
 SCRIPT_ARGS=$@
@@ -151,6 +148,9 @@ install_python_packages() {
   # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
   TF_VERSION_STR=$(find_good_tf_nightly_version_str $TF_NIGHTLY_PACKAGE)
   python -m pip install $PIP_FLAGS $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR
+
+  # For the JAX backend.
+  python -m pip install jax jaxlib
 
   # The following unofficial dependencies are used only by tests.
   # TODO(b/148685448): Unpin Hypothesis and coverage versions.

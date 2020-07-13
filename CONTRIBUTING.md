@@ -84,7 +84,7 @@ example invocation (presumed to run from the root of the TFP repo:
 
 ```shell
 # Run all TFP tests.
-./testing/tfp_test.sh //tensorflow_probability/...
+./testing/run_tfp_test.sh //tensorflow_probability/...
 ```
 
 ```shell
