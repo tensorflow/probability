@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as onp  # Avoid rewriting this to JAX.
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -64,14 +64,14 @@ class IllConditionedGaussian(model.Model):
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
-    rng = onp.random.RandomState(seed=seed & (2**32 - 1))
-    eigenvalues = 1. / onp.sort(
+    rng = np.random.RandomState(seed=seed & (2**32 - 1))
+    eigenvalues = 1. / np.sort(
         rng.gamma(shape=gamma_shape_parameter, scale=1., size=ndims))
     if max_eigvalue is not None:
       eigenvalues *= max_eigvalue / eigenvalues.max()
 
-    q, r = onp.linalg.qr(rng.randn(ndims, ndims))
-    q *= onp.sign(onp.diag(r))
+    q, r = np.linalg.qr(rng.randn(ndims, ndims))
+    q *= np.sign(np.diag(r))
 
     covariance = (q * eigenvalues).dot(q.T)
 
@@ -86,8 +86,8 @@ class IllConditionedGaussian(model.Model):
             model.Model.SampleTransformation(
                 fn=lambda params: params,
                 pretty_name='Identity',
-                ground_truth_mean=onp.zeros(ndims),
-                ground_truth_standard_deviation=onp.sqrt(onp.diag(covariance)),
+                ground_truth_mean=np.zeros(ndims),
+                ground_truth_standard_deviation=np.sqrt(np.diag(covariance)),
             )
     }
 

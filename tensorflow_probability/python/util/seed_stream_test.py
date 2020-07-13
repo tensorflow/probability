@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as onp  # Avoid JAX rewrite.
+import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -38,7 +38,7 @@ def _ensure_tuple(value):
   Returns:
     `tuple` of one or two scalars.
   """
-  return tuple(onp.reshape(value, [-1]))
+  return tuple(np.reshape(value, [-1]))
 
 
 @test_util.test_all_tf_execution_regimes

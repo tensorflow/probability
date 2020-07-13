@@ -24,9 +24,9 @@ bazel run //tools/inference_gym_ground_truth:get_ground_truth -- \
 ```
 """
 
-import numpy as onp
+import numpy as np
 
-IDENTITY_MEAN = onp.array([
+IDENTITY_MEAN = np.array([
     -0.7351048553686668,
     0.41854235448568405,
     -0.4140361022849266,
@@ -54,7 +54,7 @@ IDENTITY_MEAN = onp.array([
     -1.2033366774193333,
 ]).reshape((25,))
 
-IDENTITY_MEAN_STANDARD_ERROR = onp.array([
+IDENTITY_MEAN_STANDARD_ERROR = np.array([
     5.842293909946494e-05,
     7.242951181494356e-05,
     6.287678982885978e-05,
@@ -82,7 +82,7 @@ IDENTITY_MEAN_STANDARD_ERROR = onp.array([
     6.225181243823337e-05,
 ]).reshape((25,))
 
-IDENTITY_STANDARD_DEVIATION = onp.array([
+IDENTITY_STANDARD_DEVIATION = np.array([
     0.0898313720177512,
     0.10433392890125515,
     0.09494358976312321,

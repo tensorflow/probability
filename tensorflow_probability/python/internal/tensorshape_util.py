@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as onp
+import numpy as np
 
 import tensorflow.compat.v2 as tf
 
@@ -67,10 +67,10 @@ def as_list(x):
 def _cast_tensorshape(x, x_type):
   if issubclass(x_type, tf.TensorShape):
     return x
-  if issubclass(x_type, onp.ndarray):
+  if issubclass(x_type, np.ndarray):
     # np.ndarray default constructor will place x
     # as the shape, which we don't want.
-    return onp.array(as_list(x), dtype=onp.int32)
+    return np.array(as_list(x), dtype=np.int32)
   return x_type(as_list(x))
 
 

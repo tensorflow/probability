@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import decorator
 import numpy as np
-import numpy as onp  # Avoid jax rewrite  # pylint: disable=reimported
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -339,7 +338,7 @@ def _setdiff1d(a, b, aminusb=True, validate_indices=True):
     a_ = np.array(a_, dtype=dtype)
     b_ = np.array(b_, dtype=dtype)
     # TODO(https://github.com/google/jax/issues/70): Jax lacks setdiff1d
-    return onp.setdiff1d(a_, b_)
+    return np.setdiff1d(a_, b_)
 setdiff1d = _copy_docstring(
     tf.sets.difference,
     _setdiff1d)
@@ -358,11 +357,11 @@ size = _copy_docstring(tf.size, _size)
 
 def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,missing-docstring
   if not hasattr(input, 'shape'):
-    x = onp.array(input)
+    x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object else x
   input_shape = tf.TensorShape(input.shape)
   if tensorshape_util.is_fully_defined(input.shape):
-    return onp.array(tensorshape_util.as_list(input_shape)).astype(
+    return np.array(tensorshape_util.as_list(input_shape)).astype(
         _numpy_dtype(out_type))
   # NOTE: tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**, so we
   # pre-emptively convert-to-tensor.

@@ -64,9 +64,9 @@ checked in.
 
 """
 
-import numpy as onp
+import numpy as np
 
-STUDENT_IDS = onp.array([
+STUDENT_IDS = np.array([
     0,
     1,
     2,
@@ -30082,7 +30082,7 @@ STUDENT_IDS = onp.array([
 ]).reshape((30012,))
 
 
-QUESTION_IDS = onp.array([
+QUESTION_IDS = np.array([
     0,
     0,
     0,
@@ -60098,7 +60098,7 @@ QUESTION_IDS = onp.array([
 ]).reshape((30012,))
 
 
-CORRECT = onp.array([
+CORRECT = np.array([
     0,
     1,
     0,

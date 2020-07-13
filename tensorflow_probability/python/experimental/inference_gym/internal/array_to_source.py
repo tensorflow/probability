@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as onp
+import numpy as np
 
 __all__ = [
     'array_to_source',
@@ -30,7 +30,7 @@ def array_to_source(name, array):
 
   The generated source creates a top-level Python variable with name `name` that
   is assigned the contents of `array`. It assumes that NumPy is imported with an
-  `onp` alias.
+  `np` alias.
 
   Args:
     name: Python `str`. Name of the generated variable.
@@ -39,11 +39,11 @@ def array_to_source(name, array):
   Returns:
     array_str: The encoded array.
   """
-  ret = '{} = onp.array([\n'.format(name)
-  array = onp.asarray(array)
+  ret = '{} = np.array([\n'.format(name)
+  array = np.asarray(array)
   array_flat = array.reshape([-1])
   for e in array_flat:
-    e_str = onp.array2string(e, floatmode='unique')
+    e_str = np.array2string(e, floatmode='unique')
     ret += '    {},\n'.format(e_str)
   ret += ']).reshape({})\n'.format(array.shape)
   return ret

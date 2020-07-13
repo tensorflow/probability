@@ -24,7 +24,6 @@ import weakref
 
 # Dependency imports
 import numpy as np
-import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -86,7 +85,7 @@ def hash_structure(struct):
   def make_hashable(obj):
     if isinstance(obj, (HashableWeakRef, WeakStructRef)):
       return obj
-    elif isinstance(obj, onp.ndarray):
+    elif isinstance(obj, np.ndarray):
       return str(obj.__array_interface__) + str(id(obj))
     else:
       return _IdentityHash(obj)
@@ -116,7 +115,7 @@ class HashableWeakRef(weakref.ref):
     """
     if isinstance(referrent, np.generic):
       raise ValueError('Unable to weakref np.generic')
-    elif isinstance(referrent, onp.ndarray):
+    elif isinstance(referrent, np.ndarray):
       referrent.flags.writeable = False
     super(HashableWeakRef, self).__init__(referrent, callback)
     self._hash = hash_structure(referrent)
@@ -212,7 +211,7 @@ class WeakStructRef(object):
 # This only affects numpy/jax backends, where non-tensor values can be returned.
 def _containerize(value):
   """Converts values to types supported by weakref."""
-  if isinstance(value, (int, float, onp.generic)):
+  if isinstance(value, (int, float, np.generic)):
     return np.array(value)
   return value
 

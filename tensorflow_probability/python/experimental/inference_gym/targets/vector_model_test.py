@@ -20,7 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 from absl.testing import parameterized
-import numpy as onp  # Don't rewrite via the rewrite script.
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
@@ -129,7 +129,7 @@ class VectorModelTest(test_util.TestCase, parameterized.TestCase):
     # We can randomize only one element, as otherwise we'd need to know the
     # details of the reshaping/flattening which is outside the scope of this
     # test.
-    rand_elem = tf.constant(onp.random.randn(), tf.float32)
+    rand_elem = tf.constant(np.random.randn(), tf.float32)
 
     self.assertEqual('vector_' + base_model.name, vec_model.name)
     self.assertEqual(str(base_model), str(vec_model))

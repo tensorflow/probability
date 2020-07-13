@@ -219,7 +219,7 @@ Automatically generated using the command:
 ```
 """
 
-import numpy as onp
+import numpy as np
 
 {array_str}'''.format(
     target_name=target_name, array_str=array_str, command_str=command_str)

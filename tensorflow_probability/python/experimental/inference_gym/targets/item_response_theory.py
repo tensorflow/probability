@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import functools
 
-import numpy as onp
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -235,14 +235,14 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
     # TODO(siege): This probably should support batching, for completeness.
     # TODO(siege): This should be rewritten via scatter_nd to support
     # tensor-valued datasets. Blocked by JAX/Numpy not implementing scatter_nd.
-    dense_y = onp.zeros([self._num_students, self._num_questions], onp.float32)
+    dense_y = np.zeros([self._num_students, self._num_questions], np.float32)
     dense_y[student_ids, question_ids] = correct
-    y_mask = onp.zeros(dense_y.shape, onp.bool)
+    y_mask = np.zeros(dense_y.shape, np.bool)
     y_mask[student_ids, question_ids] = True
     return dense_y, y_mask
 
   def _dense_to_sparse(self, student_ids, question_ids, dense_correct):
-    test_y_idx = onp.stack([student_ids, question_ids], axis=-1)
+    test_y_idx = np.stack([student_ids, question_ids], axis=-1)
     # Need to tile the indices across the batch, for gather_nd.
     batch_shape = ps.shape(dense_correct)[:-2]
     broadcast_shape = ps.concat([ps.ones_like(batch_shape), test_y_idx.shape],
@@ -266,11 +266,11 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
 
     train_correct = self._dense_to_sparse(self._train_student_ids,
                                           self._train_question_ids, all_correct)
-    dataset['train_correct'] = onp.array(train_correct)
+    dataset['train_correct'] = np.array(train_correct)
     if self._have_test:
       test_correct = self._dense_to_sparse(self._test_student_ids,
                                            self._test_question_ids, all_correct)
-      dataset['test_correct'] = onp.array(test_correct)
+      dataset['test_correct'] = np.array(test_correct)
     return dataset
 
   def _log_likelihood(self, value):

@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as onp  # Avoid rewriting this to JAX.
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -104,10 +104,10 @@ class Banana(model.Model):
                   # Mean of Chi2 with one degree of freedom is 1, but since the
                   # first element has variance of 100, it cancels with the shift
                   # (which is why the shift is there).
-                  ground_truth_mean=onp.zeros(ndims),
+                  ground_truth_mean=np.zeros(ndims),
                   # Variance of Chi2 with one degree of freedom is 2.
-                  ground_truth_standard_deviation=onp.array(
-                      [10.] + [onp.sqrt(1. + 2 * curvature**2 * 10.**4)] +
+                  ground_truth_standard_deviation=np.array(
+                      [10.] + [np.sqrt(1. + 2 * curvature**2 * 10.**4)] +
                       [1.] * (ndims - 2)),
               )
       }

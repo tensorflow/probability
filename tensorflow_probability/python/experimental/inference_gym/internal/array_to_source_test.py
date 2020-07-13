@@ -28,7 +28,7 @@ class ArrayToSourceTest(test_util.TestCase):
 
   def testEncodeArray(self):
     array_str = array_to_source.array_to_source('array', [1, 2, 3])
-    expected_str = """array = onp.array([
+    expected_str = """array = np.array([
     1,
     2,
     3,
@@ -38,7 +38,7 @@ class ArrayToSourceTest(test_util.TestCase):
 
   def testEncodeScalar(self):
     array_str = array_to_source.array_to_source('array', 4)
-    expected_str = """array = onp.array([
+    expected_str = """array = np.array([
     4,
 ]).reshape(())
 """

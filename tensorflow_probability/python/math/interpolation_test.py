@@ -18,7 +18,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import numpy as onp  # pylint: disable=reimported
 from scipy import interpolate as scipy_interpolate
 
 import tensorflow.compat.v2 as tf
@@ -853,10 +852,10 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     ],
                  axis=-1)
 
-    x = onp.array(self.evaluate(x))
+    x = np.array(self.evaluate(x))
     x[0, 0] = -3  # Outside the grid, so `fill_value` will be imputed.
 
-    expected_y = onp.array(self.evaluate(func(x[:, 0], x[:, 1], x[:, 2])))
+    expected_y = np.array(self.evaluate(func(x[:, 0], x[:, 1], x[:, 2])))
     fill_value = -42
     expected_y[0, :] = fill_value
 

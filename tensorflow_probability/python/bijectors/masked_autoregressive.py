@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -411,7 +410,7 @@ def _gen_mask(num_blocks,
               dtype=tf.float32):
   """Generate the mask for building an autoregressive dense layer."""
   # TODO(b/67594795): Better support of dynamic shape.
-  mask = onp.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
+  mask = np.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
   slices = _gen_slices(num_blocks, n_in, n_out, mask_type=mask_type)
   for [row_slice, col_slice] in slices:
     mask[row_slice, col_slice] = 1
@@ -1158,7 +1157,7 @@ def _make_dense_autoregressive_masks(
     input_order_seed = None
     degrees_seed = None
   else:
-    input_order_seed, degrees_seed = onp.random.RandomState(seed).randint(
+    input_order_seed, degrees_seed = np.random.RandomState(seed).randint(
         2**31, size=2)
   input_order = _create_input_order(
       event_size, input_order, seed=input_order_seed)
@@ -1199,11 +1198,11 @@ def _create_input_order(input_size, input_order='left-to-right', seed=None):
     elif input_order == 'right-to-left':
       return np.arange(start=input_size, stop=0, step=-1)
     elif input_order == 'random':
-      ret = onp.arange(start=1, stop=input_size + 1)
+      ret = np.arange(start=1, stop=input_size + 1)
       if seed is None:
-        rng = onp.random
+        rng = np.random
       else:
-        rng = onp.random.RandomState(seed)
+        rng = np.random.RandomState(seed)
       rng.shuffle(ret)
       return ret
   elif np.all(np.sort(np.array(input_order)) == np.arange(1, input_size + 1)):
@@ -1250,9 +1249,9 @@ def _create_degrees(input_size,
     if isinstance(hidden_degrees, six.string_types):
       if hidden_degrees == 'random':
         if seed is None:
-          rng = onp.random
+          rng = np.random
         else:
-          rng = onp.random.RandomState(seed)
+          rng = np.random.RandomState(seed)
         # samples from: [low, high)
         degrees.append(
             rng.randint(low=min(np.min(degrees[-1]), input_size - 1),

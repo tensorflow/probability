@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as onp  # Avoid rewriting this to JAX.
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
@@ -97,13 +97,13 @@ class NealsFunnel(model.Model):
                   # 3 / 2. See
                   # https://en.wikipedia.org/wiki/Product_distribution for the
                   # formulas. For the mean, the formulas yield zero.
-                  ground_truth_mean=onp.zeros(ndims),
+                  ground_truth_mean=np.zeros(ndims),
                   # For the standard deviation, all means are zero and standard
                   # deivations of the normals are 1, so the formula reduces to
                   # `sqrt((sigma_log_normal + mean_log_normal**2))` which
                   # reduces to `exp((sigma_log_normal)**2)`.
-                  ground_truth_standard_deviation=onp.array(
-                      [3.] + [onp.exp((3. / 2)**2)] * (ndims - 1)),
+                  ground_truth_standard_deviation=np.array(
+                      [3.] + [np.exp((3. / 2)**2)] * (ndims - 1)),
               )
       }
 

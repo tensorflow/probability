@@ -21,7 +21,7 @@ from __future__ import print_function
 # Avoid rewriting these two for the Jax/Numpy backends.
 # For TF in particular, as TFDS is TF-only, we always use the real TF when
 # interacting with it.
-import numpy as onp
+import numpy as np
 import tensorflow.compat.v2 as otf
 
 from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib  # pylint: disable=g-import-not-at-top
@@ -66,8 +66,8 @@ def _normalize_zero_mean_one_std(train, test):
     normalized_train: The normalized training data.
     normalized_test: The normalized test data.
   """
-  train = onp.asarray(train)
-  test = onp.asarray(test)
+  train = np.asarray(train)
+  test = np.asarray(test)
   train_mean = train.mean(0, keepdims=True)
   train_std = train.std(0, keepdims=True)
   return (train - train_mean) / train_std, (test - train_mean) / train_std
@@ -113,8 +113,8 @@ def german_credit_numeric(
       # We're reversing the labels to match what's in the original dataset,
       # rather the TFDS encoding.
       labels.append(1 - entry['label'])
-    features = onp.stack(features, axis=0)
-    labels = onp.stack(labels, axis=0)
+    features = np.stack(features, axis=0)
+    labels = np.stack(labels, axis=0)
 
     num_train = int(features.shape[0] * train_fraction)
 
@@ -127,9 +127,9 @@ def german_credit_numeric(
 
     return dict(
         train_features=train_features,
-        train_labels=labels[:num_train].astype(onp.int32),
+        train_labels=labels[:num_train].astype(np.int32),
         test_features=test_features,
-        test_labels=labels[num_train:].astype(onp.int32),
+        test_labels=labels[num_train:].astype(np.int32),
     )
 
 
@@ -183,8 +183,8 @@ def synthetic_item_response_theory(
   correct = synthetic_item_response_theory_lib.CORRECT
 
   if shuffle:
-    shuffle_idxs = onp.arange(student_ids.shape[0])
-    onp.random.RandomState(shuffle_seed).shuffle(shuffle_idxs)
+    shuffle_idxs = np.arange(student_ids.shape[0])
+    np.random.RandomState(shuffle_seed).shuffle(shuffle_idxs)
     student_ids = student_ids[shuffle_idxs]
     question_ids = question_ids[shuffle_idxs]
     correct = correct[shuffle_idxs]
@@ -232,8 +232,8 @@ def synthetic_log_gaussian_cox_process(
   counts = synthetic_log_gaussian_cox_process_lib.COUNTS
 
   if shuffle:
-    shuffle_idxs = onp.arange(locations.shape[0])
-    onp.random.RandomState(shuffle_seed).shuffle(shuffle_idxs)
+    shuffle_idxs = np.arange(locations.shape[0])
+    np.random.RandomState(shuffle_seed).shuffle(shuffle_idxs)
     locations = locations[shuffle_idxs]
     counts = counts[shuffle_idxs]
     extents = extents[shuffle_idxs]

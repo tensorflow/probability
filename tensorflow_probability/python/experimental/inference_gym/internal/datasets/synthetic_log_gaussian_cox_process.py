@@ -57,9 +57,9 @@ checked in.
 
 """
 
-import numpy as onp
+import numpy as np
 
-LOCATIONS = onp.array([
+LOCATIONS = np.array([
     0.,
     0.,
     1.,
@@ -263,7 +263,7 @@ LOCATIONS = onp.array([
 ]).reshape((100, 2))
 
 
-EXTENTS = onp.array([
+EXTENTS = np.array([
     1.,
     1.,
     1.,
@@ -367,7 +367,7 @@ EXTENTS = onp.array([
 ]).reshape((100,))
 
 
-COUNTS = onp.array([
+COUNTS = np.array([
     116,
     83,
     64,

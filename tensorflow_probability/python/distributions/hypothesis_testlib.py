@@ -26,7 +26,6 @@ from absl import logging
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
-import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v2 as tf
 
@@ -484,7 +483,7 @@ def broadcasting_params(draw,
 
 def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
   for param, target_param_val in six.iteritems(target_shaped_dict):
-    onp.testing.assert_array_equal(
+    np.testing.assert_array_equal(
         tensorshape_util.as_list(target_param_val.shape),
         tensorshape_util.as_list(possibly_bcast_dict[param].shape))
 
