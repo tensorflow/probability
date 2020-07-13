@@ -34,7 +34,7 @@ __all__ = [
 
 
 RunningCovarianceState = collections.namedtuple(
-    'RunningCovarianceState', 'num_samples, mean, comoment')
+    'RunningCovarianceState', 'num_samples, mean, sum_squared_residuals')
 
 
 def _update_running_covariance(
@@ -46,14 +46,16 @@ def _update_running_covariance(
     chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
     chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
     chunk_delta_mean = new_sample - tf.expand_dims(chunk_mean, axis=axis)
-    chunk_comoment = tf.reduce_sum(
+    chunk_sum_squared_residuals = tf.reduce_sum(
         _batch_outer_product(chunk_delta_mean, event_ndims),
         axis=axis
     )
   else:
     chunk_n = tf.ones((), dtype=dtype)
     chunk_mean = new_sample
-    chunk_comoment = tf.zeros(ps.shape(state.comoment), dtype=dtype)
+    chunk_sum_squared_residuals = tf.zeros(
+        ps.shape(state.sum_squared_residuals),
+        dtype=dtype)
 
   new_n = state.num_samples + chunk_n
   delta_mean = chunk_mean - state.mean
@@ -61,10 +63,10 @@ def _update_running_covariance(
   all_pairwise_deltas = _batch_outer_product(
       delta_mean, event_ndims)
   adj_factor = state.num_samples * chunk_n / (state.num_samples + chunk_n)
-  new_comoment = (state.comoment + chunk_comoment
-                  + adj_factor * all_pairwise_deltas)
-
-  return type(state)(new_n, new_mean, new_comoment)
+  new_sum_squared_residuals = (state.sum_squared_residuals
+                               + chunk_sum_squared_residuals
+                               + adj_factor * all_pairwise_deltas)
+  return type(state)(new_n, new_mean, new_sum_squared_residuals)
 
 
 def _batch_outer_product(target, event_ndims):
@@ -108,6 +110,7 @@ class RunningCovariance(object):
   `RunningCovarianceState` as returned via `initialize` and `update` method
   calls.
   """
+
   def __init__(self, shape, event_ndims=None, dtype=tf.float32):
     """A `RunningCovariance` object holds metadata for covariance computation.
 
@@ -169,7 +172,8 @@ class RunningCovariance(object):
     return RunningCovarianceState(
         num_samples=tf.zeros((), dtype=self.dtype),
         mean=tf.zeros(self.shape, dtype=self.dtype),
-        comoment=tf.zeros(self.shape + extra_ndims_shape, dtype=self.dtype),
+        sum_squared_residuals=tf.zeros(
+            self.shape + extra_ndims_shape, dtype=self.dtype),
     )
 
   def update(self, state, new_sample, axis=None):
@@ -211,11 +215,11 @@ class RunningCovariance(object):
     Returns:
       state: `RunningCovarianceState` with updated calculations.
 
-    References:
+    #### References
     [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
-    Covariances and Arbitrary-Order Statistical Moments. _Technical Report
-    SAND2008-6212_, 2008.
-    https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
+         Covariances and Arbitrary-Order Statistical Moments. _Technical Report
+         SAND2008-6212_, 2008.
+         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
     """
     updated_state = _update_running_covariance(
         state, new_sample, self.event_ndims, self.dtype, axis)
@@ -234,7 +238,7 @@ class RunningCovariance(object):
     Returns:
       covariance: An estimate of the covariance.
     """
-    return state.comoment / (state.num_samples - ddof)
+    return state.sum_squared_residuals / (state.num_samples - ddof)
 
 
 class RunningVariance(RunningCovariance):
@@ -245,6 +249,7 @@ class RunningVariance(RunningCovariance):
   `RunningCovarianceState` as returned via `initialize` and `update` method
   calls.
   """
+
   def __init__(self, shape=(), dtype=tf.float32):
     """A `RunningVariance` object holds metadata for variance computation.
 
