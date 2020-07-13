@@ -23,7 +23,6 @@ from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import fill_diagonal
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import softplus
-from tensorflow_probability.python.bijectors import transform_diagonal
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 
@@ -41,7 +40,7 @@ class FillScaleDiagonal(chain.Chain):
   attempts to avoid numerical issues from zeros on the diagonal.
   #### Examples
   ```python
-  tfb = tfp.distributions.bijectors
+  tfb = tfp.bijectors
   b = tfb.FillScaleDiagonal(
        diag_bijector=tfb.Exp(),
        diag_shift=None)
@@ -108,9 +107,8 @@ class FillScaleDiagonal(chain.Chain):
 
       super(FillScaleDiagonal, self).__init__(
           [
-              transform_diagonal.TransformDiagonal(
-                  diag_bijector=diag_bijector),
-              fill_diagonal.FillDiagonal()
+              fill_diagonal.FillDiagonal(),
+              diag_bijector
           ],
           validate_args=validate_args,
           name=name,
