@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# lint as: python3
+# Lint as: python3
 """Module for the propagate custom Jaxpr interpreter.
 
 The propagate Jaxpr interpreter converts a Jaxpr to a directed graph where
@@ -29,7 +29,7 @@ graph are returned.
 import collections
 import functools
 import itertools as it
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import dataclasses
 from jax import core as jax_core
@@ -38,19 +38,31 @@ from jax import tree_util
 from jax import util as jax_util
 from jax.interpreters import partial_eval as pe
 
+from oryx.core import pytree
+
+
 __all__ = [
     'Cell',
-    'Unknown',
     'Equation',
     'Environment',
     'propagate'
 ]
 
+
+VarOrLiteral = Union[jax_core.Var, jax_core.Literal]
 safe_map = jax_core.safe_map
 
 
-class Cell:
+class Cell(pytree.Pytree):
   """Base interface for objects used during propagation.
+
+  A Cell represents a member of a lattice, defined by the `top`, `bottom`
+  and `join` methods. Conceptually, a "top" cell represents complete information
+  about a value and a "bottom" cell represents no information about a value.
+  Cells that are neither top nor bottom thus have partial information.
+  The `join` method is used to combine two cells to create a cell no less than
+  the two input cells. During the propagation, we hope to join cells until
+  all cells are "top".
 
   Transformations that use propagate need to pass in objects that are Cell-like.
   A Cell needs to specify how to create a new default cell from a literal value,
@@ -58,30 +70,42 @@ class Cell:
   value with the `is_unknown` method, but by default, Cells are known.
   """
 
+  def __init__(self, aval):
+    self.aval = aval
+
+  def __lt__(self, other: Any) -> bool:
+    raise NotImplementedError
+
+  def top(self) -> bool:
+    raise NotImplementedError
+
+  def bottom(self) -> bool:
+    raise NotImplementedError
+
+  def join(self, other: 'Cell') -> 'Cell':
+    raise NotImplementedError
+
+  @property
+  def shape(self) -> Tuple[int]:
+    return self.aval.shape
+
+  @property
+  def ndim(self) -> int:
+    return len(self.shape)
+
   def is_unknown(self):
-    return False
+    # Convenient alias
+    return self.bottom()
 
   @classmethod
-  def new(cls, obj):
+  def new(cls, value):
     """Creates a new instance of a Cell from a value."""
     raise NotImplementedError
 
-
-class Unknown(Cell):
-  """Sentinel type for unknown quantities during propagation."""
-
-  def is_unknown(self):
-    return True
-
-  def __repr__(self):
-    return '?'
-unknown = Unknown()  # canonical unknown instance
-
-tree_util.register_pytree_node(
-    Unknown,
-    lambda cell: ((), ()),
-    lambda data, xs: unknown
-)
+  @classmethod
+  def unknown(cls, aval):
+    """Creates an unknown Cell from an abstract value."""
+    raise NotImplementedError
 
 
 @dataclasses.dataclass(frozen=True)
@@ -119,59 +143,84 @@ class Equation:
     )
 
 
-class Environment:
+class Environment(pytree.Pytree):
   """Keeps track of variables and their values during propagation."""
 
   def __init__(self, cell_type, jaxpr):
     self.cell_type = cell_type
-    self.env = {}
-    self.subenvs = {}
-    self.jaxpr = jaxpr
+    self.env: Dict[jax_core.Var, Cell] = {}
+    self.subenvs: Dict[Equation, 'Environment'] = {}
+    self.jaxpr: jax_core.Jaxpr = jaxpr
 
-  def read(self, var):
+  def copy(self) -> 'Environment':
+    env = Environment(self.cell_type, self.jaxpr)
+    env.env = self.env.copy()
+    env.subenv = {k: subenv.copy() for k, subenv in self.subenvs.items()}
+    return env
+
+  def join(self, other: 'Environment') -> 'Environment':
+    env = Environment(self.cell_type, self.jaxpr)
+    for var, val in self.env.items():
+      env.env[var] = val.join(other.env[var])
+    for eqn, subenv in self.subenvs.items():
+      env.subenvs[eqn] = subenv.join(other.subenvs[eqn])
+    return env
+
+  def assert_same_type(self, other_env) -> None:
+    """Raises an error if environments do not have matching Jaxprs."""
+    error = ValueError('Cannot compare environments of different types.')
+    if self.cell_type != other_env.cell_type:
+      raise error
+    elif self.jaxpr != other_env.jaxpr:
+      raise error
+    elif self.env.keys() != other_env.env.keys():
+      raise error
+
+  def read(self, var: VarOrLiteral) -> Cell:
     if isinstance(var, jax_core.Literal):
       return self.cell_type.new(var.val)
     else:
-      return self.env.get(var, unknown)
+      return self.env.get(var, self.cell_type.unknown(var.aval))
 
-  def write(self, var, cell):
+  def write(self, var: VarOrLiteral, cell: Cell) -> Cell:
     if isinstance(var, jax_core.Literal):
-      return
-    if not cell.is_unknown():
-      self.env[var] = cell
+      return cell
+    cur_cell = self.read(var)
+    self.env[var] = cur_cell.join(cell)
+    return self.env[var]
 
-  def __getitem__(self, key):
-    return self.env.get(key, unknown)
+  def __getitem__(self, var: VarOrLiteral) -> Cell:
+    return self.read(var)
 
   def __setitem__(self, key, val):
-    raise NotImplementedError
+    raise ValueError('Environments do not support __setitem__. Please use the '
+                     '`write` method instead.')
 
-  def __contains__(self, key):
-    return key in self.env
+  def __contains__(self, var: VarOrLiteral):
+    if isinstance(var, jax_core.Literal):
+      return True
+    return var in self.env
 
-  def write_subenv(self, eqn, subenv):
-    self.subenvs[eqn] = subenv
+  def write_subenv(self, eqn: Equation, subenv: 'Environment') -> None:
+    if eqn not in self.subenvs:
+      self.subenvs[eqn] = subenv
+    else:
+      self.subenvs[eqn] = self.subenvs[eqn].join(subenv)
 
-  def to_tuple(self):
+  def flatten(self):
     env_keys, env_values = jax_util.unzip2(self.env.items())
     subenv_keys, subenv_values = jax_util.unzip2(self.subenvs.items())
     return (env_values, subenv_values), (env_keys, subenv_keys, self.cell_type,
                                          self.jaxpr)
 
   @classmethod
-  def from_tuple(cls, data, xs):
+  def unflatten(cls, data, xs):
     env_keys, subenv_keys, cell_type, jaxpr = data
     env_values, subenv_values = xs
     env = Environment(cell_type, jaxpr)
     env.env = dict(zip(env_keys, env_values))
     env.subenvs = dict(zip(subenv_keys, subenv_values))
     return env
-
-tree_util.register_pytree_node(
-    Environment,
-    lambda env: env.to_tuple(),
-    Environment.from_tuple
-)
 
 
 def construct_graph_representation(eqns):
@@ -190,39 +239,27 @@ def construct_graph_representation(eqns):
   return get_neighbors
 
 
-def update_queue_state(queue, cur_eqn, get_neighbor_eqns, done, done_eqns,
-                       checked_eqns, incells, outcells, new_incells,
-                       new_outcells):
-  """Updates the queue, done_eqns, and checked_eqns from the result of a propagation."""
+def update_queue_state(queue, cur_eqn, get_neighbor_eqns,
+                       incells, outcells, new_incells, new_outcells):
+  """Updates the queue from the result of a propagation."""
   all_vars = cur_eqn.invars + cur_eqn.outvars
   old_cells = incells + outcells
   new_cells = new_incells + new_outcells
-  updated = False
+
   for var, old_cell, new_cell in zip(all_vars, old_cells, new_cells):
-    if old_cell.is_unknown() and not new_cell.is_unknown():
-      updated = True
-  if updated:
-    checked_eqns.clear()
-  if done:
-    # Reset checked_eqns and enqueue new equations for updated variables
-    done_eqns.add(cur_eqn)
-  else:
-    # If equation is not done, it might have to be revisited after other
-    # equations have been propagated
-    assert cur_eqn not in done_eqns
-    checked_eqns.add(cur_eqn)
-    queue.append(cur_eqn)
-  for var, old_cell, new_cell in zip(all_vars, old_cells, new_cells):
-    if old_cell.is_unknown() and not new_cell.is_unknown():
+    # If old_cell is less than new_cell, we know the propagation has made
+    # progress.
+    if old_cell < new_cell:
       # Extend left as a heuristic because in graphs corresponding to
       # chains of unary functions, we immediately want to pop off these
       # neighbors in the next iteration
-      queue.extendleft(get_neighbor_eqns(var) - set(queue) - done_eqns)
+      neighbors = get_neighbor_eqns(var) - set(queue) - {cur_eqn}
+      queue.extendleft(neighbors)
 
 
 PropagationRule = Callable[
     [List[Any], List[Cell]],
-    Tuple[List[Cell], List[Cell], bool, Optional[Environment]],
+    Tuple[List[Cell], List[Cell], Optional[Environment]],
 ]
 
 
@@ -245,7 +282,6 @@ def propagate(cell_type: Type[Cell],
     The Jaxpr environment after propagation has terminated
   """
   env = Environment(cell_type, jaxpr)
-
   safe_map(env.write, jaxpr.constvars, constcells)
   safe_map(env.write, jaxpr.invars, incells)
   safe_map(env.write, jaxpr.outvars, outcells)
@@ -256,16 +292,15 @@ def propagate(cell_type: Type[Cell],
   # Initialize propagation queue with equations neighboring constvars, invars,
   # and outvars.
   out_eqns = set()
+  for eqn in jaxpr.eqns:
+    for var in it.chain(eqn.invars, eqn.outvars):
+      env.write(var, cell_type.unknown(var.aval))
+
   for var in it.chain(jaxpr.outvars, jaxpr.invars, jaxpr.constvars):
     out_eqns.update(get_neighbor_eqns(var))
   queue = collections.deque(out_eqns)
-  done_eqns = set()
-  # checked_eqns is used to stop propagation if all equations in queue have
-  # been checked without the propagation progressing
-  checked_eqns = set()
   while queue:
     eqn = queue.popleft()
-    assert eqn not in done_eqns
 
     incells = safe_map(env.read, eqn.invars)
     outcells = safe_map(env.read, eqn.outvars)
@@ -279,17 +314,14 @@ def propagate(cell_type: Type[Cell],
       ]
     else:
       subfuns = []
-    new_incells, new_outcells, done, subenv = rule(subfuns + incells,
-                                                   outcells, **params)
+    new_incells, new_outcells, subenv = rule(
+        subfuns + incells, outcells, **params)
     if subenv:
       env.write_subenv(eqn, subenv)
 
-    safe_map(env.write, eqn.invars, new_incells)
-    safe_map(env.write, eqn.outvars, new_outcells)
+    new_incells = safe_map(env.write, eqn.invars, new_incells)
+    new_outcells = safe_map(env.write, eqn.outvars, new_outcells)
 
-    update_queue_state(queue, eqn, get_neighbor_eqns, done, done_eqns,
-                       checked_eqns, incells, outcells, new_incells,
-                       new_outcells)
-    if checked_eqns == set(queue):
-      break
+    update_queue_state(queue, eqn, get_neighbor_eqns, incells, outcells,
+                       new_incells, new_outcells)
   return env

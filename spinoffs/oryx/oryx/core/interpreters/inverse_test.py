@@ -99,7 +99,7 @@ class InverseTest(absltest.TestCase):
 
     def f2(x):
       return np.exp(x)
-    f2_inv = ildj(f2, np.zeros(3))
+    f2_inv = ildj(f2, np.zeros(2))
     onp.testing.assert_allclose(f2_inv(2 * np.ones(2)), -2 * np.log(2.))
 
   def test_advanced_inverse_two(self):
@@ -116,13 +116,6 @@ class InverseTest(absltest.TestCase):
     onp.testing.assert_allclose(f_inv(2.0, 2.0, 2.0),
                                 (np.log(2.), 2 - np.log(2.) ** 2,
                                  np.log(2.0) - (2 - np.log(2.) ** 2)))
-
-  def test_bad_inverse(self):
-    def f(x):
-      return np.exp(x), x + 1.
-    f_ildj = ildj(f, 0.)
-    with self.assertRaises(ValueError):
-      f_ildj(2.0, 3.)
 
   def test_mul_inverse_ildj(self):
     def f(x):

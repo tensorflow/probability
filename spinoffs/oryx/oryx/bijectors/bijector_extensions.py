@@ -102,7 +102,7 @@ def bijector_ildj_rule(incells, outcells, **params):
                                                        flat_inproxies)
   flat_bijector_cells = [proxy.cell for proxy
                          in tree_util.tree_leaves(bijector_proxies)]
-  if any(cell.is_unknown() for cell in flat_bijector_cells):
+  if any(not cell.top() for cell in flat_bijector_cells):
     return const_incells + flat_incells, outcells, False, None
   bijector = tree_util.tree_multimap(lambda x: x.cell.val, bijector_proxies)
   direction = params['direction']
@@ -120,19 +120,17 @@ def bijector_ildj_rule(incells, outcells, **params):
 
   outcell, = outcells
   incell = inproxy.cell
-  done = False
-  if incell.is_unknown() and not outcell.is_unknown():
+  if not incell.top() and outcell.top():
     val, ildj = outcell.val, outcell.ildj
     flat_incells = [InverseAndILDJ(
+        outcell.aval,
         inv_func(val), ildj + ildj_func(val, np.ndim(val)))]
-    done = True
     new_outcells = outcells
-  elif outcell.is_unknown() and not incell.is_unknown():
+  elif not outcell.top() and incell.top():
     new_outcells = [InverseAndILDJ.new(forward_func(incell.val))]
-    done = True
   new_incells = flat_bijector_cells + flat_incells
-  return const_incells + new_incells, new_outcells, done, None
-inverse.custom_rules[bijector_p] = bijector_ildj_rule
+  return const_incells + new_incells, new_outcells, None
+inverse.ildj_registry[bijector_p] = bijector_ildj_rule
 
 
 def make_wrapper_type(cls):

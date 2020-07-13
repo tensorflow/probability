@@ -87,31 +87,21 @@ random_variable_p = core.HigherOrderPrimitive('random_variable')
 core.interpreters.unzip.block_registry.add(random_variable_p)
 
 
-def random_variable_log_prob_rule(flat_invals, flat_outvals, **params):
+def random_variable_log_prob_rule(flat_incells, flat_outcells, **params):
   """Registers Oryx distributions with the log_prob transformation."""
-  flat_invals = flat_invals[1:]
-  num_consts = len(flat_invals) - params['num_args']
-  const_invals, flat_invals = jax_util.split_list(flat_invals, [num_consts])
-  arg_vals = tree_util.tree_unflatten(params['in_tree'], flat_invals)
-  seed_val, dist_val = arg_vals[0], arg_vals[1]
-  if not (seed_val.is_unknown() or all(
-      v.is_unknown() for v in tree_util.tree_flatten(dist_val)[0])):
-    dist = tree_util.tree_map(lambda x: x.val, dist_val)
-    s = dist.sample(seed=seed_val.val, **params['kwargs'])
-    return const_invals + flat_invals, [InverseAndILDJ.new(s)], True, None
-  elif not all(val.is_unknown() for val in flat_outvals):
-    return const_invals + flat_invals, flat_outvals, True, None
-  return const_invals + flat_invals, flat_outvals, False, None
+  del params
+  # First incell is the call primitive function
+  return flat_incells[1:], flat_outcells, None
 core.interpreters.log_prob.log_prob_rules[
     random_variable_p] = random_variable_log_prob_rule
 
 
-def random_variable_log_prob(flat_invals, val, **params):
+def random_variable_log_prob(flat_incells, val, **params):
   """Registers Oryx distributions with the log_prob transformation."""
-  num_consts = len(flat_invals) - params['num_args']
-  _, flat_invals = jax_util.split_list(flat_invals, [num_consts])
-  _, dist = tree_util.tree_unflatten(params['in_tree'], flat_invals)
-  if any(val.is_unknown() for val in flat_invals[1:]
+  num_consts = len(flat_incells) - params['num_args']
+  _, flat_incells = jax_util.split_list(flat_incells, [num_consts])
+  _, dist = tree_util.tree_unflatten(params['in_tree'], flat_incells)
+  if any(not cell.top() for cell in flat_incells[1:]
          if isinstance(val, InverseAndILDJ)):
     return None
   return dist.log_prob(val)

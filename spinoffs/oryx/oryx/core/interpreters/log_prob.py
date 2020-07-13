@@ -32,7 +32,6 @@ safe_map = jax_core.safe_map
 
 InverseAndILDJ = inverse.InverseAndILDJ
 ildj_registry = inverse.ildj_registry
-unknown = propagate.unknown
 
 
 class LogProbRules(dict):
@@ -61,15 +60,16 @@ def log_prob(f):
   def wrapped(sample, *args, **kwargs):
     """Function wrapper that takes in log_prob arguments."""
     # Trace the function using a random seed
-    jaxpr, _ = trace_util.stage(f)(random.PRNGKey(0), *args, **kwargs)
+    dummy_seed = random.PRNGKey(0)
+    jaxpr, _ = trace_util.stage(f)(dummy_seed, *args, **kwargs)
     flat_outargs, _ = tree_util.tree_flatten(sample)
     flat_inargs, _ = tree_util.tree_flatten(args)
     constcells = [
         InverseAndILDJ.new(val) for val in jaxpr.literals
     ]
-    flat_incells = [unknown] + [
-        InverseAndILDJ.new(val) for val in flat_inargs
-    ]
+    flat_incells = [
+        InverseAndILDJ.unknown(trace_util.get_shaped_aval(dummy_seed))
+    ] + [InverseAndILDJ.new(val) for val in flat_inargs]
     flat_outcells = [InverseAndILDJ.new(a) for a in flat_outargs]
     # Re-use the InverseAndILDJ propagation but silently fail instead of
     # erroring when we hit a primitive we can't invert.
@@ -94,12 +94,12 @@ def _accumulate_log_probs(env):
       incells = [env.read(v) for v in eqn.invars]
       outcells = [env.read(v) for v in eqn.outvars]
       outcell, = outcells
+      if not outcell.top():
+        raise ValueError('Cannot compute log_prob of function.')
       lp = log_prob_registry[eqn.primitive](
-          [cell if cell.is_unknown() else cell.val for cell in incells],
+          [cell if not cell.top() else cell.val for cell in incells],
           outcell.val, **eqn.params
       )
-      if lp is None:
-        raise ValueError('Cannot compute log_prob of function.')
       assert np.ndim(lp) == 0, 'log_prob must return a scalar.'
       # Accumulate ILDJ term
       final_log_prob += lp + outcell.ildj
@@ -116,5 +116,5 @@ def make_default_rule(prim):
     try:
       return ildj_registry[prim](incells, outcells, **params)
     except NotImplementedError:
-      return incells, outcells, False, None
+      return incells, outcells, None
   return rule

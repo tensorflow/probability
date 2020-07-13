@@ -55,6 +55,7 @@ py_library(
     deps = [
         # dataclasses dep,
         # jax dep,
+        "//oryx/core:pytree",
     ],
 )
 
