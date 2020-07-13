@@ -15,28 +15,28 @@
 # ============================================================================
 
 #
-# Define convenient alias to the testing/run_tfp_test.sh script. Source this
-# file in your terminal session to define the alias `tfp_test`:
+# Define convenient alias to the testing/run_tfp_lints.sh script. Source this
+# file in your terminal session to define the alias `tfp_lints`:
 #
 # ```bash
-# source testing/define_testing_alias.sh
-# alias tfp_test
-# # ==> /absolute/path/to/testing/run_tfp_test.sh
+# source testing/define_linting_alias.sh
+# alias tfp_lints
+# # ==> /absolute/path/to/testing/run_tfp_lints.sh
 # ```
 #
 # Optionally, provide a positional arguemnt to this script to create an
 # alternate alias name:
 #
 # ```bash
-# source testing/define_testing_alias.sh my_tfp_test_alias
-# alias my_tfp_test_alias
-# # ==> /absolute/path/to/testing/run_tfp_test.sh
+# source testing/define_linting_alias.sh my_tfp_lints_alias
+# alias my_tfp_lints_alias
+# # ==> /absolute/path/to/testing/run_tfp_lints.sh
 
 # Get the absolute path to the directory containing this script
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
 # Read alias name from the first argument to the script, with a default of
-# `tfp_test`.
-ALIAS_NAME=${1:-tfp_test}
+# `tfp_lints`.
+ALIAS_NAME=${1:-tfp_lints}
 
-alias $ALIAS_NAME="$DIR/testing/run_tfp_test.sh"
+alias $ALIAS_NAME="$DIR/testing/run_tfp_lints.sh"
