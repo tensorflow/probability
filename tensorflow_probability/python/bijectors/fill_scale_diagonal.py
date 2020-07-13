@@ -33,9 +33,10 @@ __all__ = [
 
 class FillScaleDiagonal(chain.Chain):
   """Transforms unconstrained vectors to Diag matrices with positive diagonal.
-  This is implemented as a simple `tfb.Chain` of `tfb.FillDiagonal`
-  followed by `tfb.TransformDiagonal`, and provided mostly as a
-  convenience. The default setup is somewhat opinionated, using a
+  This is implemented as a simple `tfb.Chain` of a bijector
+  (to transform the diagonal) followed by `tfb.FillDiagonal`, 
+  and provided mostly as a convenience. 
+  The default setup is somewhat opinionated, using a
   Softplus transformation followed by a small shift (`1e-5`) which
   attempts to avoid numerical issues from zeros on the diagonal.
   #### Examples
