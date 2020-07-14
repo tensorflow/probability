@@ -327,3 +327,15 @@ class GeneralizedPareto(distribution.Distribution):
                  'equal to `loc - scale / concentration`.'),
         summarize=100))
     return assertions
+
+  def _quantile(self, p):
+    k = tf.convert_to_tensor(self.concentration)
+    m = tf.convert_to_tensor(self.loc)
+    s = tf.convert_to_tensor(self.scale)
+    is_k_zero = tf.equal(k, 0)
+    # Use double where trick to ensure gradient correctness.
+    safe_k = tf.where(is_k_zero, tf.ones([], k.dtype), k)
+    neglog1mp = -tf.math.log1p(-p)
+    return m + s * tf.where(is_k_zero,
+                            neglog1mp,
+                            tf.math.expm1(k * neglog1mp) / safe_k)
