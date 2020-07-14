@@ -747,7 +747,9 @@ NUMPY_TEST_CASES = [
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [pd_matrices()]),
     TestCase('linalg.lu', [nonsingular_matrices()], rtol=1e-4,
-             disabled=NUMPY_MODE and six.PY2),
+             # TODO(b/161242015) do not disable unconditionally.  Was
+             # disabled=NUMPY_MODE and six.PY2
+             disabled=True),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
     TestCase('raw_ops.MatrixDiagPartV2', [
         hps.fixed_dictionaries(dict(
