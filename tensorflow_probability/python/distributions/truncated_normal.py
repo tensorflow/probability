@@ -73,7 +73,7 @@ class TruncatedNormal(distribution.Distribution):
         { (2 pi)**(-0.5) exp(-0.5 y**2) / (scale * z) for low <= x <= high
         { 0                                    otherwise
     y = (x - loc)/scale
-    z = NormalCDF((high - loc) / scale) - NormalCDF((lower - loc) / scale)
+    z = NormalCDF((high - loc) / scale) - NormalCDF((low - loc) / scale)
   ```
 
   where:
@@ -88,8 +88,8 @@ class TruncatedNormal(distribution.Distribution):
   ```python
 
   tfd = tfp.distributions
-  # Define a batch of two scalar TruncatedNormals which modes at 0. and 1.0
-  dist = tfd.TruncatedNormal(loc=[0., 1.], scale=1.0,
+  # Define a batch of two scalar TruncatedNormals with modes at 0. and 1.0
+  dist = tfd.TruncatedNormal(loc=[0., 1.], scale=1.,
                              low=[-1., 0.],
                              high=[1., 1.])
 
