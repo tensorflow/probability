@@ -27,6 +27,8 @@ from tensorflow_probability.python.experimental.inference_gym.targets.logistic_r
 from tensorflow_probability.python.experimental.inference_gym.targets.logistic_regression import LogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.model import Model
 from tensorflow_probability.python.experimental.inference_gym.targets.neals_funnel import NealsFunnel
+from tensorflow_probability.python.experimental.inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
+from tensorflow_probability.python.experimental.inference_gym.targets.probit_regression import ProbitRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
 from tensorflow_probability.python.experimental.inference_gym.targets.vector_model import VectorModel
@@ -35,6 +37,7 @@ __all__ = [
     'Banana',
     'BayesianModel',
     'GermanCreditNumericLogisticRegression',
+    'GermanCreditNumericProbitRegression',
     'GermanCreditNumericSparseLogisticRegression',
     'IllConditionedGaussian',
     'ItemResponseTheory',
@@ -42,6 +45,7 @@ __all__ = [
     'LogisticRegression',
     'Model',
     'NealsFunnel',
+    'ProbitRegression',
     'SparseLogisticRegression',
     'SyntheticItemResponseTheory',
     'VectorModel',

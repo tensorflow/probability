@@ -43,6 +43,7 @@ multi_substrate_py_library(
         ":logistic_regression",
         ":model",
         ":neals_funnel",
+        ":probit_regression",
         ":sparse_logistic_regression",
         ":vector_model",
         "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
@@ -235,6 +236,34 @@ multi_substrate_py_test(
     deps = [
         ":neals_funnel",
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "probit_regression",
+    srcs = ["probit_regression.py"],
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth:german_credit_numeric_probit_regression",  # buildcleaner: keep
+    ],
+)
+
+multi_substrate_py_test(
+    name = "probit_regression_test",
+    size = "large",
+    srcs = ["probit_regression_test.py"],
+    deps = [
+        ":probit_regression",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        # tensorflow_datasets dep,  # buildcleaner: keep
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

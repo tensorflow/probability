@@ -72,6 +72,16 @@ py_library(
 )
 
 py_library(
+    name = "probit_regression",
+    srcs = ["probit_regression.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+    ],
+)
+
+py_library(
     name = "sparse_logistic_regression",
     srcs = ["sparse_logistic_regression.py"],
     srcs_version = "PY3",
@@ -89,6 +99,7 @@ py_library(
         ":item_response_theory",
         ":log_gaussian_cox_process",
         ":logistic_regression",
+        ":probit_regression",
         ":sparse_logistic_regression",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",
     ],
