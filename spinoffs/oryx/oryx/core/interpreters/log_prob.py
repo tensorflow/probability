@@ -30,8 +30,8 @@ __all__ = [
 
 safe_map = jax_core.safe_map
 
-InverseAndILDJ = inverse.InverseAndILDJ
-ildj_registry = inverse.ildj_registry
+InverseAndILDJ = inverse.core.InverseAndILDJ
+ildj_registry = inverse.core.ildj_registry
 
 
 class LogProbRules(dict):
@@ -64,9 +64,7 @@ def log_prob(f):
     jaxpr, _ = trace_util.stage(f)(dummy_seed, *args, **kwargs)
     flat_outargs, _ = tree_util.tree_flatten(sample)
     flat_inargs, _ = tree_util.tree_flatten(args)
-    constcells = [
-        InverseAndILDJ.new(val) for val in jaxpr.literals
-    ]
+    constcells = [InverseAndILDJ.new(val) for val in jaxpr.literals]
     flat_incells = [
         InverseAndILDJ.unknown(trace_util.get_shaped_aval(dummy_seed))
     ] + [InverseAndILDJ.new(val) for val in flat_inargs]
@@ -102,7 +100,7 @@ def _accumulate_log_probs(env):
       )
       assert np.ndim(lp) == 0, 'log_prob must return a scalar.'
       # Accumulate ILDJ term
-      final_log_prob += lp + outcell.ildj
+      final_log_prob += lp + np.sum(outcell.ildj)
   for subenv in env.subenvs.values():
     sub_lp = _accumulate_log_probs(subenv)
     final_log_prob += sub_lp

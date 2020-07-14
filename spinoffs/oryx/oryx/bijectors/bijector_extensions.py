@@ -20,8 +20,9 @@ import jax.numpy as np
 
 from six.moves import zip
 from tensorflow_probability.python.experimental.substrates import jax as tfp
-from oryx import core
+from oryx.core import primitive
 from oryx.core.interpreters import inverse
+from oryx.core.interpreters.inverse import slice as slc
 
 __all__ = [
     'make_type',
@@ -33,7 +34,8 @@ tfb = tfp.bijectors
 
 _registry = {}
 
-InverseAndILDJ = inverse.InverseAndILDJ
+InverseAndILDJ = inverse.core.InverseAndILDJ
+NDSlice = slc.NDSlice
 
 
 class _JaxBijectorTypeSpec(object):
@@ -81,7 +83,7 @@ class _JaxBijectorTypeSpec(object):
     return cls(clsid, param_specs, kwargs)
 
 
-bijector_p = core.HigherOrderPrimitive('bijector')
+bijector_p = primitive.HigherOrderPrimitive('bijector')
 
 
 class _CellProxy:
@@ -120,17 +122,19 @@ def bijector_ildj_rule(incells, outcells, **params):
 
   outcell, = outcells
   incell = inproxy.cell
-  if not incell.top() and outcell.top():
+  if incell.bottom() and not outcell.bottom():
     val, ildj = outcell.val, outcell.ildj
-    flat_incells = [InverseAndILDJ(
-        outcell.aval,
-        inv_func(val), ildj + ildj_func(val, np.ndim(val)))]
+    inildj = ildj + ildj_func(val, np.ndim(val))
+    ndslice = NDSlice.new(inv_func(val), inildj)
+    flat_incells = [
+        InverseAndILDJ(incell.aval, [ndslice])
+    ]
     new_outcells = outcells
-  elif not outcell.top() and incell.top():
+  elif outcell.is_unknown() and not incell.is_unknown():
     new_outcells = [InverseAndILDJ.new(forward_func(incell.val))]
   new_incells = flat_bijector_cells + flat_incells
   return const_incells + new_incells, new_outcells, None
-inverse.ildj_registry[bijector_p] = bijector_ildj_rule
+inverse.core.ildj_registry[bijector_p] = bijector_ildj_rule
 
 
 def make_wrapper_type(cls):
@@ -139,8 +143,9 @@ def make_wrapper_type(cls):
   clsid = (cls.__module__, cls.__name__)
 
   def bijector_bind(bijector, x, **kwargs):
-    return core.call_bind(bijector_p, direction=kwargs['direction'])(_bijector)(
-        bijector, x, **kwargs)
+    return primitive.call_bind(
+        bijector_p, direction=kwargs['direction'])(_bijector)(
+            bijector, x, **kwargs)
 
   def _bijector(bij, x, **kwargs):
     direction = kwargs.pop('direction', 'forward')

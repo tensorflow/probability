@@ -20,20 +20,17 @@ from jax import tree_util
 from jax import util as jax_util
 from six.moves import zip
 from tensorflow_probability.python.experimental.substrates import jax as tfp
-from oryx import core
 from oryx.core import ppl
+from oryx.core import primitive
 from oryx.core.interpreters import inverse
-
-__all__ = [
-    'make_type',
-]
-
+from oryx.core.interpreters import log_prob
+from oryx.core.interpreters import unzip
 
 tf = tfp.tf2jax
 tfd = tfp.distributions
 
 
-InverseAndILDJ = inverse.InverseAndILDJ
+InverseAndILDJ = inverse.core.InverseAndILDJ
 
 _registry = {}
 
@@ -83,8 +80,8 @@ class _JaxDistributionTypeSpec(object):
     return cls(clsid, param_specs, kwargs)
 
 
-random_variable_p = core.HigherOrderPrimitive('random_variable')
-core.interpreters.unzip.block_registry.add(random_variable_p)
+random_variable_p = primitive.HigherOrderPrimitive('random_variable')
+unzip.block_registry.add(random_variable_p)
 
 
 def random_variable_log_prob_rule(flat_incells, flat_outcells, **params):
@@ -92,8 +89,7 @@ def random_variable_log_prob_rule(flat_incells, flat_outcells, **params):
   del params
   # First incell is the call primitive function
   return flat_incells[1:], flat_outcells, None
-core.interpreters.log_prob.log_prob_rules[
-    random_variable_p] = random_variable_log_prob_rule
+log_prob.log_prob_rules[random_variable_p] = random_variable_log_prob_rule
 
 
 def random_variable_log_prob(flat_incells, val, **params):
@@ -107,7 +103,7 @@ def random_variable_log_prob(flat_incells, val, **params):
   return dist.log_prob(val)
 
 
-core.interpreters.log_prob.log_prob_registry[
+log_prob.log_prob_registry[
     random_variable_p] = random_variable_log_prob
 
 
@@ -119,7 +115,8 @@ def _sample_distribution(key, dist):
 def distribution_random_variable(dist: tfd.Distribution, *,
                                  name: Optional[str] = None):
   def wrapped(key):
-    result = core.call_bind(random_variable_p)(_sample_distribution)(key, dist)
+    result = primitive.call_bind(random_variable_p)(_sample_distribution)(
+        key, dist)
     if name is not None:
       result = ppl.random_variable(result, name=name)
     return result

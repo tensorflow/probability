@@ -52,7 +52,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         # jax dep,
-        "//oryx/core/interpreters:inverse",
+        "//oryx/core/interpreters/inverse:core",
         "//oryx/core/ppl",
     ],
 )

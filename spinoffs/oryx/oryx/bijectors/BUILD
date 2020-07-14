@@ -39,9 +39,9 @@ py_library(
         # jax dep,
         # six dep,
         # [tfp_jax dependency],
-        "//oryx/core",
         "//oryx/core:primitive",
-        "//oryx/core/interpreters:inverse",
+        "//oryx/core/interpreters/inverse",
+        "//oryx/core/interpreters/inverse:slice",
     ],
 )
 

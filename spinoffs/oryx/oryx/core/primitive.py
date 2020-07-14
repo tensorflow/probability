@@ -14,6 +14,8 @@
 # ============================================================================
 # Lint as: python3
 """Module for higher order primitives."""
+from typing import Callable
+
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -37,6 +39,12 @@ __all__ = [
 safe_map = jax_core.safe_map
 
 custom_batch_rules = {}
+hop_transformation_rules = {}
+
+
+def register_hop_transformation_rule(name: str, register_func: Callable[...,
+                                                                        None]):
+  hop_transformation_rules[name] = register_func
 
 
 class HigherOrderPrimitive(jax_core.Primitive):
@@ -60,15 +68,8 @@ class HigherOrderPrimitive(jax_core.Primitive):
     self.call_primitive = True
     self.multiple_results = True
     pe.staged_out_calls.add(self)
-    def _transpose_rule(*args, **kwargs):
-      return ad.call_transpose(self.subcall('transpose'), *args, **kwargs)
-    ad.primitive_transposes[self] = _transpose_rule
-    def _translation_rule(*args, backend, name, call_jaxpr, **kwargs):
-      del kwargs
-      return xla._xla_call_translation_rule(*args, name=name, backend=backend,  # pylint: disable=protected-access
-                                            call_jaxpr=call_jaxpr,
-                                            donated_invars=(False,) * len(args))
-    xla.call_translations[self] = _translation_rule
+    for register_func in hop_transformation_rules.values():
+      register_func(self)
 
   def impl(self, f, *args, **params):
     del params
@@ -86,15 +87,16 @@ class HigherOrderPrimitive(jax_core.Primitive):
         outs = self.impl(f, *args, **params)
     else:
       tracers = safe_map(top_trace.full_raise, args)
-      if isinstance(top_trace, batching.BatchTrace):
-        if self in custom_batch_rules:
-          return custom_batch_rules[self](top_trace, f, tracers, params)
-      if isinstance(top_trace, ad.JVPTrace):
-        prim = self.subcall('jvp')
+      if (isinstance(top_trace, batching.BatchTrace)
+          and self in custom_batch_rules):
+        outs = custom_batch_rules[self](top_trace, f, tracers, params)
       else:
-        prim = self
-      outs = safe_map(jax_core.full_lower,
-                      top_trace.process_call(prim, f, tracers, params))
+        if isinstance(top_trace, ad.JVPTrace):
+          prim = self.subcall('jvp')
+        else:
+          prim = self
+        outs = safe_map(jax_core.full_lower,
+                        top_trace.process_call(prim, f, tracers, params))
     return jax_core.apply_todos(env_trace_todo(), outs)
 
   def subcall(self, name):
@@ -105,6 +107,25 @@ class HigherOrderPrimitive(jax_core.Primitive):
 
   def post_process(self, trace, out_tracers, params):
     return trace.post_process_call(self, out_tracers, params)
+
+
+def hop_transpose_rule(prim):
+  def rule(*args, **kwargs):
+    return ad.call_transpose(prim.subcall('transpose'), *args, **kwargs)
+  ad.primitive_transposes[prim] = rule
+  return rule
+register_hop_transformation_rule('transpose', hop_transpose_rule)
+
+
+def hop_translation_rule(prim):
+  def rule(*args, backend, name, call_jaxpr, **params):
+    new_params = dict(name=name, backend=backend, call_jaxpr=call_jaxpr)
+    new_params['donated_invars'] = params.get('donated_invars',
+                                              (False,) * len(args))
+    return xla._xla_call_translation_rule(*args, **new_params)  # pylint: disable=protected-access
+  xla.call_translations[prim] = rule
+  return rule
+register_hop_transformation_rule('translation', hop_translation_rule)
 
 
 class FlatPrimitive(jax_core.Primitive):

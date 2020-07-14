@@ -186,6 +186,8 @@ class Environment(pytree.Pytree):
     if isinstance(var, jax_core.Literal):
       return cell
     cur_cell = self.read(var)
+    if var is jax_core.dropvar:
+      return cur_cell
     self.env[var] = cur_cell.join(cell)
     return self.env[var]
 

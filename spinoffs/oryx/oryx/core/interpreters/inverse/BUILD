@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# [internal] load pytype.bzl (pytype_strict_library)
 # [internal] load strict.bzl
+# [internal] load pytype.bzl (pytype_strict_library)
 
 licenses(["notice"])
 
@@ -21,95 +21,81 @@ package(default_visibility = ["//visibility:public"])
 
 # pytype_strict
 py_library(
-    name = "core",
+    name = "inverse",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":kwargs_util",
-        ":primitive",
-        ":pytree",
-        ":serialize",
-        ":trace_util",
-        "//oryx/core/interpreters",
+        ":core",
+        ":rules",
+        ":slice",
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "slice",
+    srcs = ["slice.py"],
+    srcs_version = "PY3",
+    deps = [
+        # dataclasses dep,
+        # jax dep,
+        "//oryx/core:pytree",
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "rules",
+    srcs = ["rules.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":core",
+        ":slice",
+        # jax dep,
+        "//oryx/core:primitive",
         "//oryx/core/interpreters:harvest",
-        "//oryx/core/interpreters:log_prob",
-        "//oryx/core/interpreters:unzip",
-        "//oryx/core/interpreters/inverse:core",
-        "//oryx/core/ppl",
-        "//oryx/core/state",
     ],
 )
 
 # pytype_strict
 py_library(
-    name = "serialize",
-    srcs = ["serialize.py"],
-    srcs_version = "PY3",
-)
-
-# pytype_strict
-py_library(
-    name = "pytree",
-    srcs = ["pytree.py"],
+    name = "core",
+    srcs = ["core.py"],
     srcs_version = "PY3",
     deps = [
+        ":slice",
         # jax dep,
-    ],
-)
-
-# pytype_strict
-py_library(
-    name = "primitive",
-    srcs = ["primitive.py"],
-    srcs_version = "PY3",
-    deps = [
-        # jax dep,
-    ],
-)
-
-# pytype_strict
-py_library(
-    name = "trace_util",
-    srcs = ["trace_util.py"],
-    srcs_version = "PY3",
-    deps = [
-        # jax dep,
-    ],
-)
-
-# pytype_strict
-py_library(
-    name = "kwargs_util",
-    srcs = ["kwargs_util.py"],
-    srcs_version = "PY3",
-    deps = [
+        "//oryx/core:primitive",
+        "//oryx/core:trace_util",
+        "//oryx/core/interpreters:harvest",
+        "//oryx/core/interpreters:propagate",
     ],
 )
 
 # py_strict
 py_test(
-    name = "serialize_test",
-    srcs = ["serialize_test.py"],
+    name = "inverse_test",
+    srcs = ["inverse_test.py"],
     python_version = "PY3",
     deps = [
-        ":serialize",
+        ":core",
+        ":rules",
         # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
         # jax dep,
         # numpy dep,
-        "//oryx/core/state",
-        "//oryx/experimental/nn",
+        "//oryx/core/interpreters:harvest",
     ],
 )
 
 # py_strict
 py_test(
-    name = "kwargs_util_test",
-    srcs = ["kwargs_util_test.py"],
+    name = "slice_test",
+    srcs = ["slice_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        ":kwargs_util",
+        ":slice",
         # absl/testing:absltest dep,
+        # jax dep,
     ],
 )

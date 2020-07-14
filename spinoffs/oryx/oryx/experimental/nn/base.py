@@ -131,6 +131,7 @@ from oryx.core import kwargs_util
 from oryx.core import primitive
 from oryx.core import state
 from oryx.core.interpreters import unzip
+from oryx.core.interpreters.inverse import core as inverse_core
 
 __all__ = [
     'LayerParams',
@@ -467,6 +468,18 @@ def _layer_cau_batched(layer, *args, **kwargs):
     kwargs['rng'] = rng
   kwargs = kwargs_util.filter_kwargs(layer._call_and_update_batched, kwargs)  # pylint: disable=protected-access
   return layer._call_and_update_batched(*args, **kwargs)  # pylint: disable=protected-access
+
+
+def _layer_cau_ildj_rule(incells, outcells, **params):
+  """InverseAndILDJ rule for layer_cau primitive."""
+  del params
+  f, incells = incells[0], incells[1:]
+  # TODO(sharadmv): update rule to use primitive when possible
+  subenv = f.call_wrapped(incells, outcells)
+  new_incells = [subenv.read(var) for var in subenv.jaxpr.invars]
+  new_outcells = [subenv.read(var) for var in subenv.jaxpr.outvars]
+  return new_incells, new_outcells, subenv
+inverse_core.ildj_registry[layer_cau_p] = _layer_cau_ildj_rule
 
 
 # Registrations
