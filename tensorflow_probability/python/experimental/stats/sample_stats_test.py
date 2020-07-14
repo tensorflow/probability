@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -366,12 +366,12 @@ class RunningStatsTest(test_util.TestCase):
     running_var = tfp.experimental.stats.RunningVariance((10,))
     _, cov_state = tf.while_loop(
         lambda i, _: i < 100,
-        lambda i, state: (i+1, running_cov.update(state, tensor_x[i])),
+        lambda i, state: (i + 1, running_cov.update(state, tensor_x[i])),
         (0, running_cov.initialize()))
     final_cov = running_cov.finalize(cov_state)
     _, var_state = tf.while_loop(
         lambda i, _: i < 100,
-        lambda i, state: (i+1, running_var.update(state, tensor_x[i])),
+        lambda i, state: (i + 1, running_var.update(state, tensor_x[i])),
         (0, running_var.initialize()))
     final_var = running_var.finalize(var_state)
     self.assertAllClose(final_cov, np.cov(x.T, ddof=0), rtol=1e-5)
@@ -387,9 +387,9 @@ class RunningStatsTest(test_util.TestCase):
         sample = tf1.placeholder_with_default(tensor_x[i], shape=None)
       else:
         sample = tensor_x[i]
-      return (i+1, running_cov.update(state, sample))
+      return (i + 1, running_cov.update(state, sample))
     _, state = tf.while_loop(
-        lambda i, _: tf.less(i, 100),
+        lambda i, _: i < 100,
         _loop_body,
         (0, running_cov.initialize()),
         shape_invariants=(
@@ -415,9 +415,9 @@ class RunningStatsTest(test_util.TestCase):
         sample = tf1.placeholder_with_default(tensor_x[i], shape=None)
       else:
         sample = tensor_x[i]
-      return (i+1, running_var.update(state, sample))
+      return (i + 1, running_var.update(state, sample))
     _, state = tf.while_loop(
-        lambda i, _: tf.less(i, 100),
+        lambda i, _: i < 100,
         _loop_body,
         (0, running_var.initialize()),
         shape_invariants=(
