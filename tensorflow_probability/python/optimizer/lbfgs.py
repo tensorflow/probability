@@ -345,9 +345,10 @@ def _get_search_direction(state):
   def _two_loop_algorithm():
     """L-BFGS two-loop algorithm."""
     # Correction pairs are always appended to the end, so only the latest
-    # `num_elements` vectors have valid position/gradient deltas.
-    position_deltas = state.position_deltas[-num_elements:]
-    gradient_deltas = state.gradient_deltas[-num_elements:]
+    # `num_elements` vectors have valid position/gradient deltas. Vectors
+    # that haven't been computed yet are zero.
+    position_deltas = state.position_deltas
+    gradient_deltas = state.gradient_deltas
 
     # Pre-compute all `inv_rho[i]`s.
     inv_rhos = tf.reduce_sum(
@@ -356,14 +357,14 @@ def _get_search_direction(state):
     def first_loop(acc, args):
       _, q_direction = acc
       position_delta, gradient_delta, inv_rho = args
-      alpha = tf.reduce_sum(
-          position_delta * q_direction, axis=-1) / inv_rho
+      alpha = tf.math.divide_no_nan(
+          tf.reduce_sum(position_delta * q_direction, axis=-1), inv_rho)
       direction_delta = alpha[..., tf.newaxis] * gradient_delta
       return (alpha, q_direction - direction_delta)
 
     # Run first loop body computing and collecting `alpha[i]`s, while also
     # computing the updated `q_direction` at each step.
-    zero = tf.zeros_like(inv_rhos[0])
+    zero = tf.zeros_like(inv_rhos[-num_elements])
     alphas, q_directions = tf.scan(
         first_loop, [position_deltas, gradient_deltas, inv_rhos],
         initializer=(zero, state.objective_gradient), reverse=True)
@@ -372,12 +373,12 @@ def _get_search_direction(state):
     # hessian for the k-th iteration; then `r_direction = H^0_k * q_direction`.
     gamma_k = inv_rhos[-1] / tf.reduce_sum(
         gradient_deltas[-1] * gradient_deltas[-1], axis=-1)
-    r_direction = gamma_k[..., tf.newaxis] * q_directions[0]
+    r_direction = gamma_k[..., tf.newaxis] * q_directions[-num_elements]
 
     def second_loop(r_direction, args):
       alpha, position_delta, gradient_delta, inv_rho = args
-      beta = tf.reduce_sum(
-          gradient_delta * r_direction, axis=-1) / inv_rho
+      beta = tf.math.divide_no_nan(
+          tf.reduce_sum(gradient_delta * r_direction, axis=-1), inv_rho)
       direction_delta = (alpha - beta)[..., tf.newaxis] * position_delta
       return r_direction + direction_delta
 
