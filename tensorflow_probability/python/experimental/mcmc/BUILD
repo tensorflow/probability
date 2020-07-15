@@ -42,6 +42,7 @@ py_library(
         ":particle_filter_augmentation",
         ":reducer",
         ":sample",
+        ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
@@ -407,6 +408,32 @@ py_test(
     name = "with_reductions_test",
     srcs = ["with_reductions_test.py"],
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "sample_fold",
+    srcs = ["sample_fold.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        ":sample",
+        ":with_reductions",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "sample_fold_test",
+    size = "small",
+    srcs = ["sample_fold_test.py"],
+    shard_count = 5,
+    deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

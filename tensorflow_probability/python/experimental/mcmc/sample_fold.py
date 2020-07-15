@@ -1,0 +1,104 @@
+# Copyright 2020 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Drivers for streaming reductions framework."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+# Dependency imports
+import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.experimental.mcmc import with_reductions
+from tensorflow_probability.python.experimental.mcmc import step_kernel
+from tensorflow.python.util import nest
+
+
+__all__ = [
+    'sample_fold',
+]
+
+
+def sample_fold(
+    num_steps,
+    current_state,
+    previous_kernel_results=None,
+    kernel=None,
+    reducers=None,
+    parallel_iterations=10,
+    seed=None,
+    name=None,
+):
+  """Finalizes `num_steps` Reducer steps, with samples provided by `kernel`.
+
+  This driver will appropriately apply `WithReductions` over the given `kernel`
+  and `reducers`. It will then update reducer states `num_steps` times (each
+  update being a call to the `Reducer`'s `one_step` method). An arbitrary
+  collection of `reducers` can be provided. If so, the resulting finalized
+  statistics will be returned in an identical structure.
+
+  Args:
+    num_steps: Integer number of `Reducer` steps.
+    current_state: `Tensor` or Python `list` of `Tensor`s representing the
+      current state(s) of the Markov chain(s).
+    previous_kernel_results: A `Tensor` or a nested collection of `Tensor`s.
+      Warm-start for the auxiliary state needed by the given `kernel`.
+      If not supplied, `sample_fold` will cold-start with
+      `kernel.bootstrap_results`.
+    kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
+      of the Markov chain.
+    reducers: A (possibly nested) structure of `Reducer`s to be evaluated
+      on the `kernel`'s samples.
+    parallel_iterations: The number of iterations allowed to run in parallel. It
+      must be a positive integer. See `tf.while_loop` for more details.
+    seed: Optional seed for reproducible sampling.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., 'mcmc_sample_fold').
+
+  Returns:
+    reduction_results: A (possibly nested) structure of finalized reducer
+      statistics. The structure identically mimics that of `reducers`
+    warm_restart_package: `Tuple` with the final state of the Markov chain(s)
+      and its kernel results, including those of applied wrapper kernels (i.e.
+      `WithReductions`). Can be used to warm restart future calls to
+      `sample_fold` or similar drivers.
+  """
+  with tf.name_scope(name or 'mcmc_sample_fold'):
+    num_steps = tf.convert_to_tensor(
+        num_steps, dtype=tf.int32, name='num_steps')
+    current_state = tf.nest.map_structure(
+        lambda x: tf.convert_to_tensor(x, name='current_state'),
+        current_state)
+    reduction_kernel = with_reductions.WithReductions(
+        inner_kernel=kernel,
+        reducers=reducers,
+    )
+    end_state, final_kernel_results = step_kernel(
+        num_steps=num_steps,
+        current_state=current_state,
+        previous_kernel_results=previous_kernel_results,
+        kernel=reduction_kernel,
+        return_final_kernel_results=True,
+        parallel_iterations=parallel_iterations,
+        seed=seed,
+        name=name,
+    )
+    reduction_results = nest.map_structure_up_to(
+        reducers,
+        lambda r, s: r.finalize(s),
+        reducers,
+        final_kernel_results.streaming_calculations,
+        check_types=False)
+    warm_restart_package = (end_state, final_kernel_results)
+    return reduction_results, warm_restart_package
