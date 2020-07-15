@@ -39,6 +39,7 @@ py_library(
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
+        ":sample",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
@@ -323,5 +324,30 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "sample",
+    srcs = ["sample.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "sample_test",
+    size = "small",
+    srcs = ["sample_test.py"],
+    shard_count = 5,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
