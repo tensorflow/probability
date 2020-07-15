@@ -395,7 +395,7 @@ def random_gamma(
       """The gradient of the gamma samples w.r.t alpha and beta."""
       partial_alpha = tf.raw_ops.RandomGammaGrad(
           alpha=concentration, sample=samples[0] * rate) / rate
-      partial_beta = dy * -samples[0] / rate
+      partial_beta = -samples[0] / rate
       # These will need to be shifted by the extra dimensions added from
       # `sample_shape`.
       grad_a = tf.math.reduce_sum(

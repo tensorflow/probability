@@ -335,6 +335,41 @@ class GammaTest(test_util.TestCase):
     self.assertAllClose(grad_concentration, grad_concentration_tf, rtol=1e-2)
     self.assertAllClose(grad_rate, grad_rate_tf, rtol=1e-2)
 
+  @test_util.numpy_disable_gradient_test
+  def testCompareGradientToTfRandomGammaGradientWithNonLinearity(self):
+    # Test that the gradient is correctly computed through a non-linearity.
+
+    n_concentration = 4
+    concentration_v = tf.constant(
+        np.array([np.arange(1, n_concentration + 1, dtype=np.float32)]))
+    n_rate = 2
+    rate_v = tf.constant(
+        np.array([np.arange(1, n_rate + 1, dtype=np.float32)]).T)
+    num_samples = int(1e5)
+
+    def tfp_gamma(a, b):
+      return tf.math.square(
+          tfd.Gamma(concentration=a, rate=b, validate_args=True).sample(
+              num_samples, seed=test_util.test_seed()))
+
+    _, [grad_concentration, grad_rate] = self.evaluate(
+        tfp.math.value_and_gradient(tfp_gamma, [concentration_v, rate_v]))
+
+    def tf_gamma(a, b):
+      return tf.math.square(tf.random.gamma(
+          shape=[num_samples],
+          alpha=a,
+          beta=b,
+          seed=test_util.test_seed()))
+
+    _, [grad_concentration_tf, grad_rate_tf] = self.evaluate(
+        tfp.math.value_and_gradient(tf_gamma, [concentration_v, rate_v]))
+
+    self.assertEqual(grad_concentration.shape, grad_concentration_tf.shape)
+    self.assertEqual(grad_rate.shape, grad_rate_tf.shape)
+    self.assertAllClose(grad_concentration, grad_concentration_tf, rtol=2e-2)
+    self.assertAllClose(grad_rate, grad_rate_tf, rtol=2e-2)
+
   def testGammaSampleMultiDimensional(self):
     n_concentration = 50
     concentration_v = np.array(
