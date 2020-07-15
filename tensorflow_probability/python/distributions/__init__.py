@@ -108,6 +108,7 @@ from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
 from tensorflow_probability.python.distributions.triangular import Triangular
+from tensorflow_probability.python.distributions.truncated_cauchy import TruncatedCauchy
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
@@ -215,6 +216,7 @@ __all__ = [
     'StudentT',
     'StudentTProcess',
     'Triangular',
+    'TruncatedCauchy',
     'TruncatedNormal',
     'Uniform',
     'MultivariateNormalDiag',

@@ -256,6 +256,8 @@ CONSTRAINTS = {
         fix_pert,
     'Triangular':
         fix_triangular,
+    'TruncatedCauchy':
+        lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
     'TruncatedNormal':
         lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
     'Uniform':

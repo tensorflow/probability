@@ -94,6 +94,7 @@ TF2_FRIENDLY_DISTS = (
     'SphericalUniform',
     'StudentT',
     'Triangular',
+    'TruncatedCauchy',
     'TruncatedNormal',
     'Uniform',
     'VonMises',

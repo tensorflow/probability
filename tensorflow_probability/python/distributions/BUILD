@@ -133,6 +133,7 @@ multi_substrate_py_library(
         ":student_t_process",
         ":transformed_distribution",
         ":triangular",
+        ":truncated_cauchy",
         ":truncated_normal",
         ":uniform",
         ":variational_gaussian_process",
@@ -1655,6 +1656,22 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "truncated_cauchy",
+    srcs = ["truncated_cauchy.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+    ],
+)
+
+multi_substrate_py_library(
     name = "uniform",
     srcs = ["uniform.py"],
     deps = [
@@ -3089,6 +3106,18 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "truncated_cauchy_test",
+    srcs = ["truncated_cauchy_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "truncated_normal_test",
     srcs = ["truncated_normal_test.py"],
     jax_size = "medium",
@@ -3416,6 +3445,7 @@ exports_files(
         "student_t.py",
         "transformed_distribution.py",
         "triangular.py",
+        "truncated_cauchy.py",
         "truncated_normal.py",
         "uniform.py",
         "vector_exponential_diag.py",
