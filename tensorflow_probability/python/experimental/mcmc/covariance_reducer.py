@@ -62,9 +62,9 @@ class CovarianceReducer(reducer_base.Reducer):
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples.
-      event_ndims:  Number of dimensions that specify the event shape, from
-        the inner-most dimensions.  Specifying `None` returns all cross
-        product terms (no batching) and is the default.
+      event_ndims:  Number of inner-most dimensions that represent the event
+        shape. Specifying `None` returns all cross product terms (no batching)
+        and is the default.
       dtype: Dtype of incoming samples and the resulting statistics.
         By default, the dtype is `tf.float32`.
     """
@@ -75,13 +75,13 @@ class CovarianceReducer(reducer_base.Reducer):
 
     Args:
       initial_chain_state: `Tensor` or Python `list` of `Tensor`s representing
-        the current state(s) of the Markov chain(s). For covariance reduction,
-        this argument is completely useless (does not factor into computation).
-        Hence, by default, it is `None`.
+        the current state(s) of the Markov chain(s). For streaming covariance,
+        this argument has no influence on computation. Hence, by default, it
+        is `None`.
       initial_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made in a related
-        `TransitionKernel`. For covariance reduction, this argument is also
-        completely useless; hence, it is also `None` by default.
+        `TransitionKernel`. For streaming covariance, this argument also has no
+        influence on computation; hence, it is also `None` by default.
 
     Returns:
       state: `RunningCovarianceState` representing a stream of no inputs.
@@ -89,9 +89,13 @@ class CovarianceReducer(reducer_base.Reducer):
     # initial state not included as a sample for consistency with `sample_chain`
     return self.strm.initialize()
 
-  def one_step(self, sample, current_state, previous_kernel_results=None,
-               axis=None):
-    """Update the `current_state` with a new sample.
+  def one_step(
+      self,
+      sample,
+      current_reducer_state,
+      previous_kernel_results=None,
+      axis=None):
+    """Update the `current_reducer_state` with a new sample.
 
     Args:
       sample: Incoming sample with shape and dtype compatible with those
@@ -100,8 +104,8 @@ class CovarianceReducer(reducer_base.Reducer):
         running covariance.
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made in a related
-        `TransitionKernel`. For covariance reduction, this argument is useless
-        and defaults to `None`.
+        `TransitionKernel`. For streaming covariance, this argument has no
+        influence on computation; hence, it is `None` by default.
       axis: If chunking is desired, this is an integer that specifies the axis
         with chunked samples. For individual samples, set this to `None`. By
         default, samples are not chunked (`axis` is None).
@@ -109,16 +113,16 @@ class CovarianceReducer(reducer_base.Reducer):
     Returns:
       new_state: `RunningCovarianceState` with updated running statistics.
     """
-    return self.strm.update(current_state, sample, axis=axis)
+    return self.strm.update(current_reducer_state, sample, axis=axis)
 
   def finalize(self, final_state, ddof=0):
     """Finalizes covariance calculation from the `final_state`.
 
     final_state: `RunningCovarianceState` that represents the final state of
         running statistics.
-    ddof: Requested dynamic degrees of freedom for the covariance calculation.
-      For example, use `ddof=0` for population covariance and `ddof=1` for
-      sample covariance. Defaults to the population covariance.
+    ddof: Requested dynamic degrees of freedom. For example, use `ddof=0`
+      for population covariance and `ddof=1` for sample covariance. Defaults
+      to the population covariance.
 
     Returns:
       covariance: an estimate of the covariance.
@@ -142,9 +146,10 @@ class VarianceReducer(CovarianceReducer):
   """VarianceReducer is a `Reducer` that computes running variance.
 
   This object is a direct extension of `CovarianceReducer` but simplified
-  in the special case of `event_ndims=0` for conveinence. See
+  in the special case of `event_ndims=0` for convenience. See
   `CovarianceReducer` for more information.
   """
+
   def __init__(self, shape=(), dtype=tf.float32):
     self.strm = RunningCovariance(shape=shape, event_ndims=0, dtype=dtype)
   
