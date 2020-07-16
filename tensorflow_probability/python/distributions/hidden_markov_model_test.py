@@ -1250,11 +1250,11 @@ class _HiddenMarkovModelAssertionTest(
   def test_github_issue_854(self):
     nstates = 3
     data = np.random.randint(low=0, high=10, size=(5, 7, 11))
-    p_init = tfd.Categorical(probs=np.ones(nstates) / nstates)
+    p_init = tfd.Categorical(probs=np.float32(np.ones(nstates) / nstates))
     pswitch = 0.05
-    pt = pswitch / (nstates - 1) * np.ones([nstates, nstates], dtype=np.float32)
+    pt = pswitch / (nstates - 1) * np.ones([nstates, nstates])
     np.fill_diagonal(pt, 1 - pswitch)
-    p_trans = tfd.Categorical(probs=pt)
+    p_trans = tfd.Categorical(probs=np.float32(pt))
     # prior on NB probability
     p_nb = self.evaluate(tfd.Beta(2, 5).sample([nstates, data.shape[-1]],
                                                seed=test_util.test_seed()))

@@ -187,10 +187,11 @@ class Categorical(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
+      prob_logit_dtype = dtype_util.common_dtype([probs, logits], tf.float32)
       self._probs = tensor_util.convert_nonref_to_tensor(
-          probs, dtype_hint=tf.float32, name='probs')
+          probs, dtype_hint=prob_logit_dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
-          logits, dtype_hint=tf.float32, name='logits')
+          logits, dtype_hint=prob_logit_dtype, name='logits')
       super(Categorical, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,

@@ -587,6 +587,30 @@ class SamplerBackwardCompatibilityTest(test_util.TestCase):
         any('Falling back to stateful sampling for `mixture_distribution`'
             in str(warning.message) for warning in triggered))
 
+  def testGithubIssue1010(self):
+    dtype = np.float64
+    npredict = int(1e2)
+    ncomponent = 5
+    ngrid = int(1e2)
+    pi_sim = np.random.uniform(size=(npredict, ncomponent)).astype(dtype)
+    pi_sim = pi_sim / pi_sim.sum(axis=1, keepdims=True)
+    mean_sim = np.random.uniform(
+        low=5, high=10, size=(npredict, ncomponent)).astype(dtype)
+    sd_sim = np.random.uniform(
+        low=0.1, high=1, size=(npredict, ncomponent)).astype(dtype)
+    mixture_distribution = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(probs=pi_sim),
+        components_distribution=tfd.Normal(
+            loc=mean_sim,
+            scale=sd_sim,
+            validate_args=True,
+            allow_nan_stats=False,
+        )
+    )
+
+    grid = np.linspace(-10, 10, num=ngrid).astype(dtype)
+    self.evaluate(mixture_distribution.prob(grid))
+
 
 if __name__ == '__main__':
   tf.test.main()
