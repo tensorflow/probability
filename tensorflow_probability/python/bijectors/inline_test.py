@@ -52,6 +52,24 @@ class InlineBijectorTest(test_util.TestCase):
         self.evaluate(-inline.inverse_log_det_jacobian(y, event_ndims=1)),
         self.evaluate(inline.forward_log_det_jacobian(x, event_ndims=1)))
 
+  def testIsIncreasing(self):
+    inline = tfb.Inline(
+        forward_fn=tf.exp,
+        inverse_fn=tf.math.log,
+        inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
+        forward_min_event_ndims=0,
+        is_increasing=True,
+        name='exp')
+    self.assertAllEqual(True, inline._internal_is_increasing())
+    inline = tfb.Inline(
+        forward_fn=lambda x: tf.exp(x) * [1., -1],
+        inverse_fn=lambda y: tf.math.log(y * [1., -1]),
+        inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
+        forward_min_event_ndims=0,
+        is_increasing=lambda: [True, False],
+        name='exp')
+    self.assertAllEqual([True, False], inline._internal_is_increasing())
+
   def testShapeGetters(self):
     bijector = tfb.Inline(
         forward_event_shape_tensor_fn=lambda x: tf.concat((x, [1]), 0),

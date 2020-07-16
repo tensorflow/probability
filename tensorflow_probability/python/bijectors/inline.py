@@ -110,7 +110,8 @@ class Inline(bijector.Bijector):
                             '_forward_log_det_jacobian',
                             'forward_log_det_jacobian_fn')
       if is_increasing is not None and not callable(is_increasing):
-        is_increasing = lambda: is_increasing
+        is_increasing_val = is_increasing
+        is_increasing = lambda: is_increasing_val
       self._maybe_implement(is_increasing, '_is_increasing', 'is_increasing')
 
       # By default assume shape doesn't change.
