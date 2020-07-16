@@ -131,7 +131,7 @@ def distribution_log_prob(dist: tfd.Distribution):
 
 
 def make_wrapper_type(cls):
-  """Creates a flattenable Distribution type that has lazily evaluated attributes."""
+  """Creates a flattenable Distribution type."""
 
   clsid = (cls.__module__, cls.__name__)
 
@@ -142,20 +142,13 @@ def make_wrapper_type(cls):
       def __init__(self, *args, **kwargs):
         self._args = args
         self._kwargs = kwargs
-
-      def _get_instance(self):
-        obj = object.__new__(cls)
-        cls.__init__(obj, *self._args, **self._kwargs)
-        return obj
+        self._instance = object.__new__(cls)
+        cls.__init__(self._instance, *self._args, **self._kwargs)
 
       def __getattr__(self, key):
-        if key not in ('_args', '_kwargs', 'parameters', '_type_spec'):
-          return getattr(self._get_instance(), key)
+        if key not in ('_args', '_kwargs', '_type_spec', '_instance'):
+          return getattr(self._instance, key)
         return object.__getattribute__(self, key)
-
-      @property
-      def parameters(self):
-        return self._get_instance().parameters
 
       @property
       def _type_spec(self):
