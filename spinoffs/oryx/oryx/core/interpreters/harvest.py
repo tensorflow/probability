@@ -666,7 +666,7 @@ def _find_sows(typed_jaxpr: jax_core.TypedJaxpr,
 
 
 def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
-                       num_consts, num_carry, linear):
+                       num_consts, num_carry, linear, unroll):
   """Collects and injects values into/from the scan body."""
   context = trace_util.get_dynamic_context(trace)
   settings = context.settings
@@ -739,7 +739,8 @@ def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       jaxpr=body_jaxpr,
       num_consts=len(new_consts),
       num_carry=num_carry,
-      linear=new_linear)
+      linear=new_linear,
+      unroll=unroll)
   outs = safe_map(trace.pure, outs)
   carry, (ys, reaps) = tree_util.tree_unflatten(out_tree, outs)
   out_reaps = {}
