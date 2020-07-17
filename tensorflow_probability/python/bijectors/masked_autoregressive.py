@@ -157,13 +157,16 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   dims = 2
 
   # A common choice for a normalizing flow is to use a Gaussian for the base
-  # distribution.  (However, any continuous distribution would work.) E.g.,
+  # distribution.  (However, any continuous distribution would work.) Here, we
+  # use `tfd.Sample` to create a joint Gaussian distribution with diagonal
+  # covariance for the base distribution (note that in the Gaussian case,
+  # `tfd.MultivariateNormalDiag` could also be used.)
   maf = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
       bijector=tfb.MaskedAutoregressiveFlow(
           shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
-              params=2, hidden_units=[512, 512])),
-      event_shape=[dims])
+              params=2, hidden_units=[512, 512])))
 
   x = maf.sample()  # Expensive; uses `tf.while_loop`, no Bijector caching.
   maf.log_prob(x)   # Almost free; uses Bijector caching.
@@ -173,11 +176,11 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   # [Papamakarios et al. (2016)][3] also describe an Inverse Autoregressive
   # Flow [(Kingma et al., 2016)][2]:
   iaf = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
       bijector=tfb.Invert(tfb.MaskedAutoregressiveFlow(
           shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
-              params=2, hidden_units=[512, 512]))),
-      event_shape=[dims])
+              params=2, hidden_units=[512, 512]))))
 
   x = iaf.sample()  # Cheap; no `tf.while_loop` despite no Bijector caching.
   iaf.log_prob(x)   # Almost free; uses Bijector caching.
@@ -189,11 +192,11 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   # different number/depth of hidden layers.
   made = tfb.AutoregressiveNetwork(params=1, hidden_units=[32])
   maf_no_scale_hidden2 = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
       bijector=tfb.MaskedAutoregressiveFlow(
           lambda y: (made(y)[..., 0], None),
-          is_constant_jacobian=True),
-      event_shape=[dims])
+          is_constant_jacobian=True))
   maf_no_scale_hidden2._made = made  # Ensure maf_no_scale_hidden2.trainable
   # NOTE: The last line ensures that maf_no_scale_hidden2.trainable_variables
   # will include all variables from `made`.
@@ -648,9 +651,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
 
   distribution = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
-      bijector=tfb.MaskedAutoregressiveFlow(made),
-      event_shape=[2])
+      distribution=tfd.Sample(tfd.Normal(loc=0., scale=1.), sample_shape=[2]),
+      bijector=tfb.MaskedAutoregressiveFlow(made))
 
   # Construct and fit model.
   x_ = tfkl.Input(shape=(2,), dtype=tf.float32)
@@ -707,9 +709,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       made = tfb.AutoregressiveNetwork(params=2, event_shape=event_shape,
                                        hidden_units=[20, 20], activation='relu')
       distribution = tfd.TransformedDistribution(
-          distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=tfb.MaskedAutoregressiveFlow(made),
-          event_shape=event_shape)
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
+      bijector=tfb.MaskedAutoregressiveFlow(made))
 
       # Construct and fit model.
       x_ = tfkl.Input(shape=event_shape, dtype=tf.float32)

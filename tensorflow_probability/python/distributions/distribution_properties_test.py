@@ -568,9 +568,9 @@ class DistributionSlicingTest(test_util.TestCase):
 
   def disabled_testFailureCase(self):  # pylint: disable=invalid-name
     # TODO(b/140229057): This test should pass.
-    dist = tfd.Chi(df=np.float32(27.744131))
+    dist = tfd.Chi(df=np.float32(27.744131) * np.ones((4,)).astype(np.float32))
     dist = tfd.TransformedDistribution(
-        bijector=tfb.NormalCDF(), distribution=dist, batch_shape=[4])
+        bijector=tfb.NormalCDF(), distribution=dist)
     dist = tfb.Expm1()(dist)
     samps = 1.7182817 + tf.zeros_like(dist.sample(seed=test_util.test_seed()))
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
