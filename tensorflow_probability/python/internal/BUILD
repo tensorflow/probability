@@ -84,6 +84,15 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_library(
+    name = "custom_gradient",
+    srcs = ["custom_gradient.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
 # py2and3
 py_test(
     name = "cache_util_test",

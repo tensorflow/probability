@@ -34,8 +34,9 @@ from tensorflow_probability.python.internal._jax import test_util
 flags.DEFINE_bool('execute_only', False,
                   'If specified, skip equality checks and only verify '
                   'execution of transforms works.')
-flags.DEFINE_bool('ignore_blocklists', False,
-                  'If specified, run tests even for blocklisted distributions.')
+# Allows us to easily evaluate which blocklisted items now pass.
+flags.DEFINE_bool('blocklists_only', False,
+                  'If specified, run tests only for blocklisted distributions.')
 FLAGS = flags.FLAGS
 
 
@@ -48,56 +49,33 @@ JIT_LOGPROB_BLOCKLIST = (
     'TransformedDistribution',
 )
 
-VMAP_SAMPLE_BLOCKLIST = ('NegativeBinomial',)
+VMAP_SAMPLE_BLOCKLIST = ()
 VMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',
     'Bates',
     'Independent',
     'MixtureSameFamily',
+    'NegativeBinomial',  # Times out.
     'TransformedDistribution',
-    'QuantizedDistribution',
 )
 
 JVP_SAMPLE_BLOCKLIST = (
     'Bates',
-    'BetaBinomial',
-    'Binomial',
-    'DirichletMultinomial',
     'Gamma',
     'GeneralizedNormal',
-    'Multinomial',
-    'OrderedLogistic',
-    'PERT',
-    'Triangular',
     'TruncatedCauchy',
     'TruncatedNormal',
-    'Uniform',
     'VonMises',
-    'VonMisesFisher',
-    'WishartTriL',
 )
 JVP_LOGPROB_SAMPLE_BLOCKLIST = (
-    'BetaBinomial',
-    'Binomial',
     'JohnsonSU',
-    'NegativeBinomial',
-    'Poisson',
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
-    'Bates',
-    'Beta',
-    'BetaBinomial',
-    'Binomial',
     'CholeskyLKJ',
-    'GammaGamma',
     'HalfStudentT',
     'JohnsonSU',
     'LKJ',
-    'NegativeBinomial',
-    'OrderedLogistic',
-    'PERT',
     'PowerSpherical',
-    'ProbitBernoulli',
     'StudentT',
     'Triangular',
     'TruncatedCauchy',
@@ -141,7 +119,7 @@ class JitTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testSample(self, dist_name, data):
-    if dist_name in JIT_SAMPLE_BLOCKLIST and not FLAGS.ignore_blocklists:
+    if (dist_name in JIT_SAMPLE_BLOCKLIST) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
@@ -157,7 +135,7 @@ class JitTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testLogProb(self, dist_name, data):
-    if dist_name in JIT_LOGPROB_BLOCKLIST and not FLAGS.ignore_blocklists:
+    if (dist_name in JIT_LOGPROB_BLOCKLIST) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
@@ -174,7 +152,7 @@ class VmapTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testSample(self, dist_name, data):
-    if dist_name in VMAP_SAMPLE_BLOCKLIST and not FLAGS.ignore_blocklists:
+    if (dist_name in VMAP_SAMPLE_BLOCKLIST) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
@@ -187,7 +165,7 @@ class VmapTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testLogProb(self, dist_name, data):
-    if dist_name in VMAP_LOGPROB_BLOCKLIST and not FLAGS.ignore_blocklists:
+    if (dist_name in VMAP_LOGPROB_BLOCKLIST) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
@@ -229,7 +207,7 @@ class _GradTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testSample(self, dist_name, data):
-    if dist_name in self.sample_blocklist and not FLAGS.ignore_blocklists:
+    if (dist_name in self.sample_blocklist) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
 
     def _sample(dist):
@@ -249,8 +227,7 @@ class _GradTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testLogProbParam(self, dist_name, data):
-    if (dist_name in self.logprob_param_blocklist and
-        not FLAGS.ignore_blocklists):
+    if (dist_name in self.logprob_param_blocklist) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
 
     params, batch_shape = data.draw(
@@ -273,8 +250,7 @@ class _GradTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testLogProbSample(self, dist_name, data):
-    if (dist_name in self.logprob_sample_blocklist and
-        not FLAGS.ignore_blocklists):
+    if (dist_name in self.logprob_sample_blocklist) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
 
     params, batch_shape = data.draw(

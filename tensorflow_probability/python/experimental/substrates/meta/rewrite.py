@@ -85,6 +85,7 @@ INTERNALS = (
     'assert_util',
     'batched_rejection_sampler',
     'cache_util',
+    'custom_gradient',
     'distribution_util',
     'dtype_util',
     'hypothesis_testlib',

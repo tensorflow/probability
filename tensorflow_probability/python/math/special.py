@@ -22,7 +22,9 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -701,18 +703,41 @@ def _lbeta_no_gradient(x, y):
                            log_beta_small))
 
 
-@tf.custom_gradient
+def _lbeta_fwd(x, y):
+  """Compute output, aux (collaborates with _lbeta_bwd)."""
+  return _lbeta_no_gradient(x, y), (x, y)
+
+
+def _lbeta_bwd(aux, g):
+  x, y = aux
+  total_digamma = tf.math.digamma(x + y)
+  px = tf.math.digamma(x) - total_digamma
+  py = tf.math.digamma(y) - total_digamma
+  return _fix_gradient_for_broadcasting(x, y, px * g, py * g)
+
+
+def _lbeta_jvp(primals, tangents):
+  """Computes JVP for log-beta (supports JAX custom derivative)."""
+  x, y = primals
+  dx, dy = tangents
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dx),
+                                         prefer_static.shape(dy))
+  dx = tf.broadcast_to(dx, bc_shp)
+  dy = tf.broadcast_to(dy, bc_shp)
+  total_digamma = tf.math.digamma(x + y)
+  px = tf.math.digamma(x) - total_digamma
+  py = tf.math.digamma(y) - total_digamma
+  return _lbeta_gradient(x, y), px * dx + py * dy
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_lbeta_fwd,
+    vjp_bwd=_lbeta_bwd,
+    jvp_fn=_lbeta_jvp)
 def _lbeta_gradient(x, y):
   """Computes log(Beta(x, y)) with correct custom gradient."""
-  answer = _lbeta_no_gradient(x, y)
-  def gradient(danswer):
-    # This gradient assumes x and y are the same shape; this needs to be
-    # arranged by pre-broadcasting before calling `_lbeta_gradient`.
-    total_digamma = tf.math.digamma(x + y)
-    px = tf.math.digamma(x) - total_digamma
-    py = tf.math.digamma(y) - total_digamma
-    return _fix_gradient_for_broadcasting(x, y, px * danswer, py * danswer)
-  return answer, gradient
+  return _lbeta_no_gradient(x, y)
 
 
 def lbeta(x, y, name=None):

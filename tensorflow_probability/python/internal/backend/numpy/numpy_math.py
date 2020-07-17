@@ -672,38 +672,33 @@ logical_xor = utils.copy_docstring(
 
 if JAX_MODE:
 
-  @jax.custom_transforms
-  def _maximum_(x, y, name=None):  # pylint: disable=unused-argument
+  # TF and Jax have differing behavior when the inputs to maximum/minimum are
+  # equal. We modify to match TF's behavior.
+
+  @jax.custom_jvp
+  def _maximum_(x, y):
     return np.maximum(x, y)
 
-  @jax.custom_transforms
-  def _minimum_(x, y, name=None):  # pylint: disable=unused-argument
+  @_maximum_.defjvp
+  def _maximum_jvp(primals, tangents):
+    x, y = primals
+    dx, dy = tangents
+    selected_x = np.where(x >= y, np.ones_like(x), np.zeros_like(x))
+    return _maximum_(x, y), selected_x * dx + (1 - selected_x) * dy
+
+  @jax.custom_jvp
+  def _minimum_(x, y):
     return np.minimum(x, y)
 
-  # TF and Jax have differing behavior
-  # when the inputs to maximum/minimum are equal.
-  # This custom transforms rule
-  # modifies Jax to match TF's behavior.
+  @_minimum_.defjvp
+  def _minimum_fwd(primals, tangents):
+    x, y = primals
+    dx, dy = tangents
+    selected_x = np.where(x <= y, np.ones_like(x), np.zeros_like(x))
+    return _minimum_(x, y), selected_x * dx + (1 - selected_x) * dy
 
-  def _maximum_vjp(x, y):
-    out_primals = _maximum_(x, y)
-    def vjp(g):
-      gx = g * np.where(x >= y, np.ones_like(x), np.zeros_like(x))
-      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
-    return out_primals, vjp
-  jax.defvjp_all(_maximum_, _maximum_vjp)
-
-  def _minimum_vjp(x, y):
-    out_primals = _minimum_(x, y)
-    def vjp(g):
-      gx = g * np.where(x <= y, np.ones_like(x), np.zeros_like(x))
-      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
-    return out_primals, vjp
-  jax.defvjp_all(_minimum_, _minimum_vjp)
-
-  # Need to wrap in a function because custom_transforms
-  # returns an object, not a function
-  # which breaks docstring wrapping
+  # Need to wrap in a function because jax custom transforms returns an object,
+  # not a function which breaks docstring wrapping.
 
   def _promote_dtypes(x, y):
     # Need to explicitly promote types because of custom_transforms.
