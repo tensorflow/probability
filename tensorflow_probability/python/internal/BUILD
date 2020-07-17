@@ -217,6 +217,12 @@ py_test(
     ],
 )
 
+py_library(
+    name = "lazy_loader",
+    srcs = ["lazy_loader.py"],
+    srcs_version = "PY2AND3",
+)
+
 multi_substrate_py_library(
     name = "monte_carlo",
     srcs = ["monte_carlo.py"],

@@ -30,5 +30,6 @@ py_library(
 #         "//tensorflow_probability/google/staging",  # DisableOnExport
 #         "//tensorflow_probability/google/tfp_google",  # DisableOnExport
         "//tensorflow_probability/python",
+        "//tensorflow_probability/python/internal:lazy_loader",
     ],
 )

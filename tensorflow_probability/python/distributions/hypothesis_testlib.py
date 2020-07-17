@@ -323,7 +323,8 @@ def _instantiable_base_dists():
       instantiate it.
   """
   result = {}
-  for (dist_name, dist_class) in six.iteritems(tfd.__dict__):
+  for dist_name in dir(tfd):
+    dist_class = getattr(tfd, dist_name)
     if (not inspect.isclass(dist_class) or
         not issubclass(dist_class, tfd.Distribution) or
         dist_name in SPECIAL_DISTS):
@@ -875,12 +876,19 @@ def transformed_distributions(draw,
   hp.note('Drawing TransformedDistribution with bijector {}'.format(bijector))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
+
+  def eligibility_fn(name):
+    if not eligibility_filter(name):
+      return False
+
+    return bijector_hps.distribution_eligilibility_filter_for(bijector)(name)
+
   underlyings = distributions(
       batch_shape=batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars,
       depth=depth - 1,
-      eligibility_filter=eligibility_filter,
+      eligibility_filter=eligibility_fn,
       validate_args=validate_args).filter(
           bijector_hps.distribution_filter_for(bijector))
   to_transform = draw(underlyings)
