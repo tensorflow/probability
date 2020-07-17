@@ -668,10 +668,10 @@ class GammaSamplingTest(test_util.TestCase):
         rtol=0.05)
 
   @parameterized.named_parameters(
-      dict(testcase_name='_float32', dtype=tf.float32),
-      dict(testcase_name='_float64', dtype=tf.float64))
+      dict(testcase_name='_float32', dtype=np.float32),
+      dict(testcase_name='_float64', dtype=np.float64))
   @test_util.numpy_disable_gradient_test
-  def testCompareToExplicitDerivative(self, dtype):
+  def testCompareToExplicitGradient(self, dtype):
     """Compare to the explicit reparameterization derivative.
 
     Defining x to be the output from a gamma sampler with rate=1, and defining y
@@ -691,66 +691,40 @@ class GammaSamplingTest(test_util.TestCase):
     Args:
       dtype: TensorFlow dtype to perform the computations in.
     """
-    if not tf.executing_eagerly():
-      return
-
     concentration_n = 4
-    concentration = tf.reshape(
-        tf.range(concentration_n, dtype=dtype), (concentration_n, 1)) + 1.
+    concentration_np = np.arange(
+        concentration_n).astype(dtype)[..., np.newaxis] + 1.
+    concentration = tf.constant(concentration_np)
     rate_n = 3
-    rate = tf.range(rate_n, dtype=dtype) + 1.
+    rate_np = np.arange(rate_n).astype(dtype) + 1.
+    rate = tf.constant(rate_np)
     num_samples = 2
 
-    with tf.GradientTape() as g:
-      g.watch(concentration)
-      g.watch(rate)
-      samples = tfd.Gamma(concentration, rate).sample(
+    def gen_samples(concentration, rate):
+      return tfd.Gamma(concentration, rate).sample(
           num_samples, seed=test_util.test_seed())
 
-    concentration_jacobian_all, rate_jacobian_all = self.evaluate(
-        g.jacobian(samples, [concentration, rate]))
-
-    samples = self.evaluate(samples)
-
+    samples, [concentration_grad, rate_grad] = self.evaluate(
+        tfp.math.value_and_gradient(gen_samples, [concentration, rate]))
     self.assertEqual(samples.shape, (num_samples, concentration_n, rate_n))
-    self.assertEqual(
-        concentration_jacobian_all.shape, samples.shape + (concentration_n, 1))
-    self.assertEqual(rate_jacobian_all.shape, samples.shape + (rate_n,))
+    self.assertEqual(concentration_grad.shape, concentration.shape)
+    self.assertEqual(rate_grad.shape, rate.shape)
+    # Sum over the first 2 dimensions since these are batch dimensions.
+    self.assertAllClose(rate_grad, np.sum(-samples / rate_np, axis=(0, 1)))
+    # Compute the gradient by computing the derivative of gammaincinv
+    # over each entry and summing.
+    def expected_grad(s, c, r):
+      u = sp_special.gammainc(c, s * r)
+      delta = 1e-4
+      return sp_misc.derivative(
+          lambda x: sp_special.gammaincinv(x, u), c, dx=delta * c) / r
 
-    concentration_all, rate_all = self.evaluate([concentration, rate])
-    concentration_all = np.squeeze(concentration_all)
-    self.assertEqual(concentration_all.shape, (concentration_n,))
-
-    for sample_i in range(num_samples):
-      for concentration_i, concentration in enumerate(concentration_all):
-        for rate_i, rate in enumerate(rate_all):
-          sample = samples[sample_i, concentration_i, rate_i]
-
-          for concentration_input_i in range(concentration_n):
-            concentration_jacobian = concentration_jacobian_all[
-                sample_i, concentration_i, rate_i, concentration_input_i, 0]
-            if concentration_i != concentration_input_i:
-              self.assertEqual(concentration_jacobian, 0.)
-            else:
-              def expected_grad(sample, concentration, rate):
-                u = sp_special.gammainc(concentration, sample*rate)
-                delta = 1e-3
-                return sp_misc.derivative(
-                    lambda concentration_prime: sp_special.gammaincinv(  # pylint:disable=g-long-lambda
-                        concentration_prime, u),
-                    concentration, dx=delta * concentration) / rate
-
-              self.assertAllClose(
-                  concentration_jacobian,
-                  expected_grad(sample, concentration, rate), rtol=6e-6)
-
-          for rate_input_i in range(rate_n):
-            rate_jacobian = rate_jacobian_all[
-                sample_i, concentration_i, rate_i, rate_input_i]
-            if rate_i != rate_input_i:
-              self.assertEqual(rate_jacobian, 0.)
-            else:
-              self.assertAllClose(rate_jacobian, -sample / rate)
+    self.assertAllClose(
+        concentration_grad,
+        np.sum(expected_grad(
+            samples,
+            concentration_np,
+            rate_np), axis=(0, 2))[..., np.newaxis], rtol=1e-3)
 
 
 if __name__ == '__main__':

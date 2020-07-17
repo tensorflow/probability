@@ -380,22 +380,26 @@ def random_gamma(
   seed = samplers.sanitize_seed(seed)
   shape = tf.convert_to_tensor(shape, dtype_hint=tf.int32, name='shape')
 
+  sampler_impl = implementation_selection.implementation_selecting(
+      fn_name='gamma',
+      default_fn=_random_gamma_noncpu,
+      cpu_fn=_random_gamma_cpu)
+
   @tf.custom_gradient
-  def sample(concentration, rate):
-    sampler_impl = implementation_selection.implementation_selecting(
-        fn_name='gamma',
-        default_fn=_random_gamma_noncpu,
-        cpu_fn=_random_gamma_cpu)
-
-    samples = sampler_impl(
+  def _sample(concentration, rate):
+    samples, impl = sampler_impl(
         shape=shape, concentration=concentration, rate=rate, seed=seed)
-
-    # Ignore any gradient contributions that come from the implementation enum.
-    def grad(dy, _):
+    def grad(*dys):
       """The gradient of the gamma samples w.r.t alpha and beta."""
+      # Ignore any gradient contributions that come from the implementation
+      # enum.
+      dy = dys[0]
+      JAX_MODE = False   # pylint: disable=invalid-name
+      if JAX_MODE:
+        dy = dy[0]
       partial_alpha = tf.raw_ops.RandomGammaGrad(
-          alpha=concentration, sample=samples[0] * rate) / rate
-      partial_beta = -samples[0] / rate
+          alpha=concentration, sample=samples * rate) / rate
+      partial_beta = -samples / rate
       # These will need to be shifted by the extra dimensions added from
       # `sample_shape`.
       grad_a = tf.math.reduce_sum(
@@ -417,8 +421,8 @@ def random_gamma(
           tf.shape(rate))
 
       return [grad_a, grad_b]
-    return samples, grad
-  return sample(concentration, rate)
+    return (samples, impl), grad
+  return _sample(concentration, rate)
 
 
 def random_gamma_rejection(

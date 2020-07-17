@@ -2166,7 +2166,7 @@ multi_substrate_py_test(
     name = "gamma_test",
     size = "medium",
     srcs = ["gamma_test.py"],
-    jax_tags = ["notap"],
+    jax_size = "large",
     shard_count = 2,
     deps = [
         # numpy dep,
@@ -2176,6 +2176,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
         # tensorflow/compiler/jit dep,
     ],
 )

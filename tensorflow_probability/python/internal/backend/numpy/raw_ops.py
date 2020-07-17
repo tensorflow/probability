@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 __all__ = [
     'BroadcastGradientArgs',
     'MatrixDiagPartV2',
+    'RandomGammaGrad',
 ]
 
 
@@ -71,6 +72,17 @@ def _matrix_diag_part_v2(input, k, padding_value, name=None):  # pylint: disable
   return output.reshape(*(shp[:-2] + output.shape[1:]))
 
 
+def _random_gamma_grad(alpha, sample, name=None):  # pylint: disable=unused-argument
+  if JAX_MODE:
+    import jax.lax  # pylint: disable=g-import-not-at-top
+    # Broadcast alpha and samples.
+    broadcast_shape = (alpha + sample).shape
+    alpha = np.broadcast_to(alpha, broadcast_shape)
+    sample = np.broadcast_to(sample, broadcast_shape)
+    return jax.lax.random_gamma_grad(alpha, sample)
+  raise NotImplementedError
+
+
 BroadcastGradientArgs = utils.copy_docstring(  # pylint: disable=invalid-name
     'tf.raw_ops.BroadcastGradientArgs',
     _broadcast_gradient_args)
@@ -78,3 +90,7 @@ BroadcastGradientArgs = utils.copy_docstring(  # pylint: disable=invalid-name
 MatrixDiagPartV2 = utils.copy_docstring(  # pylint: disable=invalid-name
     'tf.raw_ops.MatrixDiagPartV2',
     _matrix_diag_part_v2)
+
+RandomGammaGrad = utils.copy_docstring(  # pylint: disable=invalid-name
+    'tf.raw_ops.RandomGammaGrad',
+    _random_gamma_grad)
