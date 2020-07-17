@@ -29,7 +29,7 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-import tensorflow_probability.python.math as tfm
+from tensorflow_probability.python import math as tfm
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
