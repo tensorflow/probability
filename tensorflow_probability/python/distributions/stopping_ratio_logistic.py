@@ -69,9 +69,9 @@ class StoppingRatioLogistic(distribution.Distribution):
   for the OrderedLogistic reads as
 
   ```none
-  P(X = c; cutpoints, loc) = P(X > c-1) - P(X > c)
+  P(X = c; cutpoints, loc) = P(X > c - 1) - P(X > c)
                        = sigmoid(loc - concat([-inf, cutpoints, inf])[c]) -
-                         sigmoid(loc - concat([-inf, cutpoints, inf])[c+1])
+                         sigmoid(loc - concat([-inf, cutpoints, inf])[c + 1])
   ```
 
   the StoppingRatioLogistic distribution models the probability of an ordinal
@@ -109,7 +109,7 @@ class StoppingRatioLogistic(distribution.Distribution):
   ```none
   pmf(x; cutpoints, loc) =
                     sigmoid(cutpoints[x] - loc) *
-                    prod_{s=0}^{x-1} (1 - sigmoid(cutpoints[s] - loc))
+                    prod_{s=0}^{x - 1} (1 - sigmoid(cutpoints[s] - loc))
   ```
 
   where `loc` is the location of a latent logistic distribution and
@@ -130,7 +130,7 @@ class StoppingRatioLogistic(distribution.Distribution):
   # ==> array([0.2689414  0.53444666 0.19661193], dtype=float32)
   ```
 
-  Hence, the probability of finishing one's education with a Bachelor would be
+  Here, the probability of finishing one's education with a Bachelor would be
   approx. 26% in this example, while the probability of continuing to pursue
   a Master's would be approx. 53% and the probability of even attaining a PhD
   would be 20%.
@@ -224,7 +224,7 @@ class StoppingRatioLogistic(distribution.Distribution):
     return self._loc
 
   def categorical_log_probs(self):
-    """Log probabilities for the `K+1` sequential categories."""
+    """Log probabilities for the `K + 1` sequential categories."""
 
     cutpoints = self.cutpoints
     loc = self.loc
@@ -240,7 +240,7 @@ class StoppingRatioLogistic(distribution.Distribution):
     return p
 
   def categorical_probs(self):
-    """Probabilities for the `K+1` sequential categories."""
+    """Probabilities for the `K + 1` sequential categories."""
     return tf.math.exp(self.categorical_log_probs())
 
   def _num_categories(self):
