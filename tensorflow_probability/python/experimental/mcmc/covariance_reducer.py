@@ -18,10 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovariance
 from tensorflow_probability.python.experimental.mcmc import reducer as reducer_base
+from tensorflow_probability.python.experimental.stats import sample_stats
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -31,7 +33,7 @@ __all__ = [
 
 
 class CovarianceReducer(reducer_base.Reducer):
-  """CovarianceReducer is a `Reducer` that computes a running covariance.
+  """`Reducer` that computes a running covariance.
 
   As with all reducers, CovarianceReducer does not hold state information;
   rather, it stores supplied metadata. Intermediate calculations are held in
@@ -39,7 +41,7 @@ class CovarianceReducer(reducer_base.Reducer):
   calls.
   """
 
-  def __init__(self, shape, event_ndims=None, dtype=tf.float32):
+  def __init__(self, shape, event_ndims=None, dtype=tf.float32, name=None):
     """Instantiates this object.
 
     The running covariance computation supports batching. The `event_ndims`
@@ -67,8 +69,16 @@ class CovarianceReducer(reducer_base.Reducer):
         and is the default.
       dtype: Dtype of incoming samples and the resulting statistics.
         By default, the dtype is `tf.float32`.
+      name: Python `str` name prefixed to Ops created by this function.
+        Default value: `None` (i.e., 'covariance_reducer').
     """
-    self.strm = RunningCovariance(shape, event_ndims, dtype)
+    self._parameters = dict(
+        shape=shape,
+        event_ndims=event_ndims,
+        dtype=dtype,
+        name=name or 'covariance_reducer'
+    )
+    self.strm = sample_stats.RunningCovariance(shape, event_ndims, dtype)
 
   def initialize(self, initial_chain_state=None, initial_kernel_results=None):
     """Initializes a `RunningCovarianceState` using previously defined metadata.
@@ -86,8 +96,11 @@ class CovarianceReducer(reducer_base.Reducer):
     Returns:
       state: `RunningCovarianceState` representing a stream of no inputs.
     """
-    # initial state not included as a sample for consistency with `sample_chain`
-    return self.strm.initialize()
+    # `initial_chain_state` not included as a sample for consistency
+    # with `sample_chain`
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'covariance_reducer', 'initialize')):
+      return self.strm.initialize()
 
   def one_step(
       self,
@@ -99,9 +112,10 @@ class CovarianceReducer(reducer_base.Reducer):
 
     Args:
       sample: Incoming sample with shape and dtype compatible with those
-        used to initialize the `CovarianceReducer`.
-      state: `RunningCovarianceState` representing the current state of the
-        running covariance.
+        used to initialize the `CovarianceReducer` and the
+        `current_reducer_state`.
+      current_reducer_state: `RunningCovarianceState` representing the current
+        state of the running covariance.
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made in a related
         `TransitionKernel`. For streaming covariance, this argument has no
@@ -113,7 +127,9 @@ class CovarianceReducer(reducer_base.Reducer):
     Returns:
       new_state: `RunningCovarianceState` with updated running statistics.
     """
-    return self.strm.update(current_reducer_state, sample, axis=axis)
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'covariance_reducer', 'one_step')):
+      return self.strm.update(current_reducer_state, sample, axis=axis)
 
   def finalize(self, final_state, ddof=0):
     """Finalizes covariance calculation from the `final_state`.
@@ -127,29 +143,43 @@ class CovarianceReducer(reducer_base.Reducer):
     Returns:
       covariance: an estimate of the covariance.
     """
-    return self.strm.finalize(final_state, ddof=ddof)
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'covariance_reducer', 'finalize')):
+      return self.strm.finalize(final_state, ddof=ddof)
 
   @property
   def shape(self):
-    return self.strm.shape
+    return self._parameters['shape']
 
   @property
   def event_ndims(self):
-    return self.strm.event_ndims
+    return self._parameters['event_ndims']
 
   @property
   def dtype(self):
-    return self.strm.dtype
+    return self._parameters['dtype']
+
+  @property
+  def name(self):
+    return self._parameters['name']
+
+  @property
+  def paramters(self):
+    return self._parameters
 
 
 class VarianceReducer(CovarianceReducer):
-  """VarianceReducer is a `Reducer` that computes running variance.
+  """`Reducer` that computes running variance.
 
   This object is a direct extension of `CovarianceReducer` but simplified
   in the special case of `event_ndims=0` for convenience. See
   `CovarianceReducer` for more information.
   """
 
-  def __init__(self, shape=(), dtype=tf.float32):
-    self.strm = RunningCovariance(shape=shape, event_ndims=0, dtype=dtype)
-  
+  def __init__(self, shape=(), dtype=tf.float32, name=None):
+    super(VarianceReducer, self).__init__(
+        shape=shape,
+        event_ndims=0,
+        dtype=dtype,
+        name=name or 'variance_reducer',
+    )

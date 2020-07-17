@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
+
+# dependency imports
 import six
 
 
@@ -69,7 +71,8 @@ class Reducer(object):
 
     Args:
       sample: Incoming sample with shape and dtype compatible with those
-        specified when initializing the `Reducer`.
+        specified when initializing the `Reducer` and with the
+        `current_reducer_state`.
       current_reducer_state: A `tuple`, `namedtuple` or `list` of `Tensor`s
         representing the current state of reduced statistics.
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
@@ -77,7 +80,7 @@ class Reducer(object):
         `TransitionKernel`. This allows for introspection of deeper layers of
         `TransitionKernel`s that have bearing to the nature of the updated
         reducer state (i.e. updating based on a value in the kernel results of
-        a nested `TransitionKernel`).
+        some `TransitionKernel`).
 
     Returns:
       new_state: The new reducer state after updates. This has the same type and

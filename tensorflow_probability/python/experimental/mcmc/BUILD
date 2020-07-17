@@ -372,6 +372,7 @@ py_library(
         # tensorflow dep,
         ":reducer",
         "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )
 
