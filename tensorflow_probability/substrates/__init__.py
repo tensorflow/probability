@@ -12,40 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Integration test TFP+Numpy."""
+"""TensorFlow Probability alternative substrates."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from absl.testing import absltest
+from tensorflow_probability.python.internal import lazy_loader  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
-import numpy as np
-
-from tensorflow_probability.python.experimental.substrates import numpy as tfp
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-
-
-class NumpyIntegrationTest(absltest.TestCase):
-
-  def testBijector(self):
-
-    def f(x):
-      return tfb.GumbelCDF(loc=np.arange(3.)).forward(x)
-
-    f(0.)
-    f(np.array([1, 2, 3.]))
-
-  def testDistribution(self):
-
-    def f(s):
-      return tfd.Normal(loc=np.arange(3.), scale=s).sample()
-
-    f(1.)
-    f(np.array([1, 2, 3.]))
+jax = lazy_loader.LazyLoader(
+    'jax', globals(),
+    'tensorflow_probability.substrates.jax')
+numpy = lazy_loader.LazyLoader(
+    'numpy', globals(),
+    'tensorflow_probability.substrates.numpy')
 
 
-if __name__ == '__main__':
-  absltest.main()
+_allowed_symbols = [
+    'jax',
+    'numpy',
+]
+
+remove_undocumented(__name__, _allowed_symbols)

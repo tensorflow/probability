@@ -16,7 +16,7 @@
 
 from discussion.fun_mcmc import tf_on_jax
 from discussion.fun_mcmc import util_jax as util
-from tensorflow_probability.python.experimental.substrates import jax as tfp
+from tensorflow_probability.substrates import jax as tfp
 
 tf = tf_on_jax.tf
 

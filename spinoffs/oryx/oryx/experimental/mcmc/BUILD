@@ -71,7 +71,7 @@ py_test(
         # absl/testing:parameterized dep,
         # jax dep,
         # numpy dep,
-        # [tfp_jax dependency],
         "//oryx/core/interpreters:harvest",
+        # [tfp_jax dependency],
     ],
 )

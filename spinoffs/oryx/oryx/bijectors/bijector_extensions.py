@@ -19,10 +19,10 @@ from jax import util as jax_util
 import jax.numpy as np
 
 from six.moves import zip
-from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx.core import primitive
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters.inverse import slice as slc
+from tensorflow_probability.substrates import jax as tfp
 
 __all__ = [
     'make_type',

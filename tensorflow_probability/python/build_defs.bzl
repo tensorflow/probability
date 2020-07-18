@@ -23,7 +23,7 @@ NO_REWRITE_NEEDED = [
     "platform_google",
 ]
 
-REWRITER_TARGET = "//tensorflow_probability/python/experimental/substrates/meta:rewrite"
+REWRITER_TARGET = "//tensorflow_probability/substrates/meta:rewrite"
 
 def _substrate_src(src, substrate):
     """Rewrite a single src filename for the given substrate."""
@@ -42,9 +42,9 @@ def _substrate_dep(dep, substrate):
         if no_rewrite in dep_to_check:
             return dep
     if dep_to_check.endswith("python/bijectors") or dep_to_check.endswith("python/bijectors:bijectors"):
-        return "//tensorflow_probability/python/experimental/substrates/{}/bijectors".format(substrate)
+        return "//tensorflow_probability/substrates/{}/bijectors".format(substrate)
     if dep_to_check.endswith("python/distributions") or dep_to_check.endswith("python/distributions:distributions"):
-        return "//tensorflow_probability/python/experimental/substrates/{}/distributions".format(substrate)
+        return "//tensorflow_probability/substrates/{}/distributions".format(substrate)
     if "tensorflow_probability/" in dep or dep.startswith(":"):
         if "internal/backend" in dep:
             return dep

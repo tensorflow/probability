@@ -41,7 +41,7 @@ TF_REPLACEMENTS = {
         'import v2',
     'import tensorflow_probability as tfp':
         'import tensorflow_probability as tfp; '
-        'tfp = tfp.experimental.substrates.numpy',
+        'tfp = tfp.substrates.numpy',
     'from tensorflow.python.framework import tensor_shape':
         ('from tensorflow_probability.python.internal.backend.numpy.gen '
          'import tensor_shape'),
@@ -282,6 +282,7 @@ def main(argv):
   if not FLAGS.numpy_to_jax:
     contents = contents.replace('NUMPY_MODE = False', 'NUMPY_MODE = True')
   if FLAGS.numpy_to_jax:
+    contents = contents.replace('tfp.substrates.numpy', 'tfp.substrates.jax')
     contents = contents.replace('substrates.numpy', 'substrates.jax')
     contents = contents.replace('self._numpy', 'SELF_NUMPY')
     contents = contents.replace('._numpy', '._jax')

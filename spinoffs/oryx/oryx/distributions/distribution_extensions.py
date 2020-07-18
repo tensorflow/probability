@@ -19,12 +19,12 @@ from typing import Optional
 from jax import tree_util
 from jax import util as jax_util
 from six.moves import zip
-from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx.core import ppl
 from oryx.core import primitive
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters import log_prob
 from oryx.core.interpreters import unzip
+from tensorflow_probability.substrates import jax as tfp
 
 tf = tfp.tf2jax
 tfd = tfp.distributions

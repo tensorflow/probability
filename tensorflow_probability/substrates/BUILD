@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# TFP with a numpy backend.
-
-licenses(["notice"])  # Apache 2.0
+# Description:
+#   API-unstable code that is part of the TFP package.
 
 package(
     default_visibility = [
@@ -22,21 +21,17 @@ package(
     ],
 )
 
+licenses(["notice"])  # Apache 2.0
+
 exports_files(["LICENSE"])
 
 py_library(
-    name = "numpy",
+    name = "substrates",
     srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
     deps = [
-        "//tensorflow_probability/python/experimental/substrates/numpy/bijectors",
-        "//tensorflow_probability/python/experimental/substrates/numpy/distributions",
-        "//tensorflow_probability/python/experimental/substrates/numpy/experimental",
-        "//tensorflow_probability/python/experimental/substrates/numpy/internal",
-        "//tensorflow_probability/python/experimental/substrates/numpy/stats",
-        "//tensorflow_probability/python/experimental/substrates/numpy/util",
-        "//tensorflow_probability/python/internal/backend",
-        "//tensorflow_probability/python/math:math.numpy",
-        "//tensorflow_probability/python/mcmc:mcmc.numpy",
-        "//tensorflow_probability/python/random:random.numpy",
+        "//tensorflow_probability/python/internal:lazy_loader",
+        "//tensorflow_probability/substrates/jax",
+        "//tensorflow_probability/substrates/numpy",
     ],
 )

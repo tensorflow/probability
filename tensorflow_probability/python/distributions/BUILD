@@ -3299,11 +3299,11 @@ py3_test(
         # hypothesis dep,
         # jax dep,
         # numpy dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib.jax",
         "//tensorflow_probability/python/internal:tensor_util.jax",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util.jax",
+        "//tensorflow_probability/python/internal/backend/jax",
     ],
 )
 

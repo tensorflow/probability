@@ -21,10 +21,10 @@ from jax import random
 import jax.numpy as np
 import numpy as onp
 
-from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx.core.interpreters import harvest
 from oryx.experimental.mcmc import kernels
 from oryx.experimental.mcmc import utils
+from tensorflow_probability.substrates import jax as tfp
 
 
 tf = tfp.tf2jax

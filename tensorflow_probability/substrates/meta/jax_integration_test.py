@@ -23,7 +23,7 @@ from absl.testing import absltest
 import jax
 import jax.numpy as np
 
-from tensorflow_probability.python.experimental.substrates import jax as tfp
+from tensorflow_probability.substrates import jax as tfp
 
 tfb = tfp.bijectors
 tfd = tfp.distributions

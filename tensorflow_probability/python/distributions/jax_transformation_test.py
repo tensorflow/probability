@@ -26,9 +26,9 @@ import jax.numpy as np
 # pylint: disable=no-name-in-module
 
 from tensorflow_probability.python.distributions._jax import hypothesis_testlib as dhps
-from tensorflow_probability.python.experimental.substrates.jax import tf2jax as tf
 from tensorflow_probability.python.internal._jax import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal._jax import test_util
+from tensorflow_probability.python.internal.backend import jax as tf
 
 
 flags.DEFINE_bool('execute_only', False,
