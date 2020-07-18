@@ -307,7 +307,7 @@ def maybe_call_fn_and_grads(fn,
 
 def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
                    parallel_iterations=10, name=None):
-  """Construct a for loop, preferring a python loop if `n` is staticaly known.
+  """Construct a for loop, preferring a python loop if `n` is statically known.
 
   Given `loop_num_iter` and `body_fn`, return an op corresponding to executing
   `body_fn` `loop_num_iter` times, feeding previous outputs of `body_fn` into
