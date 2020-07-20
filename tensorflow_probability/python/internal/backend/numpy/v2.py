@@ -55,12 +55,21 @@ JAX_MODE = False
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
               experimental_relax_shapes=False, experimental_compile=None):  # pylint: disable=unused-argument
-  """Dummy version of `tf.function`."""
+  """Like `tf.function`, for JAX."""
   transform = lambda fn: fn
   if experimental_compile:
     if JAX_MODE:
       from jax import jit  # pylint: disable=g-import-not-at-top
-      transform = jit
+      def jit_decorator(f):
+        cache = {}
+        def jit_wrapper(*args, **kwargs):
+          static_argnums = tuple(
+              i for (i, arg) in enumerate(args) if callable(arg))
+          if cache.get(static_argnums, None) is None:
+            cache[static_argnums] = jit(f, static_argnums=static_argnums)
+          return cache[static_argnums](*args, **kwargs)
+        return jit_wrapper
+      transform = jit_decorator
     else:
       raise NotImplementedError('Could not find compiler: Numpy only.')
   # This code path is for the `foo = tf.function(foo, ...)` use case.

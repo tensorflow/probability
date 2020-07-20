@@ -463,7 +463,7 @@ unstack = utils.copy_docstring(
         np.split(value, value.shape[axis] if num is None else num, axis)))
 
 where = utils.copy_docstring(
-    'tf1.where',
+    'tf.where',
     lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = utils.copy_docstring(

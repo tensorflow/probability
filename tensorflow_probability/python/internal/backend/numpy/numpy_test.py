@@ -153,6 +153,8 @@ def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
       elements = integers()
     elif dtype in (np.complex64, np.complex128):
       elements = complex_numbers()
+    elif dtype == np.bool:
+      elements = hps.booleans()
     else:
       raise ValueError('Unexpected dtype: {}'.format(dtype))
   shape = tuple(batch_shape) + draw(shape)
@@ -273,6 +275,24 @@ def batched_probabilities(draw, batch_shape, num_classes):
 
 def tensorshapes_to_tuples(tensorshapes):
   return tuple(tuple(tensorshape.as_list()) for tensorshape in tensorshapes)
+
+
+@hps.composite
+def where_params(draw, version=2):
+  shape = draw(shapes())
+  if version == 2:
+    cond_shape, x_shape, y_shape = draw(
+        tfp_hps.broadcasting_shapes(shape, 3).map(tensorshapes_to_tuples))
+  elif version == 1:
+    cond_dims = draw(hps.sampled_from(np.arange(len(shape) + 1)))
+    cond_shape = shape[:cond_dims]
+    x_shape, y_shape = shape, shape
+  else:
+    raise ValueError('unexpected tf.where version {}'.format(version))
+  condition = draw(single_arrays(shape=hps.just(cond_shape), dtype=np.bool))
+  x = draw(single_arrays(shape=hps.just(x_shape)))
+  y = draw(single_arrays(shape=hps.just(y_shape), dtype=x.dtype))
+  return condition, x, y
 
 
 @hps.composite
@@ -1020,6 +1040,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('linspace', [linspace_params()]),
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),
+    TestCase('compat.v1.where', [where_params(version=1)]),
+    TestCase('where', [where_params(version=2)]),
 
     # Misc
     TestCase('histogram_fixed_width',

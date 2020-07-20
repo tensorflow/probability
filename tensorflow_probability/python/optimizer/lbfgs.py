@@ -33,6 +33,7 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import bfgs_utils
 
@@ -225,10 +226,10 @@ def minimize(value_and_gradients_function,
     if initial_position is not None:
       initial_position = tf.convert_to_tensor(
           initial_position, name='initial_position')
-      dtype = initial_position.dtype.base_dtype
+      dtype = dtype_util.base_dtype(initial_position.dtype)
 
     if previous_optimizer_results is not None:
-      dtype = previous_optimizer_results.position.dtype.base_dtype
+      dtype = dtype_util.base_dtype(previous_optimizer_results.position.dtype)
 
     tolerance = tf.convert_to_tensor(
         tolerance, dtype=dtype, name='grad_tolerance')
@@ -425,7 +426,7 @@ def _make_empty_queue_for(k, element):
   """
   queue_shape = tf.concat(
       [[k], distribution_util.prefer_static_shape(element)], axis=0)
-  return tf.zeros(queue_shape, dtype=element.dtype.base_dtype)
+  return tf.zeros(queue_shape, dtype=dtype_util.base_dtype(element.dtype))
 
 
 def _queue_push(queue, should_update, new_vecs):

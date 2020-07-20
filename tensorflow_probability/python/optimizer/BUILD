@@ -33,9 +33,7 @@ multi_substrate_py_library(
     srcs_version = "PY2AND3",
     substrates_omit_deps = [
         ":bfgs",
-        ":bfgs_utils",
         ":differential_evolution",
-        ":lbfgs",
         ":nelder_mead",
         ":proximal_hessian_sparse",
         ":sgld",
@@ -141,7 +139,6 @@ multi_substrate_py_test(
     name = "lbfgs_test",
     timeout = "long",
     srcs = ["lbfgs_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
@@ -149,6 +146,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 

@@ -88,6 +88,16 @@ def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redef
   return np.reshape(x, shape)
 
 
+def _where_v1(condition, x=None, y=None):
+  # V1 did not support broadcasting, and instead applied the dimensions of
+  # `condition` to the left hand dims of x and y.
+  if x is None and y is None:
+    return np.where(condition)
+  while condition.ndim < max(x.ndim, y.ndim):
+    condition = condition[..., np.newaxis]  # add 1 dims until rank matches
+  return np.where(condition, x, y)
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
@@ -125,6 +135,10 @@ global_variables_initializer = utils.copy_docstring(
 set_random_seed = utils.copy_docstring(
     'tf1.set_random_seed',
     set_seed)
+
+where = utils.copy_docstring(
+    'tf1.where',
+    _where_v1)
 
 
 class Session(object):
