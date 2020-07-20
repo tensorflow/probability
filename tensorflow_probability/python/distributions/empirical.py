@@ -157,8 +157,9 @@ class Empirical(distribution.Distribution):
       # Note: this tf.rank call affects the graph, but is ok in `__init__`
       # because we don't expect shapes (or ranks) to be runtime-variable, nor
       # ever need to differentiate with respect to them.
-      samples_rank = prefer_static.rank(self.samples)
-      self._samples_axis = samples_rank - self._event_ndims - 1
+      samples_rank = prefer_static.rank(self._samples)
+      self._samples_axis = prefer_static.cast(
+          samples_rank - self._event_ndims - 1, tf.int32)
 
       super(Empirical, self).__init__(
           dtype=dtype,
