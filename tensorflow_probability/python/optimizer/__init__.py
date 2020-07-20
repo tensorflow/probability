@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.optimizer import convergence_criteria
 from tensorflow_probability.python.optimizer import linesearch
 from tensorflow_probability.python.optimizer.bfgs import minimize as bfgs_minimize
@@ -33,8 +34,6 @@ from tensorflow_probability.python.optimizer.proximal_hessian_sparse import mini
 from tensorflow_probability.python.optimizer.sgld import StochasticGradientLangevinDynamics
 from tensorflow_probability.python.optimizer.variational_sgd import VariationalSGD
 
-
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'converged_all',
@@ -53,4 +52,4 @@ _allowed_symbols = [
     'VariationalSGD',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

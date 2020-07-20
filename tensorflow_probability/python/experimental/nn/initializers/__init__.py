@@ -21,8 +21,8 @@ from tensorflow_probability.python.experimental.nn.initializers.initializers imp
 from tensorflow_probability.python.experimental.nn.initializers.initializers import glorot_uniform
 from tensorflow_probability.python.experimental.nn.initializers.initializers import he_normal
 from tensorflow_probability.python.experimental.nn.initializers.initializers import he_uniform
+from tensorflow_probability.python.internal import all_util
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'glorot_normal',
@@ -31,4 +31,4 @@ _allowed_symbols = [
     'he_uniform',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

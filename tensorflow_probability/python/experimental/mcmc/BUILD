@@ -44,6 +44,7 @@ py_library(
         ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

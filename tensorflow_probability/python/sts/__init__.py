@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.sts.autoregressive import Autoregressive
 from tensorflow_probability.python.sts.autoregressive import AutoregressiveStateSpaceModel
 from tensorflow_probability.python.sts.decomposition import decompose_by_component
@@ -48,7 +49,6 @@ from tensorflow_probability.python.sts.structural_time_series import StructuralT
 from tensorflow_probability.python.sts.sum import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts.sum import Sum
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'AdditiveStateSpaceModel',
@@ -82,4 +82,4 @@ _allowed_symbols = [
     'sample_uniform_initial_state'
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

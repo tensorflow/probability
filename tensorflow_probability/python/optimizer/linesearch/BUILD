@@ -31,6 +31,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     deps = [
         ":hager_zhang",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/optimizer/linesearch/internal",
     ],
 )

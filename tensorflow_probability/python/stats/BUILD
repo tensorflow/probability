@@ -45,6 +45,7 @@ multi_substrate_py_library(
         ":quantiles",
         ":ranking",
         ":sample_stats",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

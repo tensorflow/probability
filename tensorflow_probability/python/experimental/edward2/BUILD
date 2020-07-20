@@ -36,6 +36,7 @@ py_library(
         ":interceptor",
         ":program_transformations",
         ":random_variable",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

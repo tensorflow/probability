@@ -41,9 +41,9 @@ from tensorflow_probability.python.experimental.edward2.interceptor import tape
 from tensorflow_probability.python.experimental.edward2.program_transformations import make_log_joint_fn
 from tensorflow_probability.python.experimental.edward2.program_transformations import make_value_setter
 from tensorflow_probability.python.experimental.edward2.random_variable import RandomVariable
+from tensorflow_probability.python.internal import all_util
 # pylint: enable=wildcard-import
 
-from tensorflow.python.util.all_util import remove_undocumented
 
 warnings.warn(
     "tfp.edward2 module is deprecated and will be removed on "
@@ -61,4 +61,4 @@ _allowed_symbols = list(rv_dict.keys()) + [
     "tape",
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

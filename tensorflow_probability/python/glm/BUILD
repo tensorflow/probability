@@ -35,6 +35,7 @@ py_library(
         ":family",
         ":fisher_scoring",
         ":proximal_hessian",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

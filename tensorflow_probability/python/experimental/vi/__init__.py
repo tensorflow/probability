@@ -16,12 +16,12 @@
 
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_factored_surrogate_posterior
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_trainable_location_scale_distribution
+from tensorflow_probability.python.internal import all_util
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'build_factored_surrogate_posterior',
     'build_trainable_location_scale_distribution'
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

@@ -39,6 +39,7 @@ py_library(
         ":variational_base",
         "//tensorflow_probability/python/experimental/nn/initializers",
         "//tensorflow_probability/python/experimental/nn/util",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

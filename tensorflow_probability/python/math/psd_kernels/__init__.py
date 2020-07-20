@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.math.psd_kernels.exp_sin_squared import ExpSinSquared
 from tensorflow_probability.python.math.psd_kernels.exponentiated_quadratic import ExponentiatedQuadratic
 from tensorflow_probability.python.math.psd_kernels.feature_scaled import FeatureScaled
@@ -32,8 +33,6 @@ from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel
 from tensorflow_probability.python.math.psd_kernels.rational_quadratic import RationalQuadratic
 from tensorflow_probability.python.math.psd_kernels.schur_complement import SchurComplement
 
-
-from tensorflow.python.util.all_util import remove_undocumented
 
 _allowed_symbols = [
     'ExponentiatedQuadratic',
@@ -51,4 +50,4 @@ _allowed_symbols = [
     'SchurComplement',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

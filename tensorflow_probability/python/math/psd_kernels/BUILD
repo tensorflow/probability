@@ -43,6 +43,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         ":rational_quadratic",
         ":schur_complement",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal",
     ],

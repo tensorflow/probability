@@ -17,6 +17,7 @@
 # [internal] load python3.bzl
 
 NO_REWRITE_NEEDED = [
+    "internal:all_util",
     "internal:docstring_util",
     "internal:reparameterization",
     "layers",

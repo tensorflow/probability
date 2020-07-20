@@ -15,11 +15,11 @@
 """Experimental tools for linear algebra."""
 
 from tensorflow_probability.python.experimental.linalg.linear_operator_psd_kernel import LinearOperatorPSDKernel
+from tensorflow_probability.python.internal import all_util
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'LinearOperatorPSDKernel',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

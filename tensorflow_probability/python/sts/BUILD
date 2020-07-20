@@ -45,6 +45,7 @@ py_library(
         ":smooth_seasonal",
         ":structural_time_series",
         ":sum",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

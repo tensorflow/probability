@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math import psd_kernels
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
@@ -66,7 +67,6 @@ from tensorflow_probability.python.random import rademacher as random_rademacher
 from tensorflow_probability.python.random import rayleigh as random_rayleigh
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 random_rademacher = deprecation.deprecated(
     '2020-09-20', 'Use tfp.random.rademacher')(random_rademacher)
@@ -122,4 +122,4 @@ _allowed_symbols = [
     'value_and_gradient',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

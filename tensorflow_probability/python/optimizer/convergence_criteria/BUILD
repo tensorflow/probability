@@ -41,6 +41,7 @@ multi_substrate_py_library(
         ":successive_gradients_are_uncorrelated",
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

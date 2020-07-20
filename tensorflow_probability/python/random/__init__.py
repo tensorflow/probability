@@ -18,11 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal.samplers import split_seed
 from tensorflow_probability.python.random.random_ops import rademacher
 from tensorflow_probability.python.random.random_ops import rayleigh
-
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'rademacher',
@@ -30,4 +29,4 @@ _allowed_symbols = [
     'split_seed',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

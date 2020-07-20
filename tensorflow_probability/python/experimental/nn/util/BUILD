@@ -33,6 +33,7 @@ py_library(
         ":im2row",
         ":random_variable",
         ":utils",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

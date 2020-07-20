@@ -35,6 +35,7 @@ py_library(
         ":csiszar_divergence",
         ":mutual_information",
         ":optimization",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

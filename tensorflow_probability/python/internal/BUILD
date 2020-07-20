@@ -40,6 +40,13 @@ multi_substrate_py_library(
     srcs_version = "PY2AND3",
 )
 
+py_library(
+    name = "all_util",
+    srcs = ["all_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [],
+)
+
 multi_substrate_py_library(
     name = "assert_util",
     srcs = ["assert_util.py"],

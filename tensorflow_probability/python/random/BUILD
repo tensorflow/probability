@@ -33,6 +33,7 @@ multi_substrate_py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":random_ops",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:samplers",
     ],
 )

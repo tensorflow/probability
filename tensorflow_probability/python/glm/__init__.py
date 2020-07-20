@@ -39,8 +39,8 @@ from tensorflow_probability.python.glm.fisher_scoring import fit
 from tensorflow_probability.python.glm.fisher_scoring import fit_one_step
 from tensorflow_probability.python.glm.proximal_hessian import fit_sparse
 from tensorflow_probability.python.glm.proximal_hessian import fit_sparse_one_step
+from tensorflow_probability.python.internal import all_util
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'compute_predicted_linear_response',
@@ -66,4 +66,4 @@ _allowed_symbols = [
     'PoissonSoftplus',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

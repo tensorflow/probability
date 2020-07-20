@@ -18,8 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal import lazy_loader  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
+
 
 jax = lazy_loader.LazyLoader(
     'jax', globals(),
@@ -34,4 +35,4 @@ _allowed_symbols = [
     'numpy',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

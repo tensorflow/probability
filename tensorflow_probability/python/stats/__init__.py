@@ -19,6 +19,7 @@ from __future__ import print_function
 
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.stats.calibration import brier_decomposition
 from tensorflow_probability.python.stats.calibration import brier_score
 from tensorflow_probability.python.stats.calibration import expected_calibration_error
@@ -46,7 +47,6 @@ from tensorflow_probability.python.stats.sample_stats import variance
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'assign_log_moving_mean_exp',
@@ -75,4 +75,4 @@ __all__ = [
     'variance',
 ]
 
-remove_undocumented(__name__, __all__)
+all_util.remove_undocumented(__name__, __all__)

@@ -43,6 +43,7 @@ py_library(
         ":type_inference",
         ":virtual_machine",
         ":xla",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

@@ -44,9 +44,8 @@ from tensorflow_probability.python.experimental import substrates
 from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.composite_tensor import as_composite
 from tensorflow_probability.python.experimental.composite_tensor import register_composite
+from tensorflow_probability.python.internal import all_util
 
-
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'auto_batching',
@@ -64,4 +63,4 @@ _allowed_symbols = [
     'vi',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

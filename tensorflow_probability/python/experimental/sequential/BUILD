@@ -37,6 +37,7 @@ py_library(
         ":extended_kalman_filter",
         ":iterated_filter",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

@@ -30,6 +30,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:lazy_loader",
         "//tensorflow_probability/substrates/jax",
         "//tensorflow_probability/substrates/numpy",

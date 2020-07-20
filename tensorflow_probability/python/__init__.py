@@ -18,8 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal import lazy_loader
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 
 # Ensure TensorFlow is importable and its version is sufficiently recent. This
@@ -87,4 +87,4 @@ for pkg in _allowed_symbols:
       pkg, globals(), 'tensorflow_probability.python.{}'.format(pkg),
       on_first_access=_ensure_tf_install)
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

@@ -23,10 +23,9 @@ from __future__ import print_function
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovariance
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovarianceState
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningVariance
-
+from tensorflow_probability.python.internal import all_util
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'RunningCovariance',
@@ -34,4 +33,4 @@ _allowed_symbols = [
     'RunningVariance',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

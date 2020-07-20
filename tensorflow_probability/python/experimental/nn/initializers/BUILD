@@ -28,6 +28,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":initializers_lib",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

@@ -33,8 +33,7 @@ from tensorflow_probability.python.experimental.nn.layers import Lambda
 from tensorflow_probability.python.experimental.nn.layers import Layer
 from tensorflow_probability.python.experimental.nn.layers import Sequential
 from tensorflow_probability.python.experimental.nn.variational_base import VariationalLayer
-
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import all_util
 
 
 _allowed_symbols = [
@@ -57,4 +56,4 @@ _allowed_symbols = [
 ]
 
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)
