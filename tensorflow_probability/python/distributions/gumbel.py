@@ -48,7 +48,9 @@ class Gumbel(transformed_distribution.TransformedDistribution):
 
   The cumulative density function of this distribution is,
 
-  ```cdf(x; mu, sigma) = exp(-exp(-(x - mu) / sigma))```
+  ```none
+  cdf(x; mu, sigma) = exp(-exp(-(x - mu) / sigma))
+  ```
 
   The Gumbel distribution is a member of the [location-scale family](
   https://en.wikipedia.org/wiki/Location-scale_family), i.e., it can be

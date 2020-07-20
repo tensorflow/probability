@@ -53,7 +53,9 @@ class Moyal(transformed_distribution.TransformedDistribution):
 
   The cumulative density function of this distribution is,
 
-  ```cdf(x; mu, sigma) = erfc(exp(- 1/2 * (x - mu) / sigma) / sqrt(2))```
+  ```none
+  cdf(x; mu, sigma) = erfc(exp(- 1/2 * (x - mu) / sigma) / sqrt(2))
+  ```
 
   The Moyal distribution is a member of the [location-scale family](
   https://en.wikipedia.org/wiki/Location-scale_family), i.e., it can be
