@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # [internal] load pytype.bzl (pytype_strict_library)
+# [internal] load dummy dependency
 
 licenses(["notice"])
 
@@ -38,3 +39,5 @@ py_library(
     srcs = ["version.py"],
     srcs_version = "PY3",
 )
+
+# third_party_dependency(package = "oryx")  # DisableOnExport
