@@ -28,10 +28,12 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensorshape_util
 
 # Tolerance to check for floating point zeros.
 _EPSILON = 1e-10
@@ -350,7 +352,7 @@ def nelder_mead_one_step(current_simplex,
                          name=None):
   """A single iteration of the Nelder Mead algorithm."""
   with tf.name_scope(name or 'nelder_mead_one_step'):
-    domain_dtype = current_simplex.dtype.base_dtype
+    domain_dtype = dtype_util.base_dtype(current_simplex.dtype)
     order = tf.argsort(
         current_objective_values, direction='ASCENDING', stable=True)
     (
@@ -388,7 +390,7 @@ def nelder_mead_one_step(current_simplex,
                                        func_tolerance,
                                        position_tolerance)
     def _converged_fn():
-      return (True, current_simplex, current_objective_values, 0)
+      return (True, current_simplex, current_objective_values, np.int32(0))
     case0 = has_converged, _converged_fn
     accept_reflected = (
         (objective_at_reflected < second_worst_objective_value) &
@@ -442,8 +444,9 @@ def nelder_mead_one_step(current_simplex,
         next_objective_at_simplex,
         case_evals) = prefer_static.case([case0, case1, case2, case3],
                                          default=default_fn, exclusive=False)
-    next_simplex.set_shape(current_simplex.shape)
-    next_objective_at_simplex.set_shape(current_objective_values.shape)
+    tensorshape_util.set_shape(next_simplex, current_simplex.shape)
+    tensorshape_util.set_shape(next_objective_at_simplex,
+                               current_objective_values.shape)
     return (
         converged,
         next_simplex,
@@ -462,7 +465,7 @@ def _accept_reflected_fn(simplex,
     next_simplex = _replace_at_index(simplex, worst_index, reflected)
     next_objective_values = _replace_at_index(objective_values, worst_index,
                                               objective_at_reflected)
-    return False, next_simplex, next_objective_values, 0
+    return False, next_simplex, next_objective_values, np.int32(0)
   return _replace_worst_with_reflected
 
 
@@ -489,7 +492,7 @@ def _expansion_fn(objective_function,
     next_objective_at_simplex = _replace_at_index(objective_values,
                                                   worst_index,
                                                   next_objective_value)
-    return False, next_simplex, next_objective_at_simplex, 1
+    return False, next_simplex, next_objective_at_simplex, np.int32(1)
   return _expand_and_maybe_replace
 
 
@@ -519,7 +522,7 @@ def _outside_contraction_fn(objective_function,
       return (False,
               next_simplex,
               objective_at_next_simplex,
-              1)
+              np.int32(1))
 
     def _reject_contraction():
       return _shrink_towards_best(objective_function,
@@ -561,7 +564,7 @@ def _inside_contraction_fn(objective_function,
           False,
           next_simplex,
           objective_at_next_simplex,
-          1
+          np.int32(1)
       )
 
     def _reject_contraction():
@@ -597,9 +600,7 @@ def _shrink_towards_best(objective_function,
 
 def _replace_at_index(x, index, replacement):
   """Replaces an element at supplied index."""
-  x_new = tf.concat([x[:index], tf.expand_dims(replacement, axis=0),
-                     x[(index + 1):]], axis=0)
-  return x_new
+  return tf.tensor_scatter_nd_update(x, [[index]], [replacement])
 
 
 def _check_convergence(simplex,
@@ -769,7 +770,7 @@ def _prepare_args_with_initial_simplex(objective_function,
   # as n - 1 where n is the number of vertices specified.
   num_vertices = tf.shape(initial_simplex)[0]
   dim = num_vertices - 1
-  num_evaluations = 0
+  num_evaluations = np.int32(0)
 
   if objective_at_initial_simplex is None:
     objective_at_initial_simplex, n_evals = _evaluate_objective_multiple(
@@ -793,7 +794,7 @@ def _prepare_args_with_initial_vertex(objective_function,
   dim = tf.size(initial_vertex)
   num_vertices = dim + 1
   unit_vectors_along_axes = tf.reshape(
-      tf.eye(dim, dim, dtype=initial_vertex.dtype.base_dtype),
+      tf.eye(dim, dim, dtype=dtype_util.base_dtype(initial_vertex.dtype)),
       tf.concat([[dim], tf.shape(initial_vertex)], axis=0))
 
   # If step_sizes does not broadcast to initial_vertex, the multiplication

@@ -33,6 +33,7 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer import bfgs_utils
 
@@ -201,7 +202,7 @@ def minimize(value_and_gradients_function,
   with tf.name_scope(name or 'minimize'):
     initial_position = tf.convert_to_tensor(
         initial_position, name='initial_position')
-    dtype = initial_position.dtype.base_dtype
+    dtype = dtype_util.base_dtype(initial_position.dtype)
     tolerance = tf.convert_to_tensor(
         tolerance, dtype=dtype, name='grad_tolerance')
     f_relative_tolerance = tf.convert_to_tensor(
@@ -322,12 +323,13 @@ def _inv_hessian_control_inputs(inv_hessian):
 
   # Simply adding a control dependencies on these results is not enough to
   # trigger them, we need to add asserts on the results.
-  return [tf.Assert(is_positive_definite,
-                    ['Initial inverse Hessian is not positive definite.',
-                     inv_hessian]),
-          tf.Assert(is_symmetric,
-                    ['Initial inverse Hessian is not symmetric',
-                     inv_hessian])]
+  return [
+      tf.debugging.Assert(
+          is_positive_definite,
+          ['Initial inverse Hessian is not positive definite.', inv_hessian]),
+      tf.debugging.Assert(
+          is_symmetric,
+          ['Initial inverse Hessian is not symmetric', inv_hessian])]
 
 
 def _get_search_direction(inv_hessian_approx, gradient):

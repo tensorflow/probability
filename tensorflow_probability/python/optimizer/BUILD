@@ -32,9 +32,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     substrates_omit_deps = [
-        ":bfgs",
         ":differential_evolution",
-        ":nelder_mead",
         ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
@@ -114,13 +112,13 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["bfgs_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -176,13 +174,13 @@ multi_substrate_py_test(
     name = "nelder_mead_test",
     size = "medium",
     srcs = ["nelder_mead_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 

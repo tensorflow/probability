@@ -63,6 +63,31 @@ class BfgsTest(test_util.TestCase):
     self.assertLessEqual(final_gradient_norm, 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
+  def test_quadratic_bowl_2d_compiled(self):
+    """Can minimize a two dimensional quadratic function."""
+
+    self.skip_if_no_xla()
+
+    minimum = np.array([1.0, 1.0])
+    scales = np.array([2.0, 3.0])
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
+
+    start = tf.constant([0.6, 0.8])
+    results = tf.function(
+        tfp.optimizer.bfgs_minimize, experimental_compile=True)(
+            quadratic, initial_position=start, tolerance=np.float32(1e-8))
+
+    results = self.evaluate(results)
+
+    self.assertTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = _norm(final_gradient)
+    self.assertLessEqual(final_gradient_norm, 1e-8)
+    self.assertArrayNear(results.position, minimum, 1e-5)
+
   def test_inverse_hessian_spec(self):
     """Checks that specifying the 'initial_inverse_hessian_estimate' works."""
     minimum = np.array([1.0, 1.0], dtype=np.float32)
@@ -96,7 +121,9 @@ class BfgsTest(test_util.TestCase):
     start = tf.constant([0.6, 0.8])
     bad_inv_hessian = tf.constant([[-2.0, 1.0], [1.0, -2.0]],
                                   dtype=tf.float32)
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError(
+        r'Initial inverse Hessian is not positive definite|'
+        r'Cholesky.*not successful'):
       self.evaluate(tfp.optimizer.bfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
@@ -118,7 +145,7 @@ class BfgsTest(test_util.TestCase):
     start = tf.constant([0.6, 0.8])
     bad_inv_hessian = tf.constant([[2.0, 0.0], [1.0, 2.0]],
                                   dtype=tf.float32)
-    with self.assertRaises(tf.errors.InvalidArgumentError):
+    with self.assertRaisesOpError(r'Initial inverse Hessian is not symmetric'):
       self.evaluate(tfp.optimizer.bfgs_minimize(
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
@@ -253,7 +280,7 @@ class BfgsTest(test_util.TestCase):
         [(-1, -1), (-3.779310, -3.283186), 29],
         [(1, -2), (3.584428, -1.848126), 28]
     ]
-    dtype = "float64"
+    dtype = 'float64'
     for start, expected_minima, expected_evals in starts_and_targets:
       start = tf.constant(start, dtype=dtype)
       results = self.evaluate(tfp.optimizer.bfgs_minimize(
@@ -271,7 +298,7 @@ class BfgsTest(test_util.TestCase):
       x, y = coord[..., 0], coord[..., 1]
       return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
 
-    dtype = "float64"
+    dtype = 'float64'
     starts = tf.constant([[1, 1],
                           [-2, 2],
                           [-1, -1],
@@ -292,13 +319,48 @@ class BfgsTest(test_util.TestCase):
       self.assertArrayNear(actual, expected, 1e-5)
     self.assertEqual(batch_results.num_objective_evaluations, 38)
 
+  def test_himmelblau_batch_all_compile(self):
+    """Tests that the computation can be XLA-compiled."""
+
+    self.skip_if_no_xla()
+
+    @_make_val_and_grad_fn
+    def himmelblau(coord):
+      x, y = coord[..., 0], coord[..., 1]
+      return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
+
+    dtype = 'float64'
+    starts = tf.constant([[1, 1],
+                          [-2, 2],
+                          [-1, -1],
+                          [1, -2]], dtype=dtype)
+    expected_minima = np.array([[3, 2],
+                                [-2.805118, 3.131312],
+                                [-3.779310, -3.283186],
+                                [3.584428, -1.848126]], dtype=dtype)
+    batch_results = tf.function(
+        tfp.optimizer.bfgs_minimize, experimental_compile=True)(
+            himmelblau,
+            initial_position=starts,
+            stopping_condition=tfp.optimizer.converged_all,
+            tolerance=1e-8)
+
+    batch_results = self.evaluate(batch_results)
+    self.assertFalse(np.any(batch_results.failed))  # None have failed.
+    self.assertTrue(np.all(batch_results.converged))  # All converged.
+
+    # All converged points are near expected minima.
+    for actual, expected in zip(batch_results.position, expected_minima):
+      self.assertArrayNear(actual, expected, 1e-5)
+    self.assertEqual(batch_results.num_objective_evaluations, 38)
+
   def test_himmelblau_batch_any(self):
     @_make_val_and_grad_fn
     def himmelblau(coord):
       x, y = coord[..., 0], coord[..., 1]
       return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
 
-    dtype = "float64"
+    dtype = 'float64'
     starts = tf.constant([[1, 1],
                           [-2, 2],
                           [-1, -1],
@@ -356,7 +418,7 @@ class BfgsTest(test_util.TestCase):
     results = self.evaluate(tfp.optimizer.bfgs_minimize(
         neg_log_likelihood, initial_position=start, tolerance=1e-6))
     expected_minima = np.array(
-        [-0.020460034354, 0.171708568111, 0.021200423717], dtype="float64")
+        [-0.020460034354, 0.171708568111, 0.021200423717], dtype='float64')
     expected_evals = 19
     self.assertArrayNear(results.position, expected_minima, 1e-6)
     self.assertEqual(results.num_objective_evaluations, expected_evals)
@@ -432,5 +494,5 @@ class BfgsTest(test_util.TestCase):
       self.assertArrayNear(results.position, minimum, 1e-5)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

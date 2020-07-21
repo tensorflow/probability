@@ -213,7 +213,8 @@ def _assert_rank_in(*_, **__):  # pylint: disable=unused-argument
 
 Assert = utils.copy_docstring(  # pylint: disable=invalid-name
     'tf.debugging.Assert',
-    lambda condition, data, summarize=None, name=None: None)
+    lambda condition, data, summarize=None, name=None: assert_equal(  # pylint: disable=g-long-lambda
+        True, condition, message=data))
 
 assert_equal = utils.copy_docstring(
     'tf.debugging.assert_equal',
