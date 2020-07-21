@@ -109,6 +109,7 @@ multi_substrate_py_test(
     srcs = ["dual_averaging_step_size_adaptation_test.py"],
     jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
+    shard_count = 4,
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
