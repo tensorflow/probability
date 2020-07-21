@@ -81,7 +81,7 @@ class _SMCResamplersTest(test_util.TestCase):
             axis=-1)
         self.assertAllLess(
             tfd.Chi2(df=self.dtype(num_probs - 1)).cdf(chi2),
-            0.9999)
+            0.99995)
 
   def test_categorical_resampler_zero_final_class(self):
     if self.use_xla and tf.executing_eagerly():
