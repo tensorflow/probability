@@ -1961,6 +1961,7 @@ py_test(
 
 multi_substrate_py_test(
     name = "blockwise_test",
+    size = "medium",
     srcs = ["blockwise_test.py"],
     jax_size = "medium",
     deps = [
