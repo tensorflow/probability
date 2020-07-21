@@ -225,7 +225,7 @@ __all__ = [
     'Dirichlet',
     'DirichletMultinomial',
     'Multinomial',
-    'VonMises',>>>>>>> 8f67456798615f9bf60ced2ce6db5d3dba3515fe
+    'VonMises',
     'VonMisesFisher',
     'Weibull',
     'WishartLinearOperator',
