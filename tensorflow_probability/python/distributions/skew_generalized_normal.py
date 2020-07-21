@@ -9,8 +9,7 @@ import tensorflow as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow.python.framework import tensor_shape
-from tensorflow_probability.python.distributions.distribution import Distribution
+from tensorflow_probability.python.distributions import Distribution
 
 __all__ = [
     "SkewGeneralizedNormal",

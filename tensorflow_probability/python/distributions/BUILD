@@ -128,6 +128,7 @@ multi_substrate_py_library(
         ":relaxed_onehot_categorical",
         ":sample",
         ":sinh_arcsinh",
+        ":skew_generalized_normal",
         ":spherical_uniform",
         ":student_t",
         ":student_t_process",
@@ -1549,6 +1550,19 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
+
+multi_substrate_py_library(
+    name = "skew_generalized_normal",
+    srcs = ["skew_generalized_normal.py"],
+    deps = [
+        ":distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:dtype_util",
+    ],
+)
+
 
 multi_substrate_py_library(
     name = "half_student_t",
