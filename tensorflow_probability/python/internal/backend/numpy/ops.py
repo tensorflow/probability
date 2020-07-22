@@ -25,7 +25,10 @@ import six
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
-import wrapt
+try:  # May not be available, not a core dep for TFP.
+  import wrapt  # pylint: disable=g-import-not-at-top
+except ImportError:
+  wrapt = None
 
 __all__ = [
     'bitcast',
@@ -58,6 +61,10 @@ __all__ = [
 
 
 JAX_MODE = False
+
+
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
 
 
 class _NullContext(object):
@@ -528,7 +535,7 @@ register_tensor_conversion_function(tensor_shape.Dimension,
                                     _convert_dimension_to_tensor)
 
 
-class NumpyVariable(wrapt.ObjectProxy):
+class NumpyVariable(getattr(wrapt, 'ObjectProxy', object)):
   """Stand-in for tf.Variable."""
 
   __slots__ = ('initializer',)
@@ -582,9 +589,7 @@ class NumpyVariable(wrapt.ObjectProxy):
         onp.array(self, dtype=self.dtype) - onp.array(value, dtype=self.dtype))
     return self
 
-
 if JAX_MODE:
-  import jax  # pylint: disable=g-import-not-at-top
   jax.interpreters.xla.canonicalize_dtype_handlers[NumpyVariable] = (
       jax.interpreters.xla.canonicalize_dtype_handlers[onp.ndarray])
   jax.interpreters.xla.pytype_aval_mappings[NumpyVariable] = (
