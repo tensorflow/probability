@@ -26,6 +26,7 @@ import jax.numpy as np
 # pylint: disable=no-name-in-module
 
 from tensorflow_probability.python.distributions._jax import hypothesis_testlib as dhps
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal._jax import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal._jax import test_util
 from tensorflow_probability.python.internal.backend import jax as tf
@@ -60,10 +61,8 @@ VMAP_LOGPROB_BLOCKLIST = (
 )
 
 JVP_SAMPLE_BLOCKLIST = (
-    'Bates',
     'Gamma',
     'GeneralizedNormal',
-    'TruncatedCauchy',
     'TruncatedNormal',
     'VonMises',
 )
@@ -77,19 +76,9 @@ JVP_LOGPROB_PARAM_BLOCKLIST = (
     'LKJ',
     'PowerSpherical',
     'StudentT',
-    'Triangular',
-    'TruncatedCauchy',
-    'TruncatedNormal',
-    'Uniform',
-    'WishartTriL',
 )
 
-VJP_SAMPLE_BLOCKLIST = (
-    'Bates',
-    'Gamma',
-    'GeneralizedNormal',
-    'VonMisesFisher',
-)
+VJP_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
     'Categorical',
     'OneHotCategorical',
@@ -196,12 +185,13 @@ class _GradTest(test_util.TestCase):
       if (not tf.is_tensor(param)
           or not np.issubdtype(param.dtype, np.floating)):
         continue
-      def _func(param_name, param):
-        dist = data.draw(self._make_distribution(
+      def _dist_func(param_name, param):
+        return data.draw(self._make_distribution(
             dist_name, params, batch_shape,
             override_params={param_name: param}))
-        return func(dist)
-      yield param_name, param, _func
+      def _func(param_name, param):
+        return func(_dist_func(param_name, param))
+      yield param_name, param, _dist_func, _func
 
   @test_base_distributions
   @hp.given(hps.data())
@@ -217,8 +207,15 @@ class _GradTest(test_util.TestCase):
         dhps.base_distribution_unconstrained_params(
             enable_vars=False, dist_name=dist_name))
 
-    for param_name, unconstrained_param, func in self._param_func_generator(
-        data, dist_name, params_unconstrained, batch_shape, _sample):
+    for (param_name, unconstrained_param, dist_func,
+         func) in self._param_func_generator(data, dist_name,
+                                             params_unconstrained, batch_shape,
+                                             _sample):
+      dist = dist_func(param_name, unconstrained_param)
+      if (dist.reparameterization_type !=
+          reparameterization.FULLY_REPARAMETERIZED):
+        # Skip distributions that don't support differentiable sampling.
+        self.skipTest('{} is not reparameterized.'.format(dist_name))
       self._test_transformation(
           functools.partial(func, param_name), unconstrained_param,
           msg=param_name)
@@ -241,8 +238,9 @@ class _GradTest(test_util.TestCase):
     sample = sampling_dist.sample(seed=random.PRNGKey(0))
     def _log_prob(dist):
       return dist.log_prob(sample)
-    for param_name, param, func in self._param_func_generator(
+    for param_name, param, dist_func, func in self._param_func_generator(
         data, dist_name, params, batch_shape, _log_prob):
+      del dist_func
       self._test_transformation(
           functools.partial(func, param_name), param, msg=param_name)
 

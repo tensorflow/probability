@@ -3280,6 +3280,25 @@ py_test(
     ],
 )
 
+py_library(
+    name = "jax_transformation_testlib",
+    testonly = 1,
+    srcs_version = "PY2AND3",
+    deps = [
+        ":hypothesis_testlib.jax",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # jax dep,
+        # numpy dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib.jax",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util.jax",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util.jax",
+    ],
+)
+
 # py_test
 py3_test(
     name = "jax_transformation_test",
@@ -3293,16 +3312,7 @@ py3_test(
         "notap",
     ],
     deps = [
-        ":hypothesis_testlib.jax",
-        # absl/testing:parameterized dep,
-        # hypothesis dep,
-        # jax dep,
-        # numpy dep,
-        "//tensorflow_probability/python/internal:hypothesis_testlib.jax",
-        "//tensorflow_probability/python/internal:tensor_util.jax",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util.jax",
-        "//tensorflow_probability/python/internal/backend/jax",
+        ":jax_transformation_testlib",
     ],
 )
 
@@ -3322,16 +3332,7 @@ py3_test(
         "omni_fail",
     ],
     deps = [
-        ":hypothesis_testlib.jax",
-        # absl/testing:parameterized dep,
-        # hypothesis dep,
-        # jax dep,
-        # numpy dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:hypothesis_testlib.jax",
-        "//tensorflow_probability/python/internal:tensor_util.jax",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util.jax",
+        ":jax_transformation_testlib",
     ],
 )
 
