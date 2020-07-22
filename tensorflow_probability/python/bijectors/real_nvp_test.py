@@ -248,7 +248,8 @@ class RealNVPTestKwargs(
         seed=54819,
         radius=1.,
         center=0.,
-        rtol=0.1)
+        rtol=0.2  # TODO(b/161840573): decrease once test is deterministic.
+        )
 
   def testInvertMutuallyConsistent(self):
     dims = 4
