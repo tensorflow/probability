@@ -34,7 +34,7 @@ class Reducer(object):
   """Base class for all MCMC `Reducer`s.
 
   This class defines the minimal requirements to implement a Markov chain Monte
-  Carlo (MCMC) reducer. A reducer updates streaming computation by reducing
+  Carlo (MCMC) reducer. A reducer updates a streaming computation by reducing
   new samples to a summary statistic. `Reducer`s can be defined to return "side
   information" if desired, but they do not remember state. Hence, reducers
   should be seen as objects that hold metadata (i.e. shape and dtype of
@@ -50,7 +50,9 @@ class Reducer(object):
 
     Args:
       initial_chain_state: `Tensor` or Python `list` of `Tensor`s representing
-        the current state(s) of the Markov chain(s).
+        the current state(s) of the Markov chain(s). This is to be used for
+        any needed (shape, dtype, etc.) information, but should not be
+        considered part of the stream being reduced.
       initial_inner_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made in a related
         `TransitionKernel`. This allows for introspection of deeper layers of
@@ -70,9 +72,9 @@ class Reducer(object):
     This is an abstract method and must be overridden by subclasses.
 
     Args:
-      sample: Incoming sample with shape and dtype compatible with those
-        specified when initializing the `Reducer` and with the
-        `current_reducer_state`.
+      sample: Incoming sample with shape and dtype compatible with the
+        `initial_chain_state` with which the `current_reducer_state` was
+        produced by `initialize`.
       current_reducer_state: A `tuple`, `namedtuple` or `list` of `Tensor`s
         representing the current state of reduced statistics.
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
@@ -91,9 +93,9 @@ class Reducer(object):
   def finalize(self, final_state):
     """Finalizes target statistic calculation from the `final_state`.
 
-    This is not an abstract method, but the base implementation is an
-    identity function of the `final_state`. Hence, it should be overriden
-    for more complex streaming calculations.
+    This is an identity function of the `final_state` by default. Subclasses
+    can override it for streaming calculations whose running state is not the
+    same as the desired result.
 
     Args:
       final_state: A `tuple`, `namedtuple` or `list` of `Tensor`s
