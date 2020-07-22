@@ -573,6 +573,20 @@ def log_gamma_correction(x, name=None):
     return accum * inverse_x
 
 
+def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
+  """Reduces broadcast dimensions for a custom gradient."""
+  if (tensorshape_util.is_fully_defined(a.shape) and
+      tensorshape_util.is_fully_defined(b.shape) and
+      a.shape == b.shape):
+    return [grad_a, grad_b]
+  a_shape = tf.shape(a)
+  b_shape = tf.shape(b)
+  ra, rb = tf.raw_ops.BroadcastGradientArgs(s0=a_shape, s1=b_shape)
+  grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
+  grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)
+  return [grad_a, grad_b]
+
+
 def _log_gamma_difference_big_y(x, y):
   """Returns lgamma(y) - lgamma(x + y), accurately if 0 <= x <= y and y >= 8.
 
@@ -599,18 +613,55 @@ def _log_gamma_difference_big_y(x, y):
   return correction + cancelled_stirling
 
 
-def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
-  """Reduces broadcast dimensions for a custom gradient."""
-  if (tensorshape_util.is_fully_defined(a.shape) and
-      tensorshape_util.is_fully_defined(b.shape) and
-      a.shape == b.shape):
-    return [grad_a, grad_b]
-  a_shape = tf.shape(a)
-  b_shape = tf.shape(b)
-  ra, rb = tf.raw_ops.BroadcastGradientArgs(s0=a_shape, s1=b_shape)
-  grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
-  grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)
-  return [grad_a, grad_b]
+def _log_gamma_difference_naive_gradient(x, y):
+  big_y = _log_gamma_difference_big_y(x, y)
+  small_y = tf.math.lgamma(y) - tf.math.lgamma(x + y)
+  return tf.where(y >= 8, big_y, small_y)
+
+
+def _log_gamma_difference_fwd(x, y):
+  """Compute output, aux (collaborates with _log_gamma_difference_bwd)."""
+  return _log_gamma_difference_naive_gradient(x, y), (x, y)
+
+
+def _log_gamma_difference_bwd(aux, g):
+  """Reverse mode impl for log-gamma-diff."""
+  x, y = aux
+  # Computing the gradient naively as the difference of digammas because
+  # (i) digamma grows slower than gamma, so gets into bad cancellations
+  # later, and (ii) doing better is work.  This matches what the gradient
+  # would be if the forward pass were computed naively as the difference
+  # of lgammas.
+  #
+  # Note: This gradient assumes x and y are the same shape; this needs to
+  # be arranged by pre-broadcasting before calling
+  # `_log_gamma_difference`.
+  px = -tf.math.digamma(x + y)
+  py = tf.math.digamma(y) + px
+  return _fix_gradient_for_broadcasting(x, y, px * g, py * g)
+
+
+def _log_gamma_difference_jvp(primals, tangents):
+  """Computes JVP for log-gamma-difference (supports JAX custom derivative)."""
+  x, y = primals
+  dx, dy = tangents
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dx),
+                                         prefer_static.shape(dy))
+  dx = tf.broadcast_to(dx, bc_shp)
+  dy = tf.broadcast_to(dy, bc_shp)
+  # See note above in _log_gamma_difference_bwd.
+  px = -tf.math.digamma(x + y)
+  py = tf.math.digamma(y) + px
+  return _log_gamma_difference_naive_gradient(x, y), px * dx + py * dy
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_log_gamma_difference_fwd,
+    vjp_bwd=_log_gamma_difference_bwd,
+    jvp_fn=_log_gamma_difference_jvp)
+def _log_gamma_difference_custom_gradient(x, y):
+  return _log_gamma_difference_naive_gradient(x, y)
 
 
 def log_gamma_difference(x, y, name=None):
@@ -638,35 +689,10 @@ def log_gamma_difference(x, y, name=None):
     dtype = dtype_util.common_dtype([x, y], tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype)
     y = tf.convert_to_tensor(y, dtype=dtype)
-
-    @tf.custom_gradient
-    def _log_gamma_difference(x, y):
-      """lgamma(y) - lgamma(x + y), accurately."""
-      big_y = _log_gamma_difference_big_y(x, y)
-      small_y = tf.math.lgamma(y) - tf.math.lgamma(x + y)
-      answer = tf.where(y >= 8, big_y, small_y)
-
-      def grad(danswer):
-        """Gradient of _log_gamma_difference."""
-        # Computing the gradient naively as the difference of digammas because
-        # (i) digamma grows slower than gamma, so gets into bad cancellations
-        # later, and (ii) doing better is work.  This matches what the gradient
-        # would be if the forward pass were computed naively as the difference
-        # of lgammas.
-        #
-        # Note: This gradient assumes x and y are the same shape; this needs to
-        # be arranged by pre-broadcasting before calling
-        # `_log_gamma_difference`.
-        px = -tf.math.digamma(x + y)
-        py = tf.math.digamma(y) + px
-        return _fix_gradient_for_broadcasting(x, y, px * danswer, py * danswer)
-
-      return answer, grad
-
-    return _log_gamma_difference(x, y)
+    return _log_gamma_difference_custom_gradient(x, y)
 
 
-def _lbeta_no_gradient(x, y):
+def _lbeta_naive_gradient(x, y):
   """Computes log(Beta(x, y)) with autodiff gradients only."""
   # Flip args if needed so y >= x.  Beta is mathematically symmetric but our
   # method for computing it is not.
@@ -705,7 +731,7 @@ def _lbeta_no_gradient(x, y):
 
 def _lbeta_fwd(x, y):
   """Compute output, aux (collaborates with _lbeta_bwd)."""
-  return _lbeta_no_gradient(x, y), (x, y)
+  return _lbeta_naive_gradient(x, y), (x, y)
 
 
 def _lbeta_bwd(aux, g):
@@ -728,16 +754,16 @@ def _lbeta_jvp(primals, tangents):
   total_digamma = tf.math.digamma(x + y)
   px = tf.math.digamma(x) - total_digamma
   py = tf.math.digamma(y) - total_digamma
-  return _lbeta_gradient(x, y), px * dx + py * dy
+  return _lbeta_naive_gradient(x, y), px * dx + py * dy
 
 
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_lbeta_fwd,
     vjp_bwd=_lbeta_bwd,
     jvp_fn=_lbeta_jvp)
-def _lbeta_gradient(x, y):
+def _lbeta_custom_gradient(x, y):
   """Computes log(Beta(x, y)) with correct custom gradient."""
-  return _lbeta_no_gradient(x, y)
+  return _lbeta_naive_gradient(x, y)
 
 
 def lbeta(x, y, name=None):
@@ -776,4 +802,4 @@ def lbeta(x, y, name=None):
     dtype = dtype_util.common_dtype([x, y], tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype)
     y = tf.convert_to_tensor(y, dtype=dtype)
-    return _lbeta_gradient(x, y)
+    return _lbeta_custom_gradient(x, y)

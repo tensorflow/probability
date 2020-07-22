@@ -70,12 +70,7 @@ JVP_LOGPROB_SAMPLE_BLOCKLIST = (
     'JohnsonSU',
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
-    'CholeskyLKJ',
-    'HalfStudentT',
     'JohnsonSU',
-    'LKJ',
-    'PowerSpherical',
-    'StudentT',
 )
 
 VJP_SAMPLE_BLOCKLIST = ()
