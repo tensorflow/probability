@@ -138,83 +138,35 @@ def main(argv):
     })
   replacements.update({
       'tensorflow_probability.python.{}'.format(lib):
-      'tensorflow_probability.python.{}._numpy'.format(lib)
+      'tensorflow_probability.substrates.numpy.{}'.format(lib)
       for lib in LIBS
   })
   replacements.update({
       'tensorflow_probability.python import {} as'.format(lib):
-      'tensorflow_probability.python.{} import _numpy as'.format(lib)
+      'tensorflow_probability.substrates.numpy import {} as'.format(lib)
       for lib in LIBS
   })
   replacements.update({
       'tensorflow_probability.python import {}'.format(lib):
-      'tensorflow_probability.python.{} import _numpy as {}'.format(lib, lib)
+      'tensorflow_probability.substrates.numpy import {}'.format(lib)
       for lib in LIBS
   })
   replacements.update({
-      '._numpy.inference_gym.targets.ground_truth':
-          '.inference_gym.targets.ground_truth._numpy',
-      '._numpy.inference_gym.internal.datasets':
-          '.inference_gym.internal.datasets._numpy',
-  })
-  replacements.update({
-      '._numpy import inference_gym':
-          '.inference_gym import _numpy as inference_gym',
-      '._numpy import psd_kernels': '.psd_kernels import _numpy as psd_kernels',
-      '._numpy.inference_gym import targets':
-          '.inference_gym.targets import _numpy as targets',
-      '._numpy.inference_gym.targets': '.inference_gym.targets._numpy',
-      '._numpy.inference_gym import internal':
-          '.inference_gym.internal import _numpy as internal',
-      '._numpy.inference_gym.internal': '.inference_gym.internal._numpy',
-      'math._numpy.psd_kernels': 'math.psd_kernels._numpy',
-      'util.seed_stream': 'util._numpy.seed_stream',
-  })
-  replacements.update({
       # Permits distributions.internal, psd_kernels.internal.
-      '._numpy.internal': '.internal._numpy',
-      'as psd_kernels as': 'as',
+      # 'as psd_kernels as': 'as',
   })
   replacements.update({
       'tensorflow_probability.python.internal.{}'.format(internal):
-      'tensorflow_probability.python.internal._numpy.{}'.format(internal)
+      'tensorflow_probability.substrates.numpy.internal.{}'.format(internal)
       for internal in INTERNALS
-  })
-  replacements.update({
-      'tensorflow_probability.python.internal import {}'.format(internal):
-      'tensorflow_probability.python.internal._numpy import {}'.format(internal)
-      for internal in INTERNALS
-  })
-  replacements.update({
-      'tensorflow_probability.python.optimizer._numpy import {}'.format(  # pylint: disable=g-complex-comprehension
-          optimizer):
-      'tensorflow_probability.python.optimizer.{} import _numpy as {}'.format(
-          optimizer, optimizer)
-      for optimizer in OPTIMIZERS
-  })
-  replacements.update({
-      'tensorflow_probability.python.optimizer._numpy.{}'.format(  # pylint: disable=g-complex-comprehension
-          optimizer):
-      'tensorflow_probability.python.optimizer.{}._numpy'.format(
-          optimizer)
-      for optimizer in OPTIMIZERS
-  })
-  replacements.update({
-      'tensorflow_probability.python.optimizer._numpy.linesearch '  # pylint: disable=g-complex-comprehension
-      'import {}'.format(linesearch):
-      'tensorflow_probability.python.optimizer.linesearch.{} '
-      'import _numpy as {}'.format(
-          linesearch, linesearch)
-      for linesearch in LINESEARCH
-  })
-  replacements.update({
-      'tensorflow_probability.python.optimizer.linesearch._numpy.{}'.format(  # pylint: disable=g-complex-comprehension
-          linesearch):
-      'tensorflow_probability.python.optimizer.linesearch.{}._numpy'.format(
-          linesearch)
-      for linesearch in LINESEARCH
   })
   # pylint: disable=g-complex-comprehension
+  replacements.update({
+      'tensorflow_probability.python.internal import {}'.format(internal):
+          'tensorflow_probability.substrates.numpy.internal import {}'.format(
+              internal)
+      for internal in INTERNALS
+  })
   replacements.update({
       'tensorflow.python.ops import {}'.format(private):
       'tensorflow_probability.python.internal.backend.numpy import private'
@@ -284,10 +236,6 @@ def main(argv):
   if FLAGS.numpy_to_jax:
     contents = contents.replace('tfp.substrates.numpy', 'tfp.substrates.jax')
     contents = contents.replace('substrates.numpy', 'substrates.jax')
-    contents = contents.replace('self._numpy', 'SELF_NUMPY')
-    contents = contents.replace('._numpy', '._jax')
-    contents = contents.replace('SELF_NUMPY', 'self._numpy')
-    contents = contents.replace('import _numpy', 'import _jax')
     contents = contents.replace('backend.numpy', 'backend.jax')
     contents = contents.replace('backend import numpy', 'backend import jax')
     contents = contents.replace('def _call_jax', 'def __call__')
@@ -301,6 +249,16 @@ def main(argv):
           'from jax.config import config; '
           'config.update("jax_enable_x64", True); '
           'tf.test.main()')
+
+  print('# ' + '@' * 78)
+  print('# This file is auto-generated by substrates/meta/rewrite.py')
+  print('# It will be surfaced by the build system as a symlink at:')
+  substrate = 'jax' if FLAGS.numpy_to_jax else 'numpy'
+  print('#   `tensorflow_probability/substrates/{substrate}/{path}`'.format(
+      substrate=substrate, path=filename.split('/python/')[1]))
+  print('# For more info, see substrate_runfiles_symlinks in build_defs.bzl')
+  print('# ' + '@' * 78)
+  print('\n\n')
 
   print(contents)
 

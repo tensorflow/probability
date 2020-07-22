@@ -26,9 +26,11 @@ NO_REWRITE_NEEDED = [
 
 REWRITER_TARGET = "//tensorflow_probability/substrates/meta:rewrite"
 
+RUNFILES_ROOT = "tensorflow_probability/"
+
 def _substrate_src(src, substrate):
     """Rewrite a single src filename for the given substrate."""
-    return "_{}/{}".format(substrate, src)
+    return "_{}/_generated_{}".format(substrate, src)
 
 def _substrate_srcs(srcs, substrate):
     """Rewrite src filenames for the given substrate."""
@@ -42,10 +44,6 @@ def _substrate_dep(dep, substrate):
     for no_rewrite in NO_REWRITE_NEEDED:
         if no_rewrite in dep_to_check:
             return dep
-    if dep_to_check.endswith("python/bijectors") or dep_to_check.endswith("python/bijectors:bijectors"):
-        return "//tensorflow_probability/substrates/{}/bijectors".format(substrate)
-    if dep_to_check.endswith("python/distributions") or dep_to_check.endswith("python/distributions:distributions"):
-        return "//tensorflow_probability/substrates/{}/distributions".format(substrate)
     if "tensorflow_probability/" in dep or dep.startswith(":"):
         if "internal/backend" in dep:
             return dep
@@ -75,6 +73,97 @@ def _resolve_omit_dep(dep):
     if dep.startswith(":"):
         dep = "{}{}".format(native.package_name(), dep)
     return dep
+
+def _substrate_runfiles_symlinks_impl(ctx):
+    """A custom BUILD rule to generate python runfiles symlinks.
+
+    A custom build rule which adds runfiles symlinks for files matching a
+    substrate genrule file pattern, i.e. `'_jax/_generated_normal.py'`.
+
+    This rule will aggregate and pass along deps while adding the given
+    symlinks to the runfiles structure.
+
+    Build rule attributes:
+    - substrate: One of 'jax' or 'numpy'; which substrate this applies to.
+    - deps: A list of py_library labels. These are passed along.
+
+    Args:
+        ctx: Rule analysis context.
+
+    Returns:
+        Info objects to propagate deps and add runfiles symlinks.
+    """
+
+    # Aggregate the depset inputs to resolve transitive dependencies.
+    transitive_sources = []
+    uses_shared_libraries = []
+    imports = []
+    has_py2_only_sources = []
+    has_py3_only_sources = []
+    cc_infos = []
+    for dep in ctx.attr.deps:
+        if PyInfo in dep:
+            transitive_sources.append(dep[PyInfo].transitive_sources)
+            uses_shared_libraries.append(dep[PyInfo].uses_shared_libraries)
+            imports.append(dep[PyInfo].imports)
+            has_py2_only_sources.append(dep[PyInfo].has_py2_only_sources)
+            has_py3_only_sources.append(dep[PyInfo].has_py3_only_sources)
+
+#         if PyCcLinkParamsProvider in dep:  # DisableOnExport
+#             cc_infos.append(dep[PyCcLinkParamsProvider].cc_info)  # DisableOnExport
+
+        if CcInfo in dep:
+            cc_infos.append(dep[CcInfo])
+
+    # Determine the set of symlinks to generate.
+    transitive_sources = depset(transitive = transitive_sources)
+    runfiles_dict = {}
+    substrate = ctx.attr.substrate
+    file_substr = "_{}/_generated_".format(substrate)
+    for f in transitive_sources.to_list():
+        if "tensorflow_probability" in f.dirname and file_substr in f.short_path:
+            pre, post = f.short_path.split("/python/")
+            out_path = "{}/substrates/{}/{}".format(
+                pre,
+                substrate,
+                post.replace(file_substr, ""),
+            )
+            runfiles_dict[RUNFILES_ROOT + out_path] = f
+
+    # Construct the output structures to pass along Python srcs/deps/etc.
+    py_info = PyInfo(
+        transitive_sources = transitive_sources,
+        uses_shared_libraries = any(uses_shared_libraries),
+        imports = depset(transitive = imports),
+        has_py2_only_sources = any(has_py2_only_sources),
+        has_py3_only_sources = any(has_py3_only_sources),
+    )
+
+    py_cc_link_info = cc_common.merge_cc_infos(cc_infos = cc_infos)
+
+    py_runfiles = depset(
+        transitive = [depset(transitive = [
+            dep[DefaultInfo].data_runfiles.files,
+            dep[DefaultInfo].default_runfiles.files,
+        ]) for dep in ctx.attr.deps],
+    )
+
+    runfiles = DefaultInfo(runfiles = ctx.runfiles(
+        transitive_files = py_runfiles,
+        root_symlinks = runfiles_dict,
+    ))
+
+    return py_info, py_cc_link_info, runfiles
+
+# See documentation at:
+# https://docs.bazel.build/versions/3.4.0/skylark/rules.html
+substrate_runfiles_symlinks = rule(
+    implementation = _substrate_runfiles_symlinks_impl,
+    attrs = {
+        "substrate": attr.string(),
+        "deps": attr.label_list(),
+    },
+)
 
 def multi_substrate_py_library(
         name,
@@ -132,10 +221,18 @@ def multi_substrate_py_library(
             tools = [REWRITER_TARGET],
         )
     native.py_library(
-        name = "{}.numpy".format(name),
+        name = "{}.numpy.raw".format(name),
         srcs = _substrate_srcs(srcs, "numpy"),
         deps = _substrate_deps(trimmed_deps, "numpy"),
         srcs_version = srcs_version,
+        testonly = testonly,
+    )
+
+    # Add symlinks under tfp/substrates/numpy.
+    substrate_runfiles_symlinks(
+        name = "{}.numpy".format(name),
+        substrate = "numpy",
+        deps = [":{}.numpy.raw".format(name)],
         testonly = testonly,
     )
 
@@ -156,10 +253,18 @@ def multi_substrate_py_library(
             tools = [REWRITER_TARGET],
         )
     native.py_library(
-        name = "{}.jax".format(name),
+        name = "{}.jax.raw".format(name),
         srcs = jax_srcs,
         deps = _substrate_deps(trimmed_deps, "jax"),
         srcs_version = srcs_version,
+        testonly = testonly,
+    )
+
+    # Add symlinks under tfp/substrates/jax.
+    substrate_runfiles_symlinks(
+        name = "{}.jax".format(name),
+        substrate = "jax",
+        deps = [":{}.jax.raw".format(name)],
         testonly = testonly,
     )
 

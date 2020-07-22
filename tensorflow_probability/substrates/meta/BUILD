@@ -37,7 +37,7 @@ py3_test(
     python_version = "PY3",
     tags = ["tfp_numpy"],
     deps = [
-        "//tensorflow_probability/substrates/numpy",
+        "//tensorflow_probability/substrates:numpy",
     ],
 )
 
@@ -49,7 +49,7 @@ py3_test(
     tags = ["tfp_jax"],
     deps = [
         # jax dep,
-        "//tensorflow_probability/substrates/jax",
+        "//tensorflow_probability/substrates:jax",
     ],
 )
 

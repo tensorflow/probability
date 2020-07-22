@@ -32,7 +32,6 @@ py_library(
     deps = [
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:lazy_loader",
-        "//tensorflow_probability/substrates/jax",
-        "//tensorflow_probability/substrates/numpy",
+        "//tensorflow_probability/substrates",
     ],
 )

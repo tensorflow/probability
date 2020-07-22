@@ -25,11 +25,11 @@ import jax.numpy as np
 
 # pylint: disable=no-name-in-module
 
-from tensorflow_probability.python.distributions._jax import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal._jax import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal._jax import test_util
 from tensorflow_probability.python.internal.backend import jax as tf
+from tensorflow_probability.substrates.jax.distributions import hypothesis_testlib as dhps
+from tensorflow_probability.substrates.jax.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.substrates.jax.internal import test_util
 
 
 flags.DEFINE_bool('execute_only', False,

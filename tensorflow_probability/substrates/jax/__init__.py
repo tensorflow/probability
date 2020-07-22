@@ -22,12 +22,12 @@ from __future__ import print_function
 
 
 # Ensure JAX is importable. This needs to happen first, since the imports below
-# will try to import jax, too.
+# will try to import JAX, too.
 def _ensure_jax_install():  # pylint: disable=g-statement-before-imports
-  """Attempt to import jax.
+  """Attempt to import JAX.
 
   Raises:
-    ImportError: if jax is not importable.
+    ImportError: if JAX is not importable.
   """
   try:
     import jax
@@ -40,15 +40,15 @@ def _ensure_jax_install():  # pylint: disable=g-statement-before-imports
 _ensure_jax_install()
 del _ensure_jax_install  # Cleanup symbol to avoid polluting namespace.
 
-from tensorflow_probability.python.bijectors import _jax as bijectors
-from tensorflow_probability.python.distributions import _jax as distributions
-from tensorflow_probability.python.experimental import _jax as experimental
-from tensorflow_probability.python.internal import _jax as internal
-from tensorflow_probability.python.math import _jax as math
-from tensorflow_probability.python.mcmc import _jax as mcmc
-from tensorflow_probability.python.random import _jax as random
-from tensorflow_probability.python.stats import _jax as stats
-from tensorflow_probability.python.util import _jax as util
-from tensorflow_probability.python.optimizer import _jax as optimizer
+from tensorflow_probability.substrates.jax import bijectors
+from tensorflow_probability.substrates.jax import distributions
+from tensorflow_probability.substrates.jax import experimental
+from tensorflow_probability.substrates.jax import internal
+from tensorflow_probability.substrates.jax import math
+from tensorflow_probability.substrates.jax import mcmc
+from tensorflow_probability.substrates.jax import optimizer
+from tensorflow_probability.substrates.jax import random
+from tensorflow_probability.substrates.jax import stats
+from tensorflow_probability.substrates.jax import util
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax

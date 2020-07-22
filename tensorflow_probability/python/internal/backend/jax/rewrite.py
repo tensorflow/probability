@@ -26,7 +26,6 @@ from absl import app
 
 def main(argv):
   contents = open(argv[1]).read()
-  contents = contents.replace('._numpy', '._jax')
   contents = contents.replace(
       'tensorflow_probability.python.internal.backend.numpy',
       'tensorflow_probability.python.internal.backend.jax')

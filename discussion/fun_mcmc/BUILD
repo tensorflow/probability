@@ -102,7 +102,7 @@ py_library(
         ":util_jax",
         ":util_tf",
         "//tensorflow_probability",
-        "//tensorflow_probability/substrates/jax",
+        "//tensorflow_probability/substrates:jax",
     ],
 )
 
@@ -151,7 +151,7 @@ py_library(
     deps = [
         ":tf_on_jax",
         ":util_jax",
-        "//tensorflow_probability/substrates/jax",
+        "//tensorflow_probability/substrates:jax",
     ],
 )
 
