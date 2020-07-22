@@ -171,7 +171,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
   at a new set of points `t`, conditional on those observed data.
 
   ```none
-    (f(t) | t, x, f(x)) ~ MVN(loc, cov)
+    (f(t) | t, x, y) ~ MVN(loc, cov)
 
     where
 
