@@ -58,6 +58,21 @@ class Blockwise(bijector_base.Bijector):
   y_1 = tfb.Sigmoid().forward(x_1)
   y = tf.concat([y_0, y_1], axis=-1)
   ```
+
+  Keyword arguments can be passed to the inner bijectors by utilizing the inner
+  bijector names, e.g.:
+
+  ```python
+  blockwise = tfb.Blockwise([Bijector1(name='b1'), Bijector2(name='b2')])
+  y = blockwise.forward(x, b1={'arg': 1}, b2={'arg': 2})
+
+  # Equivalent to:
+  x_0, x_1 = tf.split(x, [1, 1], axis=-1)
+  y_0 = Bijector1().forward(x_0, arg=1)
+  y_1 = Bijector2().forward(x_1, arg=2)
+  y = tf.concat([y_0, y_1], axis=-1)
+  ```
+
   """
 
   def __init__(self,
@@ -169,38 +184,45 @@ class Blockwise(bijector_base.Bijector):
     input_size = ps.reduce_sum(self.block_sizes)
     return ps.concat([output_shape[:-1], input_size[tf.newaxis]], -1)
 
-  def _forward(self, x):
+  def _forward(self, x, **kwargs):
     split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
                        num=len(self.bijectors))
-    split_y = [b.forward(x_) for b, x_ in zip(self.bijectors, split_x)]
+    # TODO(b/162023850): Sanitize the kwargs better.
+    split_y = [
+        b.forward(x_, **kwargs.get(b.name, {}))
+        for b, x_ in zip(self.bijectors, split_x)
+    ]
     y = tf.concat(split_y, axis=-1)
     if not self._maybe_changes_size:
       tensorshape_util.set_shape(y, x.shape)
     return y
 
-  def _inverse(self, y):
+  def _inverse(self, y, **kwargs):
     split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
                        axis=-1, num=len(self.bijectors))
-    split_x = [b.inverse(y_) for b, y_ in zip(self.bijectors, split_y)]
+    split_x = [
+        b.inverse(y_, **kwargs.get(b.name, {}))
+        for b, y_ in zip(self.bijectors, split_y)
+    ]
     x = tf.concat(split_x, axis=-1)
     if not self._maybe_changes_size:
       tensorshape_util.set_shape(x, y.shape)
     return x
 
-  def _forward_log_det_jacobian(self, x):
+  def _forward_log_det_jacobian(self, x, **kwargs):
     split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
                        num=len(self.bijectors))
     fldjs = [
-        b.forward_log_det_jacobian(x_, event_ndims=1)
+        b.forward_log_det_jacobian(x_, event_ndims=1, **kwargs.get(b.name, {}))
         for b, x_ in zip(self.bijectors, split_x)
     ]
     return sum(fldjs)
 
-  def _inverse_log_det_jacobian(self, y):
+  def _inverse_log_det_jacobian(self, y, **kwargs):
     split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
                        axis=-1, num=len(self.bijectors))
     ildjs = [
-        b.inverse_log_det_jacobian(y_, event_ndims=1)
+        b.inverse_log_det_jacobian(y_, event_ndims=1, **kwargs.get(b.name, {}))
         for b, y_ in zip(self.bijectors, split_y)
     ]
     return sum(ildjs)

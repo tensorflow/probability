@@ -141,6 +141,18 @@ class Chain(bijector.Bijector):
     = tf.log(y - 1.)
     ```
 
+  Keyword arguments can be passed to the inner bijectors by utilizing the inner
+  bijector names, e.g.:
+
+  ```python
+  chain = Chain([Bijector1(name='b1'), Bijector2(name='b2')])
+  y = chain.forward(x, b1={'arg': 1}, b2={'arg': 2})
+
+  # Equivalent to:
+  z = Bijector2().forward(x, arg=1)
+  y = Bijector1().forward(z, arg=2)
+  ```
+
   """
 
   def __init__(self,
@@ -287,6 +299,7 @@ class Chain(bijector.Bijector):
     return dtype
 
   def _forward(self, x, **kwargs):
+    # TODO(b/162023850): Sanitize the kwargs better.
     for b in reversed(self.bijectors):
       x = b.forward(x, **kwargs.get(b.name, {}))
     return x

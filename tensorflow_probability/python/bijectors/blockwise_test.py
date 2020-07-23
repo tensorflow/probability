@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 
 from absl.testing import parameterized
+import mock
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
@@ -262,6 +263,38 @@ class BlockwiseBijectorTest(test_util.TestCase):
       blockwise = tfb.Blockwise(
           bijectors=[tfb.Exp()], block_sizes=block_sizes, validate_args=True)
       self.evaluate(blockwise.block_sizes)
+
+  def testKwargs(self):
+    zeros = tf.zeros(1)
+
+    bijectors = [
+        tfb.Inline(  # pylint: disable=g-complex-comprehension
+            forward_fn=mock.Mock(return_value=zeros),
+            inverse_fn=mock.Mock(return_value=zeros),
+            forward_log_det_jacobian_fn=mock.Mock(return_value=zeros),
+            inverse_log_det_jacobian_fn=mock.Mock(return_value=zeros),
+            forward_min_event_ndims=0,
+            name='inner{}'.format(i)) for i in range(2)
+    ]
+
+    blockwise = tfb.Blockwise(bijectors)
+
+    x = [1, 2]
+    blockwise.forward(x, inner0={'arg': 1}, inner1={'arg': 2})
+    blockwise.inverse(x, inner0={'arg': 3}, inner1={'arg': 4})
+    blockwise.forward_log_det_jacobian(
+        x, event_ndims=1, inner0={'arg': 5}, inner1={'arg': 6})
+    blockwise.inverse_log_det_jacobian(
+        x, event_ndims=1, inner0={'arg': 7}, inner1={'arg': 8})
+
+    bijectors[0]._forward.assert_called_with(mock.ANY, arg=1)
+    bijectors[1]._forward.assert_called_with(mock.ANY, arg=2)
+    bijectors[0]._inverse.assert_called_with(mock.ANY, arg=3)
+    bijectors[1]._inverse.assert_called_with(mock.ANY, arg=4)
+    bijectors[0]._forward_log_det_jacobian.assert_called_with(mock.ANY, arg=5)
+    bijectors[1]._forward_log_det_jacobian.assert_called_with(mock.ANY, arg=6)
+    bijectors[0]._inverse_log_det_jacobian.assert_called_with(mock.ANY, arg=7)
+    bijectors[1]._inverse_log_det_jacobian.assert_called_with(mock.ANY, arg=8)
 
 
 if __name__ == '__main__':
