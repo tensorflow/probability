@@ -24,6 +24,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -519,18 +520,8 @@ def log1mexp(x, name=None):
         tf.math.log1p(-tf.math.exp(-x)))
 
 
-@tf.custom_gradient
-def log_cosh(x, name=None):
-  """Compute `log(cosh(x))` in a numerically stable way.
-
-  Args:
-    x: Float `Tensor`.
-    name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., `'log_cosh'`).
-
-  Returns:
-    log_cosh: `log_cosh(x)`.
-  """
+def _log_cosh_impl(x):
+  """Body of numerically stable log_cosh."""
   # log(cosh(x)) = log(e^x + e^-x) - log(2).
   # For x > 0, we can rewrite this as x + log(1 + e^(-2 * x)) - log(2).
   # The second term will be small when x is large, so we don't get any large
@@ -546,24 +537,47 @@ def log_cosh(x, name=None):
   # x ** 2 / 2.  * (1. - x ** 2 / 6) + x ** 6 / 45. + O(x**8)
   # For x < 45 * sixthroot(smallest normal), all higher level terms
   # disappear and we can use the above expression.
+  numpy_dtype = dtype_util.as_numpy_dtype(x.dtype)
+  abs_x = tf.math.abs(x)
+  logcosh = abs_x + tf.math.softplus(-2 * abs_x) - np.log(2).astype(
+      numpy_dtype)
+  bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
+  return tf.where(
+      abs_x <= bound,
+      tf.math.exp(tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
+      logcosh)
+
+
+def _log_cosh_jvp(primals, tangents):
+  x, = primals
+  dx, = tangents
+  return _log_cosh_impl(x), tf.math.tanh(x) * dx
+
+
+# The gradient of log(cosh(x)) is tanh(x)
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=lambda x: (_log_cosh_impl(x), x),
+    vjp_bwd=lambda x, dy: dy * tf.math.tanh(x),
+    jvp_fn=_log_cosh_jvp)
+def _log_cosh_custom_gradient(x):
+  return _log_cosh_impl(x)
+
+
+def log_cosh(x, name=None):
+  """Compute `log(cosh(x))` in a numerically stable way.
+
+  Args:
+    x: Float `Tensor`.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'log_cosh'`).
+
+  Returns:
+    log_cosh: `log_cosh(x)`.
+  """
   with tf.name_scope(name or 'log_cosh'):
     dtype = dtype_util.common_dtype([x], dtype_hint=tf.float32)
-    numpy_dtype = dtype_util.as_numpy_dtype(dtype)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
-    abs_x = tf.math.abs(x)
-    logcosh = abs_x + tf.math.softplus(-2 * abs_x) - np.log(2).astype(
-        numpy_dtype)
-    bound = 45. * np.power(np.finfo(numpy_dtype).tiny, 1 / 6.)
-    answer = tf.where(
-        abs_x <= bound,
-        tf.math.exp(
-            tf.math.log(abs_x) + tf.math.log1p(-tf.square(abs_x) / 6.)),
-        logcosh)
-
-    # The gradient of log(cosh(x)) is tanh(x)
-    def grad(dy):
-      return dy * tf.math.tanh(x)
-    return answer, grad
+    return _log_cosh_custom_gradient(x)
 
 
 def soft_sorting_matrix(x, temperature, name=None):

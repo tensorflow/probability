@@ -88,14 +88,13 @@ multi_substrate_py_test(
 
 multi_substrate_py_library(
     name = "generic",
-    srcs = [
-        "generic.py",
-    ],
+    srcs = ["generic.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":scan_associative",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
