@@ -43,21 +43,15 @@ FLAGS = flags.FLAGS
 
 JIT_SAMPLE_BLOCKLIST = ()
 JIT_LOGPROB_BLOCKLIST = (
-    'BatchReshape',
+    'BatchReshape',  # http://b/161984806
     'Bates',
-    'Independent',
-    'MixtureSameFamily',
-    'TransformedDistribution',
 )
 
 VMAP_SAMPLE_BLOCKLIST = ()
 VMAP_LOGPROB_BLOCKLIST = (
-    'BatchReshape',
+    'BatchReshape',  # http://b/161984806
     'Bates',
-    'Independent',
-    'MixtureSameFamily',
     'NegativeBinomial',  # Times out.
-    'TransformedDistribution',
 )
 
 JVP_SAMPLE_BLOCKLIST = (
@@ -111,8 +105,10 @@ class JitTest(test_util.TestCase):
   def testLogProb(self, dist_name, data):
     if (dist_name in JIT_LOGPROB_BLOCKLIST) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
-    dist = data.draw(dhps.distributions(enable_vars=False,
-                                        dist_name=dist_name))
+    dist = data.draw(dhps.distributions(
+        enable_vars=False,
+        dist_name=dist_name,
+        eligibility_filter=lambda dname: dname not in JIT_LOGPROB_BLOCKLIST))
     sample = dist.sample(seed=test_util.test_seed())
     result = jax.jit(dist.log_prob)(sample)
     if not FLAGS.execute_only:
@@ -141,8 +137,12 @@ class VmapTest(test_util.TestCase):
   def testLogProb(self, dist_name, data):
     if (dist_name in VMAP_LOGPROB_BLOCKLIST) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
-    dist = data.draw(dhps.distributions(enable_vars=False,
-                                        dist_name=dist_name))
+    if dist_name == 'NegativeBinomial':
+      self.skipTest('Skip never-terminating negative binomial vmap logprob.')
+    dist = data.draw(dhps.distributions(
+        enable_vars=False,
+        dist_name=dist_name,
+        eligibility_filter=lambda dname: dname not in VMAP_LOGPROB_BLOCKLIST))
     sample = dist.sample(seed=test_util.test_seed(), sample_shape=10)
     result = jax.vmap(dist.log_prob)(sample)
     if not FLAGS.execute_only:
