@@ -31,6 +31,7 @@ __all__ = [
     'gamma',
     'stateless_gamma',
     'stateless_normal',
+    'stateless_parameterized_truncated_normal',
     'stateless_poisson',
     'stateless_shuffle',
     'stateless_uniform',
@@ -222,6 +223,28 @@ def _shuffle_jax(value, seed=None, name=None):  # pylint: disable=unused-argumen
   return jaxrand.shuffle(seed, value, axis=0)
 
 
+def _truncated_normal(
+    shape, seed, means=0.0, stddevs=1.0, minvals=-2.0, maxvals=2.0, name=None):  # pylint: disable=unused-argument
+  from scipy import stats  # pylint: disable=g-import-not-at-top
+  rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
+  std_low = (minvals - means) / stddevs
+  std_high = (maxvals - means) / stddevs
+  std_samps = stats.truncnorm.rvs(
+      std_low, std_high, size=shape, random_state=rng)
+  return std_samps * stddevs + means
+
+
+def _truncated_normal_jax(
+    shape, seed, means=0.0, stddevs=1.0, minvals=-2.0, maxvals=2.0, name=None):  # pylint: disable=unused-argument
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  std_low = (minvals - means) / stddevs
+  std_high = (maxvals - means) / stddevs
+  std_samps = jaxrand.truncated_normal(seed, std_low, std_high, shape)
+  return std_samps * stddevs + means
+
+
 def _uniform(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   """Numpy uniform random sampler."""
@@ -304,6 +327,10 @@ def gamma(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
 stateless_normal = utils.copy_docstring(
     'tf.random.normal',
     _normal_jax if JAX_MODE else _normal)
+
+stateless_parameterized_truncated_normal = utils.copy_docstring(
+    'tf.random.stateless_parameterized_truncated_normal',
+    _truncated_normal_jax if JAX_MODE else _truncated_normal)
 
 stateless_poisson = utils.copy_docstring(
     'tf.random.poisson',

@@ -57,7 +57,6 @@ VMAP_LOGPROB_BLOCKLIST = (
 JVP_SAMPLE_BLOCKLIST = (
     'Gamma',
     'GeneralizedNormal',
-    'TruncatedNormal',
     'VonMises',
 )
 JVP_LOGPROB_SAMPLE_BLOCKLIST = ()
