@@ -68,7 +68,7 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
       @tf.custom_gradient
       def f_wrapped(*args, **kwargs):
         val, aux = vjp_fwd(*args, **kwargs)
-        return val, lambda g: vjp_bwd(aux, g)
+        return val, lambda *g: vjp_bwd(aux, tf.nest.pack_sequence_as(val, g))
 
       return f_wrapped
 

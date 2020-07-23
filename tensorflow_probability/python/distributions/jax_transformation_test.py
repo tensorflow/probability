@@ -74,13 +74,7 @@ JVP_LOGPROB_PARAM_BLOCKLIST = (
 )
 
 VJP_SAMPLE_BLOCKLIST = ()
-VJP_LOGPROB_SAMPLE_BLOCKLIST = (
-    'Categorical',
-    'OneHotCategorical',
-    'OrderedLogistic',
-    'PlackettLuce',
-    'ProbitBernoulli',
-)
+VJP_LOGPROB_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_PARAM_BLOCKLIST = ()
 
 
@@ -256,6 +250,8 @@ class _GradTest(test_util.TestCase):
         params=constrained_params))
 
     sample = dist.sample(seed=random.PRNGKey(0))
+    if np.issubdtype(sample.dtype, np.integer):
+      self.skipTest('{} has integer samples; no derivative.'.format(dist_name))
     def _log_prob(sample):
       return dist.log_prob(sample)
     self._test_transformation(_log_prob, sample)

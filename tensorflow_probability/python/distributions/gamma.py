@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
@@ -385,44 +386,79 @@ def random_gamma(
       default_fn=_random_gamma_noncpu,
       cpu_fn=_random_gamma_cpu)
 
-  @tf.custom_gradient
-  def _sample(concentration, rate):
+  def _sample_no_gradient(concentration, rate):
     samples, impl = sampler_impl(
         shape=shape, concentration=concentration, rate=rate, seed=seed)
-    def grad(*dys):
-      """The gradient of the gamma samples w.r.t alpha and beta."""
-      # Ignore any gradient contributions that come from the implementation
-      # enum.
-      dy = dys[0]
-      JAX_MODE = False   # pylint: disable=invalid-name
-      if JAX_MODE:
-        dy = dy[0]
-      partial_alpha = tf.raw_ops.RandomGammaGrad(
-          alpha=concentration, sample=samples * rate) / rate
-      partial_beta = -samples / rate
-      # These will need to be shifted by the extra dimensions added from
-      # `sample_shape`.
-      grad_a = tf.math.reduce_sum(
-          dy * partial_alpha, axis=tf.range(tf.size(shape)))
-      grad_b = tf.math.reduce_sum(
-          dy * partial_beta, axis=tf.range(tf.size(shape)))
-      if (tensorshape_util.is_fully_defined(concentration.shape) and
-          tensorshape_util.is_fully_defined(rate.shape) and
-          concentration.shape == rate.shape):
-        return [grad_a, grad_b]
+    return samples, impl
 
-      ra, rb = tf.raw_ops.BroadcastGradientArgs(
-          s0=tf.shape(concentration), s1=tf.shape(rate))
-      grad_a = tf.reshape(
-          tf.math.reduce_sum(grad_a, axis=ra, keepdims=True),
-          tf.shape(concentration))
-      grad_b = tf.reshape(
-          tf.math.reduce_sum(grad_b, axis=rb, keepdims=True),
-          tf.shape(rate))
+  def _sample_fwd(concentration, rate):
+    """Compute output, aux (collaborates with _log_gamma_difference_bwd)."""
+    samples, impl = _sample_no_gradient(concentration, rate)
+    return (samples, impl), (samples, concentration, rate)
 
-      return [grad_a, grad_b]
-    return (samples, impl), grad
-  return _sample(concentration, rate)
+  def _sample_bwd(aux, g):
+    """The gradient of the gamma samples w.r.t alpha and beta."""
+    samples, concentration, rate = aux
+    dsamples, dimpl = g
+    # Ignore any gradient contributions that come from the implementation enum.
+    del dimpl
+    partial_concentration = tf.raw_ops.RandomGammaGrad(
+        alpha=concentration, sample=samples * rate) / rate
+    partial_rate = -samples / rate
+    # These will need to be shifted by the extra dimensions added from
+    # `sample_shape`.
+    grad_concentration = tf.math.reduce_sum(
+        dsamples * partial_concentration, axis=tf.range(tf.size(shape)))
+    grad_rate = tf.math.reduce_sum(
+        dsamples * partial_rate, axis=tf.range(tf.size(shape)))
+    if (tensorshape_util.is_fully_defined(concentration.shape) and
+        tensorshape_util.is_fully_defined(rate.shape) and
+        concentration.shape == rate.shape):
+      return grad_concentration, grad_rate
+
+    ax_conc, ax_rate = tf.raw_ops.BroadcastGradientArgs(
+        s0=tf.shape(concentration), s1=tf.shape(rate))
+    grad_concentration = tf.reshape(
+        tf.math.reduce_sum(grad_concentration, axis=ax_conc),
+        tf.shape(concentration))
+    grad_rate = tf.reshape(
+        tf.math.reduce_sum(grad_rate, axis=ax_rate), tf.shape(rate))
+
+    return grad_concentration, grad_rate
+
+  def _sample_jvp(primals, tangents):
+    """Computes JVP for gamma sample (supports JAX custom derivative)."""
+    concentration, rate = primals
+    dconcentration, drate = tangents
+    # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+    bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dconcentration),
+                                           prefer_static.shape(drate))
+    dconcentration = tf.broadcast_to(dconcentration, bc_shp)
+    drate = tf.broadcast_to(drate, bc_shp)
+
+    samples, impl = _sample_no_gradient(concentration, rate)
+
+    partial_concentration = tf.raw_ops.RandomGammaGrad(
+        alpha=concentration, sample=samples * rate) / rate
+    partial_rate = -samples / rate
+
+    return (
+        (samples, impl),
+        (partial_concentration * dconcentration + partial_rate * drate,
+         tf.zeros_like(impl)))
+
+  # TODO(https://github.com/google/jax/issues/3822): Drop this line
+  # We will fall back to VJP, but not have JVP support.
+  _sample_jvp = None  # pylint: disable=invalid-name
+
+  @tfp_custom_gradient.custom_gradient(
+      vjp_fwd=_sample_fwd,
+      vjp_bwd=_sample_bwd,
+      jvp_fn=_sample_jvp)
+  def _sample_gradient(concentration, rate):
+    return _sample_no_gradient(concentration, rate)
+
+  return _sample_gradient(concentration, rate)
 
 
 def random_gamma_rejection(
