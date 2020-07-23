@@ -565,7 +565,12 @@ def enable_store_parameters_in_results(kernel):
 def _is_tensor_like(param):
   if is_list_like(param):
     return all([_is_tensor_like(p) for p in param])
-  return isinstance(param, tf.Tensor) or (np.array(param).dtype != np.object)
+  if isinstance(param, tf.Tensor):
+    return True
+  elif isinstance(param, tf.Variable):
+    return False
+  else:
+    return np.array(param).dtype != np.object
 
 
 def warn_if_parameters_are_not_simple_tensors(params_dict):
