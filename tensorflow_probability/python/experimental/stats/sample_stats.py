@@ -110,9 +110,9 @@ class RunningCovariance(object):
   `RunningCovarianceState` as returned via `initialize` and `update` method
   calls.
 
-  `RunningCovariance` is meant to serve more general streaming covariance needs.
-  For a specialized version that fits MCMC sampling, see `CovarianceReducer` in
-  `tfp.experimental.mcmc`.
+  `RunningCovariance` is meant to serve general streaming covariance needs.
+  For a specialized version that fits streaming over MCMC samples, see
+  `CovarianceReducer` in `tfp.experimental.mcmc`.
   """
 
   def __init__(self, shape, event_ndims=None, dtype=tf.float32):
@@ -251,9 +251,9 @@ class RunningVariance(RunningCovariance):
   `RunningCovarianceState` as returned via `initialize` and `update` method
   calls.
 
-  `RunningVariance` is meant to serve more general streaming variance needs.
-  For a specialized version that fits MCMC sampling, see `VarianceReducer` in
-  `tfp.experimental.mcmc`.
+  `RunningVariance` is meant to serve general streaming variance needs.
+  For a specialized version that fits streaming over MCMC samples, see
+  `VarianceReducer` in `tfp.experimental.mcmc`.
   """
 
   def __init__(self, shape=(), dtype=tf.float32):

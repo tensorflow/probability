@@ -75,7 +75,7 @@ class CovarianceReducer(reducer_base.Reducer):
     have structures that ressemble ({keyA: argA, keyB: argB}, {keyC: argC}).
 
     Args:
-      event_ndims: A (possibly nested) structure of integers or `None`. Defines
+      event_ndims: A (possibly nested) structure of integers, or `None`. Defines
         the number of inner-most dimensions that represent the event shape.
         Specifying `None` returns all cross product terms (no batching)
         and is the default.
@@ -103,16 +103,13 @@ class CovarianceReducer(reducer_base.Reducer):
     Args:
       initial_chain_state: A (possibly nested) structure of `Tensor`s or Python
         `list`s of `Tensor`s representing the current state(s) of the Markov
-        chain(s). For streaming covariance, this argument has no influence on
-        computation. Hence, by default, it is `None`. However, this argument is
-        still accepted as it will be supplied by the Streaming MCMC framework
-        and is used to infer the shape and dtype of future samples.
+        chain(s). It is used to infer the shape and dtype of future samples.
       initial_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made in a related
         `TransitionKernel`. For streaming covariance, this argument also has no
-        influence on computation; hence, it is also `None` by default. Likewise,
-        this argument is still accepted as it will be supplied by the Streaming
-        MCMC framework.
+        influence on computation; hence, it is also `None` by default.
+        Nonetheless, this argument is still accepted as it will be supplied by
+        the Streaming MCMC framework.
 
     Returns:
       state: `RunningCovarianceState` representing a stream of no inputs and
@@ -120,9 +117,8 @@ class CovarianceReducer(reducer_base.Reducer):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'initialize')):
-      # pylint: disable=unnecessary-lambda
       initial_chain_state = tf.nest.map_structure(
-          lambda initial_chain_state: tf.convert_to_tensor(initial_chain_state),
+          tf.convert_to_tensor,
           initial_chain_state)
       self._parameters['shape'] = tf.nest.map_structure(
           lambda chain_state: chain_state.shape,
@@ -132,26 +128,22 @@ class CovarianceReducer(reducer_base.Reducer):
           initial_chain_state)
       if self.event_ndims is None:
         self._parameters['event_ndims'] = tf.nest.map_structure(
-            lambda chain_state: ps.rank(chain_state),
-            initial_chain_state
-        )
+            ps.rank, initial_chain_state)
       elif not nest.is_sequence(self.event_ndims):
         self._parameters['event_ndims'] = tf.nest.map_structure(
             lambda _: self.event_ndims,
             initial_chain_state,
         )
-      self.strm = nest.map_structure_up_to(
+      self.strms = nest.map_structure_up_to(
           # only parameter guaranteed to give desired shallow structure
           self._parameters['dtype'],
-          lambda shape, ndims, dtype: sample_stats.RunningCovariance(
-              shape, ndims, dtype),
+          sample_stats.RunningCovariance,
           self.shape, self.event_ndims, self.dtype,
           check_types=False,
       )
-      # pylint: enable=unnecessary-lambda
       return tf.nest.map_structure(
           lambda strm: strm.initialize(),
-          self.strm)
+          self.strms)
 
 
   def one_step(
@@ -202,7 +194,7 @@ class CovarianceReducer(reducer_base.Reducer):
           sample,
           lambda strm, reducer_state, sample, axis: strm.update(
               reducer_state, sample, axis=axis),
-          self.strm, current_reducer_state, sample, axis,
+          self.strms, current_reducer_state, sample, axis,
           check_types=False,
       )
 
@@ -219,9 +211,9 @@ class CovarianceReducer(reducer_base.Reducer):
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'finalize')):
       return nest.map_structure_up_to(
-          self.strm,
+          self.strms,
           lambda strm, state: strm.finalize(state, ddof=self.ddof),
-          self.strm, final_state
+          self.strms, final_state
       )
 
   @property
