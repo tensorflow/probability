@@ -24,11 +24,13 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as otf
 
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import sp500_closing_prices as sp500_closing_prices_lib  # pylint: disable=g-import-not-at-top
 from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib  # pylint: disable=g-import-not-at-top
 from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib  # pylint: disable=g-import-not-at-top
 
 __all__ = [
     'german_credit_numeric',
+    'sp500_closing_prices',
     'synthetic_item_response_theory',
     'synthetic_log_gaussian_cox_process',
 ]
@@ -131,6 +133,27 @@ def german_credit_numeric(
         test_features=test_features,
         test_labels=labels[num_train:].astype(np.int32),
     )
+
+
+def sp500_closing_prices(num_points=None):
+  """Dataset of mean-adjusted returns of the S&P 500 index.
+
+  Each of the 2516 entries represents the adjusted return of the daily closing
+  price relative to the previous close, for each (non-holiday) weekday,
+  beginning 6/26/2010 and ending 6/24/2020.
+
+  Args:
+    num_points: Optional `int` length of the series to return. If specified,
+      only the final `num_points` returns are centered and returned.
+      Default value: `None`.
+  Returns:
+    dataset: A Dict with the following keys:
+      `centered_returns`: float `Tensor` daily returns, minus the mean return.
+  """
+  returns = np.diff(sp500_closing_prices_lib.CLOSING_PRICES)
+  num_points = num_points or len(returns)
+  return dict(
+      centered_returns=returns[-num_points:] - np.mean(returns[-num_points:]))
 
 
 def synthetic_item_response_theory(

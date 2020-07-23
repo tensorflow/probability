@@ -45,6 +45,7 @@ multi_substrate_py_library(
         ":neals_funnel",
         ":probit_regression",
         ":sparse_logistic_regression",
+        ":stochastic_volatility",
         ":vector_model",
         "//tensorflow_probability/python/experimental/inference_gym/targets/ground_truth",  # buildcleaner: keep
     ],
@@ -292,6 +293,32 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "stochastic_volatility",
+    srcs = ["stochastic_volatility.py"],
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "stochastic_volatility_test",
+    size = "large",
+    srcs = ["stochastic_volatility_test.py"],
+    deps = [
+        ":stochastic_volatility",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

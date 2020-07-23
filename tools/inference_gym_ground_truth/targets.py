@@ -24,12 +24,15 @@ from tools.inference_gym_ground_truth import log_gaussian_cox_process
 from tools.inference_gym_ground_truth import logistic_regression
 from tools.inference_gym_ground_truth import probit_regression
 from tools.inference_gym_ground_truth import sparse_logistic_regression
+from tools.inference_gym_ground_truth import stochastic_volatility
 from tensorflow_probability.python.experimental.inference_gym.internal import data
 
 __all__ = [
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
     'german_credit_numeric_sparse_logistic_regression',
+    'stochastic_volatility_sp500',
+    'stochastic_volatility_sp500_small',
     'synthetic_item_response_theory',
     'synthetic_log_gaussian_cox_process',
 ]
@@ -69,6 +72,32 @@ def german_credit_numeric_sparse_logistic_regression():
   del dataset['test_features']
   del dataset['test_labels']
   return sparse_logistic_regression.sparse_logistic_regression(**dataset)
+
+
+def stochastic_volatility_sp500():
+  """Stochastic volatility model.
+
+  This uses a dataset of 2517 daily closing prices of the S&P 500 index,
+  representing the time period 6/25/2010-6/24/2020.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.sp500_closing_prices()
+  return stochastic_volatility.stochastic_volatility(**dataset)
+
+
+def stochastic_volatility_sp500_small():
+  """Stochastic volatility model.
+
+  This is a smaller version of `stochastic_volatility_model_sp500` using only
+  100 days of returns from the S&P 500, ending 6/24/2020.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.sp500_closing_prices(num_points=100)
+  return stochastic_volatility.stochastic_volatility(**dataset)
 
 
 def synthetic_item_response_theory():

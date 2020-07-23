@@ -34,6 +34,7 @@ multi_substrate_py_library(
     name = "datasets",
     srcs = ["__init__.py"],
     deps = [
+        ":sp500_closing_prices",
         ":synthetic_item_response_theory",
         ":synthetic_log_gaussian_cox_process",
     ],
@@ -42,6 +43,14 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "synthetic_item_response_theory",
     srcs = ["synthetic_item_response_theory.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sp500_closing_prices",
+    srcs = ["sp500_closing_prices.py"],
     deps = [
         # numpy dep,
     ],

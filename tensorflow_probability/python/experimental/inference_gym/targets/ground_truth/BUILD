@@ -37,6 +37,8 @@ multi_substrate_py_library(
         ":german_credit_numeric_logistic_regression",
         ":german_credit_numeric_probit_regression",
         ":german_credit_numeric_sparse_logistic_regression",
+        ":stochastic_volatility_sp500",
+        ":stochastic_volatility_sp500_small",
         ":synthetic_item_response_theory",
         ":synthetic_log_gaussian_cox_process",
     ],
@@ -77,6 +79,22 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "synthetic_log_gaussian_cox_process",
     srcs = ["synthetic_log_gaussian_cox_process.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "stochastic_volatility_sp500",
+    srcs = ["stochastic_volatility_sp500.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "stochastic_volatility_sp500_small",
+    srcs = ["stochastic_volatility_sp500_small.py"],
     deps = [
         # numpy dep,
     ],

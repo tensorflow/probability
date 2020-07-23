@@ -60,15 +60,19 @@ py_library(
 )
 
 py_library(
-    name = "util",
-    srcs = ["util.py"],
+    name = "stan_model",
+    srcs = ["stan_model.py"],
     srcs_version = "PY3",
 )
 
 py_library(
-    name = "stan_model",
-    srcs = ["stan_model.py"],
+    name = "stochastic_volatility",
+    srcs = ["stochastic_volatility.py"],
     srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+    ],
 )
 
 py_library(
@@ -101,6 +105,13 @@ py_library(
         ":logistic_regression",
         ":probit_regression",
         ":sparse_logistic_regression",
+        ":stochastic_volatility",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",
     ],
+)
+
+py_library(
+    name = "util",
+    srcs = ["util.py"],
+    srcs_version = "PY3",
 )
