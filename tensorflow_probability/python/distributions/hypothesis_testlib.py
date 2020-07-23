@@ -484,6 +484,35 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
+def prime_factors(v):
+  """Compute the prime factors of v."""
+  factors = []
+  primes = []
+  factor = 2
+  while v > 1:
+    while any(factor % p == 0 for p in primes):
+      factor += 1
+    primes.append(factor)
+    while v % factor == 0:
+      factors.append(factor)
+      v //= factor
+  return factors
+
+
+@hps.composite
+def reshapes_of(draw, shape, max_ndims=4):
+  """Strategy for valid reshapes of the given shape, rank at most max_ndims."""
+  factors = draw(hps.permutations(
+      prime_factors(tensorshape_util.num_elements(shape))))
+  split_points = sorted(draw(
+      hps.lists(hps.integers(min_value=0, max_value=len(factors)),
+                min_size=0, max_size=max_ndims - 1)))
+  result = ()
+  for start, stop in zip([0] + split_points, split_points + [len(factors)]):
+    result += (int(np.prod(factors[start:stop])),)
+  return result
+
+
 def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
   for param, target_param_val in six.iteritems(target_shaped_dict):
     np.testing.assert_array_equal(
@@ -732,14 +761,9 @@ def batch_reshapes(
     depth = draw(depths())
 
   if batch_shape is None:
-    batch_shape = draw(tfp_hps.shapes(min_ndims=1, max_side=4))
+    batch_shape = draw(tfp_hps.shapes(min_ndims=1, max_side=13))
 
-  # TODO(b/142135119): Wanted to draw general input and output shapes like the
-  # following, but Hypothesis complained about filtering out too many things.
-  # underlying_batch_shape = draw(tfp_hps.shapes(min_ndims=1))
-  # hp.assume(
-  #   batch_shape.num_elements() == underlying_batch_shape.num_elements())
-  underlying_batch_shape = [tensorshape_util.num_elements(batch_shape)]
+  underlying_batch_shape = draw(reshapes_of(batch_shape))
 
   underlying = draw(
       distributions(
