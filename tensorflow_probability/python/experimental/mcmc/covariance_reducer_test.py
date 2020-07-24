@@ -36,8 +36,8 @@ class CovarianceReducersTest(test_util.TestCase):
     for _ in range(2):
       state = cov_reducer.one_step(0., state)
     final_num_samples, final_mean, final_cov = self.evaluate([
-        state.num_samples,
-        state.mean,
+        state.cov_state.num_samples,
+        state.cov_state.mean,
         cov_reducer.finalize(state)])
     self.assertEqual(final_num_samples, 2)
     self.assertEqual(final_mean, 0)
@@ -51,7 +51,7 @@ class CovarianceReducersTest(test_util.TestCase):
     for sample in x:
       state = cov_reducer.one_step(sample, state)
     final_mean, final_cov = self.evaluate([
-        state.mean,
+        state.cov_state.mean,
         cov_reducer.finalize(state)])
     self.assertNear(np.mean(x), final_mean, err=1e-6)
     self.assertNear(np.var(x, ddof=0), final_cov, err=1e-6)
@@ -63,7 +63,7 @@ class CovarianceReducersTest(test_util.TestCase):
       state = cov_reducer.one_step(
           tf.zeros((5, 9, 3)), state, axis=0)
     final_mean, final_cov = self.evaluate([
-        state.mean,
+        state.cov_state.mean,
         cov_reducer.finalize(state)])
     self.assertEqual(final_mean.shape, (9, 3))
     self.assertEqual(final_cov.shape, (9, 3, 3))
@@ -75,7 +75,7 @@ class CovarianceReducersTest(test_util.TestCase):
       state = var_reducer.one_step(
           tf.zeros((5, 9, 3)), state, axis=0)
     final_mean, final_var = self.evaluate([
-        state.mean,
+        state.cov_state.mean,
         var_reducer.finalize(state)])
     self.assertEqual(final_mean.shape, (9, 3))
     self.assertEqual(final_var.shape, (9, 3))
@@ -86,26 +86,22 @@ class CovarianceReducersTest(test_util.TestCase):
     state = cov_reducer.initialize(tf.ones((2, 3), dtype=tf.float64))
 
     # check attributes are correct right after initialization
-    self.assertEqual(cov_reducer.shape, (2, 3))
     self.assertEqual(cov_reducer.event_ndims, 1)
-    self.assertEqual(cov_reducer.dtype, tf.float64)
     self.assertEqual(cov_reducer.ddof, 1)
     for _ in range(2):
       state = cov_reducer.one_step(
-          tf.zeros((2, 3)), state)
+          tf.zeros((2, 3), dtype=tf.float64), state)
 
     # check attributes don't change after stepping through
-    self.assertEqual(cov_reducer.shape, (2, 3))
     self.assertEqual(cov_reducer.event_ndims, 1)
-    self.assertEqual(cov_reducer.dtype, tf.float64)
     self.assertEqual(cov_reducer.ddof, 1)
 
   def test_tf_while(self):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     state = cov_reducer.initialize(tf.ones((2, 3)))
     _, state = tf.while_loop(
-        lambda i, _: tf.less(i, 100),
-        lambda i, state: (i+1, cov_reducer.one_step(
+        lambda i, _: i < 100,
+        lambda i, state: (i + 1, cov_reducer.one_step(
             tf.ones((2, 3)), state)),
         (0., state)
     )
@@ -118,8 +114,8 @@ class CovarianceReducersTest(test_util.TestCase):
                    {'two': tf.ones((2, 3)) * 2})
     state = cov_reducer.initialize(chain_state)
     _, state = tf.while_loop(
-        lambda i, _: tf.less(i, 10),
-        lambda i, state: (i+1, cov_reducer.one_step(
+        lambda i, _: i < 10,
+        lambda i, state: (i + 1, cov_reducer.one_step(
             chain_state, state)),
         (0., state)
     )
@@ -134,8 +130,8 @@ class CovarianceReducersTest(test_util.TestCase):
                    {'two': tf.ones((3, 4)) * 2})
     state = cov_reducer.initialize(chain_state)
     _, state = tf.while_loop(
-        lambda i, _: tf.less(i, 10),
-        lambda i, state: (i+1, cov_reducer.one_step(
+        lambda i, _: i < 10,
+        lambda i, state: (i + 1, cov_reducer.one_step(
             chain_state, state, axis=0)),
         (0., state)
     )

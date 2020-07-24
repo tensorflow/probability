@@ -18,20 +18,27 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import reducer as reducer_base
 from tensorflow_probability.python.experimental.stats import sample_stats
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow.python.util import nest
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'CovarianceReducer',
     'VarianceReducer'
 ]
+
+
+CovarianceReducerState = collections.namedtuple(
+    'CovarianceReducerState', 'init_structure, cov_state')
 
 
 class CovarianceReducer(reducer_base.Reducer):
@@ -68,11 +75,12 @@ class CovarianceReducer(reducer_base.Reducer):
       is `[5, 7, 5, 7]`.
 
     For nested latent samples, both `event_ndims` and `ddof` must be either
-    a single value or an identical structure. For example, if the chain state
-    is the tuple of dictionaries ({pairA, pairB}, {pairC}), one could use
-    scalar values of `event_ndims` (integer or `None`) and `ddof` (integer) that
-    apply to all states in the latent. If not, `event_ndims` and `ddof` must
-    have structures that ressemble ({keyA: argA, keyB: argB}, {keyC: argC}).
+    a single value or of identical structure to the chain state. For example,
+    if the chain state is the tuple of dictionaries ({pairA, pairB}, {pairC}),
+    one could use scalar values for `event_ndims` (integer or `None`) and
+    `ddof` (integer) that apply to all states in the latent. If not,
+    `event_ndims` and `ddof` must be structures that exactly mimic
+    ({keyA: argA, keyB: argB}, {keyC: argC}) in composition.
 
     Args:
       event_ndims: A (possibly nested) structure of integers, or `None`. Defines
@@ -92,8 +100,8 @@ class CovarianceReducer(reducer_base.Reducer):
         name=name or 'covariance_reducer'
     )
 
-  def initialize(self, initial_chain_state=None, initial_kernel_results=None):
-    """Initializes a `RunningCovarianceState` using previously defined metadata.
+  def initialize(self, initial_chain_state, initial_kernel_results=None):
+    """Initializes a `CovarianceReducerState` using previously defined metadata.
 
     For calculation purposes, the `initial_chain_state` does not count as a
     sample. This is a deliberate decision that ensures consistency across
@@ -104,47 +112,29 @@ class CovarianceReducer(reducer_base.Reducer):
       initial_chain_state: A (possibly nested) structure of `Tensor`s or Python
         `list`s of `Tensor`s representing the current state(s) of the Markov
         chain(s). It is used to infer the shape and dtype of future samples.
-      initial_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
-        `list` of `Tensor`s representing internal calculations made in a related
-        `TransitionKernel`. For streaming covariance, this argument also has no
-        influence on computation; hence, it is also `None` by default.
-        Nonetheless, this argument is still accepted as it will be supplied by
-        the Streaming MCMC framework.
+      initial_kernel_results: A (possibly nested) structure of `Tensor`s
+        representing internal calculations made in a related `TransitionKernel`.
+        For streaming covariance, this argument also has no influence on
+        computation; hence, it is also `None` by default. However, it's
+        still accepted to fit the `Reducer` base class.
 
     Returns:
-      state: `RunningCovarianceState` representing a stream of no inputs and
-        with identical structure to the `initial_chain_state`.
+      state: `CovarianceReducerState` with `cov_state` field representing
+        a stream of no inputs and with identical structure to the
+        `initial_chain_state`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'initialize')):
       initial_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           initial_chain_state)
-      self._parameters['shape'] = tf.nest.map_structure(
-          lambda chain_state: chain_state.shape,
-          initial_chain_state)
-      self._parameters['dtype'] = tf.nest.map_structure(
-          lambda chain_state: chain_state.dtype,
-          initial_chain_state)
-      if self.event_ndims is None:
-        self._parameters['event_ndims'] = tf.nest.map_structure(
-            ps.rank, initial_chain_state)
-      elif not nest.is_sequence(self.event_ndims):
-        self._parameters['event_ndims'] = tf.nest.map_structure(
-            lambda _: self.event_ndims,
-            initial_chain_state,
-        )
-      self.strms = nest.map_structure_up_to(
-          # only parameter guaranteed to give desired shallow structure
-          self._parameters['dtype'],
-          sample_stats.RunningCovariance,
-          self.shape, self.event_ndims, self.dtype,
-          check_types=False,
-      )
-      return tf.nest.map_structure(
+      cov_streams = _prepare_args(
+          initial_chain_state, self.event_ndims)
+      running_covariance_states = tf.nest.map_structure(
           lambda strm: strm.initialize(),
-          self.strms)
-
+          cov_streams)
+      return CovarianceReducerState(
+          initial_chain_state, running_covariance_states)
 
   def one_step(
       self,
@@ -158,75 +148,75 @@ class CovarianceReducer(reducer_base.Reducer):
     `axis` parameter. If chunking is enabled (axis is not `None`), all elements
     along the specified `axis` will be treated as separate samples. If a
     single scalar value is provided for a non-scalar sample structure, that
-    value will be used for all samples in the latent. If not, an identical
+    value will be used for all elements in the structure. If not, an identical
     structure must be provided.
 
     Args:
       sample: A (possibly nested) structure of incoming sample(s) with shape
         and dtype compatible with those used to initialize the
         `current_reducer_state`.
-      current_reducer_state: A (possibly nested) structure of
-        `RunningCovarianceState`s representing the current state of the running
-        covariance.
-      previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
-        `list` of `Tensor`s representing internal calculations made in a related
+      current_reducer_state: `CovarianceReducerState`s representing the current
+        state of the running covariance.
+      previous_kernel_results: A (possibly nested) structure of `Tensor`s
+        representing internal calculations made in a related
         `TransitionKernel`. For streaming covariance, this argument has no
-        influence on computation; hence, it is `None` by default. However, this
-        argument is still accepted as it will be supplied by the Streaming MCMC
-        framework.
+        influence on computation; hence, it is `None` by default. However, it's
+        still accepted to fit the `Reducer` base class.
       axis: If chunking is desired, this is a (possibly nested) structure of
         integers that specifies the axis with chunked samples. For individual
         samples, set this to `None`. By default, samples are not chunked
         (`axis` is None).
 
     Returns:
-      new_state: `RunningCovarianceState` with updated running statistics and
-        identical structure to the `current_reducer_state`.
+      new_reducer_state: `CovarianceReducerState` with updated running
+        statistics. Its `cov_state` field has an identical structure to the
+        `current_reducer_state`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'one_step')):
-      if not nest.is_sequence(axis):
-        axis = tf.nest.map_structure(
-            lambda _: axis,
-            sample,
-        )
-      return nest.map_structure_up_to(
-          sample,
+      cov_streams = _prepare_args(
+          current_reducer_state.init_structure, self.event_ndims)
+      sample = tf.nest.map_structure(
+          tf.convert_to_tensor,
+          sample)
+      if not nest.is_nested(axis):
+        axis = nest_util.broadcast_structure(sample, axis)
+      running_cov_state = nest.map_structure_up_to(
+          current_reducer_state.init_structure,
           lambda strm, reducer_state, sample, axis: strm.update(
               reducer_state, sample, axis=axis),
-          self.strms, current_reducer_state, sample, axis,
+          cov_streams,
+          current_reducer_state.cov_state,
+          sample,
+          axis,
           check_types=False,
       )
+      return CovarianceReducerState(
+          current_reducer_state.init_structure, running_cov_state)
 
-  def finalize(self, final_state):
-    """Finalizes covariance calculation from the `final_state`.
+  def finalize(self, final_reducer_state):
+    """Finalizes covariance calculation from the `final_reducer_state`.
 
-    final_state: A (possibly nested) structure of `RunningCovarianceState`s
-      that represent the final state of running statistics.
+    final_reducer_state: `CovarianceReducerState`s that represent the
+      final running covariance state.
 
     Returns:
       covariance: an estimate of the covariance with identical structure to
-        the `final_state`.
+        `final_reducer_state.cov_state`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'finalize')):
+      cov_streams = _prepare_args(
+          final_reducer_state.init_structure, self.event_ndims)
       return nest.map_structure_up_to(
-          self.strms,
+          final_reducer_state.init_structure,
           lambda strm, state: strm.finalize(state, ddof=self.ddof),
-          self.strms, final_state
+          cov_streams, final_reducer_state.cov_state
       )
-
-  @property
-  def shape(self):
-    return self._parameters['shape']
 
   @property
   def event_ndims(self):
     return self._parameters['event_ndims']
-
-  @property
-  def dtype(self):
-    return self._parameters['dtype']
 
   @property
   def ddof(self):
@@ -258,3 +248,31 @@ class VarianceReducer(CovarianceReducer):
         ddof=ddof,
         name=name or 'variance_reducer',
     )
+
+
+def _prepare_args(target, event_ndims):
+  """Creates a structure of `RunningCovariance`s based on inferred metadata.
+
+  Metadata required to create a `RunningCovariance` object (`shape`, `dtype`,
+  and `event_ndims` of incoming samples) will be inferred from the `target`.
+  Using that information, an identical structure of `RunningCovariance`s to
+  `target` will be returned.
+  """
+
+  shape = tf.nest.map_structure(
+      lambda target: target.shape,
+      target)
+  dtype = tf.nest.map_structure(
+      lambda target: target.dtype,
+      target)
+  if event_ndims is None:
+    event_ndims = tf.nest.map_structure(
+        ps.rank, target)
+  elif not nest.is_nested(event_ndims):
+    event_ndims = nest_util.broadcast_structure(
+        target, event_ndims)
+  return nest.map_structure_up_to(
+      target,
+      sample_stats.RunningCovariance,
+      shape, event_ndims, dtype,
+      check_types=False,)

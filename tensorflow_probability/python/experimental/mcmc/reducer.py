@@ -60,10 +60,9 @@ class Reducer(object):
         reducer state.
 
     Returns:
-      init_state: `tuple`, `namedtuple` or `list` of `Tensor`s representing the
-        stream of no samples.
+      init_reducer_state: `tuple`, `namedtuple` or `list` of `Tensor`s
+        representing the stream of no samples.
     """
-    raise NotImplementedError()
 
   @abc.abstractmethod
   def one_step(self, sample, current_reducer_state, previous_kernel_results):
@@ -88,9 +87,8 @@ class Reducer(object):
       new_state: The new reducer state after updates. This has the same type and
         structure as `current_reducer_state`.
     """
-    raise NotImplementedError()
 
-  def finalize(self, final_state):
+  def finalize(self, final_reducer_state):
     """Finalizes target statistic calculation from the `final_state`.
 
     This is an identity function of the `final_state` by default. Subclasses
@@ -98,10 +96,10 @@ class Reducer(object):
     same as the desired result.
 
     Args:
-      final_state: A `tuple`, `namedtuple` or `list` of `Tensor`s
+      final_reducer_state: A `tuple`, `namedtuple` or `list` of `Tensor`s
         representing the final state of the reduced statistic.
 
     Returns:
       statistic: An estimate of the target statistic
     """
-    return final_state  # Default finalize is the identity
+    return final_reducer_state  # Default finalize is the identity

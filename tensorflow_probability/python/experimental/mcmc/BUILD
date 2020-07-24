@@ -380,7 +380,6 @@ py_library(
 py_test(
     name = "covariance_reducer_test",
     size = "small",
-    shard_count = 5,
     srcs = ["covariance_reducer_test.py"],
     deps = [
         # tensorflow dep,
