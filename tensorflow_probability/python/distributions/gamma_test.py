@@ -610,7 +610,7 @@ class GammaSamplingTest(test_util.TestCase):
         num_samples)
 
     samples = gamma_lib._random_gamma_noncpu(
-        shape=[num_samples],
+        shape=[num_samples, 10],
         concentration=concentration,
         rate=rate,
         seed=test_util.test_seed())
@@ -644,7 +644,7 @@ class GammaSamplingTest(test_util.TestCase):
         num_samples)
 
     samples = gamma_lib._random_gamma_noncpu(
-        shape=[num_samples],
+        shape=[num_samples, 10],
         concentration=concentration,
         rate=rate,
         seed=test_util.test_seed())

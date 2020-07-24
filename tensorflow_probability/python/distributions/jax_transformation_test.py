@@ -55,8 +55,6 @@ VMAP_LOGPROB_BLOCKLIST = (
 )
 
 JVP_SAMPLE_BLOCKLIST = (
-    'Gamma',
-    'GeneralizedNormal',
     'VonMises',
 )
 JVP_LOGPROB_SAMPLE_BLOCKLIST = ()
@@ -259,9 +257,10 @@ class JVPTest(_GradTest):
   logprob_sample_blocklist = JVP_LOGPROB_SAMPLE_BLOCKLIST
 
   def _test_transformation(self, func, param, msg=None):
-    _, jvp = jax.jvp(func, (param,), (np.ones_like(param),))
+    primal, tangent = jax.jvp(func, (param,), (np.ones_like(param),))
+    self.assertEqual(primal.shape, tangent.shape)
     if not FLAGS.execute_only:
-      self.assertNotAllEqual(jvp, np.zeros_like(jvp), msg=msg)
+      self.assertNotAllEqual(tangent, np.zeros_like(tangent), msg=msg)
 
 
 class VJPTest(_GradTest):
@@ -272,9 +271,10 @@ class VJPTest(_GradTest):
 
   def _test_transformation(self, func, param, msg=None):
     out, f_vjp = jax.vjp(func, param)
-    vjp, = f_vjp(np.ones_like(out).astype(out.dtype))
+    cotangent, = f_vjp(np.ones_like(out).astype(out.dtype))
+    self.assertEqual(param.shape, cotangent.shape)
     if not FLAGS.execute_only:
-      self.assertNotAllEqual(vjp, np.zeros_like(vjp), msg=msg)
+      self.assertNotAllEqual(cotangent, np.zeros_like(cotangent), msg=msg)
 
 
 del _GradTest  # not intended for standalone execution
