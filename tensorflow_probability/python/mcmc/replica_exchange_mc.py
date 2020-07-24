@@ -328,6 +328,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                inverse_temperatures,
                make_kernel_fn,
                swap_proposal_fn=default_swap_proposal_fn(1.),
+               state_includes_replicas=False,
                seed=None,
                validate_args=False,
                name=None):
@@ -349,6 +350,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         returns `swaps`, a shape `[num_replica] + batch_shape` `Tensor`, where
         axis 0 indexes a permutation of `{0,..., num_replica-1}`, designating
         replicas to swap.
+      state_includes_replicas: Boolean indicating whether the leftmost dimension
+        of each state sample should index replicas. If `True`, the leftmost
+        dimension of the `current_state` kwarg to `tfp.mcmc.sample_chain` will
+        be interpreted as indexing replicas.
       seed: Python integer to seed the random number generator. Deprecated, pass
         seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       validate_args: Python `bool`, default `False`. When `True` distribution
@@ -362,6 +367,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       ValueError: `inverse_temperatures` doesn't have statically known 1D shape.
     """
     self._parameters = {k: v for k, v in locals().items() if v is not self}
+    self._state_includes_replicas = state_includes_replicas
     self._seed_stream = SeedStream(seed, salt='replica_mc')
 
   @property
@@ -602,7 +608,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           post_swap_replica_position,
           expanded_null_swaps)
 
-      post_swap_states = [s[0] for s in post_swap_replica_states]
+      if self._state_includes_replicas:
+        post_swap_states = post_swap_replica_states
+      else:
+        post_swap_states = [s[0] for s in post_swap_replica_states]
 
       post_swap_replica_results = _make_post_swap_replica_results(
           pre_swap_replica_results,
@@ -655,6 +664,16 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           self.inverse_temperatures,
           name='inverse_temperatures')
 
+      if self._state_includes_replicas:
+        it_n_replica = inverse_temperatures.shape[0]
+        state_n_replica = init_state[0].shape[0]
+        if ((it_n_replica is not None) and (state_n_replica is not None) and
+            (it_n_replica != state_n_replica)):
+          raise ValueError(
+              'Number of replicas implied by initial state ({}) must equal '
+              'number of replicas implied by inverse_temperatures ({}), but '
+              'did not'.format(it_n_replica, state_n_replica))
+
       # We will now replicate each of a possible batch of initial stats, one for
       # each inverse_temperature. So if init_state=[x, y] of shapes [Sx, Sy]
       # then the new shape is [(T, Sx), (T, Sy)] where (a, b) means
@@ -662,14 +681,17 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       num_replica = prefer_static.size0(inverse_temperatures)
       replica_shape = tf.convert_to_tensor([num_replica])
 
-      replica_states = [
-          tf.broadcast_to(  # pylint: disable=g-complex-comprehension
-              x,
-              prefer_static.concat([replica_shape, prefer_static.shape(x)],
-                                   axis=0),
-              name='replica_states')
-          for x in init_state
-      ]
+      if self._state_includes_replicas:
+        replica_states = init_state
+      else:
+        replica_states = [
+            tf.broadcast_to(  # pylint: disable=g-complex-comprehension
+                x,
+                prefer_static.concat([replica_shape, prefer_static.shape(x)],
+                                     axis=0),
+                name='replica_states')
+            for x in init_state
+        ]
 
       target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
           self.target_log_prob_fn,

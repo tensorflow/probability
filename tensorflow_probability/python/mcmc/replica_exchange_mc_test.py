@@ -165,18 +165,20 @@ class REMCTest(test_util.TestCase):
 
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
-          testcase_name=(testcase_name + kernel_name +
-                         ['_fast_execute_only', '_slow_asserts'][asserts]),
+          testcase_name=(
+              testcase_name + kernel_name +
+              ['', '_state_includes_replicas'][state_includes_replicas] +
+              ['_fast_execute_only', '_slow_asserts'][asserts]),
           tfp_transition_kernel=tfp_transition_kernel,
           inverse_temperatures=inverse_temperatures,
+          state_includes_replicas=state_includes_replicas,
           store_parameters_in_results=store_param,
-          asserts=asserts)
+          asserts=asserts) for state_includes_replicas in [False, True]
       for asserts in [True, False]
       for kernel_name, tfp_transition_kernel, store_param in [
           ('HMC', tfp.mcmc.HamiltonianMonteCarlo, True),  # NUMPY_DISABLE
           ('RWMH', init_tfp_randomwalkmetropolis, False),
-      ]
-      for testcase_name, inverse_temperatures in [
+      ] for testcase_name, inverse_temperatures in [
           ('OddNumReplicas', [1.0, 0.8, 0.6]),
           ('EvenNumReplicas', [1.0, 0.8, 0.7, 0.6]),
           ('HighTemperatureOnly', [0.5]),
@@ -186,6 +188,7 @@ class REMCTest(test_util.TestCase):
   def testNormal(self,
                  tfp_transition_kernel,
                  inverse_temperatures,
+                 state_includes_replicas,
                  store_parameters_in_results,
                  asserts,
                  prob_swap=1.0,
@@ -209,6 +212,7 @@ class REMCTest(test_util.TestCase):
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=target.log_prob,
         inverse_temperatures=inverse_temperatures,
+        state_includes_replicas=state_includes_replicas,
         make_kernel_fn=make_kernel_fn,
         swap_proposal_fn=tfp.mcmc.default_swap_proposal_fn(prob_swap))
 
@@ -217,15 +221,23 @@ class REMCTest(test_util.TestCase):
       num_results = 2000
       remc.one_step = tf.function(remc.one_step, autograph=False)
 
+    if state_includes_replicas:
+      current_state = target.sample(num_replica, seed=_set_seed())
+    else:
+      current_state = target.sample(seed=_set_seed())
+
     states, kernel_results = tfp.mcmc.sample_chain(
         num_results=num_results,
-        current_state=target.sample(seed=_set_seed()),
+        current_state=current_state,
         kernel=remc,
         num_burnin_steps=50,
         trace_fn=lambda _, results: results,
         seed=_set_seed())
 
-    self.assertAllEqual((num_results,), states.shape)
+    if state_includes_replicas:
+      self.assertAllEqual((num_results, num_replica), states.shape)
+    else:
+      self.assertAllEqual((num_results,), states.shape)
 
     states_, kr_, replica_ess_ = self.evaluate([
         states,
@@ -245,7 +257,10 @@ class REMCTest(test_util.TestCase):
     replica_states_ = kr_.post_swap_replica_states[0]  # Get rid of "parts"
 
     # Target state is at index 0.
-    self.assertAllClose(states_, replica_states_[:, 0])
+    if state_includes_replicas:
+      self.assertAllClose(states_, replica_states_)
+    else:
+      self.assertAllClose(states_, replica_states_[:, 0])
 
     # Check that *each* replica has correct marginal.
     def _check_sample_stats(replica_idx):
@@ -322,10 +337,11 @@ class REMCTest(test_util.TestCase):
           kr_.post_swap_replica_results.accepted_results.num_leapfrog_steps)
 
   @parameterized.named_parameters([
-      ('HMC', tfp.mcmc.HamiltonianMonteCarlo),  # NUMPY_DISABLE
-      ('RWMH', init_tfp_randomwalkmetropolis),
+      ('HMC', tfp.mcmc.HamiltonianMonteCarlo, False),  # NUMPY_DISABLE
+      ('HMC_scr', tfp.mcmc.HamiltonianMonteCarlo, True),  # NUMPY_DISABLE
+      ('RWMH', init_tfp_randomwalkmetropolis, False),
   ])
-  def test2DMixNormal(self, tfp_transition_kernel):
+  def test2DMixNormal(self, tfp_transition_kernel, state_includes_replicas):
     """Sampling from a 2-D Mixture Normal Distribution."""
     dtype = np.float32
 
@@ -341,7 +357,8 @@ class REMCTest(test_util.TestCase):
             loc=[[-1., -1], [1., 1.]],
             scale_identity_multiplier=0.3))
 
-    inverse_temperatures = 10.**tf.linspace(start=0., stop=-1., num=4)
+    num_replica = 4
+    inverse_temperatures = 10.**tf.linspace(start=0., stop=-1., num=num_replica)
     # We need to pad the step_size so it broadcasts against MCMC samples. In
     # this case we have 1 replica dim, 0 batch dims, and 1 event dim hence need
     # to right pad the step_size by one dim (for the event).
@@ -362,17 +379,28 @@ class REMCTest(test_util.TestCase):
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return results.post_swap_replica_results.log_accept_ratio
 
+    if state_includes_replicas:
+      current_state = tf.ones((num_replica, 2), dtype=dtype)
+    else:
+      current_state = tf.ones(2, dtype=dtype)
+
     num_results = 2000
     states, replica_log_accept_ratio = tfp.mcmc.sample_chain(
         num_results=num_results,
         # Start at one of the modes, in order to make mode jumping necessary
         # if we want to pass test.
-        current_state=tf.ones(2, dtype=dtype),
+        current_state=current_state,
         kernel=remc,
         num_burnin_steps=50,
         trace_fn=trace_fn,
         seed=test_util.test_seed())
-    self.assertAllEqual((num_results, 2), states.shape)
+
+    if state_includes_replicas:
+      self.assertAllEqual((num_results, num_replica, 2), states.shape)
+      states = states[:, 0]  # Keep only replica 0
+    else:
+      self.assertAllEqual((num_results, 2), states.shape)
+
     replica_accept_ratio = tf.reduce_mean(
         tf.math.exp(tf.minimum(0., replica_log_accept_ratio)),
         axis=0)
@@ -733,7 +761,14 @@ class REMCTest(test_util.TestCase):
           trace_fn=None,
           seed=test_util.test_seed()))
 
-  def testKernelResultsHaveCorrectShapeWhenMultipleStatesAndBatchDims(self):
+  @parameterized.named_parameters([
+      dict(testcase_name='_no_state_includes_replicas',
+           state_includes_replicas=False),
+      dict(testcase_name='_yes_state_includes_replicas',
+           state_includes_replicas=True),
+  ])
+  def testKernelResultsHaveCorrectShapeWhenMultipleStatesAndBatchDims(
+      self, state_includes_replicas):
     def target_log_prob(x, y):
       xy = tf.concat([x, y], axis=-1)
       return -0.5 * tf.reduce_sum(xy**2, axis=-1)
@@ -747,6 +782,7 @@ class REMCTest(test_util.TestCase):
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=target_log_prob,
         inverse_temperatures=inverse_temperatures,
+        state_includes_replicas=state_includes_replicas,
         make_kernel_fn=make_kernel_fn)
 
     num_results = 6
@@ -755,17 +791,28 @@ class REMCTest(test_util.TestCase):
     n_states = 2  # Set by target_log_prob.
     num_replica = len(inverse_temperatures)
 
-    samples, kernel_results = tfp.mcmc.sample_chain(
+    if state_includes_replicas:
+      current_state = [tf.zeros((num_replica, n_batch, n_events))] * n_states
+    else:
+      current_state = [tf.zeros((n_batch, n_events))] * n_states
+
+    states, kernel_results = tfp.mcmc.sample_chain(
         num_results=num_results,
-        current_state=[tf.zeros((n_batch, n_events))] * n_states,
+        current_state=current_state,
         kernel=remc,
         num_burnin_steps=2,
         trace_fn=lambda _, results: results,
         seed=test_util.test_seed())
 
-    self.assertLen(samples, n_states)
-    self.assertAllEqual((num_results, n_batch, n_events), samples[0].shape)
-    self.assertAllEqual((num_results, n_batch, n_events), samples[1].shape)
+    self.assertLen(states, n_states)
+
+    if state_includes_replicas:
+      state_shape = (num_results, num_replica, n_batch, n_events)
+    else:
+      state_shape = (num_results, n_batch, n_events)
+
+    self.assertAllEqual(state_shape, states[0].shape)
+    self.assertAllEqual(state_shape, states[1].shape)
 
     kr_ = self.evaluate(kernel_results)
 
@@ -803,6 +850,31 @@ class REMCTest(test_util.TestCase):
     self.assertEqual(
         (num_results, num_replica, n_batch),
         kr_.swaps.shape)
+
+  def testInconsistantInverseTemperaturesAndStateSizeRaises(self):
+    target = tfd.Normal(0., 1.)
+    inverse_temperatures = [1., 0.5, 0.25]  # Implies num_replica = 3
+    current_state = tf.zeros((4,))  # Implies num_replica = 4
+
+    def make_kernel_fn(target_log_prob_fn):
+      return tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=target_log_prob_fn,
+          step_size=0.1,
+          num_leapfrog_steps=3)
+
+    remc = tfp.mcmc.ReplicaExchangeMC(
+        target_log_prob_fn=target.log_prob,
+        inverse_temperatures=inverse_temperatures,
+        state_includes_replicas=True,
+        make_kernel_fn=make_kernel_fn,
+        swap_proposal_fn=tfp.mcmc.default_swap_proposal_fn(prob_swap=1.))
+
+    with self.assertRaisesRegex(ValueError, 'Number of replicas'):
+      tfp.mcmc.sample_chain(
+          num_results=5,
+          current_state=current_state,
+          kernel=remc,
+          seed=_set_seed())
 
 
 if __name__ == '__main__':
