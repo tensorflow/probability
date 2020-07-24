@@ -54,9 +54,7 @@ VMAP_LOGPROB_BLOCKLIST = (
     'NegativeBinomial',  # Times out.
 )
 
-JVP_SAMPLE_BLOCKLIST = (
-    'VonMises',
-)
+JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_PARAM_BLOCKLIST = ()
 
