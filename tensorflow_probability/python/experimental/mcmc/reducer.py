@@ -65,15 +65,16 @@ class Reducer(object):
     """
 
   @abc.abstractmethod
-  def one_step(self, sample, current_reducer_state, previous_kernel_results):
+  def one_step(
+      self, new_chain_state, current_reducer_state, previous_kernel_results):
     """Takes one step of the `Reducer`.
 
     This is an abstract method and must be overridden by subclasses.
 
     Args:
-      sample: Incoming sample with shape and dtype compatible with the
-        `initial_chain_state` with which the `current_reducer_state` was
-        produced by `initialize`.
+      new_chain_state: Incoming chain state(s) with shape and dtype compatible
+        with the `initial_chain_state` with which the `current_reducer_state`
+        was produced by `initialize`.
       current_reducer_state: A `tuple`, `namedtuple` or `list` of `Tensor`s
         representing the current state of reduced statistics.
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or

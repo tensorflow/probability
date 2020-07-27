@@ -138,11 +138,11 @@ class CovarianceReducer(reducer_base.Reducer):
 
   def one_step(
       self,
-      sample,
+      new_chain_state,
       current_reducer_state,
       previous_kernel_results=None,
       axis=None):
-    """Update the `current_reducer_state` with a new sample.
+    """Update the `current_reducer_state` with a new chain state.
 
     Chunking semantics are similar to those of batching and are specified by the
     `axis` parameter. If chunking is enabled (axis is not `None`), all elements
@@ -152,8 +152,8 @@ class CovarianceReducer(reducer_base.Reducer):
     structure must be provided.
 
     Args:
-      sample: A (possibly nested) structure of incoming sample(s) with shape
-        and dtype compatible with those used to initialize the
+      new_chain_state: A (possibly nested) structure of incoming chain state(s)
+        with shape and dtype compatible with those used to initialize the
         `current_reducer_state`.
       current_reducer_state: `CovarianceReducerState`s representing the current
         state of the running covariance.
@@ -176,18 +176,18 @@ class CovarianceReducer(reducer_base.Reducer):
         mcmc_util.make_name(self.name, 'covariance_reducer', 'one_step')):
       cov_streams = _prepare_args(
           current_reducer_state.init_structure, self.event_ndims)
-      sample = tf.nest.map_structure(
+      new_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
-          sample)
+          new_chain_state)
       if not nest.is_nested(axis):
-        axis = nest_util.broadcast_structure(sample, axis)
+        axis = nest_util.broadcast_structure(new_chain_state, axis)
       running_cov_state = nest.map_structure_up_to(
           current_reducer_state.init_structure,
-          lambda strm, reducer_state, sample, axis: strm.update(
-              reducer_state, sample, axis=axis),
+          lambda strm, reducer_state, new_chain_state, axis: strm.update(
+              reducer_state, new_chain_state, axis=axis),
           cov_streams,
           current_reducer_state.cov_state,
-          sample,
+          new_chain_state,
           axis,
           check_types=False,
       )
@@ -254,9 +254,9 @@ def _prepare_args(target, event_ndims):
   """Creates a structure of `RunningCovariance`s based on inferred metadata.
 
   Metadata required to create a `RunningCovariance` object (`shape`, `dtype`,
-  and `event_ndims` of incoming samples) will be inferred from the `target`.
-  Using that information, an identical structure of `RunningCovariance`s to
-  `target` will be returned.
+  and `event_ndims` of incoming chain states) will be inferred from the
+  `target`. Using that information, an identical structure of
+  `RunningCovariance`s to `target` will be returned.
   """
 
   shape = tf.nest.map_structure(
