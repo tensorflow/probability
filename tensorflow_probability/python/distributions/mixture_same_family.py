@@ -26,16 +26,16 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.gradient import value_and_batch_jacobian
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
-
-from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 # Cause all warnings to always be triggered.
@@ -473,10 +473,8 @@ class MixtureSameFamily(distribution.Distribution):
     # transform_2d: [S*prod(B), prod(E)]
     # jacobian: [S*prod(B), prod(E), prod(E)]
     x_2d = tf.reshape(x, x_2d_shape)
-    with tf.GradientTape() as tape:
-      tape.watch(x_2d)
-      transform_2d = reshaped_distributional_transform(x_2d)
-    jacobian = tape.batch_jacobian(transform_2d, x_2d)
+    transform_2d, jacobian = value_and_batch_jacobian(
+        reshaped_distributional_transform, x_2d)
 
     # We only provide the first derivative; the second derivative computed by
     # autodiff would be incorrect, so we raise an error if it is requested.
@@ -677,7 +675,7 @@ def _prevent_2nd_derivative(x):
     LookupError when trying to compute the second derivatives.
   """
   def grad(dy):
-    return array_ops.prevent_gradient(
+    return tfp_custom_gradient.prevent_gradient(
         dy, message='Second derivative is not implemented.')
 
   return tf.identity(x), grad

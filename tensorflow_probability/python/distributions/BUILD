@@ -2612,7 +2612,6 @@ multi_substrate_py_test(
     name = "mixture_same_family_test",
     size = "medium",
     srcs = ["mixture_same_family_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # hypothesis dep,

@@ -20,8 +20,13 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorflow-import
+
 
 JAX_MODE = False
+
+if JAX_MODE:
+  from jax import custom_jvp  # pylint: disable=g-import-not-at-top
 
 
 def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
@@ -52,7 +57,6 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
       # For JAX, we prefer to specify a custom JVP, as JAX can use a function
       # transform to transpose a JVP (must be linear in the tangents) to a VJP.
       if jvp_fn is not None:
-        from jax import custom_jvp  # pylint: disable=g-import-not-at-top
         f_jvp = custom_jvp(f)
         f_jvp.defjvp(jvp_fn)
         return f_jvp
@@ -73,3 +77,26 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
       return f_wrapped
 
   return finalize
+
+
+def prevent_gradient(x, message='', name=None):
+  return array_ops.prevent_gradient(x, message=message, name=name)
+
+
+if JAX_MODE:
+
+  def _prevent_gradient_helper_jvp(primals, tangents):
+    # The custom error message is passed in as the key of the single item in
+    # the dict `primals`.
+    message, _ = primals[0].popitem()
+    raise LookupError(
+        'Gradient explicitly disabled. Reason: \'{}\''.format(message))
+
+  @custom_jvp
+  def _prevent_gradient_helper(d):
+    return d
+
+  _prevent_gradient_helper.defjvp(_prevent_gradient_helper_jvp)
+
+  def prevent_gradient(x, message='', name=None):  # pylint: disable=unused-argument,function-redefined
+    return _prevent_gradient_helper({message: x})[message]
