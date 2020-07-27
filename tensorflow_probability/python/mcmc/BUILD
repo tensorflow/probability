@@ -623,7 +623,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["transformed_kernel_test.py"],
     jax_tags = ["omni_fail"],
-    shard_count = 4,
+    shard_count = 6,
     deps = [
         # numpy dep,
         # tensorflow dep,

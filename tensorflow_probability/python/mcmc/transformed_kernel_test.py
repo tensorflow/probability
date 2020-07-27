@@ -98,7 +98,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test('HMC')
   def test_support_works_correctly_with_hmc(self):
-    num_results = 2000
+    num_results = 500
     target = tfd.Beta(
         concentration1=self.dtype(1.),
         concentration0=self.dtype(10.))
@@ -137,14 +137,14 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         target.variance(),
     ])
     self.assertAllClose(true_mean_, sample_mean_,
-                        atol=0.06, rtol=0.)
+                        atol=0.15, rtol=0.)
     self.assertAllClose(true_var_, sample_var_,
-                        atol=0.01, rtol=0.1)
-    self.assertNear(0.6, is_accepted_.mean(), err=0.05)
+                        atol=0.03, rtol=0.2)
+    self.assertNear(0.6, is_accepted_.mean(), err=0.15)
 
   @test_util.numpy_disable_gradient_test('Langevin')
   def test_support_works_correctly_with_mala(self):
-    num_results = 2000
+    num_results = 500
     target = tfd.Beta(
         concentration1=self.dtype(1.),
         concentration0=self.dtype(10.))
@@ -181,12 +181,12 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         target.variance(),
     ])
     self.assertAllClose(true_mean_, sample_mean_,
-                        atol=0.06, rtol=0.)
+                        atol=0.15, rtol=0.)
     self.assertAllClose(true_var_, sample_var_,
-                        atol=0.01, rtol=0.1)
+                        atol=0.03, rtol=0.2)
 
   def test_support_works_correctly_with_rwm(self):
-    num_results = 2000
+    num_results = 500
     target = tfd.Beta(
         concentration1=self.dtype(1.),
         concentration0=self.dtype(10.))
@@ -223,16 +223,16 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         target.variance(),
     ])
     self.assertAllClose(true_mean_, sample_mean_,
-                        atol=0.06, rtol=0.)
+                        atol=0.15, rtol=0.)
     self.assertAllClose(true_var_, sample_var_,
-                        atol=0.01, rtol=0.1)
+                        atol=0.03, rtol=0.2)
 
   @test_util.numpy_disable_gradient_test('HMC')
   def test_end_to_end_works_correctly(self):
     true_mean = self.dtype([0, 0])
     true_cov = self.dtype([[1, 0.5],
                            [0.5, 1]])
-    num_results = 2000
+    num_results = 500
     def target_log_prob(x, y):
       # Corresponds to unnormalized MVN.
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
@@ -273,9 +273,9 @@ class TransformedTransitionKernelTest(test_util.TestCase):
     sample_cov = tf.matmul(x, x, transpose_a=True) / self.dtype(num_results)
     [sample_mean_, sample_cov_, is_accepted_] = self.evaluate([
         sample_mean, sample_cov, kernel_results.inner_results.is_accepted])
-    self.assertAllClose(0.6, is_accepted_.mean(), atol=0.05, rtol=0.)
-    self.assertAllClose(sample_mean_, true_mean, atol=0.082, rtol=0.)
-    self.assertAllClose(sample_cov_, true_cov, atol=0., rtol=0.2)
+    self.assertAllClose(0.6, is_accepted_.mean(), atol=0.15, rtol=0.)
+    self.assertAllClose(sample_mean_, true_mean, atol=0.2, rtol=0.)
+    self.assertAllClose(sample_cov_, true_cov, atol=0., rtol=0.4)
 
   def test_bootstrap_requires_xor_args(self):
     transformed_fake = tfp.mcmc.TransformedTransitionKernel(
