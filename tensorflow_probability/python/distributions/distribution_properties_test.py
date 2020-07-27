@@ -132,8 +132,6 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 # in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
-    'Gamma',  # "Incompatible shapes" error. (b/150712618).
-    'GeneralizedNormal',  # uses Gamma (above) internally
     'PlackettLuce',  # No converter for TopKV2
     'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
@@ -168,6 +166,7 @@ VECTORIZED_LOGPROB_ATOL.update({
 VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_RTOL.update({
     'NegativeBinomial': 1e-5,
+    'PowerSpherical': 2e-5,
 })
 
 
@@ -576,9 +575,7 @@ class DistributionSlicingTest(test_util.TestCase):
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
 
 
-# TODO(b/150161911): reconcile graph- and eager-mode handling of denormal floats
-# so that we can re-enable eager mode tests.
-@test_util.test_graph_mode_only
+@test_util.test_all_tf_execution_regimes
 class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
 
   def _test_vectorization(self, dist_name, dist):
