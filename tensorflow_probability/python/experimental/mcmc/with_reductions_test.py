@@ -230,7 +230,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         kernel_results,
         cov_reducer.finalize(
             kernel_results.streaming_calculations)])
-    self.assertEqual(kernel_results.streaming_calculations.mean, 3.5)
+    self.assertEqual(kernel_results.streaming_calculations.cov_state.mean, 3.5)
     self.assertNear(
         final_cov,
         np.cov(np.arange(1, 7), ddof=ddof).tolist(),
@@ -254,7 +254,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         cov_reducer.finalize(kernel_results.streaming_calculations)
     ])
     self.assertEqual(
-        kernel_results.streaming_calculations.mean.shape, (9, 3))
+        kernel_results.streaming_calculations.cov_state.mean.shape, (9, 3))
     self.assertEqual(final_cov.shape, (9, 3, 3))
 
   @parameterized.parameters(0, 1)
@@ -275,7 +275,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         kernel_results,
         reducer.finalize(
             kernel_results.streaming_calculations)])
-    self.assertEqual(kernel_results.streaming_calculations.mean, 3.5)
+    self.assertEqual(kernel_results.streaming_calculations.cov_state.mean, 3.5)
     self.assertNear(
         final_var,
         np.var(np.arange(1, 7), ddof=ddof).tolist(),
@@ -315,7 +315,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         cov_reducer.finalize(kernel_results.streaming_calculations)
     ])
     self.assertAllClose(
-        kernel_results.streaming_calculations.mean,
+        kernel_results.streaming_calculations.cov_state.mean,
         np.mean(samples, axis=0),
         rtol=1e-6)
     self.assertAllClose(
@@ -340,7 +340,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         cov_reducer.finalize(kernel_results.streaming_calculations)
     ])
     self.assertEqual(chain_state, 6)
-    self.assertEqual(kernel_results.streaming_calculations.mean, 3.5)
+    self.assertEqual(kernel_results.streaming_calculations.cov_state.mean, 3.5)
     self.assertNear(
         final_cov,
         np.cov(np.arange(1, 7), ddof=0).tolist(),
@@ -373,7 +373,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
             kernel_results.inner_results.streaming_calculations)
     ])
     self.assertAllClose(
-        kernel_results.inner_results.streaming_calculations.mean,
+        kernel_results.inner_results.streaming_calculations.cov_state.mean,
         np.mean(np.log(samples), axis=0),
         rtol=1e-6)
     self.assertAllClose(
@@ -404,7 +404,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
             kernel_results.streaming_calculations)
     ])
     self.assertAllClose(
-        kernel_results.streaming_calculations.mean,
+        kernel_results.streaming_calculations.cov_state.mean,
         np.mean(samples, axis=0),
         rtol=1e-6)
     self.assertAllClose(
@@ -440,7 +440,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
             kernel_results.inner_results.streaming_calculations)
     ])
 
-    mean = kernel_results.inner_results.streaming_calculations.mean
+    mean = kernel_results.inner_results.streaming_calculations.cov_state.mean
     self.assertEqual(mean.shape, (2,))
     self.assertAllClose(mean, np.mean(samples, axis=0), rtol=1e-6)
     self.assertEqual(final_cov.shape, (2, 2))
@@ -474,7 +474,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertEqual(len(kernel_results.streaming_calculations[1]), 1)
 
     self.assertEqual(final_mean, 3.5)
-    self.assertEqual(kernel_results.streaming_calculations[0][1].mean, 3.5)
+    self.assertEqual(
+        kernel_results.streaming_calculations[0][1].cov_state.mean, 3.5)
     self.assertEqual(kernel_results.streaming_calculations[1][0], 6)
     self.assertNear(
         final_cov,
