@@ -18,15 +18,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+import warnings
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import sample
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
 from tensorflow_probability.python.experimental.mcmc import with_reductions
+from tensorflow_probability.python.experimental import mcmc
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
+    'sample_chain',
     'sample_fold',
 ]
 
@@ -133,3 +139,101 @@ def sample_fold(
     return (reduction_results,
             end_state,
             final_kernel_results.inner_results.inner_results)
+
+
+class StatesAndTrace(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('StatesAndTrace', ['all_states', 'trace'])):
+  """States and auxiliary trace of an MCMC chain.
+
+  The first dimension of all the `Tensor`s in this structure is the same and
+  represents the chain length.
+
+  Attributes:
+    all_states: A `Tensor` or a nested collection of `Tensor`s representing the
+      MCMC chain state.
+    trace: A `Tensor` or a nested collection of `Tensor`s representing the
+      auxiliary values traced alongside the chain.
+  """
+  __slots__ = ()
+
+
+class CheckpointableStatesAndTrace(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('CheckpointableStatesAndTrace',
+                           ['all_states', 'trace', 'final_kernel_results'])):
+  """States and auxiliary trace of an MCMC chain.
+
+  The first dimension of all the `Tensor`s in the `all_states` and `trace`
+  attributes is the same and represents the chain length.
+
+  Attributes:
+    all_states: A `Tensor` or a nested collection of `Tensor`s representing the
+      MCMC chain state.
+    trace: A `Tensor` or a nested collection of `Tensor`s representing the
+      auxiliary values traced alongside the chain.
+    final_kernel_results: A `Tensor` or a nested collection of `Tensor`s
+      representing the final value of the auxiliary state of the
+      `TransitionKernel` that generated this chain.
+  """
+  __slots__ = ()
+
+
+def sample_chain(
+    num_results,
+    current_state,
+    previous_kernel_results=None,
+    kernel=None,
+    num_burnin_steps=0,
+    num_steps_between_results=0,
+    trace_fn=lambda current_state, kernel_results: kernel_results,
+    return_final_kernel_results=False,
+    parallel_iterations=10,
+    seed=None,
+    name=None,
+):
+  with tf.name_scope(name or 'mcmc_sample_chain'):
+    if not kernel.is_calibrated:
+      warnings.warn('supplied `TransitionKernel` is not calibrated. Markov '
+                    'chain may not converge to intended target distribution.')
+
+    if trace_fn is None:
+      trace_fn = lambda *args: ()
+      no_trace = True
+    else:
+      no_trace = False
+
+    if trace_fn is sample_chain.__defaults__[4]:
+      warnings.warn('Tracing all kernel results by default is deprecated. Set '
+                    'the `trace_fn` argument to None (the future default '
+                    'value) or an explicit callback that traces the values '
+                    'you are interested in.')
+
+    tracing_reducer = mcmc.TracingReducer(
+        trace_fn=lambda curr_state, kr: (curr_state, trace_fn(curr_state, kr)),
+        size=num_results
+    )
+    trace_results, _, final_kernel_results = sample_fold(
+        num_steps=num_results,
+        current_state=current_state,
+        previous_kernel_results=previous_kernel_results,
+        kernel=kernel,
+        reducer=tracing_reducer,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_between_results=num_steps_between_results,
+        parallel_iterations=parallel_iterations,
+        seed=seed,
+        name=name,
+    )
+
+    all_states, trace = trace_results
+    if return_final_kernel_results:
+      return CheckpointableStatesAndTrace(
+          all_states=all_states,
+          trace=trace,
+          final_kernel_results=final_kernel_results)
+    else:
+      if no_trace:
+        return all_states
+      else:
+        return StatesAndTrace(all_states=all_states, trace=trace)
