@@ -38,8 +38,9 @@ class TestReducer(tfp.experimental.mcmc.Reducer):
   def initialize(self, initial_chain_state=None, initial_kernel_results=None):
     return None
 
-  def one_step(self, sample, current_reducer_state, previous_kernel_results):
-    return sample
+  def one_step(
+      self, new_chain_state, current_reducer_state, previous_kernel_results):
+    return new_chain_state
 
 
 class MeanReducer(tfp.experimental.mcmc.Reducer):
@@ -48,8 +49,9 @@ class MeanReducer(tfp.experimental.mcmc.Reducer):
   def initialize(self, initial_chain_state=None, initial_kernel_results=None):
     return tf.zeros((2,))
 
-  def one_step(self, sample, current_reducer_state, previous_kernel_results):
-    return current_reducer_state + tf.convert_to_tensor([1, sample])
+  def one_step(
+      self, new_chain_state, current_reducer_state, previous_kernel_results):
+    return current_reducer_state + tf.convert_to_tensor([1, new_chain_state])
 
   def finalize(self, final_state):
     return final_state[1] / final_state[0]
