@@ -268,7 +268,7 @@ py_library(
 # py2and3
 py_test(
     name = "weight_norm_test",
-    size = "small",
+    size = "medium",
     srcs = ["weight_norm_test.py"],
     deps = [
         # absl/testing:parameterized dep,

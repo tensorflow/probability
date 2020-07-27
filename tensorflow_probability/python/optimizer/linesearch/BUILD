@@ -49,7 +49,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "hager_zhang_test",
-    size = "small",
+    size = "medium",
     srcs = ["hager_zhang_test.py"],
     numpy_tags = ["notap"],
     shard_count = 5,

@@ -2127,7 +2127,9 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "empirical_test",
+    size = "medium",
     srcs = ["empirical_test.py"],
+    jax_size = "medium",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -2152,6 +2154,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "finite_discrete_test",
+    size = "medium",
     srcs = ["finite_discrete_test.py"],
     deps = [
         # numpy dep,
@@ -2963,6 +2966,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "quantized_distribution_test",
+    size = "medium",
     srcs = ["quantized_distribution_test.py"],
     deps = [
         # numpy dep,

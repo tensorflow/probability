@@ -62,7 +62,7 @@ py_library(
 # py2and3
 py_test(
     name = "affine_layers_test",
-    size = "small",
+    size = "medium",
     srcs = ["affine_layers_test.py"],
     deps = [
         # numpy dep,
