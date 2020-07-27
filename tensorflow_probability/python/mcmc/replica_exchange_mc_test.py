@@ -157,6 +157,114 @@ class DefaultSwapProposedFnTest(test_util.TestCase):
 
 
 @test_util.test_graph_and_eager_modes
+class EvenOddSwapProposedFnTest(test_util.TestCase):
+
+  def testYesBatchThreeReplicas(self):
+    # There are three replicas, so we get...
+    #   null swaps [0, 1, 2],
+    #   even swaps [1, 0, 2],
+    #   odd swaps [0, 2, 1].
+    # Each type is identically repeated across all batch members.
+    fn = tfp.mcmc.even_odd_swap_proposal_fn(swap_frequency=0.5)
+
+    num_batch = 2
+    num_replica = 3
+
+    null_swap = [[0] * num_batch,
+                 [1] * num_batch,
+                 [2] * num_batch]
+
+    even_swap = [[1] * num_batch,
+                 [0] * num_batch,
+                 [2] * num_batch]
+
+    odd_swap = [[0] * num_batch,
+                [2] * num_batch,
+                [1] * num_batch]
+
+    with self.subTest(
+        'Even swap since count=0 is an even multiple of period=2'):
+      swaps = fn(num_replica=num_replica, batch_shape=[num_batch], step_count=0)
+      self.assertAllEqual((num_replica, num_batch), swaps.shape)
+      self.assertAllEqual(even_swap, self.evaluate(swaps))
+
+    with self.subTest(
+        'No swap since count=1 is not a multiple of period=2'):
+      swaps = fn(num_replica=num_replica, batch_shape=[num_batch], step_count=1)
+      self.assertAllEqual((num_replica, num_batch), swaps.shape)
+      self.assertAllEqual(null_swap, self.evaluate(swaps))
+
+    with self.subTest(
+        'Odd swap since count=2 is an odd multiple of period=2'):
+      swaps = fn(num_replica=num_replica, batch_shape=[num_batch], step_count=2)
+      self.assertAllEqual((num_replica, num_batch), swaps.shape)
+      self.assertAllEqual(odd_swap, self.evaluate(swaps))
+
+    with self.subTest(
+        'No swap since count=3 is not a multiple of period=2'):
+      swaps = fn(num_replica=num_replica, batch_shape=[num_batch], step_count=3)
+      self.assertAllEqual(null_swap, self.evaluate(swaps))
+
+    with self.subTest(
+        'Even swap since count=4 is an even multiple of period=2'):
+      swaps = fn(num_replica=num_replica, batch_shape=[num_batch], step_count=4)
+      self.assertAllEqual(even_swap, self.evaluate(swaps))
+
+  def testNoBatchOneReplica(self):
+    # There is only one replica, so in all cases swaps = [0].
+    for swap_frequency in [0., 0.5, 1.]:
+      fn = tfp.mcmc.even_odd_swap_proposal_fn(swap_frequency=swap_frequency)
+      for step_count in range(5):
+        swaps = fn(num_replica=1, step_count=step_count)
+        self.assertAllEqual((1,), swaps.shape)
+        swaps_ = self.evaluate(swaps)
+        self.assertAllEqual(swaps_, [0])
+
+  def testNoBatchTwoReplicas(self):
+    # There are two replicas, so we get null swaps [0, 1], and swaps [1, 0]
+    for swap_frequency in [0., 0.5, 1.]:
+      fn = tfp.mcmc.even_odd_swap_proposal_fn(swap_frequency=swap_frequency)
+      for step_count in range(10):
+        swaps = fn(num_replica=2, step_count=step_count)
+        swaps_ = self.evaluate(swaps)
+
+        if (
+            # swap_frequency == 0 means never swap.
+            not swap_frequency or
+            # Not at swap_period := 1 / swap_frequency.
+            step_count % int(np.ceil(1 / swap_frequency))
+        ):
+          self.assertAllEqual(swaps_, [0, 1])  # No swap
+        else:
+          self.assertAllEqual(swaps_, [1, 0])
+
+  def testNoBatchThreeReplicas(self):
+    # There are three replicas, so we get...
+    #   null swaps [0, 1, 2],
+    #   even swaps [1, 0, 2],
+    #   odd swaps [0, 2, 1].
+    for swap_frequency in [0., 0.5, 1.]:
+      fn = tfp.mcmc.even_odd_swap_proposal_fn(swap_frequency=swap_frequency)
+      for step_count in range(10):
+        swaps = fn(num_replica=3, step_count=step_count)
+        swaps_ = self.evaluate(swaps)
+
+        if (
+            # swap_frequency == 0 means never swap.
+            not swap_frequency or
+            # Not at swap_period := 1 / swap_frequency.
+            step_count % int(np.ceil(1 / swap_frequency))
+        ):
+          self.assertAllEqual(swaps_, [0, 1, 2])  # No swap
+        else:  # Else swapping
+          period_count = step_count // int(np.ceil(1 / swap_frequency))
+          if period_count % 2:  # Odd parity
+            self.assertAllEqual(swaps_, [0, 2, 1])
+          else:  # Even parity
+            self.assertAllEqual(swaps_, [1, 0, 2])
+
+
+@test_util.test_graph_and_eager_modes
 class REMCTest(test_util.TestCase):
 
   def setUp(self):
@@ -337,12 +445,22 @@ class REMCTest(test_util.TestCase):
           kr_.post_swap_replica_results.accepted_results.num_leapfrog_steps)
 
   @parameterized.named_parameters([
-      ('HMC', tfp.mcmc.HamiltonianMonteCarlo, False),  # NUMPY_DISABLE
-      ('HMC_scr', tfp.mcmc.HamiltonianMonteCarlo, True),  # NUMPY_DISABLE
-      ('RWMH', init_tfp_randomwalkmetropolis, False),
+      # pylint: disable=line-too-long
+      ('_HMC_default', tfp.mcmc.HamiltonianMonteCarlo, False, 'default'),  # NUMPY_DISABLE
+      ('_HMC_scr_default', tfp.mcmc.HamiltonianMonteCarlo, True, 'default'),  # NUMPY_DISABLE
+      ('_RWMH_default', init_tfp_randomwalkmetropolis, False, 'default'),
+      ('_HMC_even_odd', tfp.mcmc.HamiltonianMonteCarlo, False, 'even_odd'),  # NUMPY_DISABLE
+      ('_RWMH_even_odd', init_tfp_randomwalkmetropolis, False, 'default'),  # NUMPY_DISABLE
+      # pylint: enable=line-too-long
   ])
-  def test2DMixNormal(self, tfp_transition_kernel, state_includes_replicas):
+  def test2DMixNormal(self, tfp_transition_kernel, state_includes_replicas,
+                      swap_proposal_fn_name):
     """Sampling from a 2-D Mixture Normal Distribution."""
+    swap_proposal_fn = {
+        'default': tfp.mcmc.default_swap_proposal_fn(1.),
+        'even_odd': tfp.mcmc.even_odd_swap_proposal_fn(1.),
+    }[swap_proposal_fn_name]
+
     dtype = np.float32
 
     # By symmetry, target has mean [0, 0]
@@ -373,6 +491,7 @@ class REMCTest(test_util.TestCase):
         target_log_prob_fn=target.log_prob,
         # Verified that test fails if inverse_temperatures = [1.]
         inverse_temperatures=inverse_temperatures,
+        swap_proposal_fn=swap_proposal_fn,
         make_kernel_fn=make_kernel_fn)
     remc.one_step = tf.function(remc.one_step, autograph=False)
 

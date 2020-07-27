@@ -108,13 +108,17 @@ class ReplicaExchangeMCKernelResults(
 
             # Random seed for this step.
             'seed',
+
+            # Count of how many steps have been taken. May be used to determine
+            # swaps.
+            'step_count',
         ])):
   """Internal state and diagnostics for Replica Exchange MC."""
   __slots__ = ()
 
 
 def default_swap_proposal_fn(prob_swap, name=None):
-  """Default swap proposal function, for replica swap MC.
+  """Make the default swap proposal func, with `P[swap]`, for replica swap MC.
 
   With probability `prob_swap`, propose combinations of replicas to swap
   When exchanging, create combinations of adjacent replicas in
@@ -137,16 +141,17 @@ def default_swap_proposal_fn(prob_swap, name=None):
   ```
 
   Args:
-    prob_swap: Scalar `Tensor` giving probability that any swaps will
-      be generated.
+    prob_swap: Scalar `Tensor` in `[0, 1]` giving probability that any swaps
+      will be generated.
     name: Python `str` name given to ops created by this function.
       Default value: `'adjacent_swaps'`.
 
   Returns:
     default_swap_proposal_fn_: Python callable which take a number of
-      replicas (a Python integer), and integer `Tensor` `batch_shape`, and
-      returns `swaps`, a shape `[num_replica] + batch_shape` `Tensor`, where
-      axis 0 indexes "one-time swaps", i.e., such that (if `rank(swaps) == 1`,
+      replicas (a Python integer), and integer `Tensor` `batch_shape`, an
+      unused `step_count`, a `seed`, and returns `swaps`, a shape
+      `[num_replica] + batch_shape` `Tensor`, where axis 0 indexes
+      "one-time swaps", i.e., such that (if `rank(swaps) == 1`,
       `range(num_replicas) == tf.gather(swaps, swaps)`.
 
   #### References
@@ -155,14 +160,15 @@ def default_swap_proposal_fn(prob_swap, name=None):
        Parallel Tempering: Theory, Applications, and New Perspectives
        https://arxiv.org/abs/physics/0508111
   """
-  def adjacent_swaps(num_replica, batch_shape=(), seed=None):
+  def adjacent_swaps(num_replica, batch_shape=(), step_count=None, seed=None):
     """Make random shuffle using only one time swaps."""
+    del step_count  # Unused for this function.
     with tf.name_scope(name or 'adjacent_swaps'):
       parity_seed, proposal_seed = samplers.split_seed(
           seed, salt='random_adjacent_shuffle')
       # u selects parity.  E.g.,
-      #  u==True ==>  [0, 2, 1, 4, 3] like swaps
-      #  u==False ==> [1, 0, 3, 2, 4] like swaps
+      #  u==False ==> [1, 0, 3, 2, 4] even parity swaps
+      #  u==True ==>  [0, 2, 1, 4, 3] odd parity swaps
       # If there are only 2 replicas, then the "True" swaps are null
       # swaps...which would contradict the user provided `prob_swap`.
       # So special case num_replica==2, forcing u==False in this case.
@@ -182,6 +188,98 @@ def default_swap_proposal_fn(prob_swap, name=None):
           samplers.uniform(batch_shape, seed=proposal_seed) < prob_swap, y, x)
 
   return adjacent_swaps
+
+
+def even_odd_swap_proposal_fn(swap_frequency, name=None):
+  """Make a deterministic swap proposal function, alternating even/odd swaps.
+
+  This proposal function swaps deterministically `swap_frequency` fraction of
+  the time, alternating even and odd parity.
+  This was shown in [2] to mix better than random schemes.
+
+  Contrast this with `default_swap_proposal_fn`, which swaps randomly with
+  probability `prob_swap`.
+
+  ```
+  swap_fn = even_odd_swap_proposal_fn(swap_frequency=1)
+
+  even_odd_swap_proposal_fn(num_replica=4, step_count=0)
+  ==> [1, 0, 3, 2]  # Swap 0 <--> 1 and 2 <--> 3, even parity.
+
+  even_odd_swap_proposal_fn(num_replica=4, step_count=1)
+  ==> [0, 2, 1, 3]  # Swap 1 <--> 2, odd parity.
+  ```
+
+  Args:
+    swap_frequency: Scalar `Tensor` in `[0, 1]` giving the frequency of swaps.
+      Swaps will occur, with alternating parity, every `N` steps, where
+      `N = 1 / swap_frequency`.
+    name: Python `str` name given to ops created by this function.
+      Default value: `'even_odd_swaps'`.
+
+  Returns:
+    default_swap_proposal_fn_: Python callable which take a number of
+      replicas (a Python integer), and integer `Tensor` `batch_shape`, a
+      `step_count`, a `seed`, and returns `swaps`, a shape
+      `[num_replica] + batch_shape` `Tensor`, where axis 0 indexes
+      "one-time swaps", i.e., such that (if `rank(swaps) == 1`,
+      `range(num_replicas) == tf.gather(swaps, swaps)`.
+
+  #### References
+
+  [1]: S. Syed, A. Bouchard-Cote G. Deligiannidis, A. Doucet
+       Non-Reversible Parallel Tempering: a Scalable Highly Parallel MCMC Scheme
+       https://arxiv.org/abs/1905.02939
+  """
+
+  def even_odd_swaps(num_replica, batch_shape=(), step_count=None, seed=None):
+    """Make deterministic even_odd one time swaps."""
+    if step_count is None:
+      raise ValueError('`step_count` must be supplied. Found `None`.')
+    del seed  # Unused for this function.
+    with tf.name_scope(name or 'even_odd_swaps'):
+      # Period is 1 / frequency, and we want period = Inf if frequency = 0.
+      # safe_swap_period is the correct swap period in case swap_frequency > 0.
+      # If swap_frequency == 0, safe_swap_period is set to 1 (to avoid integer
+      # div by zero below). We will hard-set this case to "null swap."
+      swap_freq = tf.convert_to_tensor(swap_frequency, name='swap_frequency')
+      safe_swap_period = tf.cast(
+          tf.where(swap_freq > 0,
+                   tf.math.ceil(tf.math.reciprocal_no_nan(swap_freq)), 1),
+          # Although period = 1 / frequency may have roundoff error, and result
+          # in a period different than what the user intended, the
+          # user will end up with a single integer period, and thus well defined
+          # deterministic swaps.
+          tf.int32,
+      )
+
+      # u selects parity.  E.g.,
+      #  u==False ==> [1, 0, 3, 2, 4] even parity swaps
+      #  u==True ==>  [0, 2, 1, 4, 3] odd parity swaps
+      # If there are 2 replicas, then the "True" swaps are null
+      # swaps...which would contradict the user provided `swap_frequency`.
+      # So special case num_replica==2, forcing u==False in this case.
+      u_shape = prefer_static.concat((
+          tf.ones(1, dtype=tf.int32), tf.cast(batch_shape, tf.int32)), axis=0)
+      u = tf.fill(u_shape, tf.cast((step_count // safe_swap_period) % 2,
+                                   tf.bool))
+      u = tf.where(num_replica > 2, u, False)
+
+      x = mcmc_util.left_justified_expand_dims_to(
+          tf.range(num_replica, dtype=tf.int64),
+          rank=prefer_static.size(u_shape))
+      y = tf.where(tf.equal(x % 2, tf.cast(u, dtype=tf.int64)), x + 1, x - 1)
+      y = tf.clip_by_value(y, 0, num_replica - 1)
+      # TODO(b/142689785): Consider using tf.cond and returning an empty list
+      # then in REMC consider using a tf.cond for short-circuiting.
+      return tf.where(
+          (tf.cast(step_count % safe_swap_period, tf.bool) |
+           tf.math.equal(swap_freq, 0)),
+          x,  # Don't swap
+          y,  # Swap
+      )
+
+  return even_odd_swaps
 
 
 class ReplicaExchangeMC(kernel_base.TransitionKernel):
@@ -528,10 +626,28 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       # E.g. if swaps = [1, 0, 2], we will consider swapping temperatures 0 and
       # 1, keeping 2 fixed.  This exact same swap is considered for *every*
       # batch member.  Of course some batch members may accept and some reject.
-      swaps = tf.cast(
-          self.swap_proposal_fn(  # pylint: disable=not-callable
-              num_replica, batch_shape=batch_shape, seed=swap_seed),
-          dtype=tf.int32)
+      try:
+        swaps = tf.cast(
+            self.swap_proposal_fn(  # pylint: disable=not-callable
+                num_replica,
+                batch_shape=batch_shape,
+                seed=swap_seed,
+                step_count=previous_kernel_results.step_count),
+            dtype=tf.int32)
+      except TypeError as e:
+        if 'step_count' not in str(e):
+          raise
+        warnings.warn(
+            'The `swap_proposal_fn` given to ReplicaExchangeMC did not accept '
+            'the `step_count` argument. Falling back to omitting the '
+            'argument. This fallback will be removed after 24-Oct-2020.')
+        swaps = tf.cast(
+            self.swap_proposal_fn(  # pylint: disable=not-callable
+                num_replica,
+                batch_shape=batch_shape,
+                seed=swap_seed),
+            dtype=tf.int32)
+
       null_swaps = mcmc_util.left_justified_expand_dims_like(
           tf.range(num_replica, dtype=swaps.dtype), swaps)
       swaps = _maybe_embed_swaps_validation(swaps, null_swaps,
@@ -638,6 +754,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           # `tf.Variable`.
           inverse_temperatures=previous_kernel_results.inverse_temperatures,
           swaps=swaps,
+          step_count=previous_kernel_results.step_count + 1,
           seed=samplers.zeros_seed() if seed is None else seed,
       )
 
@@ -755,6 +872,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           is_swap_accepted_adjacent=_sub_diag(is_swap_accepted),
           inverse_temperatures=self.inverse_temperatures,
           swaps=swaps,
+          step_count=tf.zeros(shape=(), dtype=tf.int32),
           seed=samplers.zeros_seed(),
       )
 
