@@ -17,7 +17,7 @@
 #   methods, including modeling and Bayesian inference. APIs here are
 #   meant to evolve over time.
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
