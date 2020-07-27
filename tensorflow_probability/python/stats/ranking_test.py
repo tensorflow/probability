@@ -95,7 +95,7 @@ class AurocAuprcTest(test_util.TestCase):
         q0, num_negative_trials, q1, num_positive_trials, curve=curve)
     auc_ = self.evaluate(auc)
 
-    self.assertAllClose(auc_, true_auc, atol=5e-3, rtol=0.)
+    self.assertAllClose(auc_, true_auc, atol=1e-2, rtol=0.)
     self.assertAllEqual(batch_shape, auc_.shape)
 
 
