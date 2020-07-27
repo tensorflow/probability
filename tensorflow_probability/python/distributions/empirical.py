@@ -249,8 +249,21 @@ class Empirical(distribution.Distribution):
     # Samples count can vary by batch member. Use map_fn to compute mode for
     # each batch separately.
     def _get_mode(samples):
-      count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0]).count
-      return tf.argmax(count)
+      _, idx, count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0])
+      # TODO(b/161402486): Remove this hack for fixing the wrong static shape
+      # of `idx` in graph mode.
+      idx = tf.vectorized_map(lambda x: tf.reshape(x, [-1])[0], idx)
+      # NOTE:
+      #  - `count` has shape `[K]`, where `K` is the number of unique elements,
+      #    and `count[j]` is the number of times the j-th unique element occurs
+      #    in `samples`.
+      #  - `idx` has shape `[samples.shape[0]]`, and `idx[i] == j` means that
+      #    `samples[i]` is equal to the `j`-th unique element.
+      max_count_idx = tf.argmax(count, output_type=tf.int32)
+      # Return an index `i` for which `idx[i] == max_count_idx`.
+      return tf.argmax(
+          tf.cast(tf.math.equal(idx, max_count_idx), dtype=tf.int32),
+          output_type=tf.int32)
 
     if samples is None:
       samples = tf.convert_to_tensor(self._samples)
@@ -268,12 +281,10 @@ class Empirical(distribution.Distribution):
           axis=0)
       flattened_samples = tf.reshape(samples, [-1, num_samples, event_size])
 
-    indices = tf.map_fn(_get_mode,
-                        flattened_samples,
-                        fn_output_signature=tf.int64)
-    full_indices = tf.stack(
-        [tf.range(tf.shape(indices)[0]),
-         tf.cast(indices, tf.int32)], axis=1)
+    indices = tf.map_fn(
+        _get_mode, flattened_samples,
+        fn_output_signature=tf.int32)
+    full_indices = tf.stack([tf.range(tf.shape(indices)[0]), indices], axis=1)
 
     mode = tf.gather_nd(flattened_samples, full_indices)
     return tf.reshape(mode, mode_shape)

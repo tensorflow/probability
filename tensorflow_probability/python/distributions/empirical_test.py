@@ -230,12 +230,14 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
   def testMode(self):
     samples = [
         [0, 1, 1, 2],
+        [0, 1, 1, 1, 2, 2, 3, 4, 5, 9, 11, 11, 11, 11, 11],
         [[0, 0, 1], [0, 1, 1], [2, 2, 2]],
         [[[0, 0, 0, 0], [0, 0, 1, 1]],
          [[1, 1, 1, 2], [0, 1, 2, 2]]]
     ]
     expected_modes = [
         1,
+        11.,
         [0, 1, 2],
         [[0, 0], [1, 2]]
     ]
@@ -455,8 +457,8 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
   def testMode(self):
     samples = [
         [[0, 0], [0, 1], [0, 1]],
-        [[[0, 0], [0, 1], [0, 1], [1, 1]],
-         [[1, 1], [2, 2], [2, 2], [2, 2]]]
+        [[[0, 0], [0, 1], [1, 0], [0, 1], [1, 1], [7, 9]],
+         [[1, 1], [1, 2], [1, 7], [2, 2], [2, 2], [2, 2]]]
     ]
     expected_modes = [
         [0, 1],
@@ -643,6 +645,8 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
       reason='UniqueWithCountsV2 is not implemented in the JAX, NumPy backends')
   def testMode(self):
     sample = [[[0, 0], [0, 1]],
+              [[0, 0], [2, 4]],
+              [[0, 1], [2, 4]],
               [[0, 1], [1, 2]],
               [[0, 1], [1, 2]],
               [[0, 2], [2, 4]]]
