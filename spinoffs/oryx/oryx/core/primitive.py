@@ -77,7 +77,8 @@ class HigherOrderPrimitive(jax_core.Primitive):
 
   def bind(self, f, *args, **params):
     top_trace = jax_core.find_top_trace(args)
-    level = (jax_core.trace_state.trace_stack.next_level(True)
+    trace_stack = jax_core.thread_local_state.trace_state.trace_stack
+    level = (trace_stack.next_level(True)
              if top_trace is None else top_trace.level)
     params_tuple = tuple(params.items())
     f, env_trace_todo = jax_core.process_env_traces(
