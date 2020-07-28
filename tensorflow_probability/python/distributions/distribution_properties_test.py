@@ -133,7 +133,7 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'PlackettLuce',  # No converter for TopKV2
-    'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
+    # 'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
