@@ -75,7 +75,7 @@ JAX_MODE = False
 
 def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redefined-builtin
   del name
-  result = input
+  result = ops.convert_to_tensor(input)
   if num_lower > -1:
     result = np.triu(result, -num_lower)
   if num_upper > -1:
@@ -191,6 +191,8 @@ def _matmul(a, b,
             a_is_sparse=False, b_is_sparse=False,
             name=None):  # pylint: disable=unused-argument
   """Numpy matmul wrapper."""
+  a = ops.convert_to_tensor(a)
+  b = ops.convert_to_tensor(b)
   if a_is_sparse or b_is_sparse:
     raise NotImplementedError('Numpy backend does not support sparse matmul.')
   if transpose_a or adjoint_a:
@@ -347,7 +349,8 @@ diag = utils.copy_docstring(
 
 diag_part = utils.copy_docstring(
     'tf.linalg.diag_part',
-    lambda input, name=None: np.diagonal(input, axis1=-2, axis2=-1))
+    lambda input, name=None: np.diagonal(  # pylint: disable=g-long-lambda
+        ops.convert_to_tensor(input), axis1=-2, axis2=-1))
 
 einsum = utils.copy_docstring(
     'tf.linalg.einsum',

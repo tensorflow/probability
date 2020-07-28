@@ -331,6 +331,7 @@ class ReshapeBijectorTestStatic(test_util.TestCase, _ReshapeBijectorTest):
         self.evaluate(reshape.forward([0]))
 
   @test_util.numpy_disable_test_missing_functionality('b/142265598')
+  @test_util.jax_disable_test_missing_functionality('tf.boolean_mask')
   def testConcretizationLimits(self):
     shape_out = tfp_hps.defer_and_count_usage(tf.Variable([1]))
     reshape = tfb.Reshape(shape_out, validate_args=True)

@@ -582,9 +582,7 @@ def constrain_params(params_unconstrained, dist_name):
   # ignoring the value.  We similarly reinstate raw tf.Variables, so they
   # appear in the distribution's `variables` list and can be initialized.
   for k in params_constrained:
-    # In JAX_MODE, tfp_util.DeferredTensor is a function, not a class, so we
-    # disable this check entirely.
-    if (not JAX_MODE and k in params_unconstrained and
+    if (k in params_unconstrained and
         isinstance(params_unconstrained[k],
                    (tfp_util.DeferredTensor, tf.Variable))
         and params_unconstrained[k] is not params_constrained[k]):

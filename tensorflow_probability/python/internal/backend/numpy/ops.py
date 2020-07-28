@@ -382,7 +382,7 @@ convert_to_tensor = utils.copy_docstring(
 
 
 def _custom_gradient(f):
-  """Jax implementation of tf.custom_gradient."""
+  """JAX implementation of tf.custom_gradient."""
   if not JAX_MODE:
     # Numpy backend ignores custom gradients, so we do too.
     return lambda *args, **kwargs: f(*args, **kwargs)[0]
@@ -414,10 +414,13 @@ executing_eagerly = utils.copy_docstring(
 
 
 def _get_static_value_jax(tensor, partial=False):
+  """JAX implementation of tf.get_static_value."""
   del partial
   if isinstance(tensor, jax.core.Tracer):
     return None
   if isinstance(tensor, NumpyVariable):
+    return None
+  if isinstance(tensor, Module):
     return None
   if isinstance(tensor, np.ndarray):
     return onp.array(tensor)
@@ -425,8 +428,11 @@ def _get_static_value_jax(tensor, partial=False):
 
 
 def _get_static_value_numpy(tensor, partial=False):
+  """NumPy implementation of tf.get_static_value."""
   del partial
   if isinstance(tensor, NumpyVariable):
+    return None
+  if isinstance(tensor, Module):
     return None
   return tensor
 
@@ -575,16 +581,16 @@ class NumpyVariable(getattr(wrapt, 'ObjectProxy', object)):
     # to `float64`. Thus we handle this case separately.
     return self.__wrapped__.__array__()
 
-  def assign(self, value):
+  def assign(self, value, **_):
     super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
     return self
 
-  def assign_add(self, value):
+  def assign_add(self, value, **_):
     super(NumpyVariable, self).__init__(
         onp.array(self, dtype=self.dtype) + onp.array(value, dtype=self.dtype))
     return self
 
-  def assign_sub(self, value):
+  def assign_sub(self, value, **_):
     super(NumpyVariable, self).__init__(
         onp.array(self, dtype=self.dtype) - onp.array(value, dtype=self.dtype))
     return self
@@ -616,7 +622,42 @@ class _TensorMeta(type(np.ndarray)):
 
 
 class Tensor(six.with_metaclass(_TensorMeta)):
-  OVERLOADABLE_OPERATORS = ()
+  OVERLOADABLE_OPERATORS = frozenset((
+      # Binary.
+      '__add__',
+      '__radd__',
+      '__sub__',
+      '__rsub__',
+      '__mul__',
+      '__rmul__',
+      '__truediv__',
+      '__rtruediv__',
+      '__floordiv__',
+      '__rfloordiv__',
+      '__mod__',
+      '__rmod__',
+      '__lt__',
+      '__le__',
+      '__gt__',
+      '__ge__',
+      '__ne__',
+      '__eq__',
+      '__and__',
+      '__rand__',
+      '__or__',
+      '__ror__',
+      '__xor__',
+      '__rxor__',
+      '__getitem__',
+      '__pow__',
+      '__rpow__',
+      # Unary.
+      '__invert__',
+      '__neg__',
+      '__abs__',
+      '__matmul__',
+      '__rmatmul__'
+  ))
 
 
 class Module(object):

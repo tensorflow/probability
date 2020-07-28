@@ -34,6 +34,10 @@ tfd = tfp.distributions
 @test_util.test_all_tf_execution_regimes
 class DeferredTensorTest(test_util.TestCase):
 
+  # This needs to match the doc example, so we won't port it to use the backend
+  # agnostic code.
+  @test_util.jax_disable_test_missing_functionality('GradientTape')
+  @test_util.numpy_disable_test_missing_functionality('GradientTape')
   def test_docstring_example(self):
     trainable_normal = tfd.Normal(
         loc=tf.Variable(0.),
@@ -63,11 +67,15 @@ class DeferredTensorTest(test_util.TestCase):
           repr(x),
           '<DeferredTensor: dtype=float32, shape=[], fn=exp>')
 
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_retains_trainable_variables_from_bijector(self):
     m = tf.Variable(0., name='m')
     x = tfp.util.DeferredTensor(1., tfb.Scale(m))
     self.assertIn(m, x.trainable_variables)
 
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_variable_shape_changes(self):
     v = tf.Variable(np.zeros((3, 2, 3)), shape=tf.TensorShape((None, 2, None)))
     self.evaluate(v.initializer)
@@ -80,6 +88,8 @@ class DeferredTensorTest(test_util.TestCase):
       self.assertAllEqual((1, 2, 4), self.evaluate(tf.shape(x)))
       self.assertAllEqual((None, 2, None), x.shape.as_list())
 
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_variable_rank_changes(self):
     def f(x):
       shape = tf.shape(x)
@@ -100,7 +110,7 @@ class DeferredTensorTest(test_util.TestCase):
   def test_from_bijector_with_inverted_assignment(self):
     x = tfp.util.DeferredTensor(tf.Variable([[1.], [2.], [3.]]),
                                 tfb.Pad(validate_args=True))
-    self.assertIs(tf.float32, x.dtype)
+    self.assertEqual(tf.float32, x.dtype)
     self.assertAllEqual([3, 1], x.pretransformed_input.shape)
     self.assertAllEqual([3, 2], x.shape)
     if tf.executing_eagerly():
@@ -132,6 +142,10 @@ class DeferredTensorTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class TransformedVariableTest(test_util.TestCase):
 
+  # This needs to match the doc example, so we won't port it to use the backend
+  # agnostic code.
+  @test_util.jax_disable_test_missing_functionality('GradientTape')
+  @test_util.numpy_disable_test_missing_functionality('GradientTape')
   def test_docstring_1(self):
     trainable_normal = tfd.Normal(
         loc=tf.Variable(0.),
@@ -228,6 +242,8 @@ class TransformedVariableTest(test_util.TestCase):
     self.assertAllEqual((5, 1, 4, 3, 3), shape_)
     self.assertAllEqual((5, 1, 4, 3, 3), scale_tril_.shape)
 
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_nested_transformed_variable(self):
     x = tfp.util.TransformedVariable(0.25, tfb.Exp())
     self.evaluate(x.initializer)
@@ -334,7 +350,7 @@ class DeferredTensorBehavesLikeTensorTest(test_util.TestCase):
     self.evaluate([v.initializer for v in x.trainable_variables])
     if tf.executing_eagerly():
       for expected_, actual_ in zip(x_, iter(x)):
-        self.assertNear(np.exp(expected_), actual_.numpy(), err=1e-5)
+        self.assertNear(np.exp(expected_), actual_, err=1e-5)
     else:
       with self.assertRaises(TypeError):
         for _ in iter(x):
@@ -346,10 +362,43 @@ class DeferredTensorBehavesLikeTensorTest(test_util.TestCase):
 
     self.evaluate([v.initializer for v in x.trainable_variables])
     if tf.executing_eagerly():
-      self.assertAllEqual(tf.math.exp(x_).numpy(), x.numpy())
+      self.assertAllEqual(tf.math.exp(x_), x.numpy())
     else:
       with self.assertRaises(NotImplementedError):
         x.numpy()
+
+
+class DeferredTensorBehavesLikeTensorInXLATest(test_util.TestCase):
+  # This is entirely for the benefit of JAX, which behaves quite differently
+  # inside its jit context than TF.
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='NumPy has no XLA.')
+  @parameterized.parameters(
+      operator.add,
+      operator.sub,
+      operator.mul,
+      operator.floordiv,
+      operator.truediv,
+      operator.pow,
+      operator.mod,
+      operator.gt,
+      operator.ge,
+      operator.lt,
+      operator.le,
+  )
+  def testOperatorBinary(self, op):
+    @tf.function(autograph=False, experimental_compile=True)
+    def fn(y):
+      x = tfp.util.DeferredTensor(y, tf.math.exp)
+      y1 = op(2., x)
+      y2 = op(x, 3.)
+      return y1, y2
+
+    y1, y2 = fn(0.)
+    self.assertAllClose([op(2., 1.), op(1., 3.)],
+                        self.evaluate([y1, y2]),
+                        atol=0., rtol=1e-5)
 
 
 if __name__ == '__main__':

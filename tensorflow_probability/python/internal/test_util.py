@@ -42,6 +42,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'substrate_disable_stateful_random_test',
     'numpy_disable_gradient_test',
+    'numpy_disable_variable_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
     'disable_test_for_backend',
@@ -574,6 +575,19 @@ def numpy_disable_gradient_test(test_fn_or_reason, reason=None):
   def new_test(self, *args, **kwargs):  # pylint: disable=unused-argument
     self.skipTest('gradient-using test disabled for numpy{}'.format(
         ': {}'.format(reason) if reason else ''))
+
+  return new_test
+
+
+def numpy_disable_variable_test(test_fn):
+  """Disable a Variable-using test when using the numpy backend."""
+
+  if not NUMPY_MODE:
+    return test_fn
+
+  def new_test(self, *args, **kwargs):
+    self.skipTest('tf.Variable-using test disabled for numpy')
+    return test_fn(self, *args, **kwargs)
 
   return new_test
 

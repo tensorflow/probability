@@ -251,6 +251,19 @@ _cumprod = utils.partial(_cumop, np.cumprod, initial_value=1.)
 _cumsum = utils.partial(_cumop, np.cumsum, initial_value=0.)
 
 
+def _equal(x, y, name=None):
+  del name
+  x = _convert_to_tensor(x)
+  y = _convert_to_tensor(y)
+  return np.equal(x, y)
+
+
+def _invert_permutation(x, name=None):
+  del name
+  x = _convert_to_tensor(x, dtype_hint=np.int32)
+  return np.argsort(x).astype(x.dtype)
+
+
 def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=unused-argument
   x = _convert_to_tensor(x)
   return x / np.linalg.norm(x, ord=2, axis=_astuple(axis), keepdims=True)
@@ -534,7 +547,7 @@ divide_no_nan = utils.copy_docstring(
 
 equal = utils.copy_docstring(
     'tf.math.equal',
-    lambda x, y, name=None: np.equal(x, y))
+    _equal)
 
 erf = utils.copy_docstring(
     'tf.math.erf',
@@ -595,7 +608,7 @@ imag = utils.copy_docstring(
 # TODO(b/256095991): Add unit-test.
 invert_permutation = utils.copy_docstring(
     'tf.math.invert_permutation',
-    lambda x, name=None: np.argsort(x))
+    _invert_permutation)
 
 is_finite = utils.copy_docstring(
     'tf.math.is_finite',

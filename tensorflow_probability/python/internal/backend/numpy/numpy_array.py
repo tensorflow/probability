@@ -338,6 +338,14 @@ def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint
   return np.split(value, indices_or_sections, axis)
 
 
+def _stack(values, axis=0, name='stack'):
+  del name
+  if axis is None:
+    raise ValueError('None values for `axis` argument not supported.')
+  values = _args_to_matching_arrays(values)
+  return np.stack(values, axis=axis)
+
+
 def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disable=unused-argument
   x = np.transpose(a, perm)
   return np.conjugate(x) if conjugate else x
@@ -352,7 +360,7 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 concat = utils.copy_docstring(
     'tf.concat',
-    lambda values, axis, name='concat': _concat(values, axis))
+    _concat)
 
 
 expand_dims = utils.copy_docstring(
@@ -446,7 +454,8 @@ squeeze = utils.copy_docstring(
     lambda input, axis=None, name=None: np.squeeze(input, _astuple(axis)))
 
 stack = utils.copy_docstring(
-    'tf.stack', lambda values, axis=0, name='stack': np.stack(values, axis))
+    'tf.stack',
+    _stack)
 
 tile = utils.copy_docstring(
     'tf.tile',
