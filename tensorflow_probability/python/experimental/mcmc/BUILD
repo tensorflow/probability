@@ -42,6 +42,7 @@ py_library(
         ":particle_filter_augmentation",
         ":reducer",
         ":sample",
+        ":sample_discarding_kernel",
         ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
@@ -431,6 +432,32 @@ py_test(
     name = "sample_fold_test",
     size = "small",
     srcs = ["sample_fold_test.py"],
+    shard_count = 5,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "sample_discarding_kernel",
+    srcs = ["sample_discarding_kernel.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        ":sample",
+        "//tensorflow_probability/python/mcmc/internal",
+        "//tensorflow_probability/python/mcmc:kernel",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "sample_discarding_kernel_test",
+    size = "small",
+    srcs = ["sample_discarding_kernel_test.py"],
     shard_count = 5,
     deps = [
         # numpy dep,
