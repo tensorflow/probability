@@ -96,6 +96,12 @@ class FactoredSurrogatePosterior(test_util.TestCase):
        'event_shape': {'x': tf.TensorShape([1]), 'y': tf.TensorShape([])},
        'constraining_bijectors': None,
        'dtype': np.float64, 'use_static_shape': True},
+      {'testcase_name': 'NestedEvent',
+       'event_shape': {'x': [tf.TensorShape([1]), tf.TensorShape([1, 2])],
+                       'y': tf.TensorShape([])},
+       'constraining_bijectors': {
+           'x': [tfb.Identity(), tfb.Softplus()], 'y': tfb.Sigmoid()},
+       'dtype': np.float32, 'use_static_shape': True},
   )
   def test_specifying_event_shape(self, event_shape,
                                   constraining_bijectors,

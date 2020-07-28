@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import softplus as softplus_lib
+from tensorflow_probability.python.distributions import joint_distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -288,13 +289,6 @@ def build_factored_surrogate_posterior(
         event_shape, flat_component_dists)
 
     # Return a `Distribution` object whose events have the specified structure.
-    if hasattr(component_distributions, 'sample'):    # Tensor-valued posterior.
-      return component_distributions
-    elif hasattr(component_distributions, 'keys'):  # Dict-valued posterior.
-      return tfd.JointDistributionNamed(component_distributions,
-                                        validate_args=validate_args,
-                                        name=name)
-    else:
-      return tfd.JointDistributionSequential(component_distributions,
-                                             validate_args=validate_args,
-                                             name=name)
+    return (
+        joint_distribution_util.independent_joint_distribution_from_structure(
+            component_distributions, validate_args=validate_args))
