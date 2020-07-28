@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import with_reductions
+from tensorflow_probability.python.experimental.mcmc import SampleDiscardingKernel
 from tensorflow_probability.python.experimental.mcmc import step_kernel
 from tensorflow.python.util import nest
 
@@ -36,6 +37,8 @@ def sample_fold(
     previous_kernel_results=None,
     kernel=None,
     reducers=None,
+    num_burnin_steps=0,
+    num_steps_between_results=0,
     parallel_iterations=10,
     seed=None,
     name=None,
@@ -60,6 +63,12 @@ def sample_fold(
       of the Markov chain.
     reducers: A (possibly nested) structure of `Reducer`s to be evaluated
       on the `kernel`'s samples.
+    num_burnin_steps: Integer number of chain steps to take before starting to
+      collect results. Defaults to 0 (i.e., no burn-in).
+    num_steps_between_results: Integer number of chain steps between collecting
+      a result. Only one out of every `num_steps_between_samples + 1` steps is
+      included in the returned results. The number of returned chain states is
+      still equal to `num_results`. Defaults to 0 (i.e., no thinning).
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
     seed: Optional seed for reproducible sampling.
@@ -81,7 +90,10 @@ def sample_fold(
         lambda x: tf.convert_to_tensor(x, name='current_state'),
         current_state)
     reduction_kernel = with_reductions.WithReductions(
-        inner_kernel=kernel,
+        inner_kernel=SampleDiscardingKernel(
+            inner_kernel=kernel,
+            num_burnin_steps=num_burnin_steps,
+            num_steps_between_results=num_steps_between_results),
         reducers=reducers,
     )
     end_state, final_kernel_results = step_kernel(

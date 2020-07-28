@@ -62,26 +62,30 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
               self.num_steps_between_results)
 
   def one_step(self, current_state, previous_kernel_results=None, seed=None):
-    if previous_kernel_results is None:
-      previous_kernel_results = self.bootstrap_results(current_state)
-    new_sample, inner_kernel_results = step_kernel(
-        num_steps=self._num_samples_to_skip(
-            previous_kernel_results.call_counter
-        ) + 1,
-        current_state=current_state,
-        previous_kernel_results=previous_kernel_results.inner_results,
-        kernel=self.inner_kernel,
-        return_final_kernel_results=True,
-        seed=seed,
-        name=self.name)
-    new_kernel_results = SampleDiscardingKernelResults(
-        previous_kernel_results.call_counter + 1, inner_kernel_results
-    )
-    return new_sample, new_kernel_results
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'sample_discarding_kernel', 'one_step')):
+      if previous_kernel_results is None:
+        previous_kernel_results = self.bootstrap_results(current_state)
+      new_sample, inner_kernel_results = step_kernel(
+          num_steps=self._num_samples_to_skip(
+              previous_kernel_results.call_counter
+          ) + 1,
+          current_state=current_state,
+          previous_kernel_results=previous_kernel_results.inner_results,
+          kernel=self.inner_kernel,
+          return_final_kernel_results=True,
+          seed=seed,
+          name=self.name)
+      new_kernel_results = SampleDiscardingKernelResults(
+          previous_kernel_results.call_counter + 1, inner_kernel_results
+      )
+      return new_sample, new_kernel_results
 
   def bootstrap_results(self, init_state):
-    return SampleDiscardingKernelResults(
-        0, self.inner_kernel.bootstrap_results(init_state))
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'with_reductions', 'bootstrap_results')):
+      return SampleDiscardingKernelResults(
+          0, self.inner_kernel.bootstrap_results(init_state))
 
   @property
   def is_calibrated(self):

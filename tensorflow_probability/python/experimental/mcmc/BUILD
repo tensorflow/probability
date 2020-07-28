@@ -423,6 +423,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         ":sample",
+        ":sample_discarding_kernel",
         ":with_reductions",
     ],
 )

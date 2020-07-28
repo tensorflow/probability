@@ -102,34 +102,42 @@ class SampleFoldTest(test_util.TestCase):
   def test_simple_operation(self):
     fake_kernel = TestTransitionKernel()
     fake_reducer = TestReducer()
-    reduction_rslt, warm_restart_pkg = self.evaluate(
-        tfp.experimental.mcmc.sample_fold(
-            num_steps=5,
-            current_state=0.,
-            kernel=fake_kernel,
-            reducers=fake_reducer,
-        ))
+    reduction_rslt, warm_restart_pkg = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=fake_kernel,
+        reducers=fake_reducer,
+    )
+    reduction_rslt, last_sample, innermost_results = self.evaluate([
+        reduction_rslt,
+        warm_restart_pkg[0],
+        warm_restart_pkg[1].inner_results.inner_results
+    ])
     self.assertEqual(reduction_rslt, 3)
-    self.assertEqual(warm_restart_pkg[0], 5)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_1, 5)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_2, 10)
+    self.assertEqual(last_sample, 5)
+    self.assertEqual(innermost_results.counter_1, 5)
+    self.assertEqual(innermost_results.counter_2, 10)
 
   @parameterized.parameters(1., 2.)
   def test_current_state(self, curr_state):
     fake_kernel = TestTransitionKernel()
     fake_reducer = TestReducer()
-    reduction_rslt, warm_restart_pkg = self.evaluate(
-        tfp.experimental.mcmc.sample_fold(
-            num_steps=5,
-            current_state=curr_state,
-            kernel=fake_kernel,
-            reducers=fake_reducer,
-        ))
+    reduction_rslt, warm_restart_pkg = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=curr_state,
+        kernel=fake_kernel,
+        reducers=fake_reducer,
+    )
+    reduction_rslt, last_sample, innermost_results = self.evaluate([
+        reduction_rslt,
+        warm_restart_pkg[0],
+        warm_restart_pkg[1].inner_results.inner_results
+    ])
     self.assertEqual(reduction_rslt, np.mean(
         np.arange(curr_state + 1, curr_state + 6)))
-    self.assertEqual(warm_restart_pkg[0], curr_state + 5)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_1, 5)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_2, 10)
+    self.assertEqual(last_sample, curr_state + 5)
+    self.assertEqual(innermost_results.counter_1, 5)
+    self.assertEqual(innermost_results.counter_2, 10)
 
   def test_warm_restart(self):
     fake_kernel = TestTransitionKernel()
@@ -140,18 +148,22 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducers=fake_reducer,)
     # verify `warm_restart_pkg` works as intended
-    reduction_rslt, warm_restart_pkg = self.evaluate(
-        tfp.experimental.mcmc.sample_fold(
-            num_steps=5,
-            current_state=warm_restart_pkg[0],
-            kernel=fake_kernel,
-            reducers=fake_reducer,
-            previous_kernel_results=warm_restart_pkg[1]
-        ))
+    reduction_rslt, warm_restart_pkg = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=warm_restart_pkg[0],
+        kernel=fake_kernel,
+        reducers=fake_reducer,
+        previous_kernel_results=warm_restart_pkg[1]
+    )
+    reduction_rslt, last_sample, innermost_results = self.evaluate([
+        reduction_rslt,
+        warm_restart_pkg[0],
+        warm_restart_pkg[1].inner_results.inner_results
+    ])
     self.assertEqual(reduction_rslt, 5.5)
-    self.assertEqual(warm_restart_pkg[0], 10)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_1, 10)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_2, 20)
+    self.assertEqual(last_sample, 10)
+    self.assertEqual(innermost_results.counter_1, 10)
+    self.assertEqual(innermost_results.counter_2, 20)
 
   def test_nested_reducers(self):
     fake_kernel = TestTransitionKernel()
@@ -159,33 +171,38 @@ class SampleFoldTest(test_util.TestCase):
         [TestReducer(), tfp.experimental.mcmc.CovarianceReducer()],
         [TestReducer()]
     ]
-    reduction_rslt, warm_restart_pkg = self.evaluate(
-        tfp.experimental.mcmc.sample_fold(
-            num_steps=3,
-            current_state=0.,
-            kernel=fake_kernel,
-            reducers=fake_reducers,
-        ))
+    reduction_rslt, warm_restart_pkg = tfp.experimental.mcmc.sample_fold(
+        num_steps=3,
+        current_state=0.,
+        kernel=fake_kernel,
+        reducers=fake_reducers,
+    )
+    reduction_rslt, last_sample, innermost_results = self.evaluate([
+        reduction_rslt,
+        warm_restart_pkg[0],
+        warm_restart_pkg[1].inner_results.inner_results
+    ])
     self.assertEqual(len(reduction_rslt), 2)
     self.assertEqual(len(reduction_rslt[0]), 2)
     self.assertEqual(len(reduction_rslt[1]), 1)
 
     self.assertEqual(reduction_rslt[0][0], 2)
     self.assertNear(reduction_rslt[0][1], 2/3, err=1e-6)
-    self.assertEqual(warm_restart_pkg[0], 3)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_1, 3)
-    self.assertEqual(warm_restart_pkg[1].inner_results.counter_2, 6)
+    self.assertEqual(last_sample, 3)
+    self.assertEqual(innermost_results.counter_1, 3)
+    self.assertEqual(innermost_results.counter_2, 6)
 
   def test_true_streaming_covariance(self):
     seed = test_util.test_seed()
     fake_kernel = TestTransitionKernel(())
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reduction_rslt, _ = self.evaluate(tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=20,
         current_state=tf.convert_to_tensor([0., 0.]),
         kernel=fake_kernel,
         reducers=cov_reducer,
-        seed=seed,))
+        seed=seed,)
+    reduction_rslt = self.evaluate(reduction_rslt)
     self.assertAllClose(
         np.cov(np.column_stack((np.arange(20), np.arange(20))).T, ddof=0),
         reduction_rslt,
@@ -194,15 +211,17 @@ class SampleFoldTest(test_util.TestCase):
   def test_batched_streaming_covariance(self):
     fake_kernel = TestTransitionKernel((2, 3))
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
-    reduction_rslt, warm_restart_pkg = self.evaluate(
-        tfp.experimental.mcmc.sample_fold(
-            num_steps=5,
-            current_state=tf.convert_to_tensor(
-                [[0., 0., 0.], [0., 0., 0.]]),
-            kernel=fake_kernel,
-            reducers=cov_reducer,
-        ))
-    mean = warm_restart_pkg[1].streaming_calculations.mean
+    reduction_rslt, warm_restart_pkg = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=tf.convert_to_tensor(
+            [[0., 0., 0.], [0., 0., 0.]]),
+        kernel=fake_kernel,
+        reducers=cov_reducer,
+    )
+    reduction_rslt, streaming_calc = self.evaluate([
+        reduction_rslt, warm_restart_pkg[1].streaming_calculations
+    ])
+    mean = streaming_calc.cov_state.mean
     self.assertEqual(reduction_rslt.shape, (2, 3, 3))
     self.assertAllEqual(reduction_rslt, np.ones(reduction_rslt.shape) * 2)
     self.assertEqual(mean.shape, (2, 3))
@@ -231,6 +250,29 @@ class SampleFoldTest(test_util.TestCase):
         first_reduction_rslt, second_reduction_rslt
     ])
     self.assertEqual(first_reduction_rslt, second_reduction_rslt)
+
+  def test_thinning_and_burnin(self):
+    fake_kernel = TestTransitionKernel()
+    fake_reducer = TestReducer()
+    reduction_rslt, warm_restart_pkg = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=fake_kernel,
+        reducers=fake_reducer,
+        num_burnin_steps=10,
+        num_steps_between_results=1,
+    )
+    reduction_rslt, last_sample, innermost_results = self.evaluate([
+        reduction_rslt,
+        warm_restart_pkg[0],
+        warm_restart_pkg[1].inner_results.inner_results
+    ])
+    self.assertEqual(reduction_rslt, 16)
+    self.assertEqual(last_sample, 20)
+    self.assertEqual(innermost_results.counter_1, 20)
+    self.assertEqual(innermost_results.counter_2, 40)
+    self.assertEqual(
+        warm_restart_pkg[1].inner_results.call_counter, 5)
 
 
 if __name__ == '__main__':
