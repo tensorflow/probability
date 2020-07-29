@@ -37,6 +37,14 @@ tfd = tfp.distributions
 Root = tfd.JointDistributionCoroutine.Root
 
 
+def basic_model_fn():
+  yield Root(tfd.Normal(0., 1.))
+  e = yield Root(tfd.Independent(
+      tfd.Exponential(rate=[100, 120]),
+      reinterpreted_batch_ndims=1, name='e'))
+  yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
+
+
 def basic_model_with_names_fn():
   yield Root(tfd.Normal(0., 1., name='a'))
   e = yield Root(tfd.Independent(
@@ -348,7 +356,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       ('basic', basic_model_with_names_fn),
-      ('nested_lists', nested_lists_with_names_model_fn))
+      ('nested_lists', nested_lists_with_names_model_fn),
+      ('basic_unnamed', basic_model_fn))
   def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):
     d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
 
@@ -383,6 +392,14 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
+
+  def test_log_prob_with_manual_kwargs(self):
+    d = tfd.JointDistributionCoroutine(basic_model_fn, validate_args=True)
+    x = d.sample(seed=test_util.test_seed())
+    lp1 = d.log_prob(_var0=x[0], e=x[1], _var2=x[2])
+    lp2 = d.log_prob(x)
+    lp1_, lp2_ = self.evaluate([lp1, lp2])
+    self.assertAllClose(lp1_, lp2_)
 
   @parameterized.named_parameters(
       ('singleton_float', singleton_normal_model_fn),

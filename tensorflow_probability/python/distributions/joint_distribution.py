@@ -508,14 +508,10 @@ class JointDistribution(distribution_lib.Distribution):
   def _flat_resolve_names(self, dummy_name='var'):
     """Resolves a name for each random variable in the model."""
     names = []
-    dummy_idx = 1
-    for d in self._get_single_sample_distributions():
+    for dummy_idx, d in enumerate(self._get_single_sample_distributions()):
       name = get_explicit_name_for_component(d)
       if name is None:
-        # Wrapping dummy names with <> prevents users from passing them as
-        # kwargs.
-        name = '<{}{}>'.format(dummy_name, dummy_idx)
-        dummy_idx += 1
+        name = '_{}{}'.format(dummy_name, dummy_idx)
       names.append(name)
     return names
 
@@ -781,4 +777,3 @@ class _DefaultJointBijector(bijector_lib.Bijector):
     with tf.name_scope('inverse_event_shape_tensor'):
       self._check_inputs_not_none(output_shapes)
       return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
-
