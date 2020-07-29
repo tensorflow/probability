@@ -47,6 +47,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       num_burnin_steps=0,
       num_steps_between_results=0,
       name=None):
+    # TODO(Ru): get static value
     self._parameters = dict(
         inner_kernel=inner_kernel,
         num_burnin_steps=num_burnin_steps,
@@ -55,15 +56,13 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     )
 
   def _num_samples_to_skip(self, call_counter):
-    # not using `tf.equal(self.num_burnin_steps, 0)` here is intentional.
-    # We are checking to see if `self.num_burnin_steps` is statically known.
-    # In the case where it's a `Tensor` holding 0, a `Tensor` will be
-    # returned in the else clause.
-    if self.num_burnin_steps == 0:
-      return self.num_steps_between_results
+    if call_counter == 0:
+      return self.num_burnin_steps
     else:
-      return (tf.where(tf.equal(call_counter, 0), self.num_burnin_steps, 0) +
-              self.num_steps_between_results)
+      return tf.where(
+          tf.equal(call_counter, 0),
+          self.num_burnin_steps,
+          self.num_steps_between_results)
 
   def one_step(self, current_state, previous_kernel_results=None, seed=None):
     with tf.name_scope(
