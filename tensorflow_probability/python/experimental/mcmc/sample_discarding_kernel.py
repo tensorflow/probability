@@ -47,7 +47,11 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       num_burnin_steps=0,
       num_steps_between_results=0,
       name=None):
-    # TODO(Ru): get static value
+    if tf.get_static_value(num_burnin_steps):
+      num_burnin_steps = tf.get_static_value(num_burnin_steps)
+    if tf.get_static_value(num_steps_between_results):
+      num_steps_between_results = tf.get_static_value(
+          num_steps_between_results)
     self._parameters = dict(
         inner_kernel=inner_kernel,
         num_burnin_steps=num_burnin_steps,
@@ -56,13 +60,15 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     )
 
   def _num_samples_to_skip(self, call_counter):
-    if call_counter == 0:
-      return self.num_burnin_steps
+    # not using `tf.equal(self.num_burnin_steps, 0)` here is intentional.
+    # We are checking to see if `self.num_burnin_steps` is statically known.
+    # In the case where it's a `Tensor` holding 0, a `Tensor` will be
+    # returned in the else clause.
+    if self.num_burnin_steps == 0:
+      return self.num_steps_between_results
     else:
-      return tf.where(
-          tf.equal(call_counter, 0),
-          self.num_burnin_steps,
-          self.num_steps_between_results)
+      return (tf.where(tf.equal(call_counter, 0), self.num_burnin_steps, 0) +
+              self.num_steps_between_results)
 
   def one_step(self, current_state, previous_kernel_results=None, seed=None):
     with tf.name_scope(
@@ -89,7 +95,8 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
         mcmc_util.make_name(
             self.name, 'sample_discarding_kernel', 'bootstrap_results')):
       return SampleDiscardingKernelResults(
-          0, self.inner_kernel.bootstrap_results(init_state))
+          tf.zeros((), dtype=tf.int32),
+          self.inner_kernel.bootstrap_results(init_state))
 
   @property
   def is_calibrated(self):
