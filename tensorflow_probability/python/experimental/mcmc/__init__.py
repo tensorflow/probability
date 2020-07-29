@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.mcmc.covariance_reducer import CovarianceReducer
+from tensorflow_probability.python.experimental.mcmc.covariance_reducer import VarianceReducer
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
 from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
@@ -27,6 +29,7 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_observation_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_state_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
+from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
 from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
@@ -46,6 +49,7 @@ from tensorflow_probability.python.internal import all_util
 
 
 _allowed_symbols = [
+    'CovarianceReducer',
     'EllipticalSliceSampler',
     'NoUTurnSampler',
     'SequentialMonteCarlo',
@@ -63,13 +67,15 @@ _allowed_symbols = [
     'make_rwmh_kernel_fn',
     'particle_filter',
     'reconstruct_trajectories',
+    'Reducer',
     'resample_deterministic_minimum_error',
     'resample_independent',
     'resample_stratified',
     'resample_systematic',
     'sample_sequential_monte_carlo',
     'simple_heuristic_tuning',
-    'step_kernel'
+    'step_kernel',
+    'VarianceReducer'
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)

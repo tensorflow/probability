@@ -18,19 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# pylint: disable=unused-import,line-too-long,g-importing-member
-
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovariance
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovarianceState
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningVariance
-from tensorflow_probability.python.internal import all_util
-# pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
-
-_allowed_symbols = [
+__all__ = [
     'RunningCovariance',
     'RunningCovarianceState',
     'RunningVariance',
 ]
 
-all_util.remove_undocumented(__name__, _allowed_symbols)

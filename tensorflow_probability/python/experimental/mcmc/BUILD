@@ -35,10 +35,12 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":covariance_reducer",
         ":elliptical_slice_sampler",
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
+        ":reducer",
         ":sample",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
@@ -347,6 +349,41 @@ py_test(
     shard_count = 5,
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "reducer",
+    srcs = ["reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # six dep,
+    ],
+)
+
+py_library(
+    name = "covariance_reducer",
+    srcs = ["covariance_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/stats",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "covariance_reducer_test",
+    size = "small",
+    srcs = ["covariance_reducer_test.py"],
+    deps = [
+        ":covariance_reducer",
+        ":sample",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
