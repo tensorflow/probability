@@ -977,7 +977,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
      filtered_means, filtered_covs,
      predicted_means, predicted_covs,
      observation_means, observation_covs) = model.forward_filter(x)
-    smoothed_means, smoothed_covs = model.backward_smoothing_pass(x)
+    smoothed_means, smoothed_covs = model.backward_smoothing_pass(
+        filtered_means, filtered_covs,
+        predicted_means, predicted_covs)
+
     ```
     where `x` is an observation sequence.
 
