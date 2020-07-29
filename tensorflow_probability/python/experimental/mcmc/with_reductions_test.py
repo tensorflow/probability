@@ -486,6 +486,9 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertEqual(kernel_results.inner_results.counter_1, 6)
     self.assertEqual(kernel_results.inner_results.counter_2, 12)
 
+  # TODO(Ru): once TracingReducer gets merged, add a test for building the onion
+  # when kernel results need to be traced
+
 
 if __name__ == '__main__':
   tf.test.main()

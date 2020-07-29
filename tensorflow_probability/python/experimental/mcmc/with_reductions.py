@@ -116,7 +116,7 @@ class WithReductions(kernel_base.TransitionKernel):
           lambda r, state: r.one_step(
               sample,
               state,
-              previous_kernel_results=previous_kernel_results,),
+              previous_kernel_results=inner_kernel_results),
           self.reducers, previous_kernel_results.streaming_calculations,
           check_types=False)
       kernel_results = WithReductionsKernelResults(
