@@ -83,7 +83,8 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
 
   def bootstrap_results(self, init_state):
     with tf.name_scope(
-        mcmc_util.make_name(self.name, 'with_reductions', 'bootstrap_results')):
+        mcmc_util.make_name(
+            self.name, 'sample_discarding_kernel', 'bootstrap_results')):
       return SampleDiscardingKernelResults(
           0, self.inner_kernel.bootstrap_results(init_state))
 
