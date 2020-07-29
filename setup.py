@@ -31,7 +31,7 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
     'decorator',
-    'cloudpickle == 1.3',  # TODO(b/155109696): Unpin cloudpickle version.
+    'cloudpickle >= 1.3',
     'gast >= 0.3.2',  # For autobatching
     'dm-tree'  # For NumPy/JAX backends (hence, also for prefer_static)
 ]

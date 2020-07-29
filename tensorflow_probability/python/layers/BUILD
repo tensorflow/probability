@@ -163,6 +163,7 @@ py_test(
     shard_count = 5,
     deps = [
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
