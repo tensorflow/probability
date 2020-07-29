@@ -28,8 +28,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
-from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
-
+from tensorflow_probability.python.math.gradient import batch_jacobian
 
 tfd = tfp.distributions
 
@@ -284,8 +283,6 @@ class SoftplusInverseTest(test_util.TestCase):
           use_gpu=True)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      'Relies on Tensorflow gradient_checker')
   def testGradient(self):
     x = tf.constant(
         [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9],
@@ -338,17 +335,13 @@ class LogCumsumExpTests(test_util.TestCase):
       self._testCumulativeLogSumExp(x, axis=axis)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      'Relies on Tensorflow gradient_checker')
   def testGradient(self):
-    x = np.arange(10) / 10.0 - 0.5
-    x = tf.convert_to_tensor(x, dtype=tf.float64)
-    grad_naive_theoretical, _ = gradient_checker_v2.compute_gradient(
-        lambda y: tf.cumsum(tf.exp(y)), [x])
-    grad_fused_theoretical, _ = gradient_checker_v2.compute_gradient(
-        lambda y: tf.exp(tfp.math.log_cumsum_exp(y)),
-        [x])
-    self.assertAllClose(grad_fused_theoretical, grad_naive_theoretical)
+    x = tf.convert_to_tensor(
+        np.arange(10)[np.newaxis, ...] / 10.0 - 0.5, dtype=tf.float64)
+    jac_naive = batch_jacobian(lambda t: tf.cumsum(tf.exp(t), axis=-1), x)
+    jac_fused = batch_jacobian(
+        lambda t: tf.exp(tfp.math.log_cumsum_exp(t, axis=-1)), x)
+    self.assertAllClose(jac_naive, jac_fused)
 
   def test1DLarge(self):
     # This test ensures that the operation is correct even when the naive
