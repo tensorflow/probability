@@ -406,7 +406,6 @@ py_library(
 # py2and3
 py_test(
     name = "with_reductions_test",
-    shard_count = 5,
     srcs = ["with_reductions_test.py"],
     deps = [
         # tensorflow dep,

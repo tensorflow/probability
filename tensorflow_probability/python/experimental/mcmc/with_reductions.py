@@ -54,7 +54,7 @@ class WithReductions(kernel_base.TransitionKernel):
   kernel results.
 
   This `TransitionKernel` can also accept an arbitrary structure of
-  reducers. It then invokes all reducers in that structure with
+  reducers. It then applies all reducers in that structure with
   one `WithReductions.one_step` call. The resulting reducer state
   will identically mimic the structure of the provided reducers.
   """
