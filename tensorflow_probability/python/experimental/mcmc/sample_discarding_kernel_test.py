@@ -199,5 +199,58 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(kernel_results.inner_results.counter_1, 14)
     self.assertEqual(kernel_results.inner_results.counter_2, 28)
 
+  def test_tensor_thinning_and_burnin(self):
+    fake_inner_kernel = TestTransitionKernel()
+    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+        fake_inner_kernel,
+        num_burnin_steps=tf.convert_to_tensor(10),
+        num_steps_between_results=tf.convert_to_tensor(1),)
+
+    def _loop_body(i, curr_state, pkr):
+      new_state, kernel_results = discarder.one_step(
+          curr_state, pkr,
+      )
+      return (i + 1, new_state, kernel_results)
+
+    pkr = discarder.bootstrap_results(0.)
+    _, final_sample, kernel_results = tf.while_loop(
+        lambda i, _, __: i < 2,
+        _loop_body,
+        (0., 0., pkr),
+    )
+    final_sample, kernel_results = self.evaluate([
+        final_sample, kernel_results])
+    self.assertEqual(final_sample, 14)
+    self.assertEqual(kernel_results.call_counter, 2)
+    self.assertEqual(kernel_results.inner_results.counter_1, 14)
+    self.assertEqual(kernel_results.inner_results.counter_2, 28)
+
+  def test_tensor_no_burnin(self):
+    fake_inner_kernel = TestTransitionKernel()
+    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+        fake_inner_kernel,
+        num_burnin_steps=tf.convert_to_tensor(0),
+        num_steps_between_results=tf.convert_to_tensor(1),)
+
+    def _loop_body(i, curr_state, pkr):
+      new_state, kernel_results = discarder.one_step(
+          curr_state, pkr,
+      )
+      return (i + 1, new_state, kernel_results)
+
+    pkr = discarder.bootstrap_results(0.)
+    _, final_sample, kernel_results = tf.while_loop(
+        lambda i, _, __: i < 2,
+        _loop_body,
+        (0., 0., pkr),
+    )
+    final_sample, kernel_results = self.evaluate([
+        final_sample, kernel_results])
+    self.assertEqual(final_sample, 4)
+    self.assertEqual(kernel_results.call_counter, 2)
+    self.assertEqual(kernel_results.inner_results.counter_1, 4)
+    self.assertEqual(kernel_results.inner_results.counter_2, 8)
+
+
 if __name__ == '__main__':
   tf.test.main()

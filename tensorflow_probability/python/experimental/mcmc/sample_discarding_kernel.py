@@ -55,6 +55,10 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     )
 
   def _num_samples_to_skip(self, call_counter):
+    # not using `tf.equal(self.num_burnin_steps, 0)` here is intentional.
+    # We are checking to see if `self.num_burnin_steps` is statically known.
+    # In the case where it's a `Tensor` holding 0, a `Tensor` will be
+    # returned in the else clause.
     if self.num_burnin_steps == 0:
       return self.num_steps_between_results
     else:
