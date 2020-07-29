@@ -321,7 +321,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   import tensorflow_probability as tfp
   tfd = tfp.distributions
 
-  dtype = tf.float32
+  dtype = np.float32
 
   target = tfd.Normal(loc=dtype(0), scale=dtype(1))
 
@@ -329,12 +329,12 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   inverse_temperatures = 0.5**tf.range(4, dtype=dtype)
 
   # If everything was Normal, step_size should be ~ sqrt(temperature).
-  step_size = 0.5 / tf.sqrt(inverse_temperatures)
+  step_size = 1.5 / tf.sqrt(inverse_temperatures)
 
-  def make_kernel_fn(target_log_prob_fn, seed):
+  def make_kernel_fn(target_log_prob_fn):
     return tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
-        seed=seed, step_size=step_size, num_leapfrog_steps=3)
+        step_size=step_size, num_leapfrog_steps=3)
 
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
@@ -345,7 +345,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     return (results.is_swap_proposed_adjacent,
             results.is_swap_accepted_adjacent)
 
-  samples, is_swap_proposed_adjacent, is_swap_accepted_adjacent = (
+  samples, (is_swap_proposed_adjacent, is_swap_accepted_adjacent) = (
       tfp.mcmc.sample_chain(
           num_results=1000,
           current_state=1.0,
@@ -371,7 +371,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   import matplotlib.pyplot as plt
   tfd = tfp.distributions
 
-  dtype = tf.float32
+  dtype = np.float32
 
   target = tfd.MixtureSameFamily(
       mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
@@ -379,12 +379,12 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           loc=[[-1., -1], [1., 1.]],
           scale_identity_multiplier=[0.1, 0.1]))
 
-  inverse_temperatures = 0.5**tf.range(4, dtype=dtype)
+  inverse_temperatures = 0.2**tf.range(4, dtype=dtype)
 
   # step_size must broadcast with all batch and event dimensions of target.
   # Here, this means it must broadcast with:
   #  [len(inverse_temperatures)] + target.event_shape
-  step_size = 0.5 / tf.reshape(tf.sqrt(inverse_temperatures), shape=(4, 1))
+  step_size = 0.075 / tf.reshape(tf.sqrt(inverse_temperatures), shape=(4, 1))
 
   def make_kernel_fn(target_log_prob_fn):
     return tfp.mcmc.HamiltonianMonteCarlo(
@@ -398,7 +398,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   samples = tfp.mcmc.sample_chain(
       num_results=1000,
-      # Start near the [1, 1] mode.  Standard HMC would get stuck there.
+      # Start near the [1, 1] mode. Standard HMC would get stuck there.
       current_state=tf.ones(2, dtype=dtype),
       kernel=remc,
       trace_fn=None,
@@ -407,7 +407,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   plt.figure(figsize=(8, 8))
   plt.xlim(-2, 2)
   plt.ylim(-2, 2)
-  plt.plot(samples_[:, 0], samples_[:, 1], '.')
+  plt.plot(samples[:, 0], samples[:, 1], '.')
   plt.show()
   ```
 
