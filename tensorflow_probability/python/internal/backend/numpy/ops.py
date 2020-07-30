@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
+
 # Dependency imports
 import numpy as np
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
@@ -47,6 +49,7 @@ __all__ = [
     'get_static_value',
     'group',
     'identity',
+    'init_scope',
     'is_tensor',
     'name_scope',
     'newaxis',
@@ -316,6 +319,12 @@ def _default_convert_to_tensor_with_dtype(value, dtype,
            ' unsupported type {} to a Tensor.').format(value, type(value)))
   return np.array(value, dtype=dtype)
 
+
+@contextlib.contextmanager
+def _init_scope():
+  yield
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
@@ -451,6 +460,8 @@ identity = utils.copy_docstring(
 is_tensor = utils.copy_docstring(
     'tf.is_tensor',
     lambda x: isinstance(x, Tensor))
+
+init_scope = utils.copy_docstring('tf.init_scope', _init_scope)
 
 
 class name_scope(object):  # pylint: disable=invalid-name

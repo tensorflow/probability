@@ -65,6 +65,17 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
             per_example_test_nll=[num_test_points],
         ))
 
+  @parameterized.named_parameters(
+      ('NoTest', None),
+      ('WithTest', 5),
+  )
+  def testDeferred(self, num_test_points):
+    """Checks that the dataset is not prematurely materialized."""
+    num_features = 5
+    kwargs = _test_dataset(num_features, num_test_points)
+    self.validate_deferred_materialization(
+        logistic_regression.LogisticRegression, **kwargs)
+
   def testPartiallySpecifiedTestSet(self):
     """Check that partially specified test set raises an error."""
     num_features = 5

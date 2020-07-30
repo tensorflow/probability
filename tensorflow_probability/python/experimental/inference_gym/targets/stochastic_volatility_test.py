@@ -41,6 +41,12 @@ class StochasticVolatilitySP500Test(test_util.InferenceGymTestCase):
                 'log_volatility': [5]
             }))
 
+  def testDeferred(self):
+    """Checks that the dataset is not prematurely materialized."""
+    self.validate_deferred_materialization(
+        stochastic_volatility.StochasticVolatility,
+        centered_returns=tf.convert_to_tensor([5., -2.1, 8., 4., 1.1]))
+
   # Verify that data loading works using the small model only, since the full
   # dataset leads to an unwieldy prior containing 2518 RVs.
   def testSP500Small(self):

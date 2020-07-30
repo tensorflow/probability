@@ -233,7 +233,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
 
   def _sparse_to_dense(self, student_ids, question_ids, correct):
     # TODO(siege): This probably should support batching, for completeness.
-    # TODO(siege): This should be rewritten via scatter_nd to support
+    # TODO(b/162452866): This should be rewritten via scatter_nd to support
     # tensor-valued datasets. Blocked by JAX/Numpy not implementing scatter_nd.
     dense_y = np.zeros([self._num_students, self._num_questions], np.float32)
     dense_y[student_ids, question_ids] = correct

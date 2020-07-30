@@ -28,6 +28,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 flags.DEFINE_bool('use_tfds', False, 'Whether to run tests that use TFDS.')
 
@@ -447,3 +448,40 @@ class InferenceGymTestCase(test_util.TestCase):
           num_samples,
           msg='Comparing variance of "{}"'.format(name),
       )
+
+  def validate_deferred_materialization(self, model_fn, **kwargs):
+    """Validates that a model does not materialize args too early.
+
+    Given a `model_fn` and a set of NumPy arrays in `kwargs` this verifies that
+    none of the arrays are actually accessed by anything other than `dtype` and
+    `shape` properties when accessing similarly lightweight properties of the
+    model.
+
+    Args:
+      model_fn: A function that returns a Model.
+      **kwargs: Keyword arguments to pass to `model_fn`. Each value should be a
+        NumPy array.
+    """
+    deferred_kwargs = {}
+
+    def make_loud_materialization(name, value):
+      if value is None:
+        return None
+
+      def do_assert():
+        raise AssertionError('Erroneously materialized {}'.format(name))
+
+      empty = np.zeros(0)
+      return DeferredTensor(
+          empty, lambda _: do_assert(), shape=value.shape, dtype=value.dtype)
+
+    for k, v in kwargs.items():
+      deferred_kwargs[k] = make_loud_materialization(k, v)
+
+    model = model_fn(**deferred_kwargs)
+    _ = model.dtype
+    _ = model.name
+    _ = model.event_shape
+    _ = model.default_event_space_bijector
+    _ = model.sample_transformations
+    _ = str(model)

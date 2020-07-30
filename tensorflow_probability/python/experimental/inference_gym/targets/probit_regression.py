@@ -71,15 +71,15 @@ class ProbitRegression(bayesian_model.BayesianModel):
         `None` or not both specified.
     """
     with tf.name_scope(name):
-      train_features = tf.convert_to_tensor(train_features, tf.float32)
-      train_features = _add_bias(train_features)
-      train_labels = tf.convert_to_tensor(train_labels)
-      num_features = int(train_features.shape[1])
-
+      num_features = int(train_features.shape[1] + 1)
       self._prior_dist = tfd.Sample(tfd.Normal(0., 1.), num_features)
 
       def log_likelihood_fn(weights, features, labels, reduce_sum=True):
         """The log_likelihood function."""
+        features = tf.convert_to_tensor(features, tf.float32)
+        features = _add_bias(features)
+        labels = tf.convert_to_tensor(labels)
+
         probits = tf.einsum('nd,...d->...n', features, weights)
         log_likelihood = tfd.ProbitBernoulli(probits=probits).log_prob(labels)
         if reduce_sum:
@@ -103,9 +103,6 @@ class ProbitRegression(bayesian_model.BayesianModel):
                          'test_labels={}'.format(test_features, test_labels))
 
       if test_features is not None and test_labels is not None:
-        test_features = tf.convert_to_tensor(test_features, tf.float32)
-        test_features = _add_bias(test_features)
-        test_labels = tf.convert_to_tensor(test_labels)
         test_log_likelihood_fn = functools.partial(
             log_likelihood_fn, features=test_features, labels=test_labels)
 

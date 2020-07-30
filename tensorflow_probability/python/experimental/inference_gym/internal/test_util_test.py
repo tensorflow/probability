@@ -19,6 +19,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -60,7 +62,7 @@ class TestModel(gym.targets.Model):
         name='test_model',
         pretty_name='TestModel',
         sample_transformations=dict(
-            identity=gym.targets.BayesianModel.SampleTransformation(
+            identity=gym.targets.Model.SampleTransformation(
                 fn=lambda x: x,
                 pretty_name='Identity',
                 ground_truth_mean=ground_truth_mean,
@@ -72,6 +74,38 @@ class TestModel(gym.targets.Model):
 
   def sample(self, n, seed=None):
     return self._distribution.sample(n, seed=seed)
+
+
+class TestModelWithDataset(gym.targets.Model):
+
+  def __init__(self, dataset, materialize_dataset=False):
+    """Creates a model that uses a dataset.
+
+    Args:
+      dataset: A 1D Tensor.
+      materialize_dataset: Python `bool`. If True, the dataset is erroneously
+        materialized in the initializer.
+    """
+    self._distribution = tfd.Sample(tfd.Normal(0., 1.), dataset.shape[-1])
+    if materialize_dataset:
+      tf.convert_to_tensor(dataset)
+
+    super(TestModelWithDataset, self).__init__(
+        default_event_space_bijector=tfb.Identity(),
+        event_shape=self._distribution.event_shape,
+        dtype=self._distribution.dtype,
+        name='test_model_width_dataset',
+        pretty_name='TestModelWithDataset',
+        sample_transformations=dict(
+            identity=gym.targets.Model.SampleTransformation(
+                fn=lambda x: x,
+                pretty_name='Identity',
+                ground_truth_mean=0.,
+            ),),
+    )
+
+  def _unnormalized_log_prob(self, x):
+    return self._distribution.log_prob(x)
 
 
 class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
@@ -150,6 +184,21 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
           model,
           num_samples=4000,
       )
+
+  def testCorrectMaterialization(self):
+    """Tests the dataset materialization a well formed model."""
+    dataset = np.zeros(5)
+    self.validate_deferred_materialization(
+        TestModelWithDataset, dataset=dataset)
+
+  def testBadMaterialization(self):
+    """Tests that an error is raised if dataset materialization is wrong."""
+    dataset = np.zeros(5)
+    with self.assertRaisesRegexp(AssertionError,
+                                 'Erroneously materialized dataset'):
+      self.validate_deferred_materialization(
+          functools.partial(TestModelWithDataset, materialize_dataset=True),
+          dataset=dataset)
 
 
 if __name__ == '__main__':

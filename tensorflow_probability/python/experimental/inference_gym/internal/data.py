@@ -18,15 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# Avoid rewriting these two for the Jax/Numpy backends.
-# For TF in particular, as TFDS is TF-only, we always use the real TF when
-# interacting with it.
 import numpy as np
-import tensorflow.compat.v2 as otf
+import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.experimental.inference_gym.internal.datasets import sp500_closing_prices as sp500_closing_prices_lib  # pylint: disable=g-import-not-at-top
-from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib  # pylint: disable=g-import-not-at-top
-from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib  # pylint: disable=g-import-not-at-top
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import sp500_closing_prices as sp500_closing_prices_lib
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = [
     'german_credit_numeric',
@@ -51,6 +49,12 @@ def _tfds():
           "or `pip install tfp_nightly[tfds]`.\n\n")
     raise
   return tfds
+
+
+def _defer(fn, shape, dtype):
+  empty = np.zeros(0)
+  return DeferredTensor(
+      empty, lambda _: fn(), shape=shape, dtype=dtype)
 
 
 def _normalize_zero_mean_one_std(train, test):
@@ -106,33 +110,64 @@ def german_credit_numeric(
 
   1. https://archive.ics.uci.edu/ml/datasets/statlog+(german+credit+data)
   """
-  with otf.name_scope('german_credit_numeric'):
-    dataset = _tfds().load(name='german_credit_numeric:1.*.*')
-    features = []
-    labels = []
-    for entry in _tfds().as_numpy(dataset)['train']:
-      features.append(entry['features'])
-      # We're reversing the labels to match what's in the original dataset,
-      # rather the TFDS encoding.
-      labels.append(1 - entry['label'])
-    features = np.stack(features, axis=0)
-    labels = np.stack(labels, axis=0)
+  num_points = 1000
+  num_train = int(num_points * train_fraction)
+  num_test = num_points - num_train
+  num_features = 24
 
-    num_train = int(features.shape[0] * train_fraction)
+  def load_dataset():
+    """Function that actually loads the dataset."""
+    if load_dataset.dataset is not None:
+      return load_dataset.dataset
 
-    train_features = features[:num_train]
-    test_features = features[num_train:]
+    with tf.name_scope('german_credit_numeric'), tf.init_scope():
+      dataset = _tfds().load('german_credit_numeric:1.*.*')
+      features = []
+      labels = []
+      for entry in _tfds().as_numpy(dataset)['train']:
+        features.append(entry['features'])
+        # We're reversing the labels to match what's in the original dataset,
+        # rather the TFDS encoding.
+        labels.append(1 - entry['label'])
+      features = np.stack(features, axis=0)
+      labels = np.stack(labels, axis=0)
 
-    if normalize_fn is not None:
-      train_features, test_features = normalize_fn(train_features,
-                                                   test_features)
+      train_features = features[:num_train]
+      test_features = features[num_train:]
 
-    return dict(
-        train_features=train_features,
-        train_labels=labels[:num_train].astype(np.int32),
-        test_features=test_features,
-        test_labels=labels[num_train:].astype(np.int32),
-    )
+      if normalize_fn is not None:
+        train_features, test_features = normalize_fn(train_features,
+                                                     test_features)
+
+      load_dataset.dataset = dict(
+          train_features=train_features,
+          train_labels=labels[:num_train].astype(np.int32),
+          test_features=test_features,
+          test_labels=labels[num_train:].astype(np.int32),
+      )
+
+    return load_dataset.dataset
+
+  load_dataset.dataset = None
+
+  return dict(
+      train_features=_defer(
+          lambda: load_dataset()['train_features'],
+          shape=[num_train, num_features],
+          dtype=np.float64),
+      train_labels=_defer(
+          lambda: load_dataset()['train_labels'],
+          shape=[num_train],
+          dtype=np.int32),
+      test_features=_defer(
+          lambda: load_dataset()['test_features'],
+          shape=[num_test, num_features],
+          dtype=np.float64),
+      test_labels=_defer(
+          lambda: load_dataset()['test_labels'],
+          shape=[num_test],
+          dtype=np.int32),
+  )
 
 
 def sp500_closing_prices(num_points=None):

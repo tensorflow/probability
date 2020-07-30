@@ -66,6 +66,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/inference_gym/internal/datasets",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -78,6 +79,8 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -109,6 +112,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
         # tensorflow/compiler/jit dep,
     ],
 )

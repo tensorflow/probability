@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.inference_gym.internal import data
 from tensorflow_probability.python.experimental.inference_gym.internal import test_util
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 
 class DataTest(test_util.InferenceGymTestCase):
@@ -36,13 +37,29 @@ class DataTest(test_util.InferenceGymTestCase):
     self.assertEqual((250, 24), dataset['test_features'].shape)
     self.assertEqual((250,), dataset['test_labels'].shape)
     self.assertAllClose(
-        np.zeros([24]), dataset['train_features'].mean(0), atol=1e-5)
+        np.zeros([24]), np.mean(dataset['train_features'], 0), atol=1e-5)
     self.assertAllClose(
-        np.ones([24]), dataset['train_features'].std(0), atol=1e-5)
+        np.ones([24]), np.std(dataset['train_features'], 0), atol=1e-5)
     self.assertAllClose(
-        np.zeros([24]), dataset['test_features'].mean(0), atol=0.3)
+        np.zeros([24]), np.mean(dataset['test_features'], 0), atol=0.3)
     self.assertAllClose(
-        np.ones([24]), dataset['test_features'].std(0), atol=0.3)
+        np.ones([24]), np.std(dataset['test_features'], 0), atol=0.3)
+
+  @test_util.uses_tfds
+  @tfp_test_util.numpy_disable_test_missing_functionality('No XLA in NumPy')
+  def testGermanCreditNumericInXLA(self):
+
+    @tf.function(autograph=False, experimental_compile=True)
+    def load_dataset_in_xla():
+      dataset = data.german_credit_numeric()
+      # The actual dataset loading will happen in Eager mode, courtesy of the
+      # init_scope.
+      return (
+          tf.convert_to_tensor(dataset['train_features']),
+          tf.convert_to_tensor(dataset['train_labels']),
+      )
+
+    load_dataset_in_xla()
 
   def testStochasticVolatilityModelSP500(self):
     num_train_points = 2516
