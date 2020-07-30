@@ -36,11 +36,10 @@ class TestReducer(tfp.experimental.mcmc.Reducer):
   """Simple Reducer that just keeps track of the last sample"""
 
   def initialize(self, initial_chain_state, initial_kernel_results=None):
-    return tf.zeros(tf.convert_to_tensor(initial_chain_state).shape)
+    return tf.zeros_like(initial_chain_state)
 
   def one_step(
       self, new_chain_state, current_reducer_state, previous_kernel_results):
-    print(new_chain_state)
     return new_chain_state
 
 
