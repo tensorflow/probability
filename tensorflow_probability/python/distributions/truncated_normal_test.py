@@ -378,6 +378,15 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
+  def testSampleXLA(self):
+    self.skip_if_no_xla()
+    @tf.function(experimental_compile=True)
+    def f(loc):
+      return tfd.TruncatedNormal(
+          loc=loc, scale=1., low=-1., high=1.).sample(
+              [3], seed=test_util.test_seed())
+    self.evaluate(f(tf.constant(0.2)))
+
 
 # TODO(b/150161911): reconcile graph- and eager-mode handling of denormal floats
 # so that we can re-enable eager mode tests.
