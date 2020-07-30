@@ -66,7 +66,8 @@ class SampleDiscardingTest(test_util.TestCase):
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_steps_between_results=1,)
-    first_state, kernel_results = discarder.one_step(0.)
+    first_state, kernel_results = discarder.one_step(
+        0., discarder.bootstrap_results(0.))
     second_state, kernel_results = discarder.one_step(
         first_state, kernel_results)
     first_state, second_state, kernel_results = self.evaluate([
@@ -82,7 +83,8 @@ class SampleDiscardingTest(test_util.TestCase):
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=5,)
-    sample, kernel_results = discarder.one_step(0.)
+    sample, kernel_results = discarder.one_step(
+        0., discarder.bootstrap_results(0.))
     sample, kernel_results = self.evaluate([
         sample, kernel_results])
     self.assertEqual(sample, 6)
@@ -94,7 +96,8 @@ class SampleDiscardingTest(test_util.TestCase):
     fake_inner_kernel = TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,)
-    first_state, kernel_results = discarder.one_step(0.)
+    first_state, kernel_results = discarder.one_step(
+        0., discarder.bootstrap_results(0.))
     second_state, kernel_results = discarder.one_step(
         first_state, kernel_results)
     first_state, second_state, kernel_results = self.evaluate([
@@ -111,7 +114,8 @@ class SampleDiscardingTest(test_util.TestCase):
         fake_inner_kernel,
         num_burnin_steps=10,
         num_steps_between_results=1,)
-    first_state, kernel_results = discarder.one_step(0.)
+    first_state, kernel_results = discarder.one_step(
+        0., discarder.bootstrap_results(0.))
     second_state, kernel_results = discarder.one_step(
         first_state, kernel_results)
     first_state, second_state, kernel_results = self.evaluate([
@@ -128,8 +132,10 @@ class SampleDiscardingTest(test_util.TestCase):
         fake_inner_kernel,
         num_burnin_steps=10,
         num_steps_between_results=1,)
-    first_state, _ = discarder.one_step(0.)
-    second_state, kernel_results = discarder.one_step(first_state)
+    first_state, _ = discarder.one_step(
+        0., discarder.bootstrap_results(0.))
+    second_state, kernel_results = discarder.one_step(
+        first_state, discarder.bootstrap_results(first_state))
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     self.assertEqual(first_state, 12)
@@ -158,7 +164,7 @@ class SampleDiscardingTest(test_util.TestCase):
             num_steps_between_results=2,),
         reducers=cov_reducer
     )
-    current_state, kernel_results = 0., None
+    current_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
     for _ in range(2):
       current_state, kernel_results = reducer_kernel.one_step(
           current_state, kernel_results)

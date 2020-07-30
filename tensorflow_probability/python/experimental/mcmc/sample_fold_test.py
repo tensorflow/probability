@@ -262,17 +262,19 @@ class SampleFoldTest(test_util.TestCase):
         num_burnin_steps=10,
         num_steps_between_results=1,
     )
-    reduction_rslt, last_sample, innermost_results = self.evaluate([
+    reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt,
         warm_restart_pkg[0],
-        warm_restart_pkg[1].inner_results.inner_results
+        warm_restart_pkg[1]
     ])
     self.assertEqual(reduction_rslt, 16)
     self.assertEqual(last_sample, 20)
-    self.assertEqual(innermost_results.counter_1, 20)
-    self.assertEqual(innermost_results.counter_2, 40)
     self.assertEqual(
-        warm_restart_pkg[1].inner_results.call_counter, 5)
+        kernel_results.inner_results.inner_results.counter_1, 20)
+    self.assertEqual(
+        kernel_results.inner_results.inner_results.counter_2, 40)
+    self.assertEqual(
+        kernel_results.inner_results.call_counter, 5)
 
 
 if __name__ == '__main__':

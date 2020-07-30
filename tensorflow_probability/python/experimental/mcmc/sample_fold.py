@@ -67,8 +67,7 @@ def sample_fold(
       collect results. Defaults to 0 (i.e., no burn-in).
     num_steps_between_results: Integer number of chain steps between collecting
       a result. Only one out of every `num_steps_between_samples + 1` steps is
-      included in the returned results. The number of returned chain states is
-      still equal to `num_results`. Defaults to 0 (i.e., no thinning).
+      included in the returned results. Defaults to 0 (i.e., no thinning).
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
     seed: Optional seed for reproducible sampling.

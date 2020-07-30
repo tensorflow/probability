@@ -39,7 +39,20 @@ class SampleDiscardingKernelResults(
                             'inner_results'])):
   __slots__ = ()
 
+
 class SampleDiscardingKernel(kernel_base.TransitionKernel):
+  """Appropriately discards samples to conduct thinning and burn-in.
+
+  `SampleDiscardingKernel` is a composable `TransitionKernel` that
+  applies thinning and burn-in to samples returned by its
+  `inner_kernel`. All Transition Kernels wrapping it will only
+  see non-discarded samples.
+
+  The burn-in step conducts both burn-in and one step of thinning.
+  In other words, the first call to `one_step` will skip
+  `num_burnin_steps + num_steps_between_results` samples. All
+  subsequent calls skip only `num_steps_between_results` samples.
+  """
 
   def __init__(
       self,
@@ -47,6 +60,20 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       num_burnin_steps=0,
       num_steps_between_results=0,
       name=None):
+    """Instantiates this object.
+
+    Args:
+      inner_kernel: `TransitionKernel` whose `one_step` will generate
+        MCMC sample(s).
+      num_burnin_steps: Integer number of chain steps to take before starting to
+        collect results. Defaults to 0 (i.e., no burn-in).
+      num_steps_between_results: Integer number of chain steps between
+        collecting a result. Only one out of every
+        `num_steps_between_samples + 1` steps is included in the returned
+        results. Defaults to 0 (i.e., no thinning).
+      name: Python `str` name prefixed to Ops created by this function.
+        Default value: `None` (i.e., "sample_discarding_kernel").
+    """
     if tf.get_static_value(num_burnin_steps):
       num_burnin_steps = tf.get_static_value(num_burnin_steps)
     if tf.get_static_value(num_steps_between_results):
@@ -60,21 +87,35 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     )
 
   def _num_samples_to_skip(self, call_counter):
+    """Calculates how many samples to skip based on the call number."""
     # not using `tf.equal(self.num_burnin_steps, 0)` here is intentional.
     # We are checking to see if `self.num_burnin_steps` is statically known.
-    # In the case where it's a `Tensor` holding 0, a `Tensor` will be
-    # returned in the else clause.
     if self.num_burnin_steps == 0:
       return self.num_steps_between_results
     else:
       return (tf.where(tf.equal(call_counter, 0), self.num_burnin_steps, 0) +
               self.num_steps_between_results)
 
-  def one_step(self, current_state, previous_kernel_results=None, seed=None):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    """Collects one non-discarded sample.
+
+    Args:
+      current_state: `Tensor` or Python `list` of `Tensor`s
+        representing the current state(s) of the Markov chain(s),
+      previous_kernel_results: `SampleDiscardingKernelResults` named tuple.
+        `SampleDiscardingKernelResults` contain the `call_counter`
+        and a reference to kernel results of nested `TransitionKernel`s.
+      seed: Optional seed for reproducible sampling.
+
+    Returns:
+      sample: Newest non-discarded MCMC sample drawn from the `inner_kernel`.
+      kernel_results: `SampleDiscardingKernelResults` representing updated
+        kernel results. The `call_counter` will be incremented by 1 and
+        its `inner_results` will reflect the new kernel results of nested
+        `TransitionKernel`s.
+    """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'sample_discarding_kernel', 'one_step')):
-      if previous_kernel_results is None:
-        previous_kernel_results = self.bootstrap_results(current_state)
       new_sample, inner_kernel_results = step_kernel(
           num_steps=self._num_samples_to_skip(
               previous_kernel_results.call_counter
@@ -91,6 +132,17 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       return new_sample, new_kernel_results
 
   def bootstrap_results(self, init_state):
+    """Instantiates a new kernel state with no calls.
+
+    Args:
+      init_state: `Tensor` or Python `list` of `Tensor`s representing the
+        state(s) of the Markov chain(s).
+
+    Returns:
+      kernel_results: `SampleDiscardingKernelResults` state with 
+        `call_counter=0` and the result of nested `TransitionKernel`s
+        `bootstrap_results`.
+    """
     with tf.name_scope(
         mcmc_util.make_name(
             self.name, 'sample_discarding_kernel', 'bootstrap_results')):
