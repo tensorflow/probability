@@ -276,6 +276,26 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(
         kernel_results.inner_results.call_counter, 5)
 
+  def test_no_reducer(self):
+    fake_kernel = TestTransitionKernel()
+    reduction_rslt, warm_restart_pkg = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=fake_kernel,
+        num_burnin_steps=10,
+        num_steps_between_results=1,
+    )
+    reduction_rslt, last_sample, kernel_results = self.evaluate([
+        reduction_rslt,
+        warm_restart_pkg[0],
+        warm_restart_pkg[1]
+    ])
+    self.assertEqual([], reduction_rslt)
+    self.assertEqual(20, last_sample)
+    self.assertEqual([], kernel_results.streaming_calculations)
+    self.assertEqual(20, kernel_results.inner_results.inner_results.counter_1)
+    self.assertEqual(40, kernel_results.inner_results.inner_results.counter_2)
+
 
 if __name__ == '__main__':
   tf.test.main()

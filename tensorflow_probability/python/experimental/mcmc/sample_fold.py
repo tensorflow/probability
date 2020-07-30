@@ -88,6 +88,8 @@ def sample_fold(
     current_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='current_state'),
         current_state)
+    if reducers is None:
+      reducers = []
     reduction_kernel = with_reductions.WithReductions(
         inner_kernel=SampleDiscardingKernel(
             inner_kernel=kernel,
