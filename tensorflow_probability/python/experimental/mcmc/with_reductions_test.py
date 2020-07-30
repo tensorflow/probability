@@ -35,11 +35,12 @@ from tensorflow_probability.python.internal import test_util
 class TestReducer(tfp.experimental.mcmc.Reducer):
   """Simple Reducer that just keeps track of the last sample"""
 
-  def initialize(self, initial_chain_state=None, initial_kernel_results=None):
-    return None
+  def initialize(self, initial_chain_state, initial_kernel_results=None):
+    return tf.zeros(tf.convert_to_tensor(initial_chain_state).shape)
 
   def one_step(
       self, new_chain_state, current_reducer_state, previous_kernel_results):
+    print(new_chain_state)
     return new_chain_state
 
 
@@ -97,7 +98,8 @@ class WithReductionsTest(test_util.TestCase):
         inner_kernel=fake_kernel,
         reducers=fake_reducer,
     )
-    new_sample, kernel_results = reducer_kernel.one_step(0.,)
+    pkr = reducer_kernel.bootstrap_results(0.,)
+    new_sample, kernel_results = reducer_kernel.one_step(0., pkr)
     new_sample, kernel_results = self.evaluate([
         new_sample, kernel_results])
     self.assertEqual(kernel_results.streaming_calculations, 1)
@@ -112,11 +114,10 @@ class WithReductionsTest(test_util.TestCase):
         inner_kernel=fake_kernel,
         reducers=fake_reducer,
     )
-    pkr = reducer_kernel.bootstrap_results(9.)
-    inner_pkr = self.evaluate(pkr.inner_results)
-    self.assertEqual(pkr.streaming_calculations, None)
-    self.assertEqual(inner_pkr.counter_1, 0)
-    self.assertEqual(inner_pkr.counter_2, 0)
+    pkr = self.evaluate(reducer_kernel.bootstrap_results(9.))
+    self.assertEqual(pkr.streaming_calculations, 0)
+    self.assertEqual(pkr.inner_results.counter_1, 0)
+    self.assertEqual(pkr.inner_results.counter_2, 0)
 
   def test_is_calibrated(self):
     fake_calibrated_kernel = TestTransitionKernel()
@@ -140,15 +141,19 @@ class WithReductionsTest(test_util.TestCase):
         inner_kernel=fake_kernel,
         reducers=fake_reducer,
     )
-    initial_sample, initial_kernel_results = reducer_kernel.one_step(0.,)
 
+    initial_state = 0.
+    initial_kernel_results = reducer_kernel.bootstrap_results(
+        initial_state
+    )
     def _loop_body(i, curr_state, pkr):
       new_state, kernel_results = reducer_kernel.one_step(curr_state, pkr)
       return (i + 1, new_state, kernel_results)
+
     _, new_sample, kernel_results = tf.while_loop(
-        lambda i, _, __: i < 5,
+        lambda i, _, __: i < 6,
         _loop_body,
-        (0., initial_sample, initial_kernel_results)
+        (0., initial_state, initial_kernel_results)
     )
 
     new_sample, kernel_results = self.evaluate([
@@ -165,7 +170,8 @@ class WithReductionsTest(test_util.TestCase):
         inner_kernel=fake_kernel,
         reducers=nested_reducers,
     )
-    new_sample, kernel_results = reducer_kernel.one_step(0.,)
+    pkr = reducer_kernel.bootstrap_results(0.)
+    new_sample, kernel_results = reducer_kernel.one_step(0., pkr)
     new_sample, kernel_results = self.evaluate([
         new_sample, kernel_results])
 
@@ -191,7 +197,8 @@ class WithReductionsTest(test_util.TestCase):
         inner_kernel=fake_kernel,
         reducers=nested_reducers,
     )
-    new_sample, kernel_results = reducer_kernel.one_step(0.,)
+    pkr = reducer_kernel.bootstrap_results(0.)
+    new_sample, kernel_results = reducer_kernel.one_step(0., pkr)
     new_sample, kernel_results = self.evaluate([
         new_sample, kernel_results])
 
@@ -223,7 +230,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         reducers=cov_reducer,
     )
 
-    chain_state, kernel_results = 0., None
+    chain_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
     for _ in range(6):
       chain_state, kernel_results = reducer_kernel.one_step(
           chain_state, kernel_results)
@@ -247,7 +254,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         inner_kernel=fake_kernel,
         reducers=cov_reducer,
     )
-    state, kernel_results = tf.zeros((9, 3)), None
+    state = tf.zeros((9, 3))
+    kernel_results = reducer_kernel.bootstrap_results(state)
     for _ in range(6):
       state, kernel_results = reducer_kernel.one_step(
           state, kernel_results)
@@ -268,7 +276,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         reducers=reducer,
     )
 
-    chain_state, kernel_results = 0., None
+    chain_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
     for _ in range(6):
       chain_state, kernel_results = reducer_kernel.one_step(
           chain_state, kernel_results)
@@ -459,7 +467,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         reducers=[[mean_reducer, cov_reducer], [fake_reducer]],
     )
 
-    chain_state, kernel_results = 0., None
+    chain_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
     for _ in range(6):
       chain_state, kernel_results = reducer_kernel.one_step(
           chain_state, kernel_results)

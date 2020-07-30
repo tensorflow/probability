@@ -22,7 +22,6 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.experimental.mcmc import step_kernel
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow.python.util import nest
@@ -38,33 +37,33 @@ class WithReductionsKernelResults(
     collections.namedtuple('WithReductionsKernelResults',
                            ['streaming_calculations',
                             'inner_results'])):
-  """Reducer state and diagnositics for `WithReductions`"""
+  """Reducer state and diagnostics for `WithReductions`"""
   __slots__ = ()
 
 
 class WithReductions(kernel_base.TransitionKernel):
   """Applies `Reducer`s to stream over MCMC samples.
+  `WithReductions` augments an inner MCMC kernel with
+  side-computations that can read the stream of samples as they
+  are generated.  This is relevant for streaming uses of MCMC,
+  where materializing the entire Markov chain history is undesirable,
+  e.g. due to memory limits.
 
-  `WithReductions` is intended to be a composable piece in the
-  Streaming MCMC framework that seemlessly faciliates the use of
-  `Reducer`s. Its purpose is twofold: it generates an appropriate
-  sample from its `inner_kernel`, then invokes each reducer's
-  `one_step` method on that sample. The updated reducer states are
-  stored in the `streaming_calculations` field of `WithReductions`'
-  kernel results.
-
-  This `TransitionKernel` can also accept an arbitrary structure of
-  reducers. It then applies all reducers in that structure with
-  one `WithReductions.one_step` call. The resulting reducer state
-  will identically mimic the structure of the provided reducers.
+  One `WithReductions` instance can attach an arbitrary collection
+  of side-computations, each of which must be packaged as a
+  `Reducer`.  `WithReductions` operates by generating a
+  sample with its `inner_kernel`'s `one_step`, then invoking each
+  `Reducer`'s `one_step` method on that sample. The updated reducer
+  states are stored in the `streaming_calculations` field of
+  `WithReductions`' kernel results.
   """
 
   def __init__(self, inner_kernel, reducers, name=None):
     """Instantiates this object.
 
     Args:
-      inner_kernel: `TransitionKernel`-like object whose `one_step` will
-        generate MCMC sample(s).
+      inner_kernel: `TransitionKernel` whose `one_step` will generate
+        MCMC sample(s).
       reducers: A (possibly nested) structure of `Reducer`s to be evaluated
         on the `inner_kernel`'s samples.
       name: Python `str` name prefixed to Ops created by this function.
@@ -77,18 +76,17 @@ class WithReductions(kernel_base.TransitionKernel):
     )
 
   def one_step(
-      self, current_state, previous_kernel_results=None, seed=None
+      self, current_state, previous_kernel_results, seed=None
   ):
     """Updates all `Reducer`s with a new sample from the `inner_kernel`.
 
     Args:
       current_state: `Tensor` or Python `list` of `Tensor`s
         representing the current state(s) of the Markov chain(s),
-      previous_kernel_results: `WithReductionsKernelResults` named tuple,
-        or `None`. `WithReductionsKernelResults` contain the state of
+      previous_kernel_results: `WithReductionsKernelResults` named tuple.
+        `WithReductionsKernelResults` contain the state of
         `streaming_calculations` and a reference to kernel results of
-        nested `TransitionKernel`s. If `None`, the kernel will cold
-        start with a call to `bootstrap_results`.
+        nested `TransitionKernel`s.
       seed: Optional seed for reproducible sampling.
 
     Returns:
@@ -100,16 +98,8 @@ class WithReductions(kernel_base.TransitionKernel):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'with_reductions', 'one_step')):
-      if previous_kernel_results is None:
-        previous_kernel_results = self.bootstrap_results(current_state)
-      sample, inner_kernel_results = step_kernel(
-          num_steps=1,
-          current_state=current_state,
-          previous_kernel_results=previous_kernel_results.inner_results,
-          kernel=self.inner_kernel,
-          return_final_kernel_results=True,
-          seed=seed,
-          name=self.name,
+      sample, inner_kernel_results = self.inner_kernel.one_step(
+          current_state, previous_kernel_results.inner_results, seed=seed
       )
       new_reducers_state = nest.map_structure_up_to(
           self.reducers,
@@ -127,10 +117,11 @@ class WithReductions(kernel_base.TransitionKernel):
     """Instantiates reducer states with identical structure to the `init_state`.
 
     Args:
-      init_state: `Tensor` or Python `list` of `Tensor`s representing the a
-        state(s) of the Markov chain(s). For consistency, the initial state does
-        not count as a "sample". Hence, all reducer states will reflect empty
-        streams.
+      init_state: `Tensor` or Python `list` of `Tensor`s representing the
+        state(s) of the Markov chain(s). For consistency across sampling
+        procedures (i.e. `tfp.mcmc.sample_chain` follows similar semantics),
+        the initial state does not count as a "sample". Hence, all reducer
+        states will reflect empty streams.
 
     Returns:
       kernel_results: `WithReductionsKernelResults` representing updated
