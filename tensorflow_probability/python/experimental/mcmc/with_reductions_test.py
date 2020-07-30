@@ -48,7 +48,7 @@ class MeanReducer(tfp.experimental.mcmc.Reducer):
 
   def one_step(
       self, new_chain_state, current_reducer_state, previous_kernel_results):
-    return current_reducer_state + tf.convert_to_tensor([1, new_chain_state])
+    return current_reducer_state + tf.stack([1, new_chain_state])
 
   def finalize(self, final_state):
     return final_state[1] / final_state[0]
