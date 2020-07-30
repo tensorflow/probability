@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 # Dependency imports
 import numpy as np
 
@@ -46,6 +47,7 @@ __all__ = [
     'matrix_transpose',
     'norm',
     'pinv',
+    'qr',
     'set_diag',
     'slogdet',
     'solve',
@@ -62,7 +64,6 @@ __all__ = [
     # 'logm',
     # 'lstsq',
     # 'l2_normalize'
-    # 'qr',
     # 'sqrtm',
     # 'tensor_diag',
     # 'tensor_diag_part',
@@ -236,6 +237,17 @@ def _norm(tensor, ord='euclidean', axis=None, keepdims=None,  # pylint: disable=
       axis=axis, keepdims=bool(keepdims))
 
 
+Qr = collections.namedtuple('Qr', 'q,r')
+
+
+def _qr(input, full_matrices=False, name=None):  # pylint: disable=redefined-builtin,unused-argument
+  mode = 'complete' if full_matrices else 'reduced'
+  op = functools.partial(np.linalg.qr, mode=mode)
+  if not JAX_MODE:
+    op = np.vectorize(op, signature='(m,n)->(m,r),(r,n)')
+  return Qr(*op(input))
+
+
 def _set_diag(input, diagonal, name=None, k=0, align='RIGHT_LEFT'):  # pylint: disable=unused-argument,redefined-builtin
   if k != 0 or align != 'RIGHT_LEFT':
     raise NotImplementedError('set_diag not implemented for k != 0')
@@ -396,6 +408,8 @@ try:
       'tf.linalg.pinv', lambda input, name=None: np.linalg.pinv(input))
 except AttributeError:
   pass
+
+qr = utils.copy_docstring('tf.linalg.qr', _qr)
 
 set_diag = utils.copy_docstring(
     'tf.linalg.set_diag',

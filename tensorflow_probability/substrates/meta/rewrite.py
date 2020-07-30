@@ -258,7 +258,7 @@ def main(argv):
       substrate=substrate, path=filename.split('/python/')[1]))
   print('# For more info, see substrate_runfiles_symlinks in build_defs.bzl')
   print('# ' + '@' * 78)
-  print('\n\n')
+  print('\n# (This notice adds 10 to line numbering.)\n\n')
 
   print(contents)
 

@@ -55,6 +55,9 @@ from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops impor
 JAX_MODE = False
 
 
+Assert = debugging.Assert
+
+
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
               experimental_relax_shapes=False, experimental_compile=None):  # pylint: disable=unused-argument

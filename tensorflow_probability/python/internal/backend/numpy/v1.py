@@ -89,10 +89,14 @@ def _placeholder_with_default(input, shape, name=None):  # pylint: disable=redef
 
 
 def _where_v1(condition, x=None, y=None):
+  """Implements tf1.where."""
   # V1 did not support broadcasting, and instead applied the dimensions of
   # `condition` to the left hand dims of x and y.
   if x is None and y is None:
     return np.where(condition)
+  dtype = utils.common_dtype([x, y])
+  x = convert_to_tensor(x, dtype=dtype)
+  y = convert_to_tensor(y, dtype=dtype)
   while condition.ndim < max(x.ndim, y.ndim):
     condition = condition[..., np.newaxis]  # add 1 dims until rank matches
   return np.where(condition, x, y)

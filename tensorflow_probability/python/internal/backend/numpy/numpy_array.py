@@ -338,14 +338,6 @@ def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint
   return np.split(value, indices_or_sections, axis)
 
 
-def _stack(values, axis=0, name='stack'):
-  del name
-  if axis is None:
-    raise ValueError('None values for `axis` argument not supported.')
-  values = _args_to_matching_arrays(values)
-  return np.stack(values, axis=axis)
-
-
 def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disable=unused-argument
   x = np.transpose(a, perm)
   return np.conjugate(x) if conjugate else x
@@ -454,8 +446,8 @@ squeeze = utils.copy_docstring(
     lambda input, axis=None, name=None: np.squeeze(input, _astuple(axis)))
 
 stack = utils.copy_docstring(
-    'tf.stack',
-    _stack)
+    'tf.stack', lambda values, axis=0, name='stack': np.moveaxis(  # pylint: disable=g-long-lambda
+        ops.convert_to_tensor(values), 0, axis))
 
 tile = utils.copy_docstring(
     'tf.tile',
@@ -467,7 +459,7 @@ transpose = utils.copy_docstring(
 
 unstack = utils.copy_docstring(
     'tf.unstack',
-    lambda value, num=None, axis=0, name='unstack': tuple(  # pylint: disable=g-long-lambda
+    lambda value, num=None, axis=0, name='unstack': list(  # pylint: disable=g-long-lambda
         np.squeeze(x, axis=axis) for x in
         np.split(value, value.shape[axis] if num is None else num, axis)))
 

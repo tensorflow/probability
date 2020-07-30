@@ -284,7 +284,8 @@ def where_params(draw, version=2):
     cond_shape, x_shape, y_shape = draw(
         tfp_hps.broadcasting_shapes(shape, 3).map(tensorshapes_to_tuples))
   elif version == 1:
-    cond_dims = draw(hps.sampled_from(np.arange(len(shape) + 1)))
+    max_cond_ndim = min(1, len(shape))
+    cond_dims = draw(hps.sampled_from(np.arange(max_cond_ndim + 1)))
     cond_shape = shape[:cond_dims]
     x_shape, y_shape = shape, shape
   else:
@@ -607,6 +608,11 @@ def _svd_post_process(vals):
       np.swapaxes(v, -2, -1))
 
 
+def _qr_post_process(qr):
+  """Values of q corresponding to zero values of r may have arbitrary values."""
+  return np.matmul(qr.q, qr.r), np.float32(qr.q.shape), np.float32(qr.r.shape)
+
+
 # __Currently untested:__
 # broadcast_dynamic_shape
 # broadcast_static_shape
@@ -731,6 +737,16 @@ NUMPY_TEST_CASES = [
     TestCase('linalg.svd',
              [single_arrays(shape=shapes(min_dims=2))],
              post_processor=_svd_post_process),
+    TestCase('linalg.qr',
+             [hps.tuples(
+                 single_arrays(dtype=np.float64, shape=shapes(min_dims=2)),
+                 hps.booleans()),
+              hps.tuples(
+                  single_arrays(dtype=np.complex128, shape=shapes(min_dims=2)),
+                  hps.booleans()),
+              ],
+             post_processor=_qr_post_process,
+             atol=1e-3),
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -1301,6 +1317,14 @@ class NumpyTest(test_util.TestCase):
       with self.assertRaises(error):
         nptf.convert_to_tensor(value, dtype=dtype, dtype_hint=dtype_hint)
 
+  def test_nested_stack_to_tensor(self):
+    state = nptf.cast([2., 3.], nptf.float64)
+    self.assertEqual(nptf.float64,
+                     nptf.stack([
+                         [0., 1.],
+                         [-2000. * state[0] * state[1] - 1.,
+                          1000. * (1. - state[0]**2)]]).dtype)
+
   def test_concat_infers_dtype(self):
     self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)
     self.assertEqual(np.float32, nptf.concat([[], [1]], 0).dtype)
@@ -1529,14 +1553,15 @@ class NumpyTest(test_util.TestCase):
 
         kwargs.update(jax_kwargs() if JAX_MODE else {})
         numpy_value = np_fn(*args, **kwargs)
-        if post_processor is not None:
-          numpy_value = post_processor(numpy_value)
-          tensorflow_value = post_processor(tensorflow_value)
 
         def assert_same_dtype(x, y):
           self.assertEqual(dtype_util.as_numpy_dtype(x.dtype),
                            dtype_util.as_numpy_dtype(y.dtype))
         tf.nest.map_structure(assert_same_dtype, tensorflow_value, numpy_value)
+
+        if post_processor is not None:
+          numpy_value = post_processor(numpy_value)
+          tensorflow_value = post_processor(tensorflow_value)
 
         if assert_shape_only:
 

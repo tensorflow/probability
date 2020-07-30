@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal.backend.numpy.ops import Tensor
 
 __all__ = [
     'Assert',
+    'assert_all_finite',
     'assert_equal',
     'assert_greater',
     'assert_greater_equal',
@@ -63,6 +64,12 @@ def skip_assert_for_tracers(f):
       return None
     return f(*args, **kwargs)
   return wrapped
+
+
+@skip_assert_for_tracers
+def _assert_all_finite(x, message, name=None):
+  if not np.all(np.isfinite(x)):
+    raise ValueError('Non-finite value detected. {}'.format(message))
 
 
 @skip_assert_for_tracers
@@ -215,6 +222,10 @@ Assert = utils.copy_docstring(  # pylint: disable=invalid-name
     'tf.debugging.Assert',
     lambda condition, data, summarize=None, name=None: assert_equal(  # pylint: disable=g-long-lambda
         True, condition, message=data))
+
+assert_all_finite = utils.copy_docstring(
+    'tf.debugging.assert_all_finite',
+    _assert_all_finite)
 
 assert_equal = utils.copy_docstring(
     'tf.debugging.assert_equal',

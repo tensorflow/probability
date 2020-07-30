@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import contextlib
+import functools
 
 # Dependency imports
 import numpy as np
@@ -26,6 +27,7 @@ import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 try:  # May not be available, not a core dep for TFP.
   import wrapt  # pylint: disable=g-import-not-at-top
@@ -45,6 +47,7 @@ __all__ = [
     'custom_gradient',
     'device',
     'enable_v2_behavior',
+    'ensure_shape',
     'executing_eagerly',
     'get_static_value',
     'group',
@@ -178,16 +181,18 @@ def _infer_dtype(value, default_dtype):
     return np.float32
   elif isinstance(value, complex):
     return np.complex128
-  else:
-    # Try inferring the type of first item in the object if possible.
-    try:
+  elif isinstance(value, (tuple, list)):
+    # Try inferring the type from items in the object if possible.
+    for v in nest.flatten(value):
+      if hasattr(v, 'dtype'):
+        return v.dtype
+    try:  # Finally fall back to raw types (int, bool).
       return _infer_dtype(value[0], default_dtype)
     except (IndexError, TypeError):
       return default_dtype
-    except KeyError:
-      raise ValueError(('Attempt to convert a value ({})'
-                        ' with an unsupported type ({}) to a Tensor.').format(
-                            value, type(value)))
+  raise ValueError(('Attempt to convert a value ({})'
+                    ' with an unsupported type ({}) to a Tensor.').format(
+                        value, type(value)))
 
 
 class _Int64ToInt32Error(TypeError):
@@ -368,9 +373,18 @@ broadcast_to = utils.copy_docstring(
     'tf.broadcast_to',
     lambda input, shape, name=None: np.broadcast_to(input, shape))
 
+
+def _cast(x, dtype):
+  x = np.asarray(x)
+  if (np.issubdtype(x.dtype, np.complexfloating) and
+      not np.issubdtype(dtype, np.complexfloating)):
+    x = np.real(x)
+  return x.astype(dtype)
+
+
 cast = utils.copy_docstring(
     'tf.cast',
-    lambda x, dtype, name=None: np.array(x, dtype=utils.numpy_dtype(dtype)))
+    lambda x, dtype, name=None: _cast(x, utils.numpy_dtype(dtype)))
 
 clip_by_value = utils.copy_docstring(
     'tf.clip_by_value',
@@ -406,6 +420,7 @@ def _custom_gradient(f):
       return cts_in
     return value, vjp_
   @jax.custom_transforms
+  @functools.wraps(f)
   def wrapped(*args, **kwargs):
     value, _ = f(*args, **kwargs)
     return value
@@ -416,6 +431,19 @@ custom_gradient = utils.copy_docstring(
     'tf.custom_gradient', _custom_gradient)
 
 device = lambda _: _NullContext()
+
+
+def _ensure_shape(x, shape, name=None):  # pylint: disable=unused-argument
+  x_shape = tensor_shape.TensorShape(x.shape)
+  shape = tensor_shape.TensorShape(shape)
+  if not shape.is_compatible_with(x_shape):
+    msg = 'Shape of tensor x {} is not compatible with expected shape {}'
+    raise ValueError(msg.format(x_shape, shape))
+  return x
+
+
+ensure_shape = utils.copy_docstring(
+    'tf.ensure_shape', _ensure_shape)
 
 executing_eagerly = utils.copy_docstring(
     'tf.executing_eagerly',
