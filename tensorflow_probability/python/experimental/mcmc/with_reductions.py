@@ -43,6 +43,7 @@ class WithReductionsKernelResults(
 
 class WithReductions(kernel_base.TransitionKernel):
   """Applies `Reducer`s to stream over MCMC samples.
+
   `WithReductions` augments an inner MCMC kernel with
   side-computations that can read the stream of samples as they
   are generated.  This is relevant for streaming uses of MCMC,
@@ -90,7 +91,7 @@ class WithReductions(kernel_base.TransitionKernel):
       seed: Optional seed for reproducible sampling.
 
     Returns:
-      sample: Newest MCMC sample drawn from the `inner_kernel`.
+      new_state: Newest MCMC state drawn from the `inner_kernel`.
       kernel_results: `WithReductionsKernelResults` representing updated
         kernel results. Reducer states are stored in the
         `streaming_calculations` field. The state structure is identical
@@ -98,20 +99,20 @@ class WithReductions(kernel_base.TransitionKernel):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'with_reductions', 'one_step')):
-      sample, inner_kernel_results = self.inner_kernel.one_step(
+      new_state, inner_kernel_results = self.inner_kernel.one_step(
           current_state, previous_kernel_results.inner_results, seed=seed
       )
       new_reducers_state = nest.map_structure_up_to(
           self.reducers,
           lambda r, state: r.one_step(
-              sample,
+              new_state,
               state,
               previous_kernel_results=inner_kernel_results),
           self.reducers, previous_kernel_results.streaming_calculations,
           check_types=False)
       kernel_results = WithReductionsKernelResults(
           new_reducers_state, inner_kernel_results)
-      return sample, kernel_results
+      return new_state, kernel_results
 
   def bootstrap_results(self, init_state):
     """Instantiates reducer states with identical structure to the `init_state`.

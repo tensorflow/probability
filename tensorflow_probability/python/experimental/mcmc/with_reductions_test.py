@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for WithReductions TransitionKernel."""
+"""Tests for tfp.experimental.mcmc.WithReductions TransitionKernel."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -26,9 +26,6 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.mcmc import CovarianceReducer
-from tensorflow_probability.python.experimental.mcmc import VarianceReducer
-from tensorflow_probability.python.experimental.mcmc import WithReductions
 from tensorflow_probability.python.internal import test_util
 
 
@@ -93,7 +90,7 @@ class WithReductionsTest(test_util.TestCase):
   def test_simple_operation(self):
     fake_kernel = TestTransitionKernel()
     fake_reducer = TestReducer()
-    reducer_kernel = WithReductions(
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=fake_reducer,
     )
@@ -101,32 +98,32 @@ class WithReductionsTest(test_util.TestCase):
     new_sample, kernel_results = reducer_kernel.one_step(0., pkr)
     new_sample, kernel_results = self.evaluate([
         new_sample, kernel_results])
-    self.assertEqual(kernel_results.streaming_calculations, 1)
-    self.assertEqual(new_sample, 1)
-    self.assertEqual(kernel_results.inner_results.counter_1, 1)
-    self.assertEqual(kernel_results.inner_results.counter_2, 2)
+    self.assertEqual(1, kernel_results.streaming_calculations)
+    self.assertEqual(1, new_sample)
+    self.assertEqual(1, kernel_results.inner_results.counter_1)
+    self.assertEqual(2, kernel_results.inner_results.counter_2)
 
   def test_boostrap_results(self):
     fake_kernel = TestTransitionKernel()
     fake_reducer = TestReducer()
-    reducer_kernel = WithReductions(
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=fake_reducer,
     )
     pkr = self.evaluate(reducer_kernel.bootstrap_results(9.))
-    self.assertEqual(pkr.streaming_calculations, 0)
-    self.assertEqual(pkr.inner_results.counter_1, 0)
-    self.assertEqual(pkr.inner_results.counter_2, 0)
+    self.assertEqual(0, pkr.streaming_calculations, 0)
+    self.assertEqual(0, pkr.inner_results.counter_1, 0)
+    self.assertEqual(0, pkr.inner_results.counter_2, 0)
 
   def test_is_calibrated(self):
     fake_calibrated_kernel = TestTransitionKernel()
     fake_uncalibrated_kernel = TestTransitionKernel(is_calibrated=False)
     fake_reducer = TestReducer()
-    calibrated_reducer_kernel = WithReductions(
+    calibrated_reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_calibrated_kernel,
         reducers=fake_reducer,
     )
-    uncalibrated_reducer_kernel = WithReductions(
+    uncalibrated_reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_uncalibrated_kernel,
         reducers=fake_reducer,
     )
@@ -136,7 +133,7 @@ class WithReductionsTest(test_util.TestCase):
   def test_tf_while(self):
     fake_kernel = TestTransitionKernel()
     fake_reducer = TestReducer()
-    reducer_kernel = WithReductions(
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=fake_reducer,
     )
@@ -157,15 +154,15 @@ class WithReductionsTest(test_util.TestCase):
 
     new_sample, kernel_results = self.evaluate([
         new_sample, kernel_results])
-    self.assertEqual(kernel_results.streaming_calculations, 6)
-    self.assertEqual(new_sample, 6)
-    self.assertEqual(kernel_results.inner_results.counter_1, 6)
-    self.assertEqual(kernel_results.inner_results.counter_2, 12)
+    self.assertEqual(6, kernel_results.streaming_calculations)
+    self.assertEqual(6, new_sample)
+    self.assertEqual(6, kernel_results.inner_results.counter_1)
+    self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_nested_reducers(self):
     fake_kernel = TestTransitionKernel()
     nested_reducers = [[TestReducer(), TestReducer()], [TestReducer()]]
-    reducer_kernel = WithReductions(
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=nested_reducers,
     )
@@ -175,24 +172,24 @@ class WithReductionsTest(test_util.TestCase):
         new_sample, kernel_results])
 
     self.assertEqual(
-        len(kernel_results.streaming_calculations[0]), 2)
+        2, len(kernel_results.streaming_calculations[0]))
     self.assertEqual(
-        len(kernel_results.streaming_calculations[1]), 1)
+        1, len(kernel_results.streaming_calculations[1]))
     self.assertEqual(
-        np.array(kernel_results.streaming_calculations).shape,
-        (2,))
+        (2,),
+        np.array(kernel_results.streaming_calculations).shape)
 
     self.assertAllEqual(
-        kernel_results.streaming_calculations,
-        [[1, 1], [1]])
-    self.assertEqual(new_sample, 1)
-    self.assertEqual(kernel_results.inner_results.counter_1, 1)
-    self.assertEqual(kernel_results.inner_results.counter_2, 2)
+        [[1, 1], [1]],
+        kernel_results.streaming_calculations)
+    self.assertEqual(1, new_sample)
+    self.assertEqual(1, kernel_results.inner_results.counter_1)
+    self.assertEqual(2, kernel_results.inner_results.counter_2)
 
   def test_nested_state_dependent_reducers(self):
     fake_kernel = TestTransitionKernel()
     nested_reducers = [[MeanReducer(), MeanReducer()], [MeanReducer()]]
-    reducer_kernel = WithReductions(
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=nested_reducers,
     )
@@ -202,19 +199,22 @@ class WithReductionsTest(test_util.TestCase):
         new_sample, kernel_results])
 
     self.assertEqual(
-        len(kernel_results.streaming_calculations[0]), 2)
+        2,
+        len(kernel_results.streaming_calculations[0]))
     self.assertEqual(
-        len(kernel_results.streaming_calculations[1]), 1)
+        1,
+        len(kernel_results.streaming_calculations[1]))
     self.assertEqual(
-        np.array(kernel_results.streaming_calculations).shape,
-        (2,))
+        (2,),
+        np.array(kernel_results.streaming_calculations).shape)
 
     self.assertAllEqualNested(
         kernel_results.streaming_calculations,
-        [[[1, 1], [1, 1]], [[1, 1]]])
-    self.assertEqual(new_sample, 1)
-    self.assertEqual(kernel_results.inner_results.counter_1, 1)
-    self.assertEqual(kernel_results.inner_results.counter_2, 2)
+        [[[1, 1], [1, 1]], [[1, 1]]],
+    )
+    self.assertEqual(1, new_sample)
+    self.assertEqual(1, kernel_results.inner_results.counter_1)
+    self.assertEqual(2, kernel_results.inner_results.counter_2)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -223,8 +223,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
   @parameterized.parameters(0, 1)
   def test_covariance_reducer(self, ddof):
     fake_kernel = TestTransitionKernel()
-    cov_reducer = CovarianceReducer(ddof=ddof)
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(ddof=ddof)
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=cov_reducer,
     )
@@ -238,18 +238,18 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         kernel_results,
         cov_reducer.finalize(
             kernel_results.streaming_calculations)])
-    self.assertEqual(kernel_results.streaming_calculations.cov_state.mean, 3.5)
+    self.assertEqual(3.5, kernel_results.streaming_calculations.cov_state.mean)
     self.assertNear(
-        final_cov,
         np.cov(np.arange(1, 7), ddof=ddof).tolist(),
+        final_cov,
         err=1e-6)
-    self.assertEqual(kernel_results.inner_results.counter_1, 6)
-    self.assertEqual(kernel_results.inner_results.counter_2, 12)
+    self.assertEqual(6, kernel_results.inner_results.counter_1)
+    self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_covariance_with_batching(self):
     fake_kernel = TestTransitionKernel((9, 3))
-    cov_reducer = CovarianceReducer(event_ndims=1)
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=cov_reducer,
     )
@@ -263,14 +263,14 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         cov_reducer.finalize(kernel_results.streaming_calculations)
     ])
     self.assertEqual(
-        kernel_results.streaming_calculations.cov_state.mean.shape, (9, 3))
-    self.assertEqual(final_cov.shape, (9, 3, 3))
+        (9, 3), kernel_results.streaming_calculations.cov_state.mean.shape)
+    self.assertEqual((9, 3, 3), final_cov.shape)
 
   @parameterized.parameters(0, 1)
   def test_variance_reducer(self, ddof):
     fake_kernel = TestTransitionKernel()
-    reducer = VarianceReducer(ddof=ddof)
-    reducer_kernel = WithReductions(
+    reducer = tfp.experimental.mcmc.VarianceReducer(ddof=ddof)
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=reducer,
     )
@@ -284,13 +284,13 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         kernel_results,
         reducer.finalize(
             kernel_results.streaming_calculations)])
-    self.assertEqual(kernel_results.streaming_calculations.cov_state.mean, 3.5)
+    self.assertEqual(3.5, kernel_results.streaming_calculations.cov_state.mean)
     self.assertNear(
-        final_var,
         np.var(np.arange(1, 7), ddof=ddof).tolist(),
+        final_var,
         err=1e-6)
-    self.assertEqual(kernel_results.inner_results.counter_1, 6)
-    self.assertEqual(kernel_results.inner_results.counter_2, 12)
+    self.assertEqual(6, kernel_results.inner_results.counter_1)
+    self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_multivariate_normal_covariance_with_sample_chain(self):
     mu = [1, 2, 3]
@@ -305,8 +305,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         step_size=1/3,
         num_leapfrog_steps=27
     )
-    cov_reducer = CovarianceReducer()
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=cov_reducer,
     )
@@ -324,16 +324,16 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         cov_reducer.finalize(kernel_results.streaming_calculations)
     ])
     self.assertAllClose(
-        kernel_results.streaming_calculations.cov_state.mean,
         np.mean(samples, axis=0),
+        kernel_results.streaming_calculations.cov_state.mean,
         rtol=1e-6)
     self.assertAllClose(
-        final_cov, np.cov(samples.T, ddof=0), rtol=1e-6)
+        np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
 
   def test_covariance_with_step_kernel(self):
     fake_kernel = TestTransitionKernel()
-    cov_reducer = CovarianceReducer()
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=cov_reducer,
     )
@@ -348,19 +348,19 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         kernel_results,
         cov_reducer.finalize(kernel_results.streaming_calculations)
     ])
-    self.assertEqual(chain_state, 6)
-    self.assertEqual(kernel_results.streaming_calculations.cov_state.mean, 3.5)
+    self.assertEqual(6, chain_state)
+    self.assertEqual(3.5, kernel_results.streaming_calculations.cov_state.mean)
     self.assertNear(
-        final_cov,
         np.cov(np.arange(1, 7), ddof=0).tolist(),
+        final_cov,
         err=1e-6)
-    self.assertEqual(kernel_results.inner_results.counter_1, 6)
-    self.assertEqual(kernel_results.inner_results.counter_2, 12)
+    self.assertEqual(6, kernel_results.inner_results.counter_1)
+    self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_covariance_before_transformation(self):
     fake_kernel = TestTransitionKernel(lambda x: -x**2 / 2)
-    cov_reducer = CovarianceReducer()
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=cov_reducer,
     )
@@ -382,11 +382,11 @@ class CovarianceWithReductionsTest(test_util.TestCase):
             kernel_results.inner_results.streaming_calculations)
     ])
     self.assertAllClose(
-        kernel_results.inner_results.streaming_calculations.cov_state.mean,
         np.mean(np.log(samples), axis=0),
+        kernel_results.inner_results.streaming_calculations.cov_state.mean,
         rtol=1e-6)
     self.assertAllClose(
-        final_cov, np.cov(np.log(samples).T, ddof=0), rtol=1e-6)
+        np.cov(np.log(samples).T, ddof=0), final_cov, rtol=1e-6)
 
   def test_covariance_after_transformation(self):
     fake_kernel = TestTransitionKernel(lambda x: -x**2 / 2)
@@ -394,8 +394,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         inner_kernel=fake_kernel,
         bijector=tfp.bijectors.Exp(),
     )
-    cov_reducer = CovarianceReducer()
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=transformed_kernel,
         reducers=cov_reducer,
     )
@@ -413,11 +413,11 @@ class CovarianceWithReductionsTest(test_util.TestCase):
             kernel_results.streaming_calculations)
     ])
     self.assertAllClose(
-        kernel_results.streaming_calculations.cov_state.mean,
         np.mean(samples, axis=0),
+        kernel_results.streaming_calculations.cov_state.mean,
         rtol=1e-6)
     self.assertAllClose(
-        final_cov, np.cov(samples.T, ddof=0), rtol=1e-6)
+        np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
 
   def test_nested_in_step_size_adaptation(self):
     target_dist = tfp.distributions.MultivariateNormalDiag(
@@ -426,8 +426,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         target_log_prob_fn=target_dist.log_prob,
         num_leapfrog_steps=27,
         step_size=10)
-    cov_reducer = CovarianceReducer()
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=hmc_kernel,
         reducers=cov_reducer
     )
@@ -450,18 +450,18 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     ])
 
     mean = kernel_results.inner_results.streaming_calculations.cov_state.mean
-    self.assertEqual(mean.shape, (2,))
-    self.assertAllClose(mean, np.mean(samples, axis=0), rtol=1e-6)
-    self.assertEqual(final_cov.shape, (2, 2))
+    self.assertEqual((2,), mean.shape)
+    self.assertAllClose(np.mean(samples, axis=0), mean, rtol=1e-6)
+    self.assertEqual((2, 2), final_cov.shape)
     self.assertAllClose(
-        final_cov, np.cov(samples.T, ddof=0), rtol=1e-6)
+        np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
 
   def test_nested_reducers(self):
     fake_kernel = TestTransitionKernel()
     fake_reducer = TestReducer()
     mean_reducer = MeanReducer()
-    cov_reducer = CovarianceReducer()
-    reducer_kernel = WithReductions(
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
+    reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducers=[[mean_reducer, cov_reducer], [fake_reducer]],
     )
@@ -478,20 +478,20 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         mean_reducer.finalize(
             kernel_results.streaming_calculations[0][0])
         ])
-    self.assertEqual(len(kernel_results.streaming_calculations), 2)
-    self.assertEqual(len(kernel_results.streaming_calculations[0]), 2)
-    self.assertEqual(len(kernel_results.streaming_calculations[1]), 1)
+    self.assertEqual(2, len(kernel_results.streaming_calculations))
+    self.assertEqual(2, len(kernel_results.streaming_calculations[0]))
+    self.assertEqual(1, len(kernel_results.streaming_calculations[1]))
 
-    self.assertEqual(final_mean, 3.5)
+    self.assertEqual(3.5, final_mean)
     self.assertEqual(
-        kernel_results.streaming_calculations[0][1].cov_state.mean, 3.5)
-    self.assertEqual(kernel_results.streaming_calculations[1][0], 6)
+        3.5, kernel_results.streaming_calculations[0][1].cov_state.mean)
+    self.assertEqual(6, kernel_results.streaming_calculations[1][0])
     self.assertNear(
-        final_cov,
         np.cov(np.arange(1, 7), ddof=0).tolist(),
+        final_cov,
         err=1e-6)
-    self.assertEqual(kernel_results.inner_results.counter_1, 6)
-    self.assertEqual(kernel_results.inner_results.counter_2, 12)
+    self.assertEqual(6, kernel_results.inner_results.counter_1)
+    self.assertEqual(12, kernel_results.inner_results.counter_2)
 
 
 if __name__ == '__main__':
