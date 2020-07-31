@@ -21,9 +21,7 @@ import numpy as np
 import six
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
-from tensorflow_probability.python.internal.backend.numpy.ops import convert_to_tensor
-from tensorflow_probability.python.internal.backend.numpy.ops import is_tensor
-from tensorflow_probability.python.internal.backend.numpy.ops import Tensor
+from tensorflow_probability.python.internal.backend.numpy import ops
 
 
 __all__ = [
@@ -58,8 +56,9 @@ def skip_assert_for_tracers(f):
     return f
   from jax import core as jax_core  # pylint: disable=g-import-not-at-top
   def wrapped(*args, **kwargs):
-    if any(isinstance(arg, jax_core.Tracer) for arg
-           in args + tuple(kwargs.values())):
+    if (isinstance(np.zeros([0]), jax_core.Tracer) or  # omnistaging
+        any(isinstance(arg, jax_core.Tracer)
+            for arg in args + tuple(kwargs.values()))):
       print('skip assert ' + f.__name__)
       return None
     return f(*args, **kwargs)
@@ -77,8 +76,8 @@ def _assert_binary(
     x, y, comparator, sym, summarize=None, message=None, name=None):
   del summarize
   del name
-  x = convert_to_tensor(x)
-  y = convert_to_tensor(y)
+  x = ops.convert_to_tensor(x)
+  y = ops.convert_to_tensor(y)
   if not np.all(comparator(x, y)):
     raise ValueError('Condition x {} y did not hold element-wise. {}'.format(
         sym, message or ''))
@@ -88,8 +87,8 @@ def _assert_binary(
 def _assert_equal(x, y, summarize=None, message=None, name=None):
   del summarize
   del name
-  x = convert_to_tensor(x)
-  y = convert_to_tensor(y)
+  x = ops.convert_to_tensor(x)
+  y = ops.convert_to_tensor(y)
   if not np.all(np.equal(x, y)):
     raise ValueError('Expected x == y but got {} vs {} {}'.format(
         x, y, message or ''))
@@ -126,7 +125,7 @@ def _assert_compare_to_zero(
     x, comparator, sym, summarize=None, message=None, name=None):
   del summarize
   del name
-  x = convert_to_tensor(x)
+  x = ops.convert_to_tensor(x)
   if not np.all(comparator(x, 0)):
     raise ValueError(
         'Condition x {} 0 did not hold element-wise; got {} {}'.format(
@@ -172,8 +171,8 @@ def _assert_near(x, y, rtol=None, atol=None,
   """Raises an error if abs(x - y) > atol + rtol * abs(y)."""
   del summarize
   del name
-  x = convert_to_tensor(x)
-  y = convert_to_tensor(y)
+  x = ops.convert_to_tensor(x)
+  y = ops.convert_to_tensor(y)
   rtol = rtol if rtol else 10 * np.finfo(x.dtype).eps
   atol = atol if atol else 10 * np.finfo(x.dtype).eps
   if np.any(np.abs(x - y) > atol + rtol * np.abs(y)):
@@ -185,15 +184,15 @@ def _assert_near(x, y, rtol=None, atol=None,
 def _assert_none_equal(x, y, summarize=None, message=None, name=None):
   del summarize
   del name
-  x = convert_to_tensor(x)
-  y = convert_to_tensor(y)
+  x = ops.convert_to_tensor(x)
+  y = ops.convert_to_tensor(y)
   if np.any(np.equal(x, y)):
     raise ValueError('Expected x != y but got {} vs {} {}'.format(
         x, y, message or ''))
 
 
 def _assert_proper_iterable(values):
-  unintentional_iterables = (Tensor, np.ndarray, bytes, six.text_type)
+  unintentional_iterables = (ops.Tensor, np.ndarray, bytes, six.text_type)
   if isinstance(values, unintentional_iterables):
     raise TypeError(
         'Expected argument "values" to be a "proper" iterable.  Found: %s' %
@@ -301,4 +300,4 @@ check_numerics = utils.copy_docstring(
 
 is_numeric_tensor = utils.copy_docstring(
     'tf.debugging.is_numeric_tensor',
-    lambda x: is_tensor(x) and np.issubdtype(x.dtype, np.number))
+    lambda x: ops.is_tensor(x) and np.issubdtype(x.dtype, np.number))

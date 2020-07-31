@@ -21,6 +21,7 @@ from __future__ import print_function
 import functools
 # Dependency imports
 import numpy as np
+import numpy as onp  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -245,11 +246,14 @@ def _pad(  # pylint: disable=unused-argument
 
 def _range(start, limit=None, delta=1, dtype=None, name='range'):  # pylint: disable=unused-argument
   """Emulates tf.range."""
-   # Emulating dtype inference logic from tf.range
+  # Emulating dtype inference logic from tf.range
   dtype = utils.numpy_dtype(dtype)
-  start = ops.convert_to_tensor(start, dtype=dtype)
-  limit = None if limit is None else ops.convert_to_tensor(limit, dtype=dtype)
-  delta = ops.convert_to_tensor(delta, dtype=dtype)
+  infer_dtype = lambda t: ops.convert_to_tensor(t, dtype=dtype).dtype
+  # We must keep start, limit, and delta static np.array since they determine
+  # the size of the result array, which JAX requires to be static.
+  start = onp.array(start, dtype=infer_dtype(start))
+  limit = None if limit is None else onp.array(limit, dtype=infer_dtype(limit))
+  delta = onp.array(delta, dtype=infer_dtype(delta))
   if dtype is None:
     dtype_hierarchy = [np.int32, np.int64, np.float32, np.float64]
     inferred_dtype = max([arg.dtype for arg in [start, limit, delta]

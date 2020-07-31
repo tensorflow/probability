@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import numpy as onp  # Avoids JAX rewrite.  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -50,21 +51,26 @@ __all__ = [
 JAX_MODE = False
 
 
-def _ensure_tuple(t):
+def _ensure_shape_tuple(t):
   try:
-    return tuple(t)
+    return tuple(int(x) for x in t)
   except TypeError:
-    return (t,)
+    pass
+  try:
+    return (int(t),)
+  except TypeError:
+    pass
+  raise TypeError('Non-shape-like value: {} (type {})'.format(t, type(t)))
 
 
 def _bcast_shape(base_shape, args):
-  base_shape = _ensure_tuple(base_shape)
+  base_shape = _ensure_shape_tuple(base_shape)
   if not args:
     return base_shape
-  bc_arr = np.zeros(base_shape + (0,))
+  bc_arr = onp.zeros(base_shape + (0,))
   for arg in args:
     if arg is not None:
-      bc_arr = bc_arr + np.zeros(np.shape(arg) + (0,))
+      bc_arr = bc_arr + onp.zeros(np.asarray(arg).shape + (0,))
   return bc_arr.shape[:-1]
 
 
@@ -109,7 +115,7 @@ def _gamma(shape, alpha, beta=None, dtype=np.float32, seed=None,
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   scale = 1. if beta is None else (1. / beta)
-  shape = _ensure_tuple(shape)
+  shape = _ensure_shape_tuple(shape)
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
 
 
@@ -118,7 +124,7 @@ def _gamma_jax(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   alpha = np.array(alpha, dtype=dtype)
   beta = None if beta is None else np.array(beta, dtype=dtype)
-  shape = _ensure_tuple(shape)
+  shape = _ensure_shape_tuple(shape)
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
@@ -153,7 +159,7 @@ def _poisson(shape, lam, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([lam], dtype_hint=dtype)
-  shape = _ensure_tuple(shape)
+  shape = _ensure_shape_tuple(shape)
   return rng.poisson(lam=lam, size=shape).astype(dtype)
 
 
@@ -179,7 +185,7 @@ if JAX_MODE:
     # lam > 10. A reference implementation can be found here:
     # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc#L159-L239
 
-    shape = _ensure_tuple(shape)
+    shape = _ensure_shape_tuple(shape)
     max_iters = (max_iters
                  if max_iters is not None
                  else np.iinfo(np.int32).max)
@@ -319,7 +325,7 @@ def gamma(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
   # `tf.random.stateless_gamma` interprets shape as the full output shape,
   # including as suffix the broadcast of alpha and beta shapes.
   scale = 1 if beta is None else beta
-  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, scale])
+  shape = _ensure_shape_tuple(shape) + _bcast_shape((), [alpha, scale])
   return stateless_gamma(shape=shape, alpha=alpha, beta=beta, dtype=dtype,
                          seed=seed, name=name)
 

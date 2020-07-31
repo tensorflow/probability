@@ -341,5 +341,6 @@ class NestUtilTest(test_util.TestCase):
           value=tf.constant(1, tf.float32),
           dtype=tf.float64)
 
+
 if __name__ == '__main__':
   tf.test.main()
