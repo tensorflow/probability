@@ -25,7 +25,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import softplus_inverse
@@ -174,13 +174,14 @@ def _log_soosum_exp_impl(logx, axis, keepdims, compute_mean):
     # specified value), i.e.,
     # soo_sum_x[i] = [exp(logx) - exp(logx[i])] + exp(mean(logx[!=i]))
     #              =  exp(log_loosum_x[i])      + exp(loo_log_swap_in[i])
+    n = tf.cast(n, logx.dtype)
     loo_log_swap_in = (
         (tf.reduce_sum(logx, axis=axis, keepdims=True) - logx) /
         (n - 1.))
     log_soosum_x = log_add_exp(log_loosum_x, loo_log_swap_in)
     if not compute_mean:
       return log_soosum_x, log_sum_x
-    log_n = prefer_static.log(n)
+    log_n = ps.log(n)
     return log_soosum_x - log_n, log_sum_x - log_n
 
 
@@ -199,8 +200,8 @@ def _log_loosum_exp_impl(logx, axis, keepdims, compute_mean):
 
     # Later we'll want to compute the mean from a sum so we calculate the number
     # of reduced elements, n.
-    n = prefer_static.size(logx) // prefer_static.size(log_sum_x)
-    n = prefer_static.cast(n, dtype)
+    n = ps.size(logx) // ps.size(log_sum_x)
+    n = ps.cast(n, dtype)
 
     # log_loosum_x[i] =
     # = logsumexp(logx[j] : j != i)
@@ -242,13 +243,13 @@ def _log_loosum_exp_impl(logx, axis, keepdims, compute_mean):
       if axis is None:
         keepdims = np.array([], dtype=np.int32)
       else:
-        rank = prefer_static.rank(logx)
-        keepdims = prefer_static.setdiff1d(
-            prefer_static.range(rank),
-            prefer_static.non_negative_axis(axis, rank))
-      squeeze_shape = tf.gather(prefer_static.shape(logx), indices=keepdims)
+        rank = ps.rank(logx)
+        keepdims = ps.setdiff1d(
+            ps.range(rank),
+            ps.non_negative_axis(axis, rank))
+      squeeze_shape = tf.gather(ps.shape(logx), indices=keepdims)
       log_sum_x = tf.reshape(log_sum_x, shape=squeeze_shape)
-      if prefer_static.is_numpy(keepdims):
+      if ps.is_numpy(keepdims):
         tensorshape_util.set_shape(log_sum_x, np.array(logx.shape)[keepdims])
 
     # Set static shapes just in case we lost them.
@@ -258,6 +259,6 @@ def _log_loosum_exp_impl(logx, axis, keepdims, compute_mean):
     if not compute_mean:
       return log_loosum_x, log_sum_x, n
 
-    log_nm1 = prefer_static.log(max(1., n - 1.))
-    log_n = prefer_static.log(n)
+    log_nm1 = ps.log(max(1., n - 1.))
+    log_n = ps.log(n)
     return log_loosum_x - log_nm1, log_sum_x - log_n, n
