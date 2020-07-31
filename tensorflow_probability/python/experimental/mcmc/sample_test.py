@@ -170,17 +170,16 @@ class StepKernelTest(test_util.TestCase):
       self.assertNotEqual(first_final_state, last_state)
       last_state_t = first_final_state_t
 
-  @test_util.test_graph_and_eager_modes
-  def test_smart_for_loop_uses_tf_function(self):
+  @test_util.test_graph_mode_only
+  def test_smart_for_loop_uses_tf_while(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5],
                       [0.5, 1]])
     true_cov_chol = np.linalg.cholesky(true_cov)
-    num_results = 1000
+    num_results = 100
     counter = collections.Counter()
 
-    @tf.function
     def target_log_prob(x, y):
       counter['target_calls'] += 1
       z = tf.stack([x, y], axis=-1) - true_mean
@@ -197,7 +196,7 @@ class StepKernelTest(test_util.TestCase):
         return_final_kernel_results=False,
         seed=test_util.test_seed())
 
-    self.assertAllEqual(dict(target_calls=1), counter)
+    self.assertAllEqual(dict(target_calls=4), counter)
 
 
 if __name__ == '__main__':

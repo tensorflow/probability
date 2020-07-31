@@ -334,6 +334,8 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
     loop_num_iter_ = tf.get_static_value(loop_num_iter)
     if (loop_num_iter_ is None
         or tf.executing_eagerly()
+        # large values for loop_num_iter_ will cause ridiculously slow
+        # graph compilation time (GitHub issue #1033)
         or loop_num_iter_ > 1
         or control_flow_util.GraphOrParentsInXlaContext(
             tf1.get_default_graph())):
@@ -347,6 +349,7 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
           parallel_iterations=parallel_iterations
       )[1:]
     result = initial_loop_vars
+    # loop_num_iter_ is no more than 1
     for _ in range(loop_num_iter_):
       result = body_fn(*result)
     return result
