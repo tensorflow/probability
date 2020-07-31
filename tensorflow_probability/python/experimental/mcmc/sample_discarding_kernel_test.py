@@ -72,11 +72,11 @@ class SampleDiscardingTest(test_util.TestCase):
         first_state, kernel_results)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
-    self.assertEqual(first_state, 2)
-    self.assertEqual(second_state, 4)
-    self.assertEqual(kernel_results.call_counter, 2)
-    self.assertEqual(kernel_results.inner_results.counter_1, 4)
-    self.assertEqual(kernel_results.inner_results.counter_2, 8)
+    self.assertEqual(2, first_state)
+    self.assertEqual(4, second_state)
+    self.assertEqual(2, kernel_results.call_counter)
+    self.assertEqual(4, kernel_results.inner_results.counter_1)
+    self.assertEqual(8, kernel_results.inner_results.counter_2)
 
   def test_burnin(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -87,10 +87,10 @@ class SampleDiscardingTest(test_util.TestCase):
         0., discarder.bootstrap_results(0.))
     sample, kernel_results = self.evaluate([
         sample, kernel_results])
-    self.assertEqual(sample, 6)
-    self.assertEqual(kernel_results.call_counter, 1)
-    self.assertEqual(kernel_results.inner_results.counter_1, 6)
-    self.assertEqual(kernel_results.inner_results.counter_2, 12)
+    self.assertEqual(6, sample)
+    self.assertEqual(1, kernel_results.call_counter)
+    self.assertEqual(6, kernel_results.inner_results.counter_1)
+    self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_no_thinning_or_burnin(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -102,11 +102,11 @@ class SampleDiscardingTest(test_util.TestCase):
         first_state, kernel_results)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
-    self.assertEqual(first_state, 1)
-    self.assertEqual(second_state, 2)
-    self.assertEqual(kernel_results.call_counter, 2)
-    self.assertEqual(kernel_results.inner_results.counter_1, 2)
-    self.assertEqual(kernel_results.inner_results.counter_2, 4)
+    self.assertEqual(1, first_state)
+    self.assertEqual(2, second_state)
+    self.assertEqual(2, kernel_results.call_counter)
+    self.assertEqual(2, kernel_results.inner_results.counter_1)
+    self.assertEqual(4, kernel_results.inner_results.counter_2)
 
   def test_both_thinning_and_burnin(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -120,11 +120,11 @@ class SampleDiscardingTest(test_util.TestCase):
         first_state, kernel_results)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
-    self.assertEqual(first_state, 12)
-    self.assertEqual(second_state, 14)
-    self.assertEqual(kernel_results.call_counter, 2)
-    self.assertEqual(kernel_results.inner_results.counter_1, 14)
-    self.assertEqual(kernel_results.inner_results.counter_2, 28)
+    self.assertEqual(12, first_state)
+    self.assertEqual(14, second_state)
+    self.assertEqual(2, kernel_results.call_counter)
+    self.assertEqual(14, kernel_results.inner_results.counter_1)
+    self.assertEqual(28, kernel_results.inner_results.counter_2)
 
   def test_cold_start(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -138,11 +138,11 @@ class SampleDiscardingTest(test_util.TestCase):
         first_state, discarder.bootstrap_results(first_state))
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
-    self.assertEqual(first_state, 12)
-    self.assertEqual(second_state, 24)
-    self.assertEqual(kernel_results.call_counter, 1)
-    self.assertEqual(kernel_results.inner_results.counter_1, 12)
-    self.assertEqual(kernel_results.inner_results.counter_2, 24)
+    self.assertEqual(12, first_state)
+    self.assertEqual(24, second_state)
+    self.assertEqual(1, kernel_results.call_counter)
+    self.assertEqual(12, kernel_results.inner_results.counter_1)
+    self.assertEqual(24, kernel_results.inner_results.counter_2)
 
   def test_is_calibrated(self):
     calibrated_kernel = TestTransitionKernel()
@@ -173,13 +173,13 @@ class SampleDiscardingTest(test_util.TestCase):
         kernel_results,
         cov_reducer.finalize(kernel_results.streaming_calculations),
     ])
-    self.assertEqual(current_state, 16)
-    self.assertEqual(kernel_results.inner_results.call_counter, 2)
+    self.assertEqual(16, current_state)
+    self.assertEqual(2, kernel_results.inner_results.call_counter)
     self.assertEqual(
-        kernel_results.inner_results.inner_results.counter_1, 16)
+        16, kernel_results.inner_results.inner_results.counter_1)
     self.assertEqual(
-        kernel_results.inner_results.inner_results.counter_2, 32)
-    self.assertEqual(cov, np.var([13, 16]))
+        32, kernel_results.inner_results.inner_results.counter_2)
+    self.assertEqual(np.var([13, 16]), cov)
 
   def test_tf_while(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -202,10 +202,10 @@ class SampleDiscardingTest(test_util.TestCase):
     )
     final_sample, kernel_results = self.evaluate([
         final_sample, kernel_results])
-    self.assertEqual(final_sample, 14)
-    self.assertEqual(kernel_results.call_counter, 2)
-    self.assertEqual(kernel_results.inner_results.counter_1, 14)
-    self.assertEqual(kernel_results.inner_results.counter_2, 28)
+    self.assertEqual(14, final_sample)
+    self.assertEqual(2, kernel_results.call_counter)
+    self.assertEqual(14, kernel_results.inner_results.counter_1)
+    self.assertEqual(28, kernel_results.inner_results.counter_2)
 
   def test_tensor_thinning_and_burnin(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -229,10 +229,10 @@ class SampleDiscardingTest(test_util.TestCase):
 
     final_sample, kernel_results = self.evaluate([
         final_sample, kernel_results])
-    self.assertEqual(final_sample, 14)
-    self.assertEqual(kernel_results.call_counter, 2)
-    self.assertEqual(kernel_results.inner_results.counter_1, 14)
-    self.assertEqual(kernel_results.inner_results.counter_2, 28)
+    self.assertEqual(14, final_sample)
+    self.assertEqual(2, kernel_results.call_counter)
+    self.assertEqual(14, kernel_results.inner_results.counter_1)
+    self.assertEqual(28, kernel_results.inner_results.counter_2)
 
   def test_tensor_no_burnin(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -255,10 +255,10 @@ class SampleDiscardingTest(test_util.TestCase):
     )
     final_sample, kernel_results = self.evaluate([
         final_sample, kernel_results])
-    self.assertEqual(final_sample, 4)
-    self.assertEqual(kernel_results.call_counter, 2)
-    self.assertEqual(kernel_results.inner_results.counter_1, 4)
-    self.assertEqual(kernel_results.inner_results.counter_2, 8)
+    self.assertEqual(4, final_sample)
+    self.assertEqual(2, kernel_results.call_counter)
+    self.assertEqual(4, kernel_results.inner_results.counter_1)
+    self.assertEqual(8, kernel_results.inner_results.counter_2)
 
   def test_call_count_is_int32(self):
     fake_inner_kernel = TestTransitionKernel()
@@ -279,7 +279,8 @@ class SampleDiscardingTest(test_util.TestCase):
         _loop_body,
         (0., 0., pkr),
     )
-    self.assertTrue(kernel_results.call_counter.dtype, tf.int32)
+    self.assertTrue(tf.int32, kernel_results.call_counter.dtype)
+
 
 if __name__ == '__main__':
   tf.test.main()

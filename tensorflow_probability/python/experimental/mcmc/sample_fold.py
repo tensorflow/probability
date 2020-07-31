@@ -43,12 +43,12 @@ def sample_fold(
     seed=None,
     name=None,
 ):
-  """Finalizes `num_steps` Reducer steps, with samples provided by `kernel`.
+  """Finalizes `num_steps` Reducer steps with samples provided by `kernel`.
 
   This driver will appropriately apply `WithReductions` over the given `kernel`
-  and `reducers`. It will then update reducer states `num_steps` times (each
-  update being a call to the `Reducer`'s `one_step` method). An arbitrary
-  collection of `reducers` can be provided. If so, the resulting finalized
+  and `reducers`. It will then update reducer states `num_steps` times (perform
+  `num_steps` calls to the `Reducer`'s `one_step` method). An arbitrary
+  collection of `reducers` can be provided, and the resulting finalized
   statistics will be returned in an identical structure.
 
   Args:
@@ -78,7 +78,7 @@ def sample_fold(
     reduction_results: A (possibly nested) structure of finalized reducer
       statistics. The structure identically mimics that of `reducers`
     warm_restart_package: `Tuple` with the final state of the Markov chain(s)
-      and its kernel results, including those of applied wrapper kernels (i.e.
+      and kernel results, including those of applied wrapper kernels (i.e.
       `WithReductions`). Can be used to warm restart future calls to
       `sample_fold` or similar drivers.
   """

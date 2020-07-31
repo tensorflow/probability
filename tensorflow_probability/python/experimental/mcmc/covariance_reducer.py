@@ -52,6 +52,34 @@ class CovarianceReducer(reducer_base.Reducer):
   `CovarianceReducer` is meant to fit into the larger Streaming MCMC
   framework. `RunningCovariance` in `tfp.experimental.stats` is better suited
   for more generic streaming covariance needs.
+
+  There are two ways to stream over MCMC samples. The first is to manually
+  wrap `CovarianceReducer` in a `tfp.experimental.mcmc.WithReductions`
+  `TransitionKernel`. Doing so enables a wide variety of possible compositions.
+  For example, to perform covariance calculation on samples that survive thinning
+  and burn-in, `WithReductions` should wrap around an appropriate
+  `SampleDiscardingKernel`.
+  
+  If the sole objective is to compute some reduction statistic, it may be more
+  convenient to use a pre-defined driver like `tfp.experimental.mcmc.sample_fold`,
+  which accepts a kernel to sample from and a collection of reducers. `sample_fold`
+  will automatically create the Transition Kernel onion and call each reducer's
+  `finalize` method. This makes it easy to calculate streaming covariance over
+  MCMC samples.
+
+  ```
+  python 
+
+  kernel = ...
+  reducer = tfp.experimental.mcmc.CovarianceReducer()
+  covariance_estimate = tfp.experimental.mcmc.sample_fold(
+      num_steps=...,
+      current_state=...,
+      previous_kernel_results=...,
+      kernel=kernel,
+      reducers=reducer,
+  )
+  ```
   """
 
   def __init__(self, event_ndims=None, ddof=0, name=None):

@@ -87,9 +87,11 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     )
 
   def _num_samples_to_skip(self, call_counter):
-    """Calculates how many samples to skip based on the call number."""
-    # not using `tf.equal(self.num_burnin_steps, 0)` here is intentional.
-    # We are checking to see if `self.num_burnin_steps` is statically known.
+    """Calculates how many samples to skip based on the call number.
+
+    If `self.num_burnin_steps` is statically known to be 0,
+    `self.num_steps_between_results` will be returned outright.
+    """
     if self.num_burnin_steps == 0:
       return self.num_steps_between_results
     else:
@@ -108,7 +110,8 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       seed: Optional seed for reproducible sampling.
 
     Returns:
-      sample: Newest non-discarded MCMC sample drawn from the `inner_kernel`.
+      new_chain_state: Newest non-discarded MCMC chain state drawn from
+        the `inner_kernel`.
       kernel_results: `SampleDiscardingKernelResults` representing updated
         kernel results. The `call_counter` will be incremented by 1 and
         its `inner_results` will reflect the new kernel results of nested
@@ -116,7 +119,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'sample_discarding_kernel', 'one_step')):
-      new_sample, inner_kernel_results = step_kernel(
+      new_chain_state, inner_kernel_results = step_kernel(
           num_steps=self._num_samples_to_skip(
               previous_kernel_results.call_counter
           ) + 1,
@@ -129,7 +132,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       new_kernel_results = SampleDiscardingKernelResults(
           previous_kernel_results.call_counter + 1, inner_kernel_results
       )
-      return new_sample, new_kernel_results
+      return new_chain_state, new_kernel_results
 
   def bootstrap_results(self, init_state):
     """Instantiates a new kernel state with no calls.
@@ -139,7 +142,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
         state(s) of the Markov chain(s).
 
     Returns:
-      kernel_results: `SampleDiscardingKernelResults` state with 
+      kernel_results: `SampleDiscardingKernelResults` state with
         `call_counter=0` and the result of nested `TransitionKernel`s
         `bootstrap_results`.
     """
