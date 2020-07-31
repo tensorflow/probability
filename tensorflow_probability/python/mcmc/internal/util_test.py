@@ -196,8 +196,28 @@ class GradientTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class SmartForLoopTest(test_util.TestCase):
 
-  def test_python_for_loop(self):
+  @parameterized.parameters(0, 1)
+  def test_python_for_loop(self, loop_iters):
     counter = None
+    # following loop variables not @parameterized because the tf.constants
+    # would be executed outside the Eager mode that
+    # @test_util.test_all_tf_execution_regimes creates
+    for n in [loop_iters, tf.constant(loop_iters, dtype=tf.int64),
+              tf.constant(loop_iters, dtype=tf.int32)]:
+      counter = collections.Counter()
+      def body(x):
+        counter['body_calls'] += 1
+        return [x + 1]
+
+      result = util.smart_for_loop(
+          loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
+      expected_calls = 1 if JAX_MODE else loop_iters  # JAX always traces loops
+      self.assertEqual(expected_calls, counter['body_calls'])
+      self.assertAllClose([loop_iters + 1], self.evaluate(result))
+
+  def test_tf_while_on_large_iters(self):
+    counter = None
+    iters = 10
     # Not @parameterized because the tf.constants would be executed outside the
     # Eager mode that @test_util.test_all_tf_execution_regimes creates, and
     # TF is unhappy about that.
@@ -210,8 +230,10 @@ class SmartForLoopTest(test_util.TestCase):
 
       result = util.smart_for_loop(
           loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
-      expected_calls = 1 if JAX_MODE else 10  # JAX always traces loops
-      self.assertEqual(expected_calls, counter['body_calls'])
+      if tf.executing_eagerly() and not JAX_MODE:  # JAX always traces loops
+        self.assertEqual(iters, counter['body_calls'])
+      else:
+        self.assertEqual(1, counter['body_calls'])
       self.assertAllClose([11], self.evaluate(result))
 
   def test_tf_while_loop(self):

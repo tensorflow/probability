@@ -332,8 +332,10 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   """
   with tf.name_scope(name or 'smart_for_loop'):
     loop_num_iter_ = tf.get_static_value(loop_num_iter)
-    if (loop_num_iter_ is None or tf.executing_eagerly() or
-        control_flow_util.GraphOrParentsInXlaContext(
+    if (loop_num_iter_ is None
+        or tf.executing_eagerly()
+        or loop_num_iter_ > 1
+        or control_flow_util.GraphOrParentsInXlaContext(
             tf1.get_default_graph())):
       # Cast to int32 to run the comparison against i in host memory,
       # where while/LoopCond needs it.

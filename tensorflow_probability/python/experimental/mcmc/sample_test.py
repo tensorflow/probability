@@ -20,8 +20,9 @@ from __future__ import print_function
 
 import collections
 import warnings
+
 # Dependency imports
-from absl.testing import parameterized
+import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -72,7 +73,7 @@ class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
   def one_step(self, current_state, previous_kernel_results, seed=None):
     if seed is not None and not self._accepts_seed:
       raise TypeError('seed arg not accepted')
-    random_next_state = tfp.random.rayleigh((1,), seed=seed)
+    random_next_state = tfp.random.rayleigh((), seed=seed)
     return random_next_state, previous_kernel_results
 
   @property
@@ -80,9 +81,9 @@ class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
     return self._is_calibrated
 
 
-@test_util.test_all_tf_execution_regimes
 class StepKernelTest(test_util.TestCase):
 
+  @test_util.test_all_tf_execution_regimes
   def test_simple_operation(self):
     fake_kernel = TestTransitionKernel()
     final_state, kernel_results = step_kernel(
@@ -96,6 +97,7 @@ class StepKernelTest(test_util.TestCase):
     self.assertEqual(kernel_results.counter_1, 2)
     self.assertEqual(kernel_results.counter_2, 4)
 
+  @test_util.test_all_tf_execution_regimes
   def test_defined_pkr(self):
     fake_kernel = TestTransitionKernel()
     init_pkr = TestTransitionKernelResults(
@@ -112,17 +114,18 @@ class StepKernelTest(test_util.TestCase):
     self.assertEqual(kernel_results.counter_1, 4)
     self.assertEqual(kernel_results.counter_2, 7)
 
-  @parameterized.parameters(1, 2)
-  def test_initial_states(self, init_state):
+  @test_util.test_all_tf_execution_regimes
+  def test_initial_state(self):
     fake_kernel = TestTransitionKernel()
     final_state = step_kernel(
         num_steps=2,
-        current_state=init_state,
+        current_state=1,
         kernel=fake_kernel,
     )
     final_state = self.evaluate(final_state)
-    self.assertEqual(final_state, init_state + 2)
+    self.assertEqual(final_state, 3)
 
+  @test_util.test_all_tf_execution_regimes
   def test_calibration_warning(self):
     with warnings.catch_warnings(record=True) as triggered:
       kernel = TestTransitionKernel(is_calibrated=False)
@@ -136,6 +139,7 @@ class StepKernelTest(test_util.TestCase):
         any('supplied `TransitionKernel` is not calibrated.' in str(
             warning.message) for warning in triggered))
 
+  @test_util.test_all_tf_execution_regimes
   def test_seed_reproducibility(self):
     first_fake_kernel = RandomTransitionKernel()
     second_fake_kernel = RandomTransitionKernel()
@@ -149,13 +153,13 @@ class StepKernelTest(test_util.TestCase):
     for num_steps in range(2, 5):
       first_final_state_t = step_kernel(
           num_steps=num_steps,
-          current_state=0,
+          current_state=0.,
           kernel=first_fake_kernel,
           seed=seed,
       )
       second_final_state_t = step_kernel(
           num_steps=num_steps,
-          current_state=1,  # difference should be irrelevant
+          current_state=1.,  # difference should be irrelevant
           kernel=second_fake_kernel,
           seed=seed,
       )
@@ -165,6 +169,35 @@ class StepKernelTest(test_util.TestCase):
       self.assertEqual(first_final_state, second_final_state)
       self.assertNotEqual(first_final_state, last_state)
       last_state_t = first_final_state_t
+
+  @test_util.test_graph_and_eager_modes
+  def test_smart_for_loop_uses_tf_function(self):
+    dtype = np.float32
+    true_mean = dtype([0, 0])
+    true_cov = dtype([[1, 0.5],
+                      [0.5, 1]])
+    true_cov_chol = np.linalg.cholesky(true_cov)
+    num_results = 1000
+    counter = collections.Counter()
+
+    @tf.function
+    def target_log_prob(x, y):
+      counter['target_calls'] += 1
+      z = tf.stack([x, y], axis=-1) - true_mean
+      z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
+      return -0.5 * tf.reduce_sum(z**2., axis=-1)
+
+    _ = tfp.experimental.mcmc.step_kernel(
+        num_steps=num_results,
+        current_state=[dtype(-2), dtype(2)],
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob,
+            step_size=[0.5, 0.5],
+            num_leapfrog_steps=2),
+        return_final_kernel_results=False,
+        seed=test_util.test_seed())
+
+    self.assertAllEqual(dict(target_calls=1), counter)
 
 
 if __name__ == '__main__':
