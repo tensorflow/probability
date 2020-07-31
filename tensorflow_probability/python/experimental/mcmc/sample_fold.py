@@ -43,13 +43,14 @@ def sample_fold(
     seed=None,
     name=None,
 ):
-  """Finalizes `num_steps` Reducer steps with samples provided by `kernel`.
+  """Finalizes `num_steps` Reducer steps with `kernel` samples.
 
-  This driver will appropriately apply `WithReductions` over the given `kernel`
-  and `reducers`. It will then update reducer states `num_steps` times (perform
-  `num_steps` calls to the `Reducer`'s `one_step` method). An arbitrary
-  collection of `reducers` can be provided, and the resulting finalized
-  statistics will be returned in an identical structure.
+  This driver will appropriately apply `WithReductions` and
+  `SampleDiscardingKernel` over the given `kernel` and `reducers`. It will
+  then update reducer states `num_steps` times (perform `num_steps` calls to
+  the `Reducer`'s `one_step` method). An arbitrary collection of `reducers`
+  can be provided, and the resulting finalized statistic(s) will be returned
+  in an identical structure.
 
   Args:
     num_steps: Integer number of `Reducer` steps.
@@ -62,7 +63,8 @@ def sample_fold(
     kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
       of the Markov chain.
     reducers: A (possibly nested) structure of `Reducer`s to be evaluated
-      on the `kernel`'s samples.
+      on the `kernel`'s samples. If no reducers are given (`reducers=None`), an
+      empty list will be returned in place of streaming calculations.
     num_burnin_steps: Integer number of chain steps to take before starting to
       collect results. Defaults to 0 (i.e., no burn-in).
     num_steps_between_results: Integer number of chain steps between collecting
@@ -79,8 +81,7 @@ def sample_fold(
       statistics. The structure identically mimics that of `reducers`
     warm_restart_package: `Tuple` with the final state of the Markov chain(s)
       and kernel results, including those of applied wrapper kernels (i.e.
-      `WithReductions`). Can be used to warm restart future calls to
-      `sample_fold` or similar drivers.
+      `WithReductions`).
   """
   with tf.name_scope(name or 'mcmc_sample_fold'):
     num_steps = tf.convert_to_tensor(

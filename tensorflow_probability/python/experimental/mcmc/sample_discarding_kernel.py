@@ -105,7 +105,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       current_state: `Tensor` or Python `list` of `Tensor`s
         representing the current state(s) of the Markov chain(s),
       previous_kernel_results: `SampleDiscardingKernelResults` named tuple.
-        `SampleDiscardingKernelResults` contain the `call_counter`
+        `SampleDiscardingKernelResults` contains the `call_counter`
         and a reference to kernel results of nested `TransitionKernel`s.
       seed: Optional seed for reproducible sampling.
 

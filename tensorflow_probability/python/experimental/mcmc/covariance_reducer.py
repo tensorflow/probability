@@ -60,12 +60,10 @@ class CovarianceReducer(reducer_base.Reducer):
   and burn-in, `WithReductions` should wrap around an appropriate
   `SampleDiscardingKernel`.
   
-  If the sole objective is to compute some reduction statistic, it may be more
-  convenient to use a pre-defined driver like `tfp.experimental.mcmc.sample_fold`,
-  which accepts a kernel to sample from and a collection of reducers. `sample_fold`
-  will automatically create the Transition Kernel onion and call each reducer's
-  `finalize` method. This makes it easy to calculate streaming covariance over
-  MCMC samples.
+  If the sole objective is to estimate covariance, it may be more convenient to
+  use a pre-defined driver like `tfp.experimental.mcmc.sample_fold`. `sample_fold`
+  will automatically create the Transition Kernel onion, apply `kernel` samples
+  to update reducer states, and `finalize` calculations.
 
   ```
   python 
@@ -79,6 +77,7 @@ class CovarianceReducer(reducer_base.Reducer):
       kernel=kernel,
       reducers=reducer,
   )
+  covariance_estimate  # estimate of covariance (not `CovarianceReducerState`)
   ```
   """
 

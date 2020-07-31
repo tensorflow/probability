@@ -459,7 +459,6 @@ py_test(
     name = "sample_discarding_kernel_test",
     size = "small",
     srcs = ["sample_discarding_kernel_test.py"],
-    shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,
