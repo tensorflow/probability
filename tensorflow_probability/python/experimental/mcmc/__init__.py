@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""TensorFlow Probability experimental NUTS package."""
+"""TensorFlow Probability experimental MCMC package."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -45,10 +45,10 @@ from tensorflow_probability.python.experimental.mcmc.weighted_resampling import 
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
-from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductions
 
 
-_allowed_symbols = [
+__all__ = [
     'CovarianceReducer',
     'EllipticalSliceSampler',
     'NoUTurnSampler',
@@ -75,7 +75,6 @@ _allowed_symbols = [
     'sample_sequential_monte_carlo',
     'simple_heuristic_tuning',
     'step_kernel',
-    'VarianceReducer'
+    'VarianceReducer',
+    'WithReductions',
 ]
-
-all_util.remove_undocumented(__name__, _allowed_symbols)
