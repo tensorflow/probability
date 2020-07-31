@@ -147,6 +147,8 @@ def gen_module(module_name):
                       'linalg_ops.triangular_solve')
   code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
+  code = code.replace('ops.convert_to_tensor_v2_with_dispatch(',
+                      'ops.convert_to_tensor(')
 
   code = code.replace('self.dtype.real_dtype', 'dtypes.real_dtype(self.dtype)')
   code = code.replace('dtype.real_dtype', 'dtypes.real_dtype(dtype)')
