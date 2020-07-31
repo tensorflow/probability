@@ -22,8 +22,9 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-
 from tensorflow_probability.python.experimental.inference_gym.targets import model
+from tensorflow_probability.python.internal import prefer_static as ps
+
 
 __all__ = [
     'NealsFunnel',
@@ -71,12 +72,12 @@ class NealsFunnel(model.Model):
 
       def bijector_fn(x):
         """Funnel transform."""
-        batch_shape = tf.shape(x)[:-1]
+        batch_shape = ps.shape(x)[:-1]
         scale = tf.concat(
             [
-                tf.ones(tf.concat([batch_shape, [1]], axis=0)),
+                tf.ones(ps.concat([batch_shape, [1]], axis=0)),
                 tf.exp(x[..., :1] / 2) *
-                tf.ones(tf.concat([batch_shape, [ndims - 1]], axis=0)),
+                tf.ones(ps.concat([batch_shape, [ndims - 1]], axis=0)),
             ],
             axis=-1,
         )
