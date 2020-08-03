@@ -25,7 +25,7 @@ import warnings
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -310,10 +310,10 @@ class SliceSampler(kernel_base.TransitionKernel):
             previous_kernel_results.target_log_prob,
             maybe_expand=True)
 
-        max_doublings = tf.convert_to_tensor(
+        max_doublings = ps.convert_to_shape_tensor(
             value=self.max_doublings, dtype=tf.int32, name='max_doublings')
 
-      independent_chain_ndims = prefer_static.rank(current_target_log_prob)
+      independent_chain_ndims = ps.rank(current_target_log_prob)
 
       [
           next_state_parts,
@@ -372,7 +372,7 @@ def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   # Chooses the random directions across each of the input components.
   rnd_direction_parts = [
       samplers.normal(
-          tf.shape(current_state_part), dtype=tf.float32, seed=part_seed)
+          ps.shape(current_state_part), dtype=tf.float32, seed=part_seed)
       for (current_state_part, part_seed) in zip(current_state_parts, seeds)
   ]
 
@@ -381,7 +381,7 @@ def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   sum_squares = sum(
       tf.reduce_sum(  # pylint: disable=g-complex-comprehension
           rnd_direction**2,
-          axis=tf.range(batch_rank, tf.rank(rnd_direction)),
+          axis=ps.range(batch_rank, ps.rank(rnd_direction)),
           keepdims=True) for rnd_direction in rnd_direction_parts)
 
   # Normalizes the random direction fragments.
@@ -473,7 +473,7 @@ def _sample_next(target_log_prob_fn,
     # ellipsoid, we get:
     # alpha^2 ( n_1^2 / s_1^2 + n_2^2 / s_2^2 + ...) = 1
     # so alpha = \sqrt { \frac{1} { ( n_1^2 / s_1^2 + n_2^2 / s_2^2 + ...) } }
-    reduce_axes = [tf.range(batch_rank, tf.rank(dirn_part))
+    reduce_axes = [ps.range(batch_rank, ps.rank(dirn_part))
                    for dirn_part in direction]
 
     components = [
@@ -482,7 +482,7 @@ def _sample_next(target_log_prob_fn,
     ]
     step_size = tf.math.rsqrt(tf.add_n(components))
     # Computes the rank of a tensor. Uses the static rank if possible.
-    state_part_ranks = [prefer_static.rank(part)
+    state_part_ranks = [ps.rank(part)
                         for part in current_state_parts]
 
     def _step_along_direction(alpha):
@@ -573,9 +573,9 @@ def _right_pad(x, final_rank):
   Returns:
     padded_x: A tensor of rank final_rank.
   """
-  padded_shape = tf.concat(
-      [tf.shape(x),
-       tf.ones(final_rank - tf.rank(x), dtype=tf.int32)],
+  padded_shape = ps.concat(
+      [ps.shape(x),
+       ps.ones(final_rank - ps.rank(x), dtype=tf.int32)],
       axis=0)
   static_padded_shape = None
   if tensorshape_util.is_fully_defined(x.shape) and isinstance(final_rank, int):

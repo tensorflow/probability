@@ -26,7 +26,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc import hmc
@@ -172,14 +172,14 @@ def default_swap_proposal_fn(prob_swap, name=None):
       # If there are only 2 replicas, then the "True" swaps are null
       # swaps...which would contradict the user provided `prob_swap`.
       # So special case num_replica==2, forcing u==False in this case.
-      u_shape = prefer_static.concat((
-          tf.ones(1, dtype=tf.int32), tf.cast(batch_shape, tf.int32)), axis=0)
+      u_shape = ps.concat((
+          ps.ones(1, dtype=tf.int32), ps.cast(batch_shape, tf.int32)), axis=0)
       u = samplers.uniform(u_shape, seed=parity_seed) < 0.5
       u = tf.where(num_replica > 2, u, False)
 
       x = mcmc_util.left_justified_expand_dims_to(
-          tf.range(num_replica, dtype=tf.int64),
-          rank=prefer_static.size(u_shape))
+          ps.range(num_replica, dtype=tf.int64),
+          rank=ps.size(u_shape))
       y = tf.where(tf.equal(x % 2, tf.cast(u, dtype=tf.int64)), x + 1, x - 1)
       y = tf.clip_by_value(y, 0, num_replica - 1)
       # TODO(b/142689785): Consider using tf.cond and returning an empty list
@@ -259,15 +259,15 @@ def even_odd_swap_proposal_fn(swap_frequency, name=None):
       # If there are 2 replicas, then the "True" swaps are null
       # swaps...which would contradict the user provided `swap_frequency`.
       # So special case num_replica==2, forcing u==False in this case.
-      u_shape = prefer_static.concat((
-          tf.ones(1, dtype=tf.int32), tf.cast(batch_shape, tf.int32)), axis=0)
+      u_shape = ps.concat((
+          ps.ones(1, dtype=tf.int32), ps.cast(batch_shape, tf.int32)), axis=0)
       u = tf.fill(u_shape, tf.cast((step_count // safe_swap_period) % 2,
                                    tf.bool))
       u = tf.where(num_replica > 2, u, False)
 
       x = mcmc_util.left_justified_expand_dims_to(
           tf.range(num_replica, dtype=tf.int64),
-          rank=prefer_static.size(u_shape))
+          rank=ps.size(u_shape))
       y = tf.where(tf.equal(x % 2, tf.cast(u, dtype=tf.int64)), x + 1, x - 1)
       y = tf.clip_by_value(y, 0, num_replica - 1)
       # TODO(b/142689785): Consider using tf.cond and returning an empty list
@@ -478,7 +478,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   def num_replica(self):
     """Integer (`Tensor`) number of replicas being tracked."""
-    return tf.constant(prefer_static.size0(self.inverse_temperatures))
+    return tf.constant(ps.size0(self.inverse_temperatures))
 
   @property
   def make_kernel_fn(self):
@@ -608,12 +608,12 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           pre_swap_replica_results, 'target_log_prob')
 
       dtype = pre_swap_replica_target_log_prob.dtype
-      replica_and_batch_shape = prefer_static.shape(
+      replica_and_batch_shape = ps.shape(
           pre_swap_replica_target_log_prob)
       batch_shape = replica_and_batch_shape[1:]
-      replica_and_batch_rank = prefer_static.rank(
+      replica_and_batch_rank = ps.rank(
           pre_swap_replica_target_log_prob)
-      num_replica = prefer_static.size0(inverse_temperatures)
+      num_replica = ps.size0(inverse_temperatures)
 
       inverse_temperatures = mcmc_util.left_justified_broadcast_to(
           inverse_temperatures, replica_and_batch_shape)
@@ -795,7 +795,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       # each inverse_temperature. So if init_state=[x, y] of shapes [Sx, Sy]
       # then the new shape is [(T, Sx), (T, Sy)] where (a, b) means
       # concatenation and T=shape(inverse_temperature).
-      num_replica = prefer_static.size0(inverse_temperatures)
+      num_replica = ps.size0(inverse_temperatures)
       replica_shape = tf.convert_to_tensor([num_replica])
 
       if self._state_includes_replicas:
@@ -804,8 +804,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         replica_states = [
             tf.broadcast_to(  # pylint: disable=g-complex-comprehension
                 x,
-                prefer_static.concat([replica_shape, prefer_static.shape(x)],
-                                     axis=0),
+                ps.concat([replica_shape, ps.shape(x)], axis=0),
                 name='replica_states')
             for x in init_state
         ]
@@ -839,7 +838,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       pre_swap_replica_target_log_prob = _get_field(
           replica_results, 'target_log_prob')
 
-      replica_and_batch_shape = prefer_static.shape(
+      replica_and_batch_shape = ps.shape(
           pre_swap_replica_target_log_prob)
       batch_shape = replica_and_batch_shape[1:]
 
@@ -950,7 +949,7 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
       proposed_state=tf.convert_to_tensor(np.nan, dtype=dtype),
   )
 
-  replica_and_batch_rank = prefer_static.rank(kr.log_accept_ratio)
+  replica_and_batch_rank = ps.rank(kr.log_accept_ratio)
 
   # After using swap_tensor_fn on "values", values will be multiplied by the
   # swapped_inverse_temperatures.  We need it to be multiplied instead by the
@@ -1055,12 +1054,12 @@ def _sub_diag(nonmatrix):
     # this special case return an empty matrix.
     # TODO(b/143702351) Remove this special case handling once
     # matrix_diag_part_v3 is ready.
-    matrix_dim = prefer_static.size0(nonmatrix)
+    matrix_dim = ps.size0(nonmatrix)
     if matrix_dim is not None and matrix_dim < 2:
       # Shape is [..., 0], so returned tensor is empty, thus contains no
       # values...and therefore the fact that we use 'ones' doesn't matter.
-      shape = prefer_static.pad(
-          prefer_static.shape(nonmatrix)[2:],
+      shape = ps.pad(
+          ps.shape(nonmatrix)[2:],
           paddings=[[0, 1]],
           constant_values=0)
       matrix_sub_diag = tf.cast(tf.ones(shape), nonmatrix.dtype)
@@ -1070,7 +1069,7 @@ def _sub_diag(nonmatrix):
       # square), but is required for the API since this is raw gen_array_ops.
       matrix_sub_diag = tf.raw_ops.MatrixDiagPartV2(
           input=distribution_util.rotate_transpose(nonmatrix, shift=-2),
-          k=tf.convert_to_tensor(-1, dtype=tf.int32),
+          k=ps.convert_to_shape_tensor(-1, dtype=tf.int32),
           padding_value=tf.cast(0.0, dtype=nonmatrix.dtype))
 
     return distribution_util.rotate_transpose(matrix_sub_diag, shift=1)

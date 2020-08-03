@@ -25,7 +25,7 @@ import warnings
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -493,12 +493,12 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         for state_part, part_seed in zip(current_state_parts, seeds):
           random_draw_parts.append(
               samplers.normal(
-                  shape=tf.shape(state_part),
+                  shape=ps.shape(state_part),
                   dtype=dtype_util.base_dtype(state_part.dtype),
                   seed=part_seed))
 
       # Number of independent chains run by the algorithm.
-      independent_chain_ndims = prefer_static.rank(current_target_log_prob)
+      independent_chain_ndims = ps.rank(current_target_log_prob)
 
       # Generate the next state of the algorithm using Euler-Maruyama method.
       next_state_parts = _euler_method(random_draw_parts,
@@ -922,7 +922,7 @@ def _prepare_args(target_log_prob_fn,
       state_parts,
       volatility,
       grads_volatility_fn,
-      prefer_static.shape(target_log_prob),
+      ps.shape(target_log_prob),
       parallel_iterations)
 
   step_sizes = (list(step_size) if mcmc_util.is_list_like(step_size)

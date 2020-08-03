@@ -29,6 +29,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 
@@ -71,13 +72,13 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
 
     def proposal_log_prob(x):
       counter['proposal_calls'] += 1
-      event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+      event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return tf.reduce_sum(tfd.Normal(loc=0., scale=1.).log_prob(x),
                            axis=event_dims)
 
     def target_log_prob(x):
       counter['target_calls'] += 1
-      event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+      event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
     num_steps = 200
@@ -183,11 +184,11 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
     x = np.random.rand(4, 3, 2)
 
     def proposal_log_prob(x):
-      event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+      event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return -0.5 * tf.reduce_sum(x**2. + np.log(2 * np.pi), axis=event_dims)
 
     def target_log_prob(x):
-      event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+      event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
     seed = test_util.test_seed()

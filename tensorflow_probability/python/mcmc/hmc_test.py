@@ -34,6 +34,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
@@ -84,7 +85,7 @@ class HMCTest(test_util.TestCase):
     independent_chain_ndims = 1
 
     def log_gamma_log_prob(x):
-      event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+      event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
     current_state = np.random.rand(4, 3, 2)
@@ -134,7 +135,7 @@ class HMCTest(test_util.TestCase):
     counter = collections.Counter()
     def log_gamma_log_prob(x):
       counter['target_calls'] += 1
-      event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+      event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
     samples, kernel_results = tfp.mcmc.sample_chain(
@@ -287,7 +288,7 @@ class HMCTest(test_util.TestCase):
   def _kernel_leaves_target_invariant(self, initial_draws,
                                       independent_chain_ndims):
     def log_gamma_log_prob(x):
-      event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+      event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
     def fake_log_prob(x):
