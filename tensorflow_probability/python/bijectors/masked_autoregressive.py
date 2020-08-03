@@ -1020,6 +1020,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     self._network = tf.keras.models.Model(
         inputs=inputs,
         outputs=outputs[-1])
+    # Allow network to be called with inputs of shapes that don't match
+    # the specs of the network's input layers.
+    self._network.input_spec = None
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
 
