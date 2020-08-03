@@ -32,7 +32,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 # Tolerance to check for floating point zeros.
@@ -442,8 +442,8 @@ def nelder_mead_one_step(current_simplex,
         converged,
         next_simplex,
         next_objective_at_simplex,
-        case_evals) = prefer_static.case([case0, case1, case2, case3],
-                                         default=default_fn, exclusive=False)
+        case_evals) = ps.case([case0, case1, case2, case3],
+                              default=default_fn, exclusive=False)
     tensorshape_util.set_shape(next_simplex, current_simplex.shape)
     tensorshape_util.set_shape(next_objective_at_simplex,
                                current_objective_values.shape)
@@ -486,7 +486,7 @@ def _expansion_fn(objective_function,
                           objective_at_reflected)
     accept_expanded_fn = lambda: (expanded, expanded_objective_value)
     accept_reflected_fn = lambda: (reflected, objective_at_reflected)
-    next_pt, next_objective_value = prefer_static.cond(
+    next_pt, next_objective_value = ps.cond(
         expanded_is_better, accept_expanded_fn, accept_reflected_fn)
     next_simplex = _replace_at_index(simplex, worst_index, next_pt)
     next_objective_at_simplex = _replace_at_index(objective_values,
@@ -531,9 +531,9 @@ def _outside_contraction_fn(objective_function,
                                   shrinkage,
                                   batch_evaluate_objective)
 
-    return prefer_static.cond(is_contracted_acceptable,
-                              _accept_contraction,
-                              _reject_contraction)
+    return ps.cond(is_contracted_acceptable,
+                   _accept_contraction,
+                   _reject_contraction)
   return _contraction
 
 
@@ -571,9 +571,9 @@ def _inside_contraction_fn(objective_function,
       return _shrink_towards_best(objective_function, simplex, best_index,
                                   shrinkage, batch_evaluate_objective)
 
-    return prefer_static.cond(is_contracted_acceptable,
-                              _accept_contraction,
-                              _reject_contraction)
+    return ps.cond(is_contracted_acceptable,
+                   _accept_contraction,
+                   _reject_contraction)
   return _contraction
 
 
@@ -791,11 +791,14 @@ def _prepare_args_with_initial_vertex(objective_function,
                                       objective_at_initial_vertex,
                                       batch_evaluate_objective):
   """Constructs a standard axes aligned simplex."""
-  dim = tf.size(initial_vertex)
+  dim = ps.size(initial_vertex)
+  # tf.eye complains about np.array(.., np.int32) num_rows, only welcomes numpy
+  # scalars. TODO(b/162529062): Remove the following line.
+  dim = dim if tf.is_tensor(dim) else int(dim)
   num_vertices = dim + 1
   unit_vectors_along_axes = tf.reshape(
       tf.eye(dim, dim, dtype=dtype_util.base_dtype(initial_vertex.dtype)),
-      tf.concat([[dim], tf.shape(initial_vertex)], axis=0))
+      ps.concat([[dim], ps.shape(initial_vertex)], axis=0))
 
   # If step_sizes does not broadcast to initial_vertex, the multiplication
   # in the second term will fail.

@@ -32,9 +32,8 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -339,9 +338,9 @@ def _get_search_direction(state):
     along which to perform line search.
   """
   # The number of correction pairs that have been collected so far.
-  num_elements = tf.minimum(
-      state.num_iterations,
-      distribution_util.prefer_static_shape(state.position_deltas)[0])
+  num_elements = ps.minimum(
+      state.num_iterations,  # TODO(b/162733947): Change loop state -> closure.
+      ps.shape(state.position_deltas)[0])
 
   def _two_loop_algorithm():
     """L-BFGS two-loop algorithm."""
@@ -390,9 +389,9 @@ def _get_search_direction(state):
         initializer=r_direction)
     return -r_directions[-1]
 
-  return prefer_static.cond(tf.equal(num_elements, 0),
-                            (lambda: -state.objective_gradient),
-                            _two_loop_algorithm)
+  return ps.cond(ps.equal(num_elements, 0),
+                 lambda: -state.objective_gradient,
+                 _two_loop_algorithm)
 
 
 def _make_empty_queue_for(k, element):
@@ -424,8 +423,7 @@ def _make_empty_queue_for(k, element):
     A zero-filed `tf.Tensor` of shape `(k,) + tf.shape(element)` and same dtype
     as `element`.
   """
-  queue_shape = tf.concat(
-      [[k], distribution_util.prefer_static_shape(element)], axis=0)
+  queue_shape = ps.concat([[k], ps.shape(element)], axis=0)
   return tf.zeros(queue_shape, dtype=dtype_util.base_dtype(element.dtype))
 
 

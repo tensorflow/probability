@@ -34,7 +34,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -211,7 +211,7 @@ def minimize(value_and_gradients_function,
         x_tolerance, dtype=dtype, name='x_tolerance')
     max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
 
-    input_shape = distribution_util.prefer_static_shape(initial_position)
+    input_shape = ps.shape(initial_position)
     batch_shape, domain_size = input_shape[:-1], input_shape[-1]
 
     if stopping_condition is None:
@@ -239,7 +239,7 @@ def minimize(value_and_gradients_function,
         control_inputs = _inv_hessian_control_inputs(initial_inv_hessian)
       else:
         control_inputs = None
-      hessian_shape = tf.concat([batch_shape, [domain_size, domain_size]], 0)
+      hessian_shape = ps.concat([batch_shape, [domain_size, domain_size]], 0)
       initial_inv_hessian = tf.broadcast_to(initial_inv_hessian, hessian_shape)
 
     # The `state` here is a `BfgsOptimizerResults` tuple with values for the
@@ -359,8 +359,8 @@ def _update_inv_hessian(prev_state, next_state):
             next_inv_hessian,
             prev_state.inverse_hessian_estimate))
 
-  return prefer_static.cond(
-      tf.reduce_any(should_update),
+  return ps.cond(
+      ps.reduce_any(should_update),
       _do_update_inv_hessian,
       lambda: next_state)
 
