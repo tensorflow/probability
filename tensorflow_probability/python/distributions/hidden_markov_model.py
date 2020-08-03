@@ -121,6 +121,7 @@ class HiddenMarkovModel(distribution.Distribution):
                num_steps,
                validate_args=False,
                allow_nan_stats=True,
+               time_varying_observation_distribution=False,
                name='HiddenMarkovModel'):
     """Initialize hidden Markov model.
 
@@ -149,6 +150,12 @@ class HiddenMarkovModel(distribution.Distribution):
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
         Default value: `True`.
+      time_varying_observation_distribution: Python `bool`, default `False`.
+        When `True`, the observation_distribution has an additional batch
+        dimension that indexes the distribution of each observation conditioned
+        on the corresponding timestep. This dimension size should always match
+        num_steps and is the second-to-last batch axis in the batch dimensions
+        (just to the left of the dimension for the number of states).
       name: Python `str` name prefixed to Ops created by this class.
         Default value: "HiddenMarkovModel".
 
@@ -170,6 +177,8 @@ class HiddenMarkovModel(distribution.Distribution):
       self._initial_distribution = initial_distribution
       self._observation_distribution = observation_distribution
       self._transition_distribution = transition_distribution
+      self._time_varying_observation_distribution = (
+          time_varying_observation_distribution)
 
       num_steps_ = tf.get_static_value(num_steps)
       if num_steps_ is not None:
@@ -186,11 +195,15 @@ class HiddenMarkovModel(distribution.Distribution):
             [None]).concatenate(
                 self._observation_distribution.event_shape)
 
+      observation_batch_shape = (
+          self._observation_distribution.batch_shape[:-2]
+          if self._time_varying_observation_distribution
+          else self._observation_distribution.batch_shape[:-1])
       self._static_batch_shape = tf.broadcast_static_shape(
           self._initial_distribution.batch_shape,
           tf.broadcast_static_shape(
               self._transition_distribution.batch_shape[:-1],
-              self._observation_distribution.batch_shape[:-1]))
+              observation_batch_shape))
 
       # pylint: disable=protected-access
       super(HiddenMarkovModel, self).__init__(
@@ -205,11 +218,15 @@ class HiddenMarkovModel(distribution.Distribution):
       self._parameters = parameters
 
   def _batch_shape_tensor(self):
+    observation_batch_shape = (
+        self._observation_distribution.batch_shape_tensor()[:-2]
+        if self._time_varying_observation_distribution
+        else self._observation_distribution.batch_shape_tensor()[:-1])
     return tf.broadcast_dynamic_shape(
         self._initial_distribution.batch_shape_tensor(),
         tf.broadcast_dynamic_shape(
             self._transition_distribution.batch_shape_tensor()[:-1],
-            self._observation_distribution.batch_shape_tensor()[:-1]))
+            observation_batch_shape))
 
   def _batch_shape(self):
     return self._static_batch_shape
@@ -341,12 +358,22 @@ class HiddenMarkovModel(distribution.Distribution):
     # the required batch size so as with the initial and
     # transition distributions we generate more samples and
     # reshape.
-    observation_repeat = (
+    observation_repeat = tf.maximum(
         batch_size // tf.reduce_prod(
-            self._observation_distribution.batch_shape_tensor()[:-1]))
+            self._observation_distribution.batch_shape_tensor()[:-1]),
+        1)
 
-    possible_observations = self._observation_distribution.sample(
-        [self._num_steps, observation_repeat * n], seed=observation_seed)
+    if self._time_varying_observation_distribution:
+      possible_observations = self._observation_distribution.sample(
+          [observation_repeat * n], seed=observation_seed)
+      # possible observations needs to have num_steps moved to the beginning.
+      possible_observations = distribution_util.move_dimension(
+          possible_observations,
+          -(tf.size(self._observation_distribution.event_shape_tensor()) + 2),
+          0)
+    else:
+      possible_observations = self._observation_distribution.sample(
+          [self._num_steps, observation_repeat * n], seed=observation_seed)
 
     inner_shape = self._observation_distribution.event_shape_tensor()
 
@@ -423,13 +450,22 @@ class HiddenMarkovModel(distribution.Distribution):
 
     # Move index into sequence of observations to front so we can apply
     # tf.foldl
-    working_obs = distribution_util.move_dimension(working_obs, -1 - r, 0)
-    # working_obs :: num_steps batch_shape underlying_event_shape
-    working_obs = tf.expand_dims(working_obs, -1 - r)
-    # working_obs :: num_steps batch_shape 1 underlying_event_shape
+    if self._time_varying_observation_distribution:
+      working_obs = tf.expand_dims(working_obs, -1 - r)
+      # working_obs :: batch_shape num_steps 1 underlying_event_shape
+      observation_probs = observation_distribution.log_prob(working_obs)
+      # observation_probs :: batch_shape num_steps num_states
+      observation_probs = distribution_util.move_dimension(
+          observation_probs, -2, 0)
+      # observation_probs :: num_steps batch_shape num_states
+    else:
+      working_obs = distribution_util.move_dimension(working_obs, -1 - r, 0)
+      # working_obs :: num_steps batch_shape underlying_event_shape
+      working_obs = tf.expand_dims(working_obs, -1 - r)
+      # working_obs :: num_steps batch_shape 1 underlying_event_shape
 
-    observation_probs = observation_distribution.log_prob(working_obs)
-    # observation_probs :: num_steps batch_shape num_states
+      observation_probs = observation_distribution.log_prob(working_obs)
+      # observation_probs :: num_steps batch_shape num_states
 
     def forward_step(log_prev_step, log_prob_observation):
       return _log_vector_matrix(log_prev_step,
@@ -498,30 +534,36 @@ class HiddenMarkovModel(distribution.Distribution):
     probs = self._marginal_hidden_probs()
     # probs :: num_steps batch_shape num_states
     means = observation_distribution.mean()
+    # means :: observation_batch_shape[:-2] num_steps num_states
+    #                                       observation_event_shape
+    # or
     # means :: observation_batch_shape[:-1] num_states
-    #          observation_event_shape
+    #                                       observation_event_shape
+    # the latter case hapens for static observations distributions and we need
+    # to add in a steps dimension.
+    if not self._time_varying_observation_distribution:
+      means = tf.expand_dims(means, tf.rank(batch_shape) - 1)
     means_shape = tf.concat(
         [batch_shape,
-         [num_states],
+         [self._num_steps, num_states],
          observation_distribution.event_shape_tensor()],
         axis=0)
     means = tf.broadcast_to(means, means_shape)
-    # means :: batch_shape num_states observation_event_shape
-
+    # means :: batch_shape num_steps num_states observation_event_shape
     observation_event_shape = (
         observation_distribution.event_shape_tensor())
     batch_size = tf.reduce_prod(batch_shape)
     flat_probs_shape = [self._num_steps, batch_size, num_states]
     flat_means_shape = [
-        batch_size, num_states,
+        batch_size, self._num_steps, num_states,
         tf.reduce_prod(observation_event_shape)
     ]
 
     flat_probs = tf.reshape(probs, flat_probs_shape)
     # flat_probs :: num_steps batch_size num_states
     flat_means = tf.reshape(means, flat_means_shape)
-    # flat_means :: batch_size num_states observation_event_size
-    flat_mean = tf.einsum('ijk,jkl->jil', flat_probs, flat_means)
+    # flat_means :: batch_size num_steps num_states observation_event_size
+    flat_mean = tf.einsum('ijk,jikl->jil', flat_probs, flat_means)
     # flat_mean :: batch_size num_steps observation_event_size
     unflat_mean_shape = tf.concat(
         [batch_shape,
@@ -538,37 +580,46 @@ class HiddenMarkovModel(distribution.Distribution):
     # probs :: num_steps batch_shape num_states
     observation_distribution = self.observation_distribution
     means = observation_distribution.mean()
-    # means :: observation_batch_shape[:-1] num_states
+    # means :: observation_batch_shape[:-2] num_steps num_states
     #          observation_event_shape
+    # or
+    # means :: observation_batch_shape[:-1] num_states
+    #                                       observation_event_shape
+    # the latter case hapens for static observations distributions and we need
+    # to add in a steps dimension.
+    if not self._time_varying_observation_distribution:
+      means = tf.expand_dims(means, tf.rank(batch_shape) - 1)
     means_shape = tf.concat(
         [batch_shape,
-         [num_states],
+         [self._num_steps, num_states],
          observation_distribution.event_shape_tensor()],
         axis=0)
     means = tf.broadcast_to(means, means_shape)
-    # means :: batch_shape num_states observation_event_shape
-
+    # means :: batch_shape num_steps num_states observation_event_shape
     observation_event_shape = (
         observation_distribution.event_shape_tensor())
     batch_size = tf.reduce_prod(batch_shape)
     flat_probs_shape = [self._num_steps, batch_size, num_states]
     flat_means_shape = [
-        batch_size, 1, num_states,
+        batch_size, self._num_steps, num_states,
         tf.reduce_prod(observation_event_shape)
     ]
 
     flat_probs = tf.reshape(probs, flat_probs_shape)
     # flat_probs :: num_steps batch_size num_states
     flat_means = tf.reshape(means, flat_means_shape)
-    # flat_means :: batch_size 1 num_states observation_event_size
-    flat_mean = tf.einsum('ijk,jmkl->jiml', flat_probs, flat_means)
+    # flat_means :: batch_size num_steps num_states observation_event_size
+    flat_mean = tf.einsum('ijk,jikl->jil', flat_probs, flat_means)
+    flat_mean = tf.expand_dims(flat_mean, 2)
     # flat_mean :: batch_size num_steps 1 observation_event_size
 
     variances = observation_distribution.variance()
+    if not self._time_varying_observation_distribution:
+      variances = tf.expand_dims(variances, tf.rank(batch_shape) - 1)
     variances = tf.broadcast_to(variances, means_shape)
-    # variances :: batch_shape num_states observation_event_shape
+    # variances :: batch_shape num_steps num_states observation_event_shape
     flat_variances = tf.reshape(variances, flat_means_shape)
-    # flat_variances :: batch_size 1 num_states observation_event_size
+    # flat_variances :: batch_size num_steps num_states observation_event_size
 
     # For a mixture of n distributions with mixture probabilities
     # p[i], and where the individual distributions have means and
