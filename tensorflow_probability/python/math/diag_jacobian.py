@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math.gradient import value_and_gradient
 
 
@@ -176,7 +177,7 @@ def diag_jacobian(xs,
             loop_vars=loop_vars,
             parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(x)
+        shape_x = ps.shape(x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
         reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())
@@ -199,7 +200,7 @@ def diag_jacobian(xs,
           if len(res) != len(state):
             res *= len(state)
           res = [tf.reshape(r + tf.zeros_like(s),
-                            tf.concat([sample_shape, [-1]], -1))
+                            ps.concat([sample_shape, [-1]], -1))
                  for r, s in zip(res, state)]
           return res
         # Expand dimensions before returning in order to support 0D input `xs`
@@ -212,15 +213,15 @@ def diag_jacobian(xs,
           if res is None:
             res = tf.zeros(sample_shape, dtype=x.dtype)
           else:
-            res = tf.reshape(res, tf.concat([sample_shape, [-1]], -1))
+            res = tf.reshape(res, ps.concat([sample_shape, [-1]], -1))
             res = res[..., j]
           return j + 1, result.write(j, res)
         return _fn
 
       for i, x in enumerate(xs):
         # Declare an iterator and tensor array loop variables for the gradients.
-        n = tf.size(x) / tf.cast(tf.reduce_prod(sample_shape), dtype=tf.int32)
-        n = tf.cast(n, dtype=tf.int32)
+        n = ps.size(x) / ps.cast(ps.reduce_prod(sample_shape), dtype=tf.int32)
+        n = ps.cast(n, dtype=tf.int32)
         loop_vars = (0, tf.TensorArray(x.dtype, n, element_shape=sample_shape))
 
         # Iterate over all elements of the gradient and compute second order
@@ -231,10 +232,10 @@ def diag_jacobian(xs,
             loop_vars=loop_vars,
             parallel_iterations=parallel_iterations)
 
-        shape_x = tf.shape(x)
+        shape_x = ps.shape(x)
         # Stack gradients together and move flattened `event_shape` to the
         # zero position
-        reshaped_jacobian_diag = tf.transpose(a=jacobian_diag_res.stack())
+        reshaped_jacobian_diag = tf.transpose(jacobian_diag_res.stack())
         # Reshape to the original tensor
         reshaped_jacobian_diag = tf.reshape(reshaped_jacobian_diag, shape_x)
         jacobians_diag_res.append(reshaped_jacobian_diag)
