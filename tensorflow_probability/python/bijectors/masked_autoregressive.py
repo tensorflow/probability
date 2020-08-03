@@ -354,7 +354,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
         y = self._bijector_fn(y, **kwargs).forward(x)
       return y
 
-    event_size = tf.reduce_prod(tf.shape(x)[-self._event_ndims:])
+    event_size = ps.reduce_prod(ps.shape(x)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name='y0')
     # call the template once to ensure creation
     if not tf.executing_eagerly():

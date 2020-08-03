@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -948,7 +949,7 @@ class Bijector(tf.Module):
         x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
 
     return self._reduce_jacobian_det_over_event(
-        tf.shape(tensor_to_use), unreduced_ildj, min_event_ndims, event_ndims)
+        ps.shape(tensor_to_use), unreduced_ildj, min_event_ndims, event_ndims)
 
   def _compute_unreduced_ildj_with_caching(
       self, x, y, tensor_to_use, use_inverse_ldj_fn, kwargs):
@@ -1026,7 +1027,7 @@ class Bijector(tf.Module):
         ildjs = self._inverse_log_det_jacobian(y, **kwargs)
         return tuple(
             self._reduce_jacobian_det_over_event(  # pylint: disable=g-complex-comprehension
-                tf.shape(y), ildj, self.inverse_min_event_ndims, event_ndims)
+                ps.shape(y), ildj, self.inverse_min_event_ndims, event_ndims)
             for ildj in ildjs)
 
       return self._compute_inverse_log_det_jacobian_with_caching(
@@ -1216,7 +1217,8 @@ class Bijector(tf.Module):
       self, shape_tensor, ildj, min_event_ndims, event_ndims):
     """Reduce jacobian over event_ndims - min_event_ndims."""
     # In this case, we need to tile the Jacobian over the event and reduce.
-    rank = tf.size(shape_tensor)
+    shape_tensor = ps.convert_to_shape_tensor(shape_tensor)
+    rank = ps.rank_from_shape(shape_tensor)
     shape_tensor = shape_tensor[rank - event_ndims:rank - min_event_ndims]
 
     ones = tf.ones(shape_tensor, ildj.dtype)

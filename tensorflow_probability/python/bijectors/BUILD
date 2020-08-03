@@ -1420,7 +1420,6 @@ multi_substrate_py_test(
     size = "small",
     timeout = "moderate",
     srcs = ["masked_autoregressive_test.py"],
-    jax_tags = ["omni_fail"],
     deps = [
         ":bijectors",
         ":masked_autoregressive",
