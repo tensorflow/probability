@@ -307,6 +307,7 @@ multi_substrate_py_library(
     srcs = ["samplers.py"],
     deps = [
         ":dtype_util",
+        ":prefer_static",
         # numpy dep,
         # tensorflow dep,
     ],

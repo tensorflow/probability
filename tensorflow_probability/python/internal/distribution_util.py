@@ -25,7 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -113,8 +113,10 @@ def shapes_from_loc_and_scale(loc, scale, name='shapes_from_loc_and_scale'):
     loc = None  # scalar loc is irrelevant to determining batch/event shape.
   with tf.name_scope(name):
     # Get event shape.
-    event_size = scale.range_dimension_tensor()
-    event_size_ = tf.get_static_value(event_size)
+    event_size = tf.compat.dimension_value(scale.range_dimension)
+    if event_size is None:
+      event_size = scale.range_dimension_tensor()
+    event_size_ = tf.get_static_value(ps.convert_to_shape_tensor(event_size))
     loc_event_size_ = (None if loc is None
                        else tf.compat.dimension_value(loc.shape[-1]))
 
@@ -130,23 +132,26 @@ def shapes_from_loc_and_scale(loc, scale, name='shapes_from_loc_and_scale'):
     if event_size_ is None:
       event_shape = event_size[tf.newaxis]
     else:
-      event_shape = tf.convert_to_tensor(
+      event_shape = ps.convert_to_shape_tensor(
           np.reshape(event_size_, [1]), dtype=tf.int32, name='event_shape')
 
     # Get batch shape.
-    batch_shape = scale.batch_shape_tensor()
+    batch_shape = scale.batch_shape
+    if not tensorshape_util.is_fully_defined(batch_shape):
+      batch_shape = scale.batch_shape_tensor()
+    else:
+      batch_shape = ps.convert_to_shape_tensor(batch_shape)
     if loc is not None:
       loc_batch_shape = tensorshape_util.with_rank_at_least(loc.shape, 1)[:-1]
-      if tensorshape_util.rank(
-          loc.shape) is None or not tensorshape_util.is_fully_defined(
-              loc_batch_shape):
+      if (tensorshape_util.rank(loc.shape) is None or
+          not tensorshape_util.is_fully_defined(loc_batch_shape)):
         loc_batch_shape = tf.shape(loc)[:-1]
       else:
-        loc_batch_shape = tf.convert_to_tensor(
+        loc_batch_shape = ps.convert_to_shape_tensor(
             loc_batch_shape, dtype=tf.int32, name='loc_batch_shape')
       # This is defined in the core util module.
-      batch_shape = prefer_static_broadcast_shape(batch_shape, loc_batch_shape)  # pylint: disable=undefined-variable
-      batch_shape = tf.convert_to_tensor(
+      batch_shape = ps.broadcast_shape(batch_shape, loc_batch_shape)
+      batch_shape = ps.convert_to_shape_tensor(
           batch_shape, dtype=tf.int32, name='batch_shape')
 
     return batch_shape, event_shape
@@ -371,45 +376,45 @@ def move_dimension(x, source_idx, dest_idx):
   ndims = prefer_static_rank(x)
   dtype = dtype_util.common_dtype([source_idx, dest_idx],
                                   dtype_hint=tf.int32)
-  source_idx = tf.convert_to_tensor(source_idx, dtype=dtype)
-  dest_idx = tf.convert_to_tensor(dest_idx, dtype=dtype)
+  source_idx = ps.convert_to_shape_tensor(source_idx, dtype=dtype)
+  dest_idx = ps.convert_to_shape_tensor(dest_idx, dtype=dtype)
 
   # Handle negative indexing.
-  source_idx = pick_scalar_condition(source_idx < 0, ndims + source_idx,
-                                     source_idx)
-  dest_idx = pick_scalar_condition(dest_idx < 0, ndims + dest_idx, dest_idx)
+  source_idx = ps.where(source_idx < 0, ndims + source_idx, source_idx)
+  dest_idx = ps.where(dest_idx < 0, ndims + dest_idx, dest_idx)
 
   # Construct the appropriate permutation of dimensions, depending
   # whether the source is before or after the destination.
   def move_left_permutation():
     return prefer_static_value(
-        tf.concat([
-            tf.range(0, dest_idx, dtype=dtype), [source_idx],
-            tf.range(dest_idx, source_idx, dtype=dtype),
-            tf.range(source_idx + 1, ndims, dtype=dtype)
+        ps.concat([
+            ps.range(0, dest_idx, dtype=dtype),
+            [source_idx],
+            ps.range(dest_idx, source_idx, dtype=dtype),
+            ps.range(source_idx + 1, ndims, dtype=dtype)
         ],
                   axis=0))
 
   def move_right_permutation():
     return prefer_static_value(
-        tf.concat([
-            tf.range(0, source_idx, dtype=dtype),
-            tf.range(source_idx + 1, dest_idx + 1, dtype=dtype), [source_idx],
-            tf.range(dest_idx + 1, ndims, dtype=dtype)
+        ps.concat([
+            ps.range(0, source_idx, dtype=dtype),
+            ps.range(source_idx + 1, dest_idx + 1, dtype=dtype),
+            [source_idx],
+            ps.range(dest_idx + 1, ndims, dtype=dtype)
         ],
                   axis=0))
 
   def x_permuted():
     return tf.transpose(
         a=x,
-        perm=prefer_static.cond(source_idx < dest_idx,
-                                move_right_permutation,
-                                move_left_permutation))
+        perm=ps.cond(source_idx < dest_idx,
+                     move_right_permutation,
+                     move_left_permutation))
 
   # One final conditional to handle the special case where source
   # and destination indices are equal.
-  return prefer_static.cond(tf.equal(source_idx, dest_idx),
-                            lambda: x, x_permuted)
+  return ps.cond(ps.equal(source_idx, dest_idx), lambda: x, x_permuted)
 
 
 def assert_integer_form(x,
@@ -1356,6 +1361,7 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
     vector: a 1-D `Tensor`.
   """
   with tf.name_scope(op_name or 'expand_to_vector'):
+    x_orig = x
     x = tf.convert_to_tensor(x, name='x')
     ndims = tensorshape_util.rank(x.shape)
 
@@ -1373,13 +1379,8 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
 
     elif ndims == 0:
       # Definitely expand ndims from 0 to 1.
-      x_const = tf.get_static_value(x)
-      if x_const is not None:
-        return tf.convert_to_tensor(
-            dtype_util.as_numpy_dtype(x.dtype)([x_const]), name=tensor_name)
-
-      else:
-        return tf.reshape(x, [1])
+      return ps.convert_to_shape_tensor(
+          ps.reshape(x_orig, [1]), name=tensor_name)
 
     elif ndims != 1:
       raise ValueError('Input is neither scalar nor vector.')

@@ -100,12 +100,17 @@ def _numpy_dtype(dtype):
 
 def _get_static_value(pred):
   """Helper function for getting static values from maybe-tensor objects."""
+  if JAX_MODE:
+    try:
+      return np.asarray(pred)
+    except:  # JAX sometimes raises raw Exception in __array__.  # pylint: disable=bare-except
+      return None
   if tf.is_tensor(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
     # pylint: disable=protected-access
-    if not JAX_MODE and pred_value is None:
+    if pred_value is None:
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
@@ -123,6 +128,16 @@ def _get_static_predicate(pred):
     raise TypeError('`pred` must be a Tensor, or a Python bool, or 1 or 0. '
                     'Found instead: {}'.format(pred))
   return pred_value
+
+
+def _convert_to_shape_tensor_jax(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
+  """Converts vectors and scalars of `int`-like to `ndarray`."""
+  dtype = dtype_util.as_numpy_dtype(dtype or dtype_hint or np.int32)
+  try:
+    return np.array([int(v) for v in value], dtype=dtype)
+  except:  # JAX throws raw Exception in some cases.  # pylint: disable=bare-except
+    pass
+  return np.array(int(value), dtype=dtype)
 
 
 def smart_where(condition, x_fn, y_fn):
@@ -415,6 +430,9 @@ broadcast_to = _prefer_static(tf.broadcast_to, nptf.broadcast_to)
 cast = _prefer_static(tf.cast, nptf.cast)
 ceil = _prefer_static(tf.math.ceil, nptf.math.ceil)
 concat = _prefer_static(tf.concat, nptf.concat)
+convert_to_shape_tensor = _prefer_static(
+    tf.convert_to_tensor,
+    _convert_to_shape_tensor_jax if JAX_MODE else tf.convert_to_tensor)
 cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)

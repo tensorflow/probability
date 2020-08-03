@@ -27,6 +27,9 @@ import six
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import prefer_static as ps
+
+
 __all__ = [
     'categorical',
     'gamma',
@@ -146,11 +149,13 @@ def gamma(
     seed = sanitize_seed(seed)
     alpha = tf.convert_to_tensor(alpha, dtype=dtype)
     beta = None if beta is None else tf.convert_to_tensor(beta, dtype=dtype)
-    params_shape = tf.shape(alpha)
+    params_shape = ps.shape(alpha)
     if beta is not None:
-      params_shape = tf.broadcast_dynamic_shape(params_shape, tf.shape(beta))
-    shape = tf.convert_to_tensor(shape, dtype=params_shape.dtype)
-    samples_shape = tf.concat([shape, params_shape], axis=0)
+      params_shape = ps.broadcast_shape(params_shape, ps.shape(beta))
+    shape = ps.convert_to_shape_tensor(
+        shape,
+        dtype=getattr(params_shape, 'dtype', np.int32))  # May be TensorShape.
+    samples_shape = ps.concat([shape, params_shape], axis=0)
     return tf.random.stateless_gamma(
         shape=samples_shape, seed=seed, alpha=alpha, beta=beta, dtype=dtype)
 
