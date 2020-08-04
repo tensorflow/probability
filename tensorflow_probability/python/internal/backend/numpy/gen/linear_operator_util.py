@@ -386,7 +386,8 @@ def matrix_solve_with_broadcast(matrix, rhs, adjoint=False, name=None):
   """Solve systems of linear equations."""
   with ops.name_scope(name, "MatrixSolveWithBroadcast", [matrix, rhs]):
     matrix = ops.convert_to_tensor(matrix, name="matrix")
-    rhs = ops.convert_to_tensor(rhs, name="rhs", dtype=matrix.dtype)
+    rhs = ops.convert_to_tensor(
+        rhs, name="rhs", dtype=matrix.dtype)
 
     # If either matrix/rhs has extra dims, we can reshape to get rid of them.
     matrix, rhs, reshape_inv, still_need_to_transpose = _reshape_for_efficiency(
@@ -545,7 +546,8 @@ def arg_is_blockwise(block_dimensions, arg, arg_split_dim):
     if not any(nest.is_nested(x) for x in arg):
       return True
     else:
-      arg_dims = [ops.convert_to_tensor(x).shape[arg_split_dim] for x in arg]
+      arg_dims = [ops.convert_to_tensor(
+          x).shape[arg_split_dim] for x in arg]
       self_dims = [dim.value for dim in block_dimensions]
 
       # If none of the operator dimensions are known, interpret the input as
