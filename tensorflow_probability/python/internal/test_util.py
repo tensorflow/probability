@@ -375,8 +375,9 @@ if JAX_MODE:
     def grad_i(d):
       return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
               - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
-    ret = vmap(grad_i, out_axes=-1)(
+    ret = vmap(grad_i)(
         np.eye(size_i, dtype=dtype_i).reshape((size_i,) + shape_i))
+    ret = np.moveaxis(ret, 0, -1)
     return np.reshape(ret, ret.shape[:-1] + shape_i)
 
 
