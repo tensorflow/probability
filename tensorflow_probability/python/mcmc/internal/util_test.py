@@ -196,27 +196,7 @@ class GradientTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class SmartForLoopTest(test_util.TestCase):
 
-  def test_no_loop_iters(self):
-    counter = None
-    # Not @parameterized because the tf.constants would be executed outside the
-    # Eager mode that @test_util.test_all_tf_execution_regimes creates, and
-    # TF is unhappy about that.
-    for n in [0, tf.constant(0, dtype=tf.int64),
-              tf.constant(0, dtype=tf.int32)]:
-      counter = collections.Counter()
-      def body(x):
-        counter['body_calls'] += 1
-        return [x + 1]
-
-      result = util.smart_for_loop(
-          loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
-      if JAX_MODE:  # JAX always traces loops
-        self.assertEqual(1, counter['body_calls'])
-      else:
-        self.assertEqual(0, counter['body_calls'])
-      self.assertAllClose([1], self.evaluate(result))
-
-  @parameterized.parameters(1, 10)
+  @parameterized.parameters(0, 1, 10)
   def test_static_num_iters(self, iters):
     counter = None
     # following loop variables not @parameterized because the tf.constants
@@ -231,10 +211,13 @@ class SmartForLoopTest(test_util.TestCase):
 
       result = util.smart_for_loop(
           loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
-      if tf.executing_eagerly() and not JAX_MODE:  # JAX always traces loops
+      if JAX_MODE:  # JAX always traces loop bodies exactly once
+        self.assertEqual(1, counter['body_calls'])
+      elif tf.executing_eagerly():
         self.assertEqual(iters, counter['body_calls'])
       else:
-        self.assertEqual(1, counter['body_calls'])
+        expected_num_calls = 1 if iters > 0 else 0
+        self.assertEqual(expected_num_calls, counter['body_calls'])
       self.assertAllClose([iters + 1], self.evaluate(result))
 
   def test_placeholder_num_iters(self):
@@ -252,6 +235,24 @@ class SmartForLoopTest(test_util.TestCase):
     else:
       self.assertEqual(1, counter['body_calls'])
     self.assertAllClose([11], self.evaluate(result))
+
+  def test_unroll_threshold(self):
+    iters = 50
+    counter = collections.Counter()
+    def body(x):
+      counter['body_calls'] += 1
+      return [x + 1]
+
+    result = util.smart_for_loop(
+        loop_num_iter=iters,
+        body_fn=body,
+        initial_loop_vars=[tf.constant(1)],
+        unroll_threshold=iters)
+    if JAX_MODE:  # JAX always traces loop bodies exactly once
+      self.assertEqual(1, counter['body_calls'])
+    else:
+      self.assertEqual(iters, counter['body_calls'])
+    self.assertAllClose([iters + 1], self.evaluate(result))
 
 
 @test_util.test_all_tf_execution_regimes
