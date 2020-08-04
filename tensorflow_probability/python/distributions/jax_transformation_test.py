@@ -14,6 +14,7 @@
 # ============================================================================
 """Tests TFP distribution compositionality with JAX transformations."""
 import functools
+import os
 
 from absl import flags
 from absl.testing import parameterized
@@ -49,6 +50,13 @@ JIT_LOGPROB_BLOCKLIST = (
 
 VMAP_SAMPLE_BLOCKLIST = ()
 VMAP_LOGPROB_BLOCKLIST = (
+    'BatchReshape',  # http://b/161984806
+    'Bates',
+    'NegativeBinomial',  # Times out.
+)
+
+PMAP_SAMPLE_BLOCKLIST = ()
+PMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
     'NegativeBinomial',  # Times out.
@@ -111,38 +119,78 @@ class JitTest(test_util.TestCase):
                           rtol=1e-6, atol=1e-6)
 
 
-class VmapTest(test_util.TestCase):
+class _MapTest(test_util.TestCase):
+
+  @property
+  def map(self):
+    raise NotImplementedError
+
+  @property
+  def batch_size(self):
+    raise NotImplementedError
 
   @test_all_distributions
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testSample(self, dist_name, data):
-    if (dist_name in VMAP_SAMPLE_BLOCKLIST) != FLAGS.blocklists_only:
+    if (dist_name in self.sample_blocklist) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
     dist = data.draw(dhps.distributions(enable_vars=False,
                                         dist_name=dist_name))
     def _sample(seed):
       return dist.sample(seed=seed)
     seed = test_util.test_seed()
-    jax.vmap(_sample)(random.split(seed, 10))
+    self.map(_sample)(random.split(seed, self.batch_size))
 
   @test_all_distributions
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
   def testLogProb(self, dist_name, data):
-    if (dist_name in VMAP_LOGPROB_BLOCKLIST) != FLAGS.blocklists_only:
+    if (dist_name in self.logprob_blocklist) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
     if dist_name == 'NegativeBinomial':
       self.skipTest('Skip never-terminating negative binomial vmap logprob.')
     dist = data.draw(dhps.distributions(
         enable_vars=False,
         dist_name=dist_name,
-        eligibility_filter=lambda dname: dname not in VMAP_LOGPROB_BLOCKLIST))
-    sample = dist.sample(seed=test_util.test_seed(), sample_shape=10)
-    result = jax.vmap(dist.log_prob)(sample)
+        eligibility_filter=lambda dname: dname not in self.logprob_blocklist))
+    sample = dist.sample(seed=test_util.test_seed(),
+                         sample_shape=self.batch_size)
+    result = self.map(dist.log_prob)(sample)
     if not FLAGS.execute_only:
       self.assertAllClose(result, dist.log_prob(sample),
                           rtol=1e-6, atol=1e-6)
+
+
+class VmapTest(_MapTest):
+
+  sample_blocklist = VMAP_SAMPLE_BLOCKLIST
+  logprob_blocklist = VMAP_LOGPROB_BLOCKLIST
+
+  @property
+  def map(self):
+    return jax.vmap
+
+  @property
+  def batch_size(self):
+    return 10
+
+
+class PmapTest(_MapTest):
+
+  sample_blocklist = PMAP_SAMPLE_BLOCKLIST
+  logprob_blocklist = PMAP_LOGPROB_BLOCKLIST
+
+  @property
+  def map(self):
+    return jax.pmap
+
+  @property
+  def batch_size(self):
+    return jax.device_count()
+
+
+del _MapTest  # not intended for standalone execution
 
 
 class _GradTest(test_util.TestCase):
@@ -279,4 +327,5 @@ del _GradTest  # not intended for standalone execution
 
 
 if __name__ == '__main__':
+  os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=8'
   tf.test.main()
