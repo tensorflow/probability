@@ -65,12 +65,13 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     Args:
       inner_kernel: `TransitionKernel` whose `one_step` will generate
         MCMC sample(s).
-      num_burnin_steps: Integer number of chain steps to take before starting to
-        collect results. Defaults to 0 (i.e., no burn-in).
-      num_steps_between_results: Integer number of chain steps between
-        collecting a result. Only one out of every
-        `num_steps_between_samples + 1` steps is included in the returned
-        results. Defaults to 0 (i.e., no thinning).
+      num_burnin_steps: Integer or scalar `Tensor` representing the number
+        of chain steps to take before starting to collect results.
+        Defaults to 0 (i.e., no burn-in).
+      num_steps_between_results: Integer or scalar `Tensor` representing
+        the number of chain steps between collecting a result. Only one out
+        of every `num_steps_between_samples + 1` steps is included in the
+        returned results. Defaults to 0 (i.e., no thinning).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., "sample_discarding_kernel").
     """
@@ -87,11 +88,9 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     )
 
   def _num_samples_to_skip(self, call_counter):
-    """Calculates how many samples to skip based on the call number.
-
-    If `self.num_burnin_steps` is statically known to be 0,
-    `self.num_steps_between_results` will be returned outright.
-    """
+    """Calculates how many samples to skip based on the call number."""
+    # If `self.num_burnin_steps` is statically known to be 0,
+    # `self.num_steps_between_results` will be returned outright.
     if self.num_burnin_steps == 0:
       return self.num_steps_between_results
     else:

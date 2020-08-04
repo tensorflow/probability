@@ -43,17 +43,23 @@ def sample_fold(
     seed=None,
     name=None,
 ):
-  """Finalizes `num_steps` Reducer steps with `kernel` samples.
+  """Computes the requested reductions over the `kernel`'s samples.
 
-  This driver will appropriately apply `WithReductions` and
-  `SampleDiscardingKernel` over the given `kernel` and `reducers`. It will
-  then update reducer states `num_steps` times (perform `num_steps` calls to
-  the `Reducer`'s `one_step` method). An arbitrary collection of `reducers`
-  can be provided, and the resulting finalized statistic(s) will be returned
-  in an identical structure.
+  To wit, runs the given `kernel` for `num_steps` steps, and consumes
+  the stream of samples with the given `Reducer`s' `one_step` method(s).
+  This runs in constant memory (unless a given `Reducer` builds a
+  large structure).
+
+  The driver internally composes the correct onion of `WithReductions`
+  and `SampleDiscardingKernel` to implement the requested optionally
+  thinned reduction.
+
+  An arbitrary collection of `reducers` can be provided, and the resulting
+  finalized statistic(s) will be returned in an identical structure.
 
   Args:
-    num_steps: Integer number of `Reducer` steps.
+    num_steps: Integer or scalar `Tensor` representing the number of `Reducer`
+      steps.
     current_state: `Tensor` or Python `list` of `Tensor`s representing the
       current state(s) of the Markov chain(s).
     previous_kernel_results: A `Tensor` or a nested collection of `Tensor`s.
@@ -63,13 +69,15 @@ def sample_fold(
     kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
       of the Markov chain.
     reducers: A (possibly nested) structure of `Reducer`s to be evaluated
-      on the `kernel`'s samples. If no reducers are given (`reducers=None`), an
-      empty list will be returned in place of streaming calculations.
-    num_burnin_steps: Integer number of chain steps to take before starting to
-      collect results. Defaults to 0 (i.e., no burn-in).
-    num_steps_between_results: Integer number of chain steps between collecting
-      a result. Only one out of every `num_steps_between_samples + 1` steps is
-      included in the returned results. Defaults to 0 (i.e., no thinning).
+      on the `kernel`'s samples. If no reducers are given (`reducers=None`),
+      then `None` will be returned in place of streaming calculations.
+    num_burnin_steps: Integer or scalar `Tensor` representing the number
+        of chain steps to take before starting to collect results.
+        Defaults to 0 (i.e., no burn-in).
+    num_steps_between_results: Integer or scalar `Tensor` representing
+      the number of chain steps between collecting a result. Only one out
+      of every `num_steps_between_samples + 1` steps is included in the
+      returned results. Defaults to 0 (i.e., no thinning).
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
     seed: Optional seed for reproducible sampling.
@@ -78,10 +86,11 @@ def sample_fold(
 
   Returns:
     reduction_results: A (possibly nested) structure of finalized reducer
-      statistics. The structure identically mimics that of `reducers`
-    warm_restart_package: `Tuple` with the final state of the Markov chain(s)
-      and kernel results, including those of applied wrapper kernels (i.e.
-      `WithReductions`).
+      statistics. The structure identically mimics that of `reducers`.
+    end_state: The final state of the Markov chain(s).
+    final_kernel_results: `WithReductionsKernelResults` containing final reducer
+      states. It also includes the kernel results of nested Transition Kernels
+      in its `inner_results` field.
   """
   with tf.name_scope(name or 'mcmc_sample_fold'):
     num_steps = tf.convert_to_tensor(
@@ -114,5 +123,9 @@ def sample_fold(
         reducers,
         final_kernel_results.streaming_calculations,
         check_types=False)
-    warm_restart_package = (end_state, final_kernel_results)
-    return reduction_results, warm_restart_package
+    if reduction_results == []:
+      reduction_results = None
+      final_kernel_results = with_reductions.WithReductionsKernelResults(
+          None, final_kernel_results.inner_results
+      )
+    return reduction_results, end_state, final_kernel_results

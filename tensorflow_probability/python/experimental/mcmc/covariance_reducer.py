@@ -56,17 +56,17 @@ class CovarianceReducer(reducer_base.Reducer):
   There are two ways to stream over MCMC samples. The first is to manually
   wrap `CovarianceReducer` in a `tfp.experimental.mcmc.WithReductions`
   `TransitionKernel`. Doing so enables a wide variety of possible compositions.
-  For example, to perform covariance calculation on samples that survive thinning
-  and burn-in, `WithReductions` should wrap around an appropriate
+  For example, to perform covariance calculation on samples that survive
+  thinning and burn-in, `WithReductions` should wrap around an appropriate
   `SampleDiscardingKernel`.
-  
+
   If the sole objective is to estimate covariance, it may be more convenient to
-  use a pre-defined driver like `tfp.experimental.mcmc.sample_fold`. `sample_fold`
-  will automatically create the Transition Kernel onion, apply `kernel` samples
-  to update reducer states, and `finalize` calculations.
+  use a pre-defined driver like `tfp.experimental.mcmc.sample_fold`.
+  `sample_fold` will automatically create the Transition Kernel onion, apply
+  `kernel` samples to update reducer states, and `finalize` calculations.
 
   ```
-  python 
+  python
 
   kernel = ...
   reducer = tfp.experimental.mcmc.CovarianceReducer()

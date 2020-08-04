@@ -120,7 +120,10 @@ class SampleDiscardingTest(test_util.TestCase):
         first_state, kernel_results)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
+    # the first `one_step` performs burn-in and thinning to skip
+    # `num_burnin_steps` + `num_steps_between_results` samples
     self.assertEqual(12, first_state)
+    # subsequent `one_step` calls only perform thinning
     self.assertEqual(14, second_state)
     self.assertEqual(2, kernel_results.call_counter)
     self.assertEqual(14, kernel_results.inner_results.counter_1)
@@ -138,7 +141,12 @@ class SampleDiscardingTest(test_util.TestCase):
         first_state, discarder.bootstrap_results(first_state))
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
+    # the first `one_step` performs burn-in and thinning to skip
+    # `num_burnin_steps` + `num_steps_between_results` samples
     self.assertEqual(12, first_state)
+    # the step count is stored in the kernel results. Cold
+    # restarting resets the count back to 0 and hence, both
+    # thinning and burn-in are once again performed.
     self.assertEqual(24, second_state)
     self.assertEqual(1, kernel_results.call_counter)
     self.assertEqual(12, kernel_results.inner_results.counter_1)
