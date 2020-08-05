@@ -104,6 +104,56 @@ TF2_FRIENDLY_DISTS = (
     'Zipf',
 )
 
+NO_XLA_GAMMA_SAMPLER = frozenset([
+    'Beta',
+    'BetaBinomial',
+    'Chi',
+    'Chi2',
+    'CholeskyLKJ',
+    'Dirichlet',
+    'DirichletMultinomial',
+    'GammaGamma',
+    'HalfStudentT',
+    'InverseGamma',
+    'LKJ',
+    'NegativeBinomial',
+    'PowerSpherical',
+    'PERT',
+    'StudentT',
+    'VonMisesFisher',
+    'WishartTriL',
+])
+
+
+XLA_UNFRIENDLY_DISTS = frozenset([
+    # TODO(b/159995894): SegmentMean not registered for XLA.
+    'Bates',
+    # TODO(b/159996837):
+    'Categorical',
+    # TODO(b/159996484): Continuous Bernoulli nan/inf locations mismatch.
+    'ContinuousBernoulli',
+    # TODO(b/159997119): Finite discrete produces NaNs.
+    'FiniteDiscrete',
+    # TODO(b/159996966)
+    'Gamma',
+    'OneHotCategorical',
+    'LogNormal',
+    # TODO(b/137956955): Add support for hypothesis testing
+    'PoissonLogNormalQuadratureCompound',
+    # TODO(b/159999573): XLA / non-XLA computation seems to have
+    # completely arbitrary differences!
+    'Poisson',
+    # TODO(b/137956955): Add support for hypothesis testing
+    'SinhArcsinh',
+    # TruncatedCauchy has log_probs that are very far off.
+    'TruncatedCauchy',
+    # TODO(b/159997353): StatelessTruncatedNormal missing in XLA.
+    'TruncatedNormal',
+    'Weibull',
+    # TODO(b/159997700) No XLA Zeta
+    'Zipf',
+])
+
 NO_SAMPLE_PARAM_GRADS = {
     'Deterministic': ('atol', 'rtol'),
 }
@@ -167,6 +217,30 @@ VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_RTOL.update({
     'NegativeBinomial': 1e-5,
     'PowerSpherical': 2e-5,
+})
+
+# TODO(b/142827327): Bring tolerance down to 0 for all distributions.
+XLA_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
+XLA_LOGPROB_ATOL.update({
+    'Binomial': 5e-6,
+    'Multinomial': 5e-6,
+})
+XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
+XLA_LOGPROB_RTOL.update({
+    'Binomial': 4e-6,
+    'Categorical': 6e-6,
+    'ContinuousBernoulli': 2e-6,
+    'ExpRelaxedOneHotCategorical': 1e-3,
+    'FiniteDiscrete': 6e-6,
+    'Geometric': 5e-5,
+    'JohnsonSU': 1e-2,
+    'LogLogistic': 3e-5,
+    'Multinomial': 3e-4,
+    'OneHotCategorical': 1e-3,
+    'Pareto': 2e-2,  # TODO(b/159997708)
+    'Poisson': 3e-2,
+    'RelaxedBernoulli': 3e-3,
+    'VonMises': 2e-2,  # TODO(b/160000258):
 })
 
 
@@ -573,6 +647,39 @@ class DistributionSlicingTest(test_util.TestCase):
     dist = tfb.Expm1()(dist)
     samps = 1.7182817 + tf.zeros_like(dist.sample(seed=test_util.test_seed()))
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
+
+
+@test_util.test_graph_mode_only
+class DistributionXLATest(test_util.TestCase):
+
+  def _test_sample_and_log_prob(self, dist_name, dist):
+    seed = test_util.test_seed()
+
+    num_samples = 3
+    sample = self.evaluate(
+        tf.function(experimental_compile=True)(dist.sample)(
+            num_samples, seed=seed))
+    hp.note('Drew samples {}'.format(sample))
+
+    xla_lp = tf.function(experimental_compile=True)(dist.log_prob)(
+        tf.convert_to_tensor(sample))
+    graph_lp = dist.log_prob(sample)
+    xla_lp_, graph_lp_ = self.evaluate((xla_lp, graph_lp))
+    self.assertAllClose(xla_lp_, graph_lp_,
+                        atol=XLA_LOGPROB_ATOL[dist_name],
+                        rtol=XLA_LOGPROB_RTOL[dist_name])
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in TF2_FRIENDLY_DISTS if dname not in (
+          XLA_UNFRIENDLY_DISTS | NO_XLA_GAMMA_SAMPLER))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testXLACompile(self, dist_name, data):
+    dist = data.draw(dhps.distributions(
+        dist_name=dist_name, enable_vars=False,
+        validate_args=False))  # TODO(b/142826246): Enable validate_args.
+    self._test_sample_and_log_prob(dist_name, dist)
 
 
 @test_util.test_all_tf_execution_regimes
