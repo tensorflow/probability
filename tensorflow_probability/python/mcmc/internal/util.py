@@ -305,7 +305,7 @@ def maybe_call_fn_and_grads(fn,
 
 
 def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
-                   parallel_iterations=10, name=None):
+                   parallel_iterations=10, unroll_threshold=1, name=None):
   """Construct a for loop, preferring a python loop if `n` is statically known.
 
   Given `loop_num_iter` and `body_fn`, return an op corresponding to executing
@@ -324,6 +324,11 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
     parallel_iterations: The number of iterations allowed to run in parallel.
       It must be a positive integer. See `tf.while_loop` for more details.
       Default value: `10`.
+    unroll_threshold: Integer denoting the maximum number of iterations to
+      unroll, if possible. If `loop_num_iter > unroll_threshold` a
+      `tf.while_loop` will always be used, even if `loop_num_iter` is
+      statically known.
+      Default value: `1`.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., "smart_for_loop").
   Returns:
@@ -331,8 +336,12 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   """
   with tf.name_scope(name or 'smart_for_loop'):
     loop_num_iter_ = tf.get_static_value(loop_num_iter)
-    if (loop_num_iter_ is None or tf.executing_eagerly() or
-        control_flow_util.GraphOrParentsInXlaContext(
+    if (loop_num_iter_ is None
+        or tf.executing_eagerly()
+        # large values for loop_num_iter_ will cause ridiculously slow
+        # graph compilation time (GitHub issue #1033)
+        or loop_num_iter_ > unroll_threshold
+        or control_flow_util.GraphOrParentsInXlaContext(
             tf1.get_default_graph())):
       # Cast to int32 to run the comparison against i in host memory,
       # where while/LoopCond needs it.
