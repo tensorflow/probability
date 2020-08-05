@@ -301,12 +301,13 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(
         5, kernel_results.inner_results.call_counter)
 
-  def test_no_reducer(self):
+  def test_none_reducer(self):
     fake_kernel = TestTransitionKernel()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
+        reducers=None,
         num_burnin_steps=10,
         num_steps_between_results=1,
     )
@@ -317,6 +318,26 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(None, reduction_rslt)
     self.assertEqual(20, last_sample)
     self.assertEqual(None, kr.streaming_calculations)
+    self.assertEqual(20, innermost_results.counter_1)
+    self.assertEqual(40, innermost_results.counter_2)
+
+  def test_empty_reducers(self):
+    fake_kernel = TestTransitionKernel()
+    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=fake_kernel,
+        reducers=[],
+        num_burnin_steps=10,
+        num_steps_between_results=1,
+    )
+    last_sample, innermost_results = self.evaluate([
+        last_sample,
+        kr.inner_results.inner_results
+    ])
+    self.assertEqual([], reduction_rslt)
+    self.assertEqual(20, last_sample)
+    self.assertEqual([], kr.streaming_calculations)
     self.assertEqual(20, innermost_results.counter_1)
     self.assertEqual(40, innermost_results.counter_2)
 

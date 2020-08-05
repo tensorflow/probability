@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental import mcmc
-from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductionsKernelResults
 from tensorflow.python.util import nest
 
 
@@ -97,8 +96,10 @@ def sample_fold(
     current_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='current_state'),
         current_state)
+    reducers_was_none = False
     if reducers is None:
       reducers = []
+      reducers_was_none = True
     reduction_kernel = mcmc.WithReductions(
         inner_kernel=mcmc.SampleDiscardingKernel(
             inner_kernel=kernel,
@@ -122,9 +123,9 @@ def sample_fold(
         reducers,
         final_kernel_results.streaming_calculations,
         check_types=False)
-    if reduction_results == []:
+    if reduction_results == [] and reducers_was_none:
       reduction_results = None
-      final_kernel_results = WithReductionsKernelResults(
+      final_kernel_results = mcmc.WithReductionsKernelResults(
           None, final_kernel_results.inner_results
       )
     return reduction_results, end_state, final_kernel_results

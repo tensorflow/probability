@@ -48,6 +48,7 @@ from tensorflow_probability.python.experimental.mcmc.weighted_resampling import 
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
 from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductions
+from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductionsKernelResults
 
 
 __all__ = [
@@ -81,4 +82,5 @@ __all__ = [
     'step_kernel',
     'VarianceReducer',
     'WithReductions',
+    'WithReductionsKernelResults',
 ]
