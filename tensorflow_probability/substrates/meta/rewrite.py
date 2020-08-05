@@ -237,7 +237,7 @@ def main(argv):
     contents = contents.replace('tfp.substrates.numpy', 'tfp.substrates.jax')
     contents = contents.replace('substrates.numpy', 'substrates.jax')
     contents = contents.replace('backend.numpy', 'backend.jax')
-    contents = contents.replace('backend import numpy', 'backend import jax')
+
     contents = contents.replace('def _call_jax', 'def __call__')
     contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
     contents = contents.replace('SKIP_DTYPE_CHECKS = True',
@@ -248,6 +248,7 @@ def main(argv):
           'tf.test.main()',
           'from jax.config import config; '
           'config.update("jax_enable_x64", True); '
+          'config.enable_omnistaging(); '
           'tf.test.main()')
 
   print('# ' + '@' * 78)

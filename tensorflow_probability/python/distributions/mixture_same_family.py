@@ -29,7 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
@@ -194,7 +194,7 @@ class MixtureSameFamily(distribution.Distribution):
           name=name)
 
   def _event_ndims(self):
-    return prefer_static.rank_from_shape(
+    return ps.rank_from_shape(
         self.components_distribution.event_shape_tensor,
         self.components_distribution.event_shape)
 
@@ -278,7 +278,7 @@ class MixtureSameFamily(distribution.Distribution):
     event_ndims = tensorshape_util.rank(self.event_shape)
     if event_ndims is None:
       event_shape = self.components_distribution.event_shape_tensor()
-      event_ndims = prefer_static.rank_from_shape(event_shape)
+      event_ndims = ps.rank_from_shape(event_shape)
     event_ndims_static = tf.get_static_value(event_ndims)
 
     num_components = None
@@ -316,17 +316,17 @@ class MixtureSameFamily(distribution.Distribution):
         off_value=npdt(0))    # [n, B, k] or [n, k]
 
     # Pad `mask` to [n, B, k, [1]*e] or [n, [1]*b, k, [1]*e] .
-    batch_ndims = prefer_static.rank(x) - event_ndims - 1
-    mask_batch_ndims = prefer_static.rank(mask) - 1
+    batch_ndims = ps.rank(x) - event_ndims - 1
+    mask_batch_ndims = ps.rank(mask) - 1
     pad_ndims = batch_ndims - mask_batch_ndims
-    mask_shape = prefer_static.shape(mask)
+    mask_shape = ps.shape(mask)
     mask = tf.reshape(
         mask,
-        shape=prefer_static.concat([
+        shape=ps.concat([
             mask_shape[:-1],
-            prefer_static.ones([pad_ndims], dtype=tf.int32),
+            ps.ones([pad_ndims], dtype=tf.int32),
             mask_shape[-1:],
-            prefer_static.ones([event_ndims], dtype=tf.int32),
+            ps.ones([event_ndims], dtype=tf.int32),
         ], axis=0))
 
     if x.dtype in [tf.bfloat16, tf.float16, tf.float32, tf.float64,
@@ -356,9 +356,9 @@ class MixtureSameFamily(distribution.Distribution):
     event_ndims = self._event_ndims()
 
     # reshape probs to [B, k, [1]*e] or [k, [1]*e]
-    probs = tf.reshape(probs, prefer_static.concat([
-        prefer_static.shape(probs),
-        prefer_static.ones([event_ndims], dtype=tf.int32)
+    probs = tf.reshape(probs, ps.concat([
+        ps.shape(probs),
+        ps.ones([event_ndims], dtype=tf.int32)
     ], axis=0))
 
     return tf.reduce_sum(probs * component_means,
@@ -378,9 +378,9 @@ class MixtureSameFamily(distribution.Distribution):
     event_ndims = self._event_ndims()
 
     # reshape probs to [B, k, [1]*e] or [k, [1]*e]
-    probs = tf.reshape(probs, prefer_static.concat([
-        prefer_static.shape(probs),
-        prefer_static.ones([event_ndims], dtype=tf.int32)
+    probs = tf.reshape(probs, ps.concat([
+        ps.shape(probs),
+        ps.ones([event_ndims], dtype=tf.int32)
     ], axis=0))
 
     # Law of total variance: Var(Y) = E[Var(Y|X)] + Var(E[Y|X])
@@ -418,11 +418,14 @@ class MixtureSameFamily(distribution.Distribution):
     with tf.name_scope('pad_sample_dims'):
       if event_ndims is None:
         event_ndims = self._event_ndims()
-      ndims = prefer_static.rank(x)
-      shape = tf.convert_to_tensor(prefer_static.shape(x))
+      ndims = ps.rank(x)
+      # Must do the c_t_t in case ndims or event_ndims are Tensors and shape is
+      # ndarray. Otherwise we get `TypeError: slice indices must be integers
+      # or None or have an __index__ method`.
+      shape = ps.convert_to_shape_tensor(ps.shape(x))
       d = ndims - event_ndims
       x = tf.reshape(
-          x, shape=prefer_static.concat([shape[:d], [1], shape[d:]], axis=0))
+          x, shape=ps.concat([shape[:d], [1], shape[d:]], axis=0))
       return x
 
   def _reparameterize_sample(self, x, event_shape):
@@ -458,8 +461,8 @@ class MixtureSameFamily(distribution.Distribution):
     # Remove the existing gradients of x wrt parameters of the components.
     x = tf.stop_gradient(x)
 
-    event_size = prefer_static.cast(
-        prefer_static.reduce_prod(event_shape), dtype=tf.int32)
+    event_size = ps.cast(
+        ps.reduce_prod(event_shape), dtype=tf.int32)
     x_2d_shape = [-1, event_size]  # [S*prod(B), prod(E)]
 
     # Perform distributional transform of x in [S, B, E] shape,
@@ -467,7 +470,7 @@ class MixtureSameFamily(distribution.Distribution):
     def reshaped_distributional_transform(x_2d):
       return tf.reshape(
           self._distributional_transform(
-              tf.reshape(x_2d, tf.shape(x)), event_shape),
+              tf.reshape(x_2d, ps.shape(x)), event_shape),
           x_2d_shape)
 
     # transform_2d: [S*prod(B), prod(E)]
@@ -485,9 +488,9 @@ class MixtureSameFamily(distribution.Distribution):
     # transform for i-th event dimension does not depend on the next
     # dimensions.
     surrogate_x_2d = -tf.linalg.triangular_solve(
-        tf.stop_gradient(jacobian), tf.expand_dims(transform_2d, axis=-1),
+        tf.stop_gradient(jacobian), transform_2d[..., tf.newaxis],
         lower=True)  # [S*prod(B), prod(E), 1]
-    surrogate_x = tf.reshape(surrogate_x_2d, tf.shape(x))
+    surrogate_x = tf.reshape(surrogate_x_2d, ps.shape(x))
 
     # Replace gradients of x with gradients of surrogate_x, but keep the value.
     return x + (surrogate_x - tf.stop_gradient(surrogate_x))
@@ -534,30 +537,30 @@ class MixtureSameFamily(distribution.Distribution):
             True,
             message='`univariate_components` must have scalar event')
     ]):
-      event_ndims = prefer_static.rank_from_shape(event_shape)
+      event_ndims = ps.rank_from_shape(event_shape)
       x_padded = self._pad_sample_dims(
           x, event_ndims=event_ndims)  # [S, B, 1, E]
       log_prob_x = univariate_components.log_prob(x_padded)  # [S, B, k, E]
       cdf_x = univariate_components.cdf(x_padded)  # [S, B, k, E]
 
       # log prob_k (x_1, ..., x_i-1)
-      event_size = prefer_static.cast(
-          prefer_static.reduce_prod(event_shape), dtype=tf.int32)
+      event_size = ps.cast(
+          ps.reduce_prod(event_shape), dtype=tf.int32)
       cumsum_log_prob_x = tf.reshape(
           tf.math.cumsum(
               # [S*prod(B)*k, prod(E)]
               tf.reshape(log_prob_x, [-1, event_size]),
               exclusive=True,
               axis=-1),
-          tf.shape(log_prob_x))  # [S, B, k, E]
+          ps.shape(log_prob_x))  # [S, B, k, E]
 
-      event_ndims = prefer_static.rank_from_shape(event_shape)
+      event_ndims = ps.rank_from_shape(event_shape)
       logits_mix_prob = self.mixture_distribution.logits_parameter()
       logits_mix_prob = tf.reshape(
           logits_mix_prob,  # [k] or [B, k]
-          prefer_static.concat([
-              prefer_static.shape(logits_mix_prob),
-              prefer_static.ones([event_ndims], dtype=tf.int32),
+          ps.concat([
+              ps.shape(logits_mix_prob),
+              ps.ones([event_ndims], dtype=tf.int32),
           ], axis=0))  # [k, [1]*e] or [B, k, [1]*e]
 
       # Logits of the posterior weights: log w_k + log prob_k (x_1, ..., x_i-1)
@@ -660,7 +663,17 @@ def _outer_squared_difference(x, y):
   return z[..., tf.newaxis, :] * z[..., tf.newaxis]
 
 
-@tf.custom_gradient
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=lambda x: (tf.identity(x), ()),
+    vjp_bwd=lambda _, dx: tfp_custom_gradient.prevent_gradient(  # pylint: disable=g-long-lambda
+        dx, message='Second derivative is not implemented.'),
+    jvp_fn=lambda primals, tangents: (  # pylint: disable=g-long-lambda
+        tfp_custom_gradient.prevent_gradient(
+            primals[0],
+            message='Second derivative is not implemented.'),
+        tfp_custom_gradient.prevent_gradient(
+            tangents[0],
+            message='Second derivative is not implemented.')))
 def _prevent_2nd_derivative(x):
   """Disables computation of the second derivatives for a tensor.
 
@@ -674,8 +687,4 @@ def _prevent_2nd_derivative(x):
     A tensor with the same value and the same derivative as x, but that raises
     LookupError when trying to compute the second derivatives.
   """
-  def grad(dy):
-    return tfp_custom_gradient.prevent_gradient(
-        dy, message='Second derivative is not implemented.')
-
-  return tf.identity(x), grad
+  return tf.identity(x)
