@@ -53,6 +53,7 @@ VMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
     'NegativeBinomial',  # Times out.
+    'QuantizedDistribution',  # http://b/162940364
 )
 
 PMAP_SAMPLE_BLOCKLIST = ()
