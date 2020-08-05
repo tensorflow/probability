@@ -16,7 +16,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
@@ -591,9 +590,16 @@ class GammaSamplingTest(test_util.TestCase):
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
                     experimental_compile=True)())
     # Also test the low-level sampler and verify the XLA-friendly variant.
+    # TODO(bjp): functools.partial, after eliminating PY2 which breaks
+    # tf_inspect in interesting ways:
+    # ValueError: Some arguments ['concentration', 'rate'] do not have default
+    # value, but they are positioned after those with default values. This can
+    # not be expressed with ArgSpec.
+    scalar_gamma = tf.function(
+        lambda **kwargs: gamma_lib.random_gamma(shape=[], **kwargs),
+        experimental_compile=True)
     _, runtime = self.evaluate(
-        tf.function(gamma_lib.random_gamma, experimental_compile=True)(
-            shape=tf.constant([], dtype=tf.int32),
+        scalar_gamma(
             concentration=tf.constant(1.),
             rate=tf.constant(1.),
             seed=test_util.test_seed()))

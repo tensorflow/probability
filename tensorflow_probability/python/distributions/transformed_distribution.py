@@ -22,7 +22,7 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -263,7 +263,7 @@ class TransformedDistribution(distribution_lib.Distribution):
         return base_batch_shape_tensor
 
       base_batch_shape_tensor = functools.reduce(
-          prefer_static.broadcast_shape,
+          ps.broadcast_shape,
           tf.nest.flatten(base_batch_shape_tensor))
 
     return base_batch_shape_tensor
@@ -303,8 +303,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       # Next, we reshape `x` into its final form. We do this prior to the call
       # to the bijector to ensure that the bijector caching works.
       def reshape_sample_shape(t):
-        batch_event_shape = tf.shape(t)[1:]
-        final_shape = tf.concat([sample_shape, batch_event_shape], 0)
+        batch_event_shape = ps.shape(t)[1:]
+        final_shape = ps.concat([sample_shape, batch_event_shape], 0)
         return tf.reshape(t, final_shape)
       x = tf.nest.map_structure(reshape_sample_shape, x)
 
@@ -323,7 +323,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     # modify the input.
     x = self.bijector.inverse(y, **bijector_kwargs)
     event_ndims = tf.nest.map_structure(
-        prefer_static.rank_from_shape,
+        ps.rank_from_shape,
         self._event_shape_tensor(),
         self.event_shape)
 
@@ -347,7 +347,7 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     x = self.bijector.inverse(y, **bijector_kwargs)
     event_ndims = tf.nest.map_structure(
-        prefer_static.rank_from_shape,
+        ps.rank_from_shape,
         self._event_shape_tensor(),
         self.event_shape
         )
@@ -373,7 +373,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     x = self.bijector.inverse(y, **bijector_kwargs)
     dist = self.distribution
     # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
+    return ps.smart_where(
         self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
         lambda: dist.log_cdf(x, **distribution_kwargs),
         lambda: dist.log_survival_function(x, **distribution_kwargs))
@@ -385,7 +385,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
     # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
+    return ps.smart_where(
         self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
         lambda: self.distribution.cdf(x, **distribution_kwargs),
         lambda: self.distribution.survival_function(x, **distribution_kwargs))
@@ -398,7 +398,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     x = self.bijector.inverse(y, **bijector_kwargs)
     dist = self.distribution
     # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
+    return ps.smart_where(
         self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
         lambda: dist.log_survival_function(x, **distribution_kwargs),
         lambda: dist.log_cdf(x, **distribution_kwargs))
@@ -410,7 +410,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = self.bijector.inverse(y, **bijector_kwargs)
     # TODO(b/141130733): Check/fix any gradient numerics issues.
-    return prefer_static.smart_where(
+    return ps.smart_where(
         self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
         lambda: self.distribution.survival_function(x, **distribution_kwargs),
         lambda: self.distribution.cdf(x, **distribution_kwargs))
@@ -420,7 +420,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       raise NotImplementedError('`quantile` is not implemented when '
                                 '`bijector` is not injective.')
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
-    value = prefer_static.smart_where(
+    value = ps.smart_where(
         self.bijector._internal_is_increasing(**bijector_kwargs),  # pylint: disable=protected-access
         lambda: value,
         lambda: 1 - value)
@@ -468,10 +468,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     # `bijector.inverse_log_det_jacobian` to extract the constant Jacobian.
     event_shape_tensor = self._event_shape_tensor()
     event_ndims = tf.nest.map_structure(
-        prefer_static.rank_from_shape,
+        ps.rank_from_shape,
         event_shape_tensor, self.event_shape)
     dummy = tf.nest.map_structure(
-        prefer_static.zeros, event_shape_tensor, self.dtype)
+        ps.zeros, event_shape_tensor, self.dtype)
 
     ildj = self.bijector.inverse_log_det_jacobian(
         dummy, event_ndims=event_ndims, **bijector_kwargs)

@@ -32,7 +32,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -46,9 +46,8 @@ tfl = tf.linalg
 
 def _safe_concat(values):
   """Concat along axis=0 that works even when some arguments have size 0."""
-  initial_value_shape = prefer_static.shape(values[0])
-  reference_shape = prefer_static.concat(
-      [[-1], initial_value_shape[1:]], axis=0)
+  initial_value_shape = ps.shape(values[0])
+  reference_shape = ps.concat([[-1], initial_value_shape[1:]], axis=0)
   return tf.concat([tf.reshape(x, reference_shape) for x in values], axis=0)
 
 
@@ -113,13 +112,11 @@ def _augment_sample_shape(partial_batch_dist,
       `partial_batch_dist.batch_shape` into a prefix of
       `full_sample_and_batch_shape` .
   """
-  full_ndims = distribution_util.prefer_static_shape(
-      full_sample_and_batch_shape)[0]
+  full_ndims = ps.rank_from_shape(full_sample_and_batch_shape)
   partial_batch_ndims = (
       tensorshape_util.rank(partial_batch_dist.batch_shape)  # pylint: disable=g-long-ternary
       if tensorshape_util.rank(partial_batch_dist.batch_shape) is not None
-      else distribution_util.prefer_static_shape(
-          partial_batch_dist.batch_shape_tensor())[0])
+      else ps.rank_from_shape(partial_batch_dist.batch_shape_tensor()))
 
   num_broadcast_dims = full_ndims - partial_batch_ndims
 
@@ -850,9 +847,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     if not tensorshape_util.is_fully_defined(batch_shape):
       batch_shape = self.batch_shape_tensor()
     sample_and_batch_shape = functools.reduce(
-        prefer_static.broadcast_shape, [
-            prefer_static.shape(x)[:-2],
-            prefer_static.shape(mask)[:-1] if mask is not None else [],
+        ps.broadcast_shape, [
+            ps.shape(x)[:-2],
+            ps.shape(mask)[:-1] if mask is not None else [],
             batch_shape
         ])
 
@@ -860,8 +857,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     # in a LGSSM depend only on the model params (batch shape) and on the
     # missingness pattern (mask shape), so in general this may be smaller
     # than the full `sample_and_batch_shape`.
-    mask_sample_and_batch_shape = prefer_static.broadcast_shape(
-        prefer_static.shape(mask)[:-1] if mask is not None else [],
+    mask_sample_and_batch_shape = ps.broadcast_shape(
+        ps.shape(mask)[:-1] if mask is not None else [],
         batch_shape)
 
     # To scan over timesteps we need to move `num_timsteps` from the
@@ -1078,27 +1075,27 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       # Draw one prior sample per result. If `x` has larger batch shape
       # than the distribution, we'll need to draw extra samples to match.
-      result_sample_and_batch_shape = prefer_static.concat([
+      result_sample_and_batch_shape = ps.concat([
           distribution_util.expand_to_vector(sample_shape),
           tf.convert_to_tensor(
-              functools.reduce(prefer_static.broadcast_shape, [
-                  prefer_static.shape(x)[:-2],
-                  prefer_static.shape(mask)[:-1] if mask is not None else [],
+              functools.reduce(ps.broadcast_shape, [
+                  ps.shape(x)[:-2],
+                  ps.shape(mask)[:-1] if mask is not None else [],
                   batch_shape]),
               dtype_hint=tf.int32)
           ], axis=0)
-      sample_size = tf.cast(
-          prefer_static.reduce_prod(result_sample_and_batch_shape) /
-          prefer_static.reduce_prod(batch_shape), tf.int32)
+      sample_size = ps.cast(
+          ps.reduce_prod(result_sample_and_batch_shape) /
+          ps.reduce_prod(batch_shape), tf.int32)
       prior_latent_sample, prior_obs_sample = self._joint_sample_n(
           sample_size, seed=seed)
 
       latent_size = self.latent_size_tensor()
-      observation_size = prefer_static.shape(prior_obs_sample)[-1]
-      result_shape = prefer_static.concat(
+      observation_size = ps.shape(prior_obs_sample)[-1]
+      result_shape = ps.concat(
           [result_sample_and_batch_shape,
            [self.num_timesteps, latent_size]], axis=0)
-      broadcast_observed_shape = prefer_static.concat(
+      broadcast_observed_shape = ps.concat(
           [result_sample_and_batch_shape,
            [self.num_timesteps, observation_size]], axis=0)
       prior_latent_sample = tf.reshape(prior_latent_sample, result_shape)

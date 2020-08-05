@@ -70,6 +70,20 @@ tensorshape_util = private.LazyLoader(
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
 """
 
+LINOP_UTIL_SUFFIX = """
+
+JAX_MODE = False
+if JAX_MODE:
+
+  def shape_tensor(shape, name=None):  # pylint: disable=unused-argument,function-redefined
+    import numpy as onp
+    try:
+      return onp.array(tuple(int(x) for x in shape), dtype=np.int32)
+    except:  # JAX raises raw Exception on __array__  # pylint: disable=bare-except
+      pass
+    return onp.array(int(shape), dtype=np.int32)
+"""
+
 DISABLED_LINTS = ('g-import-not-at-top', 'g-direct-tensorflow-import',
                   'g-bad-import-order', 'unused-import', 'line-too-long',
                   'reimported', 'g-bool-id-comparison',
@@ -179,6 +193,8 @@ def gen_module(module_name):
         'ops as _ops')
   print('from tensorflow_probability.python.internal.backend.numpy.gen import '
         'tensor_shape')
+  if module_name == 'linear_operator_util':
+    print(LINOP_UTIL_SUFFIX)
   print(UTIL_IMPORTS)
 
 

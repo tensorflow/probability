@@ -1916,7 +1916,6 @@ multi_substrate_py_test(
     name = "beta_binomial_test",
     size = "medium",
     srcs = ["beta_binomial_test.py"],
-    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -1931,7 +1930,6 @@ multi_substrate_py_test(
     name = "binomial_test",
     size = "medium",
     srcs = ["binomial_test.py"],
-    jax_tags = ["omni_fail"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -2074,7 +2072,6 @@ multi_substrate_py_test(
     name = "dirichlet_multinomial_test",
     size = "medium",
     srcs = ["dirichlet_multinomial_test.py"],
-    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
@@ -2298,10 +2295,7 @@ multi_substrate_py_test(
     name = "hidden_markov_model_test",
     size = "medium",
     srcs = ["hidden_markov_model_test.py"],
-    jax_tags = [
-        "omni_fail",
-        "notap",
-    ],
+    jax_tags = ["flaky"],
     shard_count = 4,
     deps = [
         # absl/testing:parameterized dep,
@@ -2514,7 +2508,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["linear_gaussian_ssm_test.py"],
     jax_size = "large",
-    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
@@ -2615,7 +2608,9 @@ multi_substrate_py_test(
     name = "mixture_same_family_test",
     size = "medium",
     srcs = ["mixture_same_family_test.py"],
+    jax_size = "large",
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         # hypothesis dep,
         # numpy dep,
@@ -2647,7 +2642,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["multinomial_test.py"],
     jax_size = "medium",
-    jax_tags = ["omni_fail"],
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
@@ -2884,7 +2878,6 @@ multi_substrate_py_test(
     name = "poisson_test",
     size = "medium",
     srcs = ["poisson_test.py"],
-    jax_tags = ["omni_fail"],
     shard_count = 2,
     deps = [
         # numpy dep,
@@ -3189,7 +3182,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["von_mises_fisher_test.py"],
     jax_size = "large",
-    jax_tags = ["omni_fail"],
     shard_count = 5,
     deps = [
         ":von_mises_fisher",
@@ -3334,7 +3326,7 @@ py3_test(
     tags = [
         "hypothesis",
         "no-oss-ci",
-        "omni_fail",
+        "tfp_jax",
     ],
     deps = [
         ":jax_transformation_testlib",

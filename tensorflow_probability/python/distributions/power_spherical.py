@@ -35,6 +35,7 @@ from tensorflow_probability.python.distributions import spherical_uniform
 from tensorflow_probability.python.distributions import von_mises_fisher
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -51,10 +52,10 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
   static_dimension = tf.get_static_value(dimension)
   if static_dimension is not None and static_dimension == 1:
     return tfp_random.rademacher(
-        tf.concat([shape, [1]], axis=0), dtype=dtype, seed=seed)
+        ps.concat([shape, [1]], axis=0), dtype=dtype, seed=seed)
 
   raw = samplers.normal(
-      shape=tf.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
+      shape=ps.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
   unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
   return unit_norm
 
@@ -193,10 +194,10 @@ class PowerSpherical(distribution.Distribution):
     return self._concentration
 
   def _batch_shape_tensor(self, mean_direction=None, concentration=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.mean_direction if mean_direction is None
+    return ps.broadcast_shape(
+        ps.shape(self.mean_direction if mean_direction is None
                  else mean_direction)[:-1],
-        tf.shape(self.concentration if concentration is None
+        ps.shape(self.concentration if concentration is None
                  else concentration))
 
   def _batch_shape(self):
@@ -205,7 +206,7 @@ class PowerSpherical(distribution.Distribution):
         self.concentration.shape)
 
   def _event_shape_tensor(self, mean_direction=None):
-    return tf.shape(self.mean_direction if mean_direction is None
+    return ps.shape(self.mean_direction if mean_direction is None
                     else mean_direction)[-1:]
 
   def _event_shape(self):
@@ -306,11 +307,11 @@ class PowerSpherical(distribution.Distribution):
         (event_size - 1.) / 2.)
     beta_samples = beta.sample(n, seed=beta_seed)
 
-    u_shape = tf.concat([[n], self._batch_shape_tensor(
+    u_shape = ps.concat([[n], self._batch_shape_tensor(
         mean_direction=mean_direction, concentration=concentration)], axis=0)
 
     spherical_samples = _uniform_unit_norm(
-        dimension=event_size - 1,
+        dimension=event_size_int - 1,
         shape=u_shape,
         dtype=self.dtype,
         seed=uniform_seed)

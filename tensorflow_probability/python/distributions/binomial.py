@@ -30,7 +30,7 @@ from tensorflow_probability.python.internal import batched_rejection_sampler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -117,10 +117,10 @@ def _log_concave_rejection_sampler(
       https://arxiv.org/abs/1711.10604
   """
   mode = tf.broadcast_to(
-      mode, tf.concat([sample_shape, prefer_static.shape(mode)], axis=0))
+      mode, ps.concat([sample_shape, ps.shape(mode)], axis=0))
 
   mode_height = prob_fn(mode)
-  mode_shape = prefer_static.shape(mode)
+  mode_shape = ps.shape(mode)
 
   top_width = 1. + mode_height / 2.  # w in ref [1].
   top_fraction = top_width / (1 + top_width)
@@ -188,11 +188,9 @@ def _random_binomial_cpu(
   with tf.name_scope(name or 'binomial_cpu'):
     if probs is None:
       probs = tf.where(counts > 0, tf.math.sigmoid(logits), 0)
-    batch_shape = prefer_static.broadcast_shape(
-        prefer_static.shape(counts),
-        prefer_static.shape(probs))
+    batch_shape = ps.broadcast_shape(ps.shape(counts), ps.shape(probs))
     samples = tf.random.stateless_binomial(
-        shape=tf.concat([shape, batch_shape], axis=0),
+        shape=ps.concat([shape, batch_shape], axis=0),
         seed=seed, counts=counts, probs=probs, output_dtype=output_dtype)
   return samples
 
@@ -244,7 +242,7 @@ def _random_binomial(
   """
   with tf.name_scope(name or 'random_binomial'):
     seed = samplers.sanitize_seed(seed)
-    shape = tf.convert_to_tensor(shape, dtype_hint=tf.int32, name='shape')
+    shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32, name='shape')
     params = dict(shape=shape, counts=counts, probs=probs, logits=logits,
                   output_dtype=output_dtype, seed=seed, name=name)
     sampler_impl = implementation_selection.implementation_selecting(
@@ -432,7 +430,7 @@ class Binomial(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     seed = samplers.sanitize_seed(seed, salt='binomial')
     return _random_binomial(
-        shape=tf.convert_to_tensor([n]),
+        shape=ps.convert_to_shape_tensor([n]),
         counts=tf.convert_to_tensor(self._total_count),
         probs=(None if self._probs is None else
                tf.convert_to_tensor(self._probs)),

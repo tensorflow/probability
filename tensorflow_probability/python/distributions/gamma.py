@@ -210,7 +210,7 @@ class Gamma(distribution.Distribution):
     seed = samplers.sanitize_seed(seed, salt='gamma')
 
     return random_gamma(
-        shape=tf.convert_to_tensor([n]),
+        shape=ps.convert_to_shape_tensor([n]),
         concentration=tf.convert_to_tensor(self.concentration, self.dtype),
         rate=tf.convert_to_tensor(self.rate, self.dtype), seed=seed)[0]
 
@@ -366,6 +366,8 @@ def _random_gamma_no_gradient(shape, concentration, rate, seed):
   Returns:
     samples: Samples from gamma distributions.
   """
+  seed = samplers.sanitize_seed(seed)
+
   sampler_impl = implementation_selection.implementation_selecting(
       fn_name='gamma',
       default_fn=_random_gamma_noncpu,
@@ -399,7 +401,7 @@ def _random_gamma_bwd(aux, g):
   if (tensorshape_util.is_fully_defined(concentration.shape) and
       tensorshape_util.is_fully_defined(rate.shape) and
       concentration.shape == rate.shape):
-    return None, grad_concentration, grad_rate, None
+    return grad_concentration, grad_rate, None  # seed=None
 
   ax_conc, ax_rate = tf.raw_ops.BroadcastGradientArgs(
       s0=tf.shape(concentration), s1=tf.shape(rate))
@@ -409,14 +411,14 @@ def _random_gamma_bwd(aux, g):
   grad_rate = tf.reshape(
       tf.math.reduce_sum(grad_rate, axis=ax_rate), tf.shape(rate))
 
-  return None, grad_concentration, grad_rate, None  # None for shape, ..., seed
+  return grad_concentration, grad_rate, None  # seed=None
 
 
-def _random_gamma_jvp(primals, tangents):
+def _random_gamma_jvp(shape, primals, tangents):
   """Computes JVP for gamma sample (supports JAX custom derivative)."""
-  shape, concentration, rate, seed = primals
-  dshape, dconcentration, drate, dseed = tangents
-  del dshape, dseed
+  concentration, rate, seed = primals
+  dconcentration, drate, dseed = tangents
+  del dseed
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
   dconcentration = tf.broadcast_to(dconcentration, shape)
   drate = tf.broadcast_to(drate, shape)
@@ -436,16 +438,18 @@ def _random_gamma_jvp(primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_random_gamma_fwd,
     vjp_bwd=_random_gamma_bwd,
-    jvp_fn=_random_gamma_jvp)
+    jvp_fn=_random_gamma_jvp,
+    nondiff_argnums=(0,))
 def _random_gamma_gradient(shape, concentration, rate, seed):
   return _random_gamma_no_gradient(shape, concentration, rate, seed)
 
 
 # TF custom_gradient doesn't support kwargs, so we wrap _random_gamma_gradient.
 def random_gamma(shape, concentration, rate, seed=None):
-  shape = tf.convert_to_tensor(shape, dtype_hint=tf.int32, name='shape')
-  total_shape = tf.concat(
-      [shape, ps.broadcast_shape(tf.shape(concentration), tf.shape(rate))],
+  shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32, name='shape')
+
+  total_shape = ps.concat(
+      [shape, ps.broadcast_shape(ps.shape(concentration), ps.shape(rate))],
       axis=0)
   seed = samplers.sanitize_seed(seed, salt='random_gamma')
   return _random_gamma_gradient(total_shape, concentration, rate, seed)

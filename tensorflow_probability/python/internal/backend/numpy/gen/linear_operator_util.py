@@ -610,6 +610,19 @@ from tensorflow_probability.python.internal.backend.numpy import linalg_impl as 
 from tensorflow_probability.python.internal.backend.numpy import ops as _ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 
+
+JAX_MODE = False
+if JAX_MODE:
+
+  def shape_tensor(shape, name=None):  # pylint: disable=unused-argument,function-redefined
+    import numpy as onp
+    try:
+      return onp.array(tuple(int(x) for x in shape), dtype=np.int32)
+    except:  # JAX raises raw Exception on __array__  # pylint: disable=bare-except
+      pass
+    return onp.array(int(shape), dtype=np.int32)
+
+
 from tensorflow_probability.python.internal.backend.numpy import private
 distribution_util = private.LazyLoader(
     "distribution_util", globals(),

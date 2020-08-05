@@ -26,7 +26,6 @@ import inspect
 import types
 import decorator
 
-import numpy as np
 import six
 import tensorflow.compat.v2 as tf
 
@@ -36,6 +35,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 # Symbol import needed to avoid BUILD-dependency cycle
 from tensorflow_probability.python.math.generic import log1mexp
@@ -798,10 +798,15 @@ class Distribution(_BaseDistribution):
             self.batch_shape, check_types=False)
       else:
         batch_shape = self._batch_shape_tensor()
+
+      def conversion_fn(s):
+        return tf.identity(
+            tf.convert_to_tensor(s, dtype=tf.int32), name='batch_shape')
+      if JAX_MODE:
+        conversion_fn = ps.convert_to_shape_tensor
       return nest.map_structure_up_to(
           shallow_structure,
-          lambda s: tf.identity(  # pylint: disable=g-long-lambda
-              tf.convert_to_tensor(s, dtype=tf.int32), name='batch_shape'),
+          conversion_fn,
           batch_shape, check_types=False)
 
   def _batch_shape(self):
@@ -852,10 +857,14 @@ class Distribution(_BaseDistribution):
             self.event_shape, check_types=False)
       else:
         event_shape = self._event_shape_tensor()
+      def conversion_fn(s):
+        return tf.identity(
+            tf.convert_to_tensor(s, dtype=tf.int32), name='event_shape')
+      if JAX_MODE:
+        conversion_fn = ps.convert_to_shape_tensor
       return nest.map_structure_up_to(
           self.dtype,
-          lambda s: tf.identity(  # pylint: disable=g-long-lambda
-              tf.convert_to_tensor(s, dtype=tf.int32), name='event_shape'),
+          conversion_fn,
           event_shape, check_types=False)
 
   def _event_shape(self):
@@ -910,13 +919,14 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       if JAX_MODE and seed is None:
         raise ValueError('Must provide JAX PRNGKey as `dist.sample(seed=.)`')
-      sample_shape = tf.cast(sample_shape, tf.int32, name='sample_shape')
+      sample_shape = ps.convert_to_shape_tensor(
+          ps.cast(sample_shape, tf.int32), name='sample_shape')
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')
       samples = self._sample_n(
           n, seed=seed() if callable(seed) else seed, **kwargs)
-      batch_event_shape = tf.shape(samples)[1:]
-      final_shape = tf.concat([sample_shape, batch_event_shape], 0)
+      batch_event_shape = ps.shape(samples)[1:]
+      final_shape = ps.concat([sample_shape, batch_event_shape], 0)
       samples = tf.reshape(samples, final_shape)
       samples = self._set_sample_static_shape(samples, sample_shape)
       return samples
@@ -1460,12 +1470,7 @@ class Distribution(_BaseDistribution):
 
   def _expand_sample_shape_to_vector(self, x, name):
     """Helper to `sample` which ensures input is 1D."""
-    x_static_val = tf.get_static_value(x)
-    if x_static_val is None:
-      prod = tf.reduce_prod(x)
-    else:
-      prod = np.prod(x_static_val, dtype=dtype_util.as_numpy_dtype(x.dtype))
-
+    prod = ps.reduce_prod(x)
     x = distribution_util.expand_to_vector(x, tensor_name=name)
     return x, prod
 

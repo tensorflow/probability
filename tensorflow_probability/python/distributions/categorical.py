@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -218,7 +219,7 @@ class Categorical(distribution.Distribution):
     if x is None:
       x = tf.convert_to_tensor(
           self._probs if self._logits is None else self._logits)
-    return tf.shape(x)[:-1]
+    return ps.shape(x)[:-1]
 
   def _batch_shape(self):
     x = self._probs if self._logits is None else self._logits
@@ -244,7 +245,7 @@ class Categorical(distribution.Distribution):
     draws = tf.cast(draws, self.dtype)
     return tf.reshape(
         tf.transpose(draws),
-        shape=tf.concat([[n], self._batch_shape_tensor(logits)], axis=0))
+        shape=ps.concat([[n], self._batch_shape_tensor(logits)], axis=0))
 
   def _cdf(self, k):
     # TODO(b/135263541): Improve numerical precision of categorical.cdf.

@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -119,7 +120,7 @@ class Bernoulli(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     probs = self._probs_parameter_no_checks()
-    new_shape = tf.concat([[n], tf.shape(probs)], 0)
+    new_shape = ps.concat([[n], ps.shape(probs)], 0)
     uniform = samplers.uniform(new_shape, seed=seed, dtype=probs.dtype)
     sample = tf.less(uniform, probs)
     return tf.cast(sample, self.dtype)

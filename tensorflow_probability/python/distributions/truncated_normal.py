@@ -30,7 +30,7 @@ from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
@@ -241,11 +241,11 @@ class TruncatedNormal(distribution.Distribution):
 
   def _batch_shape_tensor(self, loc=None, scale=None, low=None, high=None):
     return functools.reduce(
-        prefer_static.broadcast_shape,
-        (prefer_static.shape(self.loc if loc is None else loc),
-         prefer_static.shape(self.scale if scale is None else scale),
-         prefer_static.shape(self.low if low is None else low),
-         prefer_static.shape(self.high if high is None else high)))
+        ps.broadcast_shape,
+        (ps.shape(self.loc if loc is None else loc),
+         ps.shape(self.scale if scale is None else scale),
+         ps.shape(self.low if low is None else low),
+         ps.shape(self.high if high is None else high)))
 
   def _event_shape(self):
     return tf.TensorShape([])
@@ -254,9 +254,7 @@ class TruncatedNormal(distribution.Distribution):
     loc, scale, low, high = self._loc_scale_low_high()
     batch_shape = self._batch_shape_tensor(
         loc=loc, scale=scale, low=low, high=high)
-    sample_and_batch_shape = tf.concat([[n], batch_shape], 0)
-    flat_batch_and_sample_shape = tf.stack([tf.reduce_prod(batch_shape), n])
-
+    sample_and_batch_shape = ps.concat([[n], batch_shape], 0)
     # TODO(b/162522020): Use this behavior unconditionally.
     if (tf.executing_eagerly() or
         not control_flow_util.GraphOrParentsInXlaContext(
@@ -269,6 +267,7 @@ class TruncatedNormal(distribution.Distribution):
           maxvals=high,
           seed=samplers.sanitize_seed(seed))
 
+    flat_batch_and_sample_shape = tf.stack([tf.reduce_prod(batch_shape), n])
     # In order to be reparameterizable we sample on the truncated_normal of
     # unit variance and mean and scale (but with the standardized
     # truncation bounds).

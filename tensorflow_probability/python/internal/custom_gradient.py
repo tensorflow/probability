@@ -29,7 +29,8 @@ if JAX_MODE:
   from jax import custom_jvp  # pylint: disable=g-import-not-at-top
 
 
-def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
+def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
+                    nondiff_argnums=()):
   """Decorates a function and adds custom derivatives.
 
   TF only supports VJPs, so we decorate with tf.custom_gradient.
@@ -42,6 +43,7 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
     vjp_fwd: A function (*args) => (output, auxiliaries).
     vjp_bwd: A function (auxiliaries, output_gradient) => args_gradients.
     jvp_fn: A function (primals, tangents) => (primal_out, tangent_out).
+    nondiff_argnums: Tuple of argument indices which are not differentiable.
 
   Returns:
     A decorator to be applied to a function f(*args) => output.
@@ -57,13 +59,13 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
       # For JAX, we prefer to specify a custom JVP, as JAX can use a function
       # transform to transpose a JVP (must be linear in the tangents) to a VJP.
       if jvp_fn is not None:
-        f_jvp = custom_jvp(f)
+        f_jvp = custom_jvp(f, nondiff_argnums=nondiff_argnums)
         f_jvp.defjvp(jvp_fn)
         return f_jvp
 
       else:
         from jax import custom_vjp  # pylint: disable=g-import-not-at-top
-        f_vjp = custom_vjp(f)
+        f_vjp = custom_vjp(f, nondiff_argnums=nondiff_argnums)
         f_vjp.defvjp(vjp_fwd, vjp_bwd)
         return f_vjp
 
@@ -72,7 +74,12 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None):
       @tf.custom_gradient
       def f_wrapped(*args, **kwargs):
         val, aux = vjp_fwd(*args, **kwargs)
-        return val, lambda *g: vjp_bwd(aux, tf.nest.pack_sequence_as(val, g))
+        def vjp_bwd_wrapped(*g):
+          result = vjp_bwd(aux, tf.nest.pack_sequence_as(val, g))
+          for i in nondiff_argnums:
+            result = tuple(result[:i]) + (None,) + tuple(result[i:])
+          return result
+        return val, vjp_bwd_wrapped
 
       return f_wrapped
 

@@ -373,9 +373,9 @@ def move_dimension(x, source_idx, dest_idx):
   x_perm = _move_dimension(x, 4, 2) # result shape [200, 30, 6, 4, 1]
   ```
   """
-  ndims = prefer_static_rank(x)
   dtype = dtype_util.common_dtype([source_idx, dest_idx],
                                   dtype_hint=tf.int32)
+  ndims = ps.cast(prefer_static_rank(x), dtype)
   source_idx = ps.convert_to_shape_tensor(source_idx, dtype=dtype)
   dest_idx = ps.convert_to_shape_tensor(dest_idx, dtype=dtype)
 
