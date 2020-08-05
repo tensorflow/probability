@@ -20,9 +20,8 @@ from __future__ import print_function
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental.mcmc import with_reductions
-from tensorflow_probability.python.experimental.mcmc import SampleDiscardingKernel
-from tensorflow_probability.python.experimental.mcmc import step_kernel
+from tensorflow_probability.python.experimental import mcmc
+from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductionsKernelResults
 from tensorflow.python.util import nest
 
 
@@ -100,14 +99,14 @@ def sample_fold(
         current_state)
     if reducers is None:
       reducers = []
-    reduction_kernel = with_reductions.WithReductions(
-        inner_kernel=SampleDiscardingKernel(
+    reduction_kernel = mcmc.WithReductions(
+        inner_kernel=mcmc.SampleDiscardingKernel(
             inner_kernel=kernel,
             num_burnin_steps=num_burnin_steps,
             num_steps_between_results=num_steps_between_results),
         reducers=reducers,
     )
-    end_state, final_kernel_results = step_kernel(
+    end_state, final_kernel_results = mcmc.step_kernel(
         num_steps=num_steps,
         current_state=current_state,
         previous_kernel_results=previous_kernel_results,
@@ -125,7 +124,7 @@ def sample_fold(
         check_types=False)
     if reduction_results == []:
       reduction_results = None
-      final_kernel_results = with_reductions.WithReductionsKernelResults(
+      final_kernel_results = WithReductionsKernelResults(
           None, final_kernel_results.inner_results
       )
     return reduction_results, end_state, final_kernel_results
