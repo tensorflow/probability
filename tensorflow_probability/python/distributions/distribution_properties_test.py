@@ -216,7 +216,7 @@ VECTORIZED_LOGPROB_ATOL.update({
 VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_RTOL.update({
     'NegativeBinomial': 1e-5,
-    'PowerSpherical': 2e-5,
+    'PowerSpherical': 5e-5,
 })
 
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.
