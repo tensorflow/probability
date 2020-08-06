@@ -227,7 +227,7 @@ class CovarianceReducer(reducer_base.Reducer):
     return self._parameters['name']
 
   @property
-  def paramters(self):
+  def parameters(self):
     return self._parameters
 
 

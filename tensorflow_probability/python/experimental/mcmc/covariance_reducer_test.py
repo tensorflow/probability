@@ -39,9 +39,9 @@ class CovarianceReducersTest(test_util.TestCase):
         state.cov_state.num_samples,
         state.cov_state.mean,
         cov_reducer.finalize(state)])
-    self.assertEqual(final_num_samples, 2)
-    self.assertEqual(final_mean, 0)
-    self.assertEqual(final_cov, 0)
+    self.assertEqual(2, final_num_samples)
+    self.assertEqual(0, final_mean)
+    self.assertEqual(0, final_cov)
 
   def test_random_sanity_check(self):
     rng = test_util.test_np_rng()
@@ -65,8 +65,8 @@ class CovarianceReducersTest(test_util.TestCase):
     final_mean, final_cov = self.evaluate([
         state.cov_state.mean,
         cov_reducer.finalize(state)])
-    self.assertEqual(final_mean.shape, (9, 3))
-    self.assertEqual(final_cov.shape, (9, 3, 3))
+    self.assertEqual((9, 3), final_mean.shape)
+    self.assertEqual((9, 3, 3), final_cov.shape)
 
   def test_variance_shape(self):
     var_reducer = tfp.experimental.mcmc.VarianceReducer()
@@ -77,8 +77,8 @@ class CovarianceReducersTest(test_util.TestCase):
     final_mean, final_var = self.evaluate([
         state.cov_state.mean,
         var_reducer.finalize(state)])
-    self.assertEqual(final_mean.shape, (9, 3))
-    self.assertEqual(final_var.shape, (9, 3))
+    self.assertEqual((9, 3), final_mean.shape)
+    self.assertEqual((9, 3), final_var.shape)
 
   def test_attributes(self):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(
@@ -86,15 +86,20 @@ class CovarianceReducersTest(test_util.TestCase):
     state = cov_reducer.initialize(tf.ones((2, 3), dtype=tf.float64))
 
     # check attributes are correct right after initialization
-    self.assertEqual(cov_reducer.event_ndims, 1)
-    self.assertEqual(cov_reducer.ddof, 1)
+    parameters = dict(
+        event_ndims=1, ddof=1, name='covariance_reducer'
+    )
+    self.assertEqual(1, cov_reducer.event_ndims)
+    self.assertEqual(1, cov_reducer.ddof)
+    self.assertEqual(parameters, cov_reducer.parameters)
     for _ in range(2):
       state = cov_reducer.one_step(
           tf.zeros((2, 3), dtype=tf.float64), state)
 
     # check attributes don't change after stepping through
-    self.assertEqual(cov_reducer.event_ndims, 1)
-    self.assertEqual(cov_reducer.ddof, 1)
+    self.assertEqual(1, cov_reducer.event_ndims)
+    self.assertEqual(1, cov_reducer.ddof)
+    self.assertEqual(parameters, cov_reducer.parameters)
 
   def test_tf_while(self):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
@@ -105,7 +110,7 @@ class CovarianceReducersTest(test_util.TestCase):
         (0., state)
     )
     final_cov = self.evaluate(cov_reducer.finalize(state))
-    self.assertAllClose(final_cov, tf.zeros((2, 3, 2, 3)), rtol=1e-6)
+    self.assertAllClose(tf.zeros((2, 3, 2, 3)), final_cov, rtol=1e-6)
 
   def test_nested_chain_state(self):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=0)
