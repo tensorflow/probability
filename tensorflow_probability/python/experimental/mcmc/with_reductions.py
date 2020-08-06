@@ -60,20 +60,20 @@ class WithReductions(kernel_base.TransitionKernel):
   `WithReductions`' kernel results.
   """
 
-  def __init__(self, inner_kernel, reducers, name=None):
+  def __init__(self, inner_kernel, reducer, name=None):
     """Instantiates this object.
 
     Args:
       inner_kernel: `TransitionKernel` whose `one_step` will generate
         MCMC sample(s).
-      reducers: A (possibly nested) structure of `Reducer`s to be evaluated
+      reducer: A (possibly nested) structure of `Reducer`s to be evaluated
         on the `inner_kernel`'s samples.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., "reduced_kernel").
     """
     self._parameters = dict(
         inner_kernel=inner_kernel,
-        reducers=reducers,
+        reducer=reducer,
         name=name or 'reduced_kernel'
     )
 
@@ -96,7 +96,7 @@ class WithReductions(kernel_base.TransitionKernel):
       kernel_results: `WithReductionsKernelResults` representing updated
         kernel results. Reducer states are stored in the
         `streaming_calculations` field. The state structure is identical
-        to `self.reducers`.
+        to `self.reducer`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'with_reductions', 'one_step')):
@@ -107,13 +107,13 @@ class WithReductions(kernel_base.TransitionKernel):
             new_state,
             state,
             previous_kernel_results=inner_kernel_results)
-      new_reducers_state = nest.map_structure_up_to(
-          self.reducers,
+      new_reducer_state = nest.map_structure_up_to(
+          self.reducer,
           step_reducer,
-          self.reducers, previous_kernel_results.streaming_calculations,
+          self.reducer, previous_kernel_results.streaming_calculations,
           check_types=False)
       kernel_results = WithReductionsKernelResults(
-          new_reducers_state, inner_kernel_results)
+          new_reducer_state, inner_kernel_results)
       return new_state, kernel_results
 
   def bootstrap_results(self, init_state):
@@ -130,7 +130,7 @@ class WithReductions(kernel_base.TransitionKernel):
       kernel_results: `WithReductionsKernelResults` representing updated
         kernel results. Reducer states are stored in the
         `streaming_calculations` field. The state structure is identical
-        to `self.reducers`.
+        to `self.reducer`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'with_reductions', 'bootstrap_results')):
@@ -138,7 +138,7 @@ class WithReductions(kernel_base.TransitionKernel):
       return WithReductionsKernelResults(
           tf.nest.map_structure(
               lambda r: r.initialize(init_state, inner_kernel_results),
-              self.reducers),
+              self.reducer),
           inner_kernel_results)
 
   @property
@@ -154,8 +154,8 @@ class WithReductions(kernel_base.TransitionKernel):
     return self._parameters['inner_kernel']
 
   @property
-  def reducers(self):
-    return self._parameters['reducers']
+  def reducer(self):
+    return self._parameters['reducer']
 
   @property
   def name(self):

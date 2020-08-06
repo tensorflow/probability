@@ -70,7 +70,7 @@ class CovarianceReducer(reducer_base.Reducer):
 
   kernel = ...
   reducer = tfp.experimental.mcmc.CovarianceReducer()
-  covariance_estimate = tfp.experimental.mcmc.sample_fold(
+  covariance_estimate, _, _ = tfp.experimental.mcmc.sample_fold(
       num_steps=...,
       current_state=...,
       previous_kernel_results=...,

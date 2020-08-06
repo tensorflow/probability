@@ -34,7 +34,7 @@ def sample_fold(
     current_state,
     previous_kernel_results=None,
     kernel=None,
-    reducers=None,
+    reducer=None,
     num_burnin_steps=0,
     num_steps_between_results=0,
     parallel_iterations=10,
@@ -52,7 +52,7 @@ def sample_fold(
   and `SampleDiscardingKernel` to implement the requested optionally
   thinned reduction.
 
-  An arbitrary collection of `reducers` can be provided, and the resulting
+  An arbitrary collection of `reducer` can be provided, and the resulting
   finalized statistic(s) will be returned in an identical structure.
 
   Args:
@@ -66,8 +66,8 @@ def sample_fold(
       `kernel.bootstrap_results`.
     kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
       of the Markov chain.
-    reducers: A (possibly nested) structure of `Reducer`s to be evaluated
-      on the `kernel`'s samples. If no reducers are given (`reducers=None`),
+    reducer: A (possibly nested) structure of `Reducer`s to be evaluated
+      on the `kernel`'s samples. If no reducers are given (`reducer=None`),
       then `None` will be returned in place of streaming calculations.
     num_burnin_steps: Integer or scalar `Tensor` representing the number
         of chain steps to take before starting to collect results.
@@ -84,7 +84,7 @@ def sample_fold(
 
   Returns:
     reduction_results: A (possibly nested) structure of finalized reducer
-      statistics. The structure identically mimics that of `reducers`.
+      statistics. The structure identically mimics that of `reducer`.
     end_state: The final state of the Markov chain(s).
     final_kernel_results: `WithReductionsKernelResults` containing final reducer
       states. It also includes the kernel results of nested Transition Kernels
@@ -96,16 +96,16 @@ def sample_fold(
     current_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='current_state'),
         current_state)
-    reducers_was_none = False
-    if reducers is None:
-      reducers = []
-      reducers_was_none = True
+    reducer_was_none = False
+    if reducer is None:
+      reducer = []
+      reducer_was_none = True
     reduction_kernel = mcmc.WithReductions(
         inner_kernel=mcmc.SampleDiscardingKernel(
             inner_kernel=kernel,
             num_burnin_steps=num_burnin_steps,
             num_steps_between_results=num_steps_between_results),
-        reducers=reducers,
+        reducer=reducer,
     )
     end_state, final_kernel_results = mcmc.step_kernel(
         num_steps=num_steps,
@@ -118,12 +118,12 @@ def sample_fold(
         name=name,
     )
     reduction_results = nest.map_structure_up_to(
-        reducers,
+        reducer,
         lambda r, s: r.finalize(s),
-        reducers,
+        reducer,
         final_kernel_results.streaming_calculations,
         check_types=False)
-    if reduction_results == [] and reducers_was_none:
+    if reduction_results == [] and reducer_was_none:
       reduction_results = None
       final_kernel_results = mcmc.WithReductionsKernelResults(
           None, final_kernel_results.inner_results

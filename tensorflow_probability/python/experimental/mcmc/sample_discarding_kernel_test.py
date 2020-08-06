@@ -170,7 +170,7 @@ class SampleDiscardingTest(test_util.TestCase):
             inner_kernel=fake_inner_kernel,
             num_burnin_steps=10,
             num_steps_between_results=2,),
-        reducers=cov_reducer
+        reducer=cov_reducer
     )
     current_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
     for _ in range(2):
@@ -235,6 +235,36 @@ class SampleDiscardingTest(test_util.TestCase):
         (0., 0., pkr),
     )
 
+    final_sample, kernel_results = self.evaluate([
+        final_sample, kernel_results])
+    self.assertEqual(14, final_sample)
+    self.assertEqual(2, kernel_results.call_counter)
+    self.assertEqual(14, kernel_results.inner_results.counter_1)
+    self.assertEqual(28, kernel_results.inner_results.counter_2)
+
+  def test_non_static_thinning_and_burnin(self):
+    fake_inner_kernel = TestTransitionKernel()
+    num_burnin_steps = tf.Variable(10, dtype=tf.int32)
+    num_steps_between_results = tf.Variable(1, dtype=tf.int32)
+    discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
+        fake_inner_kernel,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_between_results=num_steps_between_results)
+
+    def _loop_body(i, curr_state, pkr):
+      new_state, kernel_results = discarder.one_step(
+          curr_state, pkr,
+      )
+      return (i + 1, new_state, kernel_results)
+
+    pkr = discarder.bootstrap_results(0.)
+    _, final_sample, kernel_results = tf.while_loop(
+        lambda i, _, __: i < 2,
+        _loop_body,
+        (0., 0., pkr),
+    )
+    self.evaluate([
+        num_burnin_steps.initializer, num_steps_between_results.initializer])
     final_sample, kernel_results = self.evaluate([
         final_sample, kernel_results])
     self.assertEqual(14, final_sample)

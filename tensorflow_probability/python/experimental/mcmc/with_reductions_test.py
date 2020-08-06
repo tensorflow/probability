@@ -92,7 +92,7 @@ class WithReductionsTest(test_util.TestCase):
     fake_reducer = TestReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
     )
     pkr = reducer_kernel.bootstrap_results(0.,)
     new_sample, kernel_results = reducer_kernel.one_step(0., pkr)
@@ -108,7 +108,7 @@ class WithReductionsTest(test_util.TestCase):
     fake_reducer = TestReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
     )
     pkr = self.evaluate(reducer_kernel.bootstrap_results(9.))
     self.assertEqual(0, pkr.streaming_calculations, 0)
@@ -121,11 +121,11 @@ class WithReductionsTest(test_util.TestCase):
     fake_reducer = TestReducer()
     calibrated_reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_calibrated_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
     )
     uncalibrated_reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_uncalibrated_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
     )
     self.assertTrue(calibrated_reducer_kernel.is_calibrated)
     self.assertFalse(uncalibrated_reducer_kernel.is_calibrated)
@@ -135,7 +135,7 @@ class WithReductionsTest(test_util.TestCase):
     fake_reducer = TestReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
     )
 
     initial_state = 0.
@@ -161,10 +161,10 @@ class WithReductionsTest(test_util.TestCase):
 
   def test_nested_reducers(self):
     fake_kernel = TestTransitionKernel()
-    nested_reducers = [[TestReducer(), TestReducer()], [TestReducer()]]
+    nested_reducer = [[TestReducer(), TestReducer()], [TestReducer()]]
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=nested_reducers,
+        reducer=nested_reducer,
     )
     pkr = reducer_kernel.bootstrap_results(0.)
     new_sample, kernel_results = reducer_kernel.one_step(0., pkr)
@@ -188,10 +188,10 @@ class WithReductionsTest(test_util.TestCase):
 
   def test_nested_state_dependent_reducers(self):
     fake_kernel = TestTransitionKernel()
-    nested_reducers = [[MeanReducer(), MeanReducer()], [MeanReducer()]]
+    nested_reducer = [[MeanReducer(), MeanReducer()], [MeanReducer()]]
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=nested_reducers,
+        reducer=nested_reducer,
     )
     pkr = reducer_kernel.bootstrap_results(0.)
     new_sample, kernel_results = reducer_kernel.one_step(0., pkr)
@@ -226,7 +226,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(ddof=ddof)
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
     )
 
     chain_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
@@ -251,7 +251,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
     )
     state = tf.zeros((9, 3))
     kernel_results = reducer_kernel.bootstrap_results(state)
@@ -272,7 +272,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     reducer = tfp.experimental.mcmc.VarianceReducer(ddof=ddof)
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=reducer,
+        reducer=reducer,
     )
 
     chain_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
@@ -308,7 +308,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
     )
     samples, _, kernel_results = tfp.mcmc.sample_chain(
         num_results=20,
@@ -335,7 +335,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
     )
     chain_state, kernel_results = tfp.experimental.mcmc.step_kernel(
         num_steps=6,
@@ -362,7 +362,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
     )
     transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=reducer_kernel,
@@ -397,7 +397,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=transformed_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
     )
     samples, _, kernel_results = tfp.mcmc.sample_chain(
         num_results=10,
@@ -429,7 +429,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=hmc_kernel,
-        reducers=cov_reducer
+        reducer=cov_reducer
     )
     step_adapted_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         inner_kernel=reducer_kernel,
@@ -463,7 +463,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
-        reducers=[[mean_reducer, cov_reducer], [fake_reducer]],
+        reducer=[[mean_reducer, cov_reducer], [fake_reducer]],
     )
 
     chain_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)

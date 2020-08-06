@@ -106,7 +106,7 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
     )
     reduction_rslt, last_sample, innermost_results = self.evaluate([
         reduction_rslt,
@@ -126,7 +126,7 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=curr_state,
         kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
     )
     reduction_rslt, last_sample, innermost_results = self.evaluate([
         reduction_rslt,
@@ -146,13 +146,13 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=fake_reducer,)
-    # verify `warm_restart_pkg` works as intended
+        reducer=fake_reducer,)
+    # verify the warm restart package (last_sample and kr) works as intended
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=last_sample,
         kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
         previous_kernel_results=kr
     )
     reduction_rslt, last_sample, innermost_results = self.evaluate([
@@ -175,7 +175,7 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=fake_reducers,
+        reducer=fake_reducers,
     )
     reduction_rslt, last_sample, innermost_results = self.evaluate([
         reduction_rslt,
@@ -200,7 +200,7 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=20,
         current_state=tf.convert_to_tensor([0., 0.]),
         kernel=fake_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
         seed=seed,)
     reduction_rslt = self.evaluate(reduction_rslt)
     self.assertAllClose(
@@ -216,7 +216,7 @@ class SampleFoldTest(test_util.TestCase):
         current_state=tf.convert_to_tensor(
             [[0., 0., 0.], [0., 0., 0.]]),
         kernel=fake_kernel,
-        reducers=cov_reducer,
+        reducer=cov_reducer,
     )
     reduction_rslt, streaming_calc = self.evaluate([
         reduction_rslt, kr.streaming_calculations
@@ -236,14 +236,14 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
         seed=seed
     )
     second_reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
         seed=seed
     )
     first_reduction_rslt, second_reduction_rslt = self.evaluate([
@@ -258,7 +258,7 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
         num_burnin_steps=10,
         num_steps_between_results=1,
     )
@@ -283,7 +283,7 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=tf.convert_to_tensor(5),
         current_state=0.,
         kernel=fake_kernel,
-        reducers=fake_reducer,
+        reducer=fake_reducer,
         num_burnin_steps=tf.convert_to_tensor(10),
         num_steps_between_results=tf.convert_to_tensor(1),
     )
@@ -307,7 +307,7 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=None,
+        reducer=None,
         num_burnin_steps=10,
         num_steps_between_results=1,
     )
@@ -321,13 +321,13 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(20, innermost_results.counter_1)
     self.assertEqual(40, innermost_results.counter_2)
 
-  def test_empty_reducers(self):
+  def test_empty_reducer(self):
     fake_kernel = TestTransitionKernel()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
-        reducers=[],
+        reducer=[],
         num_burnin_steps=10,
         num_steps_between_results=1,
     )
