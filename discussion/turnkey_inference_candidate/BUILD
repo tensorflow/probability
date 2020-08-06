@@ -15,7 +15,7 @@
 # Description:
 #   Some Turnkey inference candidates
 
-# [internal] load python3.bzl
+load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
 
 licenses(["notice"])  # Apache 2.0
 
@@ -51,12 +51,13 @@ py_library(
     ],
 )
 
-# py2and3
-py_test(
+py3_test(
     name = "window_tune_nuts_sampling_test",
     size = "enormous",
     srcs = ["window_tune_nuts_sampling_test.py"],
+    python_version = "PY3",
     shard_count = 1,
+    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -70,13 +71,14 @@ py_test(
     ],
 )
 
-# py2and3
-py_test(
+py3_test(
     name = "window_tune_nuts_sampling_test_gpu",
     size = "enormous",
     srcs = ["window_tune_nuts_sampling_test.py"],
     main = "window_tune_nuts_sampling_test.py",
+    python_version = "PY3",
     shard_count = 1,
+    srcs_version = "PY3",
     tags = [
         "notap",
         "nozapfhahn",
