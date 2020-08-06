@@ -48,13 +48,15 @@ ipython_repr = None
 class DeferredBase(special_methods.SpecialMethods):
   """Base class for all `lazybones.backend` deferred objects."""
 
-  __slots__ = ('_children', '_parents', '_name', '__weakref__')
+  __slots__ = ('_parents', '_children', '_static_iter_len', '_name',
+               '__weakref__')
 
-  def __init__(self, parents=None, name='<unknown>'):
+  def __init__(self, parents=None, static_iter_len=-1, name='<unknown>'):
     self._parents = set(() if parents is None else parents)
     self._children = weak_container.WeakSet()
     for p in self._parents:
       p._children.add(self)
+    self._static_iter_len = static_iter_len
     self._name = name
 
   @property
@@ -96,7 +98,7 @@ class DeferredBase(special_methods.SpecialMethods):
     return Deferred(fn, *args, **kwargs)
 
   def __call__(self, *args, **kwargs):
-    return self.__action__(self, *args, **kwargs)
+    return self.__action__(self, *args, _action_name=self.name, **kwargs)
 
   def __dir__(self):
     s = set(object.__dir__(self))
@@ -114,16 +116,18 @@ class DeferredBase(special_methods.SpecialMethods):
             'Taking `iter` of `iter` with different sentinel '
             'is not supported.')
       return self  # iter is idempotent.
-    return self.__action__(builtins.iter, self, *sentinel)
+    return self.__action__(
+        builtins.iter, self, *sentinel, _action_name='__iter__')
 
   @functools.wraps(builtins.next)
   def __next__(self, *default):
-    static_num_iter = 0 if not self.parents else getattr(
-        self.parents[0], '_static_iter_len', 0)
+    static_num_iter = (-1 if not self.parents
+                       else self.parents[0]._static_iter_len)  # pylint: disable=protected-access
     if getattr(self, 'fn', None) is not builtins.iter or static_num_iter < 1:
       # In this branch we presume the user does not wish to have static
       # iteration, i.e., we defer the operation as we would any other.
-      return self.__action__(builtins.next, self, *default)
+      return self.__action__(
+          builtins.next, self, *default, _action_name='__next__')
     next_children = tuple(c for c in self._children
                           if getattr(c, 'fn', None) is builtins.next)
     if len(next_children) < static_num_iter:
@@ -133,7 +137,8 @@ class DeferredBase(special_methods.SpecialMethods):
       # occuring we still need to pass this second arg (`self.children`) to
       # induce all the prior `next`s to be evaluated first thus forcing the
       # side-effect in the eventually concretized iterator.
-      return self.__action__(builtins.next, self, next_children)
+      return self.__action__(
+          builtins.next, self, next_children, _action_name='__next__')
     if default:
       return default
     raise StopIteration
@@ -196,19 +201,23 @@ class DeferredBase(special_methods.SpecialMethods):
 class Deferred(DeferredBase):
   """Defers execution of callable."""
 
-  __slots__ = ('_fn', '_args', '_kwargs', '_static_iter_len')
+  __slots__ = ('_fn', '_args', '_kwargs')
 
   def __new__(cls, fn, *args, **kwargs):
+    static_iter_len = kwargs.pop('_static_iter_len', -1)
+    name = kwargs.pop('_action_name', _try_get_name(fn, name_fallback='?'))
     parents = cls._get_deferred([fn, args, kwargs])
     if not parents:
       return fn(*args, **kwargs)
     self = super(Deferred, cls).__new__(cls)
-    super(Deferred, self).__init__(parents, name=_try_get_name(fn, '?'))
+    super(Deferred, self).__init__(
+        parents, static_iter_len=static_iter_len, name=name)
     return self
 
   def __init__(self, fn, *args, **kwargs):  # pylint: disable=super-init-not-called
     # Note: `super` is called from `__new__` so we can recycle use of `parents`.
-    self._static_iter_len = kwargs.pop('_static_iter_len', 0)
+    kwargs.pop('_static_iter_len', None)
+    kwargs.pop('_action_name', None)
     self._fn = fn
     self._args = args
     self._kwargs = kwargs
@@ -238,15 +247,15 @@ class Deferred(DeferredBase):
 class DeferredInput(DeferredBase):
   """Defers execution of input."""
 
-  __slots__ = ('_static_iter_len',)
+  __slots__ = ()
 
   def __init__(self, value=UNKNOWN, name='input', _static_iter_len=-1):  # pylint: disable=invalid-name
     super(DeferredInput, self).__init__(
         parents=self._get_deferred(value),
+        static_iter_len=_static_iter_len,
         name=name)
     if value is not UNKNOWN:
       self.value = value
-    self._static_iter_len = _static_iter_len
 
   def eval(self):
     def _concretize(v):

@@ -72,11 +72,7 @@ def _defer(fn, name=None, reverse=False):
       name = 'r' + name
   @functools.wraps(fn)
   def _wrapped_fn(self, *args, **kwargs):
-    r = self.__action__(fn, self, *args, **kwargs)
-    r._name = name  # pylint: disable=protected-access
-    return r
-  # _wrapped_fn.__name__ = name
-  # _wrapped_fn.__qualname__ = name
+    return self.__action__(fn, self, *args, _action_name=name, **kwargs)
   return _wrapped_fn
 
 
@@ -215,22 +211,18 @@ class SpecialMethods(object):
     __rmatmul__ = _defer(operator.matmul, reverse=True)
     __imatmul__ = _defer(operator.imatmul)
 
-  # @functools.wraps(object.__getattribute__)
-  def __getattribute__(self, attr):
-    """Implements `__getattribute__`."""
-    try:
-      return object.__getattribute__(self, attr)
-    except AttributeError:
-      if (attr in _GETATTRIBUTE_PASSTHROUGH_OVERRIDE or
-          # For some reason we can't use generators here because they behave
-          # differently in Ipython REPL execution regime.
-          any(tuple(fn(attr)
-                    for fn in _GETATTRIBUTE_PASSTHROUGH_OVERRIDE_CALLABLES))):
-        raise
-      r = self.__action__(getattr, self, attr)
-      # Set `_name` so getting name for repr isn't itself deferred.
-      r._name = attr    # pylint: disable=protected-access
-      return r
+  def __getattr__(self, attr):
+    """Implements `__getattr__`."""
+    # By implementing __getattr__, attributes will first be accessed from self,
+    # otherwise will be accessed from the deferred object.
+    if (attr in _GETATTRIBUTE_PASSTHROUGH_OVERRIDE or
+        # For some reason we can't use generators here because they behave
+        # differently in Ipython REPL execution regime.
+        any(tuple(
+            fn(attr) for fn in _GETATTRIBUTE_PASSTHROUGH_OVERRIDE_CALLABLES))):
+      raise AttributeError()
+    r = self.__action__(getattr, self, attr, _action_name=attr)
+    return r
 
 
 # If the following attributes are not found in the DeferredBase subclass then
