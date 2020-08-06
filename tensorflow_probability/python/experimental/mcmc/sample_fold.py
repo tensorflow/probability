@@ -50,7 +50,10 @@ def sample_fold(
 
   The driver internally composes the correct onion of `WithReductions`
   and `SampleDiscardingKernel` to implement the requested optionally
-  thinned reduction.
+  thinned reduction; however, the kernel results of those applied
+  Transition Kernels will not be returned. Hence, if warm-restarting
+  reductions is desired, one should manually build the Transition Kernel
+  onion and use `tfp.experimental.mcmc.step_kernel`.
 
   An arbitrary collection of `reducer` can be provided, and the resulting
   finalized statistic(s) will be returned in an identical structure.
@@ -86,9 +89,9 @@ def sample_fold(
     reduction_results: A (possibly nested) structure of finalized reducer
       statistics. The structure identically mimics that of `reducer`.
     end_state: The final state of the Markov chain(s).
-    final_kernel_results: `WithReductionsKernelResults` containing final reducer
-      states. It also includes the kernel results of nested Transition Kernels
-      in its `inner_results` field.
+    final_kernel_results: `collections.namedtuple` of internal calculations
+      used to advance the supplied `kernel`. These results do not include
+      the kernel results of `WithReductions` or `SampleDiscardingKernel`.
   """
   with tf.name_scope(name or 'mcmc_sample_fold'):
     num_steps = tf.convert_to_tensor(
@@ -125,7 +128,6 @@ def sample_fold(
         check_types=False)
     if reduction_results == [] and reducer_was_none:
       reduction_results = None
-      final_kernel_results = mcmc.WithReductionsKernelResults(
-          None, final_kernel_results.inner_results
-      )
-    return reduction_results, end_state, final_kernel_results
+    return (reduction_results,
+            end_state,
+            final_kernel_results.inner_results.inner_results)

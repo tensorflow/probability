@@ -108,15 +108,13 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
     )
-    reduction_rslt, last_sample, innermost_results = self.evaluate([
-        reduction_rslt,
-        last_sample,
-        kr.inner_results.inner_results
+    reduction_rslt, last_sample, kernel_results = self.evaluate([
+        reduction_rslt, last_sample, kr
     ])
     self.assertEqual(3, reduction_rslt)
     self.assertEqual(5, last_sample)
-    self.assertEqual(5, innermost_results.counter_1)
-    self.assertEqual(10, innermost_results.counter_2)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
 
   @parameterized.parameters(1., 2.)
   def test_current_state(self, curr_state):
@@ -128,42 +126,14 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
     )
-    reduction_rslt, last_sample, innermost_results = self.evaluate([
-        reduction_rslt,
-        last_sample,
-        kr.inner_results.inner_results
+    reduction_rslt, last_sample, kernel_results = self.evaluate([
+        reduction_rslt, last_sample, kr
     ])
     self.assertEqual(
         np.mean(np.arange(curr_state + 1, curr_state + 6)), reduction_rslt)
     self.assertEqual(curr_state + 5, last_sample)
-    self.assertEqual(5, innermost_results.counter_1)
-    self.assertEqual(10, innermost_results.counter_2)
-
-  def test_warm_restart(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
-    _, last_sample, kr = tfp.experimental.mcmc.sample_fold(
-        num_steps=5,
-        current_state=0.,
-        kernel=fake_kernel,
-        reducer=fake_reducer,)
-    # verify the warm restart package (last_sample and kr) works as intended
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
-        num_steps=5,
-        current_state=last_sample,
-        kernel=fake_kernel,
-        reducer=fake_reducer,
-        previous_kernel_results=kr
-    )
-    reduction_rslt, last_sample, innermost_results = self.evaluate([
-        reduction_rslt,
-        last_sample,
-        kr.inner_results.inner_results
-    ])
-    self.assertEqual(5.5, reduction_rslt)
-    self.assertEqual(10, last_sample)
-    self.assertEqual(10, innermost_results.counter_1)
-    self.assertEqual(20, innermost_results.counter_2)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
 
   def test_nested_reducers(self):
     fake_kernel = TestTransitionKernel()
@@ -177,10 +147,8 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducers,
     )
-    reduction_rslt, last_sample, innermost_results = self.evaluate([
-        reduction_rslt,
-        last_sample,
-        kr.inner_results.inner_results
+    reduction_rslt, last_sample, kernel_results = self.evaluate([
+        reduction_rslt, last_sample, kr
     ])
     self.assertEqual(2, len(reduction_rslt))
     self.assertEqual(2, len(reduction_rslt[0]))
@@ -189,8 +157,8 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(2, reduction_rslt[0][0])
     self.assertNear(2/3, reduction_rslt[0][1], err=1e-6)
     self.assertEqual(3, last_sample)
-    self.assertEqual(3, innermost_results.counter_1)
-    self.assertEqual(6, innermost_results.counter_2)
+    self.assertEqual(3, kernel_results.counter_1)
+    self.assertEqual(6, kernel_results.counter_2)
 
   def test_true_streaming_covariance(self):
     seed = test_util.test_seed()
@@ -211,21 +179,16 @@ class SampleFoldTest(test_util.TestCase):
   def test_batched_streaming_covariance(self):
     fake_kernel = TestTransitionKernel((2, 3))
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
-    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+    reduction_rslt, last_sample, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=tf.convert_to_tensor(
             [[0., 0., 0.], [0., 0., 0.]]),
         kernel=fake_kernel,
         reducer=cov_reducer,
     )
-    reduction_rslt, streaming_calc = self.evaluate([
-        reduction_rslt, kr.streaming_calculations
-    ])
-    mean = streaming_calc.cov_state.mean
+    reduction_rslt = self.evaluate(reduction_rslt)
     self.assertEqual((2, 3, 3), reduction_rslt.shape)
     self.assertAllEqual(np.ones(reduction_rslt.shape) * 2, reduction_rslt)
-    self.assertEqual((2, 3), mean.shape)
-    self.assertAllEqual(np.ones(mean.shape) * 3, mean)
     self.assertAllEqualNested(last_sample, [[5., 5., 5.], [5., 5., 5.]])
 
   def test_seed_reproducibility(self):
@@ -270,11 +233,9 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(16, reduction_rslt)
     self.assertEqual(20, last_sample)
     self.assertEqual(
-        20, kernel_results.inner_results.inner_results.counter_1)
+        20, kernel_results.counter_1)
     self.assertEqual(
-        40, kernel_results.inner_results.inner_results.counter_2)
-    self.assertEqual(
-        5, kernel_results.inner_results.call_counter)
+        40, kernel_results.counter_2)
 
   def test_tensor_thinning_and_burnin(self):
     fake_kernel = TestTransitionKernel()
@@ -295,11 +256,9 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(16, reduction_rslt)
     self.assertEqual(20, last_sample)
     self.assertEqual(
-        20, kernel_results.inner_results.inner_results.counter_1)
+        20, kernel_results.counter_1)
     self.assertEqual(
-        40, kernel_results.inner_results.inner_results.counter_2)
-    self.assertEqual(
-        5, kernel_results.inner_results.call_counter)
+        40, kernel_results.counter_2)
 
   def test_none_reducer(self):
     fake_kernel = TestTransitionKernel()
@@ -311,15 +270,13 @@ class SampleFoldTest(test_util.TestCase):
         num_burnin_steps=10,
         num_steps_between_results=1,
     )
-    last_sample, innermost_results = self.evaluate([
-        last_sample,
-        kr.inner_results.inner_results
+    last_sample, kernel_results = self.evaluate([
+        last_sample, kr
     ])
     self.assertEqual(None, reduction_rslt)
     self.assertEqual(20, last_sample)
-    self.assertEqual(None, kr.streaming_calculations)
-    self.assertEqual(20, innermost_results.counter_1)
-    self.assertEqual(40, innermost_results.counter_2)
+    self.assertEqual(20, kernel_results.counter_1)
+    self.assertEqual(40, kernel_results.counter_2)
 
   def test_empty_reducer(self):
     fake_kernel = TestTransitionKernel()
@@ -331,15 +288,13 @@ class SampleFoldTest(test_util.TestCase):
         num_burnin_steps=10,
         num_steps_between_results=1,
     )
-    last_sample, innermost_results = self.evaluate([
-        last_sample,
-        kr.inner_results.inner_results
+    last_sample, kernel_results = self.evaluate([
+        last_sample, kr
     ])
     self.assertEqual([], reduction_rslt)
     self.assertEqual(20, last_sample)
-    self.assertEqual([], kr.streaming_calculations)
-    self.assertEqual(20, innermost_results.counter_1)
-    self.assertEqual(40, innermost_results.counter_2)
+    self.assertEqual(20, kernel_results.counter_1)
+    self.assertEqual(40, kernel_results.counter_2)
 
 
 if __name__ == '__main__':
