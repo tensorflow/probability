@@ -230,15 +230,15 @@ XLA_LOGPROB_RTOL.update({
     'Binomial': 4e-6,
     'Categorical': 6e-6,
     'ContinuousBernoulli': 2e-6,
-    'ExpRelaxedOneHotCategorical': 1e-3,
+    'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
     'FiniteDiscrete': 6e-6,
     'Geometric': 5e-5,
     'JohnsonSU': 1e-2,
-    'LogLogistic': 3e-5,
+    'LogLogistic': 1e-3,  # TODO(b/163118820)
     'Multinomial': 3e-4,
-    'OneHotCategorical': 1e-3,
+    'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'Pareto': 2e-2,  # TODO(b/159997708)
-    'Poisson': 3e-2,
+    'Poisson': 3e-2,  # TODO(b/159999573)
     'RelaxedBernoulli': 3e-3,
     'VonMises': 2e-2,  # TODO(b/160000258):
 })
