@@ -159,6 +159,7 @@ class ScaleTriL(chain.Chain):
       name: Python `str` name given to ops managed by this object.
         Default value: `scale_tril`.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       if diag_bijector is None:
         diag_bijector = softplus.Softplus(validate_args=validate_args)
@@ -177,4 +178,5 @@ class ScaleTriL(chain.Chain):
           [transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector),
            fill_triangular.FillTriangular()],
           validate_args=validate_args,
+          parameters=parameters,
           name=name)
