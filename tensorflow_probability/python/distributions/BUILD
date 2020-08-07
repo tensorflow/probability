@@ -3267,14 +3267,11 @@ py_test(
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
-        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
-        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -3331,6 +3328,28 @@ py3_test(
     ],
     deps = [
         ":jax_transformation_testlib",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "platform_compatibility_test",
+    size = "large",
+    srcs = ["platform_compatibility_test.py"],
+    shard_count = 40,
+    tags = ["hypothesis"],
+    deps = [
+        ":distributions",
+        ":hypothesis_testlib",
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # numpy dep,
+        # six dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
