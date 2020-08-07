@@ -14,5 +14,6 @@
 # ============================================================================
 """Module for the inverse function transformation."""
 from oryx.core.interpreters.inverse import core
+from oryx.core.interpreters.inverse import custom_inverse
 from oryx.core.interpreters.inverse import rules
 from oryx.core.interpreters.inverse import slice  # pylint: disable=redefined-builtin

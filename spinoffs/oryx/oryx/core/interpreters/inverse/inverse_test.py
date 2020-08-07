@@ -23,6 +23,9 @@ import numpy as onp
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters.inverse import core
 from oryx.core.interpreters.inverse import rules
+from tensorflow_probability.substrates import jax as tfp
+tfb = tfp.bijectors
+
 del rules  # needed for registration only
 
 
@@ -238,6 +241,46 @@ class InverseTest(absltest.TestCase):
     onp.testing.assert_allclose(x, np.ones(2))
     onp.testing.assert_allclose(y, np.ones(2))
     onp.testing.assert_allclose(ildj_, 0., atol=1e-6, rtol=1e-6)
+
+  def test_sigmoid_ildj(self):
+    def naive_sigmoid(x):
+      # This is the default JAX implementation of sigmoid.
+      return 1. / (1 + np.exp(-x))
+    naive_inv = core.inverse(naive_sigmoid)
+    naive_ildj = core.ildj(naive_sigmoid)
+
+    with self.assertRaises(AssertionError):
+      onp.testing.assert_allclose(naive_inv(0.9999),
+                                  jax.scipy.special.logit(0.9999))
+    with self.assertRaises(AssertionError):
+      onp.testing.assert_allclose(naive_ildj(0.9999),
+                                  tfb.Sigmoid().inverse_log_det_jacobian(
+                                      0.9999, 0))
+
+    f_inv = core.inverse(jax.nn.sigmoid)
+    f_ildj = core.ildj(jax.nn.sigmoid)
+    onp.testing.assert_allclose(f_inv(0.9999), jax.scipy.special.logit(0.9999))
+    onp.testing.assert_allclose(f_ildj(0.9999),
+                                tfb.Sigmoid().inverse_log_det_jacobian(
+                                    0.9999, 0))
+
+  def test_logit_ildj(self):
+    def naive_logit(x):
+      # This is the default JAX implementation of logit.
+      return np.log(x / (1. - x))
+    naive_inv = core.inverse(naive_logit)
+    naive_ildj = core.ildj(naive_logit)
+    with self.assertRaises(ValueError):
+      naive_inv(-100.)
+    with self.assertRaises(ValueError):
+      naive_ildj(-100.)
+    f_inv = core.inverse(jax.scipy.special.logit)
+    f_ildj = core.ildj(jax.scipy.special.logit)
+    onp.testing.assert_allclose(f_inv(-100.), jax.scipy.special.expit(-100.))
+    onp.testing.assert_allclose(f_ildj(-100.),
+                                tfb.Sigmoid().forward_log_det_jacobian(
+                                    -100., 0))
+
 
 if __name__ == '__main__':
   os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=2'

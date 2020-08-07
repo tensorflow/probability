@@ -25,7 +25,6 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":kwargs_util",
         ":primitive",
         ":pytree",
         ":serialize",
@@ -35,6 +34,7 @@ py_library(
         "//oryx/core/interpreters:log_prob",
         "//oryx/core/interpreters:unzip",
         "//oryx/core/interpreters/inverse:core",
+        "//oryx/core/interpreters/inverse:custom_inverse",
         "//oryx/core/ppl",
         "//oryx/core/state",
     ],

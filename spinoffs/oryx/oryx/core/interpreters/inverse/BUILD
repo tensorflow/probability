@@ -26,6 +26,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":core",
+        ":custom_inverse",
         ":rules",
         ":slice",
     ],
@@ -50,6 +51,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":core",
+        ":custom_inverse",
         ":slice",
         # jax dep,
         "//oryx/core:primitive",
@@ -72,6 +74,19 @@ py_library(
     ],
 )
 
+# pytype_strict
+py_library(
+    name = "custom_inverse",
+    srcs = ["custom_inverse.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":core",
+        ":slice",
+        # jax dep,
+        "//oryx/core:primitive",
+    ],
+)
+
 # py_strict
 py_test(
     name = "inverse_test",
@@ -84,6 +99,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core/interpreters:harvest",
+        # [tfp_jax dependency],
     ],
 )
 
@@ -95,6 +111,21 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":slice",
+        # absl/testing:absltest dep,
+        # jax dep,
+    ],
+)
+
+# py_strict
+py_test(
+    name = "custom_inverse_test",
+    srcs = ["custom_inverse_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":core",
+        ":custom_inverse",
+        ":rules",
         # absl/testing:absltest dep,
         # jax dep,
     ],

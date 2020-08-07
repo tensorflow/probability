@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Registers inverse and ILDJ rules."""
+"""Registers inverse and ILDJ rules.
 
+This module also monkey patches `jax.nn.sigmoid`, `jax.scipy.special.logit`, and
+`jax.scipy.special.expit` to have custom inverses.
+"""
+import jax
 from jax import lax
 from jax import util as jax_util
 import jax.numpy as np
@@ -21,6 +25,7 @@ import jax.numpy as np
 from oryx.core import primitive
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters.inverse import core as inverse_core
+from oryx.core.interpreters.inverse import custom_inverse as ci
 from oryx.core.interpreters.inverse import slice as slc
 
 __all__ = [
@@ -34,6 +39,7 @@ NDSlice = slc.NDSlice
 Slice = slc.Slice
 safe_zip = jax_util.safe_zip
 safe_map = jax_util.safe_map
+custom_inverse = ci.custom_inverse
 
 register_elementwise(lax.exp_p)(np.log)
 register_elementwise(lax.log_p)(np.exp)
@@ -153,3 +159,20 @@ def reshape_ildj(incells, outcells, **params):
   return incells, outcells, None
 ildj_registry[lax.reshape_p] = reshape_ildj
 
+
+def expit_ildj(y):
+  x = jax.scipy.special.logit(y)
+  return jax.nn.softplus(-x) + jax.nn.softplus(x)
+
+
+def logit_ildj(y):
+  return -jax.nn.softplus(-y) - jax.nn.softplus(y)
+
+# Monkey patching JAX so we can define custom, more numerically stable inverses.
+jax.scipy.special.expit = custom_inverse(jax.scipy.special.expit)
+jax.scipy.special.logit = custom_inverse(jax.scipy.special.logit)
+jax.nn.sigmoid = jax.scipy.special.expit
+jax.scipy.special.expit.def_inverse_unary(f_inv=jax.scipy.special.logit,
+                                          f_ildj=expit_ildj)
+jax.scipy.special.logit.def_inverse_unary(f_inv=jax.scipy.special.expit,
+                                          f_ildj=logit_ildj)

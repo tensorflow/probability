@@ -32,6 +32,15 @@ from oryx.core.interpreters import harvest
 from oryx.core.interpreters import propagate
 from oryx.core.interpreters.inverse import slice as slc
 
+__all__ = [
+    'ildj_registry',
+    'InverseAndILDJ',
+    'inverse_and_ildj',
+    'inverse',
+    'register_elementwise',
+    'register_binary',
+]
+
 safe_map = jax_core.safe_map
 safe_zip = jax_core.safe_zip
 Cell = propagate.Cell
@@ -153,7 +162,7 @@ class InverseAndILDJ(Cell):
     return InverseAndILDJ(data[0], frozenset(slices))
 
 
-def inverse_and_ildj(f, *trace_args):
+def inverse_and_ildj(f, *trace_args, reduce_ildj=True):
   """Inverse and ILDJ function transformation."""
   def wrapped(*args, **kwargs):
     """Function wrapper that takes in inverse arguments."""
@@ -170,29 +179,34 @@ def inverse_and_ildj(f, *trace_args):
     env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr.jaxpr,
                               flat_constcells, flat_incells, flat_outcells)
     flat_incells = [env.read(invar) for invar in jaxpr.jaxpr.invars]
-    if any(flat_incell.is_unknown() for flat_incell in flat_incells):
+    if any(not flat_incell.top() for flat_incell in flat_incells):
       raise ValueError('Cannot invert function.')
-    flat_cells, flat_ildjs = jax_util.unzip2([
+    flat_vals, flat_ildjs = jax_util.unzip2([
         (flat_incell.val, flat_incell.ildj) for flat_incell in flat_incells
     ])
-    vals = tree_util.tree_unflatten(in_tree, flat_cells)
-    ildjs = tree_util.tree_unflatten(in_tree, flat_ildjs)
-    ildj_ = sum(np.sum(i) for i in ildjs)
+    vals = tree_util.tree_unflatten(in_tree, flat_vals)
+    if reduce_ildj:
+      ildj_ = sum(np.sum(i) for i in flat_ildjs)
+    else:
+      ildj_ = tree_util.tree_unflatten(in_tree, flat_ildjs)
     if len(forward_args) == 1:
       vals = vals[0]
+      ildj_ = ildj_ if reduce_ildj else ildj_[0]
     return vals, ildj_
   return wrapped
 
 
-def inverse(f, *trace_args):
+def inverse(f, *trace_args, **inverse_kwargs):
   def wrapped(*args, **kwargs):
-    return inverse_and_ildj(f, *trace_args)(*args, **kwargs)[0]
+    return inverse_and_ildj(f, *trace_args, **inverse_kwargs)(
+        *args, **kwargs)[0]
   return wrapped
 
 
-def ildj(f, *trace_args):
+def ildj(f, *trace_args, **inverse_kwargs):
   def wrapped(*args, **kwargs):
-    return inverse_and_ildj(f, *trace_args)(*args, **kwargs)[1]
+    return inverse_and_ildj(f, *trace_args, **inverse_kwargs)(
+        *args, **kwargs)[1]
   return wrapped
 
 
@@ -240,13 +254,13 @@ def register_elementwise(prim):
       """General InverseAndILDJ rule for elementwise functions."""
       outcell, = outcells
       incell, = incells
-      if incell.is_unknown() and not outcell.is_unknown():
+      if not incell.top() and outcell.top():
         val = outcell.val
         f_sum = lambda x: f(x).sum()
         ildj_ = outcell.ildj + np.log(jax.grad(f_sum)(val))
         ndslice = NDSlice.new(f(val), ildj_)
         incells = [InverseAndILDJ(outcell.aval, [ndslice])]
-      elif outcell.is_unknown() and not incell.is_unknown():
+      elif not outcell.top() and incell.top():
         outcells = [InverseAndILDJ.new(prim.bind(incell.val, **params))]
       return incells, outcells, None
     ildj_registry[prim] = ildj_rule
@@ -259,18 +273,18 @@ def register_binary(prim):
     def ildj_rule(incells, outcells, **params):
       outcell, = outcells
       left, right = incells
-      if not outcell.bottom():
+      if outcell.top():
         val, ildj_ = outcell.val, outcell.ildj
-        if not left.bottom():
+        if left.top():
           right_val, right_ildj = f_left(left.val, val, ildj_)
           ndslice = NDSlice.new(right_val, right_ildj)
           incells = [left, InverseAndILDJ(right.aval, [ndslice])]
-        elif not right.bottom():
+        elif right.top():
           left_val, left_ildj = f_right(right.val, val, ildj_)
           ndslice = NDSlice.new(left_val, left_ildj)
           incells = [InverseAndILDJ(left.aval, [ndslice]), right]
-      elif (outcell.bottom() and not left.bottom() and
-            not right.bottom()):
+      elif (not outcell.top() and left.top() and
+            right.top()):
         out_val = prim.bind(left.val, right.val, **params)
         outcells = [InverseAndILDJ.new(out_val)]
       return incells, outcells, None

@@ -54,6 +54,7 @@ from oryx.core import kwargs_util
 from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import unzip
+from oryx.core.interpreters.inverse import custom_inverse
 from oryx.core.state import api
 from oryx.core.state import module
 
@@ -73,7 +74,8 @@ def _function_register(generic_func):
   def wrapped(f):
     for pytype in [types.FunctionType, types.MethodType, types.LambdaType,
                    types.BuiltinMethodType, types.BuiltinFunctionType,
-                   functools.partial]:
+                   functools.partial, custom_inverse.CustomInverse,
+                   jax.custom_jvp, jax.custom_vjp]:
       generic_func.register(pytype, f)
     return f
   return wrapped

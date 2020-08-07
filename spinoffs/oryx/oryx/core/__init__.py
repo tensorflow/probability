@@ -29,6 +29,8 @@ from oryx.core.interpreters.inverse.core import ildj
 from oryx.core.interpreters.inverse.core import ildj_registry
 from oryx.core.interpreters.inverse.core import inverse
 from oryx.core.interpreters.inverse.core import inverse_and_ildj
+from oryx.core.interpreters.inverse.custom_inverse import custom_inverse
+from oryx.core.interpreters.inverse.custom_inverse import NonInvertibleError
 from oryx.core.interpreters.log_prob import log_prob
 from oryx.core.interpreters.log_prob import log_prob_registry
 from oryx.core.interpreters.unzip import unzip

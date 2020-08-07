@@ -56,6 +56,7 @@ py_library(
         "//oryx/core:trace_util",
         "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:unzip",
+        "//oryx/core/interpreters/inverse:custom_inverse",
     ],
 )
 
