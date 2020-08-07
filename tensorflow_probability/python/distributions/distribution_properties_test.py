@@ -653,7 +653,7 @@ class DistributionSlicingTest(test_util.TestCase):
 class DistributionXLATest(test_util.TestCase):
 
   def _test_sample_and_log_prob(self, dist_name, dist):
-    seed = test_util.test_seed()
+    seed = test_util.test_seed(sampler_type='stateless')
 
     num_samples = 3
     sample = self.evaluate(
