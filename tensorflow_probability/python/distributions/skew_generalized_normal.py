@@ -5,11 +5,17 @@ from __future__ import print_function
 
 import math
 
+import functools
+
 import tensorflow as tf
+from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.distributions import Distribution
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import special_math
-from tensorflow_probability.python.distributions import Distribution
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
     "SkewGeneralizedNormal",
@@ -47,7 +53,8 @@ class SkewGeneralizedNormal(Distribution):
 
 
     with tf.name_scope(name) as name:
-      dtype = dtype_util.common_dtype([loc, scale], tf.float32)
+      dtype = dtype_util.common_dtype([loc, scale, peak],
+                                      dtype_hint=tf.float32)
       loc = tf.convert_to_tensor(loc, name="loc", dtype=dtype)
       scale = tf.convert_to_tensor(scale, name="scale", dtype=dtype)
       peak = tf.convert_to_tensor(peak, name="peak", dtype=dtype)
@@ -75,7 +82,11 @@ class SkewGeneralizedNormal(Distribution):
   def _param_shapes(sample_shape):
     return dict(
         zip(("loc", "scale", "peak"),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 3)))
+
+  @classmethod
+  def _params_event_ndims(cls):
+    return dict(loc=0, scale=0, peak=0)
 
   @property
   def loc(self):
@@ -84,29 +95,24 @@ class SkewGeneralizedNormal(Distribution):
 
   @property
   def scale(self):
-    """Distribution parameter for standard deviation."""
+    """Distribution parameter for scale."""
     return self._scale
 
   @property
   def peak(self):
-    """Distribution parameter for mode."""
+    """Distribution parameter related to mode and skew."""
     return self._peak
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc),
-        tf.shape(self.scale))
+  def _batch_shape_tensor(self, loc=None, scale=None, peak=None):
+    return functools.reduce(prefer_static.broadcast_shape, (
+        prefer_static.shape(self.loc if loc is None else loc),
+        prefer_static.shape(self.scale if scale is None else scale),
+        prefer_static.shape(self.peak if peak is None else peak)))
 
   def _batch_shape(self):
-    loc_scale_s = tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
-    loc_peak_s = tf.broadcast_static_shape(self.loc.shape, self.peak.shape)
-    peak_scale_s = tf.broadcast_static_shape(self.peak.shape, self.scale.shape)
-    assert loc_scale_s == loc_peak_s == peak_scale_s
-    return tf.broadcast_static_shape(
-        self.loc.shape,
-        self.scale.shape)
+    return functools.reduce(tf.broadcast_static_shape, (
+        self.loc.shape, self.scale.shape, self.peak.shape))
 
-#-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -127,9 +133,8 @@ class SkewGeneralizedNormal(Distribution):
     return self._n_log_prob(self._y(x)) - log_smpe
 
   def _prob(self, x):
-    log_prob = tf.exp(self._log_prob(x))
-    return tf.where(tf.math.is_nan(log_prob), tf.zeros_like(log_prob), log_prob
-                    )
+    prob = tf.exp(self._log_prob(x))
+    return tf.where(tf.math.is_nan(prob), tf.zeros_like(prob), prob)
 
   def _log_cdf(self, x):
     return special_math.log_ndtr(self._y(x))
@@ -172,6 +177,9 @@ class SkewGeneralizedNormal(Distribution):
     scale_q = self.scale/tf.abs(self.peak)
     return scale_q * exp_square_peak * root_sq_offset * broadcast_ones
 
+  def _variance(self):
+    return tf.square(self._stddev())
+
   def _mode(self):
     broad_ones = tf.ones_like(self.scale)
     unit_mode = ((1. - tf.exp(-tf.square(self.peak)))*self.scale)/self.peak
@@ -187,4 +195,34 @@ class SkewGeneralizedNormal(Distribution):
     with tf.name_scope("reconstruct"):
       return z * self.scale + self.loc
 
+  def _default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
 
+  def _parameter_control_dependencies(self, is_init):
+    assertions = []
+    if is_init:
+      # _batch_shape() will raise error if it can statically prove that `loc`,
+      # `scale`, and `peak` have incompatible shapes.
+      # taken from generalized_normal
+      try:
+        self._batch_shape()
+      except ValueError:
+        raise ValueError(
+            'Arguments `loc`, `scale` and `peak` must have compatible shapes; '
+            'loc.shape={}, scale.shape={}, peak.shape={}.'.format(
+                self.loc.shape, self.scale.shape, self.peak.shape))
+      # We don't bother checking the shapes in the dynamic case because
+      # all member functions access the three arguments anyway.
+
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
+    if is_init != tensor_util.is_ref(self.scale):
+      assertions.append(assert_util.assert_positive(
+          self.scale, message='Argument `scale` must be positive.'))
+    if is_init != tensor_util.is_ref(self.peak):
+      assertions.append(assert_util.assert_positive(
+          self.power, message='Argument `peak` must be positive.'))
+
+    return assertions
