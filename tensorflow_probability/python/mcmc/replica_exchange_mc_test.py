@@ -28,7 +28,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 tfd = tfp.distributions
 
@@ -43,6 +43,19 @@ def init_tfp_randomwalkmetropolis(
       target_log_prob_fn,
       new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=step_size),
       seed=seed)
+
+
+def init_tfp_adaptive_hmc(
+    target_log_prob_fn,
+    step_size,
+    num_leapfrog_steps=None, seed=None, store_parameters_in_results=False):  # pylint: disable=unused-argument
+  return tfp.mcmc.simple_step_size_adaptation.SimpleStepSizeAdaptation(
+      tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn,
+          step_size=step_size,
+          num_leapfrog_steps=num_leapfrog_steps,
+          store_parameters_in_results=store_parameters_in_results),
+      target_accept_prob=0.75, num_adaptation_steps=250)
 
 
 def effective_sample_size(x, **kwargs):
@@ -285,6 +298,7 @@ class REMCTest(test_util.TestCase):
       for asserts in [True, False]
       for kernel_name, tfp_transition_kernel, store_param in [
           ('HMC', tfp.mcmc.HamiltonianMonteCarlo, True),  # NUMPY_DISABLE
+          ('AdaptiveHMC', init_tfp_adaptive_hmc, True),  # NUMPY_DISABLE
           ('RWMH', init_tfp_randomwalkmetropolis, False),
       ] for testcase_name, inverse_temperatures in [
           ('OddNumReplicas', [1.0, 0.8, 0.6]),
@@ -360,8 +374,8 @@ class REMCTest(test_util.TestCase):
             states_.mean(), states_.std()))
 
     # Some shortened names.
-    replica_log_accept_ratio = (
-        kr_.post_swap_replica_results.log_accept_ratio)
+    replica_log_accept_ratio = mcmc_util.get_field(
+        kr_.post_swap_replica_results, 'log_accept_ratio')
     replica_states_ = kr_.post_swap_replica_states[0]  # Get rid of "parts"
 
     # Target state is at index 0.
@@ -436,19 +450,24 @@ class REMCTest(test_util.TestCase):
 
     if store_parameters_in_results:
       # Check that store_parameters_in_results=True worked for HMC.
-      self.assertAllEqual(
-          np.repeat([step_size], axis=0, repeats=num_results),
-          kr_.post_swap_replica_results.accepted_results.step_size)
+      if not isinstance(
+          kr_.post_swap_replica_results,
+          tfp.mcmc.simple_step_size_adaptation.SimpleStepSizeAdaptationResults):
+        self.assertAllEqual(
+            np.repeat([step_size], axis=0, repeats=num_results),
+            mcmc_util.get_field(kr_.post_swap_replica_results, 'step_size'))
 
       self.assertAllEqual(
           np.repeat([num_leapfrog_steps], axis=0, repeats=num_results),
-          kr_.post_swap_replica_results.accepted_results.num_leapfrog_steps)
+          mcmc_util.get_field(
+            kr_.post_swap_replica_results, 'num_leapfrog_steps'))
 
   @parameterized.named_parameters([
       # pylint: disable=line-too-long
       ('_HMC_default', tfp.mcmc.HamiltonianMonteCarlo, False, 'default'),  # NUMPY_DISABLE
       ('_HMC_scr_default', tfp.mcmc.HamiltonianMonteCarlo, True, 'default'),  # NUMPY_DISABLE
       ('_RWMH_default', init_tfp_randomwalkmetropolis, False, 'default'),
+      ('_adaptive_HMC_default', init_tfp_adaptive_hmc, False, 'default'),  # NUMPY_DISABLE
       ('_HMC_even_odd', tfp.mcmc.HamiltonianMonteCarlo, False, 'even_odd'),  # NUMPY_DISABLE
       ('_RWMH_even_odd', init_tfp_randomwalkmetropolis, False, 'default'),  # NUMPY_DISABLE
       # pylint: enable=line-too-long
@@ -496,7 +515,8 @@ class REMCTest(test_util.TestCase):
     remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
-      return results.post_swap_replica_results.log_accept_ratio
+      return mcmc_util.get_field(
+        results.post_swap_replica_results, 'log_accept_ratio')
 
     if state_includes_replicas:
       current_state = tf.ones((num_replica, 2), dtype=dtype)
@@ -710,7 +730,7 @@ class REMCTest(test_util.TestCase):
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return [
-          results.post_swap_replica_results.log_accept_ratio,
+          mcmc_util.get_field(results.post_swap_replica_results, 'log_accept_ratio'),
           results.post_swap_replica_states
       ]
 
@@ -804,8 +824,8 @@ class REMCTest(test_util.TestCase):
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
       xy = tf.stack([x, y], axis=-1) - true_mean
       z = linop.solvevec(xy)
-      return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
+      return -0.5 * tf.reduce_sum(z**2., axis=-1)
     def make_kernel_fn(target_log_prob_fn):
       return tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target_log_prob_fn,
