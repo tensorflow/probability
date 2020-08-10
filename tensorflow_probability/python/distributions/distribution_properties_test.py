@@ -51,6 +51,8 @@ from tensorflow_probability.python.internal import test_util
 # batch slicing.
 INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchReshape',
+    'Mixture',
+    'QuantizedDistribution',
 )
 
 
@@ -58,6 +60,16 @@ EVENT_SPACE_BIJECTOR_IS_BROKEN = [
     'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
                      # (Reciprocal(Softplus(x)) -> inf for small x)
 ]
+
+SLICING_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-5)
+SLICING_LOGPROB_ATOL.update({
+    'Weibull': 3e-5,
+})
+
+SLICING_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-5)
+SLICING_LOGPROB_RTOL.update({
+    'Weibull': 3e-5,
+})
 
 
 @test_util.test_all_tf_execution_regimes
@@ -191,10 +203,15 @@ def _all_non_packetized(thing):
   return _all_ok(thing, one_ok)
 
 
+DISTS_OK_TO_SLICE = (set(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                         list(dhps.INSTANTIABLE_META_DISTS)) -
+                     set(INSTANTIABLE_BUT_NOT_SLICABLE))
+
+
 @test_util.test_all_tf_execution_regimes
 class DistributionSlicingTest(test_util.TestCase):
 
-  def _test_slicing(self, data, dist):
+  def _test_slicing(self, data, dist_name, dist):
     strm = test_util.test_seed_stream()
     batch_shape = dist.batch_shape
     slices = data.draw(dhps.valid_slices(batch_shape))
@@ -272,12 +289,21 @@ class DistributionSlicingTest(test_util.TestCase):
     hp.note('Non-packetization check {}'.format(all_non_packetized))
     hp.assume(all_packetized or all_non_packetized)
 
-    self.assertAllClose(lp[slices], sliced_lp, atol=1e-5, rtol=1e-5)
+    self.assertAllClose(lp[slices], sliced_lp,
+                        atol=SLICING_LOGPROB_ATOL[dist_name],
+                        rtol=SLICING_LOGPROB_RTOL[dist_name])
 
-  def _run_test(self, data):
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(DISTS_OK_TO_SLICE))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistributions(self, dist_name, data):
     def ok(name):
       return name not in INSTANTIABLE_BUT_NOT_SLICABLE
-    dist = data.draw(dhps.distributions(enable_vars=False,
+
+    dist = data.draw(dhps.distributions(dist_name=dist_name,
+                                        enable_vars=False,
                                         eligibility_filter=ok))
 
     # Check that all distributions still register as non-iterable despite
@@ -287,16 +313,11 @@ class DistributionSlicingTest(test_util.TestCase):
       iter(dist)
 
     # Test slicing
-    self._test_slicing(data, dist)
+    self._test_slicing(data, dist_name, dist)
 
     # TODO(bjp): Enable sampling and log_prob checks. Currently, too many errors
     #     from out-of-domain samples.
     # self.evaluate(dist.log_prob(dist.sample(seed=test_util.test_seed())))
-
-  @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings()
-  def testDistributions(self, data):
-    self._run_test(data)
 
   def disabled_testFailureCase(self):  # pylint: disable=invalid-name
     # TODO(b/140229057): This test should pass.
