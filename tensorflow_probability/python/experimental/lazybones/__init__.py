@@ -20,6 +20,7 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.lazybones import utils
 from tensorflow_probability.python.experimental.lazybones.deferred import Deferred
 from tensorflow_probability.python.experimental.lazybones.deferred import DeferredBase
 from tensorflow_probability.python.experimental.lazybones.deferred import DeferredInput
@@ -32,4 +33,5 @@ __all__ = [
     'DeferredInput',
     'DeferredScope',
     'UNKNOWN',
+    'utils',
 ]

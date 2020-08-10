@@ -26,8 +26,8 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.lazybones import deferred_scope
-from tensorflow_probability.python.experimental.lazybones import special_methods
-from tensorflow_probability.python.experimental.lazybones import weak_container
+from tensorflow_probability.python.experimental.lazybones.utils import special_methods
+from tensorflow_probability.python.experimental.lazybones.utils import weak_container
 
 
 __all__ = [
@@ -95,10 +95,7 @@ class DeferredBase(special_methods.SpecialMethods):
     raise AttributeError('Must be defined.')
 
   def __action__(self, fn, *args, **kwargs):
-    return Deferred(fn, *args, **kwargs)
-
-  def __call__(self, *args, **kwargs):
-    return self.__action__(self, *args, _action_name=self.name, **kwargs)
+    return Deferred(fn, self, *args, **kwargs)
 
   def __dir__(self):
     s = set(object.__dir__(self))
@@ -117,7 +114,7 @@ class DeferredBase(special_methods.SpecialMethods):
             'is not supported.')
       return self  # iter is idempotent.
     return self.__action__(
-        builtins.iter, self, *sentinel, _action_name='__iter__')
+        builtins.iter, *sentinel, _action_name='__iter__')
 
   @functools.wraps(builtins.next)
   def __next__(self, *default):
@@ -127,7 +124,7 @@ class DeferredBase(special_methods.SpecialMethods):
       # In this branch we presume the user does not wish to have static
       # iteration, i.e., we defer the operation as we would any other.
       return self.__action__(
-          builtins.next, self, *default, _action_name='__next__')
+          builtins.next, *default, _action_name='__next__')
     next_children = tuple(c for c in self._children
                           if getattr(c, 'fn', None) is builtins.next)
     if len(next_children) < static_num_iter:
@@ -138,7 +135,7 @@ class DeferredBase(special_methods.SpecialMethods):
       # induce all the prior `next`s to be evaluated first thus forcing the
       # side-effect in the eventually concretized iterator.
       return self.__action__(
-          builtins.next, self, next_children, _action_name='__next__')
+          builtins.next, next_children, _action_name='__next__')
     if default:
       return default
     raise StopIteration
@@ -205,7 +202,8 @@ class Deferred(DeferredBase):
 
   def __new__(cls, fn, *args, **kwargs):
     static_iter_len = kwargs.pop('_static_iter_len', -1)
-    name = kwargs.pop('_action_name', _try_get_name(fn, name_fallback='?'))
+    name = kwargs.pop('_action_name', special_methods.try_get_name(
+        fn, name_fallback='?'))
     parents = cls._get_deferred([fn, args, kwargs])
     if not parents:
       return fn(*args, **kwargs)
@@ -249,7 +247,10 @@ class DeferredInput(DeferredBase):
 
   __slots__ = ()
 
-  def __init__(self, value=UNKNOWN, name='input', _static_iter_len=-1):  # pylint: disable=invalid-name
+  def __init__(self, value=UNKNOWN, name=None, _static_iter_len=-1):  # pylint: disable=invalid-name
+    if name is None:
+      name = ('input' if value is UNKNOWN
+              else special_methods.try_get_name(value, 'input'))
     super(DeferredInput, self).__init__(
         parents=self._get_deferred(value),
         static_iter_len=_static_iter_len,
@@ -267,10 +268,3 @@ class DeferredInput(DeferredBase):
         return v.eval()
       return v
     return tf.nest.map_structure(_concretize, self.value)
-
-
-def _try_get_name(fn, name_fallback='unknown'):
-  if isinstance(fn, DeferredBase):
-    return fn.name
-  return str(getattr(fn, '__name__', None) or
-             getattr(type(fn), '__name__', name_fallback))

@@ -26,6 +26,14 @@ import math
 import operator
 import sys
 
+import tensorflow.compat.v2 as tf
+
+
+__all__ = [
+    'ObjectProxy',
+    'SpecialMethods',
+]
+
 
 # According to:
 #
@@ -66,22 +74,26 @@ def _defer(fn, name=None, reverse=False):
       name = name + '__'
   if reverse:
     fn = _reverse(fn)
-    if not name.startswith('__'):
+    if name.startswith('__'):
       name = '__r' + name[2:]
     else:
       name = 'r' + name
   @functools.wraps(fn)
   def _wrapped_fn(self, *args, **kwargs):
-    return self.__action__(fn, self, *args, _action_name=name, **kwargs)
+    return self.__action__(fn, *args, _action_name=name, **kwargs)
   return _wrapped_fn
 
 
-def enter(self):
+def _enter(self):
   return self.__enter__()
 
 
-def exit_(self, exc_type, exc_value, traceback):
+def _exit(self, exc_type, exc_value, traceback):
   return self.__exit__(exc_type, exc_value, traceback)
+
+
+def _call(self, *args, **kwargs):
+  return self.__call__(*args, **kwargs)
 
 
 class SpecialMethods(object):
@@ -90,7 +102,10 @@ class SpecialMethods(object):
   __slots__ = ('_name',)
 
   def __action__(self, fn, *args, **kwargs):
-    raise NotImplementedError('Subclass must implement `__action__`.')
+    action_name = kwargs.pop('_action_name', None)
+    name = try_get_name(fn) if action_name is None else action_name
+    raise NotImplementedError(
+        'Subclass must implement `__action__` ({}).'.format(name))
 
   __repr__ = _defer(builtins.repr)
   __str__ = _defer(builtins.str)
@@ -130,27 +145,28 @@ class SpecialMethods(object):
   __floor__ = _defer(math.floor)
   __ceil__ = _defer(math.ceil)
 
-  __enter__ = _defer(enter)
-  __exit__ = _defer(exit_, 'exit')
+  __enter__ = _defer(_enter, '__enter__')
+  __exit__ = _defer(_exit, '__exit__')
+  __call__ = _defer(_call, '__call__')
 
   if PY2_OR_OLDER:
 
     def next(self, *default):
-      # We don't call __action__ since __next__ will for us.
+      # We don't call __action__ since __next__ will do it for us.
       return self.__next__(*default)
 
     # '__coerce__',
     __inv__ = _defer(operator.inv)
-    __nonzero__ = _defer(builtins.bool, 'nonzero')
+    __nonzero__ = _defer(builtins.bool, '__nonzero__')
 
     __long__ = _defer(builtins.long)
     __hex__ = _defer(builtins.hex)
     __oct__ = _defer(builtins.oct)
 
     # Old PY2:
-    # __getslice__ = _defer(builtins, 'getslice')
-    # __setslice__ = _defer(builtins, 'setslice')
-    # __delslice__ = _defer(builtins, 'delslice')
+    # __getslice__ = _defer(builtins, '__getslice__')
+    # __setslice__ = _defer(builtins, '__setslice__')
+    # __delslice__ = _defer(builtins, '__delslice__')
 
   else:
 
@@ -166,9 +182,9 @@ class SpecialMethods(object):
   __pow__ = _defer(builtins.pow)
   __lshift__ = _defer(operator.lshift)
   __rshift__ = _defer(operator.rshift)
-  __and__ = _defer(operator.and_, 'and')
+  __and__ = _defer(operator.and_, '__and__')
   __xor__ = _defer(operator.xor)
-  __or__ = _defer(operator.or_, 'or')
+  __or__ = _defer(operator.or_, '__or__')
 
   __radd__ = _defer(operator.add, reverse=True)
   __rsub__ = _defer(operator.sub, reverse=True)
@@ -180,9 +196,9 @@ class SpecialMethods(object):
   __rpow__ = _defer(builtins.pow, reverse=True)
   __rlshift__ = _defer(operator.lshift, reverse=True)
   __rrshift__ = _defer(operator.rshift, reverse=True)
-  __rand__ = _defer(operator.and_, 'and', reverse=True)
+  __rand__ = _defer(operator.and_, '__and__', reverse=True)
   __rxor__ = _defer(operator.xor, reverse=True)
-  __ror__ = _defer(operator.or_, 'or', reverse=True)
+  __ror__ = _defer(operator.or_, '__or__', reverse=True)
 
   __iadd__ = _defer(operator.iadd)
   __isub__ = _defer(operator.isub)
@@ -218,11 +234,10 @@ class SpecialMethods(object):
     if (attr in _GETATTRIBUTE_PASSTHROUGH_OVERRIDE or
         # For some reason we can't use generators here because they behave
         # differently in Ipython REPL execution regime.
-        any(tuple(
-            fn(attr) for fn in _GETATTRIBUTE_PASSTHROUGH_OVERRIDE_CALLABLES))):
+        any(tuple(fn(attr)
+                  for fn in _GETATTRIBUTE_PASSTHROUGH_OVERRIDE_CALLABLES))):
       raise AttributeError()
-    r = self.__action__(getattr, self, attr, _action_name=attr)
-    return r
+    return self.__action__(getattr, attr, _action_name=attr)
 
 
 # If the following attributes are not found in the DeferredBase subclass then
@@ -275,6 +290,7 @@ _GETATTRIBUTE_PASSTHROUGH_OVERRIDE = {
     '__getattribute__',
     '__setattr__',
 
+    '_ipython_canary_method_should_not_exist_',
     '_ipython_display_',  # print: Queried by Jupyter Notebook.
     '__format__',         # print
     '__dir__',            # print
@@ -374,3 +390,27 @@ IGNORED_SPECIAL_METHODS = {
     '__getnewargs__',
     '__setstate__',
 }
+
+
+class ObjectProxy(SpecialMethods):
+  """Like `wrapt.ObjectProxy` except using our way."""
+  slots = ('__wrapped__', '__unpack__')
+
+  def __init__(self, wrapped, unpack=True):
+    self.__wrapped__ = wrapped
+    self.__unpack__ = unpack
+
+  def __action__(self, fn, *args, **kwargs):
+    kwargs.pop('_action_name', None)
+    self, args, kwargs = tf.nest.map_structure(
+        lambda x: (  # pylint: disable=g-long-lambda
+            x.__wrapped__ if isinstance(x, ObjectProxy) and x.__unpack__
+            else x),
+        [self, args, kwargs])
+    return fn(self, *args, **kwargs)
+
+
+def try_get_name(fn, name_fallback='unknown'):
+  return str(getattr(fn, 'name', None) or
+             getattr(fn, '__name__', None) or
+             getattr(type(fn), '__name__', name_fallback))

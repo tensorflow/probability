@@ -52,13 +52,13 @@ class DeferredNumpyTest(absltest.TestCase):
     c = b.sum()
     self.assertEqual('<DeferredInput "input">', repr(a))
     self.assertEqual('<Deferred "__add__">', repr(b))
-    self.assertEqual('<Deferred "sum">', repr(c))
+    self.assertEqual('<Deferred "__call__">', repr(c))
 
     a.value = np.array([[1.], [2]])
     self.assertEqual(
         '<DeferredInput "input" value=array([[1.], [2.]])>', repr(a))
     self.assertEqual('<Deferred "__add__">', repr(b))
-    self.assertEqual('<Deferred "sum">', repr(c))
+    self.assertEqual('<Deferred "__call__">', repr(c))
 
     # Properties are also Deferred object.
     self.assertTrue((b.shape == (1, 2)).eval())
@@ -66,7 +66,7 @@ class DeferredNumpyTest(absltest.TestCase):
         '<DeferredInput "input" value=array([[1.], [2.]])>', repr(a))
     self.assertEqual(
         '<Deferred "__add__" value=array([[ 9., 10.]])>', repr(b))
-    self.assertEqual('<Deferred "sum">', repr(c))
+    self.assertEqual('<Deferred "__call__">', repr(c))
 
     with lb.DeferredScope():
       b.value = np.array([4., 5, 6.])
@@ -75,35 +75,35 @@ class DeferredNumpyTest(absltest.TestCase):
           '<DeferredInput "input" value=array([[1.], [2.]])>', repr(a))
       self.assertEqual(
           '<Deferred "__add__" value=array([4., 5., 6.])>', repr(b))
-      self.assertEqual('<Deferred "sum" value=15.0>', repr(c))
+      self.assertEqual('<Deferred "__call__" value=15.0>', repr(c))
 
     self.assertEqual(c.eval(), 19)
     self.assertEqual(
         '<DeferredInput "input" value=array([[1.], [2.]])>', repr(a))
     self.assertEqual(
         '<Deferred "__add__" value=array([[ 9., 10.]])>', repr(b))
-    self.assertEqual('<Deferred "sum" value=19.0>', repr(c))
+    self.assertEqual('<Deferred "__call__" value=19.0>', repr(c))
 
     # Shape change is allowed.
     a.value = np.ones((1, 3))
     self.assertEqual(
         '<DeferredInput "input" value=array([[1., 1., 1.]])>', repr(a))
     self.assertEqual('<Deferred "__add__">', repr(b))
-    self.assertEqual('<Deferred "sum">', repr(c))
+    self.assertEqual('<Deferred "__call__">', repr(c))
 
     self.assertEqual(b.shape.eval(), (3, 1))
     self.assertEqual(
         '<DeferredInput "input" value=array([[1., 1., 1.]])>', repr(a))
     self.assertEqual(
         '<Deferred "__add__" value=array([[9.], [9.], [9.]])>', repr(b))
-    self.assertEqual('<Deferred "sum">', repr(c))
+    self.assertEqual('<Deferred "__call__">', repr(c))
 
     self.assertEqual(c.eval(), 27)
     self.assertEqual(
         '<DeferredInput "input" value=array([[1., 1., 1.]])>', repr(a))
     self.assertEqual(
         '<Deferred "__add__" value=array([[9.], [9.], [9.]])>', repr(b))
-    self.assertEqual('<Deferred "sum" value=27.0>', repr(c))
+    self.assertEqual('<Deferred "__call__" value=27.0>', repr(c))
 
   def test_str(self):
     a = lb.DeferredInput()

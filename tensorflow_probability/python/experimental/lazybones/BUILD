@@ -35,6 +35,7 @@ py_library(
     deps = [
         ":deferred",
         ":deferred_scope",
+        "//tensorflow_probability/python/experimental/lazybones/utils",
     ],
 )
 
@@ -44,9 +45,9 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":deferred_scope",
-        ":special_methods",
-        ":weak_container",
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/lazybones/utils:special_methods",
+        "//tensorflow_probability/python/experimental/lazybones/utils:weak_container",
     ],
 )
 
@@ -55,21 +56,9 @@ py_library(
     srcs = ["deferred_scope.py"],
     srcs_version = "PY2AND3",
     deps = [
-        ":weak_container",
         # six dep,
+        "//tensorflow_probability/python/experimental/lazybones/utils:weak_container",
     ],
-)
-
-py_library(
-    name = "weak_container",
-    srcs = ["weak_container.py"],
-    srcs_version = "PY2AND3",
-)
-
-py_library(
-    name = "special_methods",
-    srcs = ["special_methods.py"],
-    srcs_version = "PY2AND3",
 )
 
 # py2and3

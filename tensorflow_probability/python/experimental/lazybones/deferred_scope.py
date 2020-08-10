@@ -22,7 +22,7 @@ from __future__ import print_function
 
 import threading
 
-from tensorflow_probability.python.experimental.lazybones import weak_container
+from tensorflow_probability.python.experimental.lazybones.utils import weak_container
 
 
 __all__ = [
