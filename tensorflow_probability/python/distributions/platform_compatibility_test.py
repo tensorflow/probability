@@ -160,7 +160,7 @@ XLA_LOGPROB_RTOL.update({
     'FiniteDiscrete': 6e-6,
     'Geometric': 5e-5,
     'JohnsonSU': 1e-2,
-    'LogLogistic': 1e-2,  # TODO(b/163118820)
+    'LogLogistic': 1.5e-2,  # TODO(b/163118820)
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'Pareto': 2e-2,  # TODO(b/159997708)
