@@ -201,6 +201,9 @@ def bijector_supports():
       'RationalQuadraticSpline':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'RayleighCDF':
+          BijectorSupport(Support.SCALAR_NON_NEGATIVE,
+                          Support.SCALAR_IN_0_1),
       'Reciprocal':
           BijectorSupport(Support.SCALAR_NON_ZERO, Support.SCALAR_NON_ZERO),
       'Reshape':

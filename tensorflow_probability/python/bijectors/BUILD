@@ -83,6 +83,7 @@ multi_substrate_py_library(
         ":permute",
         ":power_transform",
         ":rational_quadratic_spline",
+        ":rayleigh_cdf",
         ":real_nvp",
         ":reciprocal",
         ":reshape",
@@ -664,6 +665,17 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "rayleigh_cdf",
+    srcs = ["rayleigh_cdf.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1537,6 +1549,20 @@ multi_substrate_py_test(
         ":bijector_test_util",
         ":bijectors",
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "rayleigh_cdf_test",
+    size = "small",
+    srcs = ["rayleigh_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
