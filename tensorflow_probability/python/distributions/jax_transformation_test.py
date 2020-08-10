@@ -48,7 +48,9 @@ JIT_LOGPROB_BLOCKLIST = (
     'Bates',
 )
 
-VMAP_SAMPLE_BLOCKLIST = ()
+VMAP_SAMPLE_BLOCKLIST = (
+    'BatchReshape',  # http://b/163171224
+)
 VMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
@@ -56,7 +58,9 @@ VMAP_LOGPROB_BLOCKLIST = (
     'QuantizedDistribution',  # http://b/162940364
 )
 
-PMAP_SAMPLE_BLOCKLIST = ()
+PMAP_SAMPLE_BLOCKLIST = (
+    'BatchReshape',  # http://b/163171224
+)
 PMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
