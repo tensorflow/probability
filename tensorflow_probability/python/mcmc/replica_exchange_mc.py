@@ -603,7 +603,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           previous_kernel_results.post_swap_replica_results,
           **inner_kwargs)
 
-      pre_swap_replica_target_log_prob = _get_field(
+      pre_swap_replica_target_log_prob = mcmc_util.get_field(
           # These are tempered log probs (have been divided by temperature).
           pre_swap_replica_results, 'target_log_prob')
 
@@ -835,7 +835,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       replica_results = inner_kernel.bootstrap_results(replica_states)
 
-      pre_swap_replica_target_log_prob = _get_field(
+      pre_swap_replica_target_log_prob = mcmc_util.get_field(
           replica_results, 'target_log_prob')
 
       replica_and_batch_shape = ps.shape(
@@ -930,26 +930,22 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
   Raises:
     NotImplementedError: If type of [nested] results is not handled.
   """
-  if not isinstance(pre_swap_replica_results,
-                    metropolis_hastings.MetropolisHastingsKernelResults):
-    # TODO(b/143702650) Handle other kernels.
-    raise NotImplementedError(
-        '`pre_swap_replica_results` currently works only for '
-        'MetropolisHastingsKernelResults.  Found: {}. '
-        'Please file a request with the TensorFlow Probability team.'.format(
-            type(pre_swap_replica_results)))
 
   kr = pre_swap_replica_results
   dtype = swapped_inverse_temperatures.dtype
 
   # Hard to modify proposed_results in an um-ambiguous manner.
   # ...we also don't need to.
-  kr = kr._replace(
-      proposed_results=tf.convert_to_tensor(np.nan, dtype=dtype),
-      proposed_state=tf.convert_to_tensor(np.nan, dtype=dtype),
-  )
+  kr = mcmc_util.update_field(
+      kr,
+      'proposed_results',
+      tf.convert_to_tensor(np.nan, dtype=dtype))
+  kr = mcmc_util.update_field(
+      kr,
+      'proposed_state',
+      tf.convert_to_tensor(np.nan, dtype=dtype))
 
-  replica_and_batch_rank = ps.rank(kr.log_accept_ratio)
+  replica_and_batch_rank = ps.rank(mcmc_util.get_field(kr, 'log_accept_ratio'))
 
   # After using swap_tensor_fn on "values", values will be multiplied by the
   # swapped_inverse_temperatures.  We need it to be multiplied instead by the
@@ -969,44 +965,16 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
       x = x[0]
     return x
 
-  if isinstance(kr.accepted_results,
-                hmc.UncalibratedHamiltonianMonteCarloKernelResults):
-    kr = kr._replace(
-        accepted_results=kr.accepted_results._replace(
-            target_log_prob=_swap_then_retemper(
-                kr.accepted_results.target_log_prob),
-            grads_target_log_prob=_swap_then_retemper(
-                kr.accepted_results.grads_target_log_prob)))
-  elif isinstance(kr.accepted_results,
-                  random_walk_metropolis.UncalibratedRandomWalkResults):
-    kr = kr._replace(
-        accepted_results=kr.accepted_results._replace(
-            target_log_prob=_swap_then_retemper(
-                kr.accepted_results.target_log_prob)))
-  else:
-    # TODO(b/143702650) Handle other kernels.
-    raise NotImplementedError(
-        'Only HMC and RWMH Kernels are handled at this time. Please file a '
-        'request with the TensorFlow Probability team.')
-
+  kr = mcmc_util.update_field(kr, 'target_log_prob', _swap_then_retemper(
+      mcmc_util.get_field(kr, 'target_log_prob')))
+  try:
+    new_grads_target_log_prob = _swap_then_retemper(
+        mcmc_util.get_field(kr, 'grads_target_log_prob'))    
+    kr = mcmc_util.update_field(kr, 'grads_target_log_prob', new_grads_target_log_prob)
+  except TypeError:
+    pass
+  
   return kr
-
-
-# TODO(b/111801087): Use a standardized API, when available.
-def _get_field(kernel_results, field_name):
-  """Get field value from kernel_results or kernel_results.accepted_results."""
-  attr = getattr(kernel_results, field_name, None)
-  if attr is not None:
-    return attr
-  accepted_results = getattr(kernel_results, 'accepted_results', None)
-  if accepted_results is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  attr = getattr(accepted_results, field_name)
-  if attr is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  return attr
 
 
 def _compute_swap_notmatrix(before_positions, after_positions):
