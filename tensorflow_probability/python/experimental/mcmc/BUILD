@@ -435,7 +435,6 @@ py_library(
 py_test(
     name = "sample_fold_test",
     size = "small",
-    timeout = "long",
     srcs = ["sample_fold_test.py"],
     shard_count = 5,
     deps = [

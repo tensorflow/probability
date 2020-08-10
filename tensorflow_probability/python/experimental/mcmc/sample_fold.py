@@ -18,16 +18,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
 import warnings
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental.mcmc import sample
+from tensorflow_probability.python.experimental.mcmc import sample as exp_sample
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
 from tensorflow_probability.python.experimental.mcmc import with_reductions
-from tensorflow_probability.python.experimental import mcmc
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.experimental.mcmc import tracing_reducer
+from tensorflow_probability.python.mcmc import sample
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -118,7 +117,7 @@ def sample_fold(
             num_steps_between_results=num_steps_between_results),
         reducer=reducer,
     )
-    end_state, final_kernel_results = sample.step_kernel(
+    end_state, final_kernel_results = exp_sample.step_kernel(
         num_steps=num_steps,
         current_state=current_state,
         previous_kernel_results=previous_kernel_results,
@@ -141,44 +140,6 @@ def sample_fold(
             final_kernel_results.inner_results.inner_results)
 
 
-class StatesAndTrace(
-    mcmc_util.PrettyNamedTupleMixin,
-    collections.namedtuple('StatesAndTrace', ['all_states', 'trace'])):
-  """States and auxiliary trace of an MCMC chain.
-
-  The first dimension of all the `Tensor`s in this structure is the same and
-  represents the chain length.
-
-  Attributes:
-    all_states: A `Tensor` or a nested collection of `Tensor`s representing the
-      MCMC chain state.
-    trace: A `Tensor` or a nested collection of `Tensor`s representing the
-      auxiliary values traced alongside the chain.
-  """
-  __slots__ = ()
-
-
-class CheckpointableStatesAndTrace(
-    mcmc_util.PrettyNamedTupleMixin,
-    collections.namedtuple('CheckpointableStatesAndTrace',
-                           ['all_states', 'trace', 'final_kernel_results'])):
-  """States and auxiliary trace of an MCMC chain.
-
-  The first dimension of all the `Tensor`s in the `all_states` and `trace`
-  attributes is the same and represents the chain length.
-
-  Attributes:
-    all_states: A `Tensor` or a nested collection of `Tensor`s representing the
-      MCMC chain state.
-    trace: A `Tensor` or a nested collection of `Tensor`s representing the
-      auxiliary values traced alongside the chain.
-    final_kernel_results: A `Tensor` or a nested collection of `Tensor`s
-      representing the final value of the auxiliary state of the
-      `TransitionKernel` that generated this chain.
-  """
-  __slots__ = ()
-
-
 def sample_chain(
     num_results,
     current_state,
@@ -194,7 +155,7 @@ def sample_chain(
 ):
   """Implements Markov chain Monte Carlo via repeated `TransitionKernel` steps.
 
-  This function samples from an Markov chain at `current_state` and whose
+  This function samples from a Markov chain at `current_state` whose
   stationary distribution is governed by the supplied `TransitionKernel`
   instance (`kernel`).
 
@@ -282,7 +243,7 @@ def sample_chain(
                     'value) or an explicit callback that traces the values '
                     'you are interested in.')
 
-    tracing_reducer = mcmc.TracingReducer(
+    trace_reducer = tracing_reducer.TracingReducer(
         trace_fn=lambda curr_state, kr: (curr_state, trace_fn(curr_state, kr)),
         size=num_results
     )
@@ -291,7 +252,7 @@ def sample_chain(
         current_state=current_state,
         previous_kernel_results=previous_kernel_results,
         kernel=kernel,
-        reducer=tracing_reducer,
+        reducer=trace_reducer,
         num_burnin_steps=num_burnin_steps,
         num_steps_between_results=num_steps_between_results,
         parallel_iterations=parallel_iterations,
@@ -301,7 +262,7 @@ def sample_chain(
 
     all_states, trace = trace_results
     if return_final_kernel_results:
-      return CheckpointableStatesAndTrace(
+      return sample.CheckpointableStatesAndTrace(
           all_states=all_states,
           trace=trace,
           final_kernel_results=final_kernel_results)
@@ -309,4 +270,4 @@ def sample_chain(
       if no_trace:
         return all_states
       else:
-        return StatesAndTrace(all_states=all_states, trace=trace)
+        return sample.StatesAndTrace(all_states=all_states, trace=trace)

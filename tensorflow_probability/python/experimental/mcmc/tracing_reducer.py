@@ -54,7 +54,7 @@ class TracingReducer(reducer_base.Reducer):
   Rather, the top level kernel results will be that of `WithReductions`' inner
   kernel.
 
-  As with all reducers, TracingReducer does not hold state information;
+  As with all reducers, `TracingReducer` does not hold state information;
   rather, it stores supplied metadata. Intermediate calculations are held in
   a `TracingState` named tuple, which is returned via `initialize` and
   `one_step` method calls.
@@ -153,7 +153,7 @@ class TracingReducer(reducer_base.Reducer):
         `TransitionKernel`.
 
     Returns:
-      new_reducer_state: `TracingState` with updated trace. Its 'trace_state'
+      new_reducer_state: `TracingState` with updated trace. Its `trace_state`
         field holds a `TensorArray` that includes the newly computed trace
         result.
     """

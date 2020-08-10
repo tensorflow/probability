@@ -561,6 +561,10 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllCloseNested(
         first_final_state, second_final_state, rtol=1e-6)
 
+
+@test_util.test_graph_mode_only
+class SampleChainGraphTest(test_util.TestCase):
+
   def test_chain_works_correlated_multivariate(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -591,8 +595,7 @@ class SampleChainTest(test_util.TestCase):
         trace_fn=None,
         seed=test_util.test_seed())
 
-    if not tf.executing_eagerly():
-      self.assertAllEqual(dict(target_calls=1), counter)
+    self.assertAllEqual(dict(target_calls=1), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(states, axis=0)
