@@ -215,6 +215,8 @@ def _random_binomial_noncpu(
 
 
 # tf.function required to access Grappler's implementation_selector.
+@implementation_selection.never_runs_functions_eagerly
+# TODO(b/163029794): Shape relaxation breaks XLA.
 @tf.function(autograph=False)
 def _random_binomial(
     shape,
@@ -537,6 +539,17 @@ class Binomial(distribution.Distribution):
 def _log_unnormalized_prob_logits(logits, counts, total_count):
   """Log unnormalized probability from logits."""
   logits = tf.convert_to_tensor(logits)
+  # softplus(x) = log(1 + exp(x))
+  # sigmoid(x) = 1 / (1 + exp(-x)) = exp(x) / (exp(x) + 1)
+  # log(probs) = log(sigmoid(logits))
+  #            = -log(1 + exp(-logits))
+  #            = -softplus(-logits)
+  # log1p(-probs) = log(1 - sigmoid(logits))
+  #               = log(1 - 1 / (1 + exp(-logits)))
+  #               = log((1 + exp(-logits) - 1) / (1 + exp(-logits)))
+  #               = log(exp(-logits) / (1 + exp(-logits)))
+  #               = log(sigmoid(-logits))
+  #               = -softplus(logits)  # by log(sigmoid(x)) = -softplus(-x))
   return (-tf.math.multiply_no_nan(tf.math.softplus(-logits), counts) -
           tf.math.multiply_no_nan(
               tf.math.softplus(logits), total_count - counts))
@@ -546,8 +559,7 @@ def _log_unnormalized_prob_probs(probs, counts, total_count):
   """Log unnormalized probability from probs."""
   probs = tf.convert_to_tensor(probs)
   return (tf.math.multiply_no_nan(tf.math.log(probs), counts) +
-          tf.math.multiply_no_nan(
-              tf.math.log1p(-probs), total_count - counts))
+          tf.math.multiply_no_nan(tf.math.log1p(-probs), total_count - counts))
 
 
 def _log_normalization(counts, total_count):

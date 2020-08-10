@@ -23,13 +23,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -126,11 +125,10 @@ class Chi2(distribution.Distribution):
       """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return samplers.gamma(
+    return gamma_lib.random_gamma(
         shape=[n],
-        alpha=0.5 * self.df,
-        beta=tf.convert_to_tensor(0.5, dtype=self.dtype),
-        dtype=self.dtype,
+        concentration=0.5 * self.df,
+        rate=tf.convert_to_tensor(0.5, dtype=self.dtype),
         seed=seed)
 
   def _log_prob(self, x):
@@ -205,7 +203,7 @@ def _kl_chi2_chi2(c0, c1, name=None):
                          name=name or 'kl_chi2_chi2')
 
 
-@kullback_leibler.RegisterKL(Chi2, gamma.Gamma)
+@kullback_leibler.RegisterKL(Chi2, gamma_lib.Gamma)
 def _kl_chi2_gamma(c0, g1, name=None):
   """Calculate batched KL divergence KL(c0 || g1) with c0 Chi2 and g1 Gamma."""
   return _kl_gamma_gamma(concentration0=0.5 * c0.df, rate0=0.5,
@@ -213,7 +211,7 @@ def _kl_chi2_gamma(c0, g1, name=None):
                          name=name or 'kl_chi2_gamma')
 
 
-@kullback_leibler.RegisterKL(gamma.Gamma, Chi2)
+@kullback_leibler.RegisterKL(gamma_lib.Gamma, Chi2)
 def _kl_gamma_chi2(g0, c1, name=None):
   """Calculate batched KL divergence KL(g0 || c1) with g0 Gamma and c1 Chi2."""
   return _kl_gamma_gamma(concentration0=g0.concentration, rate0=g0.rate,

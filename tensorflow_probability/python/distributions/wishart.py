@@ -29,6 +29,7 @@ from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scal
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import transform_diagonal as transform_diagonal_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
@@ -193,11 +194,11 @@ class WishartLinearOperator(distribution.Distribution):
         self._scale.batch_shape_tensor(),
         dtype=dtype_util.base_dtype(df.dtype))
 
-    g = samplers.gamma(
+    g = gamma_lib.random_gamma(
         shape=[n],
-        alpha=self._multi_gamma_sequence(0.5 * expanded_df, self._dimension()),
-        beta=0.5,
-        dtype=self.dtype,
+        concentration=self._multi_gamma_sequence(
+            0.5 * expanded_df, self._dimension()),
+        rate=0.5,
         seed=gamma_seed)
 
     # Complexity: O(nbk**2)

@@ -212,7 +212,7 @@ class Gamma(distribution.Distribution):
     return random_gamma(
         shape=ps.convert_to_shape_tensor([n]),
         concentration=tf.convert_to_tensor(self.concentration, self.dtype),
-        rate=tf.convert_to_tensor(self.rate, self.dtype), seed=seed)[0]
+        rate=tf.convert_to_tensor(self.rate, self.dtype), seed=seed)
 
   def _log_prob(self, x, concentration=None, rate=None):
     concentration = tf.convert_to_tensor(
@@ -353,7 +353,9 @@ def _random_gamma_noncpu(
 
 
 # tf.function required to access Grappler's implementation_selector.
-@tf.function(autograph=False)
+@implementation_selection.never_runs_functions_eagerly
+# TODO(b/163029794): Shape relaxation breaks XLA.
+@tf.function(autograph=False, experimental_relax_shapes=False)
 def _random_gamma_no_gradient(shape, concentration, rate, seed):
   """Sample a gamma, CPU specialized to stateless_gamma.
 
@@ -445,7 +447,12 @@ def _random_gamma_gradient(shape, concentration, rate, seed):
 
 
 # TF custom_gradient doesn't support kwargs, so we wrap _random_gamma_gradient.
-def random_gamma(shape, concentration, rate, seed=None):
+def random_gamma_with_runtime(shape, concentration, rate=None, seed=None):
+  """Returns both a sample and the id of the implementation-selected runtime."""
+  # This method exists chiefly for testing purposes.
+  dtype = dtype_util.common_dtype([concentration, rate], tf.float32)
+  concentration = tf.convert_to_tensor(concentration, dtype=dtype)
+  rate = tf.convert_to_tensor(1. if rate is None else rate, dtype=dtype)
   shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32, name='shape')
 
   total_shape = ps.concat(
@@ -453,6 +460,10 @@ def random_gamma(shape, concentration, rate, seed=None):
       axis=0)
   seed = samplers.sanitize_seed(seed, salt='random_gamma')
   return _random_gamma_gradient(total_shape, concentration, rate, seed)
+
+
+def random_gamma(shape, concentration, rate=None, seed=None):
+  return random_gamma_with_runtime(shape, concentration, rate, seed=seed)[0]
 
 
 def random_gamma_rejection(

@@ -1188,7 +1188,9 @@ multi_substrate_py_test(
     name = "correlation_cholesky_test",
     size = "medium",
     srcs = ["correlation_cholesky_test.py"],
+    jax_size = "large",
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         ":bijector_test_util",
         ":bijectors",

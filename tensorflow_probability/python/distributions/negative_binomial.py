@@ -156,6 +156,8 @@ class NegativeBinomial(distribution.Distribution):
     logits = self._logits_parameter_no_checks()
     gamma_seed, poisson_seed = samplers.split_seed(
         seed, salt='NegativeBinomial')
+    # TODO(b/152785714): For some reason switching to gamma_lib.random_gamma
+    # makes tests time out. Note: observed similar in jax_transformation_test.
     rate = samplers.gamma(
         shape=[n],
         alpha=self.total_count,

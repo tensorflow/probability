@@ -33,6 +33,7 @@ py_library(
     deps = [
         ":bitwise",
         ":compat",
+        ":config",
         ":control_flow",
         ":debugging",
         ":deprecation",
@@ -77,6 +78,11 @@ py_library(
         ":v1",
         ":v2",
     ],
+)
+
+py_library(
+    name = "config",
+    srcs = ["config.py"],
 )
 
 py_library(

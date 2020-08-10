@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -70,11 +71,8 @@ def sample_n(n, df, loc, scale, batch_shape, dtype, seed):
 
   normal_sample = samplers.normal(shape, dtype=dtype, seed=normal_seed)
   df = df * tf.ones(batch_shape, dtype=dtype)
-  gamma_sample = samplers.gamma([n],
-                                0.5 * df,
-                                beta=0.5,
-                                dtype=dtype,
-                                seed=gamma_seed)
+  gamma_sample = gamma_lib.random_gamma(
+      [n], concentration=0.5 * df, rate=0.5, seed=gamma_seed)
   samples = normal_sample * tf.math.rsqrt(gamma_sample / df)
   return samples * scale + loc
 

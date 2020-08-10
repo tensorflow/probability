@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -240,10 +241,10 @@ class Beta(distribution.Distribution):
     shape = self._batch_shape_tensor(concentration1, concentration0)
     expanded_concentration1 = tf.broadcast_to(concentration1, shape)
     expanded_concentration0 = tf.broadcast_to(concentration0, shape)
-    gamma1_sample = samplers.gamma(
-        shape=[n], alpha=expanded_concentration1, dtype=self.dtype, seed=seed1)
-    gamma2_sample = samplers.gamma(
-        shape=[n], alpha=expanded_concentration0, dtype=self.dtype, seed=seed2)
+    gamma1_sample = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration1, seed=seed1)
+    gamma2_sample = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration0, seed=seed2)
     beta_sample = gamma1_sample / (gamma1_sample + gamma2_sample)
     return beta_sample
 

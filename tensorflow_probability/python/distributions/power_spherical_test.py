@@ -280,7 +280,7 @@ class _PowerSphericalTest(object):
     sample_cov = tfp.stats.covariance(samples, sample_axis=0)
     true_cov, sample_cov = self.evaluate([
         ps.covariance(), sample_cov])
-    self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1e-3)
+    self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1.5e-3)
 
   def testCovarianceDim2(self):
     self.VerifyCovariance(dim=2)

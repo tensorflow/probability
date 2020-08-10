@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -280,10 +281,9 @@ class DirichletMultinomial(distribution.Distribution):
         name='alpha')
 
     unnormalized_logits = tf.math.log(
-        samplers.gamma(
+        gamma_lib.random_gamma(
             shape=[n],
-            alpha=alpha,
-            dtype=self.dtype,
+            concentration=alpha,
             seed=gamma_seed))
     x = multinomial.draw_sample(
         1, k, unnormalized_logits, n_draws, self.dtype, multinomial_seed)

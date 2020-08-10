@@ -561,10 +561,9 @@ class GammaSamplingTest(test_util.TestCase):
   def testSampleCPU(self):
     with tf.device('CPU'):
       _, runtime = self.evaluate(
-          gamma_lib.random_gamma(
+          gamma_lib.random_gamma_with_runtime(
               shape=tf.constant([], dtype=tf.int32),
               concentration=tf.constant(1.),
-              rate=tf.constant(1.),
               seed=test_util.test_seed()))
     self.assertEqual(implementation_selection._RUNTIME_CPU, runtime)
 
@@ -572,10 +571,9 @@ class GammaSamplingTest(test_util.TestCase):
     if not tf.test.is_gpu_available():
       self.skipTest('no GPU')
     with tf.device('GPU'):
-      _, runtime = self.evaluate(gamma_lib.random_gamma(
+      _, runtime = self.evaluate(gamma_lib.random_gamma_with_runtime(
           shape=tf.constant([], dtype=tf.int32),
           concentration=tf.constant(1.),
-          rate=tf.constant(1.),
           seed=test_util.test_seed()))
     self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
 
@@ -596,12 +594,11 @@ class GammaSamplingTest(test_util.TestCase):
     # value, but they are positioned after those with default values. This can
     # not be expressed with ArgSpec.
     scalar_gamma = tf.function(
-        lambda **kwargs: gamma_lib.random_gamma(shape=[], **kwargs),
+        lambda **kwds: gamma_lib.random_gamma_with_runtime(shape=[], **kwds),
         experimental_compile=True)
     _, runtime = self.evaluate(
         scalar_gamma(
             concentration=tf.constant(1.),
-            rate=tf.constant(1.),
             seed=test_util.test_seed()))
     self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
 

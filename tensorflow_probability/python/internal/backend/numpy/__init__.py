@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.internal.backend.numpy import bitwise
 from tensorflow_probability.python.internal.backend.numpy import compat
+from tensorflow_probability.python.internal.backend.numpy import config
 from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import errors

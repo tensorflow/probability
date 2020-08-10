@@ -100,6 +100,8 @@ def _random_poisson_noncpu(
 
 
 # tf.function required to access Grappler's implementation_selector.
+@implementation_selection.never_runs_functions_eagerly
+# TODO(b/163029794): Shape relaxation breaks XLA.
 @tf.function(autograph=False)
 def _random_poisson(
     shape,

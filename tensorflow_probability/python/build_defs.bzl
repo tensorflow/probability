@@ -64,6 +64,18 @@ def _substrate_deps(deps, substrate):
 # py2and3_test and py_test comingling in BUILD files. Otherwise the OSS export
 # rewrite process becomes irreversible.
 def py3_test(*args, **kwargs):
+    """Internal/external reversibility, denotes py3-only vs py2+3 tests.
+
+    Args:
+      *args: Passed to underlying py_test.
+      **kwargs: Passed to underlying py_test. srcs_version and python_version
+        are added (with value `"PY3"`) if not specified.
+    """
+    kwargs = dict(kwargs)
+    if "srcs_version" not in kwargs:
+        kwargs["srcs_version"] = "PY3"
+    if "python_version" not in kwargs:
+        kwargs["python_version"] = "PY3"
     native.py_test(*args, **kwargs)
 
 def _resolve_omit_dep(dep):

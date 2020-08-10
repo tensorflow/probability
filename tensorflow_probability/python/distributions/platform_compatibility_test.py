@@ -42,26 +42,6 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
-NO_XLA_GAMMA_SAMPLER = frozenset([
-    'Beta',
-    'BetaBinomial',
-    'Chi',
-    'Chi2',
-    'CholeskyLKJ',
-    'Dirichlet',
-    'DirichletMultinomial',
-    'GammaGamma',
-    'HalfStudentT',
-    'InverseGamma',
-    'LKJ',
-    'NegativeBinomial',
-    'PowerSpherical',
-    'PERT',
-    'StudentT',
-    'VonMisesFisher',
-    'WishartTriL',
-])
-
 XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/159995894): SegmentMean not registered for XLA.
     'Bates',
@@ -75,6 +55,8 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'Gamma',
     'OneHotCategorical',
     'LogNormal',
+    # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
+    'NegativeBinomial',
     # TODO(b/137956955): Add support for hypothesis testing
     'PoissonLogNormalQuadratureCompound',
     # TODO(b/159999573): XLA / non-XLA computation seems to have
@@ -87,6 +69,7 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/159997353): StatelessTruncatedNormal missing in XLA.
     'TruncatedNormal',
     'Weibull',
+    'WishartTriL',  # log_probs are very far off.
     # TODO(b/159997700) No XLA Zeta
     'Zipf',
 ])
@@ -148,25 +131,42 @@ XLA_LOGPROB_ATOL.update({
     'Binomial': 5e-6,
     'ExpRelaxedOneHotCategorical': 3e-5,
     'Kumaraswamy': 3e-6,
-    'Multinomial': 3e-4,
+    'DirichletMultinomial': 1e-4,
+    'Multinomial': 2e-4,
+    'InverseGamma': 5e-5,
+    'PowerSpherical': 2e-5,
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_RTOL.update({
+    'Beta': 5e-4,
+    'BetaBinomial': 5e-4,
     'Binomial': 4e-6,
     'Categorical': 6e-6,
+    'Chi': 2e-4,
+    'Chi2': 5e-5,
+    'CholeskyLKJ': 1e-4,
     'ContinuousBernoulli': 2e-6,
+    'Dirichlet': 1e-3,
+    'DirichletMultinomial': 2e-4,
     'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
     'FiniteDiscrete': 6e-6,
+    'GammaGamma': 5e-4,
     'Geometric': 5e-5,
+    'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
+    'LKJ': 5e-3,
     'LogLogistic': 1.5e-2,  # TODO(b/163118820)
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'Pareto': 2e-2,  # TODO(b/159997708)
+    'PERT': 5e-4,
     'Poisson': 3e-2,  # TODO(b/159999573)
+    'PowerSpherical': .003,
     'RelaxedBernoulli': 3e-3,
     'VonMises': 2e-2,  # TODO(b/160000258):
+    'VonMisesFisher': 5e-3,
+    'WishartTriL': 1e-5,
 })
 
 
@@ -349,8 +349,7 @@ class DistributionXLATest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
-      for dname in dhps.TF2_FRIENDLY_DISTS if dname not in (
-          XLA_UNFRIENDLY_DISTS | NO_XLA_GAMMA_SAMPLER))
+      for dname in dhps.TF2_FRIENDLY_DISTS if dname not in XLA_UNFRIENDLY_DISTS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testXLACompile(self, dist_name, data):
@@ -360,7 +359,7 @@ class DistributionXLATest(test_util.TestCase):
     self._test_sample_and_log_prob(dist_name, dist)
 
 
-@test_util.test_all_tf_execution_regimes
+@test_util.test_graph_and_eager_modes
 class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
 
   def _test_vectorization(self, dist_name, dist):

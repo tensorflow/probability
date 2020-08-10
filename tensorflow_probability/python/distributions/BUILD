@@ -21,7 +21,7 @@ load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_test",
     "multi_substrate_py_library",
-    "py3_test",  # @unused
+    "py3_test",
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -214,6 +214,7 @@ multi_substrate_py_library(
     srcs = ["beta.py"],
     deps = [
         ":distribution",
+        ":gamma",
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
@@ -233,9 +234,9 @@ multi_substrate_py_library(
     name = "beta_binomial",
     srcs = ["beta_binomial.py"],
     deps = [
-        ":beta",
         ":binomial",
         ":distribution",
+        ":gamma",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
@@ -430,6 +431,7 @@ multi_substrate_py_library(
     srcs = ["dirichlet_multinomial.py"],
     deps = [
         ":distribution",
+        ":gamma",
         ":multinomial",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -550,6 +552,7 @@ multi_substrate_py_library(
     srcs = ["gamma_gamma.py"],
     deps = [
         ":distribution",
+        ":gamma",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
@@ -765,6 +768,7 @@ multi_substrate_py_library(
     srcs = ["inverse_gamma.py"],
     deps = [
         ":distribution",
+        ":gamma",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
@@ -1237,6 +1241,7 @@ multi_substrate_py_library(
     srcs = ["negative_binomial.py"],
     deps = [
         ":distribution",
+        ":gamma",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
@@ -1575,6 +1580,7 @@ multi_substrate_py_library(
     srcs = ["student_t.py"],
     deps = [
         ":distribution",
+        ":gamma",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
@@ -1811,6 +1817,7 @@ multi_substrate_py_library(
     srcs = ["wishart.py"],
     deps = [
         ":distribution",
+        ":gamma",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
@@ -2180,6 +2187,27 @@ multi_substrate_py_test(
     ],
 )
 
+# py2and3
+py_test(
+    name = "gamma_test_gpu",
+    size = "medium",
+    srcs = ["gamma_test.py"],
+    main = "gamma_test.py",
+    shard_count = 2,
+    tags = ["requires-gpu-nvidia"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
 multi_substrate_py_test(
     name = "gamma_gamma_test",
     srcs = ["gamma_gamma_test.py"],
@@ -2411,6 +2439,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["joint_distribution_coroutine_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2436,6 +2465,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["joint_distribution_sequential_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -3267,11 +3297,14 @@ py_test(
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -3294,14 +3327,11 @@ py_library(
     ],
 )
 
-# py_test
 py3_test(
     name = "jax_transformation_test",
     size = "large",
     srcs = ["jax_transformation_test.py"],
-    python_version = "PY3",
     shard_count = 40,
-    srcs_version = "PY3",
     tags = [
         "hypothesis",
         "notap",
@@ -3311,16 +3341,13 @@ py3_test(
     ],
 )
 
-# py_test
 py3_test(
     name = "jax_transformation_test_tap",
     size = "large",
     srcs = ["jax_transformation_test.py"],
     args = ["--execute_only"],
     main = "jax_transformation_test.py",
-    python_version = "PY3",
     shard_count = 47,
-    srcs_version = "PY3",
     tags = [
         "hypothesis",
         "no-oss-ci",
@@ -3336,7 +3363,7 @@ py_test(
     name = "platform_compatibility_test",
     size = "large",
     srcs = ["platform_compatibility_test.py"],
-    shard_count = 40,
+    shard_count = 50,
     tags = ["hypothesis"],
     deps = [
         ":distributions",
@@ -3368,109 +3395,4 @@ py_test(
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
     ],
-)
-
-exports_files(
-    [
-        "__init__.py",
-        "autoregressive.py",
-        "batch_reshape.py",
-        "bernoulli.py",
-        "beta.py",
-        "binomial.py",
-        "blockwise.py",
-        "categorical.py",
-        "cauchy.py",
-        "cauchy_test.py",
-        "chi.py",
-        "chi2.py",
-        "cholesky_lkj.py",
-        "continuous_bernoulli.py",
-        "deterministic.py",
-        "dirichlet.py",
-        "dirichlet_multinomial.py",
-        "distribution.py",
-        "doublesided_maxwell.py",
-        "empirical.py",
-        "exponential.py",
-        "finite_discrete.py",
-        "gamma.py",
-        "gamma_gamma.py",
-        "gamma_gamma_test.py",
-        "generalized_normal.py",
-        "generalized_pareto.py",
-        "geometric.py",
-        "geometric_test.py",
-        "gumbel.py",
-        "half_cauchy.py",
-        "half_normal.py",
-        "half_student_t.py",
-        "hidden_markov_model.py",
-        "horseshoe.py",
-        "independent.py",
-        "inverse_gamma.py",
-        "inverse_gaussian.py",
-        "inverse_gaussian_test.py",
-        "johnson_su.py",
-        "joint_distribution.py",
-        "joint_distribution_coroutine.py",
-        "joint_distribution_named.py",
-        "joint_distribution_sequential.py",
-        "kullback_leibler.py",
-        "kumaraswamy.py",
-        "kumaraswamy_test.py",
-        "laplace.py",
-        "lambertw_f.py",
-        "linear_gaussian_ssm.py",
-        "lkj.py",
-        "logistic.py",
-        "loglogistic.py",
-        "logitnormal.py",
-        "lognormal.py",
-        "lognormal_test.py",
-        "mixture.py",
-        "mixture_same_family.py",
-        "moyal.py",
-        "multinomial.py",
-        "multivariate_student_t.py",
-        "mvn_diag.py",
-        "mvn_diag_plus_low_rank.py",
-        "mvn_full_covariance.py",
-        "mvn_linear_operator.py",
-        "mvn_tril.py",
-        "negative_binomial.py",
-        "normal.py",
-        "normal_conjugate_posteriors.py",
-        "onehot_categorical.py",
-        "ordered_logistic.py",
-        "pareto.py",
-        "pert.py",
-        "plackett_luce.py",
-        "poisson.py",
-        "poisson_lognormal.py",
-        "probit_bernoulli.py",
-        "quantized_distribution.py",
-        "relaxed_bernoulli.py",
-        "relaxed_onehot_categorical.py",
-        "sample.py",
-        "sample_test.py",
-        "sinh_arcsinh.py",
-        "sinh_arcsinh_test.py",
-        "student_t.py",
-        "transformed_distribution.py",
-        "triangular.py",
-        "truncated_cauchy.py",
-        "truncated_normal.py",
-        "uniform.py",
-        "vector_exponential_diag.py",
-        "vector_exponential_linear_operator.py",
-        "vector_laplace_diag.py",
-        "vector_sinh_arcsinh_diag.py",
-        "von_mises.py",
-        "von_mises_fisher.py",
-        "weibull.py",
-        "wishart.py",
-        "zipf.py",
-    ],
-    visibility = ["//tensorflow_probability:__subpackages__"],
 )

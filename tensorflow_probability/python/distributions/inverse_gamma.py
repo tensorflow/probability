@@ -26,11 +26,11 @@ from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import reciprocal as reciprocal_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -202,11 +202,10 @@ class InverseGamma(distribution.Distribution):
       """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return 1. / samplers.gamma(
+    return 1. / gamma_lib.random_gamma(
         shape=[n],
-        alpha=self.concentration,
-        beta=self.scale,
-        dtype=self.dtype,
+        concentration=self.concentration,
+        rate=self.scale,
         seed=seed)
 
   def _log_prob(self, x):

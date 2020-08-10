@@ -20,7 +20,8 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions.bernoulli import Bernoulli
+from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -72,7 +73,7 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     # Output shape of the left increments tensor.
     output_shape = ps.concat(([max_doublings + 1], batch_shape), axis=0)
     # A sample realization of X_k.
-    expand_left = Bernoulli(
+    expand_left = bernoulli_lib.Bernoulli(
         0.5, dtype=dtype).sample(
             sample_shape=output_shape, seed=seed)
 
@@ -418,8 +419,9 @@ def slice_sampler_one_dim(target_log_prob, x_initial, step_size=0.01,
     step_size = tf.convert_to_tensor(step_size, dtype=dtype)
     # Obtain the input dtype of the array.
     # Select the height of the slice. Tensor of shape x_initial.shape.
-    log_slice_heights = target_log_prob(x_initial) - samplers.gamma(
-        ps.shape(x_initial), alpha=1, dtype=dtype, seed=gamma_seed)
+    log_slice_heights = target_log_prob(x_initial) - gamma_lib.random_gamma(
+        ps.shape(x_initial), concentration=tf.ones([], dtype=dtype),
+        seed=gamma_seed)
     # Given the above x and slice heights, compute the bounds of the slice for
     # each chain.
     upper_bounds, lower_bounds, bounds_satisfied = slice_bounds_by_doubling(

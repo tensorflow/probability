@@ -27,6 +27,7 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
@@ -39,6 +40,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -398,7 +400,14 @@ class LKJ(distribution.Distribution):
         logdet = 2.0 * tf.reduce_sum(
             tf.math.log(tf.linalg.diag_part(x)), axis=[-1])
       else:
-        _, logdet = tf.linalg.slogdet(x)
+        # TODO(b/162937268): Remove the hackaround.
+        if (not tf.executing_eagerly() and
+            control_flow_util.GraphOrParentsInXlaContext(
+                tf1.get_default_graph())):
+          s = tf.linalg.svd(x, compute_uv=False)
+          logdet = tf.math.reduce_sum(tf.math.log(s), -1)
+        else:
+          logdet = tf.linalg.slogdet(x).log_abs_determinant
       answer = (concentration - 1.) * logdet
       return answer
 

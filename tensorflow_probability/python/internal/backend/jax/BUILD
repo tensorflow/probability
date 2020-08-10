@@ -35,6 +35,7 @@ FILENAMES = [
     "__init__",
     "bitwise",
     "compat",
+    "config",
     "control_flow",
     "debugging",
     "deprecation",

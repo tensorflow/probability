@@ -24,12 +24,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -221,8 +221,8 @@ class Dirichlet(distribution.Distribution):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
-    gamma_sample = samplers.gamma(
-        shape=[n], alpha=self.concentration, dtype=self.dtype, seed=seed)
+    gamma_sample = gamma_lib.random_gamma(
+        shape=[n], concentration=self.concentration, seed=seed)
     return gamma_sample / tf.reduce_sum(gamma_sample, axis=-1, keepdims=True)
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
