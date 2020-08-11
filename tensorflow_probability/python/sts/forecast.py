@@ -347,7 +347,7 @@ def forecast(model,
     if hasattr(model, 'constant_offset'):
       kwargs['constant_offset'] = tf.convert_to_tensor(
           value=model.constant_offset,
-          dtype=forecast_prior.dtype)[..., tf.newaxis]
+          dtype=forecast_prior.dtype)[..., tf.newaxis, :]
 
     if not include_observation_noise:
       parameter_samples_with_reordered_batch_dimension[

@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -315,8 +317,11 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     with self.assertRaisesRegexp(Exception, 'dtype'):
       _ = AdditiveStateSpaceModel(component_ssms=[ssm1, ssm2])
 
-  def test_constant_offset(self):
-    offset_ = 1.23456
+  @parameterized.named_parameters(
+      ('scalar_offset', True),
+      ('vector_offset', False))
+  def test_constant_offset(self, is_scalar=True):
+    offset_ = np.array(3.1415) if is_scalar else np.array([3., 1., 4., 1., 5.])
     offset = self._build_placeholder(offset_)
     ssm = self._dummy_model()
 
@@ -333,9 +338,10 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
         (additive_ssm.mean(),
          additive_ssm_with_offset.mean(),
          additive_ssm_with_offset_and_explicit_scale.mean()))
-    print(mean_.shape, offset_mean_.shape, offset_with_scale_mean_.shape)
-    self.assertAllClose(mean_, offset_mean_ - offset_)
-    self.assertAllClose(mean_, offset_with_scale_mean_ - offset_)
+    self.assertAllClose(mean_,
+                        offset_mean_ - offset_[..., tf.newaxis])
+    self.assertAllClose(mean_,
+                        offset_with_scale_mean_ - offset_[..., tf.newaxis])
 
     # Offset should not affect the stddev.
     stddev_, offset_stddev_, offset_with_scale_stddev_ = self.evaluate(
