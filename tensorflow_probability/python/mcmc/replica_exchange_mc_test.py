@@ -460,7 +460,7 @@ class REMCTest(test_util.TestCase):
       self.assertAllEqual(
           np.repeat([num_leapfrog_steps], axis=0, repeats=num_results),
           mcmc_util.get_field(
-            kr_.post_swap_replica_results, 'num_leapfrog_steps'))
+              kr_.post_swap_replica_results, 'num_leapfrog_steps'))
 
   @parameterized.named_parameters([
       # pylint: disable=line-too-long
@@ -516,7 +516,7 @@ class REMCTest(test_util.TestCase):
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return mcmc_util.get_field(
-        results.post_swap_replica_results, 'log_accept_ratio')
+          results.post_swap_replica_results, 'log_accept_ratio')
 
     if state_includes_replicas:
       current_state = tf.ones((num_replica, 2), dtype=dtype)
@@ -730,7 +730,8 @@ class REMCTest(test_util.TestCase):
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return [
-          mcmc_util.get_field(results.post_swap_replica_results, 'log_accept_ratio'),
+          mcmc_util.get_field(
+              results.post_swap_replica_results, 'log_accept_ratio'),
           results.post_swap_replica_states
       ]
 

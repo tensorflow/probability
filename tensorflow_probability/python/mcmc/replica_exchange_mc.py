@@ -29,10 +29,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import random_walk_metropolis
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -969,11 +966,12 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
       mcmc_util.get_field(kr, 'target_log_prob')))
   try:
     new_grads_target_log_prob = _swap_then_retemper(
-        mcmc_util.get_field(kr, 'grads_target_log_prob'))    
-    kr = mcmc_util.update_field(kr, 'grads_target_log_prob', new_grads_target_log_prob)
+        mcmc_util.get_field(kr, 'grads_target_log_prob'))
+    kr = mcmc_util.update_field(
+        kr, 'grads_target_log_prob', new_grads_target_log_prob)
   except TypeError:
     pass
-  
+
   return kr
 
 

@@ -584,24 +584,24 @@ FakeKernelResults = collections.namedtuple('FakeKernelResults', 'some_field')
 
 
 FakeKernelAcceptedResults = collections.namedtuple(
-  'FakeKernelAcceptedResults',
-  'accepted_results')
+    'FakeKernelAcceptedResults',
+    'accepted_results')
 
 
 FakeAcceptedResults = collections.namedtuple(
-  'FakeAcceptedResults', 'some_field')
+    'FakeAcceptedResults', 'some_field')
 
 
 FakeIncompleteKernelResults = collections.namedtuple(
-  'FakeIncompleteKernelResults', 'some_field')
+    'FakeIncompleteKernelResults', 'some_field')
 
 
 class GetFieldTest(test_util.TestCase):
   @parameterized.parameters(
-    [FakeKernelResults(some_field='yak')],
-    [FakeKernelAcceptedResults(
-      accepted_results=FakeAcceptedResults(some_field='yak'))]
-    )
+      [FakeKernelResults(some_field='yak')],
+      [FakeKernelAcceptedResults(
+          accepted_results=FakeAcceptedResults(some_field='yak'))]
+  )
   def testValidKernelResults(self, kernel_results):
     self.assertEqual(util.get_field(kernel_results, 'some_field'), 'yak')
     with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
@@ -616,15 +616,16 @@ class GetFieldTest(test_util.TestCase):
 
 class UpdateFieldTest(test_util.TestCase):
   @parameterized.parameters(
-    [FakeKernelResults(some_field='yak')],
-    [FakeKernelAcceptedResults(
-      accepted_results=FakeAcceptedResults(some_field='yak'))]
+      [FakeKernelResults(some_field='yak')],
+      [FakeKernelAcceptedResults(
+          accepted_results=FakeAcceptedResults(some_field='yak'))]
     )
   def testValidKernelResults(self, kernel_results):
     updated_kernel_results = util.update_field(
         kernel_results, 'some_field', 'moose')
-    self.assertEqual(util.get_field(
-            updated_kernel_results, 'some_field'),'moose')
+    self.assertEqual(
+        util.get_field(
+            updated_kernel_results, 'some_field'), 'moose')
     with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
       util.update_field(kernel_results, 'some_other_field', 'antelope')
 
