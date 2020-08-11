@@ -319,16 +319,14 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose(
         [2], tensorshape_util.as_list(samples.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_1.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_2.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([1, 2], samples)
-    self.assertAllClose([1, 2], kernel_results.inner_results.counter_1)
-    self.assertAllClose([2, 4], kernel_results.inner_results.counter_2)
+    self.assertAllClose([1, 2], kernel_results.counter_1)
+    self.assertAllClose([2, 4], kernel_results.counter_2)
 
   def test_basic_operation_legacy(self):
     kernel = TestTransitionKernel(accepts_seed=False)
@@ -340,16 +338,14 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose(
         [2], tensorshape_util.as_list(samples.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_1.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_2.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([1, 2], samples)
-    self.assertAllClose([1, 2], kernel_results.inner_results.counter_1)
-    self.assertAllClose([2, 4], kernel_results.inner_results.counter_2)
+    self.assertAllClose([1, 2], kernel_results.counter_1)
+    self.assertAllClose([2, 4], kernel_results.counter_2)
 
   def test_burn_in(self):
     kernel = TestTransitionKernel()
@@ -360,19 +356,16 @@ class SampleChainTest(test_util.TestCase):
         num_burnin_steps=1,
         seed=test_util.test_seed())
 
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(samples.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_2.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([2, 3], samples)
-    self.assertAllClose([2, 3], kernel_results.inner_results.counter_1)
-    self.assertAllClose([4, 6], kernel_results.inner_results.counter_2)
+    self.assertAllClose([2, 3], kernel_results.counter_1)
+    self.assertAllClose([4, 6], kernel_results.counter_2)
 
   def test_thinning(self):
     kernel = TestTransitionKernel()
@@ -383,19 +376,16 @@ class SampleChainTest(test_util.TestCase):
         num_steps_between_results=2,
         seed=test_util.test_seed())
 
+    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(samples.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            kernel_results.inner_results.counter_2.shape))
+        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([3, 6], samples)
-    self.assertAllClose([3, 6], kernel_results.inner_results.counter_1)
-    self.assertAllClose([6, 12], kernel_results.inner_results.counter_2)
+    self.assertAllClose([3, 6], kernel_results.counter_1)
+    self.assertAllClose([6, 12], kernel_results.counter_2)
 
   def test_default_trace_named_tuple(self):
     kernel = TestTransitionKernel()
@@ -407,14 +397,14 @@ class SampleChainTest(test_util.TestCase):
 
     self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(res.trace.inner_results.counter_1.shape))
+        [2], tensorshape_util.as_list(res.trace.counter_1.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(res.trace.inner_results.counter_2.shape))
+        [2], tensorshape_util.as_list(res.trace.counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)
-    self.assertAllClose([1, 2], res.trace.inner_results.counter_1)
-    self.assertAllClose([2, 4], res.trace.inner_results.counter_2)
+    self.assertAllClose([1, 2], res.trace.counter_1)
+    self.assertAllClose([2, 4], res.trace.counter_2)
 
   def test_no_trace_fn(self):
     kernel = TestTransitionKernel()
@@ -440,17 +430,15 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertAllClose([2], tensorshape_util.as_list(res.trace[0].shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            res.trace[1].inner_results.counter_1.shape))
+        [2], tensorshape_util.as_list(res.trace[1].counter_1.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(
-            res.trace[1].inner_results.counter_2.shape))
+        [2], tensorshape_util.as_list(res.trace[1].counter_2.shape))
 
     res = self.evaluate(res)
     self.assertAllClose([1, 2], res.all_states)
     self.assertAllClose([1, 2], res.trace[0])
-    self.assertAllClose([1, 2], res.trace[1].inner_results.counter_1)
-    self.assertAllClose([2, 4], res.trace[1].inner_results.counter_2)
+    self.assertAllClose([1, 2], res.trace[1].counter_1)
+    self.assertAllClose([2, 4], res.trace[1].counter_2)
 
   def test_checkpointing(self):
     kernel = TestTransitionKernel()
@@ -465,18 +453,14 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
     self.assertEqual((), res.trace)
     self.assertAllClose(
-        [], tensorshape_util.as_list(
-            res.final_kernel_results.counter_1.shape))
+        [], tensorshape_util.as_list(res.final_kernel_results.counter_1.shape))
     self.assertAllClose(
-        [], tensorshape_util.as_list(
-            res.final_kernel_results.counter_2.shape))
+        [], tensorshape_util.as_list(res.final_kernel_results.counter_2.shape))
 
-    all_states, kernel_results = self.evaluate([
-        res.all_states, res.final_kernel_results
-    ])
-    self.assertAllClose([1, 2], all_states)
-    self.assertAllClose(2, kernel_results.counter_1)
-    self.assertAllClose(4, kernel_results.counter_2)
+    res = self.evaluate(res)
+    self.assertAllClose([1, 2], res.all_states)
+    self.assertAllClose(2, res.final_kernel_results.counter_1)
+    self.assertAllClose(4, res.final_kernel_results.counter_2)
 
   def test_warnings_default(self):
     with warnings.catch_warnings(record=True) as triggered:

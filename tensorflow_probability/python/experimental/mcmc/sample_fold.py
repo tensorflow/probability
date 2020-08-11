@@ -140,6 +140,10 @@ def sample_fold(
             final_kernel_results.inner_results.inner_results)
 
 
+def _trace_kernel_results(current_state, kernel_results):
+  return kernel_results
+
+
 def sample_chain(
     num_results,
     current_state,
@@ -147,7 +151,7 @@ def sample_chain(
     kernel=None,
     num_burnin_steps=0,
     num_steps_between_results=0,
-    trace_fn=lambda current_state, kernel_results: kernel_results,
+    trace_fn=_trace_kernel_results,
     return_final_kernel_results=False,
     parallel_iterations=10,
     seed=None,
@@ -243,8 +247,13 @@ def sample_chain(
                     'value) or an explicit callback that traces the values '
                     'you are interested in.')
 
+    # `WithReductions` assumes all its reducers want to reducer over the
+    # immediate inner results of its kernel results. However,
+    # We don't care about the kernel results of `SampleDiscardingKernel`; hence,
+    # we evaluate the `trace_fn` on a deeper level of inner results.
     trace_reducer = tracing_reducer.TracingReducer(
-        trace_fn=lambda curr_state, kr: (curr_state, trace_fn(curr_state, kr)),
+        trace_fn=lambda curr_state, kr: (
+            curr_state, trace_fn(curr_state, kr.inner_results)),
         size=num_results
     )
     trace_results, _, final_kernel_results = sample_fold(

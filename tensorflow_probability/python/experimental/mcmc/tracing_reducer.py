@@ -60,6 +60,7 @@ class TracingReducer(reducer_base.Reducer):
   `one_step` method calls.
   """
 
+  # TODO(Ru): bring the lambda fn out
   def __init__(
       self,
       trace_fn=lambda current_state, kernel_results:
