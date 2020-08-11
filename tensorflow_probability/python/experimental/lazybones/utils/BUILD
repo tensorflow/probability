@@ -32,6 +32,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":probability",
         ":special_methods",
         ":utils_impl",
         ":weak_container",
@@ -64,6 +65,29 @@ py_test(
     deps = [
         # absl/testing:absltest dep,
         "//tensorflow_probability",
+    ],
+)
+
+py_library(
+    name = "probability",
+    srcs = ["probability.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/lazybones:deferred",
+        "//tensorflow_probability/python/experimental/lazybones:deferred_scope",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "probability_test",
+    size = "small",
+    srcs = ["probability_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

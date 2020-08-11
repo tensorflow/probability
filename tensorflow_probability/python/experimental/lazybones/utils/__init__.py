@@ -20,6 +20,9 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.lazybones.utils.probability import distribution_measure
+from tensorflow_probability.python.experimental.lazybones.utils.probability import log_prob
+from tensorflow_probability.python.experimental.lazybones.utils.probability import prob
 from tensorflow_probability.python.experimental.lazybones.utils.special_methods import ObjectProxy
 from tensorflow_probability.python.experimental.lazybones.utils.special_methods import SpecialMethods
 from tensorflow_probability.python.experimental.lazybones.utils.utils import get_leaves
@@ -38,9 +41,12 @@ __all__ = [
     'SpecialMethods',
     'WeakKeyDictionary',
     'WeakSet',
+    'distribution_measure',
     'get_leaves',
     'get_roots',
     'is_any_ancestor',
     'iter_edges',
+    'log_prob',
     'plot_graph',
+    'prob',
 ]

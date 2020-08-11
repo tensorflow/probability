@@ -90,7 +90,9 @@ def plot_graph(leaves,
     nx_graph.add_edges_from(iter_edges(leaves))
 
   if pos is None:
-    pos = nx.spring_layout(nx_graph, seed=seed)
+    pos = lambda g: nx.spring_layout(g, seed=seed)
+  if callable(pos):
+    pos = pos(nx_graph)
 
   if fig is None:
     fig = plt.figure()  # or, f,ax=plt.subplots()

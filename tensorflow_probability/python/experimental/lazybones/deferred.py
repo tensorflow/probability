@@ -71,7 +71,14 @@ class DeferredBase(special_methods.SpecialMethods):
   def value(self, value):
     deferred_scope.DeferredScope.current_scope[self] = value
     for c in self.children:
-      c.reset()
+      c.value = UNKNOWN
+
+  def set_value_down_to(self, value, leaves):
+    """Set self value and resets all children up to but not including leaves."""
+    deferred_scope.DeferredScope.current_scope[self] = value
+    for c in self.children:
+      if not any(c is l for l in leaves):
+        c.set_value_down_to(UNKNOWN, leaves)
 
   @property
   def parents(self):
@@ -238,8 +245,14 @@ class Deferred(DeferredBase):
     fn, args, kwargs = tf.nest.map_structure(
         lambda x: x.eval() if isinstance(x, DeferredBase) else x,
         [self.fn, self.args, self.kwargs])
-    self.value = fn(*args, **kwargs)
-    return self.value
+    # It'd be a subtle bug to do this:
+    #   self.value = fn(*args, **kwargs)
+    # because then children would be reset on automatic evaluation of the graph.
+    # This means that user specified values might be ignored, depending on the
+    # order of the eval.
+    v = fn(*args, **kwargs)
+    deferred_scope.DeferredScope.current_scope[self] = v
+    return v
 
 
 class DeferredInput(DeferredBase):

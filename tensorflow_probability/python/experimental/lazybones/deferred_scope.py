@@ -75,17 +75,17 @@ class DeferredScope(object):
 
   def __init__(self):
     # `_original_parent` isnt really needed but might be useful for debugging.
-    self._original_parent = type(self).current_scope
+    self._original_parent = self.current_scope
     self._parent = None
     self._slots = weak_container.WeakKeyDictionary()
 
   def __enter__(self):
-    self._parent = type(self).current_scope
-    type(self).current_scope = self
+    self._parent = self.current_scope
+    self._thread_local.current_scope = self
     return self
 
   def __exit__(self, type_, value, traceback):
-    type(self).current_scope = self._parent
+    self._thread_local.current_scope = self._parent
 
   def __getitem__(self, k):
     v = self._slots.get(k, _NOT_FOUND)
