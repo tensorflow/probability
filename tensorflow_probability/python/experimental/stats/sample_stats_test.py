@@ -31,7 +31,7 @@ from tensorflow_probability.python.internal import test_util
 
 
 @test_util.test_all_tf_execution_regimes
-class RunningStatsTest(test_util.TestCase):
+class RunningCovarianceTest(test_util.TestCase):
 
   def test_zero_running_variance(self):
     deterministic_samples = [0., 0., 0., 0.]
@@ -431,6 +431,183 @@ class RunningStatsTest(test_util.TestCase):
     self.assertEqual(final_mean.shape, (10,))
     self.assertEqual(final_var.shape, (10,))
     self.assertAllClose(final_var, np.var(x, axis=0), rtol=1e-5)
+
+
+@test_util.test_all_tf_execution_regimes
+class RunningExpectationsTest(test_util.TestCase):
+
+  def test_zero_mean(self):
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(),
+        callables=lambda x: x
+    )
+    state = running_mean.initialize()
+    for _ in range(6):
+      state = running_mean.update(state, 0)
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertEqual(0, mean)
+
+  def test_with_nested_callables(self):
+    callables = [
+        {'add_one': lambda x: x + 1},
+        {'add_two': lambda x: x + 2, 'zero': lambda x: 0}
+    ]
+    running_expectations = tfp.experimental.stats.RunningExpectations(
+        shape=(),
+        callables=callables
+    )
+    state = running_expectations.initialize()
+    for sample in range(6):
+      state = running_expectations.update(state, sample)
+    mean = self.evaluate(running_expectations.finalize(state))
+    self.assertEqual([
+        {'add_one': 3.5},
+        {'add_two': 4.5, 'zero': 0}
+    ], mean)
+
+  def test_higher_rank_shape(self):
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(5, 3),
+        callables=lambda x: x
+    )
+    state = running_mean.initialize()
+    for sample in range(6):
+      state = running_mean.update(state, tf.ones((5, 3)) * sample)
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllEqual(np.ones((5, 3)) * 2.5, mean)
+
+  def test_manual_dtype(self):
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(),
+        callables=lambda x: x,
+        dtype=tf.float64,
+    )
+    state = running_mean.initialize()
+    for _ in range(6):
+      state = running_mean.update(state, 0)
+    mean = running_mean.finalize(state)
+    self.assertEqual(tf.float64, mean.dtype)
+
+  def test_with_tuple_sample(self):
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(5, 3),
+        callables=lambda x: x[0]
+    )
+    state = running_mean.initialize()
+    fake_kernel_results = (1, (0))
+    for sample in range(6):
+      state = running_mean.update(
+          state, (tf.ones((5, 3)) * sample, fake_kernel_results))
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllEqual(np.ones((5, 3)) * 2.5, mean)
+
+  def test_random_mean(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100)
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(),
+        callables=lambda x: x,
+    )
+    state = running_mean.initialize()
+    for sample in x:
+      state = running_mean.update(state, sample)
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllClose(np.mean(x), mean, rtol=1e-6)
+
+  def test_chunking(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10, 5)
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(5,),
+        callables=lambda x: x,
+    )
+    state = running_mean.initialize()
+    for sample in x:
+      state = running_mean.update(state, sample, axis=0)
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllClose(np.mean(x.reshape(1000, 5), axis=0), mean, rtol=1e-6)
+
+  def test_chunking_with_two_callable_params(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10)
+    y = rng.rand(100, 10)
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(),
+        callables=lambda x: x[0] + x[1],
+    )
+    state = running_mean.initialize()
+    for sample in zip(x, y):
+      state = running_mean.update(state, sample, axis=0)
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllClose(np.mean(
+        (x + y).reshape(1000,)), mean, rtol=1e-6)
+
+  def test_chunking_with_nested_params(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10)
+    y = rng.rand(100, 10)
+    z = rng.rand(100, 10)
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(),
+        callables=lambda x: x[0] + x[1][0] + x[1][1][0],
+    )
+    state = running_mean.initialize()
+    for x_sample, y_sample, z_sample in zip(x, y, z):
+      sample = (x_sample, (y_sample, (z_sample,)))
+      state = running_mean.update(state, sample, axis=0)
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllClose(np.mean(
+        (x + y + z).reshape(1000,)), mean, rtol=1e-6)
+
+  def test_tf_while(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10)
+    tensor_x = tf.convert_to_tensor(x, dtype=tf.float32)
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(10,),
+        callables=lambda x: x,)
+    _, state = tf.while_loop(
+        lambda i, _: i < 100,
+        lambda i, state: (i + 1, running_mean.update(state, tensor_x[i])),
+        (0, running_mean.initialize()))
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllClose(np.mean(x, axis=0), mean, rtol=1e-6)
+
+  def test_tf_while_with_dynamic_shape(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10)
+    tensor_x = tf.convert_to_tensor(x, dtype=tf.float32)
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(10,),
+        callables=lambda x: x,)
+
+    def _loop_body(i, state):
+      if not tf.executing_eagerly():
+        sample = tf1.placeholder_with_default(tensor_x[i], shape=None)
+      else:
+        sample = tensor_x[i]
+      return (i + 1, running_mean.update(state, sample))
+
+    _, state = tf.while_loop(
+        lambda i, _: i < 100,
+        _loop_body,
+        (tf.constant(0, dtype=tf.int32), running_mean.initialize()),
+        shape_invariants=(
+            None, tfp.experimental.stats.RunningExpectationsState(
+                None,
+                tf.TensorShape(None),
+            )))
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertAllClose(np.mean(x, axis=0), mean, rtol=1e-6)
+
+  def test_no_inputs(self):
+    running_mean = tfp.experimental.stats.RunningExpectations(
+        shape=(),
+        callables=lambda x: x
+    )
+    state = running_mean.initialize()
+    mean = self.evaluate(running_mean.finalize(state))
+    self.assertEqual(0, mean)
 
 
 if __name__ == '__main__':

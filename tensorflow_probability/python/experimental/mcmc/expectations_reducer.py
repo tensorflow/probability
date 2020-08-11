@@ -24,10 +24,8 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import reducer as reducer_base
-from tensorflow_probability.python.internal import nest_util
-from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -35,17 +33,21 @@ __all__ = [
 ]
 
 
+def _get_sample(sample_and_kr):
+  return sample_and_kr[0]
+
+
 ExpectationsReducerState = collections.namedtuple(
-    'ExpectationsReducerState', 'num_samples, running_total')
+    'ExpectationsReducerState', 'init_state, expectation_state')
 
 
 class ExpectationsReducer(reducer_base.Reducer):
   """`Reducer` that computes a running expectation.
 
   `ExpectationsReducer` calculates expectation over some arbitrary structure
-  of `callables`. A callable is a function that accepts a Markov chain sample
-  and kernel results, and outputs the relevant value for expectation
-  calculation. In other words, if we denote a callable as f(x,y),
+  of `callables`. A callable is a function that accepts a tuple of a Markov
+  chain sample and kernel results, and outputs the relevant value for
+  expectation calculation. In other words, if we denote a callable as f(x,y),
   `ExpectationsReducer` computes E[f(x,y)] for all provided functions. The
   finalized expectation will also identically mimic the structure of
   `callables`.
@@ -56,7 +58,7 @@ class ExpectationsReducer(reducer_base.Reducer):
   calls.
   """
 
-  def __init__(self, callables=lambda sample, kr: sample, name=None):
+  def __init__(self, callables=_get_sample, name=None):
     """Instantiates this object.
 
     Args:
@@ -89,14 +91,12 @@ class ExpectationsReducer(reducer_base.Reducer):
       initial_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           initial_chain_state)
-      return ExpectationsReducerState(
-          num_samples=tf.zeros((), dtype=tf.int32),
-          running_total=tf.nest.map_structure(
-              lambda _: tf.zeros(
-                  initial_chain_state.shape, initial_chain_state.dtype),
-              self.callables
-          )
+      stream = sample_stats.RunningExpectations(
+          shape=initial_chain_state.shape,
+          callables=self.callables,
+          dtype=initial_chain_state.dtype
       )
+      return ExpectationsReducerState(initial_chain_state, stream.initialize())
 
   def one_step(
       self,
@@ -136,45 +136,28 @@ class ExpectationsReducer(reducer_base.Reducer):
       new_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           new_chain_state)
-      axis, new_chain_state, previous_kernel_results = _prepare_args(
-          self.callables, axis, new_chain_state, previous_kernel_results)
-      num_new_samples = 1
-
-      def _update_running_total(
-          running_total, new_chain_state, pkr, fn, axis):
-        """Updates the running total and facilitates chunking (if enabled)."""
-        nonlocal num_new_samples
-        if axis is None:
-          chunked_new_chain_state = new_chain_state
-          chunked_result = fn(chunked_new_chain_state, pkr)
-        else:
-          rank = ps.rank(new_chain_state)
-          num_new_samples = ps.shape(new_chain_state)[axis]
-          chunked_new_chain_state = tf.transpose(
-              new_chain_state,
-              [axis] + list(range(0, axis)) + list(range(axis + 1, rank)))
-          chunked_result = tf.reduce_sum(
-              tf.map_fn(lambda chain_state: fn(chain_state, pkr),
-                        chunked_new_chain_state),
-              axis=0)
-        return running_total + chunked_result
-
-      new_running_total = nest.map_structure_up_to(
-          current_reducer_state.running_total,
-          _update_running_total,
-          current_reducer_state.running_total,
-          new_chain_state,
-          previous_kernel_results,
-          self.callables,
-          axis,
-          check_types=False,
+      stream = sample_stats.RunningExpectations(
+          shape=new_chain_state.shape,
+          callables=self.callables,
+          dtype=new_chain_state.dtype
       )
+      if previous_kernel_results is None:
+        # having a `None` pkr means it's not convertible to a `Tensor`, which
+        # breaks `RunningExpectations`
+        previous_kernel_results = ()
+      updated_expectation = stream.update(
+          current_reducer_state.expectation_state,
+          (new_chain_state, previous_kernel_results),
+          axis=axis)
       return ExpectationsReducerState(
-          num_samples=current_reducer_state.num_samples + num_new_samples,
-          running_total=new_running_total)
+          current_reducer_state.init_state,
+          updated_expectation)
 
   def finalize(self, final_reducer_state):
     """Finalizes expectation calculation from the `final_reducer_state`.
+
+    If the finalized method is invoked on a stream of no inputs, a corresponding
+    structure of `tf.ones` will be returned.
 
     Args:
       final_reducer_state: `ExpectationsReducerState` that represents the
@@ -184,19 +167,14 @@ class ExpectationsReducer(reducer_base.Reducer):
       expectation: an estimate of the expectation with identical structure to
         `final_reducer_state.running_total`.
     """
-    if final_reducer_state.num_samples == 0:
-      finalize_fn = lambda x, y: None
-    else:
-      finalize_fn = lambda num_samples, total: total / tf.cast(
-          num_samples, total.dtype)
-    return tf.nest.map_structure(
-        finalize_fn,
-        nest_util.broadcast_structure(
-            final_reducer_state.running_total,
-            final_reducer_state.num_samples),
-        final_reducer_state.running_total,
-        check_types=False,
-    )
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'expectations_reducer', 'finalize')):
+      stream = sample_stats.RunningExpectations(
+          shape=final_reducer_state.init_state.shape,
+          callables=self.callables,
+          dtype=final_reducer_state.init_state.dtype,
+      )
+      return stream.finalize(final_reducer_state.expectation_state)
 
   @property
   def callables(self):
@@ -209,19 +187,3 @@ class ExpectationsReducer(reducer_base.Reducer):
   @property
   def parameters(self):
     return self._parameters
-
-
-def _prepare_args(target, axis, chain_state, pkr):
-  """Broadcasts arguments to match the structure of `target`."""
-  axis = nest_util.broadcast_structure(target, axis)
-  # using `nest_util.broadcast_structure` for the following arguments
-  # isn't robust as they may already be in some nested structure.
-  chain_state = tf.nest.map_structure(
-      lambda _: chain_state,
-      target
-  )
-  pkr = tf.nest.map_structure(
-      lambda _: pkr,
-      target
-  )
-  return axis, chain_state, pkr

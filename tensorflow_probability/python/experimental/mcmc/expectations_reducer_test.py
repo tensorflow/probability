@@ -21,7 +21,6 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
-import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
@@ -75,7 +74,7 @@ class ExpectationsReducerTest(test_util.TestCase):
     self.assertEqual(2.5, mean)
 
   def test_with_callables(self):
-    callables = [lambda x, y: x + 1, lambda x, y: x + 2]
+    callables = [lambda x: x[0] + 1, lambda x: x[0] + 2]
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer(
         callables=callables
     )
@@ -87,8 +86,8 @@ class ExpectationsReducerTest(test_util.TestCase):
 
   def test_with_nested_callables(self):
     callables = [
-        {'add_one': lambda x, y: x + 1},
-        {'add_two': lambda x, y: x + 2, 'zero': lambda x, y: 0}
+        {'add_one': lambda x: x[0] + 1},
+        {'add_two': lambda x: x[0] + 2, 'zero': lambda x: 0}
     ]
     expectations_reducer = tfp.experimental.mcmc.ExpectationsReducer(
         callables=callables
@@ -103,10 +102,10 @@ class ExpectationsReducerTest(test_util.TestCase):
     ], mean)
 
   def test_with_kernel_results(self):
-    def kernel_average(sample, kr):
-      return kr.value
-    def inner_average(sample, kr):
-      return kr.inner_results.value
+    def kernel_average(sample_and_kr):
+      return sample_and_kr[1].value
+    def inner_average(sample_and_kr):
+      return sample_and_kr[1].inner_results.value
 
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer(
         callables=[kernel_average, inner_average]
@@ -125,7 +124,7 @@ class ExpectationsReducerTest(test_util.TestCase):
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
     state = mean_reducer.initialize(tf.ones((3,)))
     kernel_results = FakeKernelResults(
-        0, FakeInnerResults(1))
+        tf.zeros((3, 9)), FakeInnerResults(tf.ones((3, 9))))
     for sample in range(6):
       state = mean_reducer.one_step(
           tf.ones((3, 9)) * sample, state, kernel_results, axis=1)
@@ -137,10 +136,7 @@ class ExpectationsReducerTest(test_util.TestCase):
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
     state = mean_reducer.initialize(0)
     mean = self.evaluate(mean_reducer.finalize(state))
-    if tf.executing_eagerly():
-      self.assertEqual(None, mean)
-    else:
-      self.assertTrue(np.isnan(mean))
+    self.assertEqual(0, mean)
 
   def test_in_with_reductions(self):
     fake_kernel = TestTransitionKernel()
