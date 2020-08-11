@@ -3362,6 +3362,7 @@ py3_test(
 py_test(
     name = "platform_compatibility_test",
     size = "large",
+    timeout = "eternal",  # TODO(b/163433191): Reduce test size and remove this line.
     srcs = ["platform_compatibility_test.py"],
     shard_count = 50,
     tags = ["hypothesis"],
