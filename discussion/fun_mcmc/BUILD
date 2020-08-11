@@ -98,6 +98,7 @@ py_library(
     srcs = ["backend.py"],
     srcs_version = "PY3",
     deps = [
+        ":rewrite",
         ":tf_on_jax",
         ":util_jax",
         ":util_tf",

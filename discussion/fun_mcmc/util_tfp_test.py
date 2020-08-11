@@ -25,15 +25,13 @@ from jax.config import config as jax_config
 import numpy as np
 import tensorflow.compat.v2 as real_tf
 
-from discussion.fun_mcmc import backend_jax
-from discussion.fun_mcmc import backend_tf
-from discussion.fun_mcmc import using_jax as fun_mcmc_jax
-from discussion.fun_mcmc import using_tensorflow as fun_mcmc_tf
+from discussion.fun_mcmc import backend
+from discussion.fun_mcmc import fun_mcmc_lib as fun_mcmc
+from discussion.fun_mcmc import util_tfp
 
-tf = backend_tf.tf
-tfp = backend_tf.tfp
-util = backend_tf.util
-fun_mcmc = fun_mcmc_tf
+tf = backend.tf
+tfp = backend.tfp
+util = backend.util
 
 real_tf.enable_v2_behavior()
 jax_config.update('jax_enable_x64', True)
@@ -74,22 +72,11 @@ class DupBijector(tfp.bijectors.Bijector):
     return y_dtype[0]
 
 
-class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
-
-  def setUp(self):
-    super(UtilTFPTestTensorFlow32, self).setUp()
-    global tf
-    global tfp
-    global util
-    global fun_mcmc
-    tf = backend_tf.tf
-    tfp = backend_tf.tfp
-    util = backend_tf.util
-    fun_mcmc = fun_mcmc_tf
+class UtilTFPTest(real_tf.test.TestCase, parameterized.TestCase):
 
   @property
   def _dtype(self):
-    return tf.float32
+    raise NotImplementedError()
 
   def _constant(self, value):
     return tf.constant(value, self._dtype)
@@ -108,7 +95,7 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
         return True
 
     def kernel(state, pkr):
-      return fun_mcmc.util_tfp.transition_kernel_wrapper(
+      return util_tfp.transition_kernel_wrapper(
           state, pkr, TestKernel())
 
     state = {'x': self._constant(0.), 'y': self._constant(1.)}
@@ -137,7 +124,7 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
         tf.ones([2, 1], dtype=self._dtype),
         tf.ones([2, 2], dtype=self._dtype)
     ]
-    transform_fn = fun_mcmc.util_tfp.bijector_to_transform_fn(
+    transform_fn = util_tfp.bijector_to_transform_fn(
         bijectors, state_structure=state, batch_ndims=1)
 
     fwd, (_, fwd_ldj1), fwd_ldj2 = fun_mcmc.call_transport_map_with_ldj(
@@ -171,7 +158,7 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
   def testBijectorToTransformFnMulti(self):
     bijector = DupBijector()
     state = tf.ones([1, 2], dtype=self._dtype)
-    transform_fn = fun_mcmc.util_tfp.bijector_to_transform_fn(
+    transform_fn = util_tfp.bijector_to_transform_fn(
         bijector, state_structure=state, batch_ndims=1)
 
     fwd, (_, fwd_ldj1), fwd_ldj2 = fun_mcmc.call_transport_map_with_ldj(
@@ -192,32 +179,23 @@ class UtilTFPTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(0., inv_ldj2)
 
 
-class UtilTFPTestJAX32(UtilTFPTestTensorFlow32):
+@backend.multi_backend_test(globals(), 'util_tfp_test')
+class UtilTFPTest32(UtilTFPTest):
 
-  def setUp(self):
-    super(UtilTFPTestJAX32, self).setUp()
-    global tf
-    global tfp
-    global util
-    global fun_mcmc
-    tf = backend_jax.tf
-    tfp = backend_jax.tfp
-    util = backend_jax.util
-    fun_mcmc = fun_mcmc_jax
+  @property
+  def _dtype(self):
+    return tf.float32
 
 
-class UtilTFPTestTensorFlow64(UtilTFPTestTensorFlow32):
+@backend.multi_backend_test(globals(), 'util_tfp_test')
+class UtilTFPTest64(UtilTFPTest):
 
   @property
   def _dtype(self):
     return tf.float64
 
 
-class UtilTFPTestJAX64(UtilTFPTestJAX32):
-
-  @property
-  def _dtype(self):
-    return tf.float64
+del UtilTFPTest
 
 
 if __name__ == '__main__':

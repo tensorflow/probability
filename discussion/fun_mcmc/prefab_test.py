@@ -20,20 +20,18 @@ from __future__ import print_function
 
 # Dependency imports
 
-from jax import random as jax_random
 from jax.config import config as jax_config
 import tensorflow.compat.v2 as real_tf
 
-from discussion.fun_mcmc import backend_jax
-from discussion.fun_mcmc import backend_tf
-from discussion.fun_mcmc import using_jax as fun_mcmc_jax
-from discussion.fun_mcmc import using_tensorflow as fun_mcmc_tf
+from discussion.fun_mcmc import backend
+from discussion.fun_mcmc import fun_mcmc_lib as fun_mcmc
+from discussion.fun_mcmc import prefab
+from discussion.fun_mcmc import util_tfp
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tf = backend_tf.tf
-tfp = backend_tf.tfp
-util = backend_tf.util
-fun_mcmc = fun_mcmc_tf
+tf = backend.tf
+tfp = backend.tfp
+util = backend.util
 
 real_tf.enable_v2_behavior()
 jax_config.update('jax_enable_x64', True)
@@ -43,25 +41,14 @@ def _test_seed():
   return tfp_test_util.test_seed() % (2**32 - 1)
 
 
-class PrefabTestTensorFlow32(tfp_test_util.TestCase):
-
-  def setUp(self):
-    super(PrefabTestTensorFlow32, self).setUp()
-    global tf
-    global tfp
-    global util
-    global fun_mcmc
-    tf = backend_tf.tf
-    tfp = backend_tf.tfp
-    util = backend_tf.util
-    fun_mcmc = fun_mcmc_tf
+class PrefabTest(tfp_test_util.TestCase):
 
   def _make_seed(self, seed):
-    return util.make_tensor_seed(seed)
+    return util.make_tensor_seed([seed, 0])
 
   @property
   def _dtype(self):
-    return tf.float32
+    raise NotImplementedError()
 
   def _constant(self, value):
     return tf.constant(value, self._dtype)
@@ -80,7 +67,7 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
                 loc=self._constant([1., 1.]), scale=0.5), 1),
     ])
     bijector = [tfp.bijectors.Identity(), tfp.bijectors.Exp()]
-    transform_fn = fun_mcmc.util_tfp.bijector_to_transform_fn(
+    transform_fn = util_tfp.bijector_to_transform_fn(
         bijector, model.dtype, batch_ndims=1)
 
     def target_log_prob_fn(*x):
@@ -100,7 +87,7 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
       hmc_seed, seed = util.split_seed(seed, 2)
 
       adaptive_hmc_state, adaptive_hmc_extra = (
-          fun_mcmc.prefab.adaptive_hamiltonian_monte_carlo_step(
+          prefab.adaptive_hamiltonian_monte_carlo_step(
               adaptive_hmc_state,
               target_log_prob_fn=reparam_log_prob_fn,
               num_adaptation_steps=num_adapt_steps,
@@ -116,7 +103,7 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
     # for the jit to do anything.
     _, (state_chain, is_accepted_chain,
         _) = tf.function(lambda reparam_state, seed: fun_mcmc.trace(  # pylint: disable=g-long-lambda
-            state=(fun_mcmc.prefab.adaptive_hamiltonian_monte_carlo_init(
+            state=(prefab.adaptive_hamiltonian_monte_carlo_init(
                 reparam_state, reparam_log_prob_fn), seed),
             fn=kernel,
             num_steps=num_steps))(reparam_state, seed)
@@ -137,36 +124,23 @@ class PrefabTestTensorFlow32(tfp_test_util.TestCase):
     self.assertAllClose(model.variance(), sample_var, rtol=0.1, atol=0.1)
 
 
-class PrefabTestJAX32(PrefabTestTensorFlow32):
+@backend.multi_backend_test(globals(), 'prefab_test')
+class PrefabTest32(PrefabTest):
 
-  def setUp(self):
-    super(PrefabTestJAX32, self).setUp()
-    global tf
-    global tfp
-    global util
-    global fun_mcmc
-    tf = backend_jax.tf
-    tfp = backend_jax.tfp
-    util = backend_jax.util
-    fun_mcmc = fun_mcmc_jax
-
-  def _make_seed(self, seed):
-    return jax_random.PRNGKey(seed)
+  @property
+  def _dtype(self):
+    return tf.float32
 
 
-class PrefabTestTensorFlow64(PrefabTestTensorFlow32):
+@backend.multi_backend_test(globals(), 'prefab_test')
+class PrefabTest64(PrefabTest):
 
   @property
   def _dtype(self):
     return tf.float64
 
 
-class PrefabTestJAX64(PrefabTestJAX32):
-
-  @property
-  def _dtype(self):
-    return tf.float64
-
+del PrefabTest
 
 if __name__ == '__main__':
   real_tf.test.main()

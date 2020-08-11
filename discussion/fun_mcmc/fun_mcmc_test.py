@@ -24,21 +24,18 @@ import functools
 # Dependency imports
 
 from absl.testing import parameterized
-from jax import random as jax_random
 from jax.config import config as jax_config
 import numpy as np
 import tensorflow.compat.v2 as real_tf
 
-from discussion.fun_mcmc import backend_jax
-from discussion.fun_mcmc import backend_tf
-from discussion.fun_mcmc import using_jax as fun_mcmc_jax
-from discussion.fun_mcmc import using_tensorflow as fun_mcmc_tf
+from discussion.fun_mcmc import backend
+from discussion.fun_mcmc import fun_mcmc_lib as fun_mcmc
+from discussion.fun_mcmc import prefab
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
-tf = backend_tf.tf
-tfp = backend_tf.tfp
-util = backend_tf.util
-fun_mcmc = fun_mcmc_tf
+tf = backend.tf
+tfp = backend.tfp
+util = backend.util
 
 real_tf.enable_v2_behavior()
 jax_config.update('jax_enable_x64', True)
@@ -133,27 +130,16 @@ class GenCovTest(real_tf.test.TestCase):
     self.assertAllClose(true_cov, _gen_cov(x, 1))
 
 
-class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
+class FunMCMCTest(real_tf.test.TestCase, parameterized.TestCase):
 
-  _is_on_jax = False
-
-  def setUp(self):
-    super(FunMCMCTestTensorFlow32, self).setUp()
-    global tf
-    global tfp
-    global util
-    global fun_mcmc
-    tf = backend_tf.tf
-    tfp = backend_tf.tfp
-    util = backend_tf.util
-    fun_mcmc = fun_mcmc_tf
+  _is_on_jax = backend.BACKEND_NAME == 'jax'
 
   def _make_seed(self, seed):
-    return util.make_tensor_seed(seed)
+    return util.make_tensor_seed([seed, 0])
 
   @property
   def _dtype(self):
-    return tf.float32
+    raise NotImplementedError()
 
   def _constant(self, value):
     return tf.constant(value, self._dtype)
@@ -835,7 +821,7 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
             target_log_prob_fn=target_log_prob_fn,
             seed=hmc_seed)
 
-        rate = fun_mcmc.prefab._polynomial_decay(  # pylint: disable=protected-access
+        rate = prefab._polynomial_decay(  # pylint: disable=protected-access
             step=step,
             step_size=self._constant(0.01),
             power=0.5,
@@ -1393,38 +1379,23 @@ class FunMCMCTestTensorFlow32(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(potential, transformed_potential)
 
 
-class FunMCMCTestJAX32(FunMCMCTestTensorFlow32):
+@backend.multi_backend_test(globals(), 'fun_mcmc_test')
+class FunMCMCTest32(FunMCMCTest):
 
-  _is_on_jax = True
-
-  def setUp(self):
-    super(FunMCMCTestJAX32, self).setUp()
-    global tf
-    global tfp
-    global util
-    global fun_mcmc
-    tf = backend_jax.tf
-    tfp = backend_jax.tfp
-    util = backend_jax.util
-    fun_mcmc = fun_mcmc_jax
-
-  def _make_seed(self, seed):
-    return jax_random.PRNGKey(seed)
+  @property
+  def _dtype(self):
+    return tf.float32
 
 
-class FunMCMCTestTensorFlow64(FunMCMCTestTensorFlow32):
+@backend.multi_backend_test(globals(), 'fun_mcmc_test')
+class FunMCMCTest64(FunMCMCTest):
 
   @property
   def _dtype(self):
     return tf.float64
 
 
-class FunMCMCTestJAX64(FunMCMCTestJAX32):
-
-  @property
-  def _dtype(self):
-    return tf.float64
-
+del FunMCMCTest
 
 if __name__ == '__main__':
   real_tf.test.main()
