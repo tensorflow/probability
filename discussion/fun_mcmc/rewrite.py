@@ -74,14 +74,15 @@ def _root_name():
 class Loader(importlib.abc.SourceLoader):
   """Custom loader which rewrites the source before loading it."""
 
-  def __init__(self, orig_module_name, orig_loader, backend):
+  def __init__(self, orig_module_name, orig_loader, orig_filename, backend):
     self._backend = backend
     self._orig_module_name = orig_module_name
     self._orig_loader = orig_loader
+    self._orig_filename = orig_filename
 
   def get_filename(self, fullname):
     del fullname
-    return self._orig_loader.get_filename(self._orig_module_name)
+    return self._orig_filename
 
   def get_data(self, path):
     if DEBUG:
@@ -158,24 +159,24 @@ class Finder(importlib.abc.MetaPathFinder):
     orig_spec = importlib.util.find_spec(orig_module_name)
     if orig_spec is None:
       raise ImportError('Cannot import ' + orig_module_name)
+    is_package = bool(orig_spec.submodule_search_locations)
     orig_loader = orig_spec.loader
     # We use duck-typing here because we don't necesarily need this to be a
-    # SourceFileLoader, just that it has these methods.
-    if not (hasattr(orig_loader, 'get_filename') and hasattr(
-        orig_loader, 'is_package') and hasattr(orig_loader, 'get_data')):
-      raise TypeError('{} has an abnormal loader: {}'.format(
+    # SourceFileLoader, just that it has this method.
+    if not hasattr(orig_loader, 'get_data'):
+      raise TypeError('{} has an unsupported loader: {}'.format(
           orig_module_name, orig_loader))
 
     spec = importlib.machinery.ModuleSpec(
         fullname,
-        Loader(orig_module_name, orig_loader, backend),  # pylint: disable=abstract-class-instantiated
-        origin=orig_loader.get_filename(orig_module_name),
-        is_package=orig_loader.is_package(orig_module_name),
+        Loader(orig_module_name, orig_loader, orig_spec.origin, backend),  # pylint: disable=abstract-class-instantiated
+        origin=orig_spec.origin,
+        is_package=is_package,
     )
 
     # We need to modify the spec after construction to set a few attributes.
     # This is allowed as per ModuleSpec docstring.
-    if orig_loader.is_package(orig_module_name):
+    if is_package:
       # Otherwise importing from packages fails to work.
       spec.submodule_search_locations = [
           '.'.join([path[0], module_name_comps[-1]])
