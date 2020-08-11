@@ -52,7 +52,7 @@ class JointDistributionCoroutineAutoBatched(
     x = yield tfd.JointDistributionCoroutine.Root(
       tfd.Normal(0., tf.ones([3])))
     y = yield tfd.JointDistributionCoroutine.Root(
-      tfd.Normal(0., 1.)))
+      tfd.Normal(0., 1.))
     z = yield tfd.Normal(x[..., :2] + y[..., tf.newaxis], 1.)
 
   can be written in auto-vectorized form as
@@ -60,7 +60,7 @@ class JointDistributionCoroutineAutoBatched(
   ```python
   def model_fn():
     x = yield tfd.Normal(0., tf.ones([3]))
-    y = yield tfd.Normal(0., 1.))
+    y = yield tfd.Normal(0., 1.)
     z = yield tfd.Normal(x[:2] + y, 1.)
   ```
 
