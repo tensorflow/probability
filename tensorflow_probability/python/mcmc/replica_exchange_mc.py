@@ -600,7 +600,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           previous_kernel_results.post_swap_replica_results,
           **inner_kwargs)
 
-      pre_swap_replica_target_log_prob = mcmc_util.get_field(
+      pre_swap_replica_target_log_prob = _get_field(
           # These are tempered log probs (have been divided by temperature).
           pre_swap_replica_results, 'target_log_prob')
 
@@ -832,7 +832,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       replica_results = inner_kernel.bootstrap_results(replica_states)
 
-      pre_swap_replica_target_log_prob = mcmc_util.get_field(
+      pre_swap_replica_target_log_prob = _get_field(
           replica_results, 'target_log_prob')
 
       replica_and_batch_shape = ps.shape(
@@ -933,16 +933,16 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
 
   # Hard to modify proposed_results in an um-ambiguous manner.
   # ...we also don't need to.
-  kr = mcmc_util.update_field(
+  kr = _update_field(
       kr,
       'proposed_results',
       tf.convert_to_tensor(np.nan, dtype=dtype))
-  kr = mcmc_util.update_field(
+  kr = _update_field(
       kr,
       'proposed_state',
       tf.convert_to_tensor(np.nan, dtype=dtype))
 
-  replica_and_batch_rank = ps.rank(mcmc_util.get_field(kr, 'log_accept_ratio'))
+  replica_and_batch_rank = ps.rank(_get_field(kr, 'log_accept_ratio'))
 
   # After using swap_tensor_fn on "values", values will be multiplied by the
   # swapped_inverse_temperatures.  We need it to be multiplied instead by the
@@ -962,14 +962,14 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
       x = x[0]
     return x
 
-  kr = mcmc_util.update_field(kr, 'target_log_prob', _swap_then_retemper(
-      mcmc_util.get_field(kr, 'target_log_prob')))
+  kr = _update_field(kr, 'target_log_prob', _swap_then_retemper(
+      _get_field(kr, 'target_log_prob')))
   try:
     new_grads_target_log_prob = _swap_then_retemper(
-        mcmc_util.get_field(kr, 'grads_target_log_prob'))
-    kr = mcmc_util.update_field(
+        _get_field(kr, 'grads_target_log_prob'))
+    kr = _update_field(
         kr, 'grads_target_log_prob', new_grads_target_log_prob)
-  except TypeError:
+  except NotImplementedError:
     pass
 
   return kr
@@ -1039,3 +1039,23 @@ def _sub_diag(nonmatrix):
           padding_value=tf.cast(0.0, dtype=nonmatrix.dtype))
 
     return distribution_util.rotate_transpose(matrix_sub_diag, shift=1)
+
+
+def _get_field(kernel_results, field_name):
+  try:
+    return mcmc_util.get_field(kernel_results, field_name)
+  except TypeError:
+    raise NotImplementedError(
+        ('{kernel_results} is currenty not supported by the ReplicaExchangeMC '
+         'kernel. Please file an issue on the TensorFlow Probability GitHub '
+         'page.'))
+
+
+def _update_field(kernel_results, field_name, value):
+  try:
+    return mcmc_util.update_field(kernel_results, field_name, value)
+  except TypeError:
+    raise NotImplementedError(
+        ('{kernel_results} or a kernel result nested within it is currently '
+         'not supported by the ReplicaExchangeMC kernel. Please file an issue '
+         'on the TensorFlow Probability GitHub page.'))
