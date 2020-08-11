@@ -335,7 +335,7 @@ genrule(
     srcs = [],
     outs = ["tensor_shape_gen.py"],
     cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@"),
-    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
+    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
 )
 
 py_library(
