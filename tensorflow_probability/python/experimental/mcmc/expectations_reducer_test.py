@@ -67,34 +67,37 @@ class ExpectationsReducerTest(test_util.TestCase):
 
   def test_simple_operation(self):
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
-    state = mean_reducer.initialize(0)
+    fake_kr = FakeKernelResults(0, FakeInnerResults(0))
+    state = mean_reducer.initialize(0, fake_kr)
     for sample in range(6):
-      state = mean_reducer.one_step(sample, state)
+      state = mean_reducer.one_step(sample, state, fake_kr)
     mean = self.evaluate(mean_reducer.finalize(state))
     self.assertEqual(2.5, mean)
 
-  def test_with_callables(self):
-    callables = [lambda x: x[0] + 1, lambda x: x[0] + 2]
+  def test_with_transform_fn(self):
+    transform_fn = [lambda x, y: x + 1, lambda x, y: x + 2]
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer(
-        callables=callables
+        transform_fn=transform_fn
     )
-    state = mean_reducer.initialize(0)
+    fake_kr = FakeKernelResults(0, FakeInnerResults(0))
+    state = mean_reducer.initialize(0, fake_kr)
     for sample in range(6):
-      state = mean_reducer.one_step(sample, state)
+      state = mean_reducer.one_step(sample, state, fake_kr)
     mean = self.evaluate(mean_reducer.finalize(state))
     self.assertEqual([3.5, 4.5], mean)
 
-  def test_with_nested_callables(self):
-    callables = [
-        {'add_one': lambda x: x[0] + 1},
-        {'add_two': lambda x: x[0] + 2, 'zero': lambda x: 0}
+  def test_with_nested_transform_fn(self):
+    transform_fn = [
+        {'add_one': lambda x, y: x + 1},
+        {'add_two': lambda x, y: x + 2, 'zero': lambda x, y: tf.zeros(())}
     ]
     expectations_reducer = tfp.experimental.mcmc.ExpectationsReducer(
-        callables=callables
+        transform_fn=transform_fn
     )
-    state = expectations_reducer.initialize(0)
+    fake_kr = FakeKernelResults(0, FakeInnerResults(0))
+    state = expectations_reducer.initialize(0, fake_kr)
     for sample in range(6):
-      state = expectations_reducer.one_step(sample, state)
+      state = expectations_reducer.one_step(sample, state, fake_kr)
     mean = self.evaluate(expectations_reducer.finalize(state))
     self.assertEqual([
         {'add_one': 3.5},
@@ -102,16 +105,16 @@ class ExpectationsReducerTest(test_util.TestCase):
     ], mean)
 
   def test_with_kernel_results(self):
-    def kernel_average(sample_and_kr):
-      return sample_and_kr[1].value
-    def inner_average(sample_and_kr):
-      return sample_and_kr[1].inner_results.value
+    def kernel_average(sample, kr):
+      return kr.value
+    def inner_average(sample, kr):
+      return kr.inner_results.value
 
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer(
-        callables=[kernel_average, inner_average]
+        transform_fn=[kernel_average, inner_average]
     )
     kernel_results = FakeKernelResults(
-        0, FakeInnerResults(1))
+        0, FakeInnerResults(0))
     state = mean_reducer.initialize(0, kernel_results)
     for sample in range(6):
       kernel_results = FakeKernelResults(
@@ -122,9 +125,9 @@ class ExpectationsReducerTest(test_util.TestCase):
 
   def test_chunking(self):
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
-    state = mean_reducer.initialize(tf.ones((3,)))
     kernel_results = FakeKernelResults(
         tf.zeros((3, 9)), FakeInnerResults(tf.ones((3, 9))))
+    state = mean_reducer.initialize(tf.ones((3,)), kernel_results)
     for sample in range(6):
       state = mean_reducer.one_step(
           tf.ones((3, 9)) * sample, state, kernel_results, axis=1)
@@ -134,7 +137,9 @@ class ExpectationsReducerTest(test_util.TestCase):
 
   def test_no_steps(self):
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
-    state = mean_reducer.initialize(0)
+    kernel_results = FakeKernelResults(
+        0, FakeInnerResults(0))
+    state = mean_reducer.initialize(0, kernel_results)
     mean = self.evaluate(mean_reducer.finalize(state))
     self.assertEqual(0, mean)
 

@@ -25,12 +25,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    'RunningExpectations',
-    'RunningExpectationsState',
+    'RunningMean',
+    'RunningMeanState',
     'RunningCovariance',
     'RunningCovarianceState',
     'RunningVariance',
@@ -146,7 +145,8 @@ class RunningCovariance(object):
         the inner-most dimensions.  Specifying `None` returns all cross
         product terms (no batching) and is the default.
       dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`.
+        By default, the dtype is `tf.float32`. Any integer dtypes will also
+        be treated as `tf.float32` (to not lose significant precision).
 
     Raises:
       ValueError: if `event_ndims` is greater than the rank of the intended
@@ -161,6 +161,8 @@ class RunningCovariance(object):
       raise ValueError('`event_ndims` over 13 not supported')
     self.shape = shape
     self.event_ndims = event_ndims
+    if dtype.is_integer:
+      dtype = tf.float32
     self.dtype = dtype
 
   def initialize(self):
@@ -270,23 +272,18 @@ class RunningVariance(RunningCovariance):
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples. By default, the shape is assumed to be scalar.
       dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`.
+        By default, the dtype is `tf.float32`. Any integer dtypes will also
+        be treated as `tf.float32` (to not lose significant precision).
     """
     super(RunningVariance, self).__init__(shape, event_ndims=0, dtype=dtype)
 
 
-RunningExpectationsState = collections.namedtuple(
-    'RunningExpectationsState', 'num_samples, expectation')
+RunningMeanState = collections.namedtuple(
+    'RunningMeanState', 'num_samples, mean')
 
 
-class RunningExpectations(object):
-  """Computes expectations over arbitrary functions evaluated at samples.
-
-  To elaborate, any function that outputs a singular `Tensor` is accepted. If
-  one wishes to compute multiple expectations over the same samples, a
-  (possibly nested) collection of callables can be provided upon instantiation
-  (instead of only one). The resulting expectation calculations will mimic the
-  exact structure of the given callabes.
+class RunningMean(object):
+  """Holds metadata for and computes a running mean.
 
   In computation, samples can be provided individually or in chunks. A
   "chunk" of size M implies incorporating M samples into a single expectation
@@ -294,49 +291,43 @@ class RunningExpectations(object):
   callable is accepted and chunking is enabled, the chunked `axis` will define
   chunking semantics for all callables.
 
-  `RunningExpectations` objects do not hold state information. That information,
+  `RunningMean` objects do not hold state information. That information,
   which includes intermediate calculations, are held in a
-  `RunningExpectationsState` as returned via `initialize` and `update` method
+  `RunningMeanState` as returned via `initialize` and `update` method
   calls.
 
-  `RunningExpectations` is meant to serve general streaming expectations.
+  `RunningMean` is meant to serve general streaming expectations.
   For a specialized version that fits streaming over MCMC samples, see
   `ExpectationsReducer` in `tfp.experimental.mcmc`.
   """
 
-  def __init__(self, shape, callables, dtype=tf.float32):
+  def __init__(self, shape, dtype=tf.float32):
     """Instantiates this object.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples.
-      callables: A (possibly nested) collection of callables to evaluate
-        samples at before expectation calculation.
       dtype: Dtype of incoming samples and the resulting statistics.
         By default, the dtype is `tf.float32`. Any integer dtypes will also
         be treated as `tf.float32` (to not lose significant precision).
     """
     self.shape = shape
-    self.callables = callables
     if dtype.is_integer:
       dtype = tf.float32
     self.dtype = dtype
 
   def initialize(self):
-    """Initializes an empty `RunningExpectationsState`.
+    """Initializes an empty `RunningMeanState`.
 
     Returns:
-      state: `RunningExpectationsState` representing a stream of no inputs.
+      state: `RunningMeanState` representing a stream of no inputs.
     """
-    return RunningExpectationsState(
+    return RunningMeanState(
         num_samples=tf.zeros((), dtype=self.dtype),
-        expectation=tf.nest.map_structure(
-            lambda _: tf.zeros(self.shape, self.dtype),
-            self.callables)
-    )
+        mean=tf.zeros(self.shape, self.dtype))
 
   def update(self, state, new_sample, axis=None):
-    """Update the `RunningExpectationsState` with a new sample.
+    """Update the `RunningMeanState` with a new sample.
 
     The update formula is from Philippe Pebay (2008) [1] and is identical to
     that used to calculate the intermediate mean in
@@ -344,16 +335,16 @@ class RunningExpectations(object):
     `tfp.experimental.stats.RunningVariance`.
 
     Args:
-      state: `RunningExpectationsState` that represents the current state of
+      state: `RunningMeanState` that represents the current state of
         running statistics.
-      new_sample: Incoming sample with shape and dtype compatible with those
-        used to form the `RunningExpectationsState`.
+      new_sample: Incoming `Tensor` sample with shape and dtype compatible with
+        those used to form the `RunningMeanState`.
       axis: If chunking is desired, this is an integer that specifies the axis
         with chunked samples. For individual samples, set this to `None`. By
         default, samples are not chunked (`axis` is None).
 
     Returns:
-      state: `RunningExpectationsState` with updated calculations.
+      state: `RunningMeanState` with updated calculations.
 
     #### References
     [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
@@ -366,76 +357,26 @@ class RunningExpectations(object):
         new_sample)
     if axis is None:
       chunk_n = tf.cast(1, dtype=self.dtype)
-    elif tf.nest.is_nested(new_sample):
-      chunk_n = tf.cast(ps.shape(new_sample[0])[axis], dtype=self.dtype)
+      chunk_mean = new_sample
     else:
       chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=self.dtype)
+      chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
     new_n = state.num_samples + chunk_n
-
-    def _update_for_one_fn(old_mean, new_sample, axis, fn, rank):
-      """Update the expectation state for one callable function."""
-      if axis is None:
-        chunk_mean = fn(new_sample)
-      else:
-        def _transpose_if_needed(sample, sample_rank):
-          # make the chunking `axis` as the first for `tf.map_fn`
-          if sample_rank < 2:
-            return sample
-          perm = [axis] + list(
-              range(0, axis)) + list(range(axis + 1, sample_rank))
-          return tf.transpose(sample, perm)
-        chunked_new_chain_state = tf.nest.map_structure(
-            _transpose_if_needed,
-            new_sample, rank)
-        chunk_mean = tf.math.reduce_mean(
-            tf.map_fn(
-                fn, chunked_new_chain_state, fn_output_signature=self.dtype),
-            axis=0)
-      delta_mean = chunk_mean - old_mean
-      new_mean_component = chunk_n * delta_mean / new_n
-      new_mean = tf.cast(
-          old_mean, dtype=new_mean_component.dtype) + new_mean_component
-      return tf.cast(new_mean, dtype=self.dtype)
-
-    axis, new_sample, rank = self._prepare_args(
-        target=self.callables,
-        axis=axis,
-        sample=new_sample,
-    )
-    new_expectation = nest.map_structure_up_to(
-        self.callables,
-        _update_for_one_fn,
-        state.expectation, new_sample, axis, self.callables, rank
-    )
-    return RunningExpectationsState(new_n, new_expectation)
+    delta_mean = chunk_mean - state.mean
+    new_mean = state.mean + chunk_n * delta_mean / new_n
+    return RunningMeanState(new_n, new_mean)
 
   def finalize(self, state):
     """Finalizes expectation computation for the `state`.
 
     If the `finalized` method is invoked on a running state of no inputs,
-    `RunningExpectations` will return a corresponding structure of `tf.zeros`.
+    `RunningMean` will return a corresponding structure of `tf.zeros`.
 
     Args:
-      state: `RunningExpectationsState` that represents the current state of
+      state: `RunningMeanState` that represents the current state of
         running statistics.
 
     Returns:
-      expectation: An estimate of the expectation.
+      mean: An estimate of the mean.
     """
-    return state.expectation
-
-  def _prepare_args(self, target, axis, sample):
-    """Broadcasts arguments to match the structure of `target`."""
-    axis = nest_util.broadcast_structure(target, axis)
-    # using `nest_util.broadcast_structure` for the `sample`
-    # isn't robust as they may already be in some nested structure.
-    sample = tf.nest.map_structure(
-        lambda _: sample,
-        target
-    )
-    sample_rank = tf.nest.map_structure(
-        ps.rank,
-        sample
-    )
-    rank = nest_util.broadcast_structure(target, sample_rank)
-    return axis, sample, rank
+    return state.mean
