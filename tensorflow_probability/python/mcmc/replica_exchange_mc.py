@@ -969,6 +969,12 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
         _get_field(kr, 'grads_target_log_prob'))
     kr = _update_field(
         kr, 'grads_target_log_prob', new_grads_target_log_prob)
+  # For transition kernels not involving the gradient of the log-probability,
+  # grads_target_log_prob will not exist in the (possibly multiply wrapped)
+  # kernel results and that's perfectly fine. But _get_field() /
+  # _update_field() (which wrap tfp.mcmc.internal.util.get_field /
+  # update_field) will throw a NotImplementedError, which we thus catch
+  # silently.
   except NotImplementedError:
     pass
 
@@ -1041,21 +1047,22 @@ def _sub_diag(nonmatrix):
     return distribution_util.rotate_transpose(matrix_sub_diag, shift=1)
 
 
+_kernel_result_not_implemented_message = (
+    '{kernel_results} or a kernel '
+    'result nested within it is currently not supported by the '
+    'ReplicaExchangeMC kernel. Please file an issue on the TensorFlow '
+    'Probability GitHub page.')
+
+
 def _get_field(kernel_results, field_name):
   try:
     return mcmc_util.get_field(kernel_results, field_name)
   except TypeError:
-    raise NotImplementedError(
-        ('{kernel_results} is currenty not supported by the ReplicaExchangeMC '
-         'kernel. Please file an issue on the TensorFlow Probability GitHub '
-         'page.'))
+    raise NotImplementedError(_kernel_result_not_implemented_message)
 
 
 def _update_field(kernel_results, field_name, value):
   try:
     return mcmc_util.update_field(kernel_results, field_name, value)
   except TypeError:
-    raise NotImplementedError(
-        ('{kernel_results} or a kernel result nested within it is currently '
-         'not supported by the ReplicaExchangeMC kernel. Please file an issue '
-         'on the TensorFlow Probability GitHub page.'))
+    raise NotImplementedError(_kernel_result_not_implemented_message)
