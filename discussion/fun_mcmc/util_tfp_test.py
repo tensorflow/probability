@@ -43,6 +43,7 @@ class DupBijector(tfp.bijectors.Bijector):
   def __init__(self):
     super(DupBijector, self).__init__(
         forward_min_event_ndims=0,
+        inverse_min_event_ndims=[0, 0],
         validate_args=False,
         parameters={},
         name='dup')

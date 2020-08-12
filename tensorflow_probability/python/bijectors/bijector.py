@@ -28,11 +28,11 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import cache_util
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
-from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import prefer_static
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -41,6 +41,9 @@ __all__ = [
 
 
 SKIP_DTYPE_CHECKS = False
+
+# Singleton object representing "no value", in cases where "None" is meaningful.
+UNSPECIFIED = object()
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -210,6 +213,25 @@ class Bijector(tf.Module):
   (e.g. a bijector which pads an extra dimension at the end, might have
   `forward_min_event_ndims=0` and `inverse_min_event_ndims=1`.
 
+  Bijectors which operate on structures of `Tensor` require structured
+  `min_event_ndims` matching the structure of the inputs. In these cases,
+  `min_event_ndims` describes both the minimum dimensionality *and* the
+  structure of arguments to `forward` and `inverse`. For example:
+
+  ```
+  Split([sizes], axis):
+    forward_min_event_ndims=-axis
+    inverse_min_event_ndims=[-axis] * len(sizes)
+  ```
+
+  In these cases, the leftmost `min_event_ndims[i]` elements of
+  `tensor[i].shape` must be identical for all structured inputs `i`.
+
+  Finally, some bijectors that operate on structures of inputs may not know
+  the minimum structured rank of their inputs without calltime shape information
+  (Composite bijectors, for example). In these cases, both `min_event_ndims`
+  properties will indicate the expected *structure* of inputs and outputs,
+  but the component values may be `None`.
 
   #### Jacobian Determinant
 
@@ -330,6 +352,13 @@ class Bijector(tf.Module):
 
     By default the event-shape is assumed unchanged from input.
 
+    Multipart bijectors, which operate on structures of tensors, may implement
+    additional methods to propogate calltime dtype information over any changes
+    to structure. These methods are:
+
+      - _forward_dtype
+      - _inverse_dtype
+
   - If the `Bijector`'s use is limited to `TransformedDistribution` (or friends
     like `QuantizedDistribution`) then depending on your use, you may not need
     to implement all of `_forward` and `_inverse` functions.
@@ -407,6 +436,8 @@ class Bijector(tf.Module):
           '_graph_parents',
           '_is_constant_jacobian',
           '_cache',
+          '_forward_min_event_ndims',
+          '_inverse_min_event_ndims',
       ))
 
   @abc.abstractmethod
@@ -415,8 +446,8 @@ class Bijector(tf.Module):
                is_constant_jacobian=False,
                validate_args=False,
                dtype=None,
-               forward_min_event_ndims=None,
-               inverse_min_event_ndims=None,
+               forward_min_event_ndims=UNSPECIFIED,
+               inverse_min_event_ndims=UNSPECIFIED,
                parameters=None,
                name=None):
     """Constructs Bijector.
@@ -443,11 +474,12 @@ class Bijector(tf.Module):
         with asserts. If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
       dtype: `tf.dtype` supported by this `Bijector`. `None` means dtype is not
-        enforced.
-      forward_min_event_ndims: Python `integer` indicating the minimum number of
-        dimensions `forward` operates on.
-      inverse_min_event_ndims: Python `integer` indicating the minimum number of
-        dimensions `inverse` operates on. Will be set to
+        enforced. For multipart bijectors, this value is expected to be the
+        same for all elements of the input and output structures.
+      forward_min_event_ndims: Python `integer` (structure) indicating the
+        minimum number of dimensions on which `forward` operates.
+      inverse_min_event_ndims: Python `integer` (structure) indicating the
+        minimum number of dimensions on which `inverse` operates. Will be set to
         `forward_min_event_ndims` by default, if no value is provided.
       parameters: Python `dict` of parameters used to instantiate this
         `Bijector`.
@@ -481,33 +513,23 @@ class Bijector(tf.Module):
       self._initial_parameter_control_dependencies = (
           tf.group(*self._initial_parameter_control_dependencies),)
 
-    if forward_min_event_ndims is None and inverse_min_event_ndims is None:
+    # Validate min_event_ndims, if all values are known.
+    # Note that bijectors without known min_event_ndims (eg, Composite)
+    # must override `_call_{ldj_func}` instead of `_{ldj_func}`.
+    if (forward_min_event_ndims is UNSPECIFIED
+        and inverse_min_event_ndims is UNSPECIFIED):
       raise ValueError('Must specify at least one of `forward_min_event_ndims` '
                        'and `inverse_min_event_ndims`.')
-    elif inverse_min_event_ndims is None:
-      inverse_min_event_ndims = forward_min_event_ndims
-    elif forward_min_event_ndims is None:
+    elif forward_min_event_ndims is UNSPECIFIED:
       forward_min_event_ndims = inverse_min_event_ndims
+    elif inverse_min_event_ndims is UNSPECIFIED:
+      inverse_min_event_ndims = forward_min_event_ndims
 
-    if not isinstance(forward_min_event_ndims, int):
-      raise TypeError('Expected forward_min_event_ndims to be of '
-                      'type int, got {}'.format(
-                          type(forward_min_event_ndims).__name__))
-
-    if not isinstance(inverse_min_event_ndims, int):
-      raise TypeError('Expected inverse_min_event_ndims to be of '
-                      'type int, got {}'.format(
-                          type(inverse_min_event_ndims).__name__))
-
-    if forward_min_event_ndims < 0:
-      raise ValueError('forward_min_event_ndims must be a non-negative '
-                       'integer.')
-    if inverse_min_event_ndims < 0:
-      raise ValueError('inverse_min_event_ndims must be a non-negative '
-                       'integer.')
-
-    self._forward_min_event_ndims = forward_min_event_ndims
-    self._inverse_min_event_ndims = inverse_min_event_ndims
+    # Prevent tf.Module from wrapping structured min_event_ndims in proxies.
+    # We use (forward|inverse)_min_event_ndims to specify input/output
+    # structures, so it is important that we retain the original containers.
+    self._forward_min_event_ndims = self._no_dependency(forward_min_event_ndims)
+    self._inverse_min_event_ndims = self._no_dependency(inverse_min_event_ndims)
 
     for i, t in enumerate(self._graph_parents):
       if t is None or not tf.is_tensor(t):
@@ -531,12 +553,22 @@ class Bijector(tf.Module):
 
   @property
   def forward_min_event_ndims(self):
-    """Returns the minimal number of dimensions bijector.forward operates on."""
+    """Returns the minimal number of dimensions bijector.forward operates on.
+
+    Multipart bijectors return structured `ndims`, which indicates the
+    expected structure of their inputs. Some multipart bijectors, notably
+    Composites, may return structures of `None`.
+    """
     return self._forward_min_event_ndims
 
   @property
   def inverse_min_event_ndims(self):
-    """Returns the minimal number of dimensions bijector.inverse operates on."""
+    """Returns the minimal number of dimensions bijector.inverse operates on.
+
+    Multipart bijectors return structured `event_ndims`, which indicates the
+    expected structure of their outputs. Some multipart bijectors, notably
+    Composites, may return structures of `None`.
+    """
     return self._inverse_min_event_ndims
 
   @property
@@ -574,7 +606,6 @@ class Bijector(tf.Module):
 
   @property
   def dtype(self):
-    """dtype of `Tensor`s transformable by this distribution."""
     return self._dtype
 
   @property
@@ -604,7 +635,7 @@ class Bijector(tf.Module):
     3. Otherwise, return `self.forward(input)`
 
     Args:
-      value: A `tfd.Distribution`, `tfb.Bijector`, or a `Tensor`.
+      value: A `tfd.Distribution`, `tfb.Bijector`, or a (structure of) `Tensor`.
       name: Python `str` name given to ops created by this function.
       **kwargs: Additional keyword arguments passed into the created
         `tfd.TransformedDistribution`, `tfb.Bijector`, or `self.forward`.
@@ -612,7 +643,7 @@ class Bijector(tf.Module):
     Returns:
       composition: A `tfd.TransformedDistribution` if the input was a
         `tfd.Distribution`, a `tfb.Chain` if the input was a `tfb.Bijector`, or
-        a `Tensor` computed by `self.forward`.
+        a (structure of) `Tensor` computed by `self.forward`.
 
     #### Examples
 
@@ -689,21 +720,31 @@ class Bijector(tf.Module):
     """Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
     Args:
-      input_shape: `Tensor`, `int32` vector indicating event-portion shape
-        passed into `forward` function.
+      input_shape: `Tensor`, `int32` vector (structure) indicating event-portion
+        shape passed into `forward` function.
       name: name to give to the op
 
     Returns:
-      forward_event_shape_tensor: `Tensor`, `int32` vector indicating
-        event-portion shape after applying `forward`.
+      forward_event_shape_tensor: `Tensor`, `int32` vector (structure)
+        indicating event-portion shape after applying `forward`.
     """
     with self._name_and_control_scope(name):
-      input_shape = tf.convert_to_tensor(
-          input_shape, dtype_hint=tf.int32, name='input_shape')
-      return tf.identity(
-          tf.convert_to_tensor(self._forward_event_shape_tensor(input_shape),
-                               dtype_hint=tf.int32),
-          name='forward_event_shape')
+      # Use statically-known dtype attribute to infer structure.
+      input_shape_dtype = nest_util.broadcast_structure(
+          self.forward_min_event_ndims, tf.int32)
+      input_shape = nest_util.convert_to_nested_tensor(
+          input_shape, dtype_hint=input_shape_dtype,
+          name='input_event_shape', allow_packing=True)
+      # Wrap inputs in identity to make sure control_scope is respected.
+      input_shape = nest.map_structure(tf.identity, input_shape)
+
+      # Refer to static-dtype to get structure; we don't care about ntype here.
+      output_shape_dtype = nest_util.broadcast_structure(
+          self.inverse_min_event_ndims, tf.int32)
+      return nest_util.convert_to_nested_tensor(
+          self._forward_event_shape_tensor(input_shape),
+          dtype_hint=output_shape_dtype,
+          name='output_event_shape', allow_packing=True)
 
   def _forward_event_shape(self, input_shape):
     """Subclass implementation for `forward_event_shape` public function."""
@@ -716,15 +757,19 @@ class Bijector(tf.Module):
     Same meaning as `forward_event_shape_tensor`. May be only partially defined.
 
     Args:
-      input_shape: `TensorShape` indicating event-portion shape passed into
-        `forward` function.
+      input_shape: `TensorShape` (structure) indicating event-portion shape
+        passed into `forward` function.
 
     Returns:
-      forward_event_shape_tensor: `TensorShape` indicating event-portion shape
-        after applying `forward`. Possibly unknown.
+      forward_event_shape_tensor: `TensorShape` (structure) indicating
+        event-portion shape after applying `forward`. Possibly unknown.
     """
-    input_shape = tf.TensorShape(input_shape)
-    return tf.TensorShape(self._forward_event_shape(input_shape))
+    # Use statically-known dtype attribute to infer structure.
+    input_shape = nest.map_structure_up_to(
+        self.forward_min_event_ndims, tf.TensorShape, input_shape)
+    return nest.map_structure_up_to(
+        self.inverse_min_event_ndims, tf.TensorShape,
+        self._forward_event_shape(input_shape))
 
   def _inverse_event_shape_tensor(self, output_shape):
     """Subclass implementation for `inverse_event_shape_tensor` function."""
@@ -737,21 +782,29 @@ class Bijector(tf.Module):
     """Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
     Args:
-      output_shape: `Tensor`, `int32` vector indicating event-portion shape
-        passed into `inverse` function.
+      output_shape: `Tensor`, `int32` vector (structure) indicating
+        event-portion shape passed into `inverse` function.
       name: name to give to the op
 
     Returns:
-      inverse_event_shape_tensor: `Tensor`, `int32` vector indicating
-        event-portion shape after applying `inverse`.
+      inverse_event_shape_tensor: `Tensor`, `int32` vector (structure)
+        indicating event-portion shape after applying `inverse`.
     """
     with self._name_and_control_scope(name):
-      output_shape = tf.convert_to_tensor(
-          output_shape, dtype_hint=tf.int32, name='output_shape')
-      return tf.identity(
-          tf.convert_to_tensor(self._inverse_event_shape_tensor(output_shape),
-                               dtype_hint=tf.int32),
-          name='inverse_event_shape')
+      output_shape = nest_util.convert_to_nested_tensor(
+          output_shape, name='output_event_shape',
+          dtype_hint=nest_util.broadcast_structure(
+              self.inverse_min_event_ndims, tf.int32),
+          allow_packing=True)
+      # Wrap inputs in identity to make sure control_scope is respected.
+      output_shape = nest.map_structure(tf.identity, output_shape)
+
+      return nest_util.convert_to_nested_tensor(
+          self._inverse_event_shape_tensor(output_shape),
+          name='input_event_shape',
+          dtype_hint=nest_util.broadcast_structure(
+              self.forward_min_event_ndims, tf.int32),
+          allow_packing=True)
 
   def _inverse_event_shape(self, output_shape):
     """Subclass implementation for `inverse_event_shape` public function."""
@@ -764,15 +817,19 @@ class Bijector(tf.Module):
     Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
 
     Args:
-      output_shape: `TensorShape` indicating event-portion shape passed into
-        `inverse` function.
+      output_shape: `TensorShape` (structure) indicating event-portion shape
+        passed into `inverse` function.
 
     Returns:
-      inverse_event_shape_tensor: `TensorShape` indicating event-portion shape
-        after applying `inverse`. Possibly unknown.
+      inverse_event_shape_tensor: `TensorShape` (structure) indicating
+        event-portion shape after applying `inverse`. Possibly unknown.
     """
-    output_shape = tf.TensorShape(output_shape)
-    return tf.TensorShape(self._inverse_event_shape(output_shape))
+    # Use statically-known dtype attribute to infer structure.
+    output_shape = nest.map_structure_up_to(
+        self.inverse_min_event_ndims, tf.TensorShape, output_shape)
+    return nest.map_structure_up_to(
+        self.forward_min_event_ndims, tf.TensorShape,
+        self._inverse_event_shape(output_shape))
 
   def _forward(self, x):
     """Subclass implementation for `forward` public function."""
@@ -781,8 +838,11 @@ class Bijector(tf.Module):
   def _call_forward(self, x, name, **kwargs):
     """Wraps call to _forward, allowing extra shared logic."""
     with self._name_and_control_scope(name):
-      x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
-      self._maybe_assert_dtype(x)
+      dtype = self.inverse_dtype(**kwargs)
+      x = nest_util.convert_to_nested_tensor(
+          x, name='x', dtype_hint=dtype,
+          dtype=None if SKIP_DTYPE_CHECKS else dtype,
+          allow_packing=True)
       if not self._is_injective:  # No caching for non-injective
         return self._forward(x, **kwargs)
       return self._cache.forward(x, **kwargs)
@@ -791,12 +851,12 @@ class Bijector(tf.Module):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
     Args:
-      x: `Tensor`. The input to the 'forward' evaluation.
+      x: `Tensor` (structure). The input to the 'forward' evaluation.
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
-      `Tensor`.
+      `Tensor` (structure).
 
     Raises:
       TypeError: if `self.dtype` is specified and `x.dtype` is not
@@ -838,8 +898,12 @@ class Bijector(tf.Module):
   def _call_inverse(self, y, name, **kwargs):
     """Wraps call to _inverse, allowing extra shared logic."""
     with self._name_and_control_scope(name):
-      y = tf.convert_to_tensor(y, dtype_hint=self.dtype, name='y')
-      self._maybe_assert_dtype(y)
+      dtype = self.forward_dtype(**kwargs)
+      y = nest_util.convert_to_nested_tensor(
+          y, name='y', dtype_hint=dtype,
+          dtype=None if SKIP_DTYPE_CHECKS else dtype,
+          allow_packing=True)
+
       if not self._is_injective:  # No caching for non-injective
         return self._inverse(y, **kwargs)
       return self._cache.inverse(y, **kwargs)
@@ -848,151 +912,21 @@ class Bijector(tf.Module):
     """Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
     Args:
-      y: `Tensor`. The input to the 'inverse' evaluation.
+      y: `Tensor` (structure). The input to the 'inverse' evaluation.
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
-      `Tensor`, if this bijector is injective.
+      `Tensor` (structure), if this bijector is injective.
         If not injective, returns the k-tuple containing the unique
         `k` points `(x1, ..., xk)` such that `g(xi) = y`.
 
     Raises:
-      TypeError: if `self.dtype` is specified and `y.dtype` is not
-        `self.dtype`.
+      TypeError: if `y`'s structured dtype is incompatible with the expected
+        output dtype.
       NotImplementedError: if `_inverse` is not implemented.
     """
     return self._call_inverse(y, name, **kwargs)
-
-  def _compute_inverse_log_det_jacobian_with_caching(
-      self, x, y, prefer_inverse_ldj_fn, event_ndims, kwargs):
-    """Compute ILDJ by the best available means, and ensure it is cached.
-
-    Sub-classes of Bijector may implement either `_forward_log_det_jacobian` or
-    `_inverse_log_det_jacobian`, or both, and may prefer one or the other for
-    reasons of computational efficiency and/or numerics. In general, to compute
-    the [I]LDJ, we need one of `x` or `y` and one of `_forward_log_det_jacobian`
-    or `_inverse_log_det_jacobian` (all bijectors implement `forward` and
-    `inverse`, so either of `x` and `y` may always computed from the other).
-
-    This method encapsulates the logic of selecting the best possible method of
-    computing the inverse log det jacobian, and executing it. Possible avenues
-    to obtaining this value are:
-      - recovering it from the cache,
-      - computing it as `-_forward_log_det_jacobian(x)`, where `x` may need to
-        be computed as `inverse(y)`, or
-      - computing it as `_inverse_log_det_jacobian(y)`, where `y` may need to
-        be computed as `forward(x)`.
-
-    To make things more interesting, we may be able to take advantage of the
-    knowledge that the jacobian is constant, for given `event_ndims`, and may
-    even cache that result.
-
-    To make things even more interesting still, we may need to perform an
-    additional `reduce_sum` over the event dims of an input after computing the
-    ILDJ (see `_reduce_jacobian_det_over_event` for the reduction logic). In
-    order to prevent spurious TF graph dependencies on past inputs in cached
-    results, we need to take care to do this reduction after the cache lookups.
-
-    This method takes care of all the above concerns.
-
-    Args:
-      x: a `Tensor`, the pre-Bijector transform value at whose post-Bijector
-        transform value the ILDJ is to be computed. Can be `None` as long as
-        `y` is not `None`.
-      y: a `Tensor`, a point in the output space of the Bijector's `forward`
-        transformation, at whose value the ILDJ is to be computed. Can be
-        `None` as long as `x` is not `None`.
-      prefer_inverse_ldj_fn: Python `bool`, if `True`, will strictly prefer to
-        use the `_inverse_log_det_jacobian` to compute ILDJ; else, will strictly
-        prefer to use `_forward_log_det_jacobian`. The switching behavior allows
-        the caller to communicate that one of the inverse or forward LDJ
-        computations may be more efficient (usually because it can avoid an
-        extra call to `inverse` or `forward`). It's only a "preference" because
-        it may not always be possible, namely if the underlying implementation
-        only has one of `_inverse_log_det_jacobian` or
-        `_forward_log_det_jacobian` defined.
-      event_ndims: int-like `Tensor`, the number of dims of an event (in the
-        pre- or post-transformed space, as appropriate). These need to be summed
-        over to compute the total ildj.
-      kwargs: dictionary of keyword args that will be passed to calls to
-        `self.forward` or `self.inverse` (if either of those are required), and
-        to `self._compute_unreduced_ildj_with_caching` (which uses the
-        conditioning kwargs for caching and for their underlying computations).
-
-    Returns:
-      ildj: a Tensor of ILDJ['s] at the given input (as specified by the args).
-        Also updates the cache as needed.
-    """
-    # Ensure at least one of _inverse/_forward_log_det_jacobian is defined.
-    if not (hasattr(self, '_inverse_log_det_jacobian') or
-            hasattr(self, '_forward_log_det_jacobian')):
-      raise NotImplementedError(
-          'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
-          'is implemented. One or the other is required.')
-
-    # Use inverse_log_det_jacobian if either
-    #   1. it is preferred to *and* we are able, or
-    #   2. forward ldj fn isn't implemented (so we have no choice).
-    use_inverse_ldj_fn = (
-        (prefer_inverse_ldj_fn and hasattr(self, '_inverse_log_det_jacobian'))
-        or not hasattr(self, '_forward_log_det_jacobian'))
-
-    if use_inverse_ldj_fn:
-      tensor_to_use = y if y is not None else self.forward(x, **kwargs)
-      min_event_ndims = self.inverse_min_event_ndims
-    else:
-      tensor_to_use = x if x is not None else self.inverse(y, **kwargs)
-      min_event_ndims = self.forward_min_event_ndims
-
-    unreduced_ildj = self._compute_unreduced_ildj_with_caching(
-        x, y, tensor_to_use, use_inverse_ldj_fn, kwargs)
-
-    return self._reduce_jacobian_det_over_event(
-        ps.shape(tensor_to_use), unreduced_ildj, min_event_ndims, event_ndims)
-
-  def _compute_unreduced_ildj_with_caching(
-      self, x, y, tensor_to_use, use_inverse_ldj_fn, kwargs):
-    """Helper for computing ILDJ, with caching.
-
-    Does not do the 'reduce' step which is necessary in some cases; this is left
-    to the caller.
-
-    Args:
-      x: a `Tensor`, the pre-Bijector transform value at whose post-Bijector
-        transform value the ILDJ is to be computed. Can be `None` as long as
-        `y` is not `None`. This method only uses the value for cache
-        lookup/updating.
-      y: a `Tensor`, a point in the output space of the Bijector's `forward`
-        transformation, at whose value the ILDJ is to be computed. Can be
-        `None` as long as `x` is not `None`. This method only uses the value
-        for cache lookup/updating.
-      tensor_to_use: a `Tensor`, the one to actually pass to the chosen compute
-        function (`_inverse_log_det_jacobian` or `_forward_log_det_jacobian`).
-        It is presumed that the caller has already figured out what input to use
-        (it will either be the x or y value corresponding to the location where
-        we are computing the ILDJ).
-      use_inverse_ldj_fn: Python `bool`, if `True`, will use the
-        `_inverse_log_det_jacobian` to compute ILDJ; else, will use
-        `_forward_log_det_jacobian`.
-      kwargs: dictionary of keyword args that will be passed to calls to to
-        `_inverse_log_det_jacobian` or `_forward_log_det_jacobian`, as well as
-        for lookup/updating of the result in the cache.
-
-    Returns:
-      ildj: the (un-reduce_sum'ed) value of the ILDJ at the specified input
-        location. Also updates the cache as needed.
-    """
-    if use_inverse_ldj_fn:
-      attrs = self._cache.inverse.attributes(tensor_to_use, **kwargs)
-      if 'ildj' not in attrs:
-        attrs['ildj'] = self._inverse_log_det_jacobian(tensor_to_use, **kwargs)
-    else:
-      attrs = self._cache.forward.attributes(tensor_to_use, **kwargs)
-      if 'ildj' not in attrs:
-        attrs['ildj'] = -self._forward_log_det_jacobian(tensor_to_use, **kwargs)
-
-    return attrs['ildj']
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     """Wraps call to _inverse_log_det_jacobian, allowing extra shared logic.
@@ -1016,26 +950,47 @@ class Bijector(tf.Module):
       ildj: the inverse log det jacobian at `y`. Also updates the cache as
         needed.
     """
-    with self._name_and_control_scope(name), tf.control_dependencies(
-        self._check_valid_event_ndims(
-            min_event_ndims=self.inverse_min_event_ndims,
-            event_ndims=event_ndims)):
-      y = tf.convert_to_tensor(y, name='y')
-      self._maybe_assert_dtype(y)
+    if any(nd is None for nd in nest.flatten(self.inverse_min_event_ndims)):
+      raise NotImplementedError(
+          'Subclasses without static `inverse_min_event_ndims` must override '
+          '`_call_inverse_log_det_jacobian`.')
 
-      if not self._is_injective:
-        ildjs = self._inverse_log_det_jacobian(y, **kwargs)
-        return tuple(
-            self._reduce_jacobian_det_over_event(  # pylint: disable=g-complex-comprehension
-                ps.shape(y), ildj, self.inverse_min_event_ndims, event_ndims)
-            for ildj in ildjs)
-
-      return self._compute_inverse_log_det_jacobian_with_caching(
-          x=None,
-          y=y,
-          prefer_inverse_ldj_fn=True,
+    with self._name_and_control_scope(name):
+      dtype = self.forward_dtype(**kwargs)
+      y = nest_util.convert_to_nested_tensor(
+          y, name='y', dtype_hint=dtype,
+          dtype=None if SKIP_DTYPE_CHECKS else dtype,
+          allow_packing=True)
+      reduce_shape, assertions = ldj_reduction_shape(
+          nest.map_structure(prefer_static.shape, y),
           event_ndims=event_ndims,
-          kwargs=kwargs)
+          min_event_ndims=self._inverse_min_event_ndims,
+          validate=self.validate_args)
+
+      # Make sure we have validated reduce_shape before continuing on.
+      with tf.control_dependencies(assertions):
+        if not self._is_injective:
+          # Non-injective bijectors don't use caching, and the resulting
+          # LDJ is a tuple of LDJ over possible partitions on `x`.
+          return tuple(
+              self._reduce_jacobian_det_over_shape(ildj, reduce_shape)
+              for ildj in self._inverse_log_det_jacobian(y, **kwargs))
+
+        # Make sure the unreduced ILDJ is in the cache.
+        attrs = self._cache.inverse.attributes(y, **kwargs)
+        if 'ildj' in attrs:
+          ildj = attrs['ildj']
+        elif hasattr(self, '_inverse_log_det_jacobian'):
+          ildj = attrs['ildj'] = self._inverse_log_det_jacobian(y, **kwargs)
+        elif hasattr(self, '_forward_log_det_jacobian'):
+          x = self.inverse(y, **kwargs)  # Fall back to computing `-fldj(x)`
+          ildj = attrs['ildj'] = -self._forward_log_det_jacobian(x, **kwargs)
+        else:
+          raise NotImplementedError(
+              'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
+              'is implemented. One or the other is required.')
+
+        return self._reduce_jacobian_det_over_shape(ildj, reduce_shape)
 
   def inverse_log_det_jacobian(self,
                                y,
@@ -1050,12 +1005,17 @@ class Bijector(tf.Module):
     evaluated at `g^{-1}(y)`.
 
     Args:
-      y: `Tensor`. The input to the 'inverse' Jacobian determinant evaluation.
+      y: `Tensor` (structure). The input to the 'inverse' Jacobian determinant
+        evaluation.
       event_ndims: Number of dimensions in the probabilistic events being
         transformed. Must be greater than or equal to
         `self.inverse_min_event_ndims`. The result is summed over the final
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
         it has shape `rank(y) - event_ndims` dimensions.
+        Multipart bijectors require *structured* event_ndims, such that
+        `rank(y[i]) - rank(event_ndims[i])` is the same for all elements `i` of
+        the structured input. Furthermore, the first `event_ndims[i]` of each
+        `x[i].shape` must be the same for all `i` (broadcasting is not allowed).
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
@@ -1066,8 +1026,7 @@ class Bijector(tf.Module):
         of `g` to the `ith` partition `Di`.
 
     Raises:
-      TypeError: if `self.dtype` is specified and `y.dtype` is not
-        `self.dtype`.
+      TypeError: if `x`'s dtype is incompatible with the expected inverse-dtype.
       NotImplementedError: if `_inverse_log_det_jacobian` is not implemented.
     """
     return self._call_inverse_log_det_jacobian(y, event_ndims, name, **kwargs)
@@ -1098,19 +1057,40 @@ class Bijector(tf.Module):
           'forward_log_det_jacobian cannot be implemented for non-injective '
           'transforms.')
 
-    with self._name_and_control_scope(name), tf.control_dependencies(
-        self._check_valid_event_ndims(
-            min_event_ndims=self.forward_min_event_ndims,
-            event_ndims=event_ndims)):
-      x = tf.convert_to_tensor(x, name='x')
-      self._maybe_assert_dtype(x)
+    if any(nd is None for nd in nest.flatten(self.forward_min_event_ndims)):
+      raise NotImplementedError(
+          'Subclasses without static `forward_min_event_ndims` must override '
+          '`_call_forward_log_det_jacobian`.')
 
-      return -self._compute_inverse_log_det_jacobian_with_caching(
-          x=x,
-          y=None,
-          prefer_inverse_ldj_fn=False,
+    with self._name_and_control_scope(name):
+      dtype = self.inverse_dtype(**kwargs)
+      x = nest_util.convert_to_nested_tensor(
+          x, name='x', dtype_hint=dtype,
+          dtype=None if SKIP_DTYPE_CHECKS else dtype,
+          allow_packing=True)
+      reduce_shape, assertions = ldj_reduction_shape(
+          nest.map_structure(prefer_static.shape, x),
           event_ndims=event_ndims,
-          kwargs=kwargs)
+          min_event_ndims=self._forward_min_event_ndims,
+          validate=self.validate_args)
+
+      # Make sure we have validated reduce_shape before continuing on.
+      with tf.control_dependencies(assertions):
+        # Make sure the unreduced ILDJ is in the cache.
+        attrs = self._cache.forward.attributes(x, **kwargs)
+        if 'ildj' in attrs:
+          ildj = attrs['ildj']
+        elif hasattr(self, '_forward_log_det_jacobian'):
+          ildj = attrs['ildj'] = -self._forward_log_det_jacobian(x, **kwargs)
+        elif hasattr(self, '_inverse_log_det_jacobian'):
+          y = self.forward(x, **kwargs)  # Fall back to computing `ildj(y)`
+          ildj = attrs['ildj'] = self._inverse_log_det_jacobian(y, **kwargs)
+        else:
+          raise NotImplementedError(
+              'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
+              'is implemented. One or the other is required.')
+
+        return self._reduce_jacobian_det_over_shape(-ildj, reduce_shape)
 
   def forward_log_det_jacobian(self,
                                x,
@@ -1120,73 +1100,109 @@ class Bijector(tf.Module):
     """Returns both the forward_log_det_jacobian.
 
     Args:
-      x: `Tensor`. The input to the 'forward' Jacobian determinant evaluation.
+      x: `Tensor` (structure). The input to the 'forward' Jacobian determinant
+        evaluation.
       event_ndims: Number of dimensions in the probabilistic events being
         transformed. Must be greater than or equal to
         `self.forward_min_event_ndims`. The result is summed over the final
         dimensions to produce a scalar Jacobian determinant for each event, i.e.
         it has shape `rank(x) - event_ndims` dimensions.
+        Multipart bijectors require *structured* event_ndims, such that
+        `rank(y[i]) - rank(event_ndims[i])` is the same for all elements `i` of
+        the structured input. Furthermore, the first `event_ndims[i]` of each
+        `x[i].shape` must be the same for all `i` (broadcasting is not allowed).
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
     Returns:
-      `Tensor`, if this bijector is injective.
+      `Tensor` (structure), if this bijector is injective.
         If not injective this is not implemented.
 
     Raises:
-      TypeError: if `self.dtype` is specified and `y.dtype` is not
-        `self.dtype`.
+      TypeError: if `y`'s dtype is incompatible with the expected output dtype.
       NotImplementedError: if neither `_forward_log_det_jacobian`
         nor {`_inverse`, `_inverse_log_det_jacobian`} are implemented, or
         this is a non-injective bijector.
     """
     return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
-  def _forward_dtype(self, dtype):
-    # TODO(emilyaf): Raise an error if not implemented for bijectors with
-    # multipart forward or inverse event shapes.
-    return dtype
+  def _forward_dtype(self, input_dtype, **kwargs):
+    """Subclass stub for `forward_dtype`."""
+    return input_dtype
 
-  def _inverse_dtype(self, dtype):
-    # TODO(emilyaf): Raise an error if not implemented for bijectors with
-    # multipart forward or inverse event shapes.
-    return dtype
+  def _inverse_dtype(self, output_dtype, **kwargs):
+    """Subclass stub for `inverse_dtype`."""
+    return output_dtype
 
-  def forward_dtype(self,
-                    dtype,
-                    name='forward_dtype',
-                    **kwargs):
-    """Returns the dtype of the output of the forward transformation.
+  def forward_dtype(self, dtype=UNSPECIFIED, name='forward_dtype', **kwargs):
+    """Returns the dtype returned by `forward` for the provided input."""
+    with tf.name_scope('{}/{}'.format(self.name, name)):
+      input_dtype = nest_util.broadcast_structure(
+          self.forward_min_event_ndims, self.dtype)
+      if dtype is not UNSPECIFIED:
+        # Make sure inputs are compatible with statically-known dtype.
+        input_dtype = nest.map_structure_up_to(
+            input_dtype,
+            lambda x, dt: dtype_util.convert_to_dtype(x, dtype=dt),
+            dtype, input_dtype)
 
-    Args:
-      dtype: `tf.dtype`, or nested structure of `tf.dtype`s, of the input to
-        `forward`.
-      name: The name to give this op.
-      **kwargs: Named arguments forwarded to subclass implementation.
+      output_dtype = self._forward_dtype(input_dtype, **kwargs)
+      try:
+        # kwargs may alter dtypes themselves, but we currently require
+        # structure to be statically known.
+        nest.assert_same_structure(self.inverse_min_event_ndims, output_dtype)
+      except Exception as err:
+        raise NotImplementedError(
+            'Changing output structure in `forward_dtype` '
+            'at runtime is not currently supported:\n' + str(err))
+      return output_dtype
 
-    Returns:
-      `tf.dtype` or nested structure of `tf.dtype`s of the output of `forward`.
-    """
-    with self._name_and_control_scope(name):
-      return self._forward_dtype(dtype, **kwargs)
+  def inverse_dtype(self, dtype=UNSPECIFIED, name='inverse_dtype', **kwargs):
+    """Returns the dtype returned by forward for the provided input."""
+    with tf.name_scope('{}/{}'.format(self.name, name)):
+      output_dtype = nest_util.broadcast_structure(
+          self.inverse_min_event_ndims, self.dtype)
+      if dtype is not UNSPECIFIED:
+        # Make sure inputs are compatible with statically-known dtype.
+        output_dtype = nest.map_structure_up_to(
+            output_dtype,
+            lambda y, dt: dtype_util.convert_to_dtype(y, dtype=dt),
+            dtype, output_dtype)
 
-  def inverse_dtype(self,
-                    dtype,
-                    name='inverse_dtype',
-                    **kwargs):
-    """Returns the dtype of the output of the inverse transformation.
+      input_dtype = self._inverse_dtype(output_dtype, **kwargs)
+      try:
+        # kwargs may alter dtypes themselves, but we currently require
+        # structure to be statically known.
+        nest.assert_same_structure(self.forward_min_event_ndims, input_dtype)
+      except Exception as err:
+        raise NotImplementedError(
+            'Changing output structure in `inverse_dtype` '
+            'at runtime is not currently supported:\n' + str(err))
+      return input_dtype
 
-    Args:
-      dtype: `tf.dtype`, or nested structure of `tf.dtype`s, of the input to
-        `inverse`.
-      name: The name to give this op.
-      **kwargs: Named arguments forwarded to subclass implementation.
+  def forward_event_ndims(self, event_ndims, **kwargs):
+    """Returns the number of event dimensions produced by `forward`."""
+    if self._forward_min_event_ndims is None:
+      raise NotImplementedError(
+          'Subclasses without static min_event_ndims must override '
+          '`forward_event_ndims`')
+    batch_ndims = aligned_batch_ndims(
+        event_ndims, self._forward_min_event_ndims)
+    return nest.map_structure(
+        lambda ndims: batch_ndims + ndims,
+        self._inverse_min_event_ndims)
 
-    Returns:
-      `tf.dtype` or nested structure of `tf.dtype`s of the output of `inverse`.
-    """
-    with self._name_and_control_scope(name):
-      return self._inverse_dtype(dtype, **kwargs)
+  def inverse_event_ndims(self, event_ndims, **kwargs):
+    """Returns the number of event dimensions produced by `inverse`."""
+    if self._inverse_min_event_ndims is None:
+      raise NotImplementedError(
+          'Subclasses without static min_event_ndims must override '
+          '`inverse_event_ndims`')
+    batch_ndims = aligned_batch_ndims(
+        event_ndims, self._inverse_min_event_ndims)
+    return nest.map_structure(
+        lambda ndims: batch_ndims + ndims,
+        self._forward_min_event_ndims)
 
   @contextlib.contextmanager
   def _name_and_control_scope(self, name=None):
@@ -1204,89 +1220,13 @@ class Bijector(tf.Module):
         with tf.control_dependencies(deps) as deps_scope:
           yield deps_scope
 
-  def _maybe_assert_dtype(self, x):
-    """Helper to check dtype when self.dtype is known."""
-    if SKIP_DTYPE_CHECKS:
-      return
-    if (self.dtype is not None and
-        not dtype_util.base_equal(self.dtype, x.dtype)):
-      raise TypeError(
-          'Input had dtype %s but expected %s.' % (x.dtype, self.dtype))
-
-  def _reduce_jacobian_det_over_event(
-      self, shape_tensor, ildj, min_event_ndims, event_ndims):
-    """Reduce jacobian over event_ndims - min_event_ndims."""
-    # In this case, we need to tile the Jacobian over the event and reduce.
-    shape_tensor = ps.convert_to_shape_tensor(shape_tensor)
-    rank = ps.rank_from_shape(shape_tensor)
-    shape_tensor = shape_tensor[rank - event_ndims:rank - min_event_ndims]
-
-    ones = tf.ones(shape_tensor, ildj.dtype)
-    reduced_ildj = tf.reduce_sum(
-        ones * ildj,
-        axis=self._get_event_reduce_dims(min_event_ndims, event_ndims))
-
-    return reduced_ildj
-
-  def _get_event_reduce_dims(self, min_event_ndims, event_ndims):
-    """Compute the reduction dimensions given event_ndims."""
-    event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
-
-    if event_ndims_ is not None:
-      return [-index for index in range(1, event_ndims_ - min_event_ndims + 1)]
-    else:
-      reduce_ndims = event_ndims - min_event_ndims
-      return tf.range(-reduce_ndims, 0)
-
-  def _check_valid_event_ndims(self, min_event_ndims, event_ndims):
-    """Check whether event_ndims is atleast min_event_ndims."""
-    event_ndims = tf.convert_to_tensor(event_ndims, name='event_ndims')
-    event_ndims_ = tf.get_static_value(event_ndims)
-    assertions = []
-
-    if not dtype_util.is_integer(event_ndims.dtype):
-      raise ValueError('Expected integer dtype, got dtype {}'.format(
-          event_ndims.dtype))
-
-    if event_ndims_ is not None:
-      if tensorshape_util.rank(event_ndims.shape) != 0:
-        raise ValueError('Expected scalar event_ndims, got shape {}'.format(
-            event_ndims.shape))
-      if min_event_ndims > event_ndims_:
-        raise ValueError('event_ndims ({}) must be larger than '
-                         'min_event_ndims ({})'.format(event_ndims_,
-                                                       min_event_ndims))
-    elif self.validate_args:
-      assertions += [
-          assert_util.assert_greater_equal(event_ndims, min_event_ndims)
-      ]
-
-    if tensorshape_util.is_fully_defined(event_ndims.shape):
-      if tensorshape_util.rank(event_ndims.shape) != 0:
-        raise ValueError('Expected scalar shape, got ndims {}'.format(
-            tensorshape_util.rank(event_ndims.shape)))
-
-    elif self.validate_args:
-      assertions += [
-          assert_util.assert_rank(event_ndims, 0, message='Expected scalar.')
-      ]
-    return assertions
-
-  def _maybe_get_static_event_ndims(self, event_ndims):
-    """Helper which returns tries to return an integer static value."""
-    event_ndims_ = distribution_util.maybe_get_static_value(event_ndims)
-
-    if isinstance(event_ndims_, (np.generic, np.ndarray)):
-      if event_ndims_.dtype not in (np.int32, np.int64):
-        raise ValueError('Expected integer dtype, got dtype {}'.format(
-            event_ndims_.dtype))
-
-      if isinstance(event_ndims_, np.ndarray) and len(event_ndims_.shape):
-        raise ValueError(
-            'Expected a scalar integer, got {}'.format(event_ndims_))
-      event_ndims_ = int(event_ndims_)
-
-    return event_ndims_
+  def _reduce_jacobian_det_over_shape(self, unreduced, reduce_shape):
+    """Reduce LDJ over the rightmost `reduce_shape.ndims` dimensions."""
+    # Broadcast LDJ to the reduce shape (in case of is_constant_jacobian)
+    # and reduce over the trailing dimensions.
+    ones = tf.ones(reduce_shape, unreduced.dtype)
+    reduce_dims = prefer_static.range(-prefer_static.size(reduce_shape), 0)
+    return tf.reduce_sum(ones * unreduced, axis=reduce_dims)
 
   def _parameter_control_dependencies(self, is_init):
     """Returns a list of ops to be executed in members with graph deps.
@@ -1344,3 +1284,284 @@ class Bijector(tf.Module):
     not in JAX applications.
     """
     return ()
+
+
+def check_valid_ndims(ndims, validate=True):
+  """Ensures that `ndims` is a non-negative integer.
+
+  Args:
+    ndims: The value to be validated and returned.
+    validate: Whether to use runtime assertions when `ndims` is not known
+      statically. If true, the value returned by this method is conditioned on
+      `tf.debugging` ops. Otherwise, only run statically-decidable assertions.
+  Returns:
+    The validated `ndims`, possibly wrapped in a `tf.identity` to trigger
+    any required runtime assertions.
+  Raises:
+    ValueError: If `ndims` is not a scalar integer.
+    ValueError: If the (statically-known) `ndims` is negative.
+  """
+  # Container for runtime assertions, when `validate=True`.
+  assertions = []
+
+  shape = prefer_static.shape(ndims)
+  if not tf.is_tensor(shape):
+    if shape.tolist():
+      raise ValueError('Expected scalar, saw shape {}.'.format(shape))
+  elif validate:
+    assertions.append(assert_util.assert_rank_at_most(
+        x=ndims, rank=0, message='Expected scalar'))
+
+  # Dtype is *always* known statically.
+  if hasattr(ndims, 'dtype'):
+    if not dtype_util.is_integer(ndims.dtype):
+      raise ValueError('Expected integer, got dtype {}.'.format(ndims.dtype))
+  elif not isinstance(ndims, int):
+    raise ValueError('Expected integer, got dtype {}.'.format(type(ndims)))
+
+  ndims_ = tf.get_static_value(ndims)
+  if ndims_ is not None:
+    if not np.all(ndims_ >= 0):
+      raise ValueError('`ndims` must be non-negative, saw {}.'.format(ndims_))
+  elif validate:
+    with tf.control_dependencies(assertions):
+      assertions.append(assert_util.assert_non_negative(
+          ndims, message='`ndims` must be non-negative.'))
+
+  if assertions:
+    with tf.control_dependencies(assertions):
+      ndims = tf.identity(ndims)
+  return ndims
+
+
+def aligned_batch_ndims(rank_structure,
+                        event_ndims,
+                        validate=True,
+                        name='aligned_batch_ndims'):
+  """Get the scalar batch-ndims given structured input-ranks and event-ndims.
+
+  This method takes two parallel structures of integer values: namely, the
+  structured ranks of a bijector input, and user-specified event-ndims. It
+  checks that the elementwise difference between the structures is equal for all
+  elements and returns the unique scalar difference.
+
+  Args:
+    rank_structure: A structure of integers representing the ranks of bijector
+      inputs. Assumed to be positive integer values.
+    event_ndims: A corresponding structure of integers. We check that every
+      element of `rank_structure[i] - event_ndims[i]` is equal, and that the
+      difference is non-negative.
+    validate: Whether to use runtime assertions when either `rank_structure` or
+      `event_ndims` are not known statically. If true, the value returned
+      by this method is conditioned on `tf.debugging` ops where required.
+      Otherwise, only run statically-decidable assertions.
+    name: Python `str` name given to ops created by this function.
+  Returns:
+    batch_ndims: An unstructured integer representing "batch" dimensions.
+  Raises:
+    ValueError: When the structured difference between `rank_structure` and
+      `event_ndims` is not the same for all elements.
+    ValueError: If the resulting `batch_ndims` is negative.
+  """
+  with tf.name_scope(name):
+    assertions = []
+
+    flat_ranks = nest.flatten(rank_structure)
+    flat_event_ndims = nest.flatten_up_to(rank_structure, event_ndims)
+
+    flat_differences = []
+    differences_all_static = True
+
+    for rank, ndims in zip(flat_ranks, flat_event_ndims):
+      difference = rank - ndims
+      difference_ = tf.get_static_value(difference)
+      if difference_ is not None:
+        flat_differences.append(np.int32(difference_))
+      else:
+        flat_differences.append(difference)
+        differences_all_static = False
+
+    # Make sure the differences are unique.
+    if len(flat_differences) > 1:
+      if differences_all_static:
+        if len(set(flat_differences)) > 1:
+          raise ValueError(('Differences between rank and event_ndims must '
+                            'be equal for all elements of the structured '
+                            'input. Saw input_rank={}, event_ndims={}.').format(
+                                rank_structure, event_ndims))
+      elif validate:
+        with tf.control_dependencies(assertions):
+          assertions.append(assert_util.assert_equal(
+              flat_differences[0], flat_differences[1:],
+              message=('Differences between rank and event_ndims must '
+                       'be equal for all elements of the structured input. '
+                       'Saw input_rank={}, event_ndims={}.').format(
+                           rank_structure, event_ndims)))
+
+    # Finally, make sure the difference is positive.
+    result = flat_differences[0]
+    if differences_all_static:
+      if result < 0:
+        raise ValueError('Input must have rank at least {}. Saw: {}'
+                         .format(event_ndims, rank_structure))
+    elif validate:
+      with tf.control_dependencies(assertions):
+        assertions.append(
+            assert_util.assert_greater_equal(
+                result, 0,
+                message='Input must have rank at least {}. Saw: {}'.format(
+                    event_ndims, rank_structure)))
+
+    if assertions:
+      with tf.control_dependencies(assertions):
+        result = tf.identity(result)
+    return result
+
+
+def ldj_reduction_shape(shape_structure,
+                        event_ndims,
+                        min_event_ndims,
+                        validate=True,
+                        name='ldj_reduction_shape'):
+  """Get the shape of the LDJ reduction for a structured input.
+
+  The `ldj_reduction_shape` is the shape of the rightmost dimensions removed
+  when computing  `a_bijector.fldj(x, event_ndims)` in terms of
+  `a_bijector.fldj(x, min_event_ndims)`.
+
+  Concretely, this value is the *unique* value of
+  `shape_structure[i][-event_ndims[i]:-min_event_ndims[i]]` for all elements
+  `i` of the structured arguments.
+
+  For this to be valid, the following must all be true:
+  1) `shape_structure`, `event_ndims`, and `min_event_ndims` have identical
+     nested structure (representing valid shapes and ranks, respectively).
+  2) `batch_ndims := shape_structure[i].ndims - event_ndims[i]` takes the
+     same value for all `i` in the structured inputs.
+  3) `max_batch_ndims := shape_structure[i].ndims - min_event_ndims[i]` takes
+     the same value for all `i` in the structured inputs.
+  4) `max_batch_ndims >= batch_ndims >= 0`.
+  5) The first `max_batch_ndims` elements of each shape must be identical.
+     Mathematically, only the shapes between `batch_ndims` and `max_batch_ndims`
+     need to be the same. Practically, broadcasting over `batch_ndims` creates
+     issues for invertibility and is currently disallowed.
+
+  Example Usage:
+  ```
+  # Standalone examples:
+  ldj_reduction_shape([1, 2, 3, 4], event_ndims=2, min_event_ndims=1)
+  ==> [3]
+
+  ldj_reduction_shape({
+      'a': [1, 2, 3, 4],
+      'b': [1, 2, 3, 4, 5]
+    },
+    event_ndims={'a': 2, 'b': 3},
+    min_event_ndims={'a': 1, 'b': 2})
+  ==> [3]
+
+  # Concrete example:
+  unreduced_ldj = some_bijector._forward_log_det_jacobian(x)
+  reduced_ldj = some_bijector.forward_log_det_jacobian(x, x_event_ndims)
+
+  reduce_shape = ldj_reduction_shape(
+    shape_structure=nest.map_structure(tf.shape, x),
+    event_ndims=x_event_ndims,
+    min_event_ndims=some_bijector._forward_min_event_ndims)
+
+  assert unreduced_ldj.shape == reduced_ldj.shape + reduce_shape
+  ```
+
+  Args:
+    shape_structure: A structure of shape-tensors describing input-shapes to a
+      bijector.
+    event_ndims: A matching structure of scalar integers used to determine the
+      "requested" batch-ndims.
+    min_event_ndims: A matching structure of scalar integers that are intrinsic
+      properties of the bijector, used to determine the maximum possible
+      batch-ndims.
+    validate: Whether to use runtime assertions when properties of the arguments
+      are not known statically. If true, the value returned by this method is
+      conditioned on `tf.debugging` ops where required. Otherwise, only run
+      statically-decidable assertions.
+    name: Python `str` name given to ops created by this function.
+      Default value: "ldj_reduction_shape".
+  Returns:
+    ldj_reduction_shape: A tensor shape describing the rightmost dimensions
+      between `event_ndims` and `min_event_ndims` for all structured inputs.
+    assertions: A list of ops that should be passed to downstream
+      `tf.control_operations`. This is a *temporary* workaround to support
+      keras models under TF1.
+  Raises:
+    ValueError: When `ndims` or `event_ndims` are not matching structures
+      of valid ranks (non-negative integers).
+    ValueError: When `min_event_ndims[i]` and `event_ndims[i]` describe an
+      invalid slice of `shape_structure[i]` for any element of the structured
+      inputs.
+    ValueError: When `ldj_reduction_shape[i]` computed on any element `[i]` of
+      the structured inputs is not the same across the structure.
+  """
+  with tf.name_scope(name):
+    # Container for dynamic assertions
+    assertions = []
+
+    # Make sure event_ndims and min_event_ndims are valid.
+    min_event_ndims = nest.map_structure(
+        lambda nd: check_valid_ndims(nd, validate), min_event_ndims)
+    event_ndims = nest.map_structure_up_to(
+        min_event_ndims,
+        lambda nd: check_valid_ndims(nd, validate), event_ndims)
+
+    # Get slice start/endpoint for the ldj_reduction_shape.
+    rank_structure = nest.map_structure(prefer_static.size, shape_structure)
+    max_batch_ndims = aligned_batch_ndims(
+        rank_structure, min_event_ndims, validate=validate,
+        name='max_batch_ndims')
+    batch_ndims = aligned_batch_ndims(
+        rank_structure, event_ndims, validate=validate,
+        name='batch_ndims')
+
+    # Make sure the batch_ndims are not larger than max_batch_ndims.
+    max_batch_ndims_ = tf.get_static_value(max_batch_ndims)
+    batch_ndims_ = tf.get_static_value(batch_ndims)
+
+    if max_batch_ndims_ is not None and batch_ndims_ is not None:
+      if max_batch_ndims_ < batch_ndims_:
+        raise ValueError('event_ndims must be larger than min_event_ndims.')
+    elif validate:
+      assertions.append(
+          assert_util.assert_greater_equal(
+              max_batch_ndims, batch_ndims,
+              message='event_ndims must be larger than min_event_ndims.'))
+
+    # Get the maximal batch shape from each component of the structured input
+    flat_max_batch_shapes = [
+        s[:max_batch_ndims] for s in nest.flatten(shape_structure)]
+
+    # The dimensions following batch-dims and preceeding maximum possible batch
+    # dims are the LDJ reduce dims. This must be the same for all structured
+    # elements, so we'll just pick the first.
+    reduce_shape = prefer_static.slice(
+        flat_max_batch_shapes[0],
+        begin=[batch_ndims],
+        size=[max_batch_ndims-batch_ndims])
+
+    # Make sure that the max_batch_shape is equal for all structured elements.
+    # We can skip this step if the input is unstructured.
+    if len(flat_max_batch_shapes) > 1:
+      # Try to check shapes statically.
+      max_batch_shapes_ = [tf.get_static_value(s)
+                           for s in flat_max_batch_shapes]
+      if not any(s is None for s in max_batch_shapes_):
+        if len(set(map(tuple, max_batch_shapes_))) > 1:
+          raise ValueError('Batch shapes must be equal. Saw: {}.'
+                           .format(nest.pack_sequence_as(
+                               shape_structure, max_batch_shapes_)))
+      elif validate:
+        with tf.control_dependencies(assertions):
+          assertions.append(
+              assert_util.assert_equal(
+                  flat_max_batch_shapes[0], flat_max_batch_shapes[1:],
+                  message='Batch shapes must be equal.'))
+
+    return reduce_shape, assertions

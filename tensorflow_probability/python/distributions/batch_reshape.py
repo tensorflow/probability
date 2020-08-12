@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -483,7 +484,7 @@ def validate_init_args_statically(distribution, batch_shape):
 
 
 class _BatchReshapeBijector(bijector_lib.Bijector):
-  """The `default_event_shape_bijector` for `tfd.BatchReshape`."""
+  """The `default_event_space_bijector` for `tfd.BatchReshape`."""
 
   def __init__(
       self,
@@ -495,12 +496,26 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
     self._reshape_fn = reshape_fn
     self._inverse_event_shapes = (
         static_inverse_event_shape, inverse_event_shape_tensor)
+
+    # Infer min_event_ndims based on the distribution's event shapes.
+    # Note that the `inverse_event_shape_tensor` argument to the constructor
+    # describes the *output* of `BatchReshape.inverse_event_shape`.
+    forward_min_event_ndims = nest.map_structure(
+        prefer_static.size, inverse_event_shape_tensor)
+
+    inverse_min_event_ndims = nest.map_structure(
+        prefer_static.size,
+        # Prefer static shape-inference if possible.
+        base_bijector.forward_event_shape(static_inverse_event_shape)
+        if static_inverse_event_shape is not None else
+        base_bijector.forward_event_shape_tensor(inverse_event_shape_tensor))
+
     super(_BatchReshapeBijector, self).__init__(
         is_constant_jacobian=base_bijector.is_constant_jacobian,
         validate_args=base_bijector.validate_args,
         dtype=base_bijector.dtype,
-        forward_min_event_ndims=base_bijector.forward_min_event_ndims,
-        inverse_min_event_ndims=base_bijector.inverse_min_event_ndims,
+        inverse_min_event_ndims=inverse_min_event_ndims,
+        forward_min_event_ndims=forward_min_event_ndims,
         name='batch_reshape_bijector')
 
   def _is_increasing(self):
@@ -521,22 +536,24 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
         keep_event_dims=True)
 
   def _forward_log_det_jacobian(self, x):
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.forward_min_event_ndims)
     return self._reshape_fn(
         lambda x_: self._base_bijector.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
-            x_, event_ndims=event_ndims),
+            x_, event_ndims=self._forward_min_event_ndims),
         x,
         input_event_shape=self._inverse_event_shapes)
 
   def _inverse_log_det_jacobian(self, y):
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.forward_min_event_ndims)
     return self._reshape_fn(
         lambda y_: self._base_bijector.inverse_log_det_jacobian(  # pylint: disable=g-long-lambda
-            y_, event_ndims=event_ndims),
+            y_, event_ndims=self._inverse_min_event_ndims),
         y,
         output_event_shape=self._inverse_event_shapes)
+
+  def _forward_dtype(self, dtype):
+    return self._base_bijector.forward_dtype(dtype)
+
+  def _inverse_dtype(self, dtype):
+    return self._base_bijector.inverse_dtype(dtype)
 
   def _forward_event_shape_tensor(self, input_shape):
     return self._base_bijector.forward_event_shape_tensor(input_shape)

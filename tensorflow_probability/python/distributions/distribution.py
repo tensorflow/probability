@@ -35,6 +35,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 # Symbol import needed to avoid BUILD-dependency cycle
@@ -74,7 +75,6 @@ _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
 
 
 UNSET_VALUE = object()
-
 
 JAX_MODE = False  # Overwritten by rewrite script.
 
@@ -137,54 +137,6 @@ def _update_docstring(old_str, append_str):
             + '\n'.join(old_str_lines[final_args_ix:]))
   else:
     return old_str + '\n\n' + append_str
-
-
-def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):
-  """Converts the given `value` to a (structure of) `Tensor`.
-
-  This function converts Python objects of various types to a (structure of)
-  `Tensor` objects. It accepts `Tensor` objects, numpy arrays, Python lists, and
-  Python scalars. For example:
-
-  Args:
-    value: An object whose structure matches that of `dtype ` and/or
-      `dtype_hint` and for which each leaf has a registered `Tensor` conversion
-      function.
-    dtype: Optional (structure of) element type for the returned tensor. If
-      missing, the type is inferred from the type of `value`.
-    dtype_hint: Optional (structure of) element type for the returned tensor,
-      used when dtype is None. In some cases, a caller may not have a dtype in
-      mind when converting to a tensor, so dtype_hint can be used as a soft
-      preference.  If the conversion to `dtype_hint` is not possible, this
-      argument has no effect.
-    name: Optional name to use if a new `Tensor` is created.
-
-  Returns:
-    tensor: A (structure of) `Tensor` based on `value`.
-
-  Raises:
-    TypeError: If no conversion function is registered for `value` to `dtype`.
-    RuntimeError: If a registered conversion function returns an invalid value.
-    ValueError: If the `value` is a tensor not of given `dtype` in graph mode.
-  """
-  if (tf.nest.is_nested(dtype) or
-      tf.nest.is_nested(dtype_hint)):
-    if dtype is None:
-      fn = lambda v, dh: tf.convert_to_tensor(v, dtype_hint=dh, name=name)
-      return nest.map_structure_up_to(dtype_hint, fn, value, dtype_hint,
-                                      # Allow list<->tuple conflation.
-                                      check_types=False)
-    elif dtype_hint is None:
-      fn = lambda v, d: tf.convert_to_tensor(v, dtype=d, name=name)
-      return nest.map_structure_up_to(dtype, fn, value, dtype,
-                                      check_types=False)
-    else:
-      fn = lambda v, d, dh: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
-          v, dtype=d, dtype_hint=dh, name=name)
-      return nest.map_structure_up_to(dtype, fn, value, dtype, dtype_hint,
-                                      check_types=False, expand_composites=True)
-  return tf.convert_to_tensor(
-      value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 
 
 def _remove_dict_keys_with_value(dict_, val):
@@ -986,7 +938,9 @@ class Distribution(_BaseDistribution):
 
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""
-    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    value = nest_util.convert_to_nested_tensor(
+        value, name='value', dtype_hint=self.dtype,
+        allow_packing=True)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_prob'):
         return self._log_prob(value, **kwargs)
@@ -1011,7 +965,9 @@ class Distribution(_BaseDistribution):
 
   def _call_prob(self, value, name, **kwargs):
     """Wrapper around _prob."""
-    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    value = nest_util.convert_to_nested_tensor(
+        value, name='value', dtype_hint=self.dtype,
+        allow_packing=True)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_prob'):
         return self._prob(value, **kwargs)
@@ -1036,7 +992,9 @@ class Distribution(_BaseDistribution):
 
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
-    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    value = nest_util.convert_to_nested_tensor(
+        value, name='value', dtype_hint=self.dtype,
+        allow_packing=True)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_log_cdf'):
         return self._log_cdf(value, **kwargs)
@@ -1071,7 +1029,9 @@ class Distribution(_BaseDistribution):
 
   def _call_cdf(self, value, name, **kwargs):
     """Wrapper around _cdf."""
-    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    value = nest_util.convert_to_nested_tensor(
+        value, name='value', dtype_hint=self.dtype,
+        allow_packing=True)
     with self._name_and_control_scope(name, value, kwargs):
       if hasattr(self, '_cdf'):
         return self._cdf(value, **kwargs)
@@ -1107,16 +1067,18 @@ class Distribution(_BaseDistribution):
 
   def _call_log_survival_function(self, value, name, **kwargs):
     """Wrapper around _log_survival_function."""
-    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    value = nest_util.convert_to_nested_tensor(
+        value, name='value', dtype_hint=self.dtype,
+        allow_packing=True)
     with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._log_survival_function(value, **kwargs)
-      except NotImplementedError as original_exception:
+      except NotImplementedError:
         if hasattr(self, '_log_cdf'):
           return log1mexp(self._log_cdf(value, **kwargs))
         if hasattr(self, '_cdf'):
           return tf.math.log1p(-self._cdf(value, **kwargs))
-        raise original_exception
+        raise
 
   def log_survival_function(self, value, name='log_survival_function',
                             **kwargs):
@@ -1150,16 +1112,18 @@ class Distribution(_BaseDistribution):
 
   def _call_survival_function(self, value, name, **kwargs):
     """Wrapper around _survival_function."""
-    value = _convert_to_tensor(value, name='value', dtype_hint=self.dtype)
+    value = nest_util.convert_to_nested_tensor(
+        value, name='value', dtype_hint=self.dtype,
+        allow_packing=True)
     with self._name_and_control_scope(name, value, kwargs):
       try:
         return self._survival_function(value, **kwargs)
-      except NotImplementedError as original_exception:
+      except NotImplementedError:
         if hasattr(self, '_log_cdf'):
           return -tf.math.expm1(self._log_cdf(value, **kwargs))
         if hasattr(self, '_cdf'):
           return 1. - self.cdf(value, **kwargs)
-        raise original_exception
+        raise
 
   def survival_function(self, value, name='survival_function', **kwargs):
     """Survival function.
@@ -1265,11 +1229,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       try:
         return self._variance(**kwargs)
-      except NotImplementedError as original_exception:
+      except NotImplementedError:
         try:
           return tf.square(self._stddev(**kwargs))
         except NotImplementedError:
-          raise original_exception
+          pass
+        raise
 
   def _stddev(self, **kwargs):
     raise NotImplementedError('stddev is not implemented: {}'.format(
@@ -1299,11 +1264,12 @@ class Distribution(_BaseDistribution):
     with self._name_and_control_scope(name):
       try:
         return self._stddev(**kwargs)
-      except NotImplementedError as original_exception:
+      except NotImplementedError:
         try:
           return tf.sqrt(self._variance(**kwargs))
         except NotImplementedError:
-          raise original_exception
+          pass
+        raise
 
   def _covariance(self, **kwargs):
     raise NotImplementedError('covariance is not implemented: {}'.format(

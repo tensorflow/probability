@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-from absl.testing import parameterized
+from absl.testing import parameterized  # pylint: disable=unused-import
 
 import numpy as np
 from scipy import stats
@@ -747,14 +747,16 @@ class ExcessiveConcretizationTestUnknownShape(ExcessiveConcretizationTest):
     self.shape = tf.TensorShape(None)
 
 
-# TODO(emilyaf): Check in `ZipMap` bijector and remove this.
 class ToyZipMap(tfb.Bijector):
 
   def __init__(self, bijectors):
     self._bijectors = bijectors
+
     super(ToyZipMap, self).__init__(
-        forward_min_event_ndims=0,
-        inverse_min_event_ndims=0,
+        forward_min_event_ndims=tf.nest.map_structure(
+            lambda b: b.forward_min_event_ndims, bijectors),
+        inverse_min_event_ndims=tf.nest.map_structure(
+            lambda b: b.inverse_min_event_ndims, bijectors),
         is_constant_jacobian=all([
             b.is_constant_jacobian for b in tf.nest.flatten(bijectors)]))
 
@@ -798,7 +800,7 @@ class ToyZipMap(tfb.Bijector):
         lambda b_i, y_i: b_i.inverse_event_shape_tensor(y_i),
         self.bijectors, y_shape_tensor)
 
-  def _forward_log_det_jacobian(self, x, event_ndims):
+  def forward_log_det_jacobian(self, x, event_ndims):
     fldj_parts = tf.nest.map_structure(
         lambda b, y, n: b.forward_log_det_jacobian(x, event_ndims=n),
         self.bijectors, x, event_ndims)

@@ -58,8 +58,8 @@ class Inline(bijector.Bijector):
                is_constant_jacobian=False,
                is_increasing=None,
                validate_args=False,
-               forward_min_event_ndims=None,
-               inverse_min_event_ndims=None,
+               forward_min_event_ndims=bijector.UNSPECIFIED,
+               inverse_min_event_ndims=bijector.UNSPECIFIED,
                name='inline'):
     """Creates a `Bijector` from callables.
 

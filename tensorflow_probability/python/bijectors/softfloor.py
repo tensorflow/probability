@@ -135,10 +135,15 @@ class Softfloor(bijector.Bijector):
     # fractional part is < 0.5 to the right hand portion of the interval.
     # We'll also need to adjust the integer part to reflect this.
     integer_part = tf.math.floor(x)
+    # We wrap `0.5` in a `tf.constant` with explicit dtype to avoid upcasting
+    # in the numpy backed. Declare this once, and use it everywhere.
+    one_half = tf.constant(0.5, self.dtype)
     integer_part = tf.where(
-        fractional_part < 0.5, integer_part - 1., integer_part)
-    fractional_part = tf.where(
-        fractional_part < 0.5, fractional_part + 0.5, fractional_part - 0.5)
+        fractional_part < one_half,
+        integer_part - tf.ones([], self.dtype), integer_part)
+    fractional_part = tf.where(fractional_part < one_half,
+                               fractional_part + one_half,
+                               fractional_part - one_half)
 
     # Rescale so the left tail is 0., and the right tail is 1. This
     # will also guarantee us continuity. Differentiability comes from the
@@ -151,19 +156,20 @@ class Softfloor(bijector.Bijector):
     # numerically stable.
 
     log_numerator = tfp_math.log_sub_exp(
-        (0.5 + fractional_part) / t, 0.5 / t)
+        (one_half + fractional_part) / t, one_half / t)
     # If fractional_part == 0, then we'll get log(0).
     log_numerator = tf.where(
         tf.equal(fractional_part, 0.),
-        dtype_util.as_numpy_dtype(self.dtype)(-np.inf), log_numerator)
+        tf.constant(-np.inf, self.dtype), log_numerator)
     log_denominator = tfp_math.log_sub_exp(
-        (0.5 + fractional_part) / t, fractional_part / t)
+        (one_half + fractional_part) / t, fractional_part / t)
     # If fractional_part == 0, then we'll get log(0).
     log_denominator = tf.where(
         tf.equal(fractional_part, 0.),
-        dtype_util.as_numpy_dtype(self.dtype)(-np.inf), log_denominator)
+        tf.constant(-np.inf, self.dtype), log_denominator)
     log_denominator = tfp_math.log_add_exp(
-        log_denominator, tfp_math.log_sub_exp(1. / t, 0.5 / t))
+        log_denominator,
+        tfp_math.log_sub_exp(tf.ones([], self.dtype) / t, one_half / t))
     rescaled_part = tf.math.exp(log_numerator - log_denominator)
     return integer_part + rescaled_part
 
@@ -176,22 +182,26 @@ class Softfloor(bijector.Bijector):
     t = tf.convert_to_tensor(self.temperature)
     fractional_part = y - tf.math.floor(y)
     log_f = tf.math.log(fractional_part)
-    log_numerator = tfp_math.log_sub_exp(0.5 / t + log_f, log_f)
-    log_numerator = tfp_math.log_add_exp(0., log_numerator)
+    # We wrap `0` and `0.5` in a `tf.constant` with explicit dtype to avoid
+    # upcasting in the numpy backed. Declare this once, and use it everywhere.
+    zero = tf.zeros([], self.dtype)
+    one_half = tf.constant(0.5, self.dtype)
+
+    log_numerator = tfp_math.log_sub_exp(one_half / t + log_f, log_f)
+    log_numerator = tfp_math.log_add_exp(zero, log_numerator)
     # When the fractional part is zero, the numerator is 1.
-    log_numerator = tf.where(
-        tf.equal(fractional_part, 0.),
-        dtype_util.as_numpy_dtype(self.dtype)(0.), log_numerator)
-    log_denominator = tfp_math.log_sub_exp(0.5 / t, log_f + 0.5 / t)
+    log_numerator = tf.where(tf.equal(fractional_part, 0.), zero, log_numerator)
+    log_denominator = tfp_math.log_sub_exp(one_half / t, log_f + one_half / t)
     log_denominator = tfp_math.log_add_exp(log_f, log_denominator)
     # When the fractional part is zero, the denominator is 0.5 / t.
     log_denominator = tf.where(
-        tf.equal(fractional_part, 0.), 0.5 / t, log_denominator)
+        tf.equal(fractional_part, 0.),
+        one_half / t, log_denominator)
 
-    new_fractional_part = t * (log_numerator - log_denominator) + 0.5
+    new_fractional_part = (t * (log_numerator - log_denominator) + one_half)
     # We finally shift this up since the original transformation was from
     # [0.5, 1.5] to [0, 1].
-    new_fractional_part = new_fractional_part + 0.5
+    new_fractional_part = new_fractional_part + one_half
     return tf.math.floor(y) + new_fractional_part
 
   def _forward_log_det_jacobian(self, x):

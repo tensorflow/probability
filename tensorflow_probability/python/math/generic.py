@@ -486,7 +486,8 @@ def log_sub_exp(x, y, return_sign=False, name=None):
     y = tf.convert_to_tensor(y, dtype=dtype, name='y')
     larger = tf.maximum(x, y)
     smaller = tf.minimum(x, y)
-    result = larger + log1mexp(tf.maximum(larger - smaller, 0))
+    zero = dtype_util.as_numpy_dtype(dtype)(0)
+    result = larger + log1mexp(tf.maximum(larger - smaller, zero))
     if return_sign:
       ones = tf.ones([], result.dtype)
       return result, tf.where(x < y, -ones, ones)

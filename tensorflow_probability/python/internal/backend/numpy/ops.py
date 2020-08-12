@@ -143,10 +143,10 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   dtype = utils.numpy_dtype(dtype)
   dtype_hint = utils.numpy_dtype(dtype_hint)
   if is_tensor(value) and not isinstance(value, Variable):
-    if dtype is not None:
-      # In NumPy mode, we are lenient on the dtype compatibility check because
-      # some codepaths rely on flexible conversion from int/float64 to 32.
-      if JAX_MODE and value.dtype != dtype:
+    # In NumPy mode, we are lenient on the dtype compatibility check because
+    # some codepaths rely on flexible conversion from int/float64 to 32.
+    if dtype is not None and value.dtype != dtype:
+      if JAX_MODE:
         raise TypeError(('Tensor conversion requested dtype {} for array with '
                          'dtype {}: {}').format(dtype, value.dtype, value))
       return value.astype(dtype)

@@ -75,7 +75,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
                                       scalings=scalings)
     step_size, expected_step_size = self.evaluate([
         tf.squeeze(kernel.inner_kernel.step_size),
-        scalings * tf.math.reduce_std(bijector.inverse(init_state))
+        scalings * tf.math.reduce_std(bijector.inverse(init_state[0]))
     ])
     self.assertAllGreater(step_size, 0.)
     self.assertAllEqual(step_size, expected_step_size)

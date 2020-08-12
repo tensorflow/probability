@@ -125,9 +125,9 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:cache_util",
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )

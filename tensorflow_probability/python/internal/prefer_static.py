@@ -466,6 +466,7 @@ reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
 round = _prefer_static(tf.math.round, nptf.math.round)  # pylint: disable=redefined-builtin
 rsqrt = _prefer_static(tf.math.rsqrt, nptf.math.rsqrt)
+slice = _prefer_static(tf.slice, nptf.slice)  # pylint: disable=redefined-builtin
 sort = _prefer_static(tf.sort, nptf.sort)
 split = _prefer_static(tf.split, nptf.split)
 sqrt = _prefer_static(tf.sqrt, nptf.sqrt)

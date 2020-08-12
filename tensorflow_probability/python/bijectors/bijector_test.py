@@ -29,6 +29,9 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
 
+JAX_MODE = False
+
+
 @test_util.test_all_tf_execution_regimes
 class BaseBijectorTest(test_util.TestCase):
   """Tests properties of the Bijector base-class."""
@@ -80,6 +83,40 @@ class BaseBijectorTest(test_util.TestCase):
         NotImplementedError,
         'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='`convert_to_tensor` casts instead of raising')
+  def testChecksDType(self):
+
+    class _TypedIdentity(tfb.Bijector):
+      """Bijector with an explicit dtype."""
+
+      def __init__(self, dtype):
+        super(_TypedIdentity, self).__init__(
+            forward_min_event_ndims=0,
+            dtype=dtype)
+
+      def _forward(self, x):
+        return x
+
+    x32 = tf.constant(0, dtype=tf.float32)
+    x64 = tf.constant(0, dtype=tf.float64)
+    error_clazz = TypeError if JAX_MODE else ValueError
+
+    b32 = _TypedIdentity(tf.float32)
+    self.assertEqual(tf.float32, b32(0).dtype)
+    self.assertEqual(tf.float32, b32(x32).dtype)
+    with self.assertRaisesRegexp(
+        error_clazz, 'Tensor conversion requested dtype'):
+      b32.forward(x64)
+
+    b64 = _TypedIdentity(tf.float64)
+    self.assertEqual(tf.float64, b64(0).dtype)
+    self.assertEqual(tf.float64, b64(x64).dtype)
+    with self.assertRaisesRegexp(
+        error_clazz, 'Tensor conversion requested dtype'):
+      b64.forward(x32)
 
 
 class IntentionallyMissingError(Exception):

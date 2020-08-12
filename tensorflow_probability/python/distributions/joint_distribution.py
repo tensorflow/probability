@@ -653,14 +653,23 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
     return tuple(tf.identity(x) for x in flat_xs)
 
 
+# TODO(b/162764645): Implement as a Composite bijector.
+# The Composite CL generalizes Chain to arbitrary bijector DAGs. It will:
+#   1) Define an abstract `CompositeBijector` class (for any bijector that
+#      wraps other bijectors, and does nothing else)
+#   2) Express `Chain` and friends (including this) in terms of Composite.
+#   3) Introduce `JointMap` (this class sans coroutine)
+#   4) Introduce `Restructure`, as Chain+JM are pretty useless without it.
 class _DefaultJointBijector(bijector_lib.Bijector):
   """Minimally-viable event space bijector for `JointDistribution`."""
 
   # TODO(b/148485798): Support joint bijectors in TransformedDistribution.
   def __init__(self, jd):
     with tf.name_scope('default_joint_bijector') as name:
+      structure = tf.nest.map_structure(lambda _: None, jd.dtype)
       super(_DefaultJointBijector, self).__init__(
-          forward_min_event_ndims=0,  # Dummy value, unused.
+          forward_min_event_ndims=structure,
+          inverse_min_event_ndims=structure,
           validate_args=jd.validate_args,
           name=name)
       self._jd = jd

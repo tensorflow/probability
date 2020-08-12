@@ -375,8 +375,8 @@ class _InverseGaussianTest(object):
         atol=0)
 
   def testModifiedVariableAssertion(self):
-    concentration = tf.Variable(0.9)
-    loc = tf.Variable(1.2)
+    concentration = tf.Variable(0.9, dtype=self.dtype)
+    loc = tf.Variable(1.2, dtype=self.dtype)
     self.evaluate([concentration.initializer, loc.initializer])
     inverse_gaussian = tfd.InverseGaussian(
         loc=loc, concentration=concentration, validate_args=True)
@@ -389,8 +389,8 @@ class _InverseGaussianTest(object):
 
   def testSupportBijectorOutsideRange(self):
     dist = tfd.InverseGaussian(
-        loc=[7., 2., 5.],
-        concentration=2.,
+        loc=self.make_tensor([7., 2., 5.]),
+        concentration=self.make_tensor(2.),
         validate_args=True)
     eps = 1e-6
     x = np.array([[-7.2, -eps, -1.3], [-5., -12., -eps]])

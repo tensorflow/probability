@@ -76,10 +76,12 @@ class _SplitBijectorTest(object):
     inverse_event_ndims = [event_ndims for _ in expected_split_sizes]
     self.assertEqual(
         0.,
-        bijector.inverse_log_det_jacobian(y, event_ndims=inverse_event_ndims))
+        self.evaluate(bijector.inverse_log_det_jacobian(
+            y, event_ndims=inverse_event_ndims)))
     self.assertEqual(
         0.,
-        bijector.forward_log_det_jacobian(x, event_ndims=event_ndims))
+        self.evaluate(bijector.forward_log_det_jacobian(
+            x, event_ndims=event_ndims)))
 
   def testAssertRaisesNonVectorSplitSizes(self):
     split_sizes = self.build_input([[1, 2, 2]])
@@ -91,7 +93,7 @@ class _SplitBijectorTest(object):
     y = [np.random.rand(2, i) for i in [5, 3, 1, 2]]
     bijector = tfb.Split(split_sizes, validate_args=True)
     with self.assertRaisesRegexp(
-        ValueError, 'does not match the number of splits'):
+        ValueError, "don't have the same sequence length"):
       self.evaluate(bijector.inverse(y))
 
   def testAssertRaisesNumSplitsNonDivisible(self):
@@ -106,7 +108,7 @@ class _SplitBijectorTest(object):
     y = [np.random.rand(2, 3)] * 3
     bijector = tfb.Split(num_splits, validate_args=True)
     with self.assertRaisesRegexp(
-        ValueError, 'does not match the number of splits'):
+        ValueError, "don't have the same sequence length"):
       self.evaluate(bijector.inverse(y))
 
   # pylint: disable=invalid-name
