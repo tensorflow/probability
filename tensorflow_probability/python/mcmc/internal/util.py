@@ -741,11 +741,7 @@ def get_field(kernel_results, field_name):
   if accepted_results is None:
     raise TypeError('Cannot extract {} from {}'.format(
         field_name, kernel_results))
-  attr = getattr(accepted_results, field_name, None)
-  if attr is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  return attr
+  return get_field(accepted_results, field_name)
 
 
 @make_innermost_setter
@@ -757,8 +753,5 @@ def update_field(kernel_results, field_name, value):
   if accepted_results is None:
     raise TypeError('Cannot set {} in {}'.format(
         field_name, kernel_results))
-  if not hasattr(accepted_results, field_name):
-    raise TypeError('Cannot set {} in {}'.format(
-        field_name, accepted_results))
   return kernel_results._replace(
-      accepted_results=accepted_results._replace(**{field_name: value}))
+      accepted_results=update_field(accepted_results, field_name, value))
