@@ -45,6 +45,8 @@ from tensorflow_probability.python.internal import test_util
 XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/159995894): SegmentMean not registered for XLA.
     'Bates',
+    # TODO(b/163433191): Infinite loop in the binomial sampler sometimes.
+    'BetaBinomial',
     # TODO(b/159996837):
     'Categorical',
     # TODO(b/159996484): Continuous Bernoulli nan/inf locations mismatch.
