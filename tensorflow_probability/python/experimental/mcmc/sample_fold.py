@@ -22,7 +22,7 @@ import warnings
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental.mcmc import sample as exp_sample
+from tensorflow_probability.python.experimental.mcmc import sample as exp_sample_lib
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
 from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.experimental.mcmc import tracing_reducer
@@ -117,7 +117,7 @@ def sample_fold(
             num_steps_between_results=num_steps_between_results),
         reducer=reducer,
     )
-    end_state, final_kernel_results = exp_sample.step_kernel(
+    end_state, final_kernel_results = exp_sample_lib.step_kernel(
         num_steps=num_steps,
         current_state=current_state,
         previous_kernel_results=previous_kernel_results,
@@ -247,7 +247,7 @@ def sample_chain(
                     'value) or an explicit callback that traces the values '
                     'you are interested in.')
 
-    # `WithReductions` assumes all its reducers want to reducer over the
+    # `WithReductions` assumes all its reducers want to reduce over the
     # immediate inner results of its kernel results. However,
     # We don't care about the kernel results of `SampleDiscardingKernel`; hence,
     # we evaluate the `trace_fn` on a deeper level of inner results.

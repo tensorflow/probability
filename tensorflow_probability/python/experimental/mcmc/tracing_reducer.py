@@ -39,6 +39,10 @@ class TracingState(
   __slots__ = ()
 
 
+def _trace_state_and_kernel_results(current_state, kernel_results):
+  return current_state, kernel_results
+
+
 class TracingReducer(reducer_base.Reducer):
   """`Reducer` that accumulates trace results at each sample.
 
@@ -63,8 +67,7 @@ class TracingReducer(reducer_base.Reducer):
   # TODO(Ru): bring the lambda fn out
   def __init__(
       self,
-      trace_fn=lambda current_state, kernel_results:
-      (current_state, kernel_results),
+      trace_fn=_trace_state_and_kernel_results,
       size=None,
       name=None):
     """Instantiates this object.
