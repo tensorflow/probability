@@ -1302,3 +1302,45 @@ class Bijector(tf.Module):
         graph dependencies.
     """
     return ()
+
+  @property
+  def _composite_tensor_params(self):
+    """A tuple describing which parameters are expected to be tensors.
+
+    CompositeTensor requires us to partition dynamic (tensor) parts from static
+    (metadata) parts like 'validate_args'.  This collects the keys of parameters
+    which are expected to be tensors.
+    """
+    return (self._composite_tensor_nonshape_params +
+            self._composite_tensor_shape_params)
+
+  @property
+  def _composite_tensor_nonshape_params(self):
+    """A tuple describing which parameters are non-shape-related tensors.
+
+    Flattening in JAX involves many of the same considerations with regards to
+    identifying tensor arguments for the purposes of CompositeTensor, except
+    that shape-related items will be considered metadata.  This property
+    identifies the keys of parameters that are expected to be tensors, except
+    those that are shape-related.
+    """
+    pnames = ()
+    for p in self.parameters.keys():
+      if p in self._composite_tensor_shape_params:
+        continue
+      if tf.is_tensor(getattr(self, p, None)):
+        pnames += (p,)
+    return pnames
+
+  @property
+  def _composite_tensor_shape_params(self):
+    """A tuple describing which parameters are shape-related tensors.
+
+    Flattening in JAX involves many of the same considerations with regards to
+    identifying tensor arguments for the purposes of CompositeTensor, except
+    that shape-related items will be considered metadata.  This property
+    identifies the keys of parameters that are expected to be shape-related
+    tensors, so that they can be collected appropriately in CompositeTensor but
+    not in JAX applications.
+    """
+    return ()

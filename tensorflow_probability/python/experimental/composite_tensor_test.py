@@ -21,6 +21,7 @@ from __future__ import print_function
 import os
 
 # Dependency imports
+import six
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -34,6 +35,11 @@ tfd = tfp.distributions
 
 def normal_composite(*args, **kwargs):
   return tfp.experimental.as_composite(tfd.Normal(*args, **kwargs))
+
+
+def sigmoid_normal_composite(*args, **kwargs):
+  return tfp.experimental.as_composite(tfb.Sigmoid()(tfd.Normal(
+      *args, **kwargs)))
 
 
 def onehot_cat_composite(*args, **kwargs):
@@ -213,19 +219,65 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     m3 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
     self.evaluate(m3.make_dist().sample())
 
-  def test_not_implemented(self):
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 r'Unable.*sigmoidNormal.*file an issue'):
-      tfp.experimental.as_composite(tfb.Sigmoid()(tfd.Normal(0, 1)))
+  def test_sigmoid_normal(self):
+    if six.PY2:
+      self.skipTest(
+          'PY3-only test because we do not support the callable argument '
+          'kwargs_split_fn of TransformedDistribution in PY2.')
+    sn = tfb.Sigmoid()(tfd.Normal(0, 1))
+    dist = tfp.experimental.as_composite(sn)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    self.evaluate(unflat.log_prob(.5))
 
+  def test_sigmoid_normal_save_load(self):
+    if six.PY2:
+      self.skipTest(
+          'PY3-only test because we do not support the callable argument '
+          'kwargs_split_fn of TransformedDistribution in PY2.')
+    path = self.create_tempdir().full_path
+
+    class Model(tf.Module):
+
+      @tf.function(
+          input_signature=(sigmoid_normal_composite(loc=0,
+                                                    scale=[1,
+                                                           2])._type_spec,))
+      def make_dist(self, d):
+        return sigmoid_normal_composite(d.sample(), 1, validate_args=True)
+
+    m1 = Model()
+    tf.saved_model.save(m1, os.path.join(path, 'saved_model1'))
+    m2 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
+    d = sigmoid_normal_composite(.3, [.5, .9])
+    self.evaluate(m2.make_dist(d).sample())
+
+  def test_sigmoid_normal_with_params(self):
+    if six.PY2:
+      self.skipTest(
+          'PY3-only test because we do not support the callable argument '
+          'kwargs_split_fn of TransformedDistribution in PY2.')
+    sn = tfb.Sigmoid(
+        low=[2.0, 3.0], high=[4.0, 5.0])(
+            tfd.Normal([6.0, 7.0], 1))
+    dist = tfp.experimental.as_composite(sn)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    self.evaluate(unflat.log_prob(.5))
+
+  def test_finite_discrete(self):
     outcomes = tf.Variable([1., 2., 4.])
     self.evaluate(outcomes.initializer)
-    # FiniteDiscrete does not include `outcomes` in the _params_event_ndims, so
-    # it doesn't become part of the Tensor part of the CompositeTensor.
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 r'FiniteDiscrete.*(Unable to serialize.)'):
-      tfp.experimental.as_composite(
-          tfd.FiniteDiscrete(outcomes, logits=tf.math.log([0.1, 0.4, 0.3])))
+    fd = tfd.FiniteDiscrete(outcomes, logits=tf.math.log([0.1, 0.4, 0.3]))
+    log_prob_before = self.evaluate(fd.log_prob(2.))
+    dist = tfp.experimental.as_composite(fd)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(2.))
+    self.assertEqual(log_prob_before, log_prob_after)
 
   def test_multi_calls(self):
     d = tfd.Normal(0, 1)
