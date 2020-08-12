@@ -588,19 +588,11 @@ FakeKernelAcceptedResults = collections.namedtuple(
     'accepted_results')
 
 
-FakeAcceptedResults = collections.namedtuple(
-    'FakeAcceptedResults', 'some_field')
-
-
-FakeIncompleteKernelResults = collections.namedtuple(
-    'FakeIncompleteKernelResults', 'some_field')
-
-
 class GetFieldTest(test_util.TestCase):
   @parameterized.parameters(
       [FakeKernelResults(some_field='yak')],
       [FakeKernelAcceptedResults(
-          accepted_results=FakeAcceptedResults(some_field='yak'))]
+          accepted_results=FakeKernelResults(some_field='yak'))]
   )
   def testValidKernelResults(self, kernel_results):
     self.assertEqual(util.get_field(kernel_results, 'some_field'), 'yak')
@@ -608,8 +600,8 @@ class GetFieldTest(test_util.TestCase):
       util.get_field(kernel_results, 'some_other_field')
 
 
-  def testIncompletedKernelResults(self):
-    kernel_results = FakeIncompleteKernelResults(some_field='zebra')
+  def testIncompleteKernelResults(self):
+    kernel_results = FakeKernelResults(some_field='zebra')
     with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
       util.get_field(kernel_results, 'some_other_field')
 
@@ -618,7 +610,7 @@ class UpdateFieldTest(test_util.TestCase):
   @parameterized.parameters(
       [FakeKernelResults(some_field='yak')],
       [FakeKernelAcceptedResults(
-          accepted_results=FakeAcceptedResults(some_field='yak'))]
+          accepted_results=FakeKernelResults(some_field='yak'))]
     )
   def testValidKernelResults(self, kernel_results):
     updated_kernel_results = util.update_field(
@@ -631,7 +623,7 @@ class UpdateFieldTest(test_util.TestCase):
 
 
   def testIncompletedKernelResults(self):
-    kernel_results = FakeIncompleteKernelResults(some_field='ibex')
+    kernel_results = FakeKernelResults(some_field='ibex')
     with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
       util.update_field(kernel_results, 'some_other_field', 'goat')
 

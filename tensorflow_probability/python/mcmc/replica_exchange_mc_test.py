@@ -825,8 +825,8 @@ class REMCTest(test_util.TestCase):
       # z = matmul(inv(chol(true_cov)), [x, y] - true_mean)
       xy = tf.stack([x, y], axis=-1) - true_mean
       z = linop.solvevec(xy)
-
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
+
     def make_kernel_fn(target_log_prob_fn):
       return tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target_log_prob_fn,
