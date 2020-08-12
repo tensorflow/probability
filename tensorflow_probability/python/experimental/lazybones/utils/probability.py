@@ -59,7 +59,7 @@ def distribution_measure(vertexes, values, attr, combine):
       if v is not None:
         # TODO(jvdillon): If eval recursively eval'ed we could assign this as a
         # deferred try-cast.
-        x.set_value_down_to(v, vertexes)
+        x.value = v
       d = x.parents[0].parents[0]
       distributions.append(d)
     r = combine(getattr(d, attr)(x) for d, x in zip(distributions, vertexes))

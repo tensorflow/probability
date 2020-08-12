@@ -92,7 +92,7 @@ class DeferredScope(object):
     if v is not _NOT_FOUND:
       return v
     if self._parent is None:
-      return UNKNOWN
+      return UNKNOWN, False
     return self._parent[k]
 
   def __setitem__(self, k, v):

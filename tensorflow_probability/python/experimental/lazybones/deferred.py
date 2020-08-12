@@ -65,20 +65,29 @@ class DeferredBase(special_methods.SpecialMethods):
 
   @property
   def value(self):
-    return deferred_scope.DeferredScope.current_scope[self]
+    return deferred_scope.DeferredScope.current_scope[self][0]
+
+  @property
+  def frozen(self):
+    return deferred_scope.DeferredScope.current_scope[self][1]
 
   @value.setter
-  def value(self, value):
-    deferred_scope.DeferredScope.current_scope[self] = value
+  def value(self, new_value):
+    old_value, old_freeze = deferred_scope.DeferredScope.current_scope[self]
+    new_freeze = new_value is not UNKNOWN
+    if new_freeze == old_freeze and new_value is old_value:
+      return
+    deferred_scope.DeferredScope.current_scope[self] = (new_value, new_freeze)
     for c in self.children:
-      c.value = UNKNOWN
+      if not c.frozen:
+        c.value = UNKNOWN
 
-  def set_value_down_to(self, value, leaves):
-    """Set self value and resets all children up to but not including leaves."""
-    deferred_scope.DeferredScope.current_scope[self] = value
-    for c in self.children:
-      if not any(c is l for l in leaves):
-        c.set_value_down_to(UNKNOWN, leaves)
+  @frozen.setter
+  def frozen(self, freeze):
+    old_value, old_freeze = deferred_scope.DeferredScope.current_scope[self]
+    if old_value is UNKNOWN or freeze == old_freeze:
+      return
+    deferred_scope.DeferredScope.current_scope[self] = (old_value, freeze)
 
   @property
   def parents(self):
@@ -96,10 +105,19 @@ class DeferredBase(special_methods.SpecialMethods):
     # that to be a subsequent "scope hit". I.e., we need the value to be
     # explicitly `UNKNOWN` to "block" cache hitting on "higher up" scope
     # contexts.
-    self.value = UNKNOWN
+    deferred_scope.DeferredScope.current_scope[self] = (UNKNOWN, False)
+    for c in self.children:
+      c.reset()
 
   def eval(self):
-    raise AttributeError('Must be defined.')
+    if self.value is not UNKNOWN:
+      return self.value
+    v = self._eval()
+    deferred_scope.DeferredScope.current_scope[self] = (v, False)
+    for c in self.children:
+      if not c.frozen:
+        c.value = UNKNOWN
+    return v
 
   def __action__(self, fn, *args, **kwargs):
     return Deferred(fn, self, *args, **kwargs)
@@ -239,20 +257,11 @@ class Deferred(DeferredBase):
   def kwargs(self):
     return self._kwargs
 
-  def eval(self):
-    if self.value is not UNKNOWN:
-      return self.value
+  def _eval(self):
     fn, args, kwargs = tf.nest.map_structure(
         lambda x: x.eval() if isinstance(x, DeferredBase) else x,
         [self.fn, self.args, self.kwargs])
-    # It'd be a subtle bug to do this:
-    #   self.value = fn(*args, **kwargs)
-    # because then children would be reset on automatic evaluation of the graph.
-    # This means that user specified values might be ignored, depending on the
-    # order of the eval.
-    v = fn(*args, **kwargs)
-    deferred_scope.DeferredScope.current_scope[self] = v
-    return v
+    return fn(*args, **kwargs)
 
 
 class DeferredInput(DeferredBase):
