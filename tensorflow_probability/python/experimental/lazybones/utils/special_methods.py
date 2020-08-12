@@ -93,7 +93,9 @@ def _exit(self, exc_type, exc_value, traceback):
 
 
 def _call(self, *args, **kwargs):
-  return self.__call__(*args, **kwargs)
+  # Note: it is essential to use `self(...)` rather than `self.__call__(...)`
+  # since the latter fails to correctly forward to `self.__init__(...)`.
+  return self(*args, **kwargs)
 
 
 class SpecialMethods(object):

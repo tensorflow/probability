@@ -24,8 +24,9 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 
-tfd = tfp.distributions
 lb = tfp.experimental.lazybones
+tfb = tfp.bijectors
+tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,12 +34,13 @@ class DeferredProbabilityUtilsTest(test_util.TestCase):
 
   def test_log_prob(self):
     tfw = lb.DeferredInput(tf)
+    tfbw = lb.DeferredInput(tfb)
     tfdw = lb.DeferredInput(tfd)
 
     a = tfdw.Normal(0, 1)
     b = a.sample(seed=test_util.test_seed())
     c = tfw.exp(b)
-    d = tfdw.Gamma(c, 2.)
+    d = tfbw.Exp()(tfdw.Normal(c, 2.))
     e = d.sample(seed=test_util.test_seed())
     actual1_lp = lb.utils.log_prob([b, e], [3., 4.])
     actual2_lp = lb.utils.log_prob([e, b], [4., 3.])
@@ -47,7 +49,7 @@ class DeferredProbabilityUtilsTest(test_util.TestCase):
 
     jd = tfd.JointDistributionSequential([
         tfd.Normal(0, 1),
-        lambda b: tfd.Gamma(tf.math.exp(b), 2.)
+        lambda b: tfb.Exp()(tfd.Normal(tf.math.exp(b), 2.)),
     ])
     expected_lp = jd.log_prob([3., 4.])
     expected_p = jd.prob([3., 4.])
