@@ -46,6 +46,7 @@ py_library(
         ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":tracing_reducer",
         ":weighted_resampling",
         ":with_reductions",
         # tensorflow dep,
@@ -422,9 +423,11 @@ py_library(
     deps = [
         ":sample",
         ":sample_discarding_kernel",
+        ":tracing_reducer",
         ":with_reductions",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )
 
@@ -459,6 +462,30 @@ py_test(
     name = "sample_discarding_kernel_test",
     size = "small",
     srcs = ["sample_discarding_kernel_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "tracing_reducer",
+    srcs = ["tracing_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "tracing_reducer_test",
+    size = "small",
+    srcs = ["tracing_reducer_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

@@ -1,0 +1,172 @@
+# Copyright 2020 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Tests for TracingReducer."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import collections
+
+# Dependency imports
+import numpy as np
+
+import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import test_util
+
+
+TestTransitionKernelResults = collections.namedtuple(
+    'TestTransitionKernelResults', 'counter_1, counter_2')
+
+
+class TestTransitionKernel(tfp.mcmc.TransitionKernel):
+  """Fake deterministic Transition Kernel."""
+
+  def __init__(self, shape=(), target_log_prob_fn=None, is_calibrated=True):
+    self._is_calibrated = is_calibrated
+    self._shape = shape
+    # for composition purposes
+    self.parameters = dict(
+        target_log_prob_fn=target_log_prob_fn)
+
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    return (current_state + tf.ones(self._shape),
+            TestTransitionKernelResults(
+                counter_1=previous_kernel_results.counter_1 + 1,
+                counter_2=previous_kernel_results.counter_2 + 2))
+
+  def bootstrap_results(self, current_state):
+    return TestTransitionKernelResults(
+        counter_1=tf.zeros(()),
+        counter_2=tf.zeros(()))
+
+  @property
+  def is_calibrated(self):
+    return self._is_calibrated
+
+
+@test_util.test_all_tf_execution_regimes
+class TracingReducerTest(test_util.TestCase):
+
+  def test_simple_operation(self):
+    tracer = tfp.experimental.mcmc.TracingReducer()
+    state = tracer.initialize(tf.zeros(()), tf.zeros(()))
+    for sample in range(1, 6):
+      # kernel results is simply the last sample
+      state = tracer.one_step(sample, state, sample)
+    all_states, final_trace = self.evaluate(tracer.finalize(state))
+    self.assertAllEqual([1, 2, 3, 4, 5], all_states)
+    self.assertAllEqual([1, 2, 3, 4, 5], final_trace)
+
+  def test_custom_tracing(self):
+    tracer = tfp.experimental.mcmc.TracingReducer(
+        trace_fn=lambda sample, pkr: (sample + pkr,))
+    state = tracer.initialize(tf.zeros(()), tf.zeros(()))
+    for sample in range(1, 6):
+      state = tracer.one_step(sample, state, sample * 2)
+    final_trace = self.evaluate(tracer.finalize(state))
+    self.assertAllEqual(([3, 6, 9, 12, 15],), final_trace)
+
+  def test_latent_chain_state(self):
+    tracer = tfp.experimental.mcmc.TracingReducer(
+        trace_fn=lambda current_state, _: current_state
+    )
+    chain_state = ({'one': np.ones((2, 3)), 'zero': np.zeros((2, 3))},
+                   {'two': np.ones((2, 3)) * 2})
+    state = tracer.initialize(chain_state)
+    for _ in range(3):
+      state = tracer.one_step(chain_state, state, None)
+    final_trace = self.evaluate(tracer.finalize(state))
+    self.assertEqual(2, len(final_trace[0]))
+    self.assertAllEqualNested(chain_state, tf.nest.map_structure(
+        lambda trace_state: trace_state[0], final_trace))
+
+  def test_differently_structured_trace_results(self):
+    def trace_fn(sample, pkr):
+      return sample, (sample, pkr), {'one': sample, 'two': pkr}
+    tracer = tfp.experimental.mcmc.TracingReducer(trace_fn=trace_fn)
+    state = tracer.initialize(tf.zeros(()), tf.zeros(()))
+    for sample in range(1, 3):
+      state = tracer.one_step(sample, state, sample * 2)
+    final_trace = self.evaluate(tracer.finalize(state))
+    self.assertEqual(3, len(final_trace))
+    self.assertAllEqual([1, 2], final_trace[0])
+    self.assertAllEqual(([1, 2], [2, 4]), final_trace[1])
+    self.assertAllEqualNested(final_trace[2], ({'one': [1, 2],
+                                                'two': [2, 4]}))
+
+  def test_tf_while(self):
+    def trace_fn(sample, pkr):
+      return sample, (sample, pkr), {'one': sample, 'two': pkr}
+    tracer = tfp.experimental.mcmc.TracingReducer(trace_fn=trace_fn)
+    state = tracer.initialize(tf.zeros(()), tf.zeros(()))
+    def _body(sample, pkr, state):
+      new_state = tracer.one_step(sample, state, pkr)
+      return (sample + 1, pkr + 2, new_state)
+    _, _, state = tf.while_loop(
+        cond=lambda i, _, __: i < 3,
+        body=_body,
+        loop_vars=(1., 2., state)
+    )
+    final_trace = self.evaluate(tracer.finalize(state))
+    self.assertEqual(3, len(final_trace))
+    self.assertAllEqual([1, 2], final_trace[0])
+    self.assertAllEqual(([1, 2], [2, 4]), final_trace[1])
+    self.assertAllEqualNested(final_trace[2], ({'one': [1, 2],
+                                                'two': [2, 4]}))
+
+  def test_in_sample_fold(self):
+    tracer = tfp.experimental.mcmc.TracingReducer()
+    fake_kernel = TestTransitionKernel()
+    trace, final_state, kernel_results = tfp.experimental.mcmc.sample_fold(
+        num_steps=3,
+        current_state=0.,
+        kernel=fake_kernel,
+        reducer=tracer,
+    )
+    trace, final_state, kernel_results = self.evaluate([
+        trace,
+        final_state,
+        kernel_results
+    ])
+    self.assertAllEqual([1, 2, 3], trace[0])
+    self.assertAllEqual([1, 2, 3], trace[1].inner_results.counter_1)
+    self.assertAllEqual([2, 4, 6], trace[1].inner_results.counter_2)
+    self.assertEqual(3, final_state)
+    self.assertEqual(3, kernel_results.counter_1)
+    self.assertEqual(6, kernel_results.counter_2)
+
+  def test_known_size(self):
+    tracer = tfp.experimental.mcmc.TracingReducer(size=3)
+    self.assertEqual(tracer.size, 3)
+    state = tracer.initialize(tf.zeros(()), tf.zeros(()))
+    for sample in range(3):
+      state = tracer.one_step(sample, state, sample)
+    all_states, final_trace = tracer.finalize(state)
+    self.assertAllClose(
+        [3], tensorshape_util.as_list(all_states.shape))
+    self.assertAllClose(
+        [3], tensorshape_util.as_list(final_trace.shape))
+    all_states, final_trace = self.evaluate([
+        all_states, final_trace
+    ])
+    self.assertAllEqual([0, 1, 2], all_states)
+    self.assertAllEqual([0, 1, 2], final_trace)
+
+
+if __name__ == '__main__':
+  tf.test.main()

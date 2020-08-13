@@ -18,15 +18,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental.mcmc import sample
+from tensorflow_probability.python.experimental.mcmc import sample as exp_sample_lib
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
+from tensorflow_probability.python.experimental.mcmc import tracing_reducer
 from tensorflow_probability.python.experimental.mcmc import with_reductions
+from tensorflow_probability.python.mcmc import sample
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
+    'sample_chain',
     'sample_fold',
 ]
 
@@ -112,7 +117,7 @@ def sample_fold(
             num_steps_between_results=num_steps_between_results),
         reducer=reducer,
     )
-    end_state, final_kernel_results = sample.step_kernel(
+    end_state, final_kernel_results = exp_sample_lib.step_kernel(
         num_steps=num_steps,
         current_state=current_state,
         previous_kernel_results=previous_kernel_results,
@@ -133,3 +138,147 @@ def sample_fold(
     return (reduction_results,
             end_state,
             final_kernel_results.inner_results.inner_results)
+
+
+def _trace_kernel_results(current_state, kernel_results):
+  del current_state
+  return kernel_results
+
+
+def sample_chain(
+    num_results,
+    current_state,
+    previous_kernel_results=None,
+    kernel=None,
+    num_burnin_steps=0,
+    num_steps_between_results=0,
+    trace_fn=_trace_kernel_results,
+    return_final_kernel_results=False,
+    parallel_iterations=10,
+    seed=None,
+    name=None,
+):
+  """Implements Markov chain Monte Carlo via repeated `TransitionKernel` steps.
+
+  This function samples from a Markov chain at `current_state` whose
+  stationary distribution is governed by the supplied `TransitionKernel`
+  instance (`kernel`).
+
+  This function can sample from multiple chains, in parallel. (Whether or not
+  there are multiple chains is dictated by the `kernel`.)
+
+  The `current_state` can be represented as a single `Tensor` or a `list` of
+  `Tensors` which collectively represent the current state.
+
+  Since MCMC states are correlated, it is sometimes desirable to produce
+  additional intermediate states, and then discard them, ending up with a set of
+  states with decreased autocorrelation.  See [Owen (2017)][1]. Such 'thinning'
+  is made possible by setting `num_steps_between_results > 0`. The chain then
+  takes `num_steps_between_results` extra steps between the steps that make it
+  into the results. The extra steps are never materialized, and thus do not
+  increase memory requirements.
+
+  In addition to returning the chain state, this function supports tracing of
+  auxiliary variables used by the kernel. The traced values are selected by
+  specifying `trace_fn`. By default, all kernel results are traced but in the
+  future the default will be changed to no results being traced, so plan
+  accordingly. See below for some examples of this feature.
+
+  Args:
+    num_results: Integer number of Markov chain draws.
+    current_state: `Tensor` or Python `list` of `Tensor`s representing the
+      current state(s) of the Markov chain(s).
+    previous_kernel_results: A `Tensor` or a nested collection of `Tensor`s
+      representing internal calculations made within the previous call to this
+      function (or as returned by `bootstrap_results`).
+    kernel: An instance of `tfp.mcmc.TransitionKernel` which implements one step
+      of the Markov chain.
+    num_burnin_steps: Integer number of chain steps to take before starting to
+      collect results.
+      Default value: 0 (i.e., no burn-in).
+    num_steps_between_results: Integer number of chain steps between collecting
+      a result. Only one out of every `num_steps_between_samples + 1` steps is
+      included in the returned results.  The number of returned chain states is
+      still equal to `num_results`.  Default value: 0 (i.e., no thinning).
+    trace_fn: A callable that takes in the current chain state and the previous
+      kernel results and return a `Tensor` or a nested collection of `Tensor`s
+      that is then traced along with the chain state.
+    return_final_kernel_results: If `True`, then the final kernel results are
+      returned alongside the chain state and the trace specified by the
+      `trace_fn`.
+    parallel_iterations: The number of iterations allowed to run in parallel. It
+      must be a positive integer. See `tf.while_loop` for more details.
+    seed: Optional, a seed for reproducible sampling.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., 'experimental_mcmc_sample_chain').
+
+  Returns:
+    checkpointable_states_and_trace: if `return_final_kernel_results` is
+      `True`. The return value is an instance of
+      `CheckpointableStatesAndTrace`.
+    all_states: if `return_final_kernel_results` is `False` and `trace_fn` is
+      `None`. The return value is a `Tensor` or Python list of `Tensor`s
+      representing the state(s) of the Markov chain(s) at each result step. Has
+      same shape as input `current_state` but with a prepended
+      `num_results`-size dimension.
+    states_and_trace: if `return_final_kernel_results` is `False` and
+      `trace_fn` is not `None`. The return value is an instance of
+      `StatesAndTrace`.
+
+  #### References
+
+  [1]: Art B. Owen. Statistically efficient thinning of a Markov chain sampler.
+       _Technical Report_, 2017.
+       http://statweb.stanford.edu/~owen/reports/bestthinning.pdf
+  """
+  with tf.name_scope(name or 'experimental_mcmc_sample_chain'):
+    if not kernel.is_calibrated:
+      warnings.warn('supplied `TransitionKernel` is not calibrated. Markov '
+                    'chain may not converge to intended target distribution.')
+
+    if trace_fn is None:
+      trace_fn = lambda *args: ()
+      no_trace = True
+    else:
+      no_trace = False
+
+    if trace_fn is sample_chain.__defaults__[4]:
+      warnings.warn('Tracing all kernel results by default is deprecated. Set '
+                    'the `trace_fn` argument to None (the future default '
+                    'value) or an explicit callback that traces the values '
+                    'you are interested in.')
+
+    # `WithReductions` assumes all its reducers want to reduce over the
+    # immediate inner results of its kernel results. However,
+    # We don't care about the kernel results of `SampleDiscardingKernel`; hence,
+    # we evaluate the `trace_fn` on a deeper level of inner results.
+    def real_trace_fn(curr_state, kr):
+      return curr_state, trace_fn(curr_state, kr.inner_results)
+    trace_reducer = tracing_reducer.TracingReducer(
+        trace_fn=real_trace_fn,
+        size=num_results
+    )
+    trace_results, _, final_kernel_results = sample_fold(
+        num_steps=num_results,
+        current_state=current_state,
+        previous_kernel_results=previous_kernel_results,
+        kernel=kernel,
+        reducer=trace_reducer,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_between_results=num_steps_between_results,
+        parallel_iterations=parallel_iterations,
+        seed=seed,
+        name=name,
+    )
+
+    all_states, trace = trace_results
+    if return_final_kernel_results:
+      return sample.CheckpointableStatesAndTrace(
+          all_states=all_states,
+          trace=trace,
+          final_kernel_results=final_kernel_results)
+    else:
+      if no_trace:
+        return all_states
+      else:
+        return sample.StatesAndTrace(all_states=all_states, trace=trace)
