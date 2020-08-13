@@ -144,8 +144,10 @@ class RunningCovariance(object):
         the inner-most dimensions.  Specifying `None` returns all cross
         product terms (no batching) and is the default.
       dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`. Any integer dtypes will also
-        be treated as `tf.float32` (to not lose significant precision).
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
 
     Raises:
       ValueError: if `event_ndims` is greater than the rank of the intended
@@ -160,7 +162,9 @@ class RunningCovariance(object):
       raise ValueError('`event_ndims` over 13 not supported')
     self.shape = shape
     self.event_ndims = event_ndims
-    if dtype.is_integer:
+    if dtype is tf.int64:
+      dtype = tf.float64
+    elif dtype.is_integer:
       dtype = tf.float32
     self.dtype = dtype
 
@@ -271,8 +275,10 @@ class RunningVariance(RunningCovariance):
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples. By default, the shape is assumed to be scalar.
       dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`. Any integer dtypes will also
-        be treated as `tf.float32` (to not lose significant precision).
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
     """
     super(RunningVariance, self).__init__(shape, event_ndims=0, dtype=dtype)
 
@@ -287,8 +293,8 @@ class RunningMean(object):
   In computation, samples can be provided individually or in chunks. A
   "chunk" of size M implies incorporating M samples into a single expectation
   computation at once, which is more efficient than one by one. If more than one
-  callable is accepted and chunking is enabled, the chunked `axis` will define
-  chunking semantics for all callables.
+  sample is accepted and chunking is enabled, the chunked `axis` will define
+  chunking semantics for all samples.
 
   `RunningMean` objects do not hold state information. That information,
   which includes intermediate calculations, are held in a
@@ -307,11 +313,15 @@ class RunningMean(object):
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples.
       dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`. Any integer dtypes will also
-        be treated as `tf.float32` (to not lose significant precision).
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
     """
     self.shape = shape
-    if dtype.is_integer:
+    if dtype is tf.int64:
+      dtype = tf.float64
+    elif dtype.is_integer:
       dtype = tf.float32
     self.dtype = dtype
 

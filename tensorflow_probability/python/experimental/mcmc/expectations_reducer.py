@@ -46,7 +46,7 @@ ExpectationsReducerState = collections.namedtuple(
 class ExpectationsReducer(reducer_base.Reducer):
   """`Reducer` that computes a running expectation.
 
-  `ExpectationsReducer` calculates expectation over some arbitrary structure
+  `ExpectationsReducer` calculates expectations over some arbitrary structure
   of `transform_fn`s. A `transform_fn` is a function that accepts a Markov
   chain sample and kernel results, and outputs the relevant value for
   expectation calculation. In other words, if we denote a `transform_fn`
