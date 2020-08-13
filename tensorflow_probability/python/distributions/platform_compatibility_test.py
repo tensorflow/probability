@@ -95,6 +95,7 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 # blocked for the autovectorization tests. Since not all distributions are
 # in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
+    'DirichletMultinomial',  # Times out. (b/164143676)
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'PlackettLuce',  # No converter for TopKV2
     # 'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
