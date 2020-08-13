@@ -279,6 +279,19 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     log_prob_after = self.evaluate(unflat.log_prob(2.))
     self.assertEqual(log_prob_before, log_prob_after)
 
+  def test_independent(self):
+    fd = tfd.Independent(
+        distribution=tfd.Normal(loc=[-1., 1], scale=[0.1, 0.5]),
+        reinterpreted_batch_ndims=1)
+    sample = [-2.0, 3.0]
+    log_prob_before = self.evaluate(fd.log_prob(sample))
+    dist = tfp.experimental.as_composite(fd)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertEqual(log_prob_before, log_prob_after)
+
   def test_multi_calls(self):
     d = tfd.Normal(0, 1)
     d1 = tfp.experimental.as_composite(d)
