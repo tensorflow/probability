@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions.internal import statistical_tes
 from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import test_util
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -658,7 +659,6 @@ class GammaSamplingTest(test_util.TestCase):
         st.assert_true_cdf_equal_by_dkwm(
             samples,
             gamma.cdf,
-            st.left_continuous_cdf_discrete_distribution(gamma),
             false_fail_rate=1e-9))
 
     self.assertAllClose(
@@ -667,7 +667,41 @@ class GammaSamplingTest(test_util.TestCase):
         rtol=0.01)
     self.assertAllClose(
         self.evaluate(tf.math.reduce_variance(samples, axis=0)),
-        sp_stats.gamma.mean(concentration, scale=1 / rate),
+        sp_stats.gamma.var(concentration, scale=1 / rate),
+        rtol=0.05)
+
+  def testSampleGammaLogSpace(self):
+    concentration = np.linspace(.1, 2., 10)
+    rate = np.linspace(.5, 2, 10)
+    num_samples = int(1e5)
+    self.assertLess(
+        self.evaluate(
+            st.min_num_samples_for_dkwm_cdf_test(
+                discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
+        num_samples)
+
+    samples = gamma_lib.random_gamma_rejection(
+        [num_samples, 10],
+        alpha=concentration,
+        beta=rate,
+        seed=test_util.test_seed(),
+        log_space=True)
+
+    exp_gamma = tfb.Log()(tfd.Gamma(
+        concentration=concentration, rate=rate, validate_args=True))
+    self.evaluate(
+        st.assert_true_cdf_equal_by_dkwm(
+            samples,
+            exp_gamma.cdf,
+            false_fail_rate=1e-9))
+
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+        tf.math.digamma(concentration) - tf.math.log(rate),
+        rtol=0.02)
+    self.assertAllClose(
+        self.evaluate(tf.math.reduce_variance(samples, axis=0)),
+        tf.math.polygamma(1., concentration),
         rtol=0.05)
 
   @parameterized.named_parameters(

@@ -772,7 +772,7 @@ not_equal = utils.copy_docstring(
 
 polygamma = utils.copy_docstring(
     'tf.math.polygamma',
-    lambda a, x, name=None: scipy_special.polygamma(a, x).astype(  # pylint: disable=unused-argument,g-long-lambda
+    lambda a, x, name=None: scipy_special.polygamma(np.int32(a), x).astype(  # pylint: disable=unused-argument,g-long-lambda
         utils.common_dtype([a, x], dtype_hint=np.float32)))
 
 polyval = utils.copy_docstring(

@@ -467,7 +467,8 @@ def random_gamma(shape, concentration, rate=None, seed=None):
 
 
 def random_gamma_rejection(
-    sample_shape, alpha, beta, internal_dtype=tf.float64, seed=None):
+    sample_shape, alpha, beta=None, log_beta=None, internal_dtype=tf.float64,
+    seed=None, log_space=False):
   """Samples from the gamma distribution.
 
   The sampling algorithm is rejection sampling [1], and pathwise gradients with
@@ -481,9 +482,14 @@ def random_gamma_rejection(
       `beta`.
     beta: Floating point tensor, the inverse scale params of the
       distribution(s). Must contain only positive values. Must broadcast with
-      `alpha`.
+      `alpha`. If `None`, handled as if 1 (but possibly more efficiently).
+       Mutually exclusive with `log_beta`.
+    log_beta: Floating point tensor, log of the inverse scale params of the
+      distribution(s). Must broadcast with `alpha`. If `None`, handled as if 0
+      (but possibly more efficiently). Mutually exclusive with `beta`.
     internal_dtype: dtype to use for internal computations.
     seed: (optional) The random seed.
+    log_space: Optionally sample log(gamma) variates.
 
   Returns:
     Differentiable samples from the gamma distribution.
@@ -498,7 +504,8 @@ def random_gamma_rejection(
   """
   generate_and_test_samples_seed, alpha_fix_seed = samplers.split_seed(
       seed, salt='random_gamma')
-  output_dtype = dtype_util.common_dtype([alpha, beta], dtype_hint=tf.float32)
+  output_dtype = dtype_util.common_dtype([alpha, beta, log_beta],
+                                         dtype_hint=tf.float32)
 
   def rejection_sample(alpha):
     """Gamma rejection sampler."""
@@ -515,7 +522,7 @@ def random_gamma_rejection(
 
     one_third = tf.constant(1. / 3, dtype=internal_dtype)
     d = modified_safe_alpha - one_third
-    c = one_third / tf.sqrt(d)
+    c = one_third * tf.math.rsqrt(d)
 
     def generate_and_test_samples(seed):
       """Generate and test samples."""
@@ -539,8 +546,11 @@ def random_gamma_rejection(
         return brs.batched_las_vegas_algorithm(_inner, v_seed)[0]
 
       (x, v) = generate_positive_v()
+      logv = tf.math.log1p(c * x)
       x2 = x * x
       v3 = v * v * v
+      logv3 = logv * 3
+
       u = samplers.uniform(
           sample_shape, dtype=internal_dtype, seed=u_seed)
 
@@ -550,43 +560,64 @@ def random_gamma_rejection(
       # have to compute or not compute the logarithms for the entire batch, and
       # as the batch gets larger, the odds we compute it grow. Therefore we
       # don't bother with the "cheap" check.
-      good_sample_mask = (
-          tf.math.log(u) < x2 / 2. + d * (1 - v3 + tf.math.log(v3)))
+      good_sample_mask = tf.math.log(u) < (x2 / 2. + d * (1 - v3 + logv3))
 
-      return v3, good_sample_mask
+      return logv3 if log_space else v3, good_sample_mask
 
     samples = brs.batched_las_vegas_algorithm(
         generate_and_test_samples, seed=generate_and_test_samples_seed)[0]
 
-    samples = samples * d
+    alpha_fix_unif = samplers.uniform(  # in [0, 1)
+        sample_shape, dtype=internal_dtype, seed=alpha_fix_seed)
 
-    one = tf.constant(1., dtype=internal_dtype)
+    if log_space:
+      alpha_lt_one_fix = tf.where(
+          safe_alpha < 1.,
+          # Why do we use log1p(-x)? x is in [0, 1) and log(0) = -inf, is bad.
+          # x ~ U(0,1) => 1-x ~ U(0,1)
+          # But at the boundary, 1-x in (0, 1]. Good.
+          # So we can take log(unif(0,1)) safely as log(1-unif(0,1)).
+          # log1p(-0) = 0, and log1p(-almost_one) = -not_quite_inf. Good.
+          tf.math.log1p(-alpha_fix_unif) / safe_alpha,
+          tf.zeros((), dtype=internal_dtype))
+      samples = samples + tf.math.log(d) + alpha_lt_one_fix
+    else:
+      alpha_lt_one_fix = tf.where(
+          safe_alpha < 1.,
+          tf.math.pow(alpha_fix_unif, tf.math.reciprocal(safe_alpha)),
+          tf.ones((), dtype=internal_dtype))
+      samples = samples * d * alpha_lt_one_fix
 
-    alpha_lt_one_fix = tf.where(
-        safe_alpha < 1.,
-        tf.math.pow(
-            samplers.uniform(
-                sample_shape, dtype=internal_dtype, seed=alpha_fix_seed),
-            one / safe_alpha),
-        one)
-    samples = samples * alpha_lt_one_fix
     samples = tf.where(good_params_mask, samples, np.nan)
-
     output_type_samples = tf.cast(samples, output_dtype)
-
-    # We use `tf.where` instead of `tf.maximum` because we need to allow for
-    # `samples` to be `nan`, but `tf.maximum(nan, x) == x`.
-    output_type_samples = tf.where(
-        output_type_samples == 0,
-        np.finfo(dtype_util.as_numpy_dtype(output_type_samples.dtype)).tiny,
-        output_type_samples)
 
     return output_type_samples
 
   broadcast_alpha_shape = ps.broadcast_shape(
-      ps.shape(alpha), ps.shape(beta))
+      ps.shape(alpha), ps.shape(1 if beta is None else beta))
   broadcast_alpha = tf.broadcast_to(alpha, broadcast_alpha_shape)
   alpha_samples = rejection_sample(broadcast_alpha)
 
-  corrected_beta = tf.where(beta > 0., beta, np.nan)
-  return alpha_samples / corrected_beta
+  if beta is not None and log_beta is not None:
+    raise ValueError('`beta` and `log_beta` are mutually exclusive.')
+
+  def fix_zero_samples(s):
+    if log_space:
+      return s
+    # We use `tf.where` instead of `tf.maximum` because we need to allow for
+    # `samples` to be `nan`, but `tf.maximum(nan, x) == x`.
+    return tf.where(
+        s == 0, np.finfo(dtype_util.as_numpy_dtype(s.dtype)).tiny, s)
+
+  if beta is None and log_beta is None:
+    return fix_zero_samples(alpha_samples)
+
+  if log_space:
+    if log_beta is None:
+      log_beta = tf.math.log(tf.where(beta > 0., beta, np.nan))
+    return alpha_samples - log_beta
+  else:
+    if beta is None:
+      beta = tf.math.exp(log_beta)
+    corrected_beta = tf.where(beta > 0., beta, np.nan)  # log_beta=-inf case
+    return fix_zero_samples(alpha_samples / corrected_beta)
