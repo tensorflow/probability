@@ -400,8 +400,54 @@ RunningPotentialScaleReductionState = collections.namedtuple(
 
 
 class RunningPotentialScaleReduction(object):
+  """Holds metadata for and computes a running rhat diagnostic statistic.
+
+  `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential
+  scale reduction (or rhat) for chain convergence [1]. This object also
+  supports both batching and chunking.
+
+  If multiple rhat computations are desired (batching), one should use a
+  (possibly nested) collection for initialization parameters `num_chains`
+  and `shape`. Subsequent chain states used to update the streaming rhat
+  should mimic their identical structure.
+
+  In computation, samples can be provided individually or in chunks. A
+  "chunk" of size M implies incorporating M samples into a single expectation
+  computation at once, which is more efficient than one by one. The `chunk_axis`
+  parameter in the `update` method defines chunking semantics.
+
+  `RunningPotentialScaleReduction` objects do not hold state information. That
+  information, which includes intermediate calculations, are held in a
+  `RunningPotentialScaleReductionState` as returned via `initialize` and
+  `update` method calls.
+
+  `RunningPotentialScaleReduction` is meant to serve general streaming rhat.
+  For a specialized version that fits streaming over MCMC samples, see
+  `RhatReducer` in `tfp.experimental.mcmc`.
+
+  #### References
+
+  [1]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
+       Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
+  """
 
   def __init__(self, shape, num_chains, dtype=tf.float32):
+    """Instantiates this object.
+
+    Args:
+      shape: Python `Tuple` or `TensorShape` representing the shape of
+        incoming samples. Using a collection enables batching and implies
+        that future samples will mimic that exact structure.
+      num_chains: A (possibly nested) collection of integers representing
+        the number of independent chains ran for each sample. Using a
+        collection enables batching and implies that future samples will
+        mimic that exact structure.
+      dtype: Dtype of incoming samples and the resulting statistics.
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
+    """
     self.shape = shape
     self.num_chains = num_chains
     if dtype is tf.int64:
@@ -411,7 +457,14 @@ class RunningPotentialScaleReduction(object):
     self.dtype = dtype
 
   def initialize(self):
+    """Initializes an empty `RunningPotentialScaleReductionState`.
+
+    Returns:
+      state: `RunningPotentialScaleReductionState` representing a stream
+        of no inputs.
+    """
     def _initialize_for_one_state(num_chains, shape):
+      """Initializes a running variance state for one group of Markov chains."""
       var_stream = RunningVariance(shape, self.dtype)
       return [var_stream.initialize()
               for _ in range(num_chains)]
@@ -426,6 +479,28 @@ class RunningPotentialScaleReduction(object):
     return RunningPotentialScaleReductionState(chain_var)
 
   def update(self, state, new_sample, chain_axis=0, chunk_axis=None):
+    """Update the `RunningPotentialScaleReductionState` with a new sample.
+
+    Args:
+      state: `RunningPotentialScaleReductionState` that represents the
+        current state of running statistics.
+      new_sample: Incoming `Tensor` sample or (possibly nested) collection of
+        `Tensor`s with shape and dtype compatible with those used to form the
+        `RunningPotentialScaleReductionState`.
+      chain_axis: The sample axis that indexes into independent Markov chains
+        samples. For batched computation, this can either be a scalar value that
+        represents the chain axis across all rhat calculations, or a
+        structure that identically mimics `self.num_chains`.
+      chunk_axis: If chunking is desired, this is an integer that specifies the
+        axis with chunked samples. For individual samples, set this to `None`.
+        By default, samples are not chunked (`axis` is None). For batched
+        computation, this can either be a scalar value or `None` that
+        represents chunking semantics across all rhat calculations, or a
+        structure that identically mimics `self.num_chains`.
+
+    Returns:
+      state: `RunningPotentialScaleReductionState` with updated calculations.
+    """
     var_stream = RunningVariance(self.shape, self.dtype)
     chunk_axis = nest_util.broadcast_structure(
         self.num_chains, chunk_axis
@@ -435,6 +510,7 @@ class RunningPotentialScaleReduction(object):
 
     def _update_for_one_state(
         num_chains, chain_var, new_sample, chain_axis, chunk_axis):
+      """Updates the running variance for one group of Markov chains."""
       sample_rank = ps.rank(new_sample)
       if sample_rank >= 2:
         # make the axis denoting independent chains the leading dimension
@@ -464,7 +540,17 @@ class RunningPotentialScaleReduction(object):
     return RunningPotentialScaleReductionState(updated_chain_vars)
 
   def finalize(self, state):
+    """Finalizes potential scale reduction computation for the `state`.
+
+    Args:
+      state: `RunningPotentialScaleReductionState` that represents
+        the current state of running statistics.
+
+    Returns:
+      rhat: An estimate of the rhat.
+    """
     def _finalize_for_one_state(m, chain_var):
+      """Calculates rhat for one group of Markov chains."""
       # using notation from Brooks and Gelman (1998),
       # n := num samples / chain; m := number of chains
       n = chain_var[0].num_samples
