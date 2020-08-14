@@ -27,6 +27,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
+    'RunningMean',
+    'RunningMeanState',
     'RunningCovariance',
     'RunningCovarianceState',
     'RunningVariance',
@@ -110,30 +112,30 @@ class RunningCovariance(object):
   `RunningCovarianceState` as returned via `initialize` and `update` method
   calls.
 
+  The running covariance computation supports batching. The `event_ndims`
+  parameter indicates the number of trailing dimensions to treat as part of
+  the event, and to compute covariance across. The leading dimensions, if
+  any, are treated as batch shape, and no cross terms are computed.
+
+  For example, if the incoming samples have shape `[5, 7]`, the `event_ndims`
+  selects among three different covariance computations:
+  - `event_ndims=0` treats the samples as a `[5, 7]` batch of scalar random
+    variables, and computes their variances in batch.  The shape of the result
+    is `[5, 7]`.
+  - `event_ndims=1` treats the samples as a `[5]` batch of vector random
+    variables of shape `[7]`, and computes their covariances in batch.  The
+    shape of the result is `[5, 7, 7]`.
+  - `event_ndims=2` treats the samples as a single random variable of
+    shape `[5, 7]` and computes its covariance.  The shape of the result
+    is `[5, 7, 5, 7]`.
+
   `RunningCovariance` is meant to serve general streaming covariance needs.
   For a specialized version that fits streaming over MCMC samples, see
   `CovarianceReducer` in `tfp.experimental.mcmc`.
   """
 
   def __init__(self, shape, event_ndims=None, dtype=tf.float32):
-    """A `RunningCovariance` object holds metadata for covariance computation.
-
-    The running covariance computation supports batching. The `event_ndims`
-    parameter indicates the number of trailing dimensions to treat as part of
-    the event, and to compute covariance across. The leading dimensions, if
-    any, are treated as batch shape, and no cross terms are computed.
-
-    For example, if the incoming samples have shape `[5, 7]`, the `event_ndims`
-    selects among three different covariance computations:
-    - `event_ndims=0` treats the samples as a `[5, 7]` batch of scalar random
-      variables, and computes their variances in batch.  The shape of the result
-      is `[5, 7]`.
-    - `event_ndims=1` treats the samples as a `[5]` batch of vector random
-      variables of shape `[7]`, and computes their covariances in batch.  The
-      shape of the result is `[5, 7, 7]`.
-    - `event_ndims=2` treats the samples as a single random variable of
-      shape `[5, 7]` and computes its covariance.  The shape of the result
-      is `[5, 7, 5, 7]`.
+    """Instantiates this object.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -142,7 +144,10 @@ class RunningCovariance(object):
         the inner-most dimensions.  Specifying `None` returns all cross
         product terms (no batching) and is the default.
       dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`.
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
 
     Raises:
       ValueError: if `event_ndims` is greater than the rank of the intended
@@ -157,6 +162,10 @@ class RunningCovariance(object):
       raise ValueError('`event_ndims` over 13 not supported')
     self.shape = shape
     self.event_ndims = event_ndims
+    if dtype is tf.int64:
+      dtype = tf.float64
+    elif dtype.is_integer:
+      dtype = tf.float32
     self.dtype = dtype
 
   def initialize(self):
@@ -266,6 +275,117 @@ class RunningVariance(RunningCovariance):
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples. By default, the shape is assumed to be scalar.
       dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`.
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
     """
     super(RunningVariance, self).__init__(shape, event_ndims=0, dtype=dtype)
+
+
+RunningMeanState = collections.namedtuple(
+    'RunningMeanState', 'num_samples, mean')
+
+
+class RunningMean(object):
+  """Holds metadata for and computes a running mean.
+
+  In computation, samples can be provided individually or in chunks. A
+  "chunk" of size M implies incorporating M samples into a single expectation
+  computation at once, which is more efficient than one by one. If more than one
+  sample is accepted and chunking is enabled, the chunked `axis` will define
+  chunking semantics for all samples.
+
+  `RunningMean` objects do not hold state information. That information,
+  which includes intermediate calculations, are held in a
+  `RunningMeanState` as returned via `initialize` and `update` method
+  calls.
+
+  `RunningMean` is meant to serve general streaming expectations.
+  For a specialized version that fits streaming over MCMC samples, see
+  `ExpectationsReducer` in `tfp.experimental.mcmc`.
+  """
+
+  def __init__(self, shape, dtype=tf.float32):
+    """Instantiates this object.
+
+    Args:
+      shape: Python `Tuple` or `TensorShape` representing the shape of
+        incoming samples.
+      dtype: Dtype of incoming samples and the resulting statistics.
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
+    """
+    self.shape = shape
+    if dtype is tf.int64:
+      dtype = tf.float64
+    elif dtype.is_integer:
+      dtype = tf.float32
+    self.dtype = dtype
+
+  def initialize(self):
+    """Initializes an empty `RunningMeanState`.
+
+    Returns:
+      state: `RunningMeanState` representing a stream of no inputs.
+    """
+    return RunningMeanState(
+        num_samples=tf.zeros((), dtype=self.dtype),
+        mean=tf.zeros(self.shape, self.dtype))
+
+  def update(self, state, new_sample, axis=None):
+    """Update the `RunningMeanState` with a new sample.
+
+    The update formula is from Philippe Pebay (2008) [1] and is identical to
+    that used to calculate the intermediate mean in
+    `tfp.experimental.stats.RunningCovariance` and
+    `tfp.experimental.stats.RunningVariance`.
+
+    Args:
+      state: `RunningMeanState` that represents the current state of
+        running statistics.
+      new_sample: Incoming `Tensor` sample with shape and dtype compatible with
+        those used to form the `RunningMeanState`.
+      axis: If chunking is desired, this is an integer that specifies the axis
+        with chunked samples. For individual samples, set this to `None`. By
+        default, samples are not chunked (`axis` is None).
+
+    Returns:
+      state: `RunningMeanState` with updated calculations.
+
+    #### References
+    [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
+         Covariances and Arbitrary-Order Statistical Moments. _Technical Report
+         SAND2008-6212_, 2008.
+         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
+    """
+    new_sample = tf.nest.map_structure(
+        lambda new_sample: tf.cast(new_sample, dtype=self.dtype),
+        new_sample)
+    if axis is None:
+      chunk_n = tf.cast(1, dtype=self.dtype)
+      chunk_mean = new_sample
+    else:
+      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=self.dtype)
+      chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
+    new_n = state.num_samples + chunk_n
+    delta_mean = chunk_mean - state.mean
+    new_mean = state.mean + chunk_n * delta_mean / new_n
+    return RunningMeanState(new_n, new_mean)
+
+  def finalize(self, state):
+    """Finalizes expectation computation for the `state`.
+
+    If the `finalized` method is invoked on a running state of no inputs,
+    `RunningMean` will return a corresponding structure of `tf.zeros`.
+
+    Args:
+      state: `RunningMeanState` that represents the current state of
+        running statistics.
+
+    Returns:
+      mean: An estimate of the mean.
+    """
+    return state.mean
