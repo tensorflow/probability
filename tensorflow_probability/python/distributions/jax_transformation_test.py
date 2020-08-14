@@ -43,6 +43,7 @@ FLAGS = flags.FLAGS
 
 JIT_SAMPLE_BLOCKLIST = (
     'Bates',
+    'Independent',  # http://b/164415821
     'Multinomial',
 )
 JIT_LOGPROB_BLOCKLIST = (
@@ -66,6 +67,7 @@ PMAP_SAMPLE_BLOCKLIST = (
 PMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
+    'MixtureSameFamily',  # http://b/164415821
     'NegativeBinomial',  # Times out.
 )
 
