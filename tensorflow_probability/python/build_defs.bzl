@@ -319,10 +319,10 @@ def multi_substrate_py_test(
         shard_count: As with `py_test`.
     """
 
-    name_tag = "_{}".format(name)
     tags = [t for t in tags]
-    tags.append(name_tag)
     tags.append("multi_substrate")
+
+    test_targets = []
     native.py_test(
         name = "{}.tf".format(name),
         size = size,
@@ -334,6 +334,7 @@ def multi_substrate_py_test(
         timeout = timeout,
         shard_count = shard_count,
     )
+    test_targets.append(":{}.tf".format(name))
 
     if "numpy" not in disabled_substrates:
         numpy_srcs = _substrate_srcs(srcs, "numpy")
@@ -356,6 +357,7 @@ def multi_substrate_py_test(
             timeout = timeout,
             shard_count = shard_count,
         )
+        test_targets.append(":{}.numpy".format(name))
 
     if "jax" not in disabled_substrates:
         jax_srcs = _substrate_srcs(srcs, "jax")
@@ -380,8 +382,9 @@ def multi_substrate_py_test(
             timeout = timeout,
             shard_count = shard_count,
         )
+        test_targets.append(":{}.jax".format(name))
 
     native.test_suite(
         name = name,
-        tags = [name_tag],
+        tests = test_targets,
     )
