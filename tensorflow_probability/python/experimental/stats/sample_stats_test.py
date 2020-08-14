@@ -449,6 +449,147 @@ class RunningCovarianceTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class RunningRhatTest(test_util.TestCase):
+
+  def test_simple_operation(self):
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+        shape=(),
+        num_chains=3,
+    )
+    state = running_rhat.initialize()
+    # 5 samples from 3 independent Markov chains
+    x = np.arange(15, dtype=np.float32).reshape((5, 3))
+    for sample in x:
+      state = running_rhat.update(state, sample)
+    rhat = running_rhat.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=x,
+        independent_chain_ndims=1,
+    )
+    true_rhat, rhat = self.evaluate([true_rhat, rhat])
+    self.assertNear(true_rhat, rhat, err=1e-6)
+
+  def test_random_scalar_computation(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10) * 100
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+        shape=(),
+        num_chains=10,
+    )
+    state = running_rhat.initialize()
+    for sample in x:
+      state = running_rhat.update(state, sample)
+    rhat = running_rhat.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=x,
+        independent_chain_ndims=1,
+    )
+    true_rhat, rhat = self.evaluate([true_rhat, rhat])
+    self.assertNear(true_rhat, rhat, err=1e-6)
+
+  def test_chain_axis(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 2, 5) * 100
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+        shape=(),
+        num_chains=5,
+    )
+    state = running_rhat.initialize()
+    for sample in x:
+      state = running_rhat.update(state, sample, chain_axis=1)
+    rhat = running_rhat.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=np.swapaxes(x, 2, 1),
+        independent_chain_ndims=1,
+    )
+    true_rhat, rhat = self.evaluate([true_rhat, rhat])
+    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
+
+  def test_non_scalar_samples(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 2, 2, 3, 5) * 100
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+        shape=(2, 3, 5),
+        num_chains=2,
+    )
+    state = running_rhat.initialize()
+    for sample in x:
+      state = running_rhat.update(state, sample)
+    rhat = running_rhat.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=x,
+        independent_chain_ndims=1,
+    )
+    true_rhat, rhat = self.evaluate([true_rhat, rhat])
+    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
+
+  def test_chunking(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10, 2, 5) * 100
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+        shape=(5,),
+        num_chains=2,
+    )
+    state = running_rhat.initialize()
+    for sample in x:
+      state = running_rhat.update(
+          state, sample, chain_axis=1, chunk_axis=0)
+    rhat = running_rhat.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=x.reshape(1000, 2, 5),
+        independent_chain_ndims=1,
+    )
+    true_rhat, rhat = self.evaluate([true_rhat, rhat])
+    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
+
+  def test_batching(self):
+    n_samples = 100
+    # state_0 is two scalar chains taken from iid Normal(0, 1).
+    state_0 = np.random.randn(n_samples, 2)
+
+    # state_1 is three 4-variate chains taken from Normal(0, 1) that have been
+    # shifted.
+    offset = np.array([1., -1., 2.]).reshape(3, 1)
+    state_1 = np.random.randn(n_samples, 3, 4) + offset
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+        shape=[(), (4,)],
+        num_chains=[2, 3]
+    )
+    state = running_rhat.initialize()
+    for sample in zip(state_0, state_1):
+      state = running_rhat.update(state, sample)
+    rhat = self.evaluate(running_rhat.finalize(state))
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=[state_0, state_1], independent_chain_ndims=1)
+    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
+
+  def test_tf_while(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(100, 10) * 100
+    tensor_x = tf.convert_to_tensor(x)
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+        shape=(),
+        num_chains=10,
+    )
+    state = running_rhat.initialize()
+    def _loop_body(i, state):
+      new_state = running_rhat.update(state, tensor_x[i])
+      return i + 1, new_state
+    _, state = tf.while_loop(
+        lambda i, _: i < 100,
+        _loop_body,
+        (0, state)
+    )
+    rhat = running_rhat.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=x,
+        independent_chain_ndims=1,
+    )
+    true_rhat, rhat = self.evaluate([true_rhat, rhat])
+    self.assertNear(true_rhat, rhat, err=1e-6)
+
+
+@test_util.test_all_tf_execution_regimes
 class RunningMeanTest(test_util.TestCase):
 
   def test_zero_mean(self):

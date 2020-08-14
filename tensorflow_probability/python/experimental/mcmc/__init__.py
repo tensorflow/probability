@@ -31,6 +31,7 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_state_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
 from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
+from tensorflow_probability.python.experimental.mcmc.rhat_reducer import RhatReducer
 from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
 from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain
@@ -79,6 +80,7 @@ __all__ = [
     'resample_independent',
     'resample_stratified',
     'resample_systematic',
+    'RhatReducer',
     'SampleDiscardingKernel',
     'sample_chain',
     'sample_fold',

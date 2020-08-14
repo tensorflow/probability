@@ -42,6 +42,7 @@ py_library(
         ":particle_filter",
         ":particle_filter_augmentation",
         ":reducer",
+        ":rhat_reducer",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
@@ -511,6 +512,31 @@ py_test(
     name = "expectations_reducer_test",
     srcs = ["expectations_reducer_test.py"],
     shard_count = 5,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "rhat_reducer",
+    srcs = ["rhat_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/stats",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "rhat_reducer_test",
+    size = "small",
+    shard_count = 5,
+    srcs = ["rhat_reducer_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,

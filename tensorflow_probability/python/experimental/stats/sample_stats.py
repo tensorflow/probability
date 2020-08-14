@@ -22,8 +22,10 @@ import collections
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
-
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.mcmc import diagnostic
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -31,6 +33,8 @@ __all__ = [
     'RunningMeanState',
     'RunningCovariance',
     'RunningCovarianceState',
+    'RunningPotentialScaleReduction',
+    'RunningPotentialScaleReductionState',
     'RunningVariance',
 ]
 
@@ -389,3 +393,99 @@ class RunningMean(object):
       mean: An estimate of the mean.
     """
     return state.mean
+
+
+RunningPotentialScaleReductionState = collections.namedtuple(
+    'RunningPotentialScaleReductionState', 'chain_var')
+
+
+class RunningPotentialScaleReduction(object):
+
+  def __init__(self, shape, num_chains, dtype=tf.float32):
+    self.shape = shape
+    self.num_chains = num_chains
+    if dtype is tf.int64:
+      dtype = tf.float64
+    elif dtype.is_integer:
+      dtype = tf.float32
+    self.dtype = dtype
+
+  def initialize(self):
+    def _initialize_for_one_state(num_chains, shape):
+      var_stream = RunningVariance(shape, self.dtype)
+      return [var_stream.initialize()
+              for _ in range(num_chains)]
+
+    chain_var = nest.map_structure_up_to(
+        self.num_chains,
+        _initialize_for_one_state,
+        self.num_chains,
+        self.shape,
+        check_types=False
+    )
+    return RunningPotentialScaleReductionState(chain_var)
+
+  def update(self, state, new_sample, chain_axis=0, chunk_axis=None):
+    var_stream = RunningVariance(self.shape, self.dtype)
+    chunk_axis = nest_util.broadcast_structure(
+        self.num_chains, chunk_axis
+    )
+    chain_axis = nest_util.broadcast_structure(
+        self.num_chains, chain_axis)
+
+    def _update_for_one_state(
+        num_chains, chain_var, new_sample, chain_axis, chunk_axis):
+      sample_rank = ps.rank(new_sample)
+      if sample_rank >= 2:
+        # make the axis denoting independent chains the leading dimension
+        perm = [chain_axis] + list(
+            range(0, chain_axis)) + list(
+                range(chain_axis + 1, sample_rank))
+        new_sample = tf.transpose(new_sample, perm)
+
+      updated_chain_var = []
+      for i in range(num_chains):
+        new_reducer_state = var_stream.update(
+            chain_var[i], new_sample[i], chunk_axis
+        )
+        updated_chain_var.append(new_reducer_state)
+      return updated_chain_var
+
+    updated_chain_vars = nest.map_structure_up_to(
+        self.num_chains,
+        _update_for_one_state,
+        self.num_chains,
+        state.chain_var,
+        new_sample,
+        chain_axis,
+        chunk_axis,
+        check_types=False
+    )
+    return RunningPotentialScaleReductionState(updated_chain_vars)
+
+  def finalize(self, state):
+    def _finalize_for_one_state(m, chain_var):
+      # using notation from Brooks and Gelman (1998),
+      # n := num samples / chain; m := number of chains
+      n = chain_var[0].num_samples
+
+      chain_means = [var_state.mean for var_state in chain_var]
+      # b/n is the between-chain variance (the variance of the chain means)
+      b_div_n = diagnostic._reduce_variance(
+          tf.convert_to_tensor(chain_means), axis=0, biased=False)
+
+      # W is the within sequence variance (the mean of the chain variances)
+      sum_of_chain_squared_residuals = sum(
+          [var_state.sum_squared_residuals for var_state in chain_var])
+      w = sum_of_chain_squared_residuals / (m * (n - 1))
+
+      # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper
+      true_variance_estimate = ((n - 1) / n) * w + b_div_n
+      return ((m + 1.) / m) * true_variance_estimate / w - (n - 1.) / (m * n)
+    return nest.map_structure_up_to(
+        self.num_chains,
+        _finalize_for_one_state,
+        self.num_chains,
+        state.chain_var,
+        check_types=False
+    )
