@@ -26,6 +26,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":version",
+        # jax dep,
         "//oryx/bijectors",
         "//oryx/core",
         "//oryx/distributions",
