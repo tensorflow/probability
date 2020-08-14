@@ -26,7 +26,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import pad as pad_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
@@ -155,8 +155,8 @@ class SoftmaxCentered(bijector.Bijector):
     #       or by noting that det{ dX/dY } = 1 / det{ dY/dX } from Bijector
     #       docstring "Tip".
     # (2) - https://en.wikipedia.org/wiki/Matrix_determinant_lemma
-    np1 = prefer_static.cast(prefer_static.shape(y)[-1], dtype=y.dtype)
-    return -(0.5 * prefer_static.log(np1) +
+    np1 = ps.cast(ps.shape(y)[-1], dtype=y.dtype)
+    return -(0.5 * ps.log(np1) +
              tf.reduce_sum(tf.math.log(y), axis=-1))
 
   def _forward_log_det_jacobian(self, x):
@@ -166,7 +166,7 @@ class SoftmaxCentered(bijector.Bijector):
     # we must do:
     #   log_normalization = 1 + reduce_sum(exp(logits))
     #   -log_normalization + reduce_sum(logits - log_normalization)
-    np1 = prefer_static.cast(1 + prefer_static.shape(x)[-1], dtype=x.dtype)
-    return (0.5 * prefer_static.log(np1) +
+    np1 = ps.cast(1 + ps.shape(x)[-1], dtype=x.dtype)
+    return (0.5 * ps.log(np1) +
             tf.reduce_sum(x, axis=-1) -
             np1 * tf.math.softplus(tf.reduce_logsumexp(x, axis=-1)))

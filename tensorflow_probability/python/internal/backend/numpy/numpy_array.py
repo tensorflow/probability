@@ -238,6 +238,8 @@ def _pad(  # pylint: disable=unused-argument
     mode='CONSTANT',
     constant_values=0,
     name=None):
+  tensor = ops.convert_to_tensor(tensor)
+  constant_values = ops.convert_to_tensor(constant_values)
   return np.pad(
       tensor, paddings,
       mode=mode.lower(),
@@ -329,7 +331,7 @@ def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,r
 
 def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint: disable=unused-argument
   """Map tf.split -> np.split."""
-  indices_or_sections = np.array(num_or_size_splits)
+  indices_or_sections = onp.array(num_or_size_splits)
   if indices_or_sections.ndim == 1:
     if any(idx == -1 for idx in indices_or_sections):
       # Numpy parameterizes by split indices and returns nsplits+1 arrays.
@@ -338,7 +340,7 @@ def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint
       indices_or_sections = [
           idx if idx != -1 else remainder for idx in indices_or_sections
       ]
-    indices_or_sections = np.cumsum(np.array(indices_or_sections))[:-1]
+    indices_or_sections = onp.cumsum(onp.array(indices_or_sections))[:-1]
   return np.split(value, indices_or_sections, axis)
 
 

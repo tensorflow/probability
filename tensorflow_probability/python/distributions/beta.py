@@ -30,7 +30,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -218,10 +218,10 @@ class Beta(distribution.Distribution):
       return self.concentration1 + self.concentration0
 
   def _batch_shape_tensor(self, concentration1=None, concentration0=None):
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(
+    return ps.broadcast_shape(
+        ps.shape(
             self.concentration1 if concentration1 is None else concentration1),
-        prefer_static.shape(
+        ps.shape(
             self.concentration0 if concentration0 is None else concentration0))
 
   def _batch_shape(self):

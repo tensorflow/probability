@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
@@ -185,8 +186,8 @@ class InverseGamma(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.concentration), tf.shape(self.scale))
+    return ps.broadcast_shape(
+        ps.shape(self.concentration), ps.shape(self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.concentration.shape,

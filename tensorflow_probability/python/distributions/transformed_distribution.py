@@ -289,7 +289,7 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
     with self._name_and_control_scope(name):
-      sample_shape = tf.convert_to_tensor(
+      sample_shape = ps.convert_to_shape_tensor(
           sample_shape, dtype=tf.int32, name='sample_shape')
       sample_shape, n = self._expand_sample_shape_to_vector(
           sample_shape, 'sample_shape')

@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
@@ -117,7 +118,7 @@ class IteratedSigmoidCentered(bijector.Bijector):
     # log-space computation.
     offset = -tf.math.log(
         tf.cast(
-            tf.range(tf.shape(x)[-1], 0, delta=-1),
+            tf.range(ps.shape(x)[-1], 0, delta=-1),
             dtype=dtype_util.base_dtype(x.dtype)))
     z = tf.math.sigmoid(x + offset)
     y = z * tf.math.cumprod(1 - z, axis=-1, exclusive=True)
@@ -131,7 +132,7 @@ class IteratedSigmoidCentered(bijector.Bijector):
     # x_k = logit(z_k) - log(1 / (N - k))
     offset = tf.math.log(
         tf.cast(
-            tf.range(tf.shape(y)[-1] - 1, 0, delta=-1),
+            tf.range(ps.shape(y)[-1] - 1, 0, delta=-1),
             dtype=dtype_util.base_dtype(y.dtype)))
     z = y / (1. - tf.math.cumsum(y, axis=-1, exclusive=True))
     return tf.math.log(z[..., :-1]) - tf.math.log1p(-z[..., :-1]) + offset

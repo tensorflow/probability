@@ -29,7 +29,7 @@ from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -238,11 +238,11 @@ class TruncatedCauchy(distribution.Distribution):
 
   def _batch_shape_tensor(self, loc=None, scale=None, low=None, high=None):
     return functools.reduce(
-        prefer_static.broadcast_shape,
-        (prefer_static.shape(self.loc if loc is None else loc),
-         prefer_static.shape(self.scale if scale is None else scale),
-         prefer_static.shape(self.low if low is None else low),
-         prefer_static.shape(self.high if high is None else high)))
+        ps.broadcast_shape,
+        (ps.shape(self.loc if loc is None else loc),
+         ps.shape(self.scale if scale is None else scale),
+         ps.shape(self.low if low is None else low),
+         ps.shape(self.high if high is None else high)))
 
   def _event_shape(self):
     return tf.TensorShape([])
@@ -253,7 +253,7 @@ class TruncatedCauchy(distribution.Distribution):
         low=low, high=high, loc=loc, scale=scale)
     batch_shape = self._batch_shape_tensor(
         loc=loc, scale=scale, low=low, high=high)
-    sample_and_batch_shape = tf.concat([[n], batch_shape], axis=0)
+    sample_and_batch_shape = ps.concat([[n], batch_shape], axis=0)
 
     std_samples = _cauchy_quantile(
         samplers.uniform(

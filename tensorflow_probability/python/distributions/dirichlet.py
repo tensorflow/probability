@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -206,7 +207,7 @@ class Dirichlet(distribution.Distribution):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
     # so we pre-emptively convert-to-tensor.
     concentration = tf.convert_to_tensor(self.concentration)
-    return tf.shape(concentration)[:-1]
+    return ps.shape(concentration)[:-1]
 
   def _batch_shape(self):
     return self.concentration.shape[:-1]
@@ -215,7 +216,7 @@ class Dirichlet(distribution.Distribution):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
     # so we pre-emptively convert-to-tensor.
     concentration = tf.convert_to_tensor(self.concentration)
-    return tf.shape(concentration)[-1:]
+    return ps.shape(concentration)[-1:]
 
   def _event_shape(self):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)

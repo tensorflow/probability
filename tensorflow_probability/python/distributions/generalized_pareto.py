@@ -27,7 +27,7 @@ from tensorflow_probability.python.bijectors import generalized_pareto as genera
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -198,10 +198,10 @@ class GeneralizedPareto(distribution.Distribution):
 
   def _batch_shape_tensor(self, loc=None, scale=None, concentration=None):
     return functools.reduce(
-        prefer_static.broadcast_shape,
-        (prefer_static.shape(self.loc if loc is None else loc),
-         prefer_static.shape(self.scale if scale is None else scale),
-         prefer_static.shape(
+        ps.broadcast_shape,
+        (ps.shape(self.loc if loc is None else loc),
+         ps.shape(self.scale if scale is None else scale),
+         ps.shape(
              self.concentration if concentration is None else concentration)))
 
   def _sample_n(self, n, seed=None):
@@ -210,7 +210,7 @@ class GeneralizedPareto(distribution.Distribution):
     scale = tf.convert_to_tensor(self.scale)
     concentration = tf.convert_to_tensor(self.concentration)
     # Pre-broadcast to ensure we draw enough randomness.
-    sample_shp = tf.concat(
+    sample_shp = ps.concat(
         [[n],
          self._batch_shape_tensor(
              loc=loc, scale=scale, concentration=concentration)],

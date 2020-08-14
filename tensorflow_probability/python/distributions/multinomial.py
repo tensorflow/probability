@@ -27,7 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -249,7 +249,7 @@ class Multinomial(distribution.Distribution):
     probs = self._probs_parameter_no_checks()
     k = tf.compat.dimension_value(probs.shape[-1])
     if k is None:
-      k = tf.shape(probs)[-1]
+      k = ps.shape(probs)[-1]
     return _sample_multinomial_as_iterated_binomial(
         n, k, probs, n_draws, self.dtype, seed)
 
@@ -438,6 +438,6 @@ def _replicate_along_left(tensor, count):
   # I am surpised that I can't seem to find this utility in the TF API.  tf.tile
   # is more general, but making it do this seems to require complicated shape
   # gymnastics.  tf.repeat repeats in place, hence this idiom:
-  desired_shape = prefer_static.concat(
-      [[count], prefer_static.shape(tensor)], axis=0)
+  desired_shape = ps.concat(
+      [[count], ps.shape(tensor)], axis=0)
   return tf.broadcast_to(tensor[tf.newaxis, ...], desired_shape)

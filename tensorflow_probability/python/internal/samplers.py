@@ -188,9 +188,8 @@ def poisson(
   """As `tf.random.poisson`, but handling stateful/stateless `seed`s."""
   with tf.name_scope(name or 'poisson'):
     seed = sanitize_seed(seed)
-    lam_shape = tf.shape(lam)
-    shape = tf.convert_to_tensor(shape, dtype=lam_shape.dtype)
-    sample_shape = tf.concat([shape, lam_shape], axis=0)
+    lam_shape = ps.shape(lam)
+    sample_shape = ps.concat([shape, lam_shape], axis=0)
     return tf.random.stateless_poisson(
         shape=sample_shape, seed=seed, lam=lam, dtype=dtype)
 
@@ -202,7 +201,7 @@ def shuffle(
   """As `tf.random.shuffle`, but handling stateful/stateless `seed`s."""
   with tf.name_scope(name or 'shuffle'):
     seed = sanitize_seed(seed)
-    sortkey = tf.random.stateless_uniform(shape=[tf.shape(value)[0]], seed=seed)
+    sortkey = tf.random.stateless_uniform(shape=[ps.shape(value)[0]], seed=seed)
     return tf.gather(value, tf.argsort(sortkey))
 
 

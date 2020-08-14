@@ -29,7 +29,7 @@ from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -225,8 +225,8 @@ class BetaBinomial(distribution.Distribution):
     if params is None:
       params = self._params_list()
     return functools.reduce(
-        prefer_static.broadcast_shape,
-        [prefer_static.shape(t) for t in params])
+        ps.broadcast_shape,
+        [ps.shape(t) for t in params])
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,

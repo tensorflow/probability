@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
@@ -137,9 +138,9 @@ class InverseGaussian(distribution.Distribution):
     return self._concentration
 
   def _batch_shape_tensor(self, loc=None, concentration=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc if loc is None else loc),
-        tf.shape(
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.shape(
             self.concentration if concentration is None else concentration))
 
   def _batch_shape(self):
@@ -155,7 +156,7 @@ class InverseGaussian(distribution.Distribution):
     concentration = tf.convert_to_tensor(self.concentration)
     loc = tf.convert_to_tensor(self.loc)
     chi2_seed, unif_seed = samplers.split_seed(seed, salt='inverse_gaussian')
-    shape = tf.concat([[n], self._batch_shape_tensor(
+    shape = ps.concat([[n], self._batch_shape_tensor(
         loc=loc, concentration=concentration)], axis=0)
     sampled_chi2 = tf.square(samplers.normal(
         shape, seed=chi2_seed, dtype=self.dtype))

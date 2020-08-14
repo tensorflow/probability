@@ -258,7 +258,7 @@ class VonMises(distribution.Distribution):
     tiny = np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny
     concentration = tf.maximum(concentration, tiny)
 
-    sample_batch_shape = tf.concat([
+    sample_batch_shape = ps.concat([
         [n], ps.shape(concentration)], axis=0)
     samples = random_von_mises(
         sample_batch_shape, concentration, dtype=self.dtype, seed=seed)
@@ -603,15 +603,15 @@ def _von_mises_sample_bwd(aux, dy):
   num_sample_dimensions = (tf.rank(broadcast_concentration) -
                            tf.rank(concentration))
 
-  # None gradients for shape, ..., seed
-  return None, tf.reduce_sum(ret, axis=tf.range(num_sample_dimensions)), None
+  # None gradients for seed
+  return tf.reduce_sum(ret, axis=tf.range(num_sample_dimensions)), None
 
 
-def _von_mises_sample_jvp(primals, tangents):
+def _von_mises_sample_jvp(shape, primals, tangents):
   """Compute primals and tangents using implicit derivative."""
-  shape, concentration, seed = primals
-  dshape, dconcentration, dseed = tangents
-  del dshape, dseed
+  concentration, seed = primals
+  dconcentration, dseed = tangents
+  del dseed
 
   dconcentration = tf.broadcast_to(dconcentration, shape)
   broadcast_concentration = tf.broadcast_to(concentration, shape)
@@ -632,7 +632,8 @@ def _von_mises_sample_jvp(primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_von_mises_sample_fwd,
     vjp_bwd=_von_mises_sample_bwd,
-    jvp_fn=_von_mises_sample_jvp)
+    jvp_fn=_von_mises_sample_jvp,
+    nondiff_argnums=(0,))
 def _von_mises_sample_with_gradient(shape, concentration, seed):
   """Performs rejection sampling for standardized von Mises.
 
@@ -674,6 +675,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
     [2] Michael Figurnov, Shakir Mohamed, Andriy Mnih. "Implicit
     Reparameterization Gradients", 2018.
   """
+  shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32, name='shape')
   seed = samplers.sanitize_seed(seed, salt='von_mises')
   concentration = tf.convert_to_tensor(
       concentration, dtype=dtype, name='concentration')

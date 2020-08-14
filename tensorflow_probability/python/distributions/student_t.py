@@ -29,7 +29,7 @@ from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -67,7 +67,7 @@ def sample_n(n, df, loc, scale, batch_shape, dtype, seed):
     samples: a `Tensor` with prepended dimensions `n`.
   """
   normal_seed, gamma_seed = samplers.split_seed(seed, salt='student_t')
-  shape = tf.concat([[n], batch_shape], 0)
+  shape = ps.concat([[n], batch_shape], 0)
 
   normal_sample = samplers.normal(shape, dtype=dtype, seed=normal_seed)
   df = df * tf.ones(batch_shape, dtype=dtype)
@@ -119,7 +119,7 @@ def cdf(x, df, loc, scale):
   y = (x - loc) / tf.abs(scale)
   x_t = df / (y**2. + df)
   neg_cdf = 0.5 * tf.math.betainc(
-      0.5 * tf.broadcast_to(df, prefer_static.shape(x_t)), 0.5, x_t)
+      0.5 * tf.broadcast_to(df, ps.shape(x_t)), 0.5, x_t)
   return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
 
 
@@ -321,11 +321,11 @@ class StudentT(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self, df=None, loc=None, scale=None):
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(self.df if df is None else df),
-        prefer_static.broadcast_shape(
-            prefer_static.shape(self.loc if loc is None else loc),
-            prefer_static.shape(self.scale if scale is None else scale)))
+    return ps.broadcast_shape(
+        ps.shape(self.df if df is None else df),
+        ps.broadcast_shape(
+            ps.shape(self.loc if loc is None else loc),
+            ps.shape(self.scale if scale is None else scale)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(

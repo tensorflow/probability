@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -163,8 +164,8 @@ class GammaGamma(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
-    return functools.reduce(tf.broadcast_dynamic_shape,
-                            [tf.shape(tensor) for tensor in tensors])
+    return functools.reduce(ps.broadcast_shape,
+                            [ps.shape(tensor) for tensor in tensors])
 
   def _batch_shape(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]

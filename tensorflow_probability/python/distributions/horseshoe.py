@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import half_cauchy
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -171,7 +172,7 @@ class Horseshoe(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.scale)
+    return ps.shape(self.scale)
 
   def _batch_shape(self):
     return self.scale.shape
@@ -201,7 +202,7 @@ class Horseshoe(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     scale = tf.convert_to_tensor(self.scale)
-    shape = tf.concat([[n], tf.shape(scale)], axis=0)
+    shape = ps.concat([[n], ps.shape(scale)], axis=0)
     shrinkage_seed, sample_seed = samplers.split_seed(seed,
                                                       salt='random_horseshoe')
     local_shrinkage = self._half_cauchy.sample(shape, seed=shrinkage_seed)

@@ -133,7 +133,8 @@ class Sample(distribution_lib.Distribution):
     with tf.name_scope(name or 'Sample' + distribution.name) as name:
       self._distribution = distribution
       self._sample_shape = tensor_util.convert_nonref_to_tensor(
-          sample_shape, dtype_hint=tf.int32, name='sample_shape')
+          sample_shape, dtype_hint=tf.int32, name='sample_shape',
+          as_shape_tensor=True)
       super(Sample, self).__init__(
           dtype=self._distribution.dtype,
           reparameterization_type=self._distribution.reparameterization_type,

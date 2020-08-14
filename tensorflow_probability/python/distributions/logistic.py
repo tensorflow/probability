@@ -26,7 +26,7 @@ from tensorflow_probability.python.bijectors import identity as identity_bijecto
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -154,9 +154,9 @@ class Logistic(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self, loc=None, scale=None):
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(self.loc if loc is None else loc),
-        prefer_static.shape(self.scale if scale is None else scale))
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
@@ -170,7 +170,7 @@ class Logistic(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    shape = tf.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)], 0)
+    shape = ps.concat([[n], self._batch_shape_tensor(loc=loc, scale=scale)], 0)
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use
     # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny` because it is the

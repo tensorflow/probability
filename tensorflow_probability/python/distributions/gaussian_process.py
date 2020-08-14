@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -438,10 +439,10 @@ class GaussianProcess(distribution.Distribution):
 
   def _batch_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
-    return functools.reduce(tf.broadcast_dynamic_shape, [
-        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
+    return functools.reduce(ps.broadcast_shape, [
+        ps.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
         self.kernel.batch_shape_tensor(),
-        tf.shape(self.observation_noise_variance)
+        ps.shape(self.observation_noise_variance)
     ])
 
   def _batch_shape(self, index_points=None):
@@ -460,7 +461,7 @@ class GaussianProcess(distribution.Distribution):
     else:
       # The examples index is one position to the left of the feature dims.
       examples_index = -(self.kernel.feature_ndims + 1)
-      return tf.shape(index_points)[examples_index:examples_index + 1]
+      return ps.shape(index_points)[examples_index:examples_index + 1]
 
   def _event_shape(self, index_points=None):
     index_points = (
@@ -499,7 +500,7 @@ class GaussianProcess(distribution.Distribution):
     event_shape = self._event_shape_tensor(index_points=index_points)
     if self._is_univariate_marginal(index_points):
       mean = tf.squeeze(mean, axis=-1)
-    mean = tf.broadcast_to(mean, tf.concat([batch_shape, event_shape], axis=0))
+    mean = tf.broadcast_to(mean, ps.concat([batch_shape, event_shape], axis=0))
     return mean
 
   def _quantile(self, value, index_points=None):

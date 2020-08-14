@@ -23,7 +23,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -41,10 +41,10 @@ def _broadcast_event_and_samples(event, samples, event_ndims):
   # of the result of a call to dist.sample(). This way we can broadcast it with
   # event to get a properly-sized event, then add the singleton dim back at
   # -event_ndims - 1.
-  samples_shape = tf.concat(
+  samples_shape = ps.concat(
       [
-          tf.shape(samples)[:-event_ndims - 1],
-          tf.shape(samples)[tf.rank(samples) - event_ndims:]
+          ps.shape(samples)[:-event_ndims - 1],
+          ps.shape(samples)[ps.rank(samples) - event_ndims:]
       ],
       axis=0)
   event = event * tf.ones(samples_shape, dtype=event.dtype)
@@ -157,8 +157,8 @@ class Empirical(distribution.Distribution):
       # Note: this tf.rank call affects the graph, but is ok in `__init__`
       # because we don't expect shapes (or ranks) to be runtime-variable, nor
       # ever need to differentiate with respect to them.
-      samples_rank = prefer_static.rank(self._samples)
-      self._samples_axis = prefer_static.cast(
+      samples_rank = ps.rank(self._samples)
+      self._samples_axis = ps.cast(
           samples_rank - self._event_ndims - 1, tf.int32)
 
       super(Empirical, self).__init__(
@@ -195,7 +195,7 @@ class Empirical(distribution.Distribution):
 
   def _compute_num_samples(self, samples):
     samples_shape = distribution_util.prefer_static_shape(samples)
-    return tf.convert_to_tensor(
+    return ps.convert_to_shape_tensor(
         samples_shape[self._samples_axis],
         dtype_hint=tf.int32,
         name='num_samples')
@@ -203,7 +203,7 @@ class Empirical(distribution.Distribution):
   def _batch_shape_tensor(self, samples=None):
     if samples is None:
       samples = tf.convert_to_tensor(self.samples)
-    return tf.shape(samples)[:self._samples_axis]
+    return ps.shape(samples)[:self._samples_axis]
 
   def _batch_shape(self):
     if tensorshape_util.rank(self.samples.shape) is None:
@@ -213,7 +213,7 @@ class Empirical(distribution.Distribution):
   def _event_shape_tensor(self, samples=None):
     if samples is None:
       samples = tf.convert_to_tensor(self.samples)
-    return tf.shape(samples)[self._samples_axis + 1:]
+    return ps.shape(samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
     if tensorshape_util.rank(self.samples.shape) is None:
@@ -237,10 +237,10 @@ class Empirical(distribution.Distribution):
     indices = samplers.uniform([n], maxval=self._compute_num_samples(samples),
                                dtype=tf.int32, seed=seed)
     draws = tf.gather(samples, indices, axis=self._samples_axis)
-    axes = tf.concat(
+    axes = ps.concat(
         [[self._samples_axis],
-         tf.range(self._samples_axis, dtype=tf.int32),
-         tf.range(self._event_ndims, dtype=tf.int32) + self._samples_axis + 1],
+         ps.range(self._samples_axis, dtype=tf.int32),
+         ps.range(self._event_ndims, dtype=tf.int32) + self._samples_axis + 1],
         axis=0)
     draws = tf.transpose(a=draws, perm=axes)
     return draws
@@ -275,7 +275,7 @@ class Empirical(distribution.Distribution):
       mode_shape = self._batch_shape_tensor(samples)
     else:
       event_size = tf.reduce_prod(self._event_shape_tensor(samples))
-      mode_shape = tf.concat(
+      mode_shape = ps.concat(
           [self._batch_shape_tensor(samples),
            self._event_shape_tensor(samples)],
           axis=0)

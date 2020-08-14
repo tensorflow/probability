@@ -24,6 +24,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gumbel
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -189,7 +190,7 @@ class PlackettLuce(distribution.Distribution):
 
   def _batch_shape_tensor(self, scores=None):
     scores = self._scores if scores is None else scores
-    return tf.shape(scores)[:-1]
+    return ps.shape(scores)[:-1]
 
   def _batch_shape(self, scores=None):
     scores = self._scores if scores is None else scores
@@ -197,7 +198,7 @@ class PlackettLuce(distribution.Distribution):
 
   def _event_shape_tensor(self, scores=None):
     scores = self._scores if scores is None else scores
-    return tf.shape(scores)[-1:]
+    return ps.shape(scores)[-1:]
 
   def _event_shape(self, scores=None):
     scores = self._scores if scores is None else scores
@@ -217,11 +218,11 @@ class PlackettLuce(distribution.Distribution):
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(scores.shape) or
         x.shape != scores.shape):
-      broadcast_shape = tf.broadcast_dynamic_shape(
-          tf.shape(scores), tf.shape(x))
+      broadcast_shape = ps.broadcast_shape(
+          ps.shape(scores), ps.shape(x))
       scores = tf.broadcast_to(scores, broadcast_shape)
       x = tf.broadcast_to(x, broadcast_shape)
-    scores_shape = tf.shape(scores)[:-1]
+    scores_shape = ps.shape(scores)[:-1]
     scores_2d = tf.reshape(scores, [-1, event_size])
     x_2d = tf.reshape(x, [-1, event_size])
 
@@ -235,7 +236,7 @@ class PlackettLuce(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     scores = tf.convert_to_tensor(self.scores)
-    sample_shape = tf.concat([[n], tf.shape(scores)], axis=0)
+    sample_shape = ps.concat([[n], ps.shape(scores)], axis=0)
     gumbel_noise = gumbel.Gumbel(loc=0, scale=1).sample(sample_shape,
                                                         seed=seed)
     noisy_log_scores = gumbel_noise + tf.math.log(scores)

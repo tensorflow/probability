@@ -22,6 +22,7 @@ import hypothesis as hp
 from hypothesis import strategies as hps
 import jax
 from jax import random
+from jax.config import config
 import jax.numpy as np
 
 # pylint: disable=no-name-in-module
@@ -32,7 +33,6 @@ from tensorflow_probability.substrates.jax.distributions import hypothesis_testl
 from tensorflow_probability.substrates.jax.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.substrates.jax.internal import test_util
 
-
 flags.DEFINE_bool('execute_only', False,
                   'If specified, skip equality checks and only verify '
                   'execution of transforms works.')
@@ -41,15 +41,16 @@ flags.DEFINE_bool('blocklists_only', False,
                   'If specified, run tests only for blocklisted distributions.')
 FLAGS = flags.FLAGS
 
-
-JIT_SAMPLE_BLOCKLIST = ()
+JIT_SAMPLE_BLOCKLIST = (
+    'Bates',
+    'Multinomial',
+)
 JIT_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
 )
 
 VMAP_SAMPLE_BLOCKLIST = (
-    'BatchReshape',  # http://b/163171224
 )
 VMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
@@ -59,6 +60,7 @@ VMAP_LOGPROB_BLOCKLIST = (
 )
 
 PMAP_SAMPLE_BLOCKLIST = (
+    'Bates',
     'BatchReshape',  # http://b/163171224
 )
 PMAP_LOGPROB_BLOCKLIST = (
@@ -84,6 +86,7 @@ test_all_distributions = parameterized.named_parameters(
     sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())
            + list(d for d in dhps.INSTANTIABLE_META_DISTS if d != 'Mixture')))
 
+
 test_base_distributions = parameterized.named_parameters(
     {'testcase_name': dname, 'dist_name': dname} for dname in
     sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())))
@@ -97,8 +100,10 @@ class JitTest(test_util.TestCase):
   def testSample(self, dist_name, data):
     if (dist_name in JIT_SAMPLE_BLOCKLIST) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
-    dist = data.draw(dhps.distributions(enable_vars=False,
-                                        dist_name=dist_name))
+    dist = data.draw(dhps.distributions(
+        enable_vars=False,
+        dist_name=dist_name,
+        eligibility_filter=lambda dname: dname not in JIT_SAMPLE_BLOCKLIST))
     def _sample(seed):
       return dist.sample(seed=seed)
     seed = test_util.test_seed()
@@ -140,8 +145,12 @@ class _MapTest(test_util.TestCase):
   def testSample(self, dist_name, data):
     if (dist_name in self.sample_blocklist) != FLAGS.blocklists_only:
       self.skipTest('Distribution currently broken.')
-    dist = data.draw(dhps.distributions(enable_vars=False,
-                                        dist_name=dist_name))
+    dist = data.draw(
+        dhps.distributions(
+            enable_vars=False,
+            dist_name=dist_name,
+            eligibility_filter=lambda dname: dname not in self.sample_blocklist)
+        )
     def _sample(seed):
       return dist.sample(seed=seed)
     seed = test_util.test_seed()
@@ -332,5 +341,6 @@ del _GradTest  # not intended for standalone execution
 
 
 if __name__ == '__main__':
+  config.enable_omnistaging()
   os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=8'
   tf.test.main()

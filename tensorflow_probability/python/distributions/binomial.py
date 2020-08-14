@@ -394,8 +394,8 @@ class Binomial(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     x = self._probs if self._logits is None else self._logits
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self._total_count), tf.shape(x))
+    return ps.broadcast_shape(
+        ps.shape(self._total_count), ps.shape(x))
 
   def _batch_shape(self):
     x = self._probs if self._logits is None else self._logits

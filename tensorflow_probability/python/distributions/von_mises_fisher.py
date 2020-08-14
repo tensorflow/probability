@@ -30,6 +30,7 @@ from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -219,10 +220,10 @@ class VonMisesFisher(distribution.Distribution):
     return self._concentration
 
   def _batch_shape_tensor(self, mean_direction=None, concentration=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.mean_direction if mean_direction is None
+    return ps.broadcast_shape(
+        ps.shape(self.mean_direction if mean_direction is None
                  else mean_direction)[:-1],
-        tf.shape(self.concentration if concentration is None
+        ps.shape(self.concentration if concentration is None
                  else concentration))
 
   def _batch_shape(self):
@@ -231,7 +232,7 @@ class VonMisesFisher(distribution.Distribution):
         self.concentration.shape)
 
   def _event_shape_tensor(self, mean_direction=None):
-    return tf.shape(self.mean_direction if mean_direction is None
+    return ps.shape(self.mean_direction if mean_direction is None
                     else mean_direction)[-1:]
 
   def _event_shape(self):
@@ -361,7 +362,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _sample_3d(self, n, mean_direction, concentration, seed=None):
     """Specialized inversion sampler for 3D."""
-    u_shape = tf.concat([[n], self._batch_shape_tensor(
+    u_shape = ps.concat([[n], self._batch_shape_tensor(
         mean_direction=mean_direction, concentration=concentration)], axis=0)
     z = samplers.uniform(u_shape, seed=seed, dtype=self.dtype)
     # TODO(bjp): Higher-order odd dim analytic CDFs are available in [1], could
@@ -409,7 +410,7 @@ class VonMisesFisher(distribution.Distribution):
         tf.compat.dimension_value(self.event_shape[0]) or
         self._event_shape_tensor(mean_direction=mean_direction)[0])
 
-    sample_batch_shape = tf.concat([[n], self._batch_shape_tensor(
+    sample_batch_shape = ps.concat([[n], self._batch_shape_tensor(
         mean_direction=mean_direction, concentration=concentration)], axis=0)
     dim = tf.cast(event_dim - 1, self.dtype)
     if event_dim == 3:
@@ -474,7 +475,7 @@ class VonMisesFisher(distribution.Distribution):
               dtype_util.as_numpy_dtype(self.dtype)(-1.01)),
       ]):
         samples_dim0 = tf.identity(samples_dim0)
-    samples_otherdims_shape = tf.concat([sample_batch_shape, [event_dim - 1]],
+    samples_otherdims_shape = ps.concat([sample_batch_shape, [event_dim - 1]],
                                         axis=0)
     unit_otherdims = tf.math.l2_normalize(
         samplers.normal(

@@ -30,7 +30,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -157,10 +157,10 @@ class GeneralizedNormal(distribution.Distribution):
     return self._power
 
   def _batch_shape_tensor(self, loc=None, scale=None, power=None):
-    return functools.reduce(prefer_static.broadcast_shape, (
-        prefer_static.shape(self.loc if loc is None else loc),
-        prefer_static.shape(self.scale if scale is None else scale),
-        prefer_static.shape(self.power if power is None else power)))
+    return functools.reduce(ps.broadcast_shape, (
+        ps.shape(self.loc if loc is None else loc),
+        ps.shape(self.scale if scale is None else scale),
+        ps.shape(self.power if power is None else power)))
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape, (
@@ -179,7 +179,7 @@ class GeneralizedNormal(distribution.Distribution):
     power = tf.convert_to_tensor(self.power)
 
     batch_shape = self._batch_shape_tensor(loc=loc, scale=scale, power=power)
-    result_shape = prefer_static.concat([[n], batch_shape], axis=0)
+    result_shape = ps.concat([[n], batch_shape], axis=0)
 
     ipower = tf.broadcast_to(tf.math.reciprocal(power), batch_shape)
     gamma_dist = gamma.Gamma(ipower, 1.)

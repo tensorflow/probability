@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -145,9 +146,9 @@ class Uniform(distribution.Distribution):
     return high - low
 
   def _batch_shape_tensor(self, low=None, high=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.low if low is None else low),
-        tf.shape(self.high if high is None else high))
+    return ps.broadcast_shape(
+        ps.shape(self.low if low is None else low),
+        ps.shape(self.high if high is None else high))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -163,7 +164,7 @@ class Uniform(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     low = tf.convert_to_tensor(self.low)
     high = tf.convert_to_tensor(self.high)
-    shape = tf.concat([[n], self._batch_shape_tensor(
+    shape = ps.concat([[n], self._batch_shape_tensor(
         low=low, high=high)], 0)
     samples = samplers.uniform(shape=shape, dtype=self.dtype, seed=seed)
     return low + self._range(low=low, high=high) * samples

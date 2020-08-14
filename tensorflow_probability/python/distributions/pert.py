@@ -32,7 +32,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
@@ -157,7 +157,7 @@ class PERT(distribution.Distribution):
             # parameters.
             scale_bijector.Scale(
                 scale=tf.broadcast_to(
-                    scale, prefer_static.shape(concentration1)))]))
+                    scale, ps.shape(concentration1)))]))
 
   @classmethod
   def _params_event_ndims(cls):
@@ -194,11 +194,11 @@ class PERT(distribution.Distribution):
                           high=None,
                           temperature=None):
     return functools.reduce(
-        prefer_static.broadcast_shape,
-        (prefer_static.shape(self.low if low is None else low),
-         prefer_static.shape(self.peak if peak is None else peak),
-         prefer_static.shape(self.high if high is None else high),
-         prefer_static.shape(
+        ps.broadcast_shape,
+        (ps.shape(self.low if low is None else low),
+         ps.shape(self.peak if peak is None else peak),
+         ps.shape(self.high if high is None else high),
+         ps.shape(
              self.temperature if temperature is None else temperature)))
 
   def _sample_n(self, n, seed=None):

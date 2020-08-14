@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -170,11 +171,11 @@ class Triangular(distribution.Distribution):
     return (self.peak - self.low) / (self.high - self.low)
 
   def _batch_shape_tensor(self, low=None, peak=None, high=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.peak if peak is None else peak),
-        tf.broadcast_dynamic_shape(
-            tf.shape(self.low if low is None else low),
-            tf.shape(self.high if high is None else high)))
+    return ps.broadcast_shape(
+        ps.shape(self.peak if peak is None else peak),
+        ps.broadcast_shape(
+            ps.shape(self.low if low is None else low),
+            ps.shape(self.high if high is None else high)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -191,7 +192,7 @@ class Triangular(distribution.Distribution):
     peak = tf.convert_to_tensor(self.peak)
 
     seed = samplers.sanitize_seed(seed, salt='triangular')
-    shape = tf.concat([[n], self._batch_shape_tensor(
+    shape = ps.concat([[n], self._batch_shape_tensor(
         low=low, high=high, peak=peak)], axis=0)
     samples = samplers.uniform(shape=shape, dtype=self.dtype, seed=seed)
     # We use Inverse CDF sampling here. Because the CDF is a quadratic function,

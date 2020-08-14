@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import psd_kernels as tfpk
@@ -578,18 +579,18 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
     index_points = (
         index_points if index_points is not None else self._index_points)
     batch_shapes_of_components = [
-        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
+        ps.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
         self.kernel.batch_shape_tensor(),
-        tf.shape(self.observation_noise_variance)
+        ps.shape(self.observation_noise_variance)
     ]
     if self.observations is not None:
       num_obs = tf.compat.dimension_value(self.observations.shape[-1])
       # We only need to add observations, since observation_index_points
       # is used in the SchurComplement kernel.
       if num_obs is None or num_obs != 0:
-        batch_shapes_of_components.append(tf.shape(self.observations)[:-1])
+        batch_shapes_of_components.append(ps.shape(self.observations)[:-1])
     return functools.reduce(
-        tf.broadcast_dynamic_shape, batch_shapes_of_components)
+        ps.broadcast_shape, batch_shapes_of_components)
 
   def _batch_shape(self, index_points=None):
     index_points = (

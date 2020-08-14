@@ -28,7 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -139,7 +139,7 @@ class CholeskyLKJ(distribution.Distribution):
     return self._concentration
 
   def _batch_shape_tensor(self):
-    return prefer_static.shape(self.concentration)
+    return ps.shape(self.concentration)
 
   def _batch_shape(self):
     return self.concentration.shape

@@ -25,7 +25,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -136,8 +136,8 @@ class NegativeBinomial(distribution.Distribution):
     if logits_or_probs is None:
       logits_or_probs = self._logits if self._probs is None else self._logits
     total_count = self._total_count if total_count is None else total_count
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(logits_or_probs), prefer_static.shape(total_count))
+    return ps.broadcast_shape(
+        ps.shape(logits_or_probs), ps.shape(total_count))
 
   def _batch_shape(self):
     x = self._probs if self._logits is None else self._logits

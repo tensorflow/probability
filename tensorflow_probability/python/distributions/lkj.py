@@ -35,7 +35,7 @@ from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -53,7 +53,7 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
   # This works because the Gaussian distribution is spherically symmetric.
   # raw shape: shape + [dimension]
   raw = samplers.normal(
-      shape=tf.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
+      shape=ps.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
   unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
   return unit_norm
 
@@ -61,7 +61,7 @@ def _uniform_unit_norm(dimension, shape, dtype, seed):
 def _replicate(n, tensor):
   """Replicate the input tensor n times along a new (major) dimension."""
   # TODO(axch) Does this already exist somewhere?  Should it get contributed?
-  multiples = tf.concat([[n], tf.ones([tf.rank(tensor)], dtype=n.dtype)],
+  multiples = ps.concat([[n], ps.ones([ps.rank(tensor)], dtype=n.dtype)],
                         axis=0)
   return tf.tile(tensor[tf.newaxis], multiples)
 
@@ -110,10 +110,10 @@ def sample_lkj(
           '{}'.format(dtype_util.name(concentration.dtype)))
 
     concentration = _replicate(num_samples, concentration)
-    concentration_shape = tf.shape(concentration)
+    concentration_shape = ps.shape(concentration)
     if dimension <= 1:
       # For any dimension <= 1, there is only one possible correlation matrix.
-      shape = tf.concat([
+      shape = ps.concat([
           concentration_shape, [dimension, dimension]], axis=0)
       return tf.ones(shape=shape, dtype=concentration.dtype)
     beta_conc = concentration + (dimension - 2.) / 2.
@@ -199,7 +199,7 @@ def sample_lkj(
     # numerical instability the matmul might not achieve that, so manually set
     # these to ones.
     result = tf.linalg.set_diag(
-        result, tf.ones(shape=tf.shape(result)[:-1], dtype=result.dtype))
+        result, tf.ones(shape=ps.shape(result)[:-1], dtype=result.dtype))
     # This sampling algorithm can produce near-PSD matrices on which standard
     # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
     # fail. Specifically, as documented in b/116828694, around 2% of trials
@@ -318,7 +318,7 @@ class LKJ(distribution.Distribution):
     return self._input_output_cholesky
 
   def _batch_shape_tensor(self):
-    return prefer_static.shape(self.concentration)
+    return ps.shape(self.concentration)
 
   def _batch_shape(self):
     return self.concentration.shape
@@ -447,7 +447,7 @@ class LKJ(distribution.Distribution):
     # Ergo, the mean must be invariant under it (for any k), and hence all the
     # off-diagonal entries must be 0.
     concentration = tf.convert_to_tensor(self.concentration)
-    batch = tf.shape(concentration)
+    batch = ps.shape(concentration)
     answer = tf.eye(
         num_rows=self.dimension, batch_shape=batch,
         dtype=concentration.dtype)

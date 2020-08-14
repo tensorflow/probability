@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -115,10 +116,10 @@ class Pareto(distribution.Distribution):
     return self._concentration
 
   def _batch_shape_tensor(self, concentration=None, scale=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(
+    return ps.broadcast_shape(
+        ps.shape(
             self.concentration if concentration is None else concentration),
-        tf.shape(self.scale if scale is None else scale))
+        ps.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.concentration.shape, self.scale.shape)
@@ -129,7 +130,7 @@ class Pareto(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     concentration = tf.convert_to_tensor(self.concentration)
     scale = tf.convert_to_tensor(self.scale)
-    shape = tf.concat(
+    shape = ps.concat(
         [[n],
          self._batch_shape_tensor(concentration=concentration, scale=scale)],
         axis=0)

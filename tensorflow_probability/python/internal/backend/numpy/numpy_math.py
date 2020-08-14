@@ -727,8 +727,10 @@ if JAX_MODE:
 
 else:
 
-  _minimum = lambda x, y, name=None: np.minimum(x, y)
-  _maximum = lambda x, y, name=None: np.maximum(x, y)
+  _minimum = lambda x, y, name=None: np.minimum(_convert_to_tensor(x),  # pylint: disable=g-long-lambda
+                                                _convert_to_tensor(y))
+  _maximum = lambda x, y, name=None: np.maximum(_convert_to_tensor(x),  # pylint: disable=g-long-lambda
+                                                _convert_to_tensor(y))
 
 maximum = utils.copy_docstring(
     'tf.math.maximum', _maximum)

@@ -28,7 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -226,8 +226,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
       param = self._logits if self._logits is not None else self._probs
     if temperature is None:
       temperature = self.temperature
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(temperature), prefer_static.shape(param)[:-1])
+    return ps.broadcast_shape(
+        ps.shape(temperature), ps.shape(param)[:-1])
 
   def _batch_shape(self):
     param = self._logits if self._logits is not None else self._probs
@@ -237,7 +237,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     param = logits
     if param is None:
       param = self._logits if self._logits is not None else self._probs
-    return prefer_static.shape(param)[-1:]
+    return ps.shape(param)[-1:]
 
   def _event_shape(self):
     param = self._logits if self._logits is not None else self._probs
@@ -254,7 +254,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     # mantissa has an implicit leading 1. Normal, positive numbers x, y have the
     # reasonable property that, `x + y >= max(x, y)`. In this case, a subnormal
     # number (i.e., np.nextafter) can cause us to sample 0.
-    uniform_shape = tf.concat(
+    uniform_shape = ps.concat(
         [[n],
          self._batch_shape_tensor(temperature=temperature, logits=logits),
          self._event_shape_tensor(logits=logits)], 0)

@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -116,7 +117,7 @@ class Geometric(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     x = self._probs if self._logits is None else self._logits
-    return tf.shape(x)
+    return ps.shape(x)
 
   def _batch_shape(self):
     x = self._probs if self._logits is None else self._logits
@@ -139,7 +140,7 @@ class Geometric(distribution.Distribution):
     # 0.
     probs = self._probs_parameter_no_checks()
     sampled = samplers.uniform(
-        tf.concat([[n], tf.shape(probs)], 0),
+        ps.concat([[n], ps.shape(probs)], 0),
         minval=np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny,
         maxval=1.,
         seed=seed,
