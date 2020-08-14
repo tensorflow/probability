@@ -132,11 +132,12 @@ VECTORIZED_LOGPROB_RTOL.update({
 XLA_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_ATOL.update({
     'Binomial': 5e-6,
-    'ExpRelaxedOneHotCategorical': 3e-5,
-    'Kumaraswamy': 3e-6,
     'DirichletMultinomial': 1e-4,
-    'Multinomial': 2e-4,
+    'ExpRelaxedOneHotCategorical': 3e-5,
     'InverseGamma': 5e-5,
+    'Kumaraswamy': 3e-6,
+    'Logistic': 3e-6,
+    'Multinomial': 2e-4,
     'PowerSpherical': 2e-5,
 })
 
