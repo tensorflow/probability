@@ -535,7 +535,6 @@ py_library(
 py_test(
     name = "rhat_reducer_test",
     size = "small",
-    shard_count = 5,
     srcs = ["rhat_reducer_test.py"],
     deps = [
         # numpy dep,
