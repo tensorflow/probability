@@ -115,7 +115,8 @@ class HashableWeakRef(weakref.ref):
     """
     if isinstance(referrent, np.generic):
       raise ValueError('Unable to weakref np.generic')
-    elif isinstance(referrent, np.ndarray):
+
+    if isinstance(referrent, np.ndarray):
       referrent.flags.writeable = False
     super(HashableWeakRef, self).__init__(referrent, callback)
     self._hash = hash_structure(referrent)
