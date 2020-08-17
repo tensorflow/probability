@@ -41,8 +41,22 @@ CovarianceReducerState = collections.namedtuple(
     'CovarianceReducerState', 'init_structure, cov_state')
 
 
+def _get_sample(current_state, kernel_results):
+  del kernel_results
+  return current_state
+
+
 class CovarianceReducer(reducer_base.Reducer):
   """`Reducer` that computes a running covariance.
+
+  `CovarianceReducer` computes a running covariance on samples evaluated on
+  some arbitrary structure of `transform_fn`s. A `trasform_fn` is defined as
+  any function that accepts the chain state and kernel results, and ouptuts
+  a `Tensor` or nested structure of `Tensor`s to compute the covariance over.
+  To be explicit, if we denote a `transform_fn` as f(x, y), then
+  `CovarianceReducer` will compute Cov(f(x, y)). If some structure of
+  `transform_fn`s are given, the final statistic (as returned by the
+  `finalize` method) will mimic that exact structure.
 
   As with all reducers, CovarianceReducer does not hold state information;
   rather, it stores supplied metadata. Intermediate calculations are held in
@@ -81,7 +95,8 @@ class CovarianceReducer(reducer_base.Reducer):
   ```
   """
 
-  def __init__(self, event_ndims=None, ddof=0, name=None):
+  def __init__(
+      self, event_ndims=None, transform_fn=_get_sample, ddof=0, name=None):
     """Instantiates this object.
 
     The running covariance computation supports batching. The `event_ndims`
@@ -114,6 +129,8 @@ class CovarianceReducer(reducer_base.Reducer):
         the number of inner-most dimensions that represent the event shape.
         Specifying `None` returns all cross product terms (no batching)
         and is the default.
+      transform_fn: A (possibly nested) structure of functions to evaluate the
+        incoming chain states on before covariance calculation.
       ddof: A (possibly nested) structure of integers that represent the
         requested dynamic degrees of freedom. For example, use `ddof=0`
         for population covariance and `ddof=1` for sample covariance. Defaults
@@ -123,11 +140,12 @@ class CovarianceReducer(reducer_base.Reducer):
     """
     self._parameters = dict(
         event_ndims=event_ndims,
+        transform_fn=transform_fn,
         ddof=ddof,
         name=name or 'covariance_reducer'
     )
 
-  def initialize(self, initial_chain_state, initial_kernel_results=None):
+  def initialize(self, initial_chain_state, initial_kernel_results):
     """Initializes a `CovarianceReducerState` using previously defined metadata.
 
     For calculation purposes, the `initial_chain_state` does not count as a
@@ -141,9 +159,6 @@ class CovarianceReducer(reducer_base.Reducer):
         chain(s). It is used to infer the shape and dtype of future samples.
       initial_kernel_results: A (possibly nested) structure of `Tensor`s
         representing internal calculations made in a related `TransitionKernel`.
-        For streaming covariance, this argument has no influence on the
-        computation; hence, it is `None` by default. However, it's
-        still accepted to fit the `Reducer` base class.
 
     Returns:
       state: `CovarianceReducerState` with `cov_state` field representing
@@ -155,19 +170,27 @@ class CovarianceReducer(reducer_base.Reducer):
       initial_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           initial_chain_state)
+      initial_kernel_results = tf.nest.map_structure(
+          tf.convert_to_tensor,
+          initial_kernel_results,
+      )
+      initial_fn_result = tf.nest.map_structure(
+          lambda fn: fn(initial_chain_state, initial_kernel_results),
+          self.transform_fn,
+      )
       cov_streams = _prepare_args(
-          initial_chain_state, self.event_ndims)
+          initial_fn_result, self.event_ndims)
       running_covariance_states = tf.nest.map_structure(
           lambda strm: strm.initialize(),
           cov_streams)
       return CovarianceReducerState(
-          initial_chain_state, running_covariance_states)
+          initial_fn_result, running_covariance_states)
 
   def one_step(
       self,
       new_chain_state,
       current_reducer_state,
-      previous_kernel_results=None,
+      previous_kernel_results,
       axis=None):
     """Update the `current_reducer_state` with a new chain state.
 
@@ -186,9 +209,7 @@ class CovarianceReducer(reducer_base.Reducer):
         state of the running covariance.
       previous_kernel_results: A (possibly nested) structure of `Tensor`s
         representing internal calculations made in a related
-        `TransitionKernel`. For streaming covariance, this argument has no
-        influence on computation; hence, it is `None` by default. However, it's
-        still accepted to fit the `Reducer` base class.
+        `TransitionKernel`.
       axis: If chunking is desired, this is a (possibly nested) structure of
         integers that specifies the axis with chunked samples. For individual
         samples, set this to `None`. By default, samples are not chunked
@@ -196,8 +217,9 @@ class CovarianceReducer(reducer_base.Reducer):
 
     Returns:
       new_reducer_state: `CovarianceReducerState` with updated running
-        statistics. Its `cov_state` field has an identical structure to the
-        `current_reducer_state`.
+        statistics. Its `cov_state` field has an identical structure to
+        `self.transform_fn`. Each of the individual values in that structure
+        subsequently mimics the structure of `current_reducer_state`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'one_step')):
@@ -206,14 +228,21 @@ class CovarianceReducer(reducer_base.Reducer):
       new_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           new_chain_state)
+      previous_kernel_results = tf.nest.map_structure(
+          tf.convert_to_tensor,
+          previous_kernel_results)
+      fn_results = tf.nest.map_structure(
+          lambda fn: fn(new_chain_state, previous_kernel_results),
+          self.transform_fn,
+      )
       if not nest.is_nested(axis):
-        axis = nest_util.broadcast_structure(new_chain_state, axis)
+        axis = nest_util.broadcast_structure(fn_results, axis)
       running_cov_state = nest.map_structure_up_to(
           current_reducer_state.init_structure,
           lambda strm, *args: strm.update(*args),
           cov_streams,
           current_reducer_state.cov_state,
-          new_chain_state,
+          fn_results,
           axis,
           check_types=False,
       )
@@ -229,7 +258,7 @@ class CovarianceReducer(reducer_base.Reducer):
 
     Returns:
       covariance: an estimate of the covariance with identical structure to
-        `final_reducer_state.cov_state`.
+        `self.transform_fn`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'finalize')):
@@ -244,6 +273,10 @@ class CovarianceReducer(reducer_base.Reducer):
   @property
   def event_ndims(self):
     return self._parameters['event_ndims']
+
+  @property
+  def transform_fn(self):
+    return self._parameters['transform_fn']
 
   @property
   def ddof(self):
@@ -269,9 +302,10 @@ class VarianceReducer(CovarianceReducer):
   `RunningVariance` in `tfp.experimental.stats`.
   """
 
-  def __init__(self, ddof=0, name=None):
+  def __init__(self, transform_fn=_get_sample, ddof=0, name=None):
     super(VarianceReducer, self).__init__(
         event_ndims=0,
+        transform_fn=transform_fn,
         ddof=ddof,
         name=name or 'variance_reducer',
     )
