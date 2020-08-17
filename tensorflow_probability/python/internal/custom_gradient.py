@@ -71,17 +71,36 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
 
     else:
       # TF custom gradients support only custom VJPs.
-      @tf.custom_gradient
-      def f_wrapped(*args, **kwargs):
-        val, aux = vjp_fwd(*args, **kwargs)
-        def vjp_bwd_wrapped(*g):
-          result = vjp_bwd(aux, tf.nest.pack_sequence_as(val, g))
-          for i in nondiff_argnums:
-            result = tuple(result[:i]) + (None,) + tuple(result[i:])
-          return result
-        return val, vjp_bwd_wrapped
+      def none_wrapper(*args, **kwargs):  # custom_gradient can't handle None.
+        closure = {i: a for i, a in enumerate(args)
+                   if i in nondiff_argnums or a is None}
+        trimmed_args = [a for i, a in enumerate(args) if i not in closure]
 
-      return f_wrapped
+        @tf.custom_gradient
+        def f_wrapped(*args, **kwargs):
+          reconstruct_args = []
+          args_structure = tf.nest.map_structure(lambda _: 0, args)
+          for i in range(len(args) + len(closure)):
+            if i in closure:
+              reconstruct_args.append(closure[i])
+            else:
+              reconstruct_args.append(args[0])
+              args = args[1:]
+          val, aux = vjp_fwd(*reconstruct_args, **kwargs)
+
+          def vjp_bwd_wrapped(*g):
+            result = tf.nest.flatten(
+                vjp_bwd(aux, tf.nest.pack_sequence_as(val, g)))
+            for i in nondiff_argnums:
+              result = tuple(result[:i]) + (None,) + tuple(result[i:])
+            result = [a for i, a in enumerate(result) if i not in closure]
+            return tf.nest.pack_sequence_as(args_structure, result)
+
+          return val, vjp_bwd_wrapped
+
+        return f_wrapped(*trimmed_args, **kwargs)
+
+      return none_wrapper
 
   return finalize
 
