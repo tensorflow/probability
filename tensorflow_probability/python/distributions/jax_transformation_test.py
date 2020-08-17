@@ -49,6 +49,7 @@ JIT_SAMPLE_BLOCKLIST = (
 JIT_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
+    'Independent',  # http://b/164415821
 )
 
 VMAP_SAMPLE_BLOCKLIST = (
