@@ -480,4 +480,4 @@ class BijectorCache(object):
   def reset(self):
     """Clears all cached values."""
     self.__init__(self.forward._func, self.inverse._func,  # pylint: disable=protected-access
-                  type(self.forward), type(self.inverse))
+                  type(self.forward))

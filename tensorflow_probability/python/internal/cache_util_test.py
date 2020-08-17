@@ -273,6 +273,17 @@ class CacheTestCommon(CacheTestBase):
     self.assertEqual(len(self.forward), 0)
     self.assertEqual(len(self.inverse), 0)
 
+  def testResetCacheClearsCache(self):
+    struct = self.test_arg()
+
+    self.cache.forward(struct)
+
+    self.assertEqual(len(self.cache.forward), 1)
+
+    self.cache.reset()
+
+    self.assertEqual(len(self.cache.forward), 0)
+
 
 class SinglePartCacheTest(CacheTestCommon, test_util.TestCase):
   """Cache tests for single-part bijectors."""
