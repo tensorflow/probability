@@ -38,7 +38,18 @@ from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 def randomize_hypothesis():
   # Use --test_env=TFP_RANDOMIZE_HYPOTHESIS=1 to get random coverage.
-  return bool(int(os.environ.get('TFP_RANDOMIZE_HYPOTHESIS', 0)))
+  # --test_env=TFP_HYPOTHESIS_RANDOMIZE=1 also works, so one needn't remember
+  # the order.
+  randomize_first = os.environ.get('TFP_RANDOMIZE_HYPOTHESIS', None)
+  hypothesis_first = os.environ.get('TFP_HYPOTHESIS_RANDOMIZE', None)
+  if randomize_first is None and hypothesis_first is None:
+    return False
+  if randomize_first == hypothesis_first:
+    return bool(int(randomize_first))
+  msg = ('Detected conflicting settings TFP_RANDOMIZE_HYPOTHESIS={} and '
+         'TFP_HYPOTHESIS_RANDOMIZE={}.  Please set just one of these variables,'
+         'or set them both to the same value.')
+  raise ValueError(msg.format(randomize_first, hypothesis_first))
 
 
 def hypothesis_max_examples(default=None):
