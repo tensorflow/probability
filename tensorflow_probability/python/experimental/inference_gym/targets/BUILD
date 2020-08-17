@@ -162,6 +162,8 @@ multi_substrate_py_test(
     name = "log_gaussian_cox_process_test",
     size = "large",
     srcs = ["log_gaussian_cox_process_test.py"],
+    # TODO(b/165026594): testSyntheticLGCPHMC Times out using JAX.
+    jax_tags = ["no-oss-ci"],
     deps = [
         ":log_gaussian_cox_process",
         # tensorflow dep,
