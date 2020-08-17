@@ -28,84 +28,18 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-
-TestTransitionKernelResults = collections.namedtuple(
-    'TestTransitionKernelResults', 'counter_1, counter_2')
-
-
-class TestTransitionKernel(tfp.mcmc.TransitionKernel):
-  """Deterministic Transition Kernel for testing purposes."""
-
-  def __init__(self, shape=(), is_calibrated=True, accepts_seed=True):
-    self._shape = shape
-    self._is_calibrated = is_calibrated
-    self._accepts_seed = accepts_seed
-
-  def one_step(self, current_state, previous_kernel_results, seed=None):
-    if seed is not None and not self._accepts_seed:
-      raise TypeError('seed arg not accepted')
-    return current_state + tf.ones((self._shape)), TestTransitionKernelResults(
-        counter_1=previous_kernel_results.counter_1 + tf.ones(self._shape),
-        counter_2=previous_kernel_results.counter_2 + tf.ones(self._shape) * 2)
-
-  def bootstrap_results(self, current_state):
-    return TestTransitionKernelResults(
-        counter_1=tf.zeros(self._shape),
-        counter_2=tf.zeros(self._shape))
-
-  @property
-  def is_calibrated(self):
-    return self._is_calibrated
-
-
-class RandomTransitionKernel(tfp.mcmc.TransitionKernel):
-  """Outputs a random next state following a Rayleigh distribution."""
-
-  def __init__(self, shape=(), is_calibrated=True, accepts_seed=True):
-    self._shape = shape
-    self._is_calibrated = is_calibrated
-    self._accepts_seed = accepts_seed
-
-  def one_step(self, current_state, previous_kernel_results, seed=None):
-    if seed is not None and not self._accepts_seed:
-      raise TypeError('seed arg not accepted')
-    new_state = tfp.random.rayleigh(self._shape, seed=seed)
-    return new_state, TestTransitionKernelResults(
-        counter_1=previous_kernel_results.counter_1 + 1,
-        counter_2=previous_kernel_results.counter_2 + 2)
-
-  def bootstrap_results(self, current_state):
-    return TestTransitionKernelResults(
-        counter_1=tf.zeros(()), counter_2=tf.zeros(()))
-
-  @property
-  def is_calibrated(self):
-    return self._is_calibrated
-
-
-class TestReducer(tfp.experimental.mcmc.Reducer):
-  """Simple Reducer that (naively) computes the mean."""
-
-  def initialize(self, initial_chain_state=None, initial_kernel_results=None):
-    return tf.zeros((2,))
-
-  def one_step(self, sample, current_state, previous_kernel_results, axis=None):
-    return current_state + tf.convert_to_tensor([1, sample])
-
-  def finalize(self, final_state):
-    return final_state[1] / final_state[0]
 
 
 @test_util.test_all_tf_execution_regimes
 class SampleFoldTest(test_util.TestCase):
 
   def test_simple_operation(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.NaiveMeanReducer()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
@@ -122,8 +56,8 @@ class SampleFoldTest(test_util.TestCase):
 
   @parameterized.parameters(1., 2.)
   def test_current_state(self, curr_state):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.NaiveMeanReducer()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=curr_state,
@@ -140,10 +74,11 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(10, kernel_results.counter_2)
 
   def test_nested_reducers(self):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducers = [
-        [TestReducer(), tfp.experimental.mcmc.CovarianceReducer()],
-        [TestReducer()]
+        [test_fixtures.NaiveMeanReducer(),
+         tfp.experimental.mcmc.CovarianceReducer()],
+        [test_fixtures.NaiveMeanReducer()]
     ]
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=3,
@@ -166,7 +101,7 @@ class SampleFoldTest(test_util.TestCase):
 
   def test_true_streaming_covariance(self):
     seed = test_util.test_seed()
-    fake_kernel = TestTransitionKernel(())
+    fake_kernel = test_fixtures.TestTransitionKernel(())
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=20,
@@ -181,7 +116,7 @@ class SampleFoldTest(test_util.TestCase):
         rtol=1e-5)
 
   def test_batched_streaming_covariance(self):
-    fake_kernel = TestTransitionKernel((2, 3))
+    fake_kernel = test_fixtures.TestTransitionKernel((2, 3))
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
     reduction_rslt, last_sample, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
@@ -197,8 +132,8 @@ class SampleFoldTest(test_util.TestCase):
 
   def test_seed_reproducibility(self):
     seed = samplers.sanitize_seed(test_util.test_seed())
-    fake_kernel = RandomTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.RandomTransitionKernel()
+    fake_reducer = test_fixtures.NaiveMeanReducer()
     first_reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=3,
         current_state=0.,
@@ -219,8 +154,8 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(first_reduction_rslt, second_reduction_rslt)
 
   def test_thinning_and_burnin(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.NaiveMeanReducer()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
@@ -242,8 +177,8 @@ class SampleFoldTest(test_util.TestCase):
         40, kernel_results.counter_2)
 
   def test_tensor_thinning_and_burnin(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.NaiveMeanReducer()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=tf.convert_to_tensor(5),
         current_state=0.,
@@ -265,7 +200,7 @@ class SampleFoldTest(test_util.TestCase):
         40, kernel_results.counter_2)
 
   def test_none_reducer(self):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
@@ -283,7 +218,7 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(40, kernel_results.counter_2)
 
   def test_empty_reducer(self):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
@@ -310,7 +245,7 @@ class SampleChainTest(test_util.TestCase):
     super(SampleChainTest, self).setUp()
 
   def test_basic_operation(self):
-    kernel = TestTransitionKernel()
+    kernel = test_fixtures.TestTransitionKernel()
     samples, kernel_results = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -329,7 +264,7 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([2, 4], kernel_results.counter_2)
 
   def test_basic_operation_legacy(self):
-    kernel = TestTransitionKernel(accepts_seed=False)
+    kernel = test_fixtures.TestTransitionKernel(accepts_seed=False)
     samples, kernel_results = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -348,7 +283,7 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([2, 4], kernel_results.counter_2)
 
   def test_burn_in(self):
-    kernel = TestTransitionKernel()
+    kernel = test_fixtures.TestTransitionKernel()
     samples, kernel_results = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -368,7 +303,7 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([4, 6], kernel_results.counter_2)
 
   def test_thinning(self):
-    kernel = TestTransitionKernel()
+    kernel = test_fixtures.TestTransitionKernel()
     samples, kernel_results = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -388,7 +323,7 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([6, 12], kernel_results.counter_2)
 
   def test_default_trace_named_tuple(self):
-    kernel = TestTransitionKernel()
+    kernel = test_fixtures.TestTransitionKernel()
     res = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -407,7 +342,7 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([2, 4], res.trace.counter_2)
 
   def test_no_trace_fn(self):
-    kernel = TestTransitionKernel()
+    kernel = test_fixtures.TestTransitionKernel()
     samples = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -419,7 +354,7 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([1, 2], samples)
 
   def test_custom_trace(self):
-    kernel = TestTransitionKernel()
+    kernel = test_fixtures.TestTransitionKernel()
     res = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -441,7 +376,7 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([2, 4], res.trace[1].counter_2)
 
   def test_checkpointing(self):
-    kernel = TestTransitionKernel()
+    kernel = test_fixtures.TestTransitionKernel()
     res = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
@@ -464,7 +399,7 @@ class SampleChainTest(test_util.TestCase):
 
   def test_warnings_default(self):
     with warnings.catch_warnings(record=True) as triggered:
-      kernel = TestTransitionKernel()
+      kernel = test_fixtures.TestTransitionKernel()
       tfp.experimental.mcmc.sample_chain(
           num_results=2,
           current_state=0.,
@@ -476,7 +411,7 @@ class SampleChainTest(test_util.TestCase):
 
   def test_no_warnings_explicit(self):
     with warnings.catch_warnings(record=True) as triggered:
-      kernel = TestTransitionKernel()
+      kernel = test_fixtures.TestTransitionKernel()
       tfp.experimental.mcmc.sample_chain(
           num_results=2,
           current_state=0.,
@@ -489,7 +424,7 @@ class SampleChainTest(test_util.TestCase):
 
   def test_is_calibrated(self):
     with warnings.catch_warnings(record=True) as triggered:
-      kernel = TestTransitionKernel(is_calibrated=False)
+      kernel = test_fixtures.TestTransitionKernel(is_calibrated=False)
       tfp.experimental.mcmc.sample_chain(
           num_results=2,
           current_state=0.,
@@ -524,8 +459,8 @@ class SampleChainTest(test_util.TestCase):
     sample(2)
 
   def test_seed_reproducibility(self):
-    first_fake_kernel = RandomTransitionKernel()
-    second_fake_kernel = RandomTransitionKernel()
+    first_fake_kernel = test_fixtures.RandomTransitionKernel()
+    second_fake_kernel = test_fixtures.RandomTransitionKernel()
     seed = samplers.sanitize_seed(test_util.test_seed())
     first_final_state = tfp.experimental.mcmc.sample_chain(
         num_results=5,
