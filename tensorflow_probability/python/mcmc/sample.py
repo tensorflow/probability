@@ -100,10 +100,13 @@ def sample_chain(
   instance (`kernel`).
 
   This function can sample from multiple chains, in parallel. (Whether or not
-  there are multiple chains is dictated by the `kernel`.)
+  there are multiple chains is dictated by the `kernel`).
 
   The `current_state` can be represented as a single `Tensor` or a `list` of
-  `Tensors` which collectively represent the current state.
+  `Tensors` which collectively represent the current state. Note, if one desires
+  to sample from multiple chains in parallel, the `current_state` must be a
+  `Tensor` with a leading batch dimension representing the number of parallel
+  chains.
 
   Since MCMC states are correlated, it is sometimes desirable to produce
   additional intermediate states, and then discard them, ending up with a set of
