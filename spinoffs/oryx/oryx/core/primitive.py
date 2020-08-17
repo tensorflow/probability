@@ -14,8 +14,10 @@
 # ============================================================================
 # Lint as: python3
 """Module for higher order primitives."""
+import functools
 from typing import Callable
 
+import jax
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -146,7 +148,8 @@ class FlatPrimitive(jax_core.Primitive):
     ad.primitive_jvps[self] = _jvp
 
     def _batch(args, dims, **params):
-      return batching.batch_fun(lu.wrap_init(self.impl, params), args, dims)
+      return jax.vmap(functools.partial(self.impl, **params),
+                      in_axes=dims)(*args)
     batching.primitive_batchers[self] = _batch
 
     def _xla(c, *xla_args, **params):
