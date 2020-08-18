@@ -198,14 +198,15 @@ class WishartLinearOperator(distribution.Distribution):
         shape=[n],
         concentration=self._multi_gamma_sequence(
             0.5 * expanded_df, self._dimension()),
-        rate=0.5,
-        seed=gamma_seed)
+        log_rate=tf.convert_to_tensor(np.log(0.5), self.dtype),
+        seed=gamma_seed,
+        log_space=True)
 
     # Complexity: O(nbk**2)
     x = tf.linalg.band_part(x, -1, 0)  # Tri-lower.
 
     # Complexity: O(nbk)
-    x = tf.linalg.set_diag(x, tf.sqrt(g))
+    x = tf.linalg.set_diag(x, tf.math.exp(g * 0.5))
 
     # Make batch-op ready.
     # Complexity: O(nbk**2)
