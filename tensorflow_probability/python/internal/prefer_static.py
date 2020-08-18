@@ -441,6 +441,8 @@ floor = _prefer_static(tf.math.floor, nptf.math.floor)
 gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)
+invert_permutation = _prefer_static(
+    tf.math.invert_permutation, nptf.invert_permutation)
 is_finite = _prefer_static(tf.math.is_finite, nptf.math.is_finite)
 is_inf = _prefer_static(tf.math.is_inf, nptf.math.is_inf)
 is_nan = _prefer_static(tf.math.is_nan, nptf.math.is_nan)
@@ -457,6 +459,7 @@ nextafter = _prefer_static(tf.math.nextafter, nptf.math.nextafter)
 one_hot = _prefer_static(tf.one_hot, nptf.one_hot)
 ones = _prefer_static(tf.ones, nptf.ones)
 pad = _prefer_static(tf.pad, nptf.pad)
+pow = _prefer_static(tf.math.pow, nptf.pow)  # pylint: disable=redefined-builtin
 range = _prefer_static(tf.range, nptf.range)  # pylint: disable=redefined-builtin
 reduce_all = _prefer_static(tf.reduce_all, nptf.reduce_all)
 reduce_any = _prefer_static(tf.reduce_any, nptf.reduce_any)

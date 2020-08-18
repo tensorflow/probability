@@ -28,7 +28,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.stats import quantiles as quantiles_lib
 
@@ -101,7 +101,8 @@ def brier_decomposition(labels, logits, name=None):
     pred_class = tf.argmax(logits, axis=-1, output_type=labels.dtype)
 
     if tensorshape_util.rank(logits.shape) > 2:
-      flatten, unflatten = _make_flatten_unflatten_fns(logits.shape[:-2])
+      shape_as_list = tensorshape_util.as_list(logits.shape)
+      flatten, unflatten = _make_flatten_unflatten_fns(shape_as_list[:-2])
       def fn_to_map(args):
         yhat, y = args
         return tf.math.confusion_matrix(yhat, y,
@@ -237,7 +238,7 @@ def _compute_calibration_bin_statistics(
   pred = tf.nn.softmax(logits, axis=1)
   prob_y = tf.gather(
       pred, pred_y[:, tf.newaxis], batch_dims=1)  # p(pred_y | x)
-  prob_y = tf.reshape(prob_y, (tf.size(prob_y),))
+  prob_y = tf.reshape(prob_y, (ps.size(prob_y),))
 
   # Compute b/z histogram statistics:
   # bz[0,bin] contains counts of incorrect predictions in the probability bin.
@@ -326,7 +327,7 @@ def _make_flatten_unflatten_fns(batch_shape):
   """Builds functions for flattening and unflattening batch dimensions."""
   batch_shape = tuple(batch_shape)
   batch_rank = len(batch_shape)
-  ndims = np.prod(batch_shape, dtype=np.int32)
+  ndims = ps.cast(ps.reduce_prod(batch_shape), tf.int32)
 
   def flatten_fn(x):
     x_shape = tuple(x.shape)
@@ -504,7 +505,7 @@ def expected_calibration_error_quantiles(
     bucket_accuracy = bucket_total_hit / n
     bucket_confidence = tf.math.exp(bucket_log_total_pred_prob - tf.math.log(n))
     bucket_error = abs(bucket_accuracy - bucket_confidence)
-    n = prefer_static.cast(prefer_static.shape(pred_log_prob)[axis], dtype)
+    n = ps.cast(ps.shape(pred_log_prob)[axis], dtype)
     ece = tf.math.reduce_sum(bucket_count * bucket_error, axis=0) / n
     return (
         ece,
@@ -524,9 +525,9 @@ def _find_bins(x, edges, axis, dtype=tf.int64, name=None):
     # because it doesn't seem to correctly handle axis!=-1. This is a bug in TFP
     # and should be fixed. Furthermore, the following is probably more efficient
     # than tfp.stats..find_bins anyway.
-    num_buckets = prefer_static.size0(edges) - 1
+    num_buckets = ps.size0(edges) - 1
     # First, we need to have `keepdims=True` semantics for edges.
-    axis = axis % prefer_static.rank(x)
+    axis = axis % ps.rank(x)
     edges = tf.expand_dims(edges, axis + 1)
     # We now find the bucket which is is the "first larger", then subtract one
     # to get the bucket which is the "last smaller". Care must be taken for the
@@ -538,8 +539,8 @@ def _find_bins(x, edges, axis, dtype=tf.int64, name=None):
     # As a bonus, we can also leverage the `sorted=True` behavior.
     _, bucket_larger = tf.math.top_k(
         tf.cast(
-            tf.transpose(pred, prefer_static.pad(
-                prefer_static.range(1, prefer_static.rank(pred)),
+            tf.transpose(pred, ps.pad(
+                ps.range(1, ps.rank(pred)),
                 paddings=[[0, 1]])),
             dtype),
         k=1,

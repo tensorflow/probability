@@ -25,7 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 
@@ -119,7 +119,7 @@ def auto_correlation(x,
 
     # Rotate dimensions of x in order to put axis at the rightmost dim.
     # FFT op requires this.
-    rank = prefer_static.rank(x)
+    rank = ps.rank(x)
     if axis < 0:
       axis = rank + axis
     shift = rank - 1 - axis
@@ -133,17 +133,17 @@ def auto_correlation(x,
 
     # x_len = N / 2 from above explanation.  The length of x along axis.
     # Get a value for x_len that works in all cases.
-    x_len = prefer_static.shape(x_rotated)[-1]
+    x_len = ps.shape(x_rotated)[-1]
 
     # TODO(langmore) Investigate whether this zero padding helps or hurts.  At
     # the moment is necessary so that all FFT implementations work.
     # Zero pad to the next power of 2 greater than 2 * x_len, which equals
     # 2**(ceil(Log_2(2 * x_len))).  Note: Log_2(X) = Log_e(X) / Log_e(2).
-    x_len_float64 = tf.cast(x_len, np.float64)
-    target_length = tf.pow(
-        np.float64(2.), tf.math.ceil(
-            tf.math.log(x_len_float64 * 2) / np.log(2.)))
-    pad_length = tf.cast(target_length - x_len_float64, np.int32)
+    x_len_float64 = ps.cast(x_len, np.float64)
+    target_length = ps.pow(
+        np.float64(2.), ps.ceil(
+            ps.log(x_len_float64 * 2) / np.log(2.)))
+    pad_length = ps.cast(target_length - x_len_float64, np.int32)
 
     # We should have:
     # x_rotated_pad.shape = x_rotated.shape[:-1] + [T + pad_length]
@@ -204,10 +204,10 @@ def auto_correlation(x,
     # `denominator = (N / 2 - m)` (defined below) is the proper term to
     # divide by to make this an unbiased estimate of the expectation
     # E[X[n] Conj(X[n - m])].
-    x_len = tf.cast(x_len, dtype_util.real_dtype(dtype))
-    max_lags = tf.cast(max_lags, dtype_util.real_dtype(dtype))
-    denominator = x_len - tf.range(0., max_lags + 1.)
-    denominator = tf.cast(denominator, dtype)
+    x_len = ps.cast(x_len, dtype_util.real_dtype(dtype))
+    max_lags = ps.cast(max_lags, dtype_util.real_dtype(dtype))
+    denominator = x_len - ps.range(0., max_lags + 1.)
+    denominator = ps.cast(denominator, dtype)
     shifted_product_rotated = shifted_product_chopped / denominator
 
     if normalize:
@@ -371,8 +371,8 @@ def covariance(x,
           'sample_axis was None, which means all axis hold events, and this '
           'overlaps with event_axis ({})'.format(event_axis))
 
-    event_axis = _make_positive_axis(event_axis, tf.rank(x))
-    sample_axis = _make_positive_axis(sample_axis, tf.rank(x))
+    event_axis = _make_positive_axis(event_axis, ps.rank(x))
+    sample_axis = _make_positive_axis(sample_axis, ps.rank(x))
 
     # If we get lucky and axis is statically defined, we can do some checks.
     if _is_list_like(event_axis) and _is_list_like(sample_axis):
@@ -390,44 +390,44 @@ def covariance(x,
               set(range(tensorshape_util.rank(
                   x.shape))).difference(sample_axis + event_axis)))
     else:
-      batch_axis = prefer_static.setdiff1d(
-          tf.range(0, tf.rank(x)), tf.concat((sample_axis, event_axis), 0))
+      batch_axis = ps.setdiff1d(
+          ps.range(0, ps.rank(x)), ps.concat((sample_axis, event_axis), 0))
 
-    event_axis = tf.convert_to_tensor(
-        event_axis, name='event_axis', dtype=tf.int32)
-    sample_axis = tf.convert_to_tensor(
-        sample_axis, name='sample_axis', dtype=tf.int32)
-    batch_axis = tf.convert_to_tensor(
-        batch_axis, name='batch_axis', dtype=tf.int32)
+    event_axis = ps.cast(
+        event_axis, dtype=tf.int32)
+    sample_axis = ps.cast(
+        sample_axis, dtype=tf.int32)
+    batch_axis = ps.cast(
+        batch_axis, dtype=tf.int32)
 
     # Permute x/y until shape = B + E + S
-    perm_for_xy = tf.concat((batch_axis, event_axis, sample_axis), 0)
+    perm_for_xy = ps.concat((batch_axis, event_axis, sample_axis), 0)
     x_permed = tf.transpose(a=x, perm=perm_for_xy)
     y_permed = tf.transpose(a=y, perm=perm_for_xy)
 
-    batch_ndims = tf.size(batch_axis)
-    batch_shape = tf.shape(x_permed)[:batch_ndims]
-    event_ndims = tf.size(event_axis)
-    event_shape = tf.shape(x_permed)[batch_ndims:batch_ndims + event_ndims]
-    sample_shape = tf.shape(x_permed)[batch_ndims + event_ndims:]
-    sample_ndims = tf.size(sample_shape)
-    n_samples = tf.reduce_prod(sample_shape)
-    n_events = tf.reduce_prod(event_shape)
+    batch_ndims = ps.size(batch_axis)
+    batch_shape = ps.shape(x_permed)[:batch_ndims]
+    event_ndims = ps.size(event_axis)
+    event_shape = ps.shape(x_permed)[batch_ndims:batch_ndims + event_ndims]
+    sample_shape = ps.shape(x_permed)[batch_ndims + event_ndims:]
+    sample_ndims = ps.size(sample_shape)
+    n_samples = ps.reduce_prod(sample_shape)
+    n_events = ps.reduce_prod(event_shape)
 
     # Flatten sample_axis into one long dim.
     x_permed_flat = tf.reshape(
-        x_permed, tf.concat((batch_shape, event_shape, [n_samples]), 0))
+        x_permed, ps.concat((batch_shape, event_shape, [n_samples]), 0))
     y_permed_flat = tf.reshape(
-        y_permed, tf.concat((batch_shape, event_shape, [n_samples]), 0))
+        y_permed, ps.concat((batch_shape, event_shape, [n_samples]), 0))
     # Do the same for event_axis.
     x_permed_flat = tf.reshape(
-        x_permed, tf.concat((batch_shape, [n_events], [n_samples]), 0))
+        x_permed, ps.concat((batch_shape, [n_events], [n_samples]), 0))
     y_permed_flat = tf.reshape(
-        y_permed, tf.concat((batch_shape, [n_events], [n_samples]), 0))
+        y_permed, ps.concat((batch_shape, [n_events], [n_samples]), 0))
 
     # After matmul, cov.shape = batch_shape + [n_events, n_events]
     cov = tf.matmul(
-        x_permed_flat, y_permed_flat, adjoint_b=True) / tf.cast(
+        x_permed_flat, y_permed_flat, adjoint_b=True) / ps.cast(
             n_samples, x.dtype)
 
     # Insert some singletons to make
@@ -436,19 +436,19 @@ def covariance(x,
     # the [n_events] became event_shape**2.
     cov = tf.reshape(
         cov,
-        tf.concat(
+        ps.concat(
             (
                 batch_shape,
                 # event_shape**2 used here because it is the same length as
                 # event_shape, and has the same number of elements as one
                 # batch of covariance.
                 event_shape**2,
-                tf.ones([sample_ndims], tf.int32)),
+                ps.ones([sample_ndims], tf.int32)),
             0))
     # Permuting by the argsort inverts the permutation, making
     # cov.shape have ones in the position where there were samples, and
     # [n_events * n_events] in the event position.
-    cov = tf.transpose(a=cov, perm=tf.math.invert_permutation(perm_for_xy))
+    cov = tf.transpose(a=cov, perm=ps.invert_permutation(perm_for_xy))
 
     # Now expand event_shape**2 into event_shape + event_shape.
     # We here use (for the first time) the fact that we require event_axis to be
@@ -457,13 +457,13 @@ def covariance(x,
     e_len = 1 + event_axis[-1] - event_axis[0]
     cov = tf.reshape(
         cov,
-        tf.concat((tf.shape(cov)[:e_start], event_shape, event_shape,
-                   tf.shape(cov)[e_start + e_len:]), 0))
+        ps.concat((ps.shape(cov)[:e_start], event_shape, event_shape,
+                   ps.shape(cov)[e_start + e_len:]), 0))
 
     # tf.squeeze requires python ints for axis, not Tensor.  This is enough to
     # require our axis args to be constants.
     if not keepdims:
-      squeeze_axis = tf.where(sample_axis < e_start, sample_axis,
+      squeeze_axis = ps.where(sample_axis < e_start, sample_axis,
                               sample_axis + e_len)
       cov = _squeeze(cov, axis=squeeze_axis)
 
@@ -703,7 +703,7 @@ def _log_softmax(x, axis, name=None):
   with tf.name_scope(name or 'log_softmax'):
     if axis is None:
       return tf.math.log_softmax(x, axis=None, name=name)
-    rank = prefer_static.rank(axis)
+    rank = ps.rank(axis)
     if rank == 0:
       return tf.math.log_softmax(x, axis=axis, name=name)
     if rank == 1:
@@ -717,17 +717,17 @@ def _log_softmax(x, axis, name=None):
 def _log_average_probs_process_args(
     logits, validate_args, sample_axis, event_axis):
   """Processes args for `log_average_probs`."""
-  rank = prefer_static.rank(logits)
+  rank = ps.rank(logits)
   if sample_axis is None or validate_args:
-    event_axis = prefer_static.reshape(
-        prefer_static.non_negative_axis(event_axis, rank),
+    event_axis = ps.reshape(
+        ps.non_negative_axis(event_axis, rank),
         shape=[-1])
   if sample_axis is None:
-    sample_axis = prefer_static.setdiff1d(
-        prefer_static.range(rank), event_axis)
+    sample_axis = ps.setdiff1d(
+        ps.range(rank), event_axis)
   elif validate_args:
-    sample_axis = prefer_static.reshape(
-        prefer_static.non_negative_axis(sample_axis, rank),
+    sample_axis = ps.reshape(
+        ps.non_negative_axis(sample_axis, rank),
         shape=[-1])
   return sample_axis, event_axis
 
@@ -736,16 +736,16 @@ def _log_average_probs_maybe_check_args(sample_axis, event_axis, validate_args):
   """Assertions for `log_average_probs`."""
   assertions = []
   msg = 'Arguments `sample_axis` and `event_axis` must be distinct.'
-  sample_setdiff = prefer_static.setdiff1d(sample_axis, event_axis)
-  if prefer_static.is_numpy(sample_setdiff):
+  sample_setdiff = ps.setdiff1d(sample_axis, event_axis)
+  if ps.is_numpy(sample_setdiff):
     if not np.array_equal(sample_setdiff, tf.get_static_value(sample_axis)):
       raise ValueError(msg)
   elif validate_args:
     assertions.append(_assert_array_equal(
         sample_setdiff, sample_axis,
         message=msg, name='sample_setdiff_rank_check'))
-  event_setdiff = prefer_static.setdiff1d(event_axis, sample_axis)
-  if prefer_static.is_numpy(event_setdiff):
+  event_setdiff = ps.setdiff1d(event_axis, sample_axis)
+  if ps.is_numpy(event_setdiff):
     if not np.array_equal(event_setdiff, tf.get_static_value(event_axis)):
       raise ValueError(msg)
   elif validate_args:
@@ -777,7 +777,7 @@ def _is_list_like(x):
 
 def _make_list_or_1d_tensor(values):
   """Return a list (preferred) or 1d Tensor from values, if values.ndims < 2."""
-  values = tf.convert_to_tensor(values, name='values')
+  values = ps.convert_to_shape_tensor(values, name='values')
   values_ = tf.get_static_value(values)
 
   # Static didn't work.
@@ -797,7 +797,7 @@ def _make_positive_axis(axis, ndims):
   """Rectify possibly negatively axis. Prefer return Python list."""
   axis = _make_list_or_1d_tensor(axis)
 
-  ndims = tf.convert_to_tensor(ndims, name='ndims', dtype=tf.int32)
+  ndims = ps.convert_to_shape_tensor(ndims, name='ndims', dtype=tf.int32)
   ndims_ = tf.get_static_value(ndims)
 
   if _is_list_like(axis) and ndims_ is not None:
@@ -820,7 +820,7 @@ def _squeeze(x, axis):
   x = tf.convert_to_tensor(x, name='x')
   if axis is None:
     return tf.squeeze(x, axis=None)
-  axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
-  axis += tf.zeros([1], dtype=axis.dtype)  # Make axis at least 1d.
-  keep_axis = prefer_static.setdiff1d(tf.range(0, tf.rank(x)), axis)
-  return tf.reshape(x, tf.gather(tf.shape(x), keep_axis))
+  axis = ps.convert_to_shape_tensor(axis, name='axis', dtype=tf.int32)
+  axis += ps.zeros([1], dtype=axis.dtype)  # Make axis at least 1d.
+  keep_axis = ps.setdiff1d(ps.range(0, ps.rank(x)), axis)
+  return tf.reshape(x, ps.gather(ps.shape(x), keep_axis))

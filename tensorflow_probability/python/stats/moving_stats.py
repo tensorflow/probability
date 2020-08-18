@@ -23,7 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
@@ -372,8 +372,7 @@ def assign_log_moving_mean_exp(log_value, moving_log_mean_exp,
     x = tf.concat([
         tf.broadcast_to(
             tf.math.log(decay),
-            prefer_static.broadcast_shape(prefer_static.shape(decay),
-                                          prefer_static.shape(delta))),
+            ps.broadcast_shape(ps.shape(decay), ps.shape(delta))),
         delta + tf.math.log1p(-decay)
     ], axis=0)
     update = tf.reduce_logsumexp(x, axis=0)
