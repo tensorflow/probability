@@ -399,7 +399,7 @@ def _random_gamma_cpu(
         orig_safe_concentration)
     seed, conc_fix_seed = samplers.split_seed(seed)
     log_rate = tf.math.log(rate) if log_rate is None else log_rate
-    rate = tf.ones([], log_rate.dtype)  # Do the division later in log-space.
+    rate = tf.ones_like(log_rate)  # Do the division later in log-space.
 
   if rate is None:
     rate = tf.math.exp(log_rate)

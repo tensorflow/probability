@@ -186,16 +186,17 @@ class GammaGamma(distribution.Distribution):
     mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
     mixing_rate = tf.convert_to_tensor(self.mixing_rate)
     seed_rate, seed_samples = samplers.split_seed(seed, salt='gamma_gamma')
-    rate = gamma_lib.random_gamma(
+    log_rate = gamma_lib.random_gamma(
         shape=[n],
         # Be sure to draw enough rates for the fully-broadcasted gamma-gamma.
         concentration=mixing_concentration + tf.zeros_like(concentration),
         rate=mixing_rate,
-        seed=seed_rate)
+        seed=seed_rate,
+        log_space=True)
     return gamma_lib.random_gamma(
         shape=[],
         concentration=concentration,
-        rate=rate,
+        log_rate=log_rate,
         seed=seed_samples)
 
   def _log_prob(self, x):

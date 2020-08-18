@@ -113,7 +113,6 @@ def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # 
 def _gamma(shape, alpha, beta=None, dtype=np.float32, seed=None,
            name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   scale = 1. if beta is None else (1. / beta)
   shape = _ensure_shape_tuple(shape)
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
