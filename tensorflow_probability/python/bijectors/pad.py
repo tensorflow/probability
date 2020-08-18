@@ -45,7 +45,7 @@ class Pad(bijector.Bijector):
 
   The argument `paddings` is a vector of `int` pairs each representing the
   number of left and/or right `constant_values` to pad to the corresponding
-  righmost dimensions. That is, unless `axis` is specified`, specifiying `k`
+  righmost dimensions. That is, unless `axis` is specified, specifiying `k`
   different `paddings` means the rightmost `k` dimensions will be "grown" by the
   sum of the respective `paddings` row. When `axis` is specified, it indicates
   the dimension to which the corresponding `paddings` element is applied. By
