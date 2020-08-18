@@ -248,10 +248,6 @@ class BetaBinomial(distribution.Distribution):
 
     expanded_concentration1 = tf.broadcast_to(concentration1, batch_shape)
     expanded_concentration0 = tf.broadcast_to(concentration0, batch_shape)
-    gamma1 = gamma_lib.random_gamma(
-        shape=[n], concentration=expanded_concentration1, seed=gamma1_seed)
-    gamma2 = gamma_lib.random_gamma(
-        shape=[n], concentration=expanded_concentration0, seed=gamma2_seed)
     # probs = g1 / (g1 + g2)
     # logits = log(probs) - log(1 - probs)
     #        = log(g1 / (g1 + g2)) - log(1 - g1 / (g1 + g2))
@@ -259,9 +255,14 @@ class BetaBinomial(distribution.Distribution):
     #        = log(g1) - log(g1 + g2) - (log(g1 + g2 - g1) - log(g1 + g2))
     #        = log(g1) - log(g1 + g2) - log(g2) + log(g1 + g2))
     #        = log(g1) - log(g2)
-    logits = tf.math.log(gamma1) - tf.math.log(gamma2)
+    log_gamma1 = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration1, seed=gamma1_seed,
+        log_space=True)
+    log_gamma2 = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration0, seed=gamma2_seed,
+        log_space=True)
     return binomial.Binomial(
-        total_count, logits=logits,
+        total_count, logits=log_gamma1 - log_gamma2,
         validate_args=self.validate_args).sample(seed=binomial_seed)
 
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)
