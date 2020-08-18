@@ -228,6 +228,21 @@ class CovarianceReducersTest(test_util.TestCase):
     self.assertAllEqualNested(
         final_cov[1], cov_latent)
 
+  def test_transform_fn_with_nested_return(self):
+    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(
+        transform_fn=lambda sample, _: [sample, sample + 1])
+    fake_kr = FakeKernelResults(0., FakeInnerResults(0))
+    state = cov_reducer.initialize(tf.zeros((2,)), fake_kr)
+    _, state = tf.while_loop(
+        lambda sample, _: sample < 5,
+        lambda sample, state: (sample + 1, cov_reducer.one_step(
+            tf.ones((2,)) * sample, state, fake_kr)),
+        (0., state)
+    )
+    final_cov = self.evaluate(cov_reducer.finalize(state))
+    self.assertEqual(2, len(final_cov))
+    self.assertAllEqual(np.ones((2, 2, 2)) * 2, final_cov)
+
 
 if __name__ == '__main__':
   tf.test.main()

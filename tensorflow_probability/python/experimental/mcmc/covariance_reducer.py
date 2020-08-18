@@ -49,14 +49,16 @@ def _get_sample(current_state, kernel_results):
 class CovarianceReducer(reducer_base.Reducer):
   """`Reducer` that computes a running covariance.
 
-  `CovarianceReducer` computes a running covariance on samples evaluated on
-  some arbitrary structure of `transform_fn`s. A `trasform_fn` is defined as
-  any function that accepts the chain state and kernel results, and ouptuts
-  a `Tensor` or nested structure of `Tensor`s to compute the covariance over.
-  To be explicit, if we denote a `transform_fn` as f(x, y), then
-  `CovarianceReducer` will compute Cov(f(x, y)). If some structure of
-  `transform_fn`s are given, the final statistic (as returned by the
-  `finalize` method) will mimic that exact structure.
+  By default, `CovarianceReducer` computes covariance directly over the
+  latent state, ignoring kernel results; however, it can also compute
+  a running covariance on samples evaluated on some arbitrary structure of
+  `transform_fn`s. A `trasform_fn` is defined as any function that accepts
+  the chain state and kernel results, and ouptuts a `Tensor` or nested
+  structure of `Tensor`s to compute the covariance over. To be explicit,
+  if we denote a `transform_fn` as f(x, y), then `CovarianceReducer` will
+  compute Cov(f(x, y)). If some structure of `transform_fn`s are given,
+  the final statistic (as returned by the `finalize` method) will mimic
+  the results of that structure.
 
   As with all reducers, CovarianceReducer does not hold state information;
   rather, it stores supplied metadata. Intermediate calculations are held in
@@ -130,7 +132,8 @@ class CovarianceReducer(reducer_base.Reducer):
         Specifying `None` returns all cross product terms (no batching)
         and is the default.
       transform_fn: A (possibly nested) structure of functions to evaluate the
-        incoming chain states on before covariance calculation.
+        incoming chain states on before covariance calculation. The default is
+        a single function that returns the chain state.
       ddof: A (possibly nested) structure of integers that represent the
         requested dynamic degrees of freedom. For example, use `ddof=0`
         for population covariance and `ddof=1` for sample covariance. Defaults
@@ -162,8 +165,7 @@ class CovarianceReducer(reducer_base.Reducer):
 
     Returns:
       state: `CovarianceReducerState` with `cov_state` field representing
-        a stream of no inputs and with identical structure to the
-        `initial_chain_state`.
+        a stream of no inputs.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'initialize')):
@@ -217,9 +219,9 @@ class CovarianceReducer(reducer_base.Reducer):
 
     Returns:
       new_reducer_state: `CovarianceReducerState` with updated running
-        statistics. Its `cov_state` field has an identical structure to
-        `self.transform_fn`. Each of the individual values in that structure
-        subsequently mimics the structure of `current_reducer_state`.
+        statistics. Its `cov_state` field has an identical structure to the
+        results of `self.transform_fn`. Each of the individual values in that
+        structure subsequently mimics the structure of `current_reducer_state`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'one_step')):
@@ -258,7 +260,7 @@ class CovarianceReducer(reducer_base.Reducer):
 
     Returns:
       covariance: an estimate of the covariance with identical structure to
-        `self.transform_fn`.
+        the results of `self.transform_fn`.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'finalize')):
