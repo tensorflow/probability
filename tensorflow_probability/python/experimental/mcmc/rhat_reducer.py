@@ -39,7 +39,7 @@ RhatReducerState = collections.namedtuple(
 
 
 class RhatReducer(reducer_base.Reducer):
-  """`Reducer` that computes a running rhat diagnostic statistic.
+  """`Reducer` that computes a running R-hat diagnostic statistic.
 
   `RhatReducer` assumes that all provided chain states include samples from
   multiple independent Markov chains, and that all of these chains are to
@@ -66,7 +66,7 @@ class RhatReducer(reducer_base.Reducer):
 
   `RhatReducer` is meant to fit into the larger Streaming MCMC framework.
   `RunningPotentialScaleReduction` in `tfp.experimental.stats` is
-  better suited for more generic streaming covariance needs. More precise
+  better suited for more generic streaming R-hat needs. More precise
   algorithmic details can also be found by referencing
   `RunningPotentialScaleReduction`.
   """
@@ -106,7 +106,7 @@ class RhatReducer(reducer_base.Reducer):
         chain(s). It is used to infer the shape and dtype of future samples.
       initial_kernel_results: A (possibly nested) structure of `Tensor`s
         representing internal calculations made in a related `TransitionKernel`.
-        For streaming rhat, this argument has no influence on the
+        For streaming R-hat, this argument has no influence on the
         computation; hence, it is `None` by default. However, it's
         still accepted to fit the `Reducer` base class.
 
@@ -141,10 +141,10 @@ class RhatReducer(reducer_base.Reducer):
         with shape and dtype compatible with those used to initialize the
         `current_reducer_state`.
       current_reducer_state: `RhatReducerState` representing the current
-        state of the running rhat statistic.
+        state of the running R-hat statistic.
       previous_kernel_results: A (possibly nested) structure of `Tensor`s
         representing internal calculations made in a related
-        `TransitionKernel`. For streaming rhat, this argument has no
+        `TransitionKernel`. For streaming R-hat, this argument has no
         influence on computation; hence, it is `None` by default. However, it's
         still accepted to fit the `Reducer` base class.
       axis: If chunking is desired, this is a (possibly nested) structure of
@@ -176,10 +176,10 @@ class RhatReducer(reducer_base.Reducer):
 
     Args:
       final_reducer_state: `RhatReducerState` that represents the
-        final state of the running rhat statistic.
+        final state of the running R-hat statistic.
 
     Returns:
-      rhat: an estimate of the rhat.
+      R-hat: an estimate of the R-hat.
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'rhat_reducer', 'finalize')):

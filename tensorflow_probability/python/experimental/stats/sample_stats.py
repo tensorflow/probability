@@ -29,10 +29,10 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 
 __all__ = [
-    'RunningMean',
-    'RunningMeanState',
     'RunningCovariance',
     'RunningCovarianceState',
+    'RunningMean',
+    'RunningMeanState',
     'RunningPotentialScaleReduction',
     'RunningPotentialScaleReductionState',
     'RunningVariance',
@@ -400,19 +400,19 @@ RunningPotentialScaleReductionState = collections.namedtuple(
 
 
 class RunningPotentialScaleReduction(object):
-  """Holds metadata for and computes a running rhat diagnostic statistic.
+  """Holds metadata for and computes a running R-hat diagnostic statistic.
 
   `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential
-  scale reduction (or rhat) for chain convergence [1]. This object also
-  supports both batching and chunking.
+  scale reduction (also known as R-hat) for chain convergence [1]. This
+  object also supports both batching and chunking.
 
-  If multiple rhat computations are desired (batching), one should use a
+  If multiple R-hat computations are desired (batching), one should use a
   (possibly nested) collection for initialization parameters `num_chains`
-  and `shape`. Subsequent chain states used to update the streaming rhat
+  and `shape`. Subsequent chain states used to update the streaming R-hat
   should mimic their identical structure.
 
   In computation, samples can be provided individually or in chunks. A
-  "chunk" of size M implies incorporating M samples into a single expectation
+  "chunk" of size M implies incorporating M samples into a single R-hat
   computation at once, which is more efficient than one by one. The `chunk_axis`
   parameter in the `update` method defines chunking semantics.
 
@@ -421,7 +421,7 @@ class RunningPotentialScaleReduction(object):
   `RunningPotentialScaleReductionState` as returned via `initialize` and
   `update` method calls.
 
-  `RunningPotentialScaleReduction` is meant to serve general streaming rhat.
+  `RunningPotentialScaleReduction` is meant to serve general streaming R-hat.
   For a specialized version that fits streaming over MCMC samples, see
   `RhatReducer` in `tfp.experimental.mcmc`.
 
@@ -489,13 +489,13 @@ class RunningPotentialScaleReduction(object):
         `RunningPotentialScaleReductionState`.
       chain_axis: The sample axis that indexes into independent Markov chains
         samples. For batched computation, this can either be a scalar value that
-        represents the chain axis across all rhat calculations, or a
+        represents the chain axis across all R-hat calculations, or a
         structure that identically mimics `self.num_chains`.
       chunk_axis: If chunking is desired, this is an integer that specifies the
         axis with chunked samples. For individual samples, set this to `None`.
         By default, samples are not chunked (`axis` is None). For batched
         computation, this can either be a scalar value or `None` that
-        represents chunking semantics across all rhat calculations, or a
+        represents chunking semantics across all R-hat calculations, or a
         structure that identically mimics `self.num_chains`.
 
     Returns:
@@ -547,10 +547,10 @@ class RunningPotentialScaleReduction(object):
         the current state of running statistics.
 
     Returns:
-      rhat: An estimate of the rhat.
+      R-hat: An estimate of the R-hat.
     """
     def _finalize_for_one_state(m, chain_var):
-      """Calculates rhat for one group of Markov chains."""
+      """Calculates R-hat for one group of Markov chains."""
       # using notation from Brooks and Gelman (1998),
       # n := num samples / chain; m := number of chains
       n = chain_var[0].num_samples
