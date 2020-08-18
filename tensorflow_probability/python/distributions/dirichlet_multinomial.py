@@ -281,11 +281,8 @@ class DirichletMultinomial(distribution.Distribution):
         concentration,
         name='alpha')
 
-    unnormalized_logits = tf.math.log(
-        gamma_lib.random_gamma(
-            shape=[n],
-            concentration=alpha,
-            seed=gamma_seed))
+    unnormalized_logits = gamma_lib.random_gamma(
+        shape=[n], concentration=alpha, seed=gamma_seed, log_space=True)
     x = multinomial.draw_sample(
         1, k, unnormalized_logits, n_draws, self.dtype, multinomial_seed)
     final_shape = ps.concat(
