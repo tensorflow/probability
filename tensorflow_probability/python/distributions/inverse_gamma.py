@@ -203,11 +203,12 @@ class InverseGamma(distribution.Distribution):
       """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return 1. / gamma_lib.random_gamma(
+    return tf.math.exp(-gamma_lib.random_gamma(
         shape=[n],
         concentration=self.concentration,
         rate=self.scale,
-        seed=seed)
+        seed=seed,
+        log_space=True))
 
   def _log_prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)
