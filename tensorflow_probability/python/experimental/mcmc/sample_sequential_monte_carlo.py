@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.math.generic import log1mexp
 from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
@@ -32,7 +33,6 @@ from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import random_walk_metropolis
 from tensorflow_probability.python.mcmc import transformed_kernel
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
 __all__ = [
@@ -44,26 +44,35 @@ __all__ = [
     'simple_heuristic_tuning',
 ]
 
-
 PRINT_DEBUG = False
 
-ParticleInfo = collections.namedtuple(
-    'ParticleInfo',
-    [
-        'log_accept_prob',  # log acceptance probability per particle
-        'log_scalings',
-        'tempered_log_prob',
-        'likelihood_log_prob',
-    ])
 
-SMCResults = collections.namedtuple(
-    'SMCResults',
-    [
-        'num_steps',
-        'inverse_temperature',
-        'log_marginal_likelihood',
-        'particle_info',  # A namedtuple of ParticleInfo
-    ])
+class ParticleInfo(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'ParticleInfo',
+        [
+            'log_accept_prob',  # log acceptance probability per particle
+            'log_scalings',
+            'tempered_log_prob',
+            'likelihood_log_prob',
+        ])):
+  """Internal particle state for Sequential Monte Carlos."""
+  __slots__ = ()
+
+
+class SMCResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'SMCResults',
+        [
+            'num_steps',
+            'inverse_temperature',
+            'log_marginal_likelihood',
+            'particle_info',  # A namedtuple of ParticleInfo
+        ])):
+  """Result state for Sequential Monte Carlos."""
+  __slots__ = ()
 
 
 def gather_mh_like_result(results):
@@ -85,6 +94,7 @@ def gather_mh_like_result(results):
 def default_make_tempered_target_log_prob_fn(
     prior_log_prob_fn, likelihood_log_prob_fn, inverse_temperatures):
   """Helper which creates inner kernel target_log_prob_fn."""
+
   def _tempered_target_log_prob(*args):
     priorlogprob = tf.identity(prior_log_prob_fn(*args),
                                name='prior_log_prob')
@@ -95,24 +105,21 @@ def default_make_tempered_target_log_prob_fn(
   return _tempered_target_log_prob
 
 
-def make_rwmh_kernel_fn(target_log_prob_fn, init_state, scalings, seed=None):
+def make_rwmh_kernel_fn(target_log_prob_fn, init_state, scalings):
   """Generate a Random Walk MH kernel."""
   with tf.name_scope('make_rwmh_kernel_fn'):
-    seed = SeedStream(seed, salt='make_rwmh_kernel_fn')
     state_std = [
-        tf.math.reduce_std(x, axis=0, keepdims=True)
-        for x in init_state
+        tf.math.reduce_std(x, axis=0, keepdims=True) for x in init_state
     ]
     step_size = [
         s * ps.cast(  # pylint: disable=g-complex-comprehension
-            mcmc_util.left_justified_expand_dims_like(scalings, s),
-            s.dtype) for s in state_std
+            mcmc_util.left_justified_expand_dims_like(scalings, s), s.dtype)
+        for s in state_std
     ]
     return random_walk_metropolis.RandomWalkMetropolis(
         target_log_prob_fn,
         new_state_fn=random_walk_metropolis.random_walk_normal_fn(
-            scale=step_size),
-        seed=seed)
+            scale=step_size))
 
 
 def compute_hmc_step_size(scalings, state_std, num_leapfrog_steps):
@@ -130,12 +137,10 @@ def gen_make_transform_hmc_kernel_fn(unconstraining_bijectors,
   def make_transform_hmc_kernel_fn(
       target_log_prob_fn,
       init_state,
-      scalings,
-      seed=None):
+      scalings):
     """Generate a transform hmc kernel."""
 
     with tf.name_scope('make_transformed_hmc_kernel_fn'):
-      seed = SeedStream(seed, salt='make_transformed_hmc_kernel_fn')
       # TransformedTransitionKernel doesn't modify the input step size, thus we
       # need to pass the appropriate step size that are already in unconstrained
       # space
@@ -148,8 +153,7 @@ def gen_make_transform_hmc_kernel_fn(unconstraining_bijectors,
           hmc.HamiltonianMonteCarlo(
               target_log_prob_fn=target_log_prob_fn,
               num_leapfrog_steps=num_leapfrog_steps,
-              step_size=step_size,
-              seed=seed),
+              step_size=step_size),
           unconstraining_bijectors)
 
   return make_transform_hmc_kernel_fn
@@ -157,15 +161,11 @@ def gen_make_transform_hmc_kernel_fn(unconstraining_bijectors,
 
 def gen_make_hmc_kernel_fn(num_leapfrog_steps=10):
   """Generate a transformed hmc kernel."""
-  def make_hmc_kernel_fn(
-      target_log_prob_fn,
-      init_state,
-      scalings,
-      seed=None):
+
+  def make_hmc_kernel_fn(target_log_prob_fn, init_state, scalings):
     """Generate a hmc without transformation kernel."""
 
     with tf.name_scope('make_hmc_kernel_fn'):
-      seed = SeedStream(seed, salt='make_hmc_kernel_fn')
       state_std = [
           tf.math.reduce_std(x, axis=0, keepdims=True)
           for x in init_state
@@ -174,10 +174,10 @@ def gen_make_hmc_kernel_fn(num_leapfrog_steps=10):
       return hmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target_log_prob_fn,
           num_leapfrog_steps=num_leapfrog_steps,
-          step_size=step_size,
-          seed=seed)
+          step_size=step_size)
 
   return make_hmc_kernel_fn
+
 
 # Generate a default `make_hmc_kernel_fn`
 default_make_hmc_kernel_fn = gen_make_hmc_kernel_fn()
@@ -302,10 +302,10 @@ def sample_sequential_monte_carlo(
       object. Must take one argument representing the `TransitionKernel`'s
       `target_log_prob_fn`. The `target_log_prob_fn` argument represents the
       `TransitionKernel`'s target log distribution.  Note:
-      `sample_sequential_monte_carlo` creates a new `target_log_prob_fn`
-      which is an interpolation between the supplied `target_log_prob_fn` and
-      `proposal_log_prob_fn`; it is this interpolated function which is used as
-      an argument to `make_kernel_fn`.
+        `sample_sequential_monte_carlo` creates a new `target_log_prob_fn` which
+        is an interpolation between the supplied `target_log_prob_fn` and
+        `proposal_log_prob_fn`; it is this interpolated function which is used
+        as an argument to `make_kernel_fn`.
     tuning_fn: Python `callable` which takes the number of steps, the log
       scaling, and the log acceptance ratio from the last mutation and output
       the number of steps and log scaling for the next mutation.
@@ -316,12 +316,12 @@ def sample_sequential_monte_carlo(
     resample_fn: Python `callable` to generate the indices of resampled
       particles, given their weights. Generally, one of
       `tfp.experimental.mcmc.resample_independent` or
-      `tfp.experimental.mcmc.resample_systematic`, or any function
-      with the same signature.
+      `tfp.experimental.mcmc.resample_systematic`, or any function with the same
+      signature.
       Default value: `tfp.experimental.mcmc.resample_systematic`.
     ess_threshold_ratio: Target ratio for effective sample size.
-    parallel_iterations: The number of iterations allowed to run in parallel.
-        It must be a positive integer. See `tf.while_loop` for more details.
+    parallel_iterations: The number of iterations allowed to run in parallel. It
+      must be a positive integer. See `tf.while_loop` for more details.
     seed: Python integer or TFP seedstream to seed the random number generator.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'sample_sequential_monte_carlo').
@@ -343,7 +343,8 @@ def sample_sequential_monte_carlo(
   """
 
   with tf.name_scope(name or 'sample_sequential_monte_carlo'):
-    seed_stream = SeedStream(seed, salt='smc_seed')
+    is_seeded = seed is not None
+    seed = samplers.sanitize_seed(seed, salt='mcmc.sample_smc')
 
     unwrap_state_list = not tf.nest.is_nested(current_state)
     if unwrap_state_list:
@@ -356,8 +357,8 @@ def sample_sequential_monte_carlo(
     likelihood_log_prob = likelihood_log_prob_fn(*current_state)
 
     likelihood_rank = ps.rank(likelihood_log_prob)
-    dimension = ps.reduce_sum([
-        ps.reduce_prod(ps.shape(x)[likelihood_rank:]) for x in current_state])
+    dimension = ps.reduce_sum(
+        [ps.reduce_prod(ps.shape(x)[likelihood_rank:]) for x in current_state])
 
     # We infer the particle shapes from the resulting likelihood:
     # [num_particles, b1, ..., bN]
@@ -374,7 +375,7 @@ def sample_sequential_monte_carlo(
     # random walk Metropolis algorithms. _The annals of applied probability_.
     # 1997;7(1):110-20.
     scale_start = (
-        tf.constant(2.38 ** 2, dtype=likelihood_log_prob.dtype) /
+        tf.constant(2.38**2, dtype=likelihood_log_prob.dtype) /
         tf.constant(dimension, dtype=likelihood_log_prob.dtype))
 
     inverse_temperature = tf.zeros(batch_shape, dtype=likelihood_log_prob.dtype)
@@ -385,8 +386,7 @@ def sample_sequential_monte_carlo(
             likelihood_log_prob_fn,
             inverse_temperature),
         current_state,
-        scalings,
-        seed=seed_stream)
+        scalings)
     pkr = kernel.bootstrap_results(current_state)
     _, kernel_target_log_prob = gather_mh_like_result(pkr)
 
@@ -471,21 +471,28 @@ def sample_sequential_monte_carlo(
                 likelihood_log_prob_fn,
                 inverse_temperature),
             current_state,
-            scalings,
-            seed=seed_stream)
+            scalings)
         pkr = kernel.bootstrap_results(current_state)
         kernel_log_accept_ratio, _ = gather_mh_like_result(pkr)
 
-        def mutate_onestep(i, state, pkr, log_accept_prob_sum):
-          next_state, next_kernel_results = kernel.one_step(state, pkr)
+        def mutate_onestep(i, seed, state, pkr, log_accept_prob_sum):
+          iter_seed, next_seed = (
+              samplers.split_seed(seed) if is_seeded else (None, seed))
+
+          one_step_kwargs = dict(seed=iter_seed) if is_seeded else {}
+          next_state, next_kernel_results = kernel.one_step(
+              state, pkr, **one_step_kwargs)
           kernel_log_accept_ratio, _ = gather_mh_like_result(pkr)
           log_accept_prob = tf.minimum(kernel_log_accept_ratio, 0.)
-          log_accept_prob_sum = log_add_exp(
-              log_accept_prob_sum, log_accept_prob)
-          return i + 1, next_state, next_kernel_results, log_accept_prob_sum
+          log_accept_prob_sum = log_add_exp(log_accept_prob_sum,
+                                            log_accept_prob)
+          return [
+              i + 1, next_seed, next_state, next_kernel_results,
+              log_accept_prob_sum
+          ]
 
         (
-            _,
+            _, _,
             next_state,
             next_kernel_results,
             log_accept_prob_sum
@@ -494,6 +501,7 @@ def sample_sequential_monte_carlo(
             body=mutate_onestep,
             loop_vars=(
                 tf.zeros([], dtype=tf.int32),
+                seed,
                 current_state,
                 pkr,
                 # we accumulate the acceptance probability in log space.
@@ -536,7 +544,7 @@ def sample_sequential_monte_carlo(
            particles=(state, smc_kernel_result.particle_info),
            log_weights=log_weights,
            resample_fn=resample_fn,
-           seed=seed_stream)
+           seed=seed)
       next_num_steps, next_log_scalings = tuning_fn(
           smc_kernel_result.num_steps,
           resampled_particle_info.log_scalings,
