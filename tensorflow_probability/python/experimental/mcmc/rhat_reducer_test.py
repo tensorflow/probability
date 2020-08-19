@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 
 # Dependency imports
 
@@ -64,7 +65,7 @@ class RhatReducerTest(test_util.TestCase):
 
   def test_simple_operation(self):
     rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        num_parallel_chains=5,
+        independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(tf.zeros(5,))
     chain_state = np.arange(20, dtype=np.float32).reshape((4, 5))
@@ -80,9 +81,9 @@ class RhatReducerTest(test_util.TestCase):
 
   def test_non_scalar_sample(self):
     rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        num_parallel_chains=5,
+        independent_chain_ndims=1,
     )
-    state = rhat_reducer.initialize(tf.zeros(5,))
+    state = rhat_reducer.initialize(tf.zeros((5, 3)))
     chain_state = np.arange(60, dtype=np.float32).reshape((4, 5, 3))
     for sample in chain_state:
       state = rhat_reducer.one_step(sample, state)
@@ -96,9 +97,9 @@ class RhatReducerTest(test_util.TestCase):
 
   def test_int_samples(self):
     rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        num_parallel_chains=5,
+        independent_chain_ndims=1,
     )
-    state = rhat_reducer.initialize(tf.zeros((5,), dtype=tf.int64))
+    state = rhat_reducer.initialize(tf.zeros((5, 3), dtype=tf.int64))
     chain_state = np.arange(60).reshape((4, 5, 3))
     for sample in chain_state:
       state = rhat_reducer.one_step(sample, state)
@@ -113,12 +114,12 @@ class RhatReducerTest(test_util.TestCase):
 
   def test_chunking(self):
     rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        num_parallel_chains=5,
+        independent_chain_ndims=1,
     )
-    state = rhat_reducer.initialize(tf.zeros(()))
+    state = rhat_reducer.initialize(tf.zeros((5,)))
     chain_state = np.arange(60, dtype=np.float32).reshape((4, 5, 3))
     for sample in chain_state:
-      state = rhat_reducer.one_step(sample, state, axis=0)
+      state = rhat_reducer.one_step(sample, state, axis=1)
     rhat = rhat_reducer.finalize(state)
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=np.swapaxes(chain_state, 1, 2).reshape((12, 5)),
@@ -129,7 +130,7 @@ class RhatReducerTest(test_util.TestCase):
 
   def test_in_with_reductions(self):
     rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        num_parallel_chains=5,
+        independent_chain_ndims=1,
     )
     fake_kernel = TestTransitionKernel(shape=(5,))
     reduced_kernel = tfp.experimental.mcmc.WithReductions(
@@ -151,7 +152,7 @@ class RhatReducerTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     iid_normal_samples = rng.randn(n_samples, 2)
     rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        num_parallel_chains=2,
+        independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(iid_normal_samples[0])
     for sample in iid_normal_samples:
@@ -169,7 +170,7 @@ class RhatReducerTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     offset_samples = rng.randn(n_samples, 3, 4) + offset
     rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        num_parallel_chains=3,
+        independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(offset_samples[0])
     for sample in offset_samples:
@@ -190,7 +191,7 @@ class RhatReducerTest(test_util.TestCase):
         kernel=hmc_kernel,
         reducer=[
             tfp.experimental.mcmc.TracingReducer(),
-            tfp.experimental.mcmc.RhatReducer(num_parallel_chains=2)
+            tfp.experimental.mcmc.RhatReducer(independent_chain_ndims=1)
         ]
     )
     rhat = reduced_stats[1]
@@ -199,6 +200,23 @@ class RhatReducerTest(test_util.TestCase):
         independent_chain_ndims=1,
     )
     true_rhat, rhat = self.evaluate([true_rhat, rhat])
+    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
+
+  def test_multiple_latent_state(self):
+    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+        independent_chain_ndims=1,
+    )
+    state = rhat_reducer.initialize([tf.zeros(5,), tf.zeros((2, 5))])
+    chain_state = np.arange(20, dtype=np.float32).reshape((4, 5))
+    second_chain_state = np.arange(40, dtype=np.float32).reshape((4, 2, 5))
+    for latent in zip(chain_state, second_chain_state):
+      state = rhat_reducer.one_step(latent, state)
+    rhat = rhat_reducer.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=[chain_state, second_chain_state],
+        independent_chain_ndims=1,
+    )
+    rhat, true_rhat = self.evaluate([rhat, true_rhat])
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
 
 
