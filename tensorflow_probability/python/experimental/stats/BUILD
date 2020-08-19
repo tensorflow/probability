@@ -57,6 +57,7 @@ py_test(
     deps = [
         ":sample_stats",
         # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

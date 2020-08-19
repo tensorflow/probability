@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import math
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -29,6 +30,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 __all__ = [
     'RunningMean',
     'RunningMeanState',
+    'RunningCentralMoments',
+    'RunningCentralMomentsState',
     'RunningCovariance',
     'RunningCovarianceState',
     'RunningVariance',
@@ -389,3 +392,146 @@ class RunningMean(object):
       mean: An estimate of the mean.
     """
     return state.mean
+
+
+RunningCentralMomentsState = collections.namedtuple(
+    'RunningCentralMomentsState',
+    'num_samples, mean, sum_exponentiated_residuals')
+
+
+class RunningCentralMoments(object):
+  """Holds metadata for and computes running central moments.
+
+  `RunningCentralMoments` will compute an arbitrary central moment in
+  streaming fashion following the formula proposed by Philippe Pebay
+  (2008) [1]. Since the algorithm computes moments as a function of
+  lower ones, even if not requested, all lower moments will be computed
+  as well. Whether all moments are returned is defined by the
+  `return_all_moments` argument in the `finalize` method. Note, while
+  any arbitrarily high central moment is theoretically supported,
+  `RunningCentralMoments` cannot guarantee numerical stability for all
+  moments.
+
+  `RunningCentralMoments` objects do not hold state information. That
+  information, which includes intermediate calculations, are held in a
+  `RunningCentralMomentsState` as returned via `initialize` and `update`
+  method calls.
+
+  #### References
+  [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
+        Covariances and Arbitrary-Order Statistical Moments. _Technical Report
+        SAND2008-6212_, 2008.
+        https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
+  """
+
+  def __init__(self, shape, moment, dtype=tf.float32):
+    """Instantiates this object.
+
+    Args:
+      shape: Python `Tuple` or `TensorShape` representing the shape of
+        incoming samples.
+      moment: Integer that represents the central moment of interest.
+      dtype: Dtype of incoming samples and the resulting statistics.
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
+    """
+    self.shape = shape
+    self.moment = moment
+    if dtype is tf.int64:
+      dtype = tf.float64
+    elif dtype.is_integer:
+      dtype = tf.float32
+    self.dtype = dtype
+
+  def initialize(self):
+    """Initializes an empty `RunningCentralMomentsState`.
+
+    Returns:
+      state: `RunningCentralMomentsState` representing a stream of no
+        inputs.
+    """
+    mean_stream = RunningMean(
+        self.shape, self.dtype
+    )
+    return RunningCentralMomentsState(
+        num_samples=0,
+        mean=mean_stream.initialize().mean,
+        sum_exponentiated_residuals=tf.zeros(
+            (self.moment,) + self.shape, self.dtype),
+    )
+
+  def update(self, state, new_sample):
+    """Update the `RunningCentralMomentsState` with a new sample.
+
+    Args:
+      state: `RunningCentralMomentsState` that represents the current
+        state of running statistics.
+      new_sample: Incoming `Tensor` sample with shape and dtype compatible with
+        those used to form the `RunningCentralMomentsState`.
+
+    Returns:
+      state: `RunningCentralMomentsState` with updated calculations.
+    """
+    n_2 = 1
+    n_1 = state.num_samples
+    n = tf.cast(n_1 + n_2, dtype=self.dtype)
+    delta_mean = new_sample - state.mean
+    mean_stream = RunningMean(
+        self.shape, self.dtype
+    )
+    new_mean = mean_stream.update(RunningMeanState(
+        tf.cast(state.num_samples, self.dtype), state.mean,
+    ), new_sample).mean
+    old_res = state.sum_exponentiated_residuals
+    new_sum_exponentiated_residuals = [tf.zeros(self.shape, self.dtype)]
+
+    for p in range(2, self.moment + 1):
+      summation = tf.zeros(self.shape, self.dtype)
+      for k in range(1, p - 1):
+        adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p-k-1]
+        summation += self._n_choose_k(p, k) * adjusted_old_res
+      adj_term = (((delta_mean / n) ** p) * (n - 1) *
+                  ((n - 1) ** (p - 1) + (-1) ** p))
+      new_sum_pth_residual = old_res[p - 1] + summation + adj_term
+      new_sum_exponentiated_residuals.append(new_sum_pth_residual)
+
+    return RunningCentralMomentsState(
+        num_samples=n_1 + 1,
+        mean=new_mean,
+        sum_exponentiated_residuals=tf.convert_to_tensor(
+            new_sum_exponentiated_residuals
+        )
+    )
+
+  def finalize(self, state, return_all_moments=True):
+    """Finalizes streaming computation for all central moments.
+
+    Args:
+      state: `RunningMeanState` that represents the current state of
+        running statistics.
+      return_all_moments: Boolean flag that represents whether all
+        lower moments to `self.moment` will be returned or not. Defaults
+        to `True` (i.e. all moments will be returned).
+
+    Returns:
+      all_moments: A `Tensor` representing estimates of central moments
+        up to and including `self.moment`. Its leading dimension indexes
+        the moment. This is the return value if `return_all_moments` is
+        `True`.
+      target_moment: A `Tensor` representing the estimate of the
+        `self.moment`th central moment. This is the return value if
+        `return_all_moments` is `False`.
+    """
+    all_moments = state.sum_exponentiated_residuals / tf.cast(
+        state.num_samples, self.dtype)
+    if return_all_moments:
+      return all_moments
+    else:
+      return all_moments[self.moment - 1]
+
+  def _n_choose_k(self, n, k):
+    """Computes nCk."""
+    return math.factorial(n) // math.factorial(k) // math.factorial(n-k)
+  
