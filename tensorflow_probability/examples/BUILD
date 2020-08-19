@@ -255,6 +255,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         # absl/flags dep,
+        # absl/logging dep,
         # numpy dep,
         # scipy dep,
         # six dep,

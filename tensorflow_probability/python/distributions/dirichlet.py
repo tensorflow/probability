@@ -222,9 +222,14 @@ class Dirichlet(distribution.Distribution):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
-    gamma_sample = gamma_lib.random_gamma(
-        shape=[n], concentration=self.concentration, seed=seed)
-    return gamma_sample / tf.reduce_sum(gamma_sample, axis=-1, keepdims=True)
+    # We use the log-space gamma sampler to avoid the bump-up-from-0 correction,
+    # and to apply the concentration < 1 recurrence in log-space. This improves
+    # accuracy for small concentrations.
+    log_gamma_sample = gamma_lib.random_gamma(
+        shape=[n], concentration=self.concentration, seed=seed, log_space=True)
+    return tf.math.exp(
+        log_gamma_sample -
+        tf.math.reduce_logsumexp(log_gamma_sample, axis=-1, keepdims=True))
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):
