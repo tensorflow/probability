@@ -404,11 +404,12 @@ class RunningCentralMoments(object):
 
   `RunningCentralMoments` will compute an arbitrary central moment in
   streaming fashion following the formula proposed by Philippe Pebay
-  (2008) [1]. Since the algorithm computes moments as a function of
-  lower ones, even if not requested, all lower moments will be computed
-  as well. Whether all moments are returned is defined by the
-  `return_all_moments` argument in the `finalize` method. Note, while
-  any arbitrarily high central moment is theoretically supported,
+  (2008) [1]. For reference, the formula we refer to is the incremental
+  version of arbitrary moments (equation 2.9). Since the algorithm computes
+  moments as a function of lower ones, even if not requested, all lower
+  moments will be computed as well. Whether all moments are returned is
+  defined by the `return_all_moments` argument in the `finalize` method.
+  Note, while any arbitrarily high central moment is theoretically supported,
   `RunningCentralMoments` cannot guarantee numerical stability for all
   moments.
 
@@ -487,11 +488,16 @@ class RunningCentralMoments(object):
     old_res = state.sum_exponentiated_residuals
     new_sum_exponentiated_residuals = [tf.zeros(self.shape, self.dtype)]
 
+    # the following two nested for loops calculate equation 2.9 in Pebay's
+    # 2008 paper from smallest moment to highest.
     for p in range(2, self.moment + 1):
       summation = tf.zeros(self.shape, self.dtype)
       for k in range(1, p - 1):
         adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p-k-1]
         summation += self._n_choose_k(p, k) * adjusted_old_res
+      # the `adj_term` refers to the final term in equation 2.9 and is not
+      # transcribed exactly, but rather, it's actually simplified to avoid
+      # having a `(n-1)` denominator.
       adj_term = (((delta_mean / n) ** p) * (n - 1) *
                   ((n - 1) ** (p - 1) + (-1) ** p))
       new_sum_pth_residual = old_res[p - 1] + summation + adj_term
