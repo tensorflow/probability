@@ -396,7 +396,7 @@ class RunningMean(object):
 
 RunningCentralMomentsState = collections.namedtuple(
     'RunningCentralMomentsState',
-    'num_samples, mean, sum_exponentiated_residuals')
+    'mean_state, sum_exponentiated_residuals')
 
 
 class RunningCentralMoments(object):
@@ -456,8 +456,7 @@ class RunningCentralMoments(object):
         inputs.
     """
     return RunningCentralMomentsState(
-        num_samples=0,
-        mean=self.mean_stream.initialize().mean,
+        mean_state=self.mean_stream.initialize(),
         sum_exponentiated_residuals=tf.zeros(
             (self.max_moment,) + self.shape, self.dtype),
     )
@@ -475,12 +474,10 @@ class RunningCentralMoments(object):
       state: `RunningCentralMomentsState` with updated calculations.
     """
     n_2 = 1
-    n_1 = state.num_samples
+    n_1 = state.mean_state.num_samples
     n = tf.cast(n_1 + n_2, dtype=self.dtype)
-    delta_mean = new_sample - state.mean
-    new_mean = self.mean_stream.update(RunningMeanState(
-        tf.cast(state.num_samples, self.dtype), state.mean,
-    ), new_sample).mean
+    delta_mean = new_sample - state.mean_state.mean
+    new_mean_state = self.mean_stream.update(state.mean_state, new_sample)
     old_res = state.sum_exponentiated_residuals
     new_sum_exponentiated_residuals = [tf.zeros(self.shape, self.dtype)]
 
@@ -500,8 +497,7 @@ class RunningCentralMoments(object):
       new_sum_exponentiated_residuals.append(new_sum_pth_residual)
 
     return RunningCentralMomentsState(
-        num_samples=n_1 + 1,
-        mean=new_mean,
+        new_mean_state,
         sum_exponentiated_residuals=tf.stack(
             new_sum_exponentiated_residuals
         )
@@ -520,7 +516,7 @@ class RunningCentralMoments(object):
         indexes the different moments.
     """
     return state.sum_exponentiated_residuals / tf.cast(
-        state.num_samples, self.dtype)
+        state.mean_state.num_samples, self.dtype)
 
   def _n_choose_k(self, n, k):
     """Computes nCk."""
