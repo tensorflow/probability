@@ -30,7 +30,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
 
-'''@test_util.test_all_tf_execution_regimes
+@test_util.test_all_tf_execution_regimes
 class RunningCovarianceTest(test_util.TestCase):
 
   def test_zero_running_variance(self):
@@ -445,7 +445,7 @@ class RunningCovarianceTest(test_util.TestCase):
         state.mean, running_var.finalize(state)])
     self.assertEqual(final_mean.shape, (10,))
     self.assertEqual(final_var.shape, (10,))
-    self.assertAllClose(final_var, np.var(x, axis=0), rtol=1e-5)'''
+    self.assertAllClose(final_var, np.var(x, axis=0), rtol=1e-5)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -571,7 +571,7 @@ class RunningRhatTest(test_util.TestCase):
     self.assertNear(true_rhat, rhat, err=1e-6)
 
 
-'''@test_util.test_all_tf_execution_regimes
+@test_util.test_all_tf_execution_regimes
 class RunningMeanTest(test_util.TestCase):
 
   def test_zero_mean(self):
@@ -687,7 +687,7 @@ class RunningMeanTest(test_util.TestCase):
     )
     state = running_mean.initialize()
     mean = self.evaluate(running_mean.finalize(state))
-    self.assertEqual(0, mean)'''
+    self.assertEqual(0, mean)
 
 
 if __name__ == '__main__':
