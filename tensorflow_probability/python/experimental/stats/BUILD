@@ -53,7 +53,7 @@ py_test(
     name = "sample_stats_test",
     size = "small",
     srcs = ["sample_stats_test.py"],
-    shard_count = 5,
+    shard_count = 10,
     deps = [
         ":sample_stats",
         # numpy dep,

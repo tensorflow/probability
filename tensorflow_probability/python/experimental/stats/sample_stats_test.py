@@ -573,7 +573,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
   def test_first_five_moments(self):
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(),
-        moment=5
+        max_moment=5
     )
     state = running_moments.initialize()
     for sample in range(5):
@@ -586,22 +586,10 @@ class RunningCentralMomentsTest(test_util.TestCase):
     self.assertNear(6.8, kur, err=1e-6)
     self.assertNear(0, fifth_moment, err=1e-6)
 
-  def test_return_all_moments_flag(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
-        shape=(),
-        moment=4
-    )
-    state = running_moments.initialize()
-    for sample in range(5):
-      state = running_moments.update(state, sample)
-    moment = self.evaluate(
-        running_moments.finalize(state, return_all_moments=False))
-    self.assertNear(6.8, moment, err=1e-6)
-
   def test_very_high_moments(self):
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(),
-        moment=15
+        max_moment=15
     )
     state = running_moments.initialize()
     for sample in range(5):
@@ -616,7 +604,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
   def test_higher_rank_samples(self):
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(2, 2),
-        moment=5
+        max_moment=5
     )
     state = running_moments.initialize()
     for sample in range(5):
@@ -634,7 +622,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
     x = rng.rand(100)
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(),
-        moment=5
+        max_moment=5
     )
     state = running_moments.initialize()
     for sample in x:
@@ -648,7 +636,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
     x = rng.rand(100, 10)
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(10,),
-        moment=5
+        max_moment=5
     )
     state = running_moments.initialize()
     for sample in x:
@@ -660,7 +648,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
   def test_manual_dtype(self):
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(),
-        moment=1,
+        max_moment=1,
         dtype=tf.float64
     )
     state = running_moments.initialize()
@@ -671,7 +659,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
   def test_int_dtype_casts(self):
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(),
-        moment=1,
+        max_moment=1,
         dtype=tf.int32
     )
     state = running_moments.initialize()
@@ -682,7 +670,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
   def test_in_tf_while(self):
     running_moments = tfp.experimental.stats.RunningCentralMoments(
         shape=(),
-        moment=4
+        max_moment=4
     )
     state = running_moments.initialize()
     _, state = tf.while_loop(
@@ -691,9 +679,12 @@ class RunningCentralMomentsTest(test_util.TestCase):
             state, tf.ones(()) * i)),
         (0., state)
     )
-    kur = self.evaluate(
-        running_moments.finalize(state, return_all_moments=False))
-    self.assertNear(6.8, kur, err=1e-6)
+    moments = self.evaluate(
+        running_moments.finalize(state))
+    self.assertAllClose(
+        stats.moment(np.arange(5), moment=np.arange(4) + 1),
+        moments,
+        rtol=1e-6)
 
 
 if __name__ == '__main__':

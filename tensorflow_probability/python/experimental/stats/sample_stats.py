@@ -407,11 +407,9 @@ class RunningCentralMoments(object):
   (2008) [1]. For reference, the formula we refer to is the incremental
   version of arbitrary moments (equation 2.9). Since the algorithm computes
   moments as a function of lower ones, even if not requested, all lower
-  moments will be computed as well. Whether all moments are returned is
-  defined by the `return_all_moments` argument in the `finalize` method.
-  Note, while any arbitrarily high central moment is theoretically supported,
-  `RunningCentralMoments` cannot guarantee numerical stability for all
-  moments.
+  moments will be computed as well. Note, while any arbitrarily high
+  central moment is theoretically supported, `RunningCentralMoments` cannot
+  guarantee numerical stability for all moments.
 
   `RunningCentralMoments` objects do not hold state information. That
   information, which includes intermediate calculations, are held in a
@@ -425,13 +423,14 @@ class RunningCentralMoments(object):
         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
   """
 
-  def __init__(self, shape, moment, dtype=tf.float32):
+  def __init__(self, shape, max_moment, dtype=tf.float32):
     """Instantiates this object.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples.
-      moment: Integer that represents the central moment of interest.
+      max_moment: Integer that represents the highest central moment of
+        interest.
       dtype: Dtype of incoming samples and the resulting statistics.
         By default, the dtype is `tf.float32`. Any integer dtypes will be
         cast to corresponding floats (i.e. `tf.int32` will be cast to
@@ -439,12 +438,15 @@ class RunningCentralMoments(object):
         floating-point division.
     """
     self.shape = shape
-    self.moment = moment
+    self.max_moment = max_moment
     if dtype is tf.int64:
       dtype = tf.float64
     elif dtype.is_integer:
       dtype = tf.float32
     self.dtype = dtype
+    self.mean_stream = RunningMean(
+        self.shape, self.dtype
+    )
 
   def initialize(self):
     """Initializes an empty `RunningCentralMomentsState`.
@@ -453,14 +455,11 @@ class RunningCentralMoments(object):
       state: `RunningCentralMomentsState` representing a stream of no
         inputs.
     """
-    mean_stream = RunningMean(
-        self.shape, self.dtype
-    )
     return RunningCentralMomentsState(
         num_samples=0,
-        mean=mean_stream.initialize().mean,
+        mean=self.mean_stream.initialize().mean,
         sum_exponentiated_residuals=tf.zeros(
-            (self.moment,) + self.shape, self.dtype),
+            (self.max_moment,) + self.shape, self.dtype),
     )
 
   def update(self, state, new_sample):
@@ -479,10 +478,7 @@ class RunningCentralMoments(object):
     n_1 = state.num_samples
     n = tf.cast(n_1 + n_2, dtype=self.dtype)
     delta_mean = new_sample - state.mean
-    mean_stream = RunningMean(
-        self.shape, self.dtype
-    )
-    new_mean = mean_stream.update(RunningMeanState(
+    new_mean = self.mean_stream.update(RunningMeanState(
         tf.cast(state.num_samples, self.dtype), state.mean,
     ), new_sample).mean
     old_res = state.sum_exponentiated_residuals
@@ -490,14 +486,14 @@ class RunningCentralMoments(object):
 
     # the following two nested for loops calculate equation 2.9 in Pebay's
     # 2008 paper from smallest moment to highest.
-    for p in range(2, self.moment + 1):
+    for p in range(2, self.max_moment + 1):
       summation = tf.zeros(self.shape, self.dtype)
       for k in range(1, p - 1):
-        adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p-k-1]
+        adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p - k - 1]
         summation += self._n_choose_k(p, k) * adjusted_old_res
       # the `adj_term` refers to the final term in equation 2.9 and is not
       # transcribed exactly, but rather, it's actually simplified to avoid
-      # having a `(n-1)` denominator.
+      # having a `(n - 1)` denominator.
       adj_term = (((delta_mean / n) ** p) * (n - 1) *
                   ((n - 1) ** (p - 1) + (-1) ** p))
       new_sum_pth_residual = old_res[p - 1] + summation + adj_term
@@ -506,38 +502,27 @@ class RunningCentralMoments(object):
     return RunningCentralMomentsState(
         num_samples=n_1 + 1,
         mean=new_mean,
-        sum_exponentiated_residuals=tf.convert_to_tensor(
+        sum_exponentiated_residuals=tf.stack(
             new_sum_exponentiated_residuals
         )
     )
 
-  def finalize(self, state, return_all_moments=True):
+  def finalize(self, state):
     """Finalizes streaming computation for all central moments.
 
     Args:
-      state: `RunningMeanState` that represents the current state of
-        running statistics.
-      return_all_moments: Boolean flag that represents whether all
-        lower moments to `self.moment` will be returned or not. Defaults
-        to `True` (i.e. all moments will be returned).
+      state: `RunningCentralMomentsState` that represents the current state
+        of running statistics.
 
     Returns:
       all_moments: A `Tensor` representing estimates of central moments
-        up to and including `self.moment`. Its leading dimension indexes
-        the moment. This is the return value if `return_all_moments` is
-        `True`.
-      target_moment: A `Tensor` representing the estimate of the
-        `self.moment`th central moment. This is the return value if
-        `return_all_moments` is `False`.
+        up to and including `self.max_moment`. Its leading dimension
+        indexes the different moments.
     """
-    all_moments = state.sum_exponentiated_residuals / tf.cast(
+    return state.sum_exponentiated_residuals / tf.cast(
         state.num_samples, self.dtype)
-    if return_all_moments:
-      return all_moments
-    else:
-      return all_moments[self.moment - 1]
 
   def _n_choose_k(self, n, k):
     """Computes nCk."""
-    return math.factorial(n) // math.factorial(k) // math.factorial(n-k)
+    return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
   
