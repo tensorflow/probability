@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'bessel_iv_ratio',
+    'erfcinv',
     'round_exponential_bump_function',
     'lambertw',
     'lambertw_winitzki_approx',
@@ -37,6 +38,25 @@ __all__ = [
     'log_gamma_difference',
     'lbeta',
 ]
+
+
+def erfcinv(z, name=None):
+  """Computes the inverse of `tf.math.erfc` of `z` element-wise.
+
+  NOTE: This is mathematically equivalent to computing `erfinv(1 - x)`
+  however is more numerically stable.
+
+  Args:
+    z: A Tensor with type `float32` or `float64`.
+    name: A name for the operation (optional).
+
+  Returns:
+    erfcinv: erfcinv evaluated at `z`. A Tensor with the same shape and same
+      dtype as `z`.
+  """
+  with tf.name_scope(name or 'erfcinv'):
+    z = tf.convert_to_tensor(z)
+    return -tf.math.ndtri(0.5 * z) * np.sqrt(0.5)
 
 
 def _compute_general_continued_fraction(

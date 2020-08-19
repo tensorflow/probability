@@ -393,6 +393,7 @@ multi_substrate_py_test(
     name = "special_test",
     size = "medium",
     srcs = ["special_test.py"],
+    tags = ["tf1-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

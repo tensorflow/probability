@@ -283,6 +283,21 @@ class BesselTest(test_util.TestCase):
 
 class SpecialTest(test_util.TestCase):
 
+  def testErfcinv(self):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=0.,
+        maxval=1.,
+        seed=test_util.test_seed())
+    erfcinv = tfp.math.erfcinv(x)
+    x_prime = tf.math.erfc(erfcinv)
+    x_prime, erfcinv = self.evaluate([x_prime, erfcinv])
+
+    self.assertFalse(np.all(np.isnan(erfcinv)))
+    self.assertGreaterEqual(np.min(erfcinv), 0.)
+    # Check that erfc(erfcinv(x)) = x.
+    self.assertAllClose(x_prime, x, rtol=1e-6)
+
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
   # for a list of special values and known identities.
   @parameterized.named_parameters(

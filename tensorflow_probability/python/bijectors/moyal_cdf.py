@@ -23,6 +23,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -100,18 +101,16 @@ class MoyalCDF(bijector.Bijector):
     z = (x - self.loc) / self.scale
     return tf.math.erfc(tf.exp(-z / 2) / np.sqrt(2.))
 
-  # TODO(b/157561663): Use `tf.math.special.erfcinv`.
-
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
       return (self.loc - self.scale *
-              (np.log(2.) + 2. * tf.math.log(tf.math.erfinv(1 - y))))
+              (np.log(2.) + 2. * tf.math.log(tfp_math.erfcinv(y))))
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return (tf.math.square(tf.math.erfinv(1 - y)) +
+      return (tf.math.square(tfp_math.erfcinv(y)) +
               tf.math.log(self.scale) + 0.5 * np.log(np.pi) -
-              tf.math.log(tf.math.erfinv(1 - y)))
+              tf.math.log(tfp_math.erfcinv(y)))
 
   def _forward_log_det_jacobian(self, x):
     scale = tf.convert_to_tensor(self.scale)

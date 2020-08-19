@@ -57,6 +57,7 @@ from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import bessel_iv_ratio
+from tensorflow_probability.python.math.special import erfcinv
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
@@ -84,6 +85,7 @@ _allowed_symbols = [
     'custom_gradient',
     'dense_to_sparse',
     'diag_jacobian',
+    'erfcinv',
     'fill_triangular',
     'fill_triangular_inverse',
     'interp_regular_1d_grid',
