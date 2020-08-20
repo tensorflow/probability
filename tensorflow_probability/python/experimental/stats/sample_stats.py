@@ -451,6 +451,14 @@ class RunningCentralMoments(object):
   def initialize(self):
     """Initializes an empty `RunningCentralMomentsState`.
 
+    The `RunningCentralMomentsState` contains a `RunningMeanState` and
+    a `Tensor` representing the sum of exponentiated residuals. The sum
+    of exponentiated residuals is a `Tensor` of shape
+    (`self.max_moment`, `self.shape`) which contains the sum of
+    residuals raised to the nth power, for all `2 <= n <= self.max_moment`.
+    In the case of `n == 1`, the value is a corresponding structure of
+    `tf.zeros`.
+
     Returns:
       state: `RunningCentralMomentsState` representing a stream of no
         inputs.
