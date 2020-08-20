@@ -18,51 +18,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
-
 # Dependency imports
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
-
-
-TestTransitionKernelResults = collections.namedtuple(
-    'TestTransitionKernelResults', 'counter_1, counter_2')
-
-
-class TestTransitionKernel(tfp.mcmc.TransitionKernel):
-  """Fake deterministic Transition Kernel."""
-
-  def __init__(self, shape=(), target_log_prob_fn=None, is_calibrated=True):
-    self._is_calibrated = is_calibrated
-    self._shape = shape
-    # for composition purposes
-    self.parameters = dict(
-        target_log_prob_fn=target_log_prob_fn)
-
-  def one_step(self, current_state, previous_kernel_results, seed=None):
-    return (current_state + tf.ones(self._shape),
-            TestTransitionKernelResults(
-                counter_1=previous_kernel_results.counter_1 + 1,
-                counter_2=previous_kernel_results.counter_2 + 2))
-
-  def bootstrap_results(self, current_state):
-    return TestTransitionKernelResults(
-        counter_1=tf.zeros(()),
-        counter_2=tf.zeros(()))
-
-  @property
-  def is_calibrated(self):
-    return self._is_calibrated
 
 
 @test_util.test_all_tf_execution_regimes
 class SampleDiscardingTest(test_util.TestCase):
 
   def test_thinning(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_steps_between_results=1,)
@@ -79,7 +48,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(8, kernel_results.inner_results.counter_2)
 
   def test_burnin(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=5,)
@@ -93,7 +62,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_no_thinning_or_burnin(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,)
     first_state, kernel_results = discarder.one_step(
@@ -109,7 +78,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(4, kernel_results.inner_results.counter_2)
 
   def test_both_thinning_and_burnin(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,
@@ -130,7 +99,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(28, kernel_results.inner_results.counter_2)
 
   def test_cold_start(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,
@@ -153,8 +122,9 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(24, kernel_results.inner_results.counter_2)
 
   def test_is_calibrated(self):
-    calibrated_kernel = TestTransitionKernel()
-    uncalibrated_kernel = TestTransitionKernel(is_calibrated=False)
+    calibrated_kernel = test_fixtures.TestTransitionKernel()
+    uncalibrated_kernel = test_fixtures.TestTransitionKernel(
+        is_calibrated=False)
     calibrated_discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         calibrated_kernel)
     uncalibrated_discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
@@ -163,7 +133,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertFalse(uncalibrated_discarder.is_calibrated)
 
   def test_with_composed_kernel(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=tfp.experimental.mcmc.SampleDiscardingKernel(
@@ -190,7 +160,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(np.var([13, 16]), cov)
 
   def test_tf_while(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,
@@ -216,7 +186,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(28, kernel_results.inner_results.counter_2)
 
   def test_tensor_thinning_and_burnin(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=tf.convert_to_tensor(10),
@@ -243,7 +213,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(28, kernel_results.inner_results.counter_2)
 
   def test_non_static_thinning_and_burnin(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     num_burnin_steps = tf.Variable(10, dtype=tf.int32)
     num_steps_between_results = tf.Variable(1, dtype=tf.int32)
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
@@ -273,7 +243,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(28, kernel_results.inner_results.counter_2)
 
   def test_tensor_no_burnin(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=tf.convert_to_tensor(0),
@@ -299,7 +269,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(8, kernel_results.inner_results.counter_2)
 
   def test_call_count_is_int32(self):
-    fake_inner_kernel = TestTransitionKernel()
+    fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=10,

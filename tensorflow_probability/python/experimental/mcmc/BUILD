@@ -356,6 +356,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -413,6 +414,7 @@ py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -442,6 +444,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -467,6 +470,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -491,6 +495,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -515,6 +520,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

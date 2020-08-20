@@ -18,45 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
-
 # Dependency imports
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-
-TestTransitionKernelResults = collections.namedtuple(
-    'TestTransitionKernelResults', 'counter_1, counter_2')
-
-
-class TestTransitionKernel(tfp.mcmc.TransitionKernel):
-  """Fake deterministic Transition Kernel."""
-
-  def __init__(self, shape=(), target_log_prob_fn=None, is_calibrated=True):
-    self._is_calibrated = is_calibrated
-    self._shape = shape
-    # for composition purposes
-    self.parameters = dict(
-        target_log_prob_fn=target_log_prob_fn)
-
-  def one_step(self, current_state, previous_kernel_results, seed=None):
-    return (current_state + tf.ones(self._shape),
-            TestTransitionKernelResults(
-                counter_1=previous_kernel_results.counter_1 + 1,
-                counter_2=previous_kernel_results.counter_2 + 2))
-
-  def bootstrap_results(self, current_state):
-    return TestTransitionKernelResults(
-        counter_1=tf.zeros(()),
-        counter_2=tf.zeros(()))
-
-  @property
-  def is_calibrated(self):
-    return self._is_calibrated
 
 
 @test_util.test_all_tf_execution_regimes
@@ -131,7 +100,7 @@ class TracingReducerTest(test_util.TestCase):
 
   def test_in_sample_fold(self):
     tracer = tfp.experimental.mcmc.TracingReducer()
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     trace, final_state, kernel_results = tfp.experimental.mcmc.sample_fold(
         num_steps=3,
         current_state=0.,

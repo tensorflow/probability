@@ -23,6 +23,7 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
 
 
@@ -32,34 +33,6 @@ FakeKernelResults = collections.namedtuple(
 
 FakeInnerResults = collections.namedtuple(
     'FakeInnerResults', 'value')
-
-
-TestTransitionKernelResults = collections.namedtuple(
-    'TestTransitionKernelResults', 'counter_1, counter_2')
-
-
-class TestTransitionKernel(tfp.mcmc.TransitionKernel):
-  """Fake deterministic `TransitionKernel` for testing purposes."""
-
-  def __init__(self, is_calibrated=True, accepts_seed=True):
-    self._is_calibrated = is_calibrated
-    self._accepts_seed = accepts_seed
-
-  def one_step(self, current_state, previous_kernel_results, seed=None):
-    if seed is not None and not self._accepts_seed:
-      raise TypeError('seed arg not accepted')
-    return current_state + 1, TestTransitionKernelResults(
-        counter_1=previous_kernel_results.counter_1 + 1,
-        counter_2=previous_kernel_results.counter_2 + 2)
-
-  def bootstrap_results(self, current_state):
-    return TestTransitionKernelResults(
-        counter_1=tf.constant(0, dtype=tf.int32),
-        counter_2=tf.constant(0, dtype=tf.int32))
-
-  @property
-  def is_calibrated(self):
-    return self._is_calibrated
 
 
 @test_util.test_all_tf_execution_regimes
@@ -146,7 +119,7 @@ class ExpectationsReducerTest(test_util.TestCase):
     self.assertEqual(0, mean)
 
   def test_in_with_reductions(self):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
     reduced_kernel = tfp.experimental.mcmc.WithReductions(
         fake_kernel, mean_reducer,
@@ -158,7 +131,7 @@ class ExpectationsReducerTest(test_util.TestCase):
     self.assertEqual(9, streaming_calculations)
 
   def test_in_step_kernel(self):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
     reduced_kernel = tfp.experimental.mcmc.WithReductions(
         fake_kernel, mean_reducer,

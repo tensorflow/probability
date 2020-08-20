@@ -18,78 +18,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
-
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
-
-
-class TestReducer(tfp.experimental.mcmc.Reducer):
-  """Simple Reducer that just keeps track of the last sample."""
-
-  def initialize(self, initial_chain_state, initial_kernel_results=None):
-    return tf.zeros_like(initial_chain_state)
-
-  def one_step(
-      self, new_chain_state, current_reducer_state, previous_kernel_results):
-    return new_chain_state
-
-
-class MeanReducer(tfp.experimental.mcmc.Reducer):
-  """Simple Reducer that (naively) computes the mean."""
-
-  def initialize(self, initial_chain_state=None, initial_kernel_results=None):
-    return tf.zeros((2,))
-
-  def one_step(
-      self, new_chain_state, current_reducer_state, previous_kernel_results):
-    return current_reducer_state + tf.stack([1, new_chain_state])
-
-  def finalize(self, final_state):
-    return final_state[1] / final_state[0]
-
-
-TestTransitionKernelResults = collections.namedtuple(
-    'TestTransitionKernelResults', 'counter_1, counter_2')
-
-
-class TestTransitionKernel(tfp.mcmc.TransitionKernel):
-  """Fake deterministic Transition Kernel."""
-
-  def __init__(self, shape=(), target_log_prob_fn=None, is_calibrated=True):
-    self._is_calibrated = is_calibrated
-    self._shape = shape
-    # for composition purposes
-    self.parameters = dict(
-        target_log_prob_fn=target_log_prob_fn)
-
-  def one_step(self, current_state, previous_kernel_results, seed=None):
-    return (current_state + tf.ones(self._shape),
-            TestTransitionKernelResults(
-                counter_1=previous_kernel_results.counter_1 + 1,
-                counter_2=previous_kernel_results.counter_2 + 2))
-
-  def bootstrap_results(self, current_state):
-    return TestTransitionKernelResults(
-        counter_1=tf.zeros(()),
-        counter_2=tf.zeros(()))
-
-  @property
-  def is_calibrated(self):
-    return self._is_calibrated
 
 
 @test_util.test_all_tf_execution_regimes
 class WithReductionsTest(test_util.TestCase):
 
   def test_simple_operation(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.TestReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducer=fake_reducer,
@@ -104,8 +48,8 @@ class WithReductionsTest(test_util.TestCase):
     self.assertEqual(2, kernel_results.inner_results.counter_2)
 
   def test_boostrap_results(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.TestReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducer=fake_reducer,
@@ -116,9 +60,10 @@ class WithReductionsTest(test_util.TestCase):
     self.assertEqual(0, pkr.inner_results.counter_2, 0)
 
   def test_is_calibrated(self):
-    fake_calibrated_kernel = TestTransitionKernel()
-    fake_uncalibrated_kernel = TestTransitionKernel(is_calibrated=False)
-    fake_reducer = TestReducer()
+    fake_calibrated_kernel = test_fixtures.TestTransitionKernel()
+    fake_uncalibrated_kernel = test_fixtures.TestTransitionKernel(
+        is_calibrated=False)
+    fake_reducer = test_fixtures.TestReducer()
     calibrated_reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_calibrated_kernel,
         reducer=fake_reducer,
@@ -131,8 +76,8 @@ class WithReductionsTest(test_util.TestCase):
     self.assertFalse(uncalibrated_reducer_kernel.is_calibrated)
 
   def test_tf_while(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.TestReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducer=fake_reducer,
@@ -160,8 +105,11 @@ class WithReductionsTest(test_util.TestCase):
     self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_nested_reducers(self):
-    fake_kernel = TestTransitionKernel()
-    nested_reducer = [[TestReducer(), TestReducer()], [TestReducer()]]
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    nested_reducer = [
+        [test_fixtures.TestReducer(), test_fixtures.TestReducer()],
+        [test_fixtures.TestReducer()]
+    ]
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducer=nested_reducer,
@@ -187,8 +135,11 @@ class WithReductionsTest(test_util.TestCase):
     self.assertEqual(2, kernel_results.inner_results.counter_2)
 
   def test_nested_state_dependent_reducers(self):
-    fake_kernel = TestTransitionKernel()
-    nested_reducer = [[MeanReducer(), MeanReducer()], [MeanReducer()]]
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    nested_reducer = [
+        [test_fixtures.NaiveMeanReducer(), test_fixtures.NaiveMeanReducer()],
+        [test_fixtures.NaiveMeanReducer()]
+    ]
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
         reducer=nested_reducer,
@@ -222,7 +173,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
 
   @parameterized.parameters(0, 1)
   def test_covariance_reducer(self, ddof):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(ddof=ddof)
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
@@ -247,7 +198,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_covariance_with_batching(self):
-    fake_kernel = TestTransitionKernel((9, 3))
+    fake_kernel = test_fixtures.TestTransitionKernel((9, 3))
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
@@ -268,7 +219,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
 
   @parameterized.parameters(0, 1)
   def test_variance_reducer(self, ddof):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     reducer = tfp.experimental.mcmc.VarianceReducer(ddof=ddof)
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
@@ -331,7 +282,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
 
   def test_covariance_with_step_kernel(self):
-    fake_kernel = TestTransitionKernel()
+    fake_kernel = test_fixtures.TestTransitionKernel()
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
@@ -358,7 +309,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertEqual(12, kernel_results.inner_results.counter_2)
 
   def test_covariance_before_transformation(self):
-    fake_kernel = TestTransitionKernel(lambda x: -x**2 / 2)
+    fake_kernel = test_fixtures.TestTransitionKernel(
+        target_log_prob_fn=lambda x: -x**2 / 2)
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
@@ -389,7 +341,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         np.cov(np.log(samples).T, ddof=0), final_cov, rtol=1e-6)
 
   def test_covariance_after_transformation(self):
-    fake_kernel = TestTransitionKernel(lambda x: -x**2 / 2)
+    fake_kernel = test_fixtures.TestTransitionKernel(
+        target_log_prob_fn=lambda x: -x**2 / 2)
     transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=fake_kernel,
         bijector=tfp.bijectors.Exp(),
@@ -457,9 +410,9 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
 
   def test_nested_reducers(self):
-    fake_kernel = TestTransitionKernel()
-    fake_reducer = TestReducer()
-    mean_reducer = MeanReducer()
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.TestReducer()
+    mean_reducer = test_fixtures.NaiveMeanReducer()
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reducer_kernel = tfp.experimental.mcmc.WithReductions(
         inner_kernel=fake_kernel,
