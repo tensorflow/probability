@@ -92,11 +92,11 @@ def stochastic_volatility(centered_returns):
     """Extracts the values of all latent variables."""
     res = collections.OrderedDict()
     res['mean_log_volatility'] = util.get_columns(
-        samples, r'^mean_log_volatility$')
+        samples, r'^mean_log_volatility$')[:, 0]
     res['white_noise_shock_scale'] = util.get_columns(
-        samples, r'^white_noise_shock_scale$')
+        samples, r'^white_noise_shock_scale$')[:, 0]
     res['persistence_of_volatility'] = util.get_columns(
-        samples, r'^persistence$')
+        samples, r'^persistence$')[:, 0]
     res['log_volatility'] = util.get_columns(
         samples, r'^log_volatilities\.\d+$',)
     return res

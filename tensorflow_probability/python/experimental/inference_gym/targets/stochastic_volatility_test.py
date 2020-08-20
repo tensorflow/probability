@@ -61,7 +61,10 @@ class StochasticVolatilitySP500Test(test_util.InferenceGymTestCase):
                 'mean_log_volatility': [],
                 'white_noise_shock_scale': [],
                 'log_volatility': [100]
-            }))
+            }),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True)
 
 
 if __name__ == '__main__':

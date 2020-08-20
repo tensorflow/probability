@@ -161,6 +161,11 @@ class StochasticVolatility(bayesian_model.BayesianModel):
               model.Model.SampleTransformation(
                   fn=_ext_identity,
                   pretty_name='Identity',
+                  dtype=collections.OrderedDict(
+                      persistence_of_volatility=tf.float32,
+                      mean_log_volatility=tf.float32,
+                      white_noise_shock_scale=tf.float32,
+                      log_volatility=tf.float32)
               )
       }
 

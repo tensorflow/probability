@@ -337,36 +337,36 @@ IDENTITY_LOG_VOLATILITY_STANDARD_DEVIATION = np.array([
 
 IDENTITY_MEAN_LOG_VOLATILITY_MEAN = np.array([
     7.91516637742,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_MEAN_LOG_VOLATILITY_MEAN_STANDARD_ERROR = np.array([
     0.004522720834862319,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_MEAN_LOG_VOLATILITY_STANDARD_DEVIATION = np.array([
     1.0478904838684748,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_PERSISTENCE_OF_VOLATILITY_MEAN = np.array([
     0.9249792145839999,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_PERSISTENCE_OF_VOLATILITY_MEAN_STANDARD_ERROR = np.array([
     0.00014421067997856288,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_PERSISTENCE_OF_VOLATILITY_STANDARD_DEVIATION = np.array([
     0.04760110487933296,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_WHITE_NOISE_SHOCK_SCALE_MEAN = np.array([
     0.500450060468,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_WHITE_NOISE_SHOCK_SCALE_MEAN_STANDARD_ERROR = np.array([
     0.00038906346615080745,
-]).reshape((1,))
+]).reshape(())
 
 IDENTITY_WHITE_NOISE_SHOCK_SCALE_STANDARD_DEVIATION = np.array([
     0.13947841751592666,
-]).reshape((1,))
+]).reshape(())
