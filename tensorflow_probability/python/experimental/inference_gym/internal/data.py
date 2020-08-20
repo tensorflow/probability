@@ -21,12 +21,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.experimental.inference_gym.internal.datasets import brownian_motion_missing_middle_observations as brownian_motion_lib
 from tensorflow_probability.python.experimental.inference_gym.internal.datasets import sp500_closing_prices as sp500_closing_prices_lib
 from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib
 from tensorflow_probability.python.experimental.inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = [
+    'brownian_motion_missing_middle_observations',
     'german_credit_numeric',
     'sp500_closing_prices',
     'synthetic_item_response_theory',
@@ -77,6 +79,25 @@ def _normalize_zero_mean_one_std(train, test):
   train_mean = train.mean(0, keepdims=True)
   train_std = train.std(0, keepdims=True)
   return (train - train_mean) / train_std, (test - train_mean) / train_std
+
+
+def brownian_motion_missing_middle_observations():
+  """Synthetic dataset sampled from the BrownianMotion model.
+
+  This dataset is a simulation of a 30 timestep Brownian Motion where
+  the loc paramters of the middle ten timesteps are unobservable.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      locs: Float `Tensor` of observed loc parameters at each timestep.
+      observation_noise: Float `Tensor` of observation noise, must be positive.
+      innovation_noise: Float `Tensor` of innovation noise, must be positive.
+
+  """
+  return dict(
+      locs=brownian_motion_lib.OBSERVED_LOC,
+      observation_noise=brownian_motion_lib.OBSERVATION_NOISE,
+      innovation_noise=brownian_motion_lib.INNOVATION_NOISE)
 
 
 def german_credit_numeric(

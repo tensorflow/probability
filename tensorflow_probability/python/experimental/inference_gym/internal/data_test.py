@@ -69,6 +69,10 @@ class DataTest(test_util.InferenceGymTestCase):
     self.assertEqual((num_train_points,), dataset['centered_returns'].shape)
     self.assertAllClose(0.0, np.mean(dataset['centered_returns']), atol=1e-5)
 
+  def testBrownianMotion(self):
+    dataset = data.brownian_motion_missing_middle_observations()
+    self.assertEqual((30,), dataset['locs'].shape)
+
   def testSyntheticItemResponseTheory(self):
     num_train_points = int(0.75 * 30012)
     num_test_points = 30012 - num_train_points

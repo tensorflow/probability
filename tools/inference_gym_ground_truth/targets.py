@@ -19,6 +19,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tools.inference_gym_ground_truth import brownian_motion
 from tools.inference_gym_ground_truth import item_response_theory
 from tools.inference_gym_ground_truth import log_gaussian_cox_process
 from tools.inference_gym_ground_truth import logistic_regression
@@ -28,6 +29,7 @@ from tools.inference_gym_ground_truth import stochastic_volatility
 from tensorflow_probability.python.experimental.inference_gym.internal import data
 
 __all__ = [
+    'brownian_motion_missing_middle_observations',
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
     'german_credit_numeric_sparse_logistic_regression',
@@ -36,6 +38,16 @@ __all__ = [
     'synthetic_item_response_theory',
     'synthetic_log_gaussian_cox_process',
 ]
+
+
+def brownian_motion_missing_middle_observations():
+  """Brownian Motion with missing observations.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.brownian_motion_missing_middle_observations()
+  return brownian_motion.brownian_motion(**dataset)
 
 
 def german_credit_numeric_logistic_regression():

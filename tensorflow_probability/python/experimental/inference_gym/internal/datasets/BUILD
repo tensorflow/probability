@@ -34,6 +34,7 @@ multi_substrate_py_library(
     name = "datasets",
     srcs = ["__init__.py"],
     deps = [
+        ":brownian_motion_missing_middle_observations",
         ":sp500_closing_prices",
         ":synthetic_item_response_theory",
         ":synthetic_log_gaussian_cox_process",
@@ -51,6 +52,14 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "sp500_closing_prices",
     srcs = ["sp500_closing_prices.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "brownian_motion_missing_middle_observations",
+    srcs = ["brownian_motion_missing_middle_observations.py"],
     deps = [
         # numpy dep,
     ],

@@ -30,6 +30,17 @@ py_binary(
 )
 
 py_library(
+    name = "brownian_motion",
+    srcs = ["brownian_motion.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+        # numpy dep,
+    ],
+)
+
+py_library(
     name = "item_response_theory",
     srcs = ["item_response_theory.py"],
     srcs_version = "PY3",
@@ -100,6 +111,7 @@ py_library(
     srcs = ["targets.py"],
     srcs_version = "PY3",
     deps = [
+        ":brownian_motion",
         ":item_response_theory",
         ":log_gaussian_cox_process",
         ":logistic_regression",

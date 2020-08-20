@@ -37,6 +37,7 @@ multi_substrate_py_library(
     deps = [
         ":banana",
         ":bayesian_model",
+        ":brownian_motion",
         ":ill_conditioned_gaussian",
         ":item_response_theory",
         ":log_gaussian_cox_process",
@@ -91,6 +92,31 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "brownian_motion",
+    srcs = ["brownian_motion.py"],
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "brownian_motion_test",
+    size = "large",
+    srcs = ["brownian_motion_test.py"],
+    deps = [
+        ":brownian_motion",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

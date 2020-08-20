@@ -34,6 +34,7 @@ multi_substrate_py_library(
     name = "ground_truth",
     srcs = ["__init__.py"],
     deps = [
+        ":brownian_motion_missing_middle_observations",
         ":german_credit_numeric_logistic_regression",
         ":german_credit_numeric_probit_regression",
         ":german_credit_numeric_sparse_logistic_regression",
@@ -95,6 +96,14 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "stochastic_volatility_sp500_small",
     srcs = ["stochastic_volatility_sp500_small.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "brownian_motion_missing_middle_observations",
+    srcs = ["brownian_motion_missing_middle_observations.py"],
     deps = [
         # numpy dep,
     ],
