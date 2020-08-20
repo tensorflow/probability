@@ -81,7 +81,8 @@ class TracingReducer(reducer_base.Reducer):
         previous kernel results and return a `Tensor` or a nested collection
         of `Tensor`s that is accumulated across samples.
       size: Integer or scalar `Tensor` denoting the size of the accumulated
-        `TensorArray`.
+        `TensorArray`. If this is `None` (which is the default), a
+        dynamic-shaped `TensorArray` will be used.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'tracing_reducer').
     """
