@@ -17,8 +17,7 @@
 
 There are a few key differences:
 1. We use Oryx's state API to handle variables.
-2. We include the params as an input to the optimizer so we can build optimizers
-like LARS and LAMB.
+2. We change the order of the arguments of the optimiser's update function.
 """
 import itertools
 
