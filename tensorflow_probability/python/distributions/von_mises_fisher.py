@@ -22,12 +22,15 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import spherical_uniform
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -350,6 +353,25 @@ class VonMisesFisher(distribution.Distribution):
                           mean_direction=mean_direction,
                           concentration=concentration)) / event_dim)
 
+  def _entropy(self):
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+    event_dimension = tf.cast(
+        self._event_shape_tensor(
+            mean_direction=mean_direction)[0], dtype=self.dtype)
+    concentration = tf.convert_to_tensor(self.concentration)
+    # Compared to [1] (see the KL(VonMisesFisher || SphericalUniform) for the
+    # exact reference, we add the log normalization constant rather than
+    # subtract it. This is because in TFP, we have the convention that we
+    # normalize our distributions p(x) by a constant 1 / Z. Taking the log
+    # gives us a negative sign.
+    entropy = -concentration * tfp_math.bessel_iv_ratio(
+        event_dimension / 2., concentration) + self._log_normalization(
+            concentration=concentration)
+
+    return tf.broadcast_to(
+        entropy, self._batch_shape_tensor(
+            mean_direction=mean_direction, concentration=concentration))
+
   def _rotate(self, samples, mean_direction):
     """Applies a Householder rotation to `samples`."""
     event_dim = (
@@ -555,3 +577,44 @@ class VonMisesFisher(distribution.Distribution):
           assert_util.assert_non_negative(
               concentration, message='`concentration` must be non-negative'))
     return assertions
+
+
+@kullback_leibler.RegisterKL(VonMisesFisher, spherical_uniform.SphericalUniform)
+def _kl_vmf_spherical_uniform(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b).
+
+  Args:
+    a: instance of a VonMisesFisher distribution object.
+    b: instance of a SphericalUniform distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_vmf_spherical_uniform".
+
+  Returns:
+    Batchwise KL(a || b)
+
+  Raises:
+    ValueError: If the two distributions are over spheres of different
+      dimensions.
+
+  #### References
+
+  [1] T. Davidson, L. Falorsi, N. Cao, T. Kipf, J. Tomczak. Hyperspherical
+      Variational Auto-Encoders. Uncertainty In Artifical Intelligence
+      (UAI) 2020.
+      https://arxiv.org/abs/1804.00891.
+  """
+  with tf.name_scope(name or 'kl_vmf_spherical_uniform'):
+    msg = (
+        'Can not compute the KL divergence between a `VonMisesFisher` and '
+        '`SphericalUniform` of different dimensions.')
+    deps = []
+    if a.event_shape[-1] is not None:
+      if a.event_shape[-1] != b.dimension:
+        raise ValueError(
+            (msg + 'Got {} vs. {}').format(a.event_shape[-1], b.dimension))
+    elif a.validate_args or b.validate_args:
+      deps += [assert_util.assert_equal(
+          a.event_shape_tensor()[-1], b.dimension, message=msg)]
+
+    with tf.control_dependencies(deps):
+      return b.entropy() - a.entropy()
