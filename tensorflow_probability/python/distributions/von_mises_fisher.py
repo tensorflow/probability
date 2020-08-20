@@ -312,46 +312,47 @@ class VonMisesFisher(distribution.Distribution):
     concentration = tf.convert_to_tensor(self.concentration)
     mean_direction = tf.convert_to_tensor(self.mean_direction)
 
-    event_dim = tf.compat.dimension_value(self.event_shape[0])
-    if event_dim is None:
-      raise ValueError('event shape must be statically known for _bessel_ive')
+    event_dimension = tf.cast(
+        self._event_shape_tensor(mean_direction)[0], self.dtype)
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))
     safe_mean = mean_direction * (
-        _bessel_ive(event_dim / 2, safe_conc) /
-        _bessel_ive(event_dim / 2 - 1, safe_conc))[..., tf.newaxis]
+        tfp_math.bessel_iv_ratio(
+            event_dimension / 2., safe_conc)[..., tf.newaxis])
     return tf.where(
         concentration[..., tf.newaxis] > 0.,
         safe_mean, tf.zeros_like(safe_mean))
 
   def _covariance(self):
     # Derivation: https://sachinruk.github.io/blog/von-Mises-Fisher/
-    event_dim = tf.compat.dimension_value(self.event_shape[0])
-    if event_dim is None:
-      raise ValueError('event shape must be statically known for _bessel_ive')
+
+    event_dimension_static = tf.compat.dimension_value(self.event_shape[0])
+
     # TODO(b/141142878): Enable this; numerically unstable.
-    if event_dim > 2:
+    if event_dimension_static is not None and event_dimension_static > 2:
       raise NotImplementedError(
           'vMF covariance is numerically unstable for dim>2')
+
     mean_direction = tf.convert_to_tensor(self.mean_direction)
     concentration = tf.convert_to_tensor(self.concentration)
+    event_dimension = tf.cast(self._event_shape_tensor(
+        mean_direction)[0], self.dtype)
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))[..., tf.newaxis]
-    h = (_bessel_ive(event_dim / 2, safe_conc) /
-         _bessel_ive(event_dim / 2 - 1, safe_conc))
+    h = tfp_math.bessel_iv_ratio(event_dimension / 2, safe_conc)
     intermediate = (
         tf.matmul(mean_direction[..., :, tf.newaxis],
                   mean_direction[..., tf.newaxis, :]) *
-        (1 - event_dim * h / safe_conc - h**2)[..., tf.newaxis])
+        (1 - event_dimension * h / safe_conc - h**2)[..., tf.newaxis])
     cov = tf.linalg.set_diag(
         intermediate,
         tf.linalg.diag_part(intermediate) + (h / safe_conc))
     return tf.where(
         concentration[..., tf.newaxis, tf.newaxis] > 0., cov,
-        tf.linalg.eye(event_dim,
+        tf.linalg.eye(event_dimension_static,
                       batch_shape=self._batch_shape_tensor(
                           mean_direction=mean_direction,
-                          concentration=concentration)) / event_dim)
+                          concentration=concentration)) / event_dimension)
 
   def _entropy(self):
     mean_direction = tf.convert_to_tensor(self.mean_direction)
