@@ -90,6 +90,7 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
                is_self_adjoint=None,
                is_positive_definite=None,
                is_square=True,
+               parameters=None,
                name="LinearOperatorCirculant"):
     r"""Initialize an `_BaseLinearOperatorCirculant`.
 
@@ -110,6 +111,8 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
         https://en.wikipedia.org/wiki/Positive-definite_matrix\
             #Extension_for_non_symmetric_matrices
       is_square:  Expect that this operator acts like square [batch] matrices.
+      parameters: Python `dict` of parameters used to instantiate this
+        `LinearOperator`.
       name:  A name to prepend to all ops created by this class.
 
     Raises:
@@ -148,6 +151,7 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
           is_square=is_square,
+          parameters=parameters,
           name=name)
       # TODO(b/143910018) Remove graph_parents in V3.
       self._set_graph_parents([self.spectrum])
@@ -771,6 +775,15 @@ class LinearOperatorCirculant(_BaseLinearOperatorCirculant):
       is_square:  Expect that this operator acts like square [batch] matrices.
       name:  A name to prepend to all ops created by this class.
     """
+    parameters = dict(
+        spectrum=spectrum,
+        input_output_dtype=input_output_dtype,
+        is_non_singular=is_non_singular,
+        is_self_adjoint=is_self_adjoint,
+        is_positive_definite=is_positive_definite,
+        is_square=is_square,
+        name=name
+    )
     super(LinearOperatorCirculant, self).__init__(
         spectrum,
         block_depth=1,
@@ -779,6 +792,7 @@ class LinearOperatorCirculant(_BaseLinearOperatorCirculant):
         is_self_adjoint=is_self_adjoint,
         is_positive_definite=is_positive_definite,
         is_square=is_square,
+        parameters=parameters,
         name=name)
 
   def _eigvals(self):
@@ -951,6 +965,15 @@ class LinearOperatorCirculant2D(_BaseLinearOperatorCirculant):
       is_square:  Expect that this operator acts like square [batch] matrices.
       name:  A name to prepend to all ops created by this class.
     """
+    parameters = dict(
+        spectrum=spectrum,
+        input_output_dtype=input_output_dtype,
+        is_non_singular=is_non_singular,
+        is_self_adjoint=is_self_adjoint,
+        is_positive_definite=is_positive_definite,
+        is_square=is_square,
+        name=name
+    )
     super(LinearOperatorCirculant2D, self).__init__(
         spectrum,
         block_depth=2,
@@ -959,6 +982,7 @@ class LinearOperatorCirculant2D(_BaseLinearOperatorCirculant):
         is_self_adjoint=is_self_adjoint,
         is_positive_definite=is_positive_definite,
         is_square=is_square,
+        parameters=parameters,
         name=name)
 
 
@@ -1101,6 +1125,15 @@ class LinearOperatorCirculant3D(_BaseLinearOperatorCirculant):
       is_square:  Expect that this operator acts like square [batch] matrices.
       name:  A name to prepend to all ops created by this class.
     """
+    parameters = dict(
+        spectrum=spectrum,
+        input_output_dtype=input_output_dtype,
+        is_non_singular=is_non_singular,
+        is_self_adjoint=is_self_adjoint,
+        is_positive_definite=is_positive_definite,
+        is_square=is_square,
+        name=name
+    )
     super(LinearOperatorCirculant3D, self).__init__(
         spectrum,
         block_depth=3,
@@ -1109,6 +1142,7 @@ class LinearOperatorCirculant3D(_BaseLinearOperatorCirculant):
         is_self_adjoint=is_self_adjoint,
         is_positive_definite=is_positive_definite,
         is_square=is_square,
+        parameters=parameters,
         name=name)
 
 

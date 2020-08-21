@@ -498,7 +498,6 @@ py_test(
     srcs_version = "PY2AND3",
     tags = [
         "no-oss-ci",
-        "notap",  # TODO(b/165819187): re-enable tests when TF nightly is updated
     ],
     deps = [
         ":linear_operator_gen",
