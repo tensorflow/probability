@@ -431,7 +431,7 @@ class RunningCentralMoments(object):
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples.
-      moment: Integer or shallow collection of integers that represent the
+      moment: Integer or iterable of integers that represent the
         desired moments to return.
       dtype: Dtype of incoming samples and the resulting statistics.
         By default, the dtype is `tf.float32`. Any integer dtypes will be
