@@ -61,7 +61,7 @@ def log_prob(f):
     """Function wrapper that takes in log_prob arguments."""
     # Trace the function using a random seed
     dummy_seed = random.PRNGKey(0)
-    jaxpr, _ = trace_util.stage(f)(dummy_seed, *args, **kwargs)
+    jaxpr, _ = trace_util.stage(f, dynamic=False)(dummy_seed, *args, **kwargs)
     flat_outargs, _ = tree_util.tree_flatten(sample)
     flat_inargs, _ = tree_util.tree_flatten(args)
     constcells = [InverseAndILDJ.new(val) for val in jaxpr.literals]

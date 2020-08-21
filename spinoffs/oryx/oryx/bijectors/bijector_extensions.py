@@ -83,7 +83,7 @@ class _JaxBijectorTypeSpec(object):
     return cls(clsid, param_specs, kwargs)
 
 
-bijector_p = primitive.HigherOrderPrimitive('bijector')
+bijector_p = primitive.InitialStylePrimitive('bijector')
 
 
 class _CellProxy:
@@ -93,21 +93,18 @@ class _CellProxy:
     self.cell = cell
 
 
-def bijector_ildj_rule(incells, outcells, **params):
+def bijector_ildj_rule(incells, outcells, *, in_tree, num_consts, direction,
+                       **_):
   """Inverse/ILDJ rule for bijectors."""
-  incells = incells[1:]
-  num_consts = len(incells) - params['num_args']
   const_incells, flat_incells = jax_util.split_list(incells, [num_consts])
   flat_inproxies = safe_map(_CellProxy, flat_incells)
-  in_tree = params['in_tree']
   bijector_proxies, inproxy = tree_util.tree_unflatten(in_tree,
                                                        flat_inproxies)
   flat_bijector_cells = [proxy.cell for proxy
                          in tree_util.tree_leaves(bijector_proxies)]
   if any(not cell.top() for cell in flat_bijector_cells):
-    return const_incells + flat_incells, outcells, False, None
+    return (const_incells + flat_incells, outcells, None)
   bijector = tree_util.tree_multimap(lambda x: x.cell.val, bijector_proxies)
-  direction = params['direction']
   if direction == 'forward':
     forward_func = bijector.forward
     inv_func = bijector.inverse
@@ -133,7 +130,7 @@ def bijector_ildj_rule(incells, outcells, **params):
   elif outcell.is_unknown() and not incell.is_unknown():
     new_outcells = [InverseAndILDJ.new(forward_func(incell.val))]
   new_incells = flat_bijector_cells + flat_incells
-  return const_incells + new_incells, new_outcells, None
+  return (const_incells + new_incells, new_outcells, None)
 inverse.core.ildj_registry[bijector_p] = bijector_ildj_rule
 
 
@@ -143,8 +140,9 @@ def make_wrapper_type(cls):
   clsid = (cls.__module__, cls.__name__)
 
   def bijector_bind(bijector, x, **kwargs):
-    return primitive.call_bind(
-        bijector_p, direction=kwargs['direction'])(_bijector)(
+    return primitive.initial_style_bind(
+        bijector_p, direction=kwargs['direction'],
+        bijector_name=bijector.__class__.__name__)(_bijector)(
             bijector, x, **kwargs)
 
   def _bijector(bij, x, **kwargs):

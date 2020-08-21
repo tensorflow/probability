@@ -310,7 +310,7 @@ def template_build(cls, init_key, *args, name=None, **kwargs):
     raise ValueError('Cannot initialize template with `None` PRNGKey.')
   layer_params = cls.initialize(init_key, *args, **kwargs)
   if init_key is not None:
-    new_params = tree_util.tree_map(lambda x: lax.tie_in(init_key, x),
+    new_params = tree_util.tree_map(lambda x: primitive.tie_in(init_key, x),
                                     (layer_params.params, layer_params.state))
     layer_params = LayerParams(params=new_params[0], state=new_params[1],
                                info=layer_params.info)

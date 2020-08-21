@@ -80,23 +80,21 @@ class _JaxDistributionTypeSpec(object):
     return cls(clsid, param_specs, kwargs)
 
 
-random_variable_p = primitive.HigherOrderPrimitive('random_variable')
+random_variable_p = primitive.InitialStylePrimitive('random_variable')
 unzip.block_registry.add(random_variable_p)
 
 
 def random_variable_log_prob_rule(flat_incells, flat_outcells, **params):
   """Registers Oryx distributions with the log_prob transformation."""
   del params
-  # First incell is the call primitive function
-  return flat_incells[1:], flat_outcells, None
+  return flat_incells, flat_outcells, None
 log_prob.log_prob_rules[random_variable_p] = random_variable_log_prob_rule
 
 
-def random_variable_log_prob(flat_incells, val, **params):
+def random_variable_log_prob(flat_incells, val, *, num_consts, in_tree, **_):
   """Registers Oryx distributions with the log_prob transformation."""
-  num_consts = len(flat_incells) - params['num_args']
   _, flat_incells = jax_util.split_list(flat_incells, [num_consts])
-  _, dist = tree_util.tree_unflatten(params['in_tree'], flat_incells)
+  _, dist = tree_util.tree_unflatten(in_tree, flat_incells)
   if any(not cell.top() for cell in flat_incells[1:]
          if isinstance(val, InverseAndILDJ)):
     return None
@@ -114,9 +112,12 @@ def _sample_distribution(key, dist):
 @ppl.random_variable.register(tfd.Distribution)
 def distribution_random_variable(dist: tfd.Distribution, *,
                                  name: Optional[str] = None):
+  """Converts a distribution into a sampling function."""
   def wrapped(key):
-    result = primitive.call_bind(random_variable_p)(_sample_distribution)(
-        key, dist)
+    result = primitive.initial_style_bind(
+        random_variable_p,
+        distribution_name=dist.__class__.__name__)(_sample_distribution)(
+            key, dist)
     if name is not None:
       result = ppl.random_variable(result, name=name)
     return result

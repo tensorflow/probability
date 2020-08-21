@@ -50,11 +50,10 @@ class CustomInverse:
   def __init__(self, func, prim):
     self.func = func
     self.prim = prim
-    # Register a default inverse that inverts the wrapped function
-    ildj_registry[self.prim] = jax_util.partial(core.call_ildj, self.prim)
 
   def __call__(self, *args, **kwargs):
-    return primitive.call_bind(self.prim)(self.func)(*args, **kwargs)
+    return primitive.initial_style_bind(self.prim)(self.func)(
+        *args, **kwargs)
 
   def def_inverse_unary(self, f_inv=None, f_ildj=None):
     """Defines a unary inverse rule.
@@ -89,12 +88,9 @@ class CustomInverse:
         new_ildjs`. Unknown values are provided as `None`.
     """
 
-    def ildj_rule(incells, outcells, *, in_tree, out_tree, num_args, **_):
+    def ildj_rule(incells, outcells, *, in_tree, out_tree, num_consts, **_):
       # First incell is a wrapped function because prim is a call primitive.
-      incells = incells[1:]
-      num_consts = len(incells) - num_args
       const_incells, incells = jax_util.split_list(incells, [num_consts])
-      out_tree = out_tree()
       if (all(outcell.top() for outcell in outcells) and
           any(not incell.top() for incell in incells)):
         flat_outvals = [outcell.val for outcell in outcells]
@@ -230,7 +226,7 @@ def custom_inverse(f):
     A `CustomInverse` object whose inverse can be overridden with
     `def_inverse_unary` or `def_inverse`.
   """
-  return CustomInverse(f, primitive.HigherOrderPrimitive(f.__name__))
+  return CustomInverse(f, primitive.InitialStylePrimitive(f.__name__))
 
 
 class NonInvertibleError(Exception):

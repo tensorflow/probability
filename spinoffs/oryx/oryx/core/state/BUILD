@@ -99,6 +99,7 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,
         # numpy dep,
+        "//oryx/core:primitive",
     ],
 )
 

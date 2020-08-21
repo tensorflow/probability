@@ -17,11 +17,11 @@
 import abc
 import collections
 import jax
-from jax import lax
 from jax import random
 from jax.experimental import stax
 import jax.numpy as np
 
+from oryx.core import primitive
 from oryx.core import state
 from oryx.experimental.nn import base
 
@@ -121,7 +121,7 @@ class Dropout(base.Layer):
       if rng is None:
         raise ValueError('rng is required when training is True')
       # Using tie_in to avoid materializing constants
-      keep = lax.tie_in(x, random.bernoulli(rng, info.rate, x.shape))
+      keep = primitive.tie_in(x, random.bernoulli(rng, info.rate, x.shape))
       return np.where(keep, x / info.rate, 0)
     else:
       return x

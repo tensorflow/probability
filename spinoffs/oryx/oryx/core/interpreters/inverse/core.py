@@ -167,7 +167,8 @@ def inverse_and_ildj(f, *trace_args, reduce_ildj=True):
   def wrapped(*args, **kwargs):
     """Function wrapper that takes in inverse arguments."""
     forward_args = trace_args if len(trace_args) else args
-    jaxpr, (in_tree, _) = trace_util.stage(f)(*forward_args, **kwargs)
+    jaxpr, (in_tree, _) = trace_util.stage(f, dynamic=False)(
+        *forward_args, **kwargs)
     flat_forward_args, _ = tree_util.tree_flatten(forward_args)
     flat_args, _ = tree_util.tree_flatten(args)
     flat_constcells = safe_map(InverseAndILDJ.new, jaxpr.literals)
@@ -326,6 +327,21 @@ ildj_registry[harvest.nest_p] = jax_util.partial(call_ildj, harvest.nest_p)
 def hop_inverse_rule(prim):
   ildj_registry[prim] = jax_util.partial(call_ildj, prim)
 primitive.register_hop_transformation_rule('inverse', hop_inverse_rule)
+
+
+def initial_ildj(incells, outcells, *, jaxpr, **_):
+  env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr, [], incells,
+                            outcells)
+  new_incells = [env.read(invar) for invar in jaxpr.invars]
+  new_outcells = [env.read(outvar) for outvar in jaxpr.outvars]
+  return new_incells, new_outcells, None
+
+
+def initial_inverse_rule(prim):
+  ildj_registry[prim] = initial_ildj
+
+
+primitive.register_initial_transformation_rule('inverse', initial_inverse_rule)
 
 
 def map_ildj(prim, incells, outcells, **params):

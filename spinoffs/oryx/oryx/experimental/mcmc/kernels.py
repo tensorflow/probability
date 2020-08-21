@@ -91,7 +91,7 @@ def metropolis(unnormalized_log_prob: LogProbFunction,
         np.clip(np.exp(log_unclipped_accept_prob), 0., 1.),
         tag=MCMC_METRICS,
         name='accept_prob')
-    u = lax.tie_in(accept_prob, random.uniform(accept_key))
+    u = primitive.tie_in(accept_prob, random.uniform(accept_key))
     accept = np.log(u) < log_unclipped_accept_prob
     return tree_util.tree_multimap(lambda n, s: np.where(accept, n, s),
                                    next_state, state)
@@ -135,7 +135,7 @@ def metropolis_hastings(unnormalized_log_prob: LogProbFunction,
         np.clip(np.exp(log_unclipped_accept_prob), 0., 1.),
         tag=MCMC_METRICS,
         name='accept_prob')
-    u = lax.tie_in(accept_prob, random.uniform(accept_key))
+    u = primitive.tie_in(accept_prob, random.uniform(accept_key))
     accept = np.log(u) < log_unclipped_accept_prob
     return tree_util.tree_multimap(lambda n, s: np.where(accept, n, s),
                                    next_state, state)

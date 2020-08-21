@@ -261,8 +261,8 @@ def function_init(f, *, name=None, init_keyword='init_key'):
       init_f = harvest.nest(init_f, scope=name)
       cau_f = harvest.nest(cau_f, scope=name)
     variables = init_f(init_key)
-    cau_jaxpr, (in_tree, out_tree) = trace_util.stage(cau_f)(variables, *args,
-                                                             **kwargs)
+    cau_jaxpr, (in_tree, out_tree) = trace_util.stage(cau_f, dynamic=True)(
+        variables, *args, **kwargs)
     if name is None:
       variables = {
           k: module.variable(val, name=k, key=init_key)

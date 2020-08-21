@@ -114,6 +114,7 @@ class Module(pytree.Pytree, metaclass=abc.ABCMeta):
 
   def __init__(self, *, name=None):
     self.name = name
+    self.__name__ = name or 'module'
 
   @abc.abstractmethod
   def call(self, *args, **kwargs) -> Any:

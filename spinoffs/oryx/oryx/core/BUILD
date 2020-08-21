@@ -63,6 +63,7 @@ py_library(
     srcs = ["primitive.py"],
     srcs_version = "PY3",
     deps = [
+        ":trace_util",
         # jax dep,
     ],
 )
@@ -73,6 +74,7 @@ py_library(
     srcs = ["trace_util.py"],
     srcs_version = "PY3",
     deps = [
+        # dataclasses dep,
         # jax dep,
     ],
 )

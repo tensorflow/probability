@@ -14,20 +14,22 @@
 # ============================================================================
 # Lint as: python3
 """Module for higher order primitives."""
-import functools
+import itertools as it
 from typing import Callable
 
-import jax
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
 from jax import linear_util as lu
 from jax import tree_util
+from jax import util as jax_util
 from jax.interpreters import ad
 from jax.interpreters import batching
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 from jax.lib.xla_bridge import xla_client as xc
+
+from oryx.core import trace_util
 
 __all__ = [
     'HigherOrderPrimitive',
@@ -42,11 +44,18 @@ safe_map = jax_core.safe_map
 
 custom_batch_rules = {}
 hop_transformation_rules = {}
+initial_transformation_rules = {}
 
 
 def register_hop_transformation_rule(name: str, register_func: Callable[...,
                                                                         None]):
   hop_transformation_rules[name] = register_func
+
+
+def register_initial_transformation_rule(
+    name: str,
+    register_func: Callable[..., None]):
+  initial_transformation_rules[name] = register_func
 
 
 class HigherOrderPrimitive(jax_core.Primitive):
@@ -148,8 +157,9 @@ class FlatPrimitive(jax_core.Primitive):
     ad.primitive_jvps[self] = _jvp
 
     def _batch(args, dims, **params):
-      return jax.vmap(functools.partial(self.impl, **params),
-                      in_axes=dims)(*args)
+      batched, out_dims = batching.batch_fun2(lu.wrap_init(self.impl, params),
+                                              dims)
+      return batched.call_wrapped(*args), out_dims()
     batching.primitive_batchers[self] = _batch
 
     def _xla(c, *xla_args, **params):
@@ -177,6 +187,36 @@ def call_bind(prim, **params):
       return tree_util.tree_unflatten(out_tree_dest, out)
     return wrapped
   return bind
+
+
+def initial_style_bind(prim, **params):
+  """Binds a primitive to a function call."""
+  def bind(f):
+    """Wraps a function to be bound to a primitive, keeping track of Pytree information."""
+    def wrapped(*args, **kwargs):
+      """Runs a function and binds it to a call primitive."""
+      jaxpr, (in_tree, out_tree) = trace_util.stage(f, dynamic=True)(
+          *args, **kwargs)
+      flat_args = tree_util.tree_leaves(args)
+      outs = prim.bind(*it.chain(jaxpr.literals, flat_args),
+                       jaxpr=jaxpr.jaxpr, in_tree=in_tree, out_tree=out_tree,
+                       num_consts=len(jaxpr.literals), **params)
+      return tree_util.tree_unflatten(out_tree, outs)
+    return wrapped
+  return bind
+
+
+class InitialStylePrimitive(FlatPrimitive):
+  """Contains default implementations of transformations."""
+
+  def __init__(self, name):
+    super().__init__(name)
+    def fun_impl(*args, **params):
+      consts, args = jax_util.split_list(args, [params['num_consts']])
+      return jax_core.eval_jaxpr(params['jaxpr'], consts, *args)
+    self.def_impl(fun_impl)
+    for register_func in initial_transformation_rules.values():
+      register_func(self)
 
 
 tie_all_p = jax_core.Primitive('tie_all')

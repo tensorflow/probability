@@ -45,6 +45,7 @@ py_library(
         ":base",
         # jax dep,
         # jax:stax dep,
+        "//oryx/core:primitive",
         "//oryx/core/state",
     ],
 )

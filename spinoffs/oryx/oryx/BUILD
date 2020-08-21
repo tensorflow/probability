@@ -41,4 +41,4 @@ py_library(
     srcs_version = "PY3",
 )
 
-# third_party_dependency(package = "oryx")  # DisableOnExport
+# third_party_dependency(package = "py/oryx")  # DisableOnExport
