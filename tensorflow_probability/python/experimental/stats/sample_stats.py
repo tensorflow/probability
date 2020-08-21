@@ -19,18 +19,25 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 # Dependency imports
 
+import numpy as np
 import tensorflow.compat.v2 as tf
-
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.mcmc import diagnostic
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    'RunningMean',
-    'RunningMeanState',
     'RunningCovariance',
     'RunningCovarianceState',
+    'RunningMean',
+    'RunningMeanState',
+    'RunningPotentialScaleReduction',
+    'RunningPotentialScaleReductionState',
     'RunningVariance',
 ]
 
@@ -389,3 +396,167 @@ class RunningMean(object):
       mean: An estimate of the mean.
     """
     return state.mean
+
+
+RunningPotentialScaleReductionState = collections.namedtuple(
+    'RunningPotentialScaleReductionState', 'chain_var')
+
+
+class RunningPotentialScaleReduction(object):
+  """Holds metadata for and computes a running R-hat diagnostic statistic.
+
+  `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential
+  scale reduction (also known as R-hat) for chain convergence [1].
+
+  If multiple independent R-hat computations are desired across a latent
+  state, one should use a (possibly nested) collection for initialization
+  parameters `independent_chain_ndims` and `shape`. Subsequent chain states
+  used to update the streaming R-hat should mimic their identical structure.
+
+  `RunningPotentialScaleReduction` also assumes that incoming samples have shape
+  `[Ci1, Ci2,...,CiD] + A`. Dimensions `0` through `D - 1` index the
+  `Ci1 x ... x CiD` independent chains to be tested for convergence to the same
+  target. The remaining dimensions, `A`, represent the event shape and hence,
+  can have any shape (even empty, which implies scalar samples). The number of
+  independent chain dimensions is defined by the `independent_chain_ndims`
+  parameter at initialization.
+
+  `RunningPotentialScaleReduction` objects do not hold state information. That
+  information, which includes intermediate calculations, are held in a
+  `RunningPotentialScaleReductionState` as returned via `initialize` and
+  `update` method calls.
+
+  `RunningPotentialScaleReduction` is meant to serve general streaming R-hat.
+  For a specialized version that fits streaming over MCMC samples, see
+  `RhatReducer` in `tfp.experimental.mcmc`.
+
+  #### References
+
+  [1]: Andrew Gelman and Donald B. Rubin. Inference from Iterative Simulation
+       Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
+  """
+
+  def __init__(self, shape, independent_chain_ndims, dtype=tf.float32):
+    """Instantiates this object.
+
+    Args:
+      shape: Python `Tuple` or `TensorShape` representing the shape of
+        incoming samples. Using a collection implies that future samples
+        will mimic that exact structure.
+      independent_chain_ndims: Integer or Integer type `Tensor` with value
+        `>= 1` giving the number of leading dimensions holding independent
+        chain results to be tested for convergence. Using a collection
+        implies that future samples will mimic that exact structure.
+      dtype: Dtype of incoming samples and the resulting statistics.
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
+    """
+    self.shape = shape
+    self.independent_chain_ndims = independent_chain_ndims
+    def _cast_dtype(dtype):
+      if dtype_util.as_numpy_dtype(dtype) is np.int64:
+        return tf.float64
+      elif dtype_util.is_integer(dtype):
+        return tf.float32
+      return dtype
+    self.dtype = tf.nest.map_structure(_cast_dtype, dtype)
+
+  def initialize(self):
+    """Initializes an empty `RunningPotentialScaleReductionState`.
+
+    Returns:
+      state: `RunningPotentialScaleReductionState` representing a stream
+        of no inputs.
+    """
+    def _initialize_for_one_state(shape, dtype):
+      """Initializes a running variance state for one group of Markov chains."""
+      var_stream = RunningVariance(shape, dtype=dtype)
+      return var_stream.initialize()
+    broadcasted_dtype = nest_util.broadcast_structure(
+        self.independent_chain_ndims, self.dtype)
+    chain_var = nest.map_structure_up_to(
+        self.independent_chain_ndims,
+        _initialize_for_one_state,
+        self.shape,
+        broadcasted_dtype,
+        check_types=False
+    )
+    return RunningPotentialScaleReductionState(chain_var)
+
+  def update(self, state, new_sample):
+    """Update the `RunningPotentialScaleReductionState` with a new sample.
+
+    Args:
+      state: `RunningPotentialScaleReductionState` that represents the
+        current state of running statistics.
+      new_sample: Incoming `Tensor` sample or (possibly nested) collection of
+        `Tensor`s with shape and dtype compatible with those used to form the
+        `RunningPotentialScaleReductionState`.
+
+    Returns:
+      state: `RunningPotentialScaleReductionState` with updated calculations.
+    """
+    def _update_for_one_state(
+        shape, dtype, chain_var, new_sample):
+      """Updates the running variance for one group of Markov chains."""
+      # TODO(axch): chunking could be reasonably added here by accepting and
+      # including the chunked axis to the running variance object
+      var_stream = RunningVariance(shape, dtype=dtype)
+      return var_stream.update(chain_var, new_sample)
+    broadcasted_dtype = nest_util.broadcast_structure(
+        self.independent_chain_ndims, self.dtype)
+    updated_chain_vars = nest.map_structure_up_to(
+        self.independent_chain_ndims,
+        _update_for_one_state,
+        self.shape,
+        broadcasted_dtype,
+        state.chain_var,
+        new_sample,
+        check_types=False
+    )
+    return RunningPotentialScaleReductionState(updated_chain_vars)
+
+  def finalize(self, state):
+    """Finalizes potential scale reduction computation for the `state`.
+
+    Args:
+      state: `RunningPotentialScaleReductionState` that represents
+        the current state of running statistics.
+
+    Returns:
+      rhat: An estimate of the R-hat.
+    """
+    def _finalize_for_one_state(shape, chain_ndims, chain_var):
+      """Calculates R-hat for one group of Markov chains."""
+      # using notation from Brooks and Gelman (1998),
+      # n := num samples / chain; m := number of chains
+      n = chain_var.num_samples
+      m = tf.cast(
+          functools.reduce((lambda x, y: x * y), (shape[:chain_ndims])),
+          n.dtype)
+
+      # b/n is the between-chain variance (the variance of the chain means)
+      b_div_n = diagnostic._reduce_variance(  # pylint:disable=protected-access
+          tf.convert_to_tensor(chain_var.mean),
+          axis=tf.range(chain_ndims),
+          biased=False)
+
+      # W is the within sequence variance (the mean of the chain variances)
+      sum_of_chain_squared_residuals = tf.reduce_sum(
+          chain_var.sum_squared_residuals, axis=tf.range(chain_ndims))
+      w = sum_of_chain_squared_residuals / (m * (n - 1))
+
+      # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper
+      true_variance_estimate = ((n - 1) / n) * w + b_div_n
+      return ((m + 1.) / m) * true_variance_estimate / w - (n - 1.) / (m * n)
+
+    return nest.map_structure_up_to(
+        self.independent_chain_ndims,
+        _finalize_for_one_state,
+        self.shape,
+        self.independent_chain_ndims,
+        state.chain_var,
+        check_types=False
+    )

@@ -41,6 +41,7 @@ py_library(
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
+        ":potential_scale_reduction_reducer",
         ":reducer",
         ":sample",
         ":sample_discarding_kernel",
@@ -521,6 +522,30 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "potential_scale_reduction_reducer",
+    srcs = ["potential_scale_reduction_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/stats",
+    ],
+)
+
+# py2and3
+py_test(
+    name = "potential_scale_reduction_reducer_test",
+    size = "small",
+    srcs = ["potential_scale_reduction_reducer_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

@@ -1221,6 +1221,8 @@ class FunMCMCTest(real_tf.test.TestCase, parameterized.TestCase):
       ('BatchedVector', (10, 5, 20, 7), 2),
   )
   def testPotentialScaleReduction(self, chain_shape, independent_chain_ndims):
+    self.skipTest('https://github.com/tensorflow/probability/issues/1054')
+    # TODO(siege): Update fun_mcmc.potential_scale_reduction.
     rng = np.random.RandomState(_test_seed())
     chain_means = rng.randn(*((1,) + chain_shape[1:])).astype(np.float32)
     chains = 0.4 * rng.randn(*chain_shape).astype(np.float32) + chain_means

@@ -30,6 +30,7 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_observation_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_state_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
+from tensorflow_probability.python.experimental.mcmc.potential_scale_reduction_reducer import PotentialScaleReductionReducer
 from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
 from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
@@ -73,6 +74,7 @@ __all__ = [
     'gen_make_transform_hmc_kernel_fn',
     'make_rwmh_kernel_fn',
     'particle_filter',
+    'PotentialScaleReductionReducer',
     'reconstruct_trajectories',
     'Reducer',
     'resample_deterministic_minimum_error',

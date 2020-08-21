@@ -22,10 +22,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import stats
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -492,6 +494,12 @@ def potential_scale_reduction(chains_states,
 def _potential_scale_reduction_single_state(state, independent_chain_ndims,
                                             split_chains, validate_args):
   """potential_scale_reduction for one single state `Tensor`."""
+  # casting integers to floats for floating-point division
+  # check to see if the `state` is a numpy object for the numpy test suite
+  if dtype_util.as_numpy_dtype(state.dtype) is np.int64:
+    state = tf.cast(state, tf.float64)
+  elif dtype_util.is_integer(state.dtype):
+    state = tf.cast(state, tf.float32)
   with tf.name_scope('potential_scale_reduction_single_state'):
     # We assume exactly one leading dimension indexes e.g. correlated samples
     # from each Markov chain.
@@ -568,13 +576,12 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
         sample_and_chain_axis,
         biased=False)
     w = tf.reduce_mean(
-        _reduce_variance(state, sample_axis, keepdims=True, biased=True),
+        _reduce_variance(state, sample_axis, keepdims=True, biased=False),
         axis=sample_and_chain_axis)
 
     # sigma^2_+ is an estimate of the true variance, which would be unbiased if
     # each chain was drawn from the target.  c.f. "law of total variance."
-    sigma_2_plus = w + b_div_n
-
+    sigma_2_plus = ((n - 1) / n) * w + b_div_n
     return ((m + 1.) / m) * sigma_2_plus / w - (n - 1.) / (m * n)
 
 
