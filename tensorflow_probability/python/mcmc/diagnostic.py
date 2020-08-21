@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import stats
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -495,16 +496,10 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
   """potential_scale_reduction for one single state `Tensor`."""
   # casting integers to floats for floating-point division
   # check to see if the `state` is a numpy object for the numpy test suite
-  if type(state).__module__ == np.__name__:
-    if state.dtype is np.int64:
-      state = state.astype(np.float64)
-    elif np.issubdtype(state.dtype, np.integer):
-      state = state.astype(np.float32)
-  else:
-    if state.dtype is tf.int64:
-      state = tf.cast(state, tf.float64)
-    elif state.dtype.is_integer:
-      state = tf.cast(state, tf.float32)
+  if state.dtype is tf.int64 or state.dtype is np:
+    state = tf.cast(state, tf.float64)
+  elif dtype_util.is_integer(state.dtype):
+    state = tf.cast(state, tf.float32)
   with tf.name_scope('potential_scale_reduction_single_state'):
     # We assume exactly one leading dimension indexes e.g. correlated samples
     # from each Markov chain.

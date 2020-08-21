@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for RhatReducer."""
+"""Tests for PotentialScaleReductionReducer."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -60,10 +60,10 @@ class TestTransitionKernel(tfp.mcmc.TransitionKernel):
 
 
 @test_util.test_all_tf_execution_regimes
-class RhatReducerTest(test_util.TestCase):
+class PotentialScaleReductionReducerTest(test_util.TestCase):
 
   def test_simple_operation(self):
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
         independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(tf.zeros(5,))
@@ -79,7 +79,7 @@ class RhatReducerTest(test_util.TestCase):
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
 
   def test_non_scalar_sample(self):
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
         independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(tf.zeros((5, 3)))
@@ -94,8 +94,24 @@ class RhatReducerTest(test_util.TestCase):
     rhat, true_rhat = self.evaluate([rhat, true_rhat])
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
 
+  def test_independent_chain_ndims(self):
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
+        independent_chain_ndims=2,
+    )
+    state = rhat_reducer.initialize(tf.zeros((2, 5, 3)))
+    chain_state = np.arange(120, dtype=np.float32).reshape((4, 2, 5, 3))
+    for sample in chain_state:
+      state = rhat_reducer.one_step(sample, state)
+    rhat = rhat_reducer.finalize(state)
+    true_rhat = tfp.mcmc.potential_scale_reduction(
+        chains_states=chain_state,
+        independent_chain_ndims=2,
+    )
+    rhat, true_rhat = self.evaluate([rhat, true_rhat])
+    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
+
   def test_int_samples(self):
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
         independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(tf.zeros((5, 3), dtype=tf.int64))
@@ -111,24 +127,8 @@ class RhatReducerTest(test_util.TestCase):
     rhat, true_rhat = self.evaluate([rhat, true_rhat])
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
 
-  def test_chunking(self):
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
-        independent_chain_ndims=1,
-    )
-    state = rhat_reducer.initialize(tf.zeros((5,)))
-    chain_state = np.arange(60, dtype=np.float32).reshape((4, 5, 3))
-    for sample in chain_state:
-      state = rhat_reducer.one_step(sample, state, axis=1)
-    rhat = rhat_reducer.finalize(state)
-    true_rhat = tfp.mcmc.potential_scale_reduction(
-        chains_states=np.swapaxes(chain_state, 1, 2).reshape((12, 5)),
-        independent_chain_ndims=1,
-    )
-    rhat, true_rhat = self.evaluate([rhat, true_rhat])
-    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
-
   def test_in_with_reductions(self):
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
         independent_chain_ndims=1,
     )
     fake_kernel = TestTransitionKernel(shape=(5,))
@@ -150,7 +150,7 @@ class RhatReducerTest(test_util.TestCase):
     # two scalar chains taken from iid Normal(0, 1)
     rng = test_util.test_np_rng()
     iid_normal_samples = rng.randn(n_samples, 2)
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
         independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(iid_normal_samples[0])
@@ -168,7 +168,7 @@ class RhatReducerTest(test_util.TestCase):
     offset = np.array([1., -1., 2.]).reshape(3, 1)
     rng = test_util.test_np_rng()
     offset_samples = rng.randn(n_samples, 3, 4) + offset
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
         independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize(offset_samples[0])
@@ -190,7 +190,7 @@ class RhatReducerTest(test_util.TestCase):
         kernel=hmc_kernel,
         reducer=[
             tfp.experimental.mcmc.TracingReducer(),
-            tfp.experimental.mcmc.RhatReducer(independent_chain_ndims=1)
+            tfp.experimental.mcmc.PotentialScaleReductionReducer()
         ]
     )
     rhat = reduced_stats[1]
@@ -202,7 +202,7 @@ class RhatReducerTest(test_util.TestCase):
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
 
   def test_multiple_latent_state(self):
-    rhat_reducer = tfp.experimental.mcmc.RhatReducer(
+    rhat_reducer = tfp.experimental.mcmc.PotentialScaleReductionReducer(
         independent_chain_ndims=1,
     )
     state = rhat_reducer.initialize([tf.zeros(5,), tf.zeros((2, 5))])

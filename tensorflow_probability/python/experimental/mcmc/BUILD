@@ -41,8 +41,8 @@ py_library(
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
+        ":potential_scale_reduction_reducer",
         ":reducer",
-        ":rhat_reducer",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
@@ -521,8 +521,8 @@ py_test(
 )
 
 py_library(
-    name = "rhat_reducer",
-    srcs = ["rhat_reducer.py"],
+    name = "potential_scale_reduction_reducer",
+    srcs = ["potential_scale_reduction_reducer.py"],
     srcs_version = "PY2AND3",
     deps = [
         ":reducer",
@@ -533,9 +533,9 @@ py_library(
 
 # py2and3
 py_test(
-    name = "rhat_reducer_test",
+    name = "potential_scale_reduction_reducer_test",
     size = "small",
-    srcs = ["rhat_reducer_test.py"],
+    srcs = ["potential_scale_reduction_reducer_test.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
