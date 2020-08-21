@@ -51,7 +51,8 @@ class QuapTestJDNamed(test_util.TestCase):
 
     self.assertAllCloseNested(
         approx.stddev(),
-        dict(a=1., b=2., c=30 ** 0.5))
+        dict(a=1., b=2., c=30 ** 0.5),
+        atol=1e-04)
 
   @parameterized.named_parameters(
       {'testcase_name': 'jd_named',
@@ -94,7 +95,8 @@ class QuapTestJDNamedTuple(test_util.TestCase):
 
     self.assertAllCloseNested(
         approx.stddev(),
-        ModelSpec(a=1., b=2., c=30 ** 0.5))
+        ModelSpec(a=1., b=2., c=30 ** 0.5),
+        atol=1e-04)
 
   @parameterized.named_parameters(
       {'testcase_name': 'jd_named',
@@ -137,7 +139,8 @@ class QuapTestJDSequential(test_util.TestCase):
 
     self.assertAllCloseNested(
         approx.stddev(),
-        [1., 2., 30 ** 0.5])
+        [1., 2., 30 ** 0.5],
+        atol=1e-04)
 
   @parameterized.named_parameters(
       {'testcase_name': 'jd_sequential',
