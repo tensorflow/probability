@@ -454,10 +454,8 @@ class RunningCentralMoments(object):
     The `RunningCentralMomentsState` contains a `RunningMeanState` and
     a `Tensor` representing the sum of exponentiated residuals. The sum
     of exponentiated residuals is a `Tensor` of shape
-    (`self.max_moment`, `self.shape`) which contains the sum of
+    (`self.max_moment - 1`, `self.shape`) which contains the sum of
     residuals raised to the nth power, for all `2 <= n <= self.max_moment`.
-    In the case of `n == 1`, the value is a corresponding structure of
-    `tf.zeros`.
 
     Returns:
       state: `RunningCentralMomentsState` representing a stream of no
@@ -466,7 +464,7 @@ class RunningCentralMoments(object):
     return RunningCentralMomentsState(
         mean_state=self.mean_stream.initialize(),
         sum_exponentiated_residuals=tf.zeros(
-            (self.max_moment,) + self.shape, self.dtype),
+            (self.max_moment - 1,) + self.shape, self.dtype),
     )
 
   def update(self, state, new_sample):
@@ -486,7 +484,13 @@ class RunningCentralMoments(object):
     n = tf.cast(n_1 + n_2, dtype=self.dtype)
     delta_mean = new_sample - state.mean_state.mean
     new_mean_state = self.mean_stream.update(state.mean_state, new_sample)
-    old_res = state.sum_exponentiated_residuals
+    old_res = tf.concat([
+        tf.zeros((1,) + self.shape, self.dtype),
+        state.sum_exponentiated_residuals], axis=0)
+    # the sum of exponentiated residuals can be thought of as an estimation
+    # of the central moment before diving through by the number of samples.
+    # Since the first central moment is always 0, it simplifies update
+    # logic to prepend an appropriate structure of zeros.
     new_sum_exponentiated_residuals = [tf.zeros(self.shape, self.dtype)]
 
     # the following two nested for loops calculate equation 2.9 in Pebay's
@@ -497,8 +501,8 @@ class RunningCentralMoments(object):
         adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p - k - 1]
         summation += self._n_choose_k(p, k) * adjusted_old_res
       # the `adj_term` refers to the final term in equation 2.9 and is not
-      # transcribed exactly, but rather, it's actually simplified to avoid
-      # having a `(n - 1)` denominator.
+      # transcribed exactly; rather, it's simplified to avoid having a
+      # `(n - 1)` denominator.
       adj_term = (((delta_mean / n) ** p) * (n - 1) *
                   ((n - 1) ** (p - 1) + (-1) ** p))
       new_sum_pth_residual = old_res[p - 1] + summation + adj_term
@@ -506,8 +510,8 @@ class RunningCentralMoments(object):
 
     return RunningCentralMomentsState(
         new_mean_state,
-        sum_exponentiated_residuals=tf.stack(
-            new_sum_exponentiated_residuals
+        sum_exponentiated_residuals=tf.convert_to_tensor(
+            new_sum_exponentiated_residuals[1:], dtype=self.dtype
         )
     )
 
@@ -523,7 +527,11 @@ class RunningCentralMoments(object):
         up to and including `self.max_moment`. Its leading dimension
         indexes the different moments.
     """
-    return state.sum_exponentiated_residuals / tf.cast(
+    # prepend a structure of zeros for the first moment
+    all_unfinalized_moments = tf.concat([
+        tf.zeros((1,) + self.shape, self.dtype),
+        state.sum_exponentiated_residuals], axis=0)
+    return all_unfinalized_moments / tf.cast(
         state.mean_state.num_samples, self.dtype)
 
   def _n_choose_k(self, n, k):
