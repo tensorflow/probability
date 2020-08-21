@@ -402,14 +402,16 @@ RunningCentralMomentsState = collections.namedtuple(
 class RunningCentralMoments(object):
   """Holds metadata for and computes running central moments.
 
-  `RunningCentralMoments` will compute an arbitrary central moment in
+  `RunningCentralMoments` will compute arbitrary central moments in
   streaming fashion following the formula proposed by Philippe Pebay
   (2008) [1]. For reference, the formula we refer to is the incremental
   version of arbitrary moments (equation 2.9). Since the algorithm computes
   moments as a function of lower ones, even if not requested, all lower
-  moments will be computed as well. Note, while any arbitrarily high
-  central moment is theoretically supported, `RunningCentralMoments` cannot
-  guarantee numerical stability for all moments.
+  moments will be computed as well. The moments that are actually returned
+  is specified by the `moment` parameter at initialization. Note, while
+  any arbitrarily high central moment is theoretically supported,
+  `RunningCentralMoments` cannot guarantee numerical stability for all
+  moments.
 
   `RunningCentralMoments` objects do not hold state information. That
   information, which includes intermediate calculations, are held in a
@@ -423,14 +425,14 @@ class RunningCentralMoments(object):
         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
   """
 
-  def __init__(self, shape, max_moment, dtype=tf.float32):
+  def __init__(self, shape, moment, dtype=tf.float32):
     """Instantiates this object.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
         incoming samples.
-      max_moment: Integer that represents the highest central moment of
-        interest.
+      moment: Integer or shallow collection of integers that represent the
+        desired moments to return.
       dtype: Dtype of incoming samples and the resulting statistics.
         By default, the dtype is `tf.float32`. Any integer dtypes will be
         cast to corresponding floats (i.e. `tf.int32` will be cast to
@@ -438,7 +440,14 @@ class RunningCentralMoments(object):
         floating-point division.
     """
     self.shape = shape
-    self.max_moment = max_moment
+    if isinstance(moment, collections.abc.Iterable):
+      # we want to support numpy arrays too, but must convert to a list to not
+      # confuse `tf.nest.map_structure` in `finalize`
+      self.moment = list(moment)
+      self.max_moment = max(self.moment)
+    else:
+      self.moment = moment
+      self.max_moment = moment
     if dtype is tf.int64:
       dtype = tf.float64
     elif dtype.is_integer:
@@ -454,7 +463,7 @@ class RunningCentralMoments(object):
     The `RunningCentralMomentsState` contains a `RunningMeanState` and
     a `Tensor` representing the sum of exponentiated residuals. The sum
     of exponentiated residuals is a `Tensor` of shape
-    (`self.max_moment - 1`, `self.shape`) which contains the sum of
+    (`self.max_moment - 1`, `self.shape`), which contains the sum of
     residuals raised to the nth power, for all `2 <= n <= self.max_moment`.
 
     Returns:
@@ -523,16 +532,19 @@ class RunningCentralMoments(object):
         of running statistics.
 
     Returns:
-      all_moments: A `Tensor` representing estimates of central moments
-        up to and including `self.max_moment`. Its leading dimension
-        indexes the different moments.
+      all_moments: A `Tensor` representing estimates of the requested central
+        moments. Its leading dimension indexes the moment, in order of those
+        requested (i.e. in order of `self.moment`).
     """
     # prepend a structure of zeros for the first moment
     all_unfinalized_moments = tf.concat([
         tf.zeros((1,) + self.shape, self.dtype),
         state.sum_exponentiated_residuals], axis=0)
-    return all_unfinalized_moments / tf.cast(
+    all_moments = all_unfinalized_moments / tf.cast(
         state.mean_state.num_samples, self.dtype)
+    return tf.convert_to_tensor(tf.nest.map_structure(
+        lambda i: all_moments[i - 1],
+        self.moment), self.dtype)
 
   def _n_choose_k(self, n, k):
     """Computes nCk."""
