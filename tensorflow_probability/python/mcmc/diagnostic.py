@@ -496,7 +496,7 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
   """potential_scale_reduction for one single state `Tensor`."""
   # casting integers to floats for floating-point division
   # check to see if the `state` is a numpy object for the numpy test suite
-  if state.dtype is tf.int64 or state.dtype is np:
+  if dtype_util.as_numpy_dtype(state.dtype) is np.int64:
     state = tf.cast(state, tf.float64)
   elif dtype_util.is_integer(state.dtype):
     state = tf.cast(state, tf.float32)

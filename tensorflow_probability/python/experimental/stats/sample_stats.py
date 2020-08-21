@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 import functools
+import numpy as np
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -454,18 +455,8 @@ class RunningPotentialScaleReduction(object):
     """
     self.shape = shape
     self.independent_chain_ndims = independent_chain_ndims
-    def _infer_one_chain_shape(shape, chain_ndims):
-      return ((functools.reduce(
-          (lambda x, y: x * y), (shape[:chain_ndims])),)
-              + shape[chain_ndims:])
-    self.one_chain_ndims_shape = nest.map_structure_up_to(
-        self.independent_chain_ndims,
-        _infer_one_chain_shape,
-        self.shape,
-        self.independent_chain_ndims,
-    )
     def _cast_dtype(dtype):
-      if dtype is tf.int64 or tf.float64:
+      if dtype_util.as_numpy_dtype(dtype) is np.int64:
         return tf.float64
       elif dtype_util.is_integer(dtype):
         return tf.float32
@@ -488,7 +479,7 @@ class RunningPotentialScaleReduction(object):
     chain_var = nest.map_structure_up_to(
         self.independent_chain_ndims,
         _initialize_for_one_state,
-        self.one_chain_ndims_shape,
+        self.shape,
         broadcasted_dtype,
         check_types=False
     )
@@ -510,9 +501,8 @@ class RunningPotentialScaleReduction(object):
     def _update_for_one_state(
         shape, dtype, chain_var, new_sample):
       """Updates the running variance for one group of Markov chains."""
-      # TODO: chunking could be reasonably added here by reshaping
-      # appropriately, then including the chunked axis to the running variance
-      # object
+      # TODO: chunking could be reasonably added here by accepting and including
+      # the chunked axis to the running variance object
       new_sample = tf.reshape(new_sample, shape)
       var_stream = RunningVariance(shape, dtype=dtype)
       return var_stream.update(chain_var, new_sample)
@@ -521,7 +511,7 @@ class RunningPotentialScaleReduction(object):
     updated_chain_vars = nest.map_structure_up_to(
         self.independent_chain_ndims,
         _update_for_one_state,
-        self.one_chain_ndims_shape,
+        self.shape,
         broadcasted_dtype,
         state.chain_var,
         new_sample,
@@ -544,15 +534,19 @@ class RunningPotentialScaleReduction(object):
       # using notation from Brooks and Gelman (1998),
       # n := num samples / chain; m := number of chains
       n = chain_var.num_samples
-      m = tf.cast(shape[0], n.dtype)
+      m = tf.cast(
+          functools.reduce((lambda x, y: x * y), (shape[:chain_ndims])),
+          n.dtype)
 
       # b/n is the between-chain variance (the variance of the chain means)
       b_div_n = diagnostic._reduce_variance(
-          tf.convert_to_tensor(chain_var.mean), axis=0, biased=False)
+          tf.convert_to_tensor(chain_var.mean),
+          axis=tf.range(chain_ndims),
+          biased=False)
 
       # W is the within sequence variance (the mean of the chain variances)
       sum_of_chain_squared_residuals = tf.reduce_sum(
-          chain_var.sum_squared_residuals, axis=0)
+          chain_var.sum_squared_residuals, axis=tf.range(chain_ndims))
       w = sum_of_chain_squared_residuals / (m * (n - 1))
 
       # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper
@@ -562,7 +556,7 @@ class RunningPotentialScaleReduction(object):
     return nest.map_structure_up_to(
         self.independent_chain_ndims,
         _finalize_for_one_state,
-        self.one_chain_ndims_shape,
+        self.shape,
         self.independent_chain_ndims,
         state.chain_var,
         check_types=False

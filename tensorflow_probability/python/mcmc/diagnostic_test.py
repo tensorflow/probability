@@ -429,15 +429,18 @@ class _PotentialScaleReductionTest(object):
   def testIntegerSamples(self):
     # 5 samples from 3 independent Markov chains
     int_chain_state = np.arange(15, dtype=np.int64).reshape((5, 3))
-    int_rhat = self.evaluate(tfp.mcmc.potential_scale_reduction(
+    int_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=int_chain_state,
         independent_chain_ndims=1,
-    ))
+    )
     float_chain_state = np.arange(15, dtype=np.float64).reshape((5, 3))
-    float_rhat = self.evaluate(tfp.mcmc.potential_scale_reduction(
+    float_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=float_chain_state,
         independent_chain_ndims=1,
-    ))
+    )
+    int_rhat, float_rhat = self.evaluate([int_rhat, float_rhat])
+    self.assertEqual(tf.float64, int_rhat.dtype)
+    self.assertEqual(tf.float64, float_rhat.dtype)
     self.assertNear(float_rhat, int_rhat, err=1e-6)
 
   def testListOfStatesWhereFirstPassesSecondFails(self):
