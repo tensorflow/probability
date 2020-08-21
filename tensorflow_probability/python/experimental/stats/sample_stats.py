@@ -510,6 +510,9 @@ class RunningPotentialScaleReduction(object):
     def _update_for_one_state(
         shape, dtype, chain_var, new_sample):
       """Updates the running variance for one group of Markov chains."""
+      # TODO: chunking could be reasonably added here by reshaping
+      # appropriately, then including the chunked axis to the running variance
+      # object
       new_sample = tf.reshape(new_sample, shape)
       var_stream = RunningVariance(shape, dtype=dtype)
       return var_stream.update(chain_var, new_sample)
