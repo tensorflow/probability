@@ -24,6 +24,7 @@ from tools.inference_gym_ground_truth import item_response_theory
 from tools.inference_gym_ground_truth import log_gaussian_cox_process
 from tools.inference_gym_ground_truth import logistic_regression
 from tools.inference_gym_ground_truth import probit_regression
+from tools.inference_gym_ground_truth import radon_contextual_effects
 from tools.inference_gym_ground_truth import sparse_logistic_regression
 from tools.inference_gym_ground_truth import stochastic_volatility
 from tensorflow_probability.python.experimental.inference_gym.internal import data
@@ -33,6 +34,7 @@ __all__ = [
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
     'german_credit_numeric_sparse_logistic_regression',
+    'radon_contextual_effects_minnesota',
     'stochastic_volatility_sp500',
     'stochastic_volatility_sp500_small',
     'synthetic_item_response_theory',
@@ -84,6 +86,19 @@ def german_credit_numeric_sparse_logistic_regression():
   del dataset['test_features']
   del dataset['test_labels']
   return sparse_logistic_regression.sparse_logistic_regression(**dataset)
+
+
+def radon_contextual_effects_minnesota():
+  """Hierarchical radon model with contextual effects, with data from Minnesota.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.radon(state='MN')
+  for key in list(dataset.keys()):
+    if key.startswith('test_'):
+      del dataset[key]
+  return radon_contextual_effects.radon_contextual_effects(**dataset)
 
 
 def stochastic_volatility_sp500():

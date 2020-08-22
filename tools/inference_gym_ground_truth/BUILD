@@ -71,6 +71,16 @@ py_library(
 )
 
 py_library(
+    name = "radon_contextual_effects",
+    srcs = ["radon_contextual_effects.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+    ],
+)
+
+py_library(
     name = "stan_model",
     srcs = ["stan_model.py"],
     srcs_version = "PY3",
@@ -116,6 +126,7 @@ py_library(
         ":log_gaussian_cox_process",
         ":logistic_regression",
         ":probit_regression",
+        ":radon_contextual_effects",
         ":sparse_logistic_regression",
         ":stochastic_volatility",
         "//tensorflow_probability/python/experimental/inference_gym/internal:data",

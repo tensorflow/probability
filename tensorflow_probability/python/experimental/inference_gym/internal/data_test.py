@@ -73,6 +73,15 @@ class DataTest(test_util.InferenceGymTestCase):
     dataset = data.brownian_motion_missing_middle_observations()
     self.assertEqual((30,), dataset['locs'].shape)
 
+  @test_util.uses_tfds
+  def testRadon(self):
+    dataset = data.radon(train_fraction=0.75)
+    for k, v in dataset.items():
+      if k.startswith('train_'):
+        self.assertEqual((689,), v.shape)
+      if k.startswith('test_'):
+        self.assertEqual((230,), v.shape)
+
   def testSyntheticItemResponseTheory(self):
     num_train_points = int(0.75 * 30012)
     num_test_points = 30012 - num_train_points

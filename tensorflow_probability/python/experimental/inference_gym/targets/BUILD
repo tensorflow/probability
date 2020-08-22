@@ -45,6 +45,7 @@ multi_substrate_py_library(
         ":model",
         ":neals_funnel",
         ":probit_regression",
+        ":radon_contextual_effects",
         ":sparse_logistic_regression",
         ":stochastic_volatility",
         ":vector_model",
@@ -292,6 +293,31 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "radon_contextual_effects",
+    srcs = ["radon_contextual_effects.py"],
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "radon_contextual_effects_test",
+    srcs = ["radon_contextual_effects_test.py"],
+    deps = [
+        ":radon_contextual_effects",
+        # numpy dep,
+        # tensorflow dep,
         "//tensorflow_probability/python/experimental/inference_gym/internal:test_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

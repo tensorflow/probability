@@ -30,6 +30,7 @@ from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 __all__ = [
     'brownian_motion_missing_middle_observations',
     'german_credit_numeric',
+    'radon',
     'sp500_closing_prices',
     'synthetic_item_response_theory',
     'synthetic_log_gaussian_cox_process',
@@ -188,6 +189,205 @@ def german_credit_numeric(
           lambda: load_dataset()['test_labels'],
           shape=[num_test],
           dtype=np.int32),
+  )
+
+
+def radon(
+    state='MN',
+    num_examples=919,
+    num_counties=85,
+    train_fraction=1.,
+    shuffle=False,
+    shuffle_seed=42):
+  """The Radon dataset [1] loaded from `tensorflow_datasets`.
+
+  Radon is a radioactive gas that enters homes through contact points with the
+  ground. It is a carcinogen that is the primary cause of lung cancer in
+  non-smokers. Radon levels vary greatly from household to household.
+
+  This dataset contains measured radon concentrations from houses in the
+  United States and associated features.
+
+  Args:
+    state: `str`, the two-character code for the U.S. state by which to filter
+      the data. If `None`, data for all states are returned.
+    num_examples: `int`, total number of examples in the filtered dataset. When
+      the dataset is materialized, this value is verified against the size of
+      the filtered dataset, and if there is a mismatch a ValueError is raised.
+      (The value is not determined automatically from the dataset because it is
+      needed before the dataset is materialized).
+    num_counties: `int`, number of unique counties in the filtered dataset.
+    train_fraction: What fraction of the data to put in the training set. When
+      the dataset is materialized, this value is verified against the size of
+      the filtered dataset, and if there is a mismatch a ValueError is raised.
+      (The value is not determined automatically from the dataset because it is
+      needed before the dataset is materialized).
+    shuffle: `bool`. If `True`, shuffle the data.
+    shuffle_seed: `int`, RNG seed to use if shuffling the data.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      `num_counties`: `int`, number of unique counties in the filtered dataset.
+      `train_log_uranium`: Floating-point `Tensor` with shape
+        `[num_train]`. Soil uranium measurements.
+      `train_floor`: Integer `Tensor` with shape `[num_train]`. Floor of the
+        house on which the measurement was taken.
+      `train_county`: Integer `Tensor` with values in `range(0, num_counties)`
+        of shape `[num_train]`. County in which the measurement was taken.
+      `train_floor_by_county`: Floating-point `Tensor` with shape
+        `[num_train]`. Average floor on which the measurement was taken for the
+        county in which each house is located (the `Tensor` will have
+        `num_counties` unique values). This represents the contextual effect.
+      `train_log_radon`: Floating-point `Tensor` with shape `[num_train]`.
+        Radon measurement for each house (the dependent variable in the model).
+      `test_log_uranium`: Floating-point `Tensor` with shape `[num_test`. Soil
+        Soil uranium measurements for the test set.
+      `test_floor`: Integer `Tensor` with shape `[num_test]`. Floor of the house
+        house on which the measurement was taken.
+      `test_county`: Integer `Tensor` with values in `range(0, num_counties)` of
+        shape `[num_test]`. County in which the measurement was taken. Can be
+        `None`, in which case test-related sample transformations are not
+        computed.
+      `test_floor_by_county`: Floating-point `Tensor` with shape
+        `[num_test]`. Average floor on which the measurement was taken
+        (calculated from the training set) for the county in which each house is
+        located (the `Tensor` will have `num_counties` unique values). This
+        represents the contextual effect.
+      `test_log_radon`: Floating-point `Tensor` with shape `[num_test]`. Radon
+        measurement for each house (the dependent variable in the model).
+
+  Raises:
+    ValueError if `num_examples` is not equal to the number of examples in the
+      materialized dataset.
+    ValueError if `num_counties` is not equal to the number of unique counties
+      in the materialized dataset.
+
+  #### References
+
+  [1] Gelman, A., & Hill, J. (2007). Data Analysis Using Regression and
+      Multilevel/Hierarchical Models (1st ed.). Cambridge University Press.
+      http://www.stat.columbia.edu/~gelman/arm/examples/radon/
+  """
+  num_train = int(num_examples * train_fraction)
+  num_test = num_examples - num_train
+
+  def load_dataset():
+    """Function that actually loads the dataset."""
+    if load_dataset.dataset is not None:
+      return load_dataset.dataset
+
+    with tf.name_scope('radon'), tf.init_scope():
+
+      dataset = _tfds().load(name='radon:1.*.*', split='train', batch_size=-1)
+      dataset = _tfds().as_numpy(dataset)
+
+      states = dataset['features']['state'].astype('U13')
+      floor = dataset['features']['floor'].astype(np.int32)
+      radon_val = dataset['activity'].astype(np.float64)
+      county_strings = dataset['features']['county'].astype('U13')
+      uranium = dataset['features']['Uppm'].astype(np.float64)
+
+      if state is not None:
+        floor = floor[states == state]
+        radon_val = radon_val[states == state]
+        county_strings = county_strings[states == state]
+        uranium = uranium[states == state]
+
+      radon_val[radon_val <= 0.] = 0.1
+      log_radon = np.log(radon_val)
+      log_uranium = np.log(uranium)
+      unique_counties, county = np.unique(county_strings, return_inverse=True)
+      county = county.astype(np.int32)
+
+      if log_radon.size != num_examples:
+        raise ValueError(
+            'The size of the filtered dataset must equal the input '
+            '`num_examples`. Saw dataset size = {}, `num_examples` = {}'
+            ''.format(log_radon.size, num_examples))
+      if unique_counties.size != num_counties:
+        raise ValueError(
+            'The number of counties present in the filtered dataset must equal '
+            'the input `num_counties`. Saw {} counties but `num_counties` = {}'
+            ''.format(unique_counties.size, num_counties))
+
+      if shuffle:
+        shuffle_idxs = np.arange(num_examples)
+        np.random.RandomState(shuffle_seed).shuffle(shuffle_idxs)
+        log_uranium = log_uranium[shuffle_idxs]
+        floor = floor[shuffle_idxs]
+        county = county[shuffle_idxs]
+        log_radon = log_radon[shuffle_idxs]
+
+      train_floor = floor[:num_train]
+      train_county = county[:num_train]
+      test_floor = floor[num_train:]
+      test_county = county[num_train:]
+
+      # Create a new features for mean of floor across counties.
+      xbar = []
+      for i in range(num_counties):
+        xbar.append(train_floor[county == i].mean())
+      floor_by_county = np.array(xbar, dtype=log_radon.dtype)
+
+      load_dataset.dataset = dict(
+          train_log_uranium=log_uranium[:num_train],
+          train_floor=train_floor,
+          train_county=train_county,
+          train_floor_by_county=floor_by_county[train_county],
+          train_log_radon=log_radon[:num_train],
+          test_log_uranium=log_uranium[num_train:],
+          test_floor=test_floor,
+          test_county=test_county,
+          test_floor_by_county=floor_by_county[test_county],
+          test_log_radon=log_radon[num_train:],
+      )
+
+    return load_dataset.dataset
+
+  load_dataset.dataset = None
+
+  return dict(
+      num_counties=np.array(num_counties, dtype=np.int32),
+      train_log_uranium=_defer(
+          lambda: load_dataset()['train_log_uranium'],
+          shape=[num_train],
+          dtype=np.float64),
+      train_floor=_defer(
+          lambda: load_dataset()['train_floor'],
+          shape=[num_train],
+          dtype=np.int32),
+      train_county=_defer(
+          lambda: load_dataset()['train_county'],
+          shape=[num_train],
+          dtype=np.int32),
+      train_floor_by_county=_defer(
+          lambda: load_dataset()['train_floor_by_county'],
+          shape=[num_train],
+          dtype=np.float64),
+      train_log_radon=_defer(
+          lambda: load_dataset()['train_log_radon'],
+          shape=[num_train],
+          dtype=np.float64),
+      test_log_uranium=_defer(
+          lambda: load_dataset()['test_log_uranium'],
+          shape=[num_test],
+          dtype=np.float64),
+      test_floor=_defer(
+          lambda: load_dataset()['test_floor'],
+          shape=[num_test],
+          dtype=np.int32),
+      test_county=_defer(
+          lambda: load_dataset()['test_county'],
+          shape=[num_test],
+          dtype=np.int32),
+      test_floor_by_county=_defer(
+          lambda: load_dataset()['test_floor_by_county'],
+          shape=[num_test],
+          dtype=np.float64),
+      test_log_radon=_defer(
+          lambda: load_dataset()['test_log_radon'],
+          shape=[num_test],
+          dtype=np.float64),
   )
 
 
