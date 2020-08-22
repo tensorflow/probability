@@ -71,6 +71,7 @@ py_test(
         # absl/testing:parameterized dep,
         # jax dep,
         # numpy dep,
+        "//spinoffs/inference_gym",
         "//oryx/core/interpreters:harvest",
         # [tfp_jax dependency],
     ],
