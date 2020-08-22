@@ -25,7 +25,7 @@ py_binary(
     deps = [
         ":targets",
         "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/inference_gym/internal:ground_truth_encoding",
+        "//spinoffs/inference_gym/internal:ground_truth_encoding",
     ],
 )
 
@@ -129,7 +129,7 @@ py_library(
         ":radon_contextual_effects",
         ":sparse_logistic_regression",
         ":stochastic_volatility",
-        "//tensorflow_probability/python/experimental/inference_gym/internal:data",
+        "//spinoffs/inference_gym/internal:data",
     ],
 )
 

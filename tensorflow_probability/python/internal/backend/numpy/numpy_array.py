@@ -349,6 +349,14 @@ def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disa
   return np.conjugate(x) if conjugate else x
 
 
+def _unstack(value, num=None, axis=0, name='unstack'):
+  del name
+  value = np.array(value)
+  return list(
+      np.squeeze(x, axis=axis)
+      for x in np.split(value, value.shape[axis] if num is None else num, axis))
+
+
 def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
   return np.zeros_like(input, dtype=utils.numpy_dtype(dtype))
 
@@ -465,9 +473,7 @@ transpose = utils.copy_docstring(
 
 unstack = utils.copy_docstring(
     'tf.unstack',
-    lambda value, num=None, axis=0, name='unstack': list(  # pylint: disable=g-long-lambda
-        np.squeeze(x, axis=axis) for x in
-        np.split(value, value.shape[axis] if num is None else num, axis)))
+    _unstack)
 
 where = utils.copy_docstring(
     'tf.where',

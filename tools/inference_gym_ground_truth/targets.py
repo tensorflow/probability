@@ -27,7 +27,7 @@ from tools.inference_gym_ground_truth import probit_regression
 from tools.inference_gym_ground_truth import radon_contextual_effects
 from tools.inference_gym_ground_truth import sparse_logistic_regression
 from tools.inference_gym_ground_truth import stochastic_volatility
-from tensorflow_probability.python.experimental.inference_gym.internal import data
+from spinoffs.inference_gym.internal import data
 
 __all__ = [
     'brownian_motion_missing_middle_observations',

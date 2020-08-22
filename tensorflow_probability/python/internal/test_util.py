@@ -64,11 +64,15 @@ NUMPY_MODE = False
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
-                   'With --runs_per_test=N, produces N iid runs.'))
+                   'With --runs_per_test=N, produces N iid runs.'),
+                  allow_override=True)
 
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
-                     'Takes precedence over --vary-seed when both appear.'))
+                     'Takes precedence over --vary-seed when both appear.'),
+                    allow_override=True,
+                    allow_override_cpp=False,
+                    allow_hide_cpp=True)
 
 
 class TestCase(tf.test.TestCase, parameterized.TestCase):

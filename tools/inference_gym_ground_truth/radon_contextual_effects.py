@@ -110,12 +110,12 @@ def radon_contextual_effects(
     """Extracts the values of all latent variables."""
     res = collections.OrderedDict()
     res['county_effect_mean'] = util.get_columns(
-        samples, r'^county_effect_mean$')
+        samples, r'^county_effect_mean$')[:, 0]
     res['county_effect_scale'] = util.get_columns(
-        samples, r'^county_effect_scale$')
+        samples, r'^county_effect_scale$')[:, 0]
     res['county_effect'] = util.get_columns(samples, r'^county_effect\.\d+$')
     res['weight'] = util.get_columns(samples, r'^weight\.\d+$')
-    res['log_radon_scale'] = util.get_columns(samples, r'^log_radon_scale$')
+    res['log_radon_scale'] = util.get_columns(samples, r'^log_radon_scale$')[:, 0]
     return res
 
   extract_fns = {'identity': _ext_identity}

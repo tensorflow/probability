@@ -58,7 +58,7 @@ import pandas as pd
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tools.inference_gym_ground_truth import targets
-from tensorflow_probability.python.experimental.inference_gym.internal import ground_truth_encoding
+from spinoffs.inference_gym.internal import ground_truth_encoding
 # Direct import for flatten_with_tuple_paths.
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -163,8 +163,7 @@ def main(argv):
   if FLAGS.output_directory is None:
     file_basedir = os.path.dirname(os.path.realpath(__file__))
     output_directory = os.path.join(
-        file_basedir, '../../tensorflow_probability/python/experimental/'
-        'inference_gym/targets/ground_truth')
+        file_basedir, '../../spinoffs/inference_gym/targets/ground_truth')
   else:
     output_directory = FLAGS.output_directory
   file_path = os.path.join(output_directory, '{}.py'.format(FLAGS.target))
