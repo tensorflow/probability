@@ -29,10 +29,7 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import random_walk_metropolis
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -930,26 +927,22 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
   Raises:
     NotImplementedError: If type of [nested] results is not handled.
   """
-  if not isinstance(pre_swap_replica_results,
-                    metropolis_hastings.MetropolisHastingsKernelResults):
-    # TODO(b/143702650) Handle other kernels.
-    raise NotImplementedError(
-        '`pre_swap_replica_results` currently works only for '
-        'MetropolisHastingsKernelResults.  Found: {}. '
-        'Please file a request with the TensorFlow Probability team.'.format(
-            type(pre_swap_replica_results)))
 
   kr = pre_swap_replica_results
   dtype = swapped_inverse_temperatures.dtype
 
   # Hard to modify proposed_results in an um-ambiguous manner.
   # ...we also don't need to.
-  kr = kr._replace(
-      proposed_results=tf.convert_to_tensor(np.nan, dtype=dtype),
-      proposed_state=tf.convert_to_tensor(np.nan, dtype=dtype),
-  )
+  kr = _update_field(
+      kr,
+      'proposed_results',
+      tf.convert_to_tensor(np.nan, dtype=dtype))
+  kr = _update_field(
+      kr,
+      'proposed_state',
+      tf.convert_to_tensor(np.nan, dtype=dtype))
 
-  replica_and_batch_rank = ps.rank(kr.log_accept_ratio)
+  replica_and_batch_rank = ps.rank(_get_field(kr, 'log_accept_ratio'))
 
   # After using swap_tensor_fn on "values", values will be multiplied by the
   # swapped_inverse_temperatures.  We need it to be multiplied instead by the
@@ -969,44 +962,23 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
       x = x[0]
     return x
 
-  if isinstance(kr.accepted_results,
-                hmc.UncalibratedHamiltonianMonteCarloKernelResults):
-    kr = kr._replace(
-        accepted_results=kr.accepted_results._replace(
-            target_log_prob=_swap_then_retemper(
-                kr.accepted_results.target_log_prob),
-            grads_target_log_prob=_swap_then_retemper(
-                kr.accepted_results.grads_target_log_prob)))
-  elif isinstance(kr.accepted_results,
-                  random_walk_metropolis.UncalibratedRandomWalkResults):
-    kr = kr._replace(
-        accepted_results=kr.accepted_results._replace(
-            target_log_prob=_swap_then_retemper(
-                kr.accepted_results.target_log_prob)))
-  else:
-    # TODO(b/143702650) Handle other kernels.
-    raise NotImplementedError(
-        'Only HMC and RWMH Kernels are handled at this time. Please file a '
-        'request with the TensorFlow Probability team.')
+  kr = _update_field(kr, 'target_log_prob', _swap_then_retemper(
+      _get_field(kr, 'target_log_prob')))
+  try:
+    new_grads_target_log_prob = _swap_then_retemper(
+        _get_field(kr, 'grads_target_log_prob'))
+    kr = _update_field(
+        kr, 'grads_target_log_prob', new_grads_target_log_prob)
+  # For transition kernels not involving the gradient of the log-probability,
+  # grads_target_log_prob will not exist in the (possibly multiply wrapped)
+  # kernel results and that's perfectly fine. But _get_field() /
+  # _update_field() (which wrap tfp.mcmc.internal.util.get_field /
+  # update_field) will throw a NotImplementedError, which we thus catch
+  # silently.
+  except REMCFieldNotFoundError:
+    pass
 
   return kr
-
-
-# TODO(b/111801087): Use a standardized API, when available.
-def _get_field(kernel_results, field_name):
-  """Get field value from kernel_results or kernel_results.accepted_results."""
-  attr = getattr(kernel_results, field_name, None)
-  if attr is not None:
-    return attr
-  accepted_results = getattr(kernel_results, 'accepted_results', None)
-  if accepted_results is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  attr = getattr(accepted_results, field_name)
-  if attr is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  return attr
 
 
 def _compute_swap_notmatrix(before_positions, after_positions):
@@ -1073,3 +1045,32 @@ def _sub_diag(nonmatrix):
           padding_value=tf.cast(0.0, dtype=nonmatrix.dtype))
 
     return distribution_util.rotate_transpose(matrix_sub_diag, shift=1)
+
+
+_kernel_result_not_implemented_message_template = (
+    '{} or a kernel '
+    'result nested within it is currently not supported by the '
+    'ReplicaExchangeMC kernel. Missing field {}. Please file an issue on '
+    'the TensorFlow Probability GitHub page.')
+
+
+class REMCFieldNotFoundError(AttributeError):
+  pass
+
+
+def _get_field(kernel_results, field_name):
+  try:
+    return mcmc_util.get_field(kernel_results, field_name)
+  except TypeError:
+    msg = _kernel_result_not_implemented_message_template.format(
+        kernel_results, field_name)
+    raise REMCFieldNotFoundError(msg)
+
+
+def _update_field(kernel_results, field_name, value):
+  try:
+    return mcmc_util.update_field(kernel_results, field_name, value)
+  except TypeError:
+    msg = _kernel_result_not_implemented_message_template.format(
+        kernel_results, field_name)
+    raise REMCFieldNotFoundError(msg)

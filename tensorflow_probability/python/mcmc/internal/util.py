@@ -728,3 +728,30 @@ def index_remapping_gather(params,
     return dist_util.move_dimension(result_t,
                                     source_idx=broadcast_indices_ndims - 1,
                                     dest_idx=axis)
+
+
+# TODO(b/111801087): Use a standardized API, when available.
+@make_innermost_getter
+def get_field(kernel_results, field_name):
+  """Get field value from kernel_results or kernel_results.accepted_results."""
+  attr = getattr(kernel_results, field_name, None)
+  if attr is not None:
+    return attr
+  accepted_results = getattr(kernel_results, 'accepted_results', None)
+  if accepted_results is None:
+    raise TypeError('Cannot extract {} from {}'.format(
+        field_name, kernel_results))
+  return get_field(accepted_results, field_name)
+
+
+@make_innermost_setter
+def update_field(kernel_results, field_name, value):
+  """Set field value in kernel_results or kernel_results.accepted_results."""
+  if hasattr(kernel_results, field_name):
+    return kernel_results._replace(**{field_name: value})
+  accepted_results = getattr(kernel_results, 'accepted_results', None)
+  if accepted_results is None:
+    raise TypeError('Cannot set {} in {}'.format(
+        field_name, kernel_results))
+  return kernel_results._replace(
+      accepted_results=update_field(accepted_results, field_name, value))

@@ -580,5 +580,53 @@ class SimpleTensorWarningTest(test_util.TestCase):
             for warning in triggered))
 
 
+FakeKernelResults = collections.namedtuple('FakeKernelResults', 'some_field')
+
+
+FakeKernelAcceptedResults = collections.namedtuple(
+    'FakeKernelAcceptedResults',
+    'accepted_results')
+
+
+class GetFieldTest(test_util.TestCase):
+
+  @parameterized.parameters(
+      [FakeKernelResults(some_field='yak')],
+      [FakeKernelAcceptedResults(
+          accepted_results=FakeKernelResults(some_field='yak'))]
+  )
+  def testValidKernelResults(self, kernel_results):
+    self.assertEqual(util.get_field(kernel_results, 'some_field'), 'yak')
+    with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
+      util.get_field(kernel_results, 'some_other_field')
+
+  def testIncompleteKernelResults(self):
+    kernel_results = FakeKernelResults(some_field='zebra')
+    with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
+      util.get_field(kernel_results, 'some_other_field')
+
+
+class UpdateFieldTest(test_util.TestCase):
+
+  @parameterized.parameters(
+      [FakeKernelResults(some_field='yak')],
+      [FakeKernelAcceptedResults(
+          accepted_results=FakeKernelResults(some_field='yak'))]
+    )
+  def testValidKernelResults(self, kernel_results):
+    updated_kernel_results = util.update_field(
+        kernel_results, 'some_field', 'moose')
+    self.assertEqual(
+        util.get_field(
+            updated_kernel_results, 'some_field'), 'moose')
+    with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
+      util.update_field(kernel_results, 'some_other_field', 'antelope')
+
+  def testIncompletedKernelResults(self):
+    kernel_results = FakeKernelResults(some_field='ibex')
+    with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
+      util.update_field(kernel_results, 'some_other_field', 'goat')
+
+
 if __name__ == '__main__':
   tf.test.main()
