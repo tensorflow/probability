@@ -17,7 +17,7 @@
 
 load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [

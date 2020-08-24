@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Ground truth computation using Stan.
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
 

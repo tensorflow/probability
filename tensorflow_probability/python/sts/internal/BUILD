@@ -14,7 +14,7 @@
 # ============================================================================
 # [internal] load python3.bzl
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
