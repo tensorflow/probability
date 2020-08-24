@@ -177,7 +177,7 @@ class DeferredTensor(six.with_metaclass(TensorMetaClass, tf.Module)):
   """
 
   def __init__(self, pretransformed_input, transform_fn, dtype=None,
-               shape=NONE_SPECIFIED, name=None):
+               shape=NONE_SPECIFIED, also_track=None, name=None):
     """Creates the `DeferredTensor` object.
 
     Args:
@@ -197,6 +197,12 @@ class DeferredTensor(six.with_metaclass(TensorMetaClass, tf.Module)):
          Default value: `'None'` (i.e.,
          `getattr(transform_fn, 'forward_event_shape', lambda x: x)(
               pretransformed_input.shape)`).
+      also_track: Optional instance or structure of instances of `tf.Variable`
+        and/or `tf.Module`, containing any additional trainable variables that
+        the `transform_fn` may access beyond the given
+        `pretransformed_input`. This ensures that such variables
+        will be correctly tracked in `self.trainable_variables`.
+        Default value: `None`.
       name: Python `str` representing this object's `name`; used only in graph
         mode.
         Default value: `None` (i.e.,
@@ -253,6 +259,7 @@ class DeferredTensor(six.with_metaclass(TensorMetaClass, tf.Module)):
     self._transform_fn = transform_fn
     self._dtype = dtype
     self._shape = shape
+    self._also_track = also_track
     self._name = name
     self._fwd_name = fwd_name
 
@@ -291,6 +298,11 @@ class DeferredTensor(six.with_metaclass(TensorMetaClass, tf.Module)):
   def get_shape(self):
     """Legacy means of getting Tensor shape, for compat with 2.0.0 LinOp."""
     return self._shape
+
+  @property
+  def also_track(self):
+    """Additional variables tracked by tf.Module in self.trainable_variables."""
+    return self._also_track
 
   @property
   def name(self):

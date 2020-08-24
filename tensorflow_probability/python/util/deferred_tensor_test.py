@@ -76,6 +76,13 @@ class DeferredTensorTest(test_util.TestCase):
 
   @test_util.jax_disable_variable_test
   @test_util.numpy_disable_variable_test
+  def test_retains_trainable_variables_from_also_track(self):
+    m = tf.Variable(0., name='m')
+    x = tfp.util.DeferredTensor(1., lambda x: x * m, also_track=m)
+    self.assertIn(m, x.trainable_variables)
+
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_variable_shape_changes(self):
     v = tf.Variable(np.zeros((3, 2, 3)), shape=tf.TensorShape((None, 2, None)))
     self.evaluate(v.initializer)
