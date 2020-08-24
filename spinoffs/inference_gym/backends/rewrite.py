@@ -189,6 +189,8 @@ class Finder(importlib.abc.MetaPathFinder):
     root_name_comps = _root_name_comps()
     root_name = _root_name() + '.dynamic'
 
+    if DEBUG:
+      print('candidate: ', fullname, path)
     # Only handle things starting with .dynamic.
     if not fullname.startswith(root_name):
       return
@@ -252,7 +254,7 @@ class Finder(importlib.abc.MetaPathFinder):
 def enable_backends():
   """Enables the backends."""
   if DEBUG:
-    print(sys.meta_path)
+    print('sys.meta_path: ', sys.meta_path)
 
   # We try to be robust to reloading this module, and remove the old instance of
   # the Finder from sys.meta_path.
@@ -266,9 +268,12 @@ def enable_backends():
   if found:
     sys.meta_path[i] = Finder()
   else:
-    # We insert it at the end, so the regular finders get first dibs. This is
-    # significantly more robust than pre-pending it.
-    sys.meta_path.append(Finder())
+    # We insert it at the beginning. This enables us to intercept the dynamic
+    # modules before any other finder tries and (mistakenly) succeeds in somehow
+    # handling them. This does force us to be careful about letting all the
+    # regular modules to be handled by the regular finders via the early
+    # returns.
+    sys.meta_path.insert(0, Finder())
 
 
 enable_backends()
