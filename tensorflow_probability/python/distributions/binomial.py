@@ -166,10 +166,15 @@ def _log_concave_rejection_sampler(
     return potential_samples, envelope_height
 
   def target(values):
-    in_range_mask = (
-        (values >= distribution_minimum) & (values <= distribution_maximum))
-    in_range_values = tf.where(in_range_mask, values, 0.)
-    return tf.where(in_range_mask, prob_fn(in_range_values), 0.)
+    # Check for out of bounds rather than in bounds to avoid accidentally
+    # masking a `nan` value.
+    out_of_bounds_mask = (
+        (values < distribution_minimum) | (values > distribution_maximum))
+    in_bounds_values = tf.where(
+        out_of_bounds_mask, tf.constant(0., dtype=values.dtype), values)
+    probs = prob_fn(in_bounds_values)
+    return tf.where(
+        out_of_bounds_mask, tf.constant(0., dtype=probs.dtype), probs)
 
   return tf.stop_gradient(
       batched_rejection_sampler.batched_rejection_sampler(

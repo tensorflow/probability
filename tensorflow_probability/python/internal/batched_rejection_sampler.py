@@ -19,6 +19,8 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static
@@ -133,16 +135,49 @@ def batched_rejection_sampler(
       """Internal randomized computation."""
       proposal_seed, mask_seed = samplers.split_seed(
           seed, salt='batched_rejection_sampler')
+
       proposed_samples, proposed_values = proposal_fn(proposal_seed)
+
       # The comparison needs to be strictly less to avoid spurious acceptances
       # when the uniform samples exactly 0 (or when the product underflows to
       # 0).
+      target_values = target_fn(proposed_samples)
       good_samples_mask = tf.less(
           proposed_values * samplers.uniform(
               prefer_static.shape(proposed_samples),
               seed=mask_seed,
               dtype=dtype),
-          target_fn(proposed_samples))
+          target_values)
+
+      # If either the `proposed_value` or the corresponding `target_value` is
+      # `nan`, force that `proposed_sample` to `nan` and accept.  Why?
+      #
+      # - A `nan` would never be accepted, because tf.less must return False
+      #   when either argument is `nan`.
+      #
+      # - If `nan` happens every time (e.g., due to `nan` in the parameters of
+      #   the distribution we are trying to sample from), then we should clearly
+      #   return `nan` after going around the rejection loop only once, rather
+      #   than looping forever.
+      #
+      # - If `nan` happens only some of the time, it would silently skew the
+      #   distribution on results to always reject, because some of those `nan`
+      #   values may have stood for proposals that would have been accepted if
+      #   we had computed more accurately.  Instead we forward the `nan`
+      #   upstream, so the client can fix their proposal or evaluation
+      #   functions.
+      #
+      # - We force the `proposed_sample` to `nan` because not doing so would
+      #   hide a `nan` that occurred in only the `proposed_value` or
+      #   `target_value`, silently skewing the distribution on results.
+      #
+      # - Corner case: if the `proposed_sample` is `nan` but both the
+      #   corresponding `proposed_value` and `proposed_target` are for some
+      #   reason not `nan`, we trust the user and proceed normally.
+      nans = tf.math.is_nan(proposed_values) | tf.math.is_nan(target_values)
+      proposed_samples = tf.where(
+          nans, tf.cast(np.nan, proposed_samples.dtype), proposed_samples)
+      good_samples_mask |= nans
       return proposed_samples, good_samples_mask
 
     return batched_las_vegas_algorithm(randomized_computation, seed)

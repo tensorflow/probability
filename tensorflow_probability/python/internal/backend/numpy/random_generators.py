@@ -75,6 +75,7 @@ def _bcast_shape(base_shape, args):
 
 
 def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # pylint: disable=unused-argument
+  """Massaging dtype and nan handling of np.random.binomial."""
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   invalid_count = (np.int64(counts) < 0) != (counts < 0)
   if np.any(invalid_count):
@@ -82,8 +83,10 @@ def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # 
         counts[np.where(invalid_count)],
         np.int64(counts)[np.where(invalid_count)]))
   probs = np.where(counts > 0, probs, 0)
-  samps = rng.binomial(np.int64(counts), np.float64(probs), shape)
-  return samps.astype(utils.numpy_dtype(output_dtype))
+  nans = np.isnan(probs)
+  probs_for_np = np.where(nans, 0, probs)
+  samps = rng.binomial(np.int64(counts), np.float64(probs_for_np), shape)
+  return np.where(nans, np.nan, samps.astype(utils.numpy_dtype(output_dtype)))
 
 
 def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
