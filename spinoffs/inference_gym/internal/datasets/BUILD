@@ -65,6 +65,7 @@ py_library(
 py_library(
     name = "brownian_motion_missing_middle_observations",
     srcs = ["brownian_motion_missing_middle_observations.py"],
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],

@@ -34,6 +34,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
+    srcs_version = "PY3",
     deps = [
         ":array_to_source",
         ":data",
@@ -65,6 +66,7 @@ py_test(
 py_library(
     name = "data",
     srcs = ["data.py"],
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         "//spinoffs/inference_gym/internal/datasets",
@@ -117,6 +119,7 @@ py_library(
     name = "test_util",
     testonly = True,
     srcs = ["test_util.py"],
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
