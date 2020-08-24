@@ -28,6 +28,7 @@ import jax.numpy as np
 
 __all__ = [
     'assert_same_shallow_tree',
+    'block_until_ready',
     'flatten_tree',
     'inverse_fn',
     'make_tensor_seed',
@@ -280,3 +281,20 @@ def inverse_fn(fn):
   ```
   """
   return fn.inverse
+
+
+def block_until_ready(tensors):
+  """Blocks computation until it is ready.
+
+  Args:
+    tensors: A nest of Tensors.
+
+  Returns:
+    tensors: Tensors that are are guaranteed to be ready to materialize.
+  """
+  def _block_until_ready(tensor):
+    if hasattr(tensor, 'block_until_ready'):
+      return tensor.block_until_ready()
+    else:
+      return tensor
+  return map_tree(_block_until_ready, tensors)

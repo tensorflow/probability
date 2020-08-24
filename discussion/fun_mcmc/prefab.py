@@ -29,12 +29,12 @@ from __future__ import print_function
 
 import collections
 import functools
+from typing import Any, Callable, Iterable, Optional, Tuple
 
 import numpy as np
 
 from discussion.fun_mcmc import backend
 from discussion.fun_mcmc import fun_mcmc_lib as fun_mc
-from typing import Any, Optional, Tuple
 
 tf = backend.tf
 util = backend.util
@@ -43,6 +43,7 @@ __all__ = [
     'AdaptiveHamiltonianMonteCarloState',
     'adaptive_hamiltonian_monte_carlo_init',
     'adaptive_hamiltonian_monte_carlo_step',
+    'interactive_trace',
 ]
 
 
@@ -389,3 +390,83 @@ def adaptive_hamiltonian_monte_carlo_step(
       num_leapfrog_steps=num_leapfrog_steps)
 
   return adaptive_hmc_state, extra
+
+
+def _tqdm_progress_bar_fn(iterable: 'Iterable[Any]') -> 'Iterable[Any]':
+  """The TQDM progress bar function."""
+  # pytype: disable=import-error
+  import tqdm  # pylint: disable=g-import-not-at-top
+  # pytype: enable=import-error
+  return tqdm.tqdm(iterable, leave=True)
+
+
+def interactive_trace(
+    state: 'fun_mc.State',
+    fn: 'fun_mc.TransitionOperator',
+    num_steps: 'fun_mc.IntTensor',
+    trace_mask: 'fun_mc.BooleanNest' = True,
+    block_until_ready: 'bool' = True,
+    progress_bar_fn: 'Callable[[Iterable[Any]], Iterable[Any]]' = (
+        _tqdm_progress_bar_fn),
+) -> 'Tuple[fun_mc.State, fun_mc.TensorNest]':
+  """Wrapped around fun_mcmc.trace, suited for interactive work.
+
+  This is accomplished through unrolling fun_mcmc.trace, as well as optionally
+  using a progress bar (TQDM by default).
+
+  Args:
+    state: A nest of `Tensor`s or None.
+    fn: A `TransitionOperator`.
+    num_steps: Number of steps to run the function for. Must be greater than 1.
+    trace_mask: A potentially shallow nest with boolean leaves applied to the
+      `extra` return value of `fn`. This controls whether or not to actually
+      trace the quantities in `extra`. For subtrees of `extra` where the mask
+      leaf is `True`, those subtrees are traced (i.e. the corresponding subtrees
+      in `traces` will contain an extra leading dimension equalling
+      `num_steps`). For subtrees of `extra` where the mask leaf is `False`,
+      those subtrees are merely propagated, and their corresponding subtrees in
+      `traces` correspond to their final value.
+    block_until_ready: Whether to wait for the computation to finish between
+      steps. This results in smoother progress bars under, e.g., JAX.
+    progress_bar_fn: A callable that will be called with an iterable with length
+      `num_steps` and which returns another iterable with the same length. This
+      will be advanced for every step taken. If None, no progress bar is
+      shown. Default: `lambda it: tqdm.tqdm(it, leave=True)`.
+
+  Returns:
+    state: The final state returned by `fn`.
+    traces: A nest with the same structure as the extra return value of `fn`,
+      but with leaves replaced with stacked and unstacked values according to
+      the `trace_mask`.
+  """
+  num_steps = tf.get_static_value(num_steps)
+  if num_steps is None:
+    raise ValueError(
+        'Interactive tracing requires `num_steps` to be statically known.')
+
+  if progress_bar_fn is None:
+    pbar = None
+  else:
+    pbar = iter(progress_bar_fn(range(num_steps)))
+
+  def fn_with_progress(state):
+    state, extra = fun_mc.call_transition_operator(fn, state)
+    if block_until_ready:
+      state, extra = util.block_until_ready((state, extra))
+    if pbar is not None:
+      try:
+        next(pbar)
+      except StopIteration:
+        pass
+    return [state], extra
+
+  [state], trace = fun_mc.trace(
+      # Wrap the state in a singleton list to simplify implementation of
+      # `fn_with_progress`.
+      state=[state],
+      fn=fn_with_progress,
+      num_steps=num_steps,
+      trace_mask=trace_mask,
+      unroll=True,
+  )
+  return state, trace

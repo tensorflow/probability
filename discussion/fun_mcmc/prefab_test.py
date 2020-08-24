@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 
 from jax.config import config as jax_config
+import numpy as np
 import tensorflow.compat.v2 as real_tf
 
 from discussion.fun_mcmc import backend
@@ -122,6 +123,25 @@ class PrefabTest(tfp_test_util.TestCase):
     self.assertAllClose(0.8, accept_rate, atol=0.05)
     self.assertAllClose(model.mean(), sample_mean, rtol=0.1, atol=0.1)
     self.assertAllClose(model.variance(), sample_var, rtol=0.1, atol=0.1)
+
+  def testInteractiveTrace(self):
+
+    def kernel(x):
+      return x + 1, x
+
+    counter = [0]
+
+    def progress_bar_fn(iterable):
+      for _ in iterable:
+        counter[0] += 1
+        yield
+
+    x_fin, x_trace = prefab.interactive_trace(
+        0., kernel, num_steps=5, progress_bar_fn=progress_bar_fn)
+
+    self.assertAllClose(5, x_fin)
+    self.assertAllClose(np.arange(5), x_trace)
+    self.assertEqual(5, counter[0])
 
 
 @backend.multi_backend_test(globals(), 'prefab_test')
