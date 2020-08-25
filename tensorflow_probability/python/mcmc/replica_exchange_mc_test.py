@@ -462,6 +462,86 @@ class REMCTest(test_util.TestCase):
           mcmc_util.get_field(
               kr_.post_swap_replica_results, 'num_leapfrog_steps'))
 
+  @test_util.numpy_disable_gradient_test('HMC')
+  def testAdaptingPerReplicaStepSize(self):
+    num_chains, num_events = 3, 2
+    target = tfd.MultivariateNormalDiag(loc=[0.] * num_events)
+    inverse_temperatures = 0.5**np.arange(4, dtype=np.float32)
+    num_replica = len(inverse_temperatures)
+
+    # step_size is...
+    #   Too large == 3!
+    #   A shape that will broadcast across the chains, and (after adaptation)
+    #   give a diffeent value for each replica.
+    initial_step_scale = 3
+    step_size = initial_step_scale * np.ones((num_replica, 1, 1))
+
+    def make_kernel_fn(target_log_prob_fn):
+      hmc = tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=target_log_prob_fn,
+          step_size=step_size,
+          num_leapfrog_steps=3,
+      )
+      return tfp.mcmc.SimpleStepSizeAdaptation(
+          inner_kernel=hmc,
+          target_accept_prob=0.75,
+          adaptation_rate=0.03,
+          num_adaptation_steps=num_results,
+      )
+
+    adaptive_remc = tfp.mcmc.ReplicaExchangeMC(
+        target_log_prob_fn=target.log_prob,
+        inverse_temperatures=inverse_temperatures,
+        make_kernel_fn=make_kernel_fn,
+        state_includes_replicas=True,
+    )
+
+    num_results = 200
+
+    def trace_fn(_, results):
+      step_adapt_results = results.post_swap_replica_results
+      hmc_results = step_adapt_results.inner_results
+      return {
+          'step_size':
+              step_adapt_results.new_step_size,
+          'prob_accept':
+              tf.math.exp(tf.math.minimum(hmc_results.log_accept_ratio, 0.)),
+      }
+
+    states, trace = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=tf.zeros((num_replica, num_chains, num_events)),
+        kernel=adaptive_remc,
+        trace_fn=trace_fn,
+        num_burnin_steps=0,
+        seed=_set_seed(),
+    )
+
+    states_, final_step_size_, mean_accept_ = self.evaluate([
+        states,
+        trace['step_size'][-1],
+        tf.reduce_mean(trace['prob_accept'][num_results // 2:], axis=0),
+    ])
+
+    self.assertAllEqual((num_replica, 1, 1), final_step_size_.shape)
+
+    self.assertAllClose(
+        0.75 * np.ones_like(mean_accept_), mean_accept_, atol=0.2)
+
+    # Step size should be increasing (with temperature).
+    np.testing.assert_array_less(0.05, np.diff(final_step_size_.ravel()))
+
+    # Step size for the Temperature = 1 replica should have decreased
+    # significantly from the large initial value.
+    self.assertEqual(initial_step_scale, 3)
+    self.assertLess(final_step_size_[0, 0, 0], 2)
+
+    # The mean shouldn't be ridiculous.
+    self.assertAllClose(np.zeros((num_replica, num_chains, num_events)),
+                        np.mean(states_, axis=0),
+                        # Passed at atol = 8 / Sqrt(num_results).
+                        atol=16 / np.sqrt(num_results))
+
   @parameterized.named_parameters([
       # pylint: disable=line-too-long
       ('_HMC_default', tfp.mcmc.HamiltonianMonteCarlo, False, 'default'),  # NUMPY_DISABLE
