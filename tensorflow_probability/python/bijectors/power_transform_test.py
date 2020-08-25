@@ -31,6 +31,9 @@ from tensorflow_probability.python.internal import test_util
 class PowerTransformBijectorTest(test_util.TestCase):
   """Tests correctness of the power transformation."""
 
+  dtype = np.float32
+  use_static_shape = True
+
   def testBijector(self):
     c = 0.2
     bijector = tfb.PowerTransform(power=c, validate_args=True)
@@ -59,6 +62,17 @@ class PowerTransformBijectorTest(test_util.TestCase):
     y = np.logspace(0.001, 10, num=10).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
+
+  def testDtype(self):
+    bijector = tfb.PowerTransform(power=0.2, validate_args=True)
+    x = self.make_input([-0.5, 1., 3.])
+    y = self.make_input([0.3, 3., 1.2])
+    self.assertIs(bijector.forward(x).dtype, x.dtype)
+    self.assertIs(bijector.inverse(y).dtype, y.dtype)
+    self.assertIs(
+        bijector.forward_log_det_jacobian(x, event_ndims=0).dtype, x.dtype)
+    self.assertIs(
+        bijector.inverse_log_det_jacobian(y, event_ndims=0).dtype, y.dtype)
 
 
 if __name__ == '__main__':

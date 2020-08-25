@@ -85,7 +85,8 @@ class PowerTransform(bijector.Bijector):
         return tf.exp(x)
       # If large x accuracy is an issue, consider using:
       # (1. + x * self.power)**(1. / self.power) when x >> 1.
-      return tf.exp(tf.math.log1p(x * self.power) / self.power)
+      power = tf.cast(self.power, x.dtype)
+      return tf.exp(tf.math.log1p(x * power) / power)
 
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
@@ -93,17 +94,21 @@ class PowerTransform(bijector.Bijector):
         return tf.math.log(y)
       # If large y accuracy is an issue, consider using:
       # (y**self.power - 1.) / self.power when y >> 1.
-      return tf.math.expm1(tf.math.log(y) * self.power) / self.power
+      power = tf.cast(self.power, y.dtype)
+      return tf.math.expm1(tf.math.log(y) * power) / power
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return (self.power - 1.) * tf.math.log(y)
+      power = tf.cast(self.power, y.dtype)
+      return (power - tf.ones([], y.dtype)) * tf.math.log(y)
 
   def _forward_log_det_jacobian(self, x):
     with tf.control_dependencies(self._maybe_assert_valid_x(x)):
       if self.power == 0.:
         return x
-      return (1. / self.power - 1.) * tf.math.log1p(x * self.power)
+      power = tf.cast(self.power, x.dtype)
+      return (tf.math.reciprocal(power) - tf.ones([], x.dtype)
+              ) * tf.math.log1p(x * power)
 
   def _maybe_assert_valid_x(self, x):
     if not self.validate_args or self.power == 0.:
