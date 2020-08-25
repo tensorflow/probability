@@ -339,7 +339,8 @@ def real_nvp_default_template(hidden_layers,
 
   Arguments:
     hidden_layers: Python `list`-like of non-negative integer, scalars
-      indicating the number of units in each hidden layer. Default: `[512, 512].
+      indicating the number of units in each hidden layer. Default: `[512,
+        512]`.
     shift_only: Python `bool` indicating if only the `shift` term shall be
       computed (i.e. NICE bijector). Default: `False`.
     activation: Activation function (callable). Explicitly setting to `None`
