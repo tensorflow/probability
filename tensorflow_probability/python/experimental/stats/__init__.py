@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.stats.sample_stats import RunningCentralMoments
+from tensorflow_probability.python.experimental.stats.sample_stats import RunningCentralMomentsState
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovariance
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovarianceState
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningMean
@@ -28,6 +30,8 @@ from tensorflow_probability.python.experimental.stats.sample_stats import Runnin
 
 
 __all__ = [
+    'RunningCentralMoments',
+    'RunningCentralMomentsState',
     'RunningCovariance',
     'RunningCovarianceState',
     'RunningMean',
