@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +15,10 @@
 # ============================================================================
 """Probit regression, implemented in Stan."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 
-from tools.inference_gym_ground_truth import stan_model
-from tools.inference_gym_ground_truth import util
+from spinoffs.inference_gym.tools.stan import stan_model
+from spinoffs.inference_gym.tools.stan import util
 
 __all__ = [
     'probit_regression',

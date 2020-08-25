@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,19 +15,15 @@
 # ============================================================================
 """Stan models, used as a source of ground truth."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-from tools.inference_gym_ground_truth import brownian_motion
-from tools.inference_gym_ground_truth import item_response_theory
-from tools.inference_gym_ground_truth import log_gaussian_cox_process
-from tools.inference_gym_ground_truth import logistic_regression
-from tools.inference_gym_ground_truth import probit_regression
-from tools.inference_gym_ground_truth import radon_contextual_effects
-from tools.inference_gym_ground_truth import sparse_logistic_regression
-from tools.inference_gym_ground_truth import stochastic_volatility
 from spinoffs.inference_gym.internal import data
+from spinoffs.inference_gym.tools.stan import brownian_motion
+from spinoffs.inference_gym.tools.stan import item_response_theory
+from spinoffs.inference_gym.tools.stan import log_gaussian_cox_process
+from spinoffs.inference_gym.tools.stan import logistic_regression
+from spinoffs.inference_gym.tools.stan import probit_regression
+from spinoffs.inference_gym.tools.stan import radon_contextual_effects
+from spinoffs.inference_gym.tools.stan import sparse_logistic_regression
+from spinoffs.inference_gym.tools.stan import stochastic_volatility
 
 __all__ = [
     'brownian_motion_missing_middle_observations',

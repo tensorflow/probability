@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,10 +43,6 @@ NOTE: This must be run locally, and requires at least the following packages:
 - tfds-nightly
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import os
 import sys
@@ -57,8 +53,8 @@ import numpy as np
 import pandas as pd
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tools.inference_gym_ground_truth import targets
 from spinoffs.inference_gym.internal import ground_truth_encoding
+from spinoffs.inference_gym.tools.stan import targets
 # Direct import for flatten_with_tuple_paths.
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -72,7 +68,7 @@ flags.DEFINE_boolean('print_summary', True, 'Whether to print the Stan fit'
 flags.DEFINE_string('output_directory', None,
                     'Where to save the ground truth values. By default, this '
                     'places it in the appropriate directory in the '
-                    'TensorFlow Probability source directory.')
+                    'Inference Gym source directory.')
 
 FLAGS = flags.FLAGS
 
@@ -154,7 +150,7 @@ def main(argv):
 
   argv_str = '\n'.join(['  {} \\'.format(arg) for arg in sys.argv[1:]])
   command_str = (
-      """bazel run //tools/inference_gym_ground_truth:get_ground_truth -- \
+      """bazel run //spinoffs/inference_gym/tools:get_ground_truth -- \
 {argv_str}""".format(argv_str=argv_str))
 
   file_str = ground_truth_encoding.get_ground_truth_module_source(
@@ -163,7 +159,7 @@ def main(argv):
   if FLAGS.output_directory is None:
     file_basedir = os.path.dirname(os.path.realpath(__file__))
     output_directory = os.path.join(
-        file_basedir, '../../spinoffs/inference_gym/targets/ground_truth')
+        file_basedir, '../targets/ground_truth')
   else:
     output_directory = FLAGS.output_directory
   file_path = os.path.join(output_directory, '{}.py'.format(FLAGS.target))

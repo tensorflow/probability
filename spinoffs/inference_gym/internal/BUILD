@@ -21,7 +21,7 @@
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
-        "//tools/inference_gym_ground_truth:__subpackages__",
+        "//tensorflow_probability/opensource/tools/inference_gym_ground_truth:__subpackages__",
         "//spinoffs/inference_gym:__subpackages__",
     ],
 )

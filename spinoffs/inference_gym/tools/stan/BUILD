@@ -13,22 +13,19 @@
 # limitations under the License.
 # ============================================================================
 # Ground truth computation using Stan.
-licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
-
-py_binary(
-    name = "get_ground_truth",
-    srcs = ["get_ground_truth.py"],
-    python_version = "PY3",
-    tags = ["notap"],
-    deps = [
-        ":targets",
-        "//tensorflow_probability",
-        "//spinoffs/inference_gym/internal:ground_truth_encoding",
+package(
+    default_visibility = [
+        "//tensorflow_probability:__subpackages__",
+        "//spinoffs/inference_gym:__subpackages__",
     ],
 )
 
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+# We can't use strict/pytype because `cmdstanpy` is not available internally.
 py_library(
     name = "brownian_motion",
     srcs = ["brownian_motion.py"],

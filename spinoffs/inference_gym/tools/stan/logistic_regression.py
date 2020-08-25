@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Sparse logistic regression, implemented in Stan."""
+"""Logistic regression, implemented in Stan."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import collections
 import numpy as np
 
-from tools.inference_gym_ground_truth import stan_model
-from tools.inference_gym_ground_truth import util
+from spinoffs.inference_gym.tools.stan import stan_model
+from spinoffs.inference_gym.tools.stan import util
 
 __all__ = [
-    'sparse_logistic_regression',
+    'logistic_regression',
 ]
 
 
@@ -34,13 +29,13 @@ def _add_bias(features):
   return np.concatenate([features, np.ones([features.shape[0], 1])], axis=-1)
 
 
-def sparse_logistic_regression(
+def logistic_regression(
     train_features,
     train_labels,
     test_features=None,
     test_labels=None,
 ):
-  """Bayesian logistic regression with a sparsity-inducing prior.
+  """Bayesian logistic regression with a Gaussian prior.
 
   Args:
     train_features: Floating-point `Tensor` with shape `[num_train_points,
@@ -69,21 +64,14 @@ def sparse_logistic_regression(
     int<lower=0,upper=1> test_labels[num_test_points];
   }
   parameters {
-    vector[num_features] unscaled_weights;
-    vector<lower=0>[num_features] local_scales;
-    real<lower=0> global_scale;
+    vector[num_features] weights;
   }
   model {
     {
-      vector[num_features] weights;
       vector[num_train_points] logits;
-
-      weights = unscaled_weights .* local_scales * global_scale;
       logits = train_features * weights;
 
-      unscaled_weights ~ normal(0, 1);
-      local_scales ~ gamma(0.5, 0.5);
-      global_scale ~ gamma(0.5, 0.5);
+      weights ~ normal(0, 1);
       train_labels ~ bernoulli_logit(logits);
     }
   }
@@ -91,10 +79,7 @@ def sparse_logistic_regression(
     real test_nll;
     real per_example_test_nll[num_test_points];
     {
-      vector[num_features] weights;
       vector[num_test_points] logits;
-
-      weights = unscaled_weights .* local_scales * global_scale;
       logits = test_features * weights;
 
       test_nll = -bernoulli_logit_lpmf(test_labels | logits);
@@ -127,21 +112,7 @@ def sparse_logistic_regression(
   model = util.cached_stan_model(code)
 
   def _ext_identity(samples):
-    """Extract all the parameters."""
-    res = collections.OrderedDict()
-    res['unscaled_weights'] = util.get_columns(
-        samples,
-        r'^unscaled_weights\.\d+$',
-    )
-    res['local_scales'] = util.get_columns(
-        samples,
-        r'^local_scales\.\d+$',
-    )
-    res['global_scale'] = util.get_columns(
-        samples,
-        r'^global_scale$',
-    )[:, 0]
-    return res
+    return util.get_columns(samples, r'^weights\.\d+$')
 
   def _ext_test_nll(samples):
     return util.get_columns(samples, r'^test_nll$')[:, 0]

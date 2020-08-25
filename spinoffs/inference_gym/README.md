@@ -109,7 +109,7 @@ models.
 Currently we have a little tooling to help use `cmdstanpy` to generate ground
 truth values (in the correct format) for models without analytic ground truth.
 Using this requires adding a model implementation inside the
-[`tools/inference_gym_ground_truth`][ground_truth_dir]
+[`inference_gym/tools/stan`][ground_truth_dir]
 directory.
 
 ### Adding a new real dataset
@@ -124,11 +124,11 @@ Follow the example of the [`SyntheticItemResponseTheory`][irt] model.
 
 ### Generating ground truth files.
 
-See [`tools/inference_gym_ground_truth/get_ground_truth.py`][get_ground_truth].
+See [`inference_gym/tools/get_ground_truth.py`][get_ground_truth].
 
 [model]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/targets/model.py
-[get_ground_truth]: https://github.com/tensorflow/probability/tree/master/tools/inference_gym_ground_truth/get_ground_truth.py
-[ground_truth_dir]: https://github.com/tensorflow/probability/tree/master/tools/inference_gym_ground_truth
+[get_ground_truth]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/tools/get_ground_truth.py
+[ground_truth_dir]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/tools/stan
 [bayesian_model]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/targets/bayesian_model.py
 [sparse_logistic_regression]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/targets/sparse_logistic_regression.py
 [logistic_regression]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/targets/logistic_regression.py

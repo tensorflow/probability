@@ -1,4 +1,4 @@
-# Lint as: python2, python3
+# Lint as: python3
 # Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +15,12 @@
 # ============================================================================
 """Radon model, implemented in Stan."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 import numpy as np
 
-from tools.inference_gym_ground_truth import stan_model
-from tools.inference_gym_ground_truth import util
+from spinoffs.inference_gym.tools.stan import stan_model
+from spinoffs.inference_gym.tools.stan import util
 
 __all__ = [
     'radon_contextual_effects',
@@ -115,7 +111,8 @@ def radon_contextual_effects(
         samples, r'^county_effect_scale$')[:, 0]
     res['county_effect'] = util.get_columns(samples, r'^county_effect\.\d+$')
     res['weight'] = util.get_columns(samples, r'^weight\.\d+$')
-    res['log_radon_scale'] = util.get_columns(samples, r'^log_radon_scale$')[:, 0]
+    res['log_radon_scale'] = (
+        util.get_columns(samples, r'^log_radon_scale$')[:, 0])
     return res
 
   extract_fns = {'identity': _ext_identity}
