@@ -63,6 +63,7 @@ TF2_FRIENDLY_DISTS = (
     'DoublesidedMaxwell',
     'Empirical',
     'Exponential',
+    'ExpGamma',
     'FiniteDiscrete',
     'Gamma',
     'GammaGamma',

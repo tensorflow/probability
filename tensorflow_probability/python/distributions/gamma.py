@@ -39,6 +39,8 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'Gamma',
+    'kl_gamma_gamma',
+    'random_gamma',
 ]
 
 
@@ -88,7 +90,8 @@ class Gamma(distribution.Distribution):
   the samples that are smaller than `np.finfo(dtype).tiny` are rounded
   to this value, so it appears more often than it should.
   This should only be noticeable when the `concentration` is very small, or the
-  `rate` is very large. See note in `tf.random.gamma` docstring.
+  `rate` is very large. See note in `tf.random.gamma` docstring. To avoid this
+  hazard, consider `tfp.distributions.ExpGamma`.
 
   Samples of this distribution are reparameterized (pathwise differentiable).
   The derivatives are computed using the approach described in the paper
@@ -323,7 +326,7 @@ class Gamma(distribution.Distribution):
 
 
 @kullback_leibler.RegisterKL(Gamma, Gamma)
-def _kl_gamma_gamma(g0, g1, name=None):
+def kl_gamma_gamma(g0, g1, name=None):
   """Calculate the batched KL divergence KL(g0 || g1) with g0 and g1 Gamma.
 
   Args:
@@ -381,9 +384,14 @@ def _random_gamma_cpu(
       bad_concentration,
       dtype_util.as_numpy_dtype(concentration.dtype)(100.), concentration)
 
-  if rate is None and log_rate is None:
-    rate = tf.ones([], concentration.dtype)
-    log_rate = tf.zeros([], concentration.dtype)
+  if rate is None:
+    if log_rate is None:
+      rate = tf.ones([], concentration.dtype)
+      log_rate = tf.zeros([], concentration.dtype)
+    else:
+      rate = tf.math.exp(log_rate)
+
+  bad_rate = (rate <= 0.) | tf.math.is_nan(rate)
 
   if log_space:
     # The underlying gamma sampler uses a recurrence for conc < 1.  When
@@ -401,10 +409,6 @@ def _random_gamma_cpu(
     log_rate = tf.math.log(rate) if log_rate is None else log_rate
     rate = tf.ones_like(log_rate)  # Do the division later in log-space.
 
-  if rate is None:
-    rate = tf.math.exp(log_rate)
-
-  bad_rate = (rate <= 0.) | tf.math.is_nan(rate)
   safe_rate = tf.where(
       bad_rate,
       dtype_util.as_numpy_dtype(concentration.dtype)(100.), rate)
@@ -437,7 +441,7 @@ def _random_gamma_cpu(
 def _random_gamma_noncpu(
     shape, concentration, rate=None, log_rate=None, seed=None, log_space=False):
   """Sample using XLA-friendly python-based rejection sampler."""
-  return random_gamma_rejection(
+  return _random_gamma_rejection(
       shape, concentration, rate, log_rate, seed, log_space)
 
 
@@ -647,7 +651,7 @@ def random_gamma(
       shape, concentration, rate, log_rate, seed, log_space)[0]
 
 
-def random_gamma_rejection(
+def _random_gamma_rejection(
     shape, concentration, rate=None, log_rate=None, seed=None, log_space=False,
     internal_dtype=tf.float64):
   """Samples from the gamma distribution.

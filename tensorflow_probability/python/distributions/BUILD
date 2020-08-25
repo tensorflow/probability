@@ -63,6 +63,7 @@ multi_substrate_py_library(
         ":distribution",
         ":doublesided_maxwell",
         ":empirical",
+        ":exp_gamma",
         ":exponential",
         ":finite_discrete",
         ":gamma",
@@ -497,6 +498,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "exp_gamma",
+    srcs = ["exp_gamma.py"],
+    deps = [
+        ":gamma",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -2159,6 +2174,27 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "exp_gamma_test",
+    size = "medium",
+    srcs = ["exp_gamma_test.py"],
+    jax_size = "large",
+    numpy_tags = ["notap"],
+    shard_count = 2,
+    deps = [
+        ":exp_gamma",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

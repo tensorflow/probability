@@ -41,6 +41,7 @@ from tensorflow_probability.python.distributions.dirichlet_multinomial import Di
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.empirical import Empirical
+from tensorflow_probability.python.distributions.exp_gamma import ExpGamma
 from tensorflow_probability.python.distributions.exponential import Exponential
 from tensorflow_probability.python.distributions.finite_discrete import FiniteDiscrete
 from tensorflow_probability.python.distributions.gamma import Gamma
@@ -168,6 +169,7 @@ __all__ = [
     'DoublesidedMaxwell',
     'VectorDeterministic',
     'Empirical',
+    'ExpGamma',
     'Exponential',
     'VectorExponentialDiag',
     'Gamma',

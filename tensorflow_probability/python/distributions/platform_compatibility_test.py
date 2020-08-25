@@ -133,6 +133,7 @@ XLA_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_ATOL.update({
     'Binomial': 5e-6,
     'DirichletMultinomial': 1e-4,
+    'ExpGamma': 1e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
     'InverseGamma': 5e-5,
     'Kumaraswamy': 3e-6,
@@ -154,6 +155,7 @@ XLA_LOGPROB_RTOL.update({
     'Dirichlet': 1e-3,
     'DirichletMultinomial': 2e-4,
     'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
+    'ExpGamma': 5e-2,  # TODO(b/166257329)
     'FiniteDiscrete': 6e-6,
     'GammaGamma': 5e-4,
     'Geometric': 5e-5,
