@@ -22,6 +22,7 @@ import tensorflow_probability as tfp
 from spinoffs.inference_gym.internal import data
 from spinoffs.inference_gym.targets import bayesian_model
 from spinoffs.inference_gym.targets import model
+from spinoffs.inference_gym.targets.ground_truth import radon_contextual_effects_minnesota
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -309,6 +310,8 @@ class RadonContextualEffectsMinnesota(RadonContextualEffects):
       Multilevel/Hierarchical Models (1st ed.). Cambridge University Press.
       http://www.stat.columbia.edu/~gelman/arm/examples/radon/
   """
+
+  GROUND_TRUTH_MODULE = radon_contextual_effects_minnesota
 
   def __init__(self):
     dataset = data.radon(state='MN')

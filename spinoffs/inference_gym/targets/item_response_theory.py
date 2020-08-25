@@ -24,6 +24,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from spinoffs.inference_gym.internal import data
 from spinoffs.inference_gym.targets import bayesian_model
 from spinoffs.inference_gym.targets import model
+from spinoffs.inference_gym.targets.ground_truth import synthetic_item_response_theory
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -286,6 +287,8 @@ class SyntheticItemResponseTheory(ItemResponseTheory):
   400 students each answering a subset of 100 unique questions, with a total of
   30012 questions answered.
   """
+
+  GROUND_TRUTH_MODULE = synthetic_item_response_theory
 
   def __init__(self):
     dataset = data.synthetic_item_response_theory()

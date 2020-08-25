@@ -22,6 +22,7 @@ import tensorflow_probability as tfp
 from spinoffs.inference_gym.internal import data
 from spinoffs.inference_gym.targets import bayesian_model
 from spinoffs.inference_gym.targets import model
+from spinoffs.inference_gym.targets.ground_truth import german_credit_numeric_logistic_regression
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -140,6 +141,8 @@ class GermanCreditNumericLogisticRegression(LogisticRegression):
 
   1. https://archive.ics.uci.edu/ml/datasets/statlog+(german+credit+data)
   """
+
+  GROUND_TRUTH_MODULE = german_credit_numeric_logistic_regression
 
   def __init__(self):
     dataset = data.german_credit_numeric()

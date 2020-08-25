@@ -24,6 +24,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from spinoffs.inference_gym.internal import data
 from spinoffs.inference_gym.targets import bayesian_model
 from spinoffs.inference_gym.targets import model
+from spinoffs.inference_gym.targets.ground_truth import stochastic_volatility_sp500
+from spinoffs.inference_gym.targets.ground_truth import stochastic_volatility_sp500_small
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -189,6 +191,8 @@ class StochasticVolatility(bayesian_model.BayesianModel):
 class StochasticVolatilitySP500(StochasticVolatility):
   """Stochastic volatility model of ten years of S&P500 returns."""
 
+  GROUND_TRUTH_MODULE = stochastic_volatility_sp500
+
   def __init__(self):
     dataset = data.sp500_closing_prices()
     super(StochasticVolatilitySP500, self).__init__(
@@ -199,6 +203,8 @@ class StochasticVolatilitySP500(StochasticVolatility):
 
 class StochasticVolatilitySP500Small(StochasticVolatility):
   """Stochastic volatility model of 100 days of S&P500 returns."""
+
+  GROUND_TRUTH_MODULE = stochastic_volatility_sp500_small
 
   def __init__(self):
     dataset = data.sp500_closing_prices(num_points=100)

@@ -56,7 +56,6 @@ py_library(
         ":sparse_logistic_regression",
         ":stochastic_volatility",
         ":vector_model",
-        "//spinoffs/inference_gym/targets/ground_truth",  # buildcleaner: keep
     ],
 )
 
@@ -117,6 +116,7 @@ py_library(
         ":bayesian_model",
         ":model",
         "//spinoffs/inference_gym/internal:data",
+        "//spinoffs/inference_gym/targets/ground_truth:brownian_motion_missing_middle_observations",
     ],
 )
 
@@ -168,6 +168,7 @@ py_library(
         ":bayesian_model",
         ":model",
         # numpy dep,
+        "//spinoffs/inference_gym/targets/ground_truth:synthetic_item_response_theory",
     ],
 )
 
@@ -186,7 +187,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
         "//spinoffs/inference_gym/internal:test_util",
-        "//spinoffs/inference_gym/targets/ground_truth:synthetic_item_response_theory",  # buildcleaner: keep
     ],
 )
 
@@ -199,7 +199,7 @@ py_library(
         ":model",
         # tensorflow dep,
         "//spinoffs/inference_gym/internal:data",
-        "//spinoffs/inference_gym/targets/ground_truth:synthetic_log_gaussian_cox_process",  # buildcleaner: keep
+        "//spinoffs/inference_gym/targets/ground_truth:synthetic_log_gaussian_cox_process",
     ],
 )
 
@@ -228,7 +228,7 @@ py_library(
         ":bayesian_model",
         ":model",
         "//spinoffs/inference_gym/internal:data",
-        "//spinoffs/inference_gym/targets/ground_truth:german_credit_numeric_logistic_regression",  # buildcleaner: keep
+        "//spinoffs/inference_gym/targets/ground_truth:german_credit_numeric_logistic_regression",
     ],
 )
 
@@ -305,7 +305,7 @@ py_library(
         ":bayesian_model",
         ":model",
         "//spinoffs/inference_gym/internal:data",
-        "//spinoffs/inference_gym/targets/ground_truth:german_credit_numeric_probit_regression",  # buildcleaner: keep
+        "//spinoffs/inference_gym/targets/ground_truth:german_credit_numeric_probit_regression",
     ],
 )
 
@@ -334,7 +334,7 @@ py_library(
         ":bayesian_model",
         ":model",
         "//spinoffs/inference_gym/internal:data",
-        "//spinoffs/inference_gym/targets/ground_truth:radon_contextual_effects_minnesota",  # buildcleaner: keep
+        "//spinoffs/inference_gym/targets/ground_truth:radon_contextual_effects_minnesota",
     ],
 )
 
@@ -364,7 +364,7 @@ py_library(
         ":bayesian_model",
         ":model",
         "//spinoffs/inference_gym/internal:data",
-        "//spinoffs/inference_gym/targets/ground_truth:german_credit_numeric_sparse_logistic_regression",  # buildcleaner: keep
+        "//spinoffs/inference_gym/targets/ground_truth:german_credit_numeric_sparse_logistic_regression",
     ],
 )
 
@@ -393,6 +393,8 @@ py_library(
         ":bayesian_model",
         ":model",
         "//spinoffs/inference_gym/internal:data",
+        "//spinoffs/inference_gym/targets/ground_truth:stochastic_volatility_sp500",
+        "//spinoffs/inference_gym/targets/ground_truth:stochastic_volatility_sp500_small",
     ],
 )
 

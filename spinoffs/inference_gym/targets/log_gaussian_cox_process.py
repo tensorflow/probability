@@ -20,6 +20,7 @@ import tensorflow_probability as tfp
 from spinoffs.inference_gym.internal import data
 from spinoffs.inference_gym.targets import bayesian_model
 from spinoffs.inference_gym.targets import model
+from spinoffs.inference_gym.targets.ground_truth import synthetic_log_gaussian_cox_process
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -186,6 +187,8 @@ class SyntheticLogGaussianCoxProcess(LogGaussianCoxProcess):
   locations with spacing = 1, and then sampling from the prior to determine the
   counts at those locations.
   """
+
+  GROUND_TRUTH_MODULE = synthetic_log_gaussian_cox_process
 
   def __init__(self):
     dataset = data.synthetic_log_gaussian_cox_process()

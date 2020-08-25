@@ -23,6 +23,7 @@ import tensorflow_probability as tfp
 from spinoffs.inference_gym.internal import data
 from spinoffs.inference_gym.targets import bayesian_model
 from spinoffs.inference_gym.targets import model
+from spinoffs.inference_gym.targets.ground_truth import brownian_motion_missing_middle_observations
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -145,6 +146,8 @@ class BrownianMotion(bayesian_model.BayesianModel):
 
 class BrownianMotionMissingMiddleObservations(BrownianMotion):
   """A simple Brownian Motion with 30 timesteps where 10 are unobservable."""
+
+  GROUND_TRUTH_MODULE = brownian_motion_missing_middle_observations
 
   def __init__(self):
     dataset = data.brownian_motion_missing_middle_observations()

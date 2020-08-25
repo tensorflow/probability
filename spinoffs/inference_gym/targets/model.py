@@ -16,7 +16,6 @@
 """Implementation of the Bayesian model class."""
 
 import collections
-import importlib
 
 import tensorflow.compat.v2 as tf
 from spinoffs.inference_gym.internal import ground_truth_encoding
@@ -28,30 +27,19 @@ __all__ = [
 ]
 
 
-def _maybe_populate_ground_truth(sample_transformations, module_name):
-  """Populates the ground truth values.
-
-  This tries to import a module from the `ground_truth` module with the
-  `module_name` name.
+def _populate_ground_truth(sample_transformations, module):
+  """Populates the ground truth values from a module.
 
   Args:
     sample_transformations: A dictionary of Python strings to
       `SampleTransformation`s.
-    module_name: Python string. Module name from which to load the ground truth.
+    module: Python module from which to load the ground truth.
 
   Returns:
     sample_transformations: Same as the input `sample_transformations`, but with
       the ground truth values populated.
   """
   sample_transformations = sample_transformations.copy()
-  try:
-    # This assumes `model` is a 2 levels deep inside of `inference_gym`. If we
-    # move it, we'd change the `-2` to equal the (negative) nesting level.
-    root_name_comps = __name__.split('.')[:-2]
-    module = importlib.import_module(
-        '.'.join(root_name_comps + ['targets', 'ground_truth', module_name]))
-  except ImportError:
-    return sample_transformations
   for name, sample_transformation in sample_transformations.items():
     flat_mean = []
     flat_sem = []
@@ -170,6 +158,9 @@ class Model:
   for ground truth into a sample transformation.
   """
 
+  # Specify this to load the ground truths from this module.
+  GROUND_TRUTH_MODULE = None
+
   def __init__(
       self,
       default_event_space_bijector,
@@ -199,8 +190,9 @@ class Model:
     if not isinstance(sample_transformations, collections.OrderedDict):
       sample_transformations = collections.OrderedDict(
           sorted(sample_transformations.items()))
-    sample_transformations = _maybe_populate_ground_truth(
-        sample_transformations, module_name=name)
+    if self.GROUND_TRUTH_MODULE is not None:
+      sample_transformations = _populate_ground_truth(
+          sample_transformations, module=self.GROUND_TRUTH_MODULE)
     self._sample_transformations = sample_transformations
 
   # PyLint is confused, this is a new-style class.

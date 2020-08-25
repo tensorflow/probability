@@ -30,24 +30,6 @@ exports_files(["LICENSE"])
 
 # pytype_strict
 py_library(
-    name = "ground_truth",
-    srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":brownian_motion_missing_middle_observations",
-        ":german_credit_numeric_logistic_regression",
-        ":german_credit_numeric_probit_regression",
-        ":german_credit_numeric_sparse_logistic_regression",
-        ":radon_contextual_effects_minnesota",
-        ":stochastic_volatility_sp500",
-        ":stochastic_volatility_sp500_small",
-        ":synthetic_item_response_theory",
-        ":synthetic_log_gaussian_cox_process",
-    ],
-)
-
-# pytype_strict
-py_library(
     name = "brownian_motion_missing_middle_observations",
     srcs = ["brownian_motion_missing_middle_observations.py"],
     srcs_version = "PY3",
