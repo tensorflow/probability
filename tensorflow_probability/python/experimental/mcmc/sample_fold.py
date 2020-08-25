@@ -65,6 +65,12 @@ def sample_fold(
   An arbitrary collection of `reducer` can be provided, and the resulting
   finalized statistic(s) will be returned in an identical structure.
 
+  This function can sample from and reduce over multiple chains, in parallel.
+  Whether or not there are multiple chains is dictated by how the `kernel`
+  treats its inputs.  Typically, the shape of the independent chains is shape of
+  the result of the `target_log_prob_fn` used by the `kernel` when applied to
+  the given `current_state`.
+
   Args:
     num_steps: Integer or scalar `Tensor` representing the number of `Reducer`
       steps.
