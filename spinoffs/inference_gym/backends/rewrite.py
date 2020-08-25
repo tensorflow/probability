@@ -217,6 +217,10 @@ class Finder(importlib.abc.MetaPathFinder):
     if DEBUG:
       print('backend: ', backend_name)
       print('orig_module_name: ', orig_module_name)
+    # N.B. this will actually execute package __init__.py files. If those import
+    # backend-specific modules, those imports will fail. That's why the
+    # __init__.py files in question disable import errors using the
+    # backends.util.silence_nonrewritten_import_errors utility.
     orig_spec = importlib.util.find_spec(orig_module_name)
     if orig_spec is None:
       raise ImportError('Cannot import ' + orig_module_name)

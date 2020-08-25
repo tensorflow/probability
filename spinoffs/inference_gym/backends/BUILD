@@ -16,6 +16,9 @@
 #   A package for target densities and benchmarking of inference algorithms
 #   against the same.
 
+# [internal] load pytype.bzl (pytype_strict_library)
+# [internal] load strict.bzl
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -27,8 +30,53 @@ licenses(["notice"])
 
 exports_files(["LICENSE"])
 
+# pytype_strict
 py_library(
     name = "rewrite",
     srcs = ["rewrite.py"],
     srcs_version = "PY3",
+)
+
+# pytype_strict
+py_library(
+    name = "util",
+    srcs = ["util.py"],
+    srcs_version = "PY3",
+)
+
+# py_strict
+py_test(
+    name = "jax_integration_test",
+    srcs = ["jax_integration_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:absltest dep,
+        "//spinoffs/inference_gym:using_jax",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "numpy_integration_test",
+    srcs = ["numpy_integration_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:absltest dep,
+        "//spinoffs/inference_gym:using_numpy",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "tensorflow_integration_test",
+    srcs = ["tensorflow_integration_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:absltest dep,
+        # tensorflow dep,
+        "//spinoffs/inference_gym:using_tensorflow",
+    ],
 )

@@ -56,6 +56,7 @@ py_library(
         ":sparse_logistic_regression",
         ":stochastic_volatility",
         ":vector_model",
+        "//spinoffs/inference_gym/backends:util",
     ],
 )
 

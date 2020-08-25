@@ -13,22 +13,26 @@
 # limitations under the License.
 """Targets package."""
 
-from spinoffs.inference_gym.targets.banana import Banana
-from spinoffs.inference_gym.targets.bayesian_model import BayesianModel
-from spinoffs.inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
-from spinoffs.inference_gym.targets.item_response_theory import ItemResponseTheory
-from spinoffs.inference_gym.targets.item_response_theory import SyntheticItemResponseTheory
-from spinoffs.inference_gym.targets.log_gaussian_cox_process import LogGaussianCoxProcess
-from spinoffs.inference_gym.targets.log_gaussian_cox_process import SyntheticLogGaussianCoxProcess
-from spinoffs.inference_gym.targets.logistic_regression import GermanCreditNumericLogisticRegression
-from spinoffs.inference_gym.targets.logistic_regression import LogisticRegression
-from spinoffs.inference_gym.targets.model import Model
-from spinoffs.inference_gym.targets.neals_funnel import NealsFunnel
-from spinoffs.inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
-from spinoffs.inference_gym.targets.probit_regression import ProbitRegression
-from spinoffs.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
-from spinoffs.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
-from spinoffs.inference_gym.targets.vector_model import VectorModel
+from spinoffs.inference_gym.backends import util
+
+with util.silence_nonrewritten_import_errors():
+  # pylint: disable=g-import-not-at-top
+  from spinoffs.inference_gym.targets.banana import Banana
+  from spinoffs.inference_gym.targets.bayesian_model import BayesianModel
+  from spinoffs.inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
+  from spinoffs.inference_gym.targets.item_response_theory import ItemResponseTheory
+  from spinoffs.inference_gym.targets.item_response_theory import SyntheticItemResponseTheory
+  from spinoffs.inference_gym.targets.log_gaussian_cox_process import LogGaussianCoxProcess
+  from spinoffs.inference_gym.targets.log_gaussian_cox_process import SyntheticLogGaussianCoxProcess
+  from spinoffs.inference_gym.targets.logistic_regression import GermanCreditNumericLogisticRegression
+  from spinoffs.inference_gym.targets.logistic_regression import LogisticRegression
+  from spinoffs.inference_gym.targets.model import Model
+  from spinoffs.inference_gym.targets.neals_funnel import NealsFunnel
+  from spinoffs.inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
+  from spinoffs.inference_gym.targets.probit_regression import ProbitRegression
+  from spinoffs.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
+  from spinoffs.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
+  from spinoffs.inference_gym.targets.vector_model import VectorModel
 
 __all__ = [
     'Banana',
