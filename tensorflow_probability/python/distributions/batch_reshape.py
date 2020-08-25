@@ -492,6 +492,7 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
       reshape_fn,
       static_inverse_event_shape,
       inverse_event_shape_tensor):
+    parameters = dict(locals())
     self._base_bijector = base_bijector
     self._reshape_fn = reshape_fn
     self._inverse_event_shapes = (
@@ -516,6 +517,7 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
         dtype=base_bijector.dtype,
         inverse_min_event_ndims=inverse_min_event_ndims,
         forward_min_event_ndims=forward_min_event_ndims,
+        parameters=parameters,
         name='batch_reshape_bijector')
 
   def _is_increasing(self):

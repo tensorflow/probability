@@ -41,9 +41,11 @@ class DummyMatrixTransform(tfb.Bijector):
   """
 
   def __init__(self):
+    parameters = dict(locals())
     super(DummyMatrixTransform, self).__init__(
         forward_min_event_ndims=2,
         is_constant_jacobian=False,
+        parameters=parameters,
         validate_args=False,
         name='dummy')
 
@@ -65,12 +67,14 @@ class _ChooseLocation(tfp.bijectors.Bijector):
   """A Bijector which chooses between one of two location parameters."""
 
   def __init__(self, loc, name='ChooseLocation'):
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._loc = tf.convert_to_tensor(loc, name='loc')
       super(_ChooseLocation, self).__init__(
           is_constant_jacobian=True,
           validate_args=False,
           forward_min_event_ndims=0,
+          parameters=parameters,
           name=name)
 
   def _forward(self, x, z=0.):
@@ -221,7 +225,10 @@ class TransformedDistributionTest(test_util.TestCase):
     class ExpForwardOnly(tfb.Bijector):
 
       def __init__(self):
-        super(ExpForwardOnly, self).__init__(forward_min_event_ndims=0)
+        parameters = dict(locals())
+        super(ExpForwardOnly, self).__init__(
+            forward_min_event_ndims=0,
+            parameters=parameters)
 
       def _forward(self, x):
         return tf.exp(x)
@@ -249,7 +256,10 @@ class TransformedDistributionTest(test_util.TestCase):
     class ExpInverseOnly(tfb.Bijector):
 
       def __init__(self):
-        super(ExpInverseOnly, self).__init__(inverse_min_event_ndims=0)
+        parameters = dict(locals())
+        super(ExpInverseOnly, self).__init__(
+            inverse_min_event_ndims=0,
+            parameters=parameters)
 
       def _inverse(self, y):
         return tf.math.log(y)
@@ -750,6 +760,7 @@ class ExcessiveConcretizationTestUnknownShape(ExcessiveConcretizationTest):
 class ToyZipMap(tfb.Bijector):
 
   def __init__(self, bijectors):
+    parameters = dict(locals())
     self._bijectors = bijectors
 
     super(ToyZipMap, self).__init__(
@@ -758,7 +769,8 @@ class ToyZipMap(tfb.Bijector):
         inverse_min_event_ndims=tf.nest.map_structure(
             lambda b: b.inverse_min_event_ndims, bijectors),
         is_constant_jacobian=all([
-            b.is_constant_jacobian for b in tf.nest.flatten(bijectors)]))
+            b.is_constant_jacobian for b in tf.nest.flatten(bijectors)]),
+        parameters=parameters)
 
   @property
   def bijectors(self):
