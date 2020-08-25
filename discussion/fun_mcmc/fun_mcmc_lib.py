@@ -2102,12 +2102,13 @@ def potential_scale_reduction_extract(
 
     independent_dims = list(range(independent_chain_ndims))
     # Within chain variance.
-    var_w = tf.reduce_mean(variance, independent_dims)
+    var_w = num_points / (num_points - 1) * tf.reduce_mean(
+        variance, independent_dims)
     # Between chain variance.
     var_b = num_chains / (num_chains - 1) * tf.math.reduce_variance(
         mean, independent_dims)
     # Estimate of the true variance of the target distribution.
-    sigma2p = var_w + var_b
+    sigma2p = (num_points - 1) / num_points * var_w + var_b
     return ((num_chains + 1) / num_chains * sigma2p / var_w - (num_points - 1) /
             (num_chains * num_points))
 
