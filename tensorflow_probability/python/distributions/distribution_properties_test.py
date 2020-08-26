@@ -97,6 +97,16 @@ class ReproducibilityTest(test_util.TestCase):
 class EventSpaceBijectorsTest(test_util.TestCase):
 
   def check_bad_loc_scale(self, dist):
+    if hasattr(dist, 'distribution'):
+      # BatchReshape, Independent, TransformedDistribution, and
+      # QuantizedDistribution
+      self.check_bad_loc_scale(dist.distribution)
+    if isinstance(dist, tfd.MixtureSameFamily):
+      self.check_bad_loc_scale(dist.mixture_distribution)
+      self.check_bad_loc_scale(dist.components_distribution)
+    if isinstance(dist, tfd.Mixture):
+      self.check_bad_loc_scale(dist.cat)
+      self.check_bad_loc_scale(dist.components)
     if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
       try:
         loc_ = tf.convert_to_tensor(dist.loc)
@@ -109,23 +119,7 @@ class EventSpaceBijectorsTest(test_util.TestCase):
       loc, scale = self.evaluate([loc_, scale_])
       hp.assume(np.all(np.abs(loc / scale) < 1e7))
 
-  @hp.given(hps.data())
-  @tfp_hps.tfp_hp_settings()
-  def testDistribution(self, data):
-    enable_vars = data.draw(hps.booleans())
-
-    # TODO(b/146572907): Fix `enable_vars` for metadistributions.
-    broken_dists = EVENT_SPACE_BIJECTOR_IS_BROKEN
-    if enable_vars:
-      broken_dists.extend(dhps.INSTANTIABLE_META_DISTS)
-
-    dist = data.draw(
-        dhps.distributions(
-            enable_vars=enable_vars,
-            eligibility_filter=(lambda name: name not in broken_dists)))
-    self.evaluate([var.initializer for var in dist.variables])
-    self.check_bad_loc_scale(dist)
-
+  def check_event_space_bijector_constrains(self, dist, data):
     event_space_bijector = dist._experimental_default_event_space_bijector()
     if event_space_bijector is None:
       return
@@ -149,6 +143,36 @@ class EventSpaceBijectorsTest(test_util.TestCase):
     x = event_space_bijector(y)
     with tf.control_dependencies(dist._sample_control_dependencies(x)):
       self.evaluate(tf.identity(x))
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(set(dhps.INSTANTIABLE_BASE_DISTS.keys()) -
+                               set(EVENT_SPACE_BIJECTOR_IS_BROKEN))))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistributionWithVars(self, dist_name, data):
+    dist = data.draw(dhps.base_distributions(
+        dist_name=dist_name, enable_vars=True))
+    self.evaluate([var.initializer for var in dist.variables])
+    self.check_bad_loc_scale(dist)
+    self.check_event_space_bijector_constrains(dist, data)
+
+  # TODO(b/146572907): Fix `enable_vars` for metadistributions and
+  # fold these two tests into one.
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistributionNoVars(self, dist_name, data):
+    def ok(name):
+      return name not in EVENT_SPACE_BIJECTOR_IS_BROKEN
+    dist = data.draw(dhps.distributions(
+        dist_name=dist_name, enable_vars=True,
+        eligibility_filter=ok))
+    self.evaluate([var.initializer for var in dist.variables])
+    self.check_bad_loc_scale(dist)
+    self.check_event_space_bijector_constrains(dist, data)
 
 
 def _all_shapes(thing):
