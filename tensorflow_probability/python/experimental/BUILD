@@ -42,7 +42,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
-        "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/sequential",
         "//tensorflow_probability/python/experimental/stats",

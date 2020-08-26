@@ -19,6 +19,11 @@
 #   internally.
 
 # [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_test",
+    "multi_substrate_py_library",
+)
 
 package(
     default_visibility = [
@@ -30,10 +35,26 @@ licenses(["notice"])
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    substrates_omit_deps = [
+        ":covariance_reducer",
+        ":elliptical_slice_sampler",
+        ":expectations_reducer",
+        ":nuts_autobatching",
+        ":particle_filter",
+        ":particle_filter_augmentation",
+        ":potential_scale_reduction_reducer",
+        ":reducer",
+        ":sample",
+        ":sample_discarding_kernel",
+        ":sample_fold",
+        ":sequential_monte_carlo_kernel",
+        ":tracing_reducer",
+        ":with_reductions",
+    ],
     deps = [
         ":covariance_reducer",
         ":elliptical_slice_sampler",
@@ -87,7 +108,7 @@ py_test(
 
 py_library(
     name = "nuts_autobatching",
-    srcs = ["nuts.py"],
+    srcs = ["nuts_autobatching.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
@@ -101,9 +122,9 @@ py_library(
 )
 
 py_library(
-    name = "nuts_testlib",
+    name = "nuts_autobatching_testlib",
     testonly = 1,
-    srcs = ["nuts_test.py"],
+    srcs = ["nuts_autobatching_test.py"],
     srcs_version = "PY2AND3",
     deps = [
         # absl/testing:parameterized dep,
@@ -117,23 +138,23 @@ py_library(
 
 # py2and3
 py_test(
-    name = "nuts_test",
+    name = "nuts_autobatching_test",
     size = "medium",
-    srcs = ["nuts_test.py"],
+    srcs = ["nuts_autobatching_test.py"],
     shard_count = 7,
     srcs_version = "PY2AND3",
     tags = ["nozapfhahn"],
     deps = [
-        ":nuts_testlib",
+        ":nuts_autobatching_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
 # py2and3
 py_test(
-    name = "nuts_test_gpu",
-    srcs = ["nuts_test.py"],
-    main = "nuts_test.py",
+    name = "nuts_autobatching_test_gpu",
+    srcs = ["nuts_autobatching_test.py"],
+    main = "nuts_autobatching_test.py",
     shard_count = 7,
     srcs_version = "PY2AND3",
     tags = [
@@ -142,18 +163,18 @@ py_test(
         "requires-gpu-nvidia",
     ],
     deps = [
-        ":nuts_testlib",
+        ":nuts_autobatching_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
 # py2and3
 py_test(
-    name = "nuts_xla_test_cpu",
+    name = "nuts_autobatching_xla_test_cpu",
     size = "large",
-    srcs = ["nuts_xla_test.py"],
+    srcs = ["nuts_autobatching_xla_test.py"],
     args = ["--test_device=cpu"],
-    main = "nuts_xla_test.py",
+    main = "nuts_autobatching_xla_test.py",
     shard_count = 1,
     tags = [
         "nozapfhahn",
@@ -170,11 +191,11 @@ py_test(
 
 # py2and3
 py_test(
-    name = "nuts_xla_test_gpu",
+    name = "nuts_autobatching_xla_test_gpu",
     size = "large",
-    srcs = ["nuts_xla_test.py"],
+    srcs = ["nuts_autobatching_xla_test.py"],
     args = ["--test_device=gpu"],
-    main = "nuts_xla_test.py",
+    main = "nuts_autobatching_xla_test.py",
     shard_count = 1,
     tags = [
         "nozapfhahn",
@@ -245,7 +266,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample_sequential_monte_carlo",
     srcs = ["sample_sequential_monte_carlo.py"],
     srcs_version = "PY2AND3",
@@ -260,12 +281,12 @@ py_library(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "sample_sequential_monte_carlo_test",
     size = "medium",
     timeout = "long",
     srcs = ["sample_sequential_monte_carlo_test.py"],
+    disabled_substrates = ["numpy"],
     shard_count = 2,
     deps = [
         # numpy dep,
@@ -307,7 +328,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "weighted_resampling",
     srcs = ["weighted_resampling.py"],
     srcs_version = "PY2AND3",
@@ -321,11 +342,11 @@ py_library(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "weighted_resampling_test",
     size = "medium",
     srcs = ["weighted_resampling_test.py"],
+    disabled_substrates = ["numpy"],
     shard_count = 2,
     deps = [
         # numpy dep,

@@ -22,7 +22,7 @@ from tensorflow_probability.python.experimental.mcmc.covariance_reducer import C
 from tensorflow_probability.python.experimental.mcmc.covariance_reducer import VarianceReducer
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.expectations_reducer import ExpectationsReducer
-from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
+from tensorflow_probability.python.experimental.mcmc.nuts_autobatching import NoUTurnSampler
 from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
 from tensorflow_probability.python.experimental.mcmc.particle_filter import reconstruct_trajectories

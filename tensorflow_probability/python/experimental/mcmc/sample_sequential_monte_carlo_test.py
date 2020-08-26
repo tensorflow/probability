@@ -35,7 +35,6 @@ from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_car
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import simple_heuristic_tuning
 from tensorflow_probability.python.internal import test_util
 
-
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
@@ -75,7 +74,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
                                       init_state,
                                       scalings=scalings)
     step_size, expected_step_size = self.evaluate([
-        tf.squeeze(kernel.inner_kernel.step_size),
+        tf.squeeze(kernel.inner_kernel.step_size[0]),
         scalings * tf.math.reduce_std(bijector.inverse(init_state[0]))
     ])
     self.assertAllGreater(step_size, 0.)
