@@ -35,7 +35,7 @@ class SkewGeneralizedNormal(Distribution):
   Quantile, survival, log_survival, and all other essential functions
   were derived and defined by
   Daniel Luria, legally Daniel Maryanovsky, of vAIral, Kabbalah AI,
-  and formerly of Lofty AI and Locbit Inc.
+  and formerly of Lofty AI, MariaDB, and Locbit Inc.
 
   The distribution returns NaN when evaluating
   probability of points outside its support
@@ -211,8 +211,6 @@ class SkewGeneralizedNormal(Distribution):
             'Arguments `loc`, `scale` and `peak` must have compatible shapes; '
             'loc.shape={}, scale.shape={}, peak.shape={}.'.format(
                 self.loc.shape, self.scale.shape, self.peak.shape))
-      # We don't bother checking the shapes in the dynamic case because
-      # all member functions access the three arguments anyway.
 
     if not self.validate_args:
       assert not assertions  # Should never happen.

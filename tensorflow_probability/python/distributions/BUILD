@@ -2788,6 +2788,20 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "skew_generalized_normal_test",
+    size = "medium",
+    srcs = ["skew_generalized_normal_test.py"],
+    shard_count = 3,
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "normal_conjugate_posteriors_test",
     srcs = ["normal_conjugate_posteriors_test.py"],
     deps = [
