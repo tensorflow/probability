@@ -20,13 +20,35 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import vectorization_util
 
 
 def _might_have_nonzero_size(sample_shape):
   static_size = tf.get_static_value(tf.size(sample_shape))
   return (static_size is None) or static_size >= 1
+
+
+def _might_have_excess_ndims(flat_value, flat_core_ndims):
+  for v, nd in zip(flat_value, flat_core_ndims):
+    static_excess_ndims = (
+        0 if v is None else
+        tf.get_static_value(ps.convert_to_shape_tensor(ps.rank(v) - nd)))
+    if static_excess_ndims is None or static_excess_ndims > 0:
+      return True
+  return False
+
+
+def _pad_value_to_full_length(value, dtype):
+  """Fills a partial `value` structure with `None`s for any unspecified RVs."""
+  # If dtype is dict-like, set missing values to `None`.
+  if hasattr(dtype, 'keys'):
+    return type(dtype)({k: value.get(k, None) for k in dtype.keys()})
+
+  # Otherwise, dtype is a sequence, so append `None`s.
+  return tf.nest.pack_sequence_as(dtype,
+                                  [value[i] if i < len(value) else None
+                                   for i in range(len(dtype))])
 
 
 # Lint doesn't know that docstrings are defined in the base JD class.
@@ -84,10 +106,9 @@ class JointDistributionVmapMixin(object):
     """Computes the rank of values produced by executing the base model."""
     result = []
     for d in self._get_single_sample_distributions():
-      batch_ndims = prefer_static.rank_from_shape(d.batch_shape_tensor,
-                                                  d.batch_shape)
+      batch_ndims = ps.rank_from_shape(d.batch_shape_tensor, d.batch_shape)
       result.append(tf.nest.map_structure(
-          lambda a, b, nd=batch_ndims: nd + prefer_static.rank_from_shape(a, b),
+          lambda a, b, nd=batch_ndims: nd + ps.rank_from_shape(a, b),
           d.event_shape_tensor(),
           d.event_shape))
     return result
@@ -96,9 +117,20 @@ class JointDistributionVmapMixin(object):
                            name='sample_distributions'):
     with self._name_and_control_scope(name):
 
+      value_might_have_sample_dims = False
+      if value is not None:
+        value = _pad_value_to_full_length(value, self.dtype)
+        value = tf.nest.map_structure(
+            lambda v: v if v is None else tf.convert_to_tensor(v), value)
+        value_might_have_sample_dims = _might_have_excess_ndims(
+            flat_value=self._model_flatten(value),
+            flat_core_ndims=self._single_sample_ndims)
+
       # TODO(b/157953455): Return distributions as CompositeTensors once
       # vectorized_map supports this.
-      if self.use_vectorized_map and _might_have_nonzero_size(sample_shape):
+      if self.use_vectorized_map and (
+          _might_have_nonzero_size(sample_shape) or
+          value_might_have_sample_dims):
         raise NotImplementedError('sample_distributions` with nontrivial '
                                   'sample shape is not yet supported '
                                   'for autovectorized JointDistributions.')
@@ -109,11 +141,18 @@ class JointDistributionVmapMixin(object):
 
   def _sample_n(self, sample_shape, seed, value=None):
 
+    value_might_have_sample_dims = False
     if value is not None:
+      value = _pad_value_to_full_length(value, self.dtype)
       value = tf.nest.map_structure(
           lambda v: v if v is None else tf.convert_to_tensor(v), value)
+      value_might_have_sample_dims = _might_have_excess_ndims(
+          flat_value=self._model_flatten(value),
+          flat_core_ndims=self._single_sample_ndims)
 
-    if not (self.use_vectorized_map and _might_have_nonzero_size(sample_shape)):
+    if not self.use_vectorized_map or not (
+        _might_have_nonzero_size(sample_shape) or
+        value_might_have_sample_dims):
       # No need to auto-vectorize.
       xs = self._call_flat_sample_distributions(
           sample_shape=sample_shape, seed=seed, value=value)[1]
@@ -122,15 +161,16 @@ class JointDistributionVmapMixin(object):
     # Set up for autovectorized sampling. To support the `value` arg, we need to
     # first understand which dims are from the model itself, then wrap
     # `_call_flat_sample_distributions` to batch over all remaining dims.
-    value_ndims = None
+    value_core_ndims = None
     if value is not None:
-      value_ndims = tf.nest.map_structure(
+      value_core_ndims = tf.nest.map_structure(
           lambda v, nd: nd if v is not None else None,
-          value, self._single_sample_ndims, check_types=False)
+          value, self._model_unflatten(self._single_sample_ndims),
+          check_types=False)
     batch_flat_sample = vectorization_util.make_rank_polymorphic(
         lambda v, seed: self._call_flat_sample_distributions(  # pylint: disable=g-long-lambda
             sample_shape=(), seed=seed, value=v)[1],
-        core_ndims=[value_ndims, None],
+        core_ndims=[value_core_ndims, None],
         validate_args=self.validate_args)
 
     # Draw samples.

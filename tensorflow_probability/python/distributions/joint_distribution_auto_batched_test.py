@@ -332,6 +332,27 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
+  def test_sample_with_batch_value(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      a = yield tfd.Sample(tfd.Normal(0, 1.), 2)
+      b = yield tfd.Sample(tfd.Normal(0, 1.), 3)
+      # The following line fails if not autovectorized.
+      yield tfd.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)
+    x = self.evaluate(dist.sample(123))
+    x2 = self.evaluate(dist.sample(value=x))
+    self.assertAllCloseNested(x, x2)
+
+    # Also test a dict-type value (JDNamed).
+    dist = tfd.JointDistributionNamedAutoBatched({
+        'a': tfd.Sample(tfd.Normal(0, 1.), 2),
+        'b': tfd.Sample(tfd.Normal(0, 1.), 3),
+        'c': lambda a, b: tfd.Normal(  # pylint: disable=g-long-lambda
+            a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)})
+    x = self.evaluate(dist.sample(123))
+    x2 = self.evaluate(dist.sample(value=x))
+    self.assertAllCloseNested(x, x2)
+
   def test_sample_with_partially_specified_value(self):
 
     num_features = 5
@@ -356,8 +377,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     xs = self.evaluate(joint.sample(value=value))
     self.assertAllEqual(xs[0], value_[0]  * tf.ones_like(xs[0]))
     self.assertAllEqual(xs[3], value_[3])
-    self.assertAllEqual(xs[1].shape, [num_features])
-    self.assertAllEqual(xs[2].shape, [num_features])
+    self.assertAllEqual(xs[1].shape[-1:], [num_features])
+    self.assertAllEqual(xs[2].shape[-1:], [num_features])
 
     sample_shape = [6, 2]
     samples = joint.sample(sample_shape, value=value)
@@ -375,6 +396,39 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllEqual(xs[1].shape,
                         sample_shape + [value_partial_batch_dim, num_features])
     self.assertAllEqual(xs[3], value_[3] * tf.ones_like(xs[3]))
+
+  def test_sample_with_prefix_of_values(self):
+    num_rows = 4
+    num_columns = 5
+    def dist():
+      a = yield tfd.Sample(tfd.Normal(0., 1.), num_rows, name='a')
+      b = yield tfd.Sample(tfd.Normal(0., 1.), num_columns, name='b')
+      yield tfd.Normal(a[..., None] * b[None, ...], 1., name='c')
+
+    tuple_joint = tfd.JointDistributionCoroutineAutoBatched(
+        dist, validate_args=True)
+    namedtuple_joint = tfd.JointDistributionCoroutineAutoBatched(
+        dist,
+        sample_dtype=collections.namedtuple(
+            'ModelSpec', ['a', 'b', 'c'])(
+                a=tf.float32, b=tf.float32, c=tf.float32),
+        validate_args=True)
+
+    value_partial_batch_dim = 3
+    v0 = 3. * np.ones([value_partial_batch_dim, num_rows]).astype(np.float32)
+
+    # Tuple (or namedtuple) value contains only the first variable.
+    tuple_value = (v0,)
+    namedtuple_value = collections.namedtuple('ValueSpec', ['a'])(a=v0)
+
+    for joint in (tuple_joint, namedtuple_joint):
+      for value in (tuple_value, namedtuple_value):
+        xs = self.evaluate(joint.sample(value=value))
+        self.assertAllEqual(xs[0], v0)
+        self.assertAllEqual(xs[1].shape,
+                            [value_partial_batch_dim, num_columns])
+        self.assertAllEqual(xs[2].shape,
+                            [value_partial_batch_dim, num_rows, num_columns])
 
   def test_sample_dtype_structures_output(self):
 
