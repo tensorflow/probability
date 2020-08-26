@@ -33,3 +33,17 @@ py_library(
         "//tensorflow_probability/substrates",
     ],
 )
+
+# The public target for `import tensorflow_probability.substrates.jax as tfp`
+py_library(
+    name = "jax",
+    visibility = ["//visibility:public"],
+    deps = ["//tensorflow_probability/substrates:jax"],
+)
+
+# The public target for `import tensorflow_probability.substrates.numpy as tfp`
+py_library(
+    name = "numpy",
+    visibility = ["//visibility:public"],
+    deps = ["//tensorflow_probability/substrates:numpy"],
+)

@@ -46,6 +46,7 @@ py_library(
     name = "jax",
     srcs = ["jax/__init__.py"],
     srcs_version = "PY2AND3",
+    tags = ["alt_dep=//tensorflow_probability:jax"],
     deps = [
         "//tensorflow_probability/python/bijectors:bijectors.jax",
         "//tensorflow_probability/python/distributions:distributions.jax",
@@ -64,6 +65,7 @@ py_library(
     name = "numpy",
     srcs = ["numpy/__init__.py"],
     srcs_version = "PY2AND3",
+    tags = ["alt_dep=//tensorflow_probability:numpy"],
     deps = [
         "//tensorflow_probability/python/bijectors:bijectors.numpy",
         "//tensorflow_probability/python/distributions:distributions.numpy",
