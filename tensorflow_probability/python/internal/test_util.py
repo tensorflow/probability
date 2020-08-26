@@ -284,6 +284,33 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         .format([i for i, x in enumerate(each_is) if not x]))
     raise AssertionError(msg)
 
+  def evaluate_dict(self, dictionary):
+    """Invokes `self.evaluate` on the `Tensor`s in `dictionary`.
+
+    Reconstructs the results as a dictionary with the same keys and values.
+    Leaves non-`Tensor` values alone (lest `self.evaluate` fail on them).
+
+    This can be useful to debug Hypothesis examples, with
+    `hp.note(self.evaluate_dict(dist.parameters()))`.  The standard
+    `self.evaluate` can fail if the `parameters` dictionary contains
+    non-`Tensor` values (which it typically does).
+
+    Args:
+      dictionary: Dictionary to traverse.
+
+    Returns:
+      result: Dictionary with the same keys, but with `Tensor` values
+        replaced by the results of `self.evaluate`.
+    """
+    python_values = {}
+    tensor_values = {}
+    for k, v in dictionary.items():
+      if tf.is_tensor(v):
+        tensor_values[k] = v
+      else:
+        python_values[k] = v
+    return dict(self.evaluate(tensor_values), **python_values)
+
   def compute_max_gradient_error(self, f, args, delta=1e-3):
     """Wrapper around TF's gradient_checker_v2.
 

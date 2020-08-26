@@ -143,6 +143,10 @@ class Bernoulli(distribution.Distribution):
     #  logits = +inf ==> log_probs0 = -inf, log_probs1 = 0 (as desired)
     return -tf.math.softplus(s), -tf.math.softplus(-s)
 
+  def _cdf(self, event):
+    prob = self._probs_parameter_no_checks()
+    return tf.where(event < 0, 0.0, tf.where(event < 1, 1.0 - prob, 1.0))
+
   def _entropy(self):
     probs0, probs1, log_probs0, log_probs1 = _probs_and_log_probs(
         probs=self._probs, logits=self._logits, return_log_probs=True)

@@ -239,6 +239,38 @@ class BetaBinomialTest(test_util.TestCase):
     self.assertIsNone(grad_c1)
     self.assertIsNone(grad_c0)
 
+  def testXLAFriendlySampler(self):
+    if tf.executing_eagerly():
+      msg = 'XLA requires tf.function, mode switching is meaningless.'
+      self.skipTest(msg)
+    dist = tfd.BetaBinomial(
+        total_count=50, concentration0=1e-7, concentration1=1e-5)
+    seed = test_util.test_seed(sampler_type='stateless')
+    num_samples = 20000
+    sample = self.evaluate(
+        tf.function(experimental_compile=True)(dist.sample)(
+            num_samples, seed=seed))
+    self.assertAllEqual(np.zeros_like(sample), np.isnan(sample))
+    # Beta(1e-7, 1e-5) should basically always be either 1 or 0, and 1 should
+    # occur with probability 100/101.
+    # Ergo, the beta binomial samples should basically always be either 50 or 0,
+    # and 50 should occur with probability 100/101.
+    high_samples_mask = sample == 50
+    low_samples_mask = sample == 0
+    self.assertAllEqual(np.ones_like(sample),
+                        high_samples_mask | low_samples_mask)
+    expect = tfd.Bernoulli(probs=100.0/101.0)
+    self.evaluate(st.assert_true_cdf_equal_by_dkwm(
+        samples=tf.cast(high_samples_mask, tf.float32),
+        cdf=expect.cdf,
+        left_continuous_cdf=st.left_continuous_cdf_discrete_distribution(
+            expect),
+        false_fail_rate=1e-9))
+    self.assertGreater(
+        num_samples,
+        self.evaluate(st.min_num_samples_for_dkwm_cdf_test(
+            0.05, false_fail_rate=1e-9, false_pass_rate=1e-9)))
+
 
 @test_util.test_all_tf_execution_regimes
 class BetaBinomialFromVariableTest(test_util.TestCase):

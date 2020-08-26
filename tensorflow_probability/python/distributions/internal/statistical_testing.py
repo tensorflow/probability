@@ -139,6 +139,7 @@ __all__ = [
     'min_discrepancy_of_true_cdfs_detectable_by_dkwm',
     'min_num_samples_for_dkwm_cdf_test',
     'kolmogorov_smirnov_distance',
+    'left_continuous_cdf_discrete_distribution',
     'kolmogorov_smirnov_distance_two_sample',
     'empirical_cdfs',
     'assert_true_cdf_equal_by_dkwm_two_sample',
