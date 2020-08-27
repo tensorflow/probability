@@ -140,9 +140,10 @@ class EventSpaceBijectorsTest(test_util.TestCase):
     y = data.draw(
         tfp_hps.constrained_tensors(
             tfp_hps.identity_fn, total_sample_shape.as_list()))
-    x = event_space_bijector(y)
-    with tf.control_dependencies(dist._sample_control_dependencies(x)):
-      self.evaluate(tf.identity(x))
+    with tfp_hps.no_tf_rank_errors():
+      x = event_space_bijector(y)
+      with tf.control_dependencies(dist._sample_control_dependencies(x)):
+        self.evaluate(tf.identity(x))
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
