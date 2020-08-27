@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import structural_tuple
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -100,12 +101,47 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   joint = tfd.JointDistributionCoroutine(model)
 
   x = joint.sample()
-  # ==> x is A length-4 tuple of Tensors representing a draw/realization from
+  # ==> x is a length-4 tuple of Tensors representing a draw/realization from
   #     each distribution.
   joint.log_prob(x)
   # ==> A scalar `Tensor` representing the total log prob under all four
   #     distributions.
   ```
+
+  For improved readability of sampled values, the yielded distributions can also
+  be named:
+
+  ```python
+  tfd = tfp.distributions
+
+  Root = tfd.JointDistributionCoroutine.Root  # Convenient alias.
+  def model():
+    e = yield Root(tfd.Independent(
+        tfd.Exponential(rate=[100, 120], name='e'), 1))
+    g = yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1], name='g')
+    n = yield Root(tfd.Normal(loc=0, scale=2., name='n'))
+    m = yield tfd.Normal(loc=n, scale=g, name='m')
+
+  joint = tfd.JointDistributionCoroutine(model)
+
+  x = joint.sample()
+  # ==> x is a namedtuple with fields (in order) 'e', 'g', 'n', 'm' and values
+  #     representing the draw/realization from each corresponding distribution.
+  joint.log_prob(x)
+  # ==> A scalar `Tensor` representing the total log prob under all four
+  #     distributions.
+
+  # Passing dictionaries via `kwargs` also works.
+  joint.log_prob(**x._as_dict())
+  # Or:
+  joint.log_prob(e=..., g=..., n=..., m=...)
+  ```
+
+  If any of the yielded distributions are not explicitly named, they will
+  automatically be given a name of the form `var#` where `#` is the index of the
+  associated distribution. E.g. the first yielded distribution will have a
+  default name of `var0`.
+
 
   #### Discussion
 
@@ -142,7 +178,13 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """Wrapper for coroutine distributions which lack distribution parents."""
     __slots__ = ()
 
-  def __init__(self, model, sample_dtype=None, validate_args=False, name=None):
+  def __init__(
+      self,
+      model,
+      sample_dtype=None,
+      validate_args=False,
+      name=None,
+  ):
     """Construct the `JointDistributionCoroutine` distribution.
 
     Args:
@@ -152,7 +194,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
         `tf.nest.pack_sequence_as(sample_dtype, list_)`. `sample_dtype` is only
         used for `tf.nest.pack_sequence_as` structuring of outputs, never
         casting (which is the responsibility of the component distributions).
-        Default value: `None` (i.e., `tuple`).
+        Default value: `None` (i.e. `namedtuple`).
       validate_args: Python `bool`.  Whether to validate input with asserts.
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
@@ -282,7 +324,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
 
   def _model_unflatten(self, xs):
     if self._sample_dtype is None:
-      return tuple(xs)
+      return structural_tuple.structtuple(self._flat_resolve_names())(*xs)
     # Cast `xs` as `tuple` so we can handle generators.
     return tf.nest.pack_sequence_as(self._sample_dtype, tuple(xs))
 

@@ -127,7 +127,8 @@ class BrownianMotion(bayesian_model.BayesianModel):
               )
       }
 
-      event_space_bijector = tuple([tfb.Identity()] * num_timesteps)
+      event_space_bijector = type(
+          self._prior_dist.dtype)(*([tfb.Identity()] * num_timesteps))
     super(BrownianMotion, self).__init__(
         default_event_space_bijector=event_space_bijector,
         event_shape=self._prior_dist.event_shape,

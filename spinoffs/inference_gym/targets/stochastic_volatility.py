@@ -59,11 +59,10 @@ def autoregressive_series_fn(num_timesteps,
 def stochastic_volatility_prior_fn(num_timesteps):
   """Generative process for the stochastic volatility model."""
   persistence_of_volatility = yield Root(
-      tfb.Shift(-1.)(
-          tfb.Scale(2.)(
-              tfd.Beta(concentration1=20.,
-                       concentration0=1.5,
-                       name='persistence_of_volatility'))))
+      tfd.TransformedDistribution(
+          tfd.Beta(concentration1=20., concentration0=1.5),
+          tfb.Shift(-1.)(tfb.Scale(2.)),
+          name='persistence_of_volatility'))
   mean_log_volatility = yield Root(tfd.Cauchy(loc=0., scale=5.,
                                               name='mean_log_volatility'))
   white_noise_shock_scale = yield Root(tfd.HalfCauchy(
@@ -170,10 +169,13 @@ class StochasticVolatility(bayesian_model.BayesianModel):
       }
 
     super(StochasticVolatility, self).__init__(
-        default_event_space_bijector=(tfb.Sigmoid(-1., 1.),
-                                      tfb.Identity(),
-                                      tfb.Softplus()) + ((
-                                          tfb.Identity(),) * num_timesteps,),
+        default_event_space_bijector=type(self._prior_dist.dtype)(
+            tfb.Sigmoid(-1., 1.),
+            tfb.Identity(),
+            tfb.Softplus(),
+            type(self._prior_dist.dtype[-1])(*(
+                (tfb.Identity(),) * num_timesteps)),
+        ),
         event_shape=self._prior_dist.event_shape,
         dtype=self._prior_dist.dtype,
         name=name,

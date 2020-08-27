@@ -890,6 +890,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:structural_tuple",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
