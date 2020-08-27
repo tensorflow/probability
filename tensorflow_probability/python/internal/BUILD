@@ -442,6 +442,23 @@ py_test(
 )
 
 multi_substrate_py_library(
+    name = "structural_tuple",
+    srcs = ["structural_tuple.py"],
+    srcs_version = "PY2AND3",
+)
+
+multi_substrate_py_test(
+    name = "structural_tuple_test",
+    srcs = ["structural_tuple_test.py"],
+    deps = [
+        ":nest_util",
+        ":structural_tuple",
+        ":test_util",
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
     name = "test_util",
     testonly = 1,
     srcs = ["test_util.py"],

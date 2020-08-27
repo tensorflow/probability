@@ -74,10 +74,15 @@ def _force_leaf(struct):
   return hasattr(struct, '_tfp_nest_expansion_force_leaf')
 
 
+def _force_expand_as_args(struct):
+  return hasattr(struct, '_tfp_nest_expansion_force_args')
+
+
 def expand_as_args(args):
   """Returns `True` if `args` should be expanded as `*args`."""
-  return (isinstance(args, collections.Sequence) and
-          not _is_namedtuple(args) and not _force_leaf(args))
+  return ((isinstance(args, collections.Sequence) and
+           not _is_namedtuple(args) and not _force_leaf(args)) or
+          _force_expand_as_args(args))
 
 
 def _expand_as_kwargs(args):

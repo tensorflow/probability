@@ -96,6 +96,7 @@ INTERNALS = (
     'prefer_static',
     'samplers',
     'special_math',
+    'structural_tuple',
     'tensor_util',
     'tensorshape_util',
     'test_combinations',
