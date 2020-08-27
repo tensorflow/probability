@@ -27,6 +27,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import test_util
 
 
@@ -1044,6 +1045,30 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     sample = self.evaluate(model.sample(seed=test_util.test_seed()))
     self.assertEqual(['c', 'var1', 'a', 'var3'], list(sample._asdict().keys()))
+
+  def test_target_log_prob_fn(self):
+    """Test the construction `target_log_prob_fn` from a joint distribution."""
+
+    def model_fn():
+      c = yield Root(tfd.LogNormal(0., 1., name='c'))
+      b = yield tfd.Normal(c, 1., name='b')
+      yield tfd.Normal(c + b, 1., name='a')
+
+    model = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+
+    def target_log_prob_fn(*args):
+      return model.log_prob(args + (1.,))
+
+    dtype = model.dtype[:-1]
+    event_shape = model.event_shape[:-1]
+    self.assertAllEqual(('c', 'b'), dtype._fields)
+    self.assertAllEqual(('c', 'b'), event_shape._fields)
+
+    test_point = tf.nest.map_structure(tf.zeros, event_shape, dtype)
+    lp_manual = model.log_prob(test_point + (1.,))
+    lp_tlp = nest_util.call_fn(target_log_prob_fn, test_point)
+
+    self.assertAllClose(self.evaluate(lp_manual), self.evaluate(lp_tlp))
 
 
 if __name__ == '__main__':

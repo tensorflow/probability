@@ -49,6 +49,46 @@ class StructTupleTest(test_util.TestCase):
     self.assertAllEqualNested(
         t(2, 3, 4), tf.nest.map_structure(lambda x: x + 1, inst))
 
+  def testSlicing(self):
+    t = structural_tuple.structtuple(['a', 'b', 'c'])
+    inst = t(a=1, b=2, c=3)
+
+    abc = inst[:]
+    self.assertAllEqual((1, 2, 3), tuple(abc))
+    self.assertAllEqual(('a', 'b', 'c'), abc._fields)
+
+    ab = inst[:2]
+    self.assertAllEqual((1, 2), tuple(ab))
+    self.assertAllEqual(('a', 'b'), ab._fields)
+
+    ac = inst[::2]
+    self.assertAllEqual((1, 3), tuple(ac))
+    self.assertAllEqual(('a', 'c'), ac._fields)
+
+    ab2 = abc[:2]
+    self.assertAllEqual((1, 2), tuple(ab2))
+    self.assertAllEqual(('a', 'b'), ab2._fields)
+
+  def testConcatenation(self):
+    t1 = structural_tuple.structtuple(['a', 'b'])
+    t2 = structural_tuple.structtuple(['c', 'd'])
+    ab = t1(a=1, b=2)
+    cd = t2(c=3, d=4)
+
+    abcd = ab + cd
+    self.assertAllEqual((1, 2, 3, 4), tuple(abcd))
+    self.assertAllEqual(('a', 'b', 'c', 'd'), abcd._fields)
+
+    cdab = cd + ab
+    self.assertAllEqual((3, 4, 1, 2), tuple(cdab))
+    self.assertAllEqual(('c', 'd', 'a', 'b'), cdab._fields)
+
+    ab_tuple = ab + (3,)
+    self.assertAllEqual((1, 2, 3), ab_tuple)
+
+    tuple_ab = (3,) + ab
+    self.assertAllEqual((3, 1, 2), tuple_ab)
+
   def testArgsExpansion(self):
 
     def foo(a, b):

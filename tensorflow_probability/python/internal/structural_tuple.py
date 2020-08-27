@@ -29,6 +29,15 @@ import weakref
 _TYPES = weakref.WeakValueDictionary()
 
 
+def _concat_structtuples(a, b):
+  tuple_result = tuple(a) + tuple(b)
+  if not hasattr(a, '_fields') or not hasattr(b, '_fields'):
+    return tuple_result
+
+  new_fields = a._fields + b._fields
+  return structtuple(new_fields)(*tuple_result)
+
+
 def structtuple(field_names):
   """Return a StructTuple with specified fields.
 
@@ -47,13 +56,32 @@ def structtuple(field_names):
   try:
     return _TYPES[key]
   except KeyError:
+    pass
 
-    class StructTuple(collections.namedtuple('StructTuple', list(field_names))):
-      __slots__ = ()
-      # Secret handshake with nest_util to make call_fn expand StructTuples as
-      # *args.
-      _tfp_nest_expansion_force_args = ()
+  class StructTuple(collections.namedtuple('StructTuple', list(field_names))):
+    """A structurally-typed tuple."""
+    __slots__ = ()
+    # Secret handshake with nest_util to make call_fn expand StructTuples as
+    # *args.
+    _tfp_nest_expansion_force_args = ()
 
-    StructTuple.__new__.__defaults__ = (None,) * len(field_names)
-    _TYPES[key] = StructTuple
-    return StructTuple
+    def __getitem__(self, index):
+      tuple_result = tuple(self)[index]
+      if isinstance(index, slice):
+        new_fields = self._fields[index]
+        return structtuple(new_fields)(*tuple_result)
+      else:
+        return tuple_result
+
+    def __getslice__(self, i, j):
+      return self.__getitem__(slice(i, j))
+
+    def __add__(self, other):
+      return _concat_structtuples(self, other)
+
+    def __radd__(self, other):
+      return _concat_structtuples(other, self)
+
+  StructTuple.__new__.__defaults__ = (None,) * len(field_names)
+  _TYPES[key] = StructTuple
+  return StructTuple
