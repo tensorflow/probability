@@ -508,10 +508,15 @@ class JointDistribution(distribution_lib.Distribution):
   def _flat_resolve_names(self, dummy_name='var'):
     """Resolves a name for each random variable in the model."""
     names = []
+    names_used = set()
     for dummy_idx, d in enumerate(self._get_single_sample_distributions()):
       name = get_explicit_name_for_component(d)
       if name is None:
-        name = '_{}{}'.format(dummy_name, dummy_idx)
+        name = '{}{}'.format(dummy_name, dummy_idx)
+      if name in names_used:
+        raise ValueError('Duplicated distribution name: {}'.format(name))
+      else:
+        names_used.add(name)
       names.append(name)
     return names
 

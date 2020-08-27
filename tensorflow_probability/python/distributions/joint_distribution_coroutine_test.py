@@ -396,10 +396,20 @@ class JointDistributionCoroutineTest(test_util.TestCase):
   def test_log_prob_with_manual_kwargs(self):
     d = tfd.JointDistributionCoroutine(basic_model_fn, validate_args=True)
     x = d.sample(seed=test_util.test_seed())
-    lp1 = d.log_prob(_var0=x[0], e=x[1], _var2=x[2])
+    lp1 = d.log_prob(var0=x[0], e=x[1], var2=x[2])
     lp2 = d.log_prob(x)
     lp1_, lp2_ = self.evaluate([lp1, lp2])
     self.assertAllClose(lp1_, lp2_)
+
+  def test_duplicate_names_error(self):
+
+    @tfd.JointDistributionCoroutine
+    def dist():
+      yield Root(tfd.Normal(0., 1., name='a'))
+      yield Root(tfd.Normal(0., 1., name='a'))
+
+    with self.assertRaisesRegexp(ValueError, 'Duplicated distribution name: a'):
+      dist.log_prob((1, 2))
 
   @parameterized.named_parameters(
       ('singleton_float', singleton_normal_model_fn),
