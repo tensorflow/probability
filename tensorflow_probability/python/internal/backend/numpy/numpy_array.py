@@ -173,6 +173,7 @@ def _gather_nd(  # pylint: disable=unused-argument
     batch_dims=0,
     name=None):
   """gather_nd."""
+  params = ops.convert_to_tensor(params)
   indices = ops.convert_to_tensor(indices, dtype_hint=np.int32)
   if batch_dims < 0:
     raise NotImplementedError('Negative `batch_dims` is currently unsupported.')
