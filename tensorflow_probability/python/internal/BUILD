@@ -48,6 +48,27 @@ py_library(
 )
 
 multi_substrate_py_library(
+    name = "auto_composite_tensor",
+    srcs = ["auto_composite_tensor.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "auto_composite_tensor_test",
+    srcs = ["auto_composite_tensor_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "assert_util",
     srcs = ["assert_util.py"],
     srcs_version = "PY2AND3",

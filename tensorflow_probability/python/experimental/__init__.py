@@ -45,11 +45,13 @@ from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.composite_tensor import as_composite
 from tensorflow_probability.python.experimental.composite_tensor import register_composite
 from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.internal.auto_composite_tensor import auto_composite_tensor
 
 
 _allowed_symbols = [
     'auto_batching',
     'as_composite',
+    'auto_composite_tensor',
     'edward2',
     'lazybones',
     'linalg',
