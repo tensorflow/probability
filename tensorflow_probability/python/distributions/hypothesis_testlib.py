@@ -64,6 +64,7 @@ TF2_FRIENDLY_DISTS = (
     'Empirical',
     'Exponential',
     'ExpGamma',
+    'ExpInverseGamma',
     'FiniteDiscrete',
     'Gamma',
     'GammaGamma',
@@ -134,6 +135,7 @@ MUTEX_PARAMS = (
     set(['logits', 'probs']),
     set(['probits', 'probs']),
     set(['rate', 'log_rate']),
+    set(['scale', 'log_scale']),
     set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
 )
 
@@ -291,6 +293,8 @@ CONSTRAINTS = {
         # Permit values that aren't too large
         lambda x: tfb.Ordered().inverse(10 * tf.math.tanh(x)),
     'log_rate':
+        lambda x: tf.maximum(x, -16.),
+    'log_scale':
         lambda x: tf.maximum(x, -16.),
     'mixing_concentration':
         tfp_hps.softplus_plus_eps(),

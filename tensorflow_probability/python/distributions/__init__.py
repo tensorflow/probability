@@ -42,6 +42,7 @@ from tensorflow_probability.python.distributions.distribution import Distributio
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exp_gamma import ExpGamma
+from tensorflow_probability.python.distributions.exp_gamma import ExpInverseGamma
 from tensorflow_probability.python.distributions.exponential import Exponential
 from tensorflow_probability.python.distributions.finite_discrete import FiniteDiscrete
 from tensorflow_probability.python.distributions.gamma import Gamma
@@ -170,6 +171,7 @@ __all__ = [
     'VectorDeterministic',
     'Empirical',
     'ExpGamma',
+    'ExpInverseGamma',
     'Exponential',
     'VectorExponentialDiag',
     'Gamma',
