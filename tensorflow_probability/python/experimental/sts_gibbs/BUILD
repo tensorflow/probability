@@ -15,8 +15,6 @@
 # Description:
 #   Gibbs sampling for Bayesian structural time series models
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -36,11 +34,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "benchmarks_test",
     size = "medium",
     srcs = ["benchmarks_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
@@ -64,12 +63,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "gibbs_sampler_test",
     size = "medium",
     srcs = ["gibbs_sampler_test.py"],
+    python_version = "PY3",
     shard_count = 2,
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

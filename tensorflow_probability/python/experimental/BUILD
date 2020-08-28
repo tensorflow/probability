@@ -15,7 +15,6 @@
 # Description:
 #   API-unstable code that is part of the TFP package.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -77,10 +76,11 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "composite_tensor_test",
     srcs = ["composite_tensor_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

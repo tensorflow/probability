@@ -15,8 +15,6 @@
 # Description:
 #   Edward2 probabilistic programming language.
 
-# [internal] load python3.bzl
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -52,11 +50,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "generated_random_variables_test",
     size = "small",
     srcs = ["generated_random_variables_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -72,11 +71,12 @@ py_library(
     srcs_version = "PY2AND3",
 )
 
-# py2and3
 py_test(
     name = "interceptor_test",
     size = "small",
     srcs = ["interceptor_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -95,11 +95,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "program_transformations_test",
     size = "small",
     srcs = ["program_transformations_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -116,11 +117,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "random_variable_test",
     size = "small",
     srcs = ["random_variable_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

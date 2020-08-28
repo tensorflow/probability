@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# [internal] load python3.bzl
 
 licenses(["notice"])
 
@@ -47,11 +46,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "missing_values_util_test",
     size = "small",
     srcs = ["missing_values_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -73,11 +73,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

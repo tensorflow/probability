@@ -14,8 +14,6 @@
 # ============================================================================
 """Build defs for TF/NumPy/JAX-variadic libraries & tests."""
 
-# [internal] load python3.bzl
-
 NO_REWRITE_NEEDED = [
     "internal:all_util",
     "internal:docstring_util",
@@ -59,24 +57,6 @@ def _substrate_deps(deps, substrate):
     if backend_dep not in new_deps:
         new_deps.append(backend_dep)
     return new_deps
-
-# This is needed for the transitional period during which we have the internal
-# py2and3_test and py_test comingling in BUILD files. Otherwise the OSS export
-# rewrite process becomes irreversible.
-def py3_test(*args, **kwargs):
-    """Internal/external reversibility, denotes py3-only vs py2+3 tests.
-
-    Args:
-      *args: Passed to underlying py_test.
-      **kwargs: Passed to underlying py_test. srcs_version and python_version
-        are added (with value `"PY3"`) if not specified.
-    """
-    kwargs = dict(kwargs)
-    if "srcs_version" not in kwargs:
-        kwargs["srcs_version"] = "PY3"
-    if "python_version" not in kwargs:
-        kwargs["python_version"] = "PY3"
-    native.py_test(*args, **kwargs)
 
 def _resolve_omit_dep(dep):
     """Resolves a `substrates_omit_deps` item to full target."""
@@ -133,7 +113,7 @@ def _substrate_runfiles_symlinks_impl(ctx):
     substrate = ctx.attr.substrate
     file_substr = "_{}/_generated_".format(substrate)
     for f in transitive_sources.to_list():
-        if "tensorflow_probability" in f.dirname and file_substr in f.short_path:
+        if "tensorflow_probability/python/" in f.dirname and file_substr in f.short_path:
             pre, post = f.short_path.split("/python/")
             out_path = "{}/substrates/{}/{}".format(
                 pre,
@@ -294,11 +274,11 @@ def multi_substrate_py_test(
         srcs_version = "PY2AND3",
         timeout = None,
         shard_count = None):
-    """A TFP `py2and3_test` for each of TF, NumPy, and JAX.
+    """A TFP `py_test` for each of TF, NumPy, and JAX.
 
     Args:
         name: Name of the `test_suite` which covers TF, NumPy and JAX variants
-            of the test. Each substrate will have a dedicated `py2and3_test`
+            of the test. Each substrate will have a dedicated `py_test`
             suffixed with '.tf', '.numpy', or '.jax' as appropriate.
         size: As with `py_test`.
         jax_size: A size override for the JAX target.
@@ -331,6 +311,7 @@ def multi_substrate_py_test(
         deps = deps,
         tags = tags,
         srcs_version = srcs_version,
+        python_version = "PY3",
         timeout = timeout,
         shard_count = shard_count,
     )
@@ -345,7 +326,7 @@ def multi_substrate_py_test(
             cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
             exec_tools = [REWRITER_TARGET],
         )
-        py3_test(
+        native.py_test(
             name = "{}.numpy".format(name),
             size = numpy_size or size,
             srcs = numpy_srcs,
@@ -370,7 +351,7 @@ def multi_substrate_py_test(
         )
         jax_deps = _substrate_deps(deps, "jax")
         # [internal] Add JAX build dep
-        py3_test(
+        native.py_test(
             name = "{}.jax".format(name),
             size = jax_size or size,
             srcs = jax_srcs,

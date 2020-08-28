@@ -15,8 +15,6 @@
 # Description:
 #   Utilities for lazybones symbolic execution/analysis.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -57,11 +55,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "utils_test",
     size = "small",
     srcs = ["utils_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:absltest dep,
         "//tensorflow_probability",
@@ -79,11 +78,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "probability_test",
     size = "small",
     srcs = ["probability_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

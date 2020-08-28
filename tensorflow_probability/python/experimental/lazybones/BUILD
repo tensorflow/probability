@@ -16,7 +16,6 @@
 #   Experimental code for symbolic execution/analysis.
 
 # [internal] load strict.bzl
-# [internal] load python3.bzl
 
 licenses(["notice"])
 
@@ -61,11 +60,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "deferred_np_test",
     size = "small",
     srcs = ["deferred_np_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:absltest dep,
         # numpy dep,
@@ -73,11 +73,12 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "deferred_tf_test",
     size = "small",
     srcs = ["deferred_tf_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

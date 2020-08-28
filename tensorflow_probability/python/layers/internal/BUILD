@@ -15,8 +15,6 @@
 # Description:
 #   Internal helper libraries for layers.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -49,11 +47,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "distribution_tensor_coercible_test",
     size = "small",
     srcs = ["distribution_tensor_coercible_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":distribution_tensor_coercible",
         # absl/testing:parameterized dep,
@@ -73,11 +72,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "tensor_tuple_test",
     size = "small",
     srcs = ["tensor_tuple_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":tensor_tuple",
         # tensorflow dep,

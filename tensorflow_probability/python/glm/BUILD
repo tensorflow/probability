@@ -15,8 +15,6 @@
 # Description:
 #   Generalized Linear Model specification, fitting, and related utilities.
 
-# [internal] load python3.bzl
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -53,11 +51,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "fisher_scoring_test",
     size = "small",
     srcs = ["fisher_scoring_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -79,12 +78,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "proximal_hessian_test",
     size = "medium",
     srcs = ["proximal_hessian_test.py"],
+    python_version = "PY3",
     shard_count = 4,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -107,11 +107,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "family_test",
     size = "small",
     srcs = ["family_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

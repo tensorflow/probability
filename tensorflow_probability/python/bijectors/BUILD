@@ -16,11 +16,10 @@
 #   Contains ops for bijectors.
 #   APIs here are meant to evolve over time.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 licenses(["notice"])
@@ -132,12 +131,13 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "bijector_properties_test",
     size = "large",
     srcs = ["bijector_properties_test.py"],
+    python_version = "PY3",
     shard_count = 25,
+    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":bijectors",
@@ -1476,11 +1476,12 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "scale_matvec_lu_test",
     size = "small",
     srcs = ["scale_matvec_lu_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1571,11 +1572,12 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "real_nvp_test",
     size = "small",
     srcs = ["real_nvp_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":bijectors",
         # absl/testing:parameterized dep,

@@ -15,8 +15,6 @@
 # Description:
 #   TransitionKernel for NeuTra.
 
-load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
-
 licenses(["notice"])
 
 package(
@@ -48,7 +46,7 @@ py_library(
     ],
 )
 
-py3_test(
+py_test(
     name = "neutra_kernel_test",
     size = "medium",
     srcs = ["neutra_kernel_test.py"],

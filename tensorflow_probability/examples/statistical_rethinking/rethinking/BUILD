@@ -15,8 +15,6 @@
 # Description:
 #   Functions and boilerplate for the Statistical Rethinking notebooks
 
-load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
-
 package(
     default_visibility = [
         "//tensorflow_probability/examples:__subpackages__",
@@ -44,7 +42,7 @@ py_library(
     ],
 )
 
-py3_test(
+py_test(
     name = "quap_test",
     size = "large",
     srcs = ["quap_test.py"],

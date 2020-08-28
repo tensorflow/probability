@@ -18,13 +18,6 @@
 # [internal] load pytype.bzl (pytype_strict_library)
 # [internal] load strict.bzl
 
-# py_test rules are rewritten to py3_test on export to OSS, for reasons of
-# reversibility of import<->export transforms. This is only necessary until we
-# eliminate all py2and3_test targets, after which everything can safely use
-# py_test, internally and externally, and no rewrites will be needed.
-# @unused  <-- satisfy buildifier errors
-load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -260,7 +253,7 @@ py_library(
 )
 
 # Not strict due to the TF internal nest import.
-py3_test(
+py_test(
     name = "model_test",
     srcs = ["model_test.py"],
     python_version = "PY3",

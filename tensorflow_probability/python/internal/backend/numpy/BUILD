@@ -15,8 +15,6 @@
 # Description:
 #   Numpy backend.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -276,11 +274,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "tensor_array_ops_test",
     size = "small",
     srcs = ["tensor_array_ops_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = ["tfp_numpy"],
     deps = [
         ":tensor_array_ops",
@@ -363,12 +362,13 @@ py_library(
     deps = [],
 )
 
-# py2and3
 py_test(
     name = "numpy_test",
     size = "small",
     srcs = ["numpy_test.py"],
+    python_version = "PY3",
     shard_count = 11,
+    srcs_version = "PY3",
     tags = ["tfp_numpy"],
     deps = [
         ":numpy",
@@ -487,7 +487,6 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "rewrite_equivalence_test",
     srcs = ["rewrite_equivalence_test.py"],
@@ -495,7 +494,8 @@ py_test(
         "--modules_to_check",
         ",".join(LINOP_FILES + ["tensor_shape"]),
     ],
-    srcs_version = "PY2AND3",
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = [
         "no-oss-ci",
     ],

@@ -15,8 +15,6 @@
 # Description:
 #   Experimental linear algebra tools.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -50,11 +48,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "linear_operator_psd_kernel_test",
     size = "small",
     srcs = ["linear_operator_psd_kernel_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

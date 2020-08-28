@@ -15,8 +15,6 @@
 # Description:
 #   Methods and objectives for variational inference.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -55,12 +53,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "csiszar_divergence_test",
     size = "small",
     srcs = ["csiszar_divergence_test.py"],
+    python_version = "PY3",
     shard_count = 5,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -82,12 +81,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "mutual_information_test",
     size = "small",
     srcs = ["mutual_information_test.py"],
+    python_version = "PY3",
     shard_count = 5,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -110,12 +110,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "optimization_test",
     size = "medium",
     srcs = ["optimization_test.py"],
+    python_version = "PY3",
     shard_count = 5,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

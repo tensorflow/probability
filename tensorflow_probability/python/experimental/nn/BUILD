@@ -15,8 +15,6 @@
 # Description:
 #   tf.Module tools for building neural architectures.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -59,11 +57,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "affine_layers_test",
     size = "medium",
     srcs = ["affine_layers_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -88,11 +87,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "convolutional_layers_test",
     size = "small",
     srcs = ["convolutional_layers_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -116,11 +116,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "convolutional_transpose_layers_test",
     size = "small",
     srcs = ["convolutional_transpose_layers_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -139,11 +140,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "layers_test",
     size = "small",
     srcs = ["layers_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

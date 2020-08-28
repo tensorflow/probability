@@ -15,8 +15,6 @@
 # Description:
 #   Experimental methods and objectives for variational inference.
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -51,12 +49,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "surrogate_posteriors_test",
     size = "small",
     srcs = ["surrogate_posteriors_test.py"],
+    python_version = "PY3",
     shard_count = 5,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

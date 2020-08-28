@@ -15,11 +15,10 @@
 # Description:
 #   TensorFlow Probability general math functions.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -217,11 +216,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "minimize_test",
     size = "small",
     srcs = ["minimize_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -334,11 +334,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "sparse_test",
     size = "small",
     srcs = ["sparse_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

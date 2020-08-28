@@ -16,12 +16,10 @@
 #   Contains ops for statistical distributions (with pdf, cdf, sample, etc...).
 #   APIs here are meant to evolve over time.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
-    "py3_test",
+    "multi_substrate_py_test",
 )
 
 licenses(["notice"])
@@ -1983,12 +1981,13 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "binomial_test_gpu",
     size = "medium",
     srcs = ["binomial_test.py"],
     main = "binomial_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # numpy dep,
@@ -2244,13 +2243,14 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "gamma_test_gpu",
     size = "medium",
     srcs = ["gamma_test.py"],
     main = "gamma_test.py",
+    python_version = "PY3",
     shard_count = 2,
+    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # numpy dep,
@@ -2979,12 +2979,13 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "poisson_test_gpu",
     size = "medium",
     srcs = ["poisson_test.py"],
     main = "poisson_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # numpy dep,
@@ -3342,12 +3343,13 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "distribution_properties_test",
     size = "large",
     srcs = ["distribution_properties_test.py"],
+    python_version = "PY3",
     shard_count = 40,
+    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":distributions",
@@ -3385,11 +3387,13 @@ py_library(
     ],
 )
 
-py3_test(
+py_test(
     name = "jax_transformation_test",
     size = "large",
     srcs = ["jax_transformation_test.py"],
+    python_version = "PY3",
     shard_count = 40,
+    srcs_version = "PY3",
     tags = [
         "hypothesis",
         "notap",
@@ -3399,13 +3403,15 @@ py3_test(
     ],
 )
 
-py3_test(
+py_test(
     name = "jax_transformation_test_tap",
     size = "large",
     srcs = ["jax_transformation_test.py"],
     args = ["--execute_only"],
     main = "jax_transformation_test.py",
+    python_version = "PY3",
     shard_count = 47,
+    srcs_version = "PY3",
     tags = [
         "hypothesis",
         "no-oss-ci",
@@ -3416,12 +3422,13 @@ py3_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "platform_compatibility_test",
     size = "large",
     srcs = ["platform_compatibility_test.py"],
+    python_version = "PY3",
     shard_count = 50,
+    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":distributions",
@@ -3438,12 +3445,13 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "stochastic_process_properties_test",
     size = "large",
     srcs = ["stochastic_process_properties_test.py"],
+    python_version = "PY3",
     shard_count = 3,
+    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         "//tensorflow_probability",

@@ -15,8 +15,6 @@
 # Description:
 #   Some Turnkey inference candidates
 
-load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
-
 licenses(["notice"])
 
 package(
@@ -51,7 +49,7 @@ py_library(
     ],
 )
 
-py3_test(
+py_test(
     name = "window_tune_nuts_sampling_test",
     size = "enormous",
     srcs = ["window_tune_nuts_sampling_test.py"],
@@ -71,7 +69,7 @@ py3_test(
     ],
 )
 
-py3_test(
+py_test(
     name = "window_tune_nuts_sampling_test_gpu",
     size = "enormous",
     srcs = ["window_tune_nuts_sampling_test.py"],

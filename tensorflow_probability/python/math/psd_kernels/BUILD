@@ -14,11 +14,10 @@
 # ============================================================================
 # Library for representation of positive-semidefinite kernel functions.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 licenses(["notice"])
@@ -316,12 +315,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "psd_kernel_properties_test",
     size = "medium",
     srcs = ["psd_kernel_properties_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         # absl/logging dep,

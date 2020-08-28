@@ -15,8 +15,6 @@
 # Description:
 #   Tools for calculating sample statistics.
 
-# [internal] load python3.bzl
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -48,12 +46,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "sample_stats_test",
     size = "small",
     srcs = ["sample_stats_test.py"],
+    python_version = "PY3",
     shard_count = 10,
+    srcs_version = "PY3",
     deps = [
         ":sample_stats",
         # numpy dep,

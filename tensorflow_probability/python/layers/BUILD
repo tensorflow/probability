@@ -15,8 +15,6 @@
 # Description:
 #   TensorFlow Probability layers.
 
-# [internal] load python3.bzl
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -60,11 +58,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "conv_variational_test",
     size = "medium",
     srcs = ["conv_variational_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -90,11 +89,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "dense_variational_test",
     size = "medium",
     srcs = ["dense_variational_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -116,11 +116,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "dense_variational_v2_test",
     size = "small",
     srcs = ["dense_variational_v2_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -155,12 +156,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "distribution_layer_test",
     size = "medium",
     srcs = ["distribution_layer_test.py"],
+    python_version = "PY3",
     shard_count = 5,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # six dep,
@@ -181,11 +183,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "initializers_test",
     size = "small",
     srcs = ["initializers_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -204,11 +207,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "masked_autoregressive_test",
     size = "small",
     srcs = ["masked_autoregressive_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -243,11 +247,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "variable_input_test",
     size = "small",
     srcs = ["variable_input_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -266,11 +271,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "weight_norm_test",
     size = "medium",
     srcs = ["weight_norm_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

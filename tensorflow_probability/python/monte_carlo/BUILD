@@ -15,8 +15,6 @@
 # Description:
 #   Support for Monte Carlo expectations
 
-# [internal] load python3.bzl
-
 licenses(["notice"])
 
 package(
@@ -48,11 +46,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "expectation_test",
     size = "small",
     srcs = ["expectation_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

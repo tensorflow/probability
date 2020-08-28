@@ -15,11 +15,10 @@
 # Description:
 #   MCMC methods, diagnostics, and related utilities.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -117,11 +116,12 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_dual_averaging_step_size_adaptation_test",
     size = "medium",
     srcs = ["legacy_dual_averaging_step_size_adaptation_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -164,13 +164,14 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_hmc_test",
     size = "medium",
     timeout = "long",
     srcs = ["legacy_hmc_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -228,13 +229,13 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_nuts_test",
     size = "large",
     srcs = ["legacy_nuts_test.py"],
+    python_version = "PY3",
     shard_count = 7,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_testlib",
@@ -242,14 +243,14 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "nuts_test_gpu",
     size = "large",
     srcs = ["nuts_test.py"],
     main = "nuts_test.py",
+    python_version = "PY3",
     shard_count = 7,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     tags = [
         "notap",
         "nozapfhahn",
@@ -291,12 +292,13 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_langevin_test",
     size = "medium",
     timeout = "long",
     srcs = ["legacy_langevin_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -339,10 +341,11 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_metropolis_hastings_test",
     srcs = ["legacy_metropolis_hastings_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -377,11 +380,12 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_random_walk_metropolis_test",
     size = "medium",
     srcs = ["legacy_random_walk_metropolis_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -422,13 +426,14 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_replica_exchange_mc_test",
     size = "medium",
     timeout = "long",
     srcs = ["legacy_replica_exchange_mc_test.py"],
+    python_version = "PY3",
     shard_count = 11,
+    srcs_version = "PY3",
     deps = [
         # absl/logging dep,
         # numpy dep,
@@ -464,12 +469,13 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_sample_test",
     size = "medium",
     timeout = "long",
     srcs = ["legacy_sample_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -504,11 +510,12 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_sample_annealed_importance_test",
     size = "medium",
     srcs = ["legacy_sample_annealed_importance_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -579,13 +586,14 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_slice_sampler_test",
     size = "medium",
     timeout = "long",
     srcs = ["legacy_slice_sampler_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -622,13 +630,14 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_transformed_kernel_test",
     size = "medium",
     timeout = "long",
     srcs = ["legacy_transformed_kernel_test.py"],
+    python_version = "PY3",
     shard_count = 4,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -648,11 +657,12 @@ py_library(
 )
 
 # bazel run -c opt :eight_schools_hmc_eager_test -- --benchmarks=.
-# py2and3
 py_test(
     name = "eight_schools_hmc_eager_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_eager_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":eight_schools_hmc",
         # tensorflow dep,
@@ -661,11 +671,12 @@ py_test(
 )
 
 # bazel run -c opt :eight_schools_hmc_graph_test -- --benchmarks=.
-# py2and3
 py_test(
     name = "eight_schools_hmc_graph_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["eight_schools_hmc_graph_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":eight_schools_hmc",
         # tensorflow dep,
@@ -702,10 +713,11 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "legacy_simple_step_size_adaptation_test",
     srcs = ["legacy_simple_step_size_adaptation_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -725,11 +737,12 @@ py_library(
 )
 
 # bazel run -c opt :text_messages_hmc_eager_test -- --benchmarks=.
-# py2and3
 py_test(
     name = "text_messages_hmc_eager_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["text_messages_hmc_eager_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":text_messages_hmc",
         # tensorflow dep,
@@ -738,11 +751,12 @@ py_test(
 )
 
 # bazel run -c opt :text_messages_hmc_graph_test -- --benchmarks=.
-# py2and3
 py_test(
     name = "text_messages_hmc_graph_test",
     size = "medium",  # Might run > 1 minute.
     srcs = ["text_messages_hmc_graph_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":text_messages_hmc",
         # tensorflow dep,

@@ -15,11 +15,10 @@
 # Description:
 #   Internal utilities for TensorFlow probability.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 licenses(["notice"])
@@ -102,11 +101,12 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "cache_util_test",
     size = "small",
     srcs = ["cache_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":cache_util",
         # numpy dep,
@@ -125,11 +125,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "docstring_util_test",
     size = "small",
     srcs = ["docstring_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":docstring_util",
         # numpy dep,
@@ -177,11 +178,12 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "distribution_util_test",
     size = "small",
     srcs = ["distribution_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":distribution_util",
         ":tensorshape_util",
@@ -213,11 +215,12 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "implementation_selection_test_gpu",
     srcs = ["implementation_selection_test.py"],
     main = "implementation_selection_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         ":implementation_selection",
@@ -363,11 +366,12 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "tensor_util_test",
     size = "small",
     srcs = ["tensor_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":tensor_util",
         # numpy dep,
@@ -424,13 +428,13 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "hypothesis_testlib_test",
     size = "small",
     srcs = ["hypothesis_testlib_test.py"],
+    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":hypothesis_testlib",
         # absl/testing:parameterized dep,
