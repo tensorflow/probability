@@ -22,15 +22,21 @@ from __future__ import print_function
 import functools
 
 import tensorflow.compat.v2 as tf
-
+import tensorflow_probability as tfp
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import softplus as softplus_lib
 from tensorflow_probability.python.distributions import joint_distribution_util
+from tensorflow_probability.python.experimental.vi import parameter_constraints
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
+Root = tfd.JointDistributionCoroutine.Root
+
+_NON_STATISTICAL_PARAMS = ['name', 'validate_args', 'allow_nan_stats']
 
 
 def build_trainable_location_scale_distribution(initial_loc,
@@ -292,3 +298,165 @@ def build_factored_surrogate_posterior(
     return (
         joint_distribution_util.independent_joint_distribution_from_structure(
             component_distributions, validate_args=validate_args))
+
+
+def make_asvi_trainable_variables(prior):
+  """Generates parameter dictionaries given a prior distribution and list."""
+  param_dicts = []
+  prior_dists = prior._get_single_sample_distributions()  # pylint: disable=protected-access
+  d = 0
+
+  for dist in prior_dists:
+    actual_dist = dist.distribution if isinstance(dist, Root) else dist
+    dist_params = actual_dist.parameters
+    new_params_dict = {}
+
+    # make and store mean_field_parameters & prior_weights in new_params_dict
+    for param, value in dist_params.items():
+      if param in _NON_STATISTICAL_PARAMS or value is None:
+        new_params_dict[param] = value
+      else:
+        # TODO(kateslin): Change dictionary naming scheme to use namedtuples.
+        prior_weight_name = 'prior_weight_{}'.format(d)
+        mean_field_parameter_name = 'mean_field_parameter_{}'.format(d)
+        prior_weight = tfp.util.TransformedVariable(
+            0.5, bijector=tfb.Sigmoid(), name=prior_weight_name)
+        new_params_dict['{}_prior_weight'.format(param)] = prior_weight
+
+        mean_field_parameter_constraint_bijector = (
+            parameter_constraints.constraint_for(param))
+        mean_field_parameter = tfp.util.TransformedVariable(
+            0.5,
+            mean_field_parameter_constraint_bijector,
+            name=mean_field_parameter_name)
+        new_params_dict['{}_mean_field_parameter'.format(
+            param)] = mean_field_parameter
+      d += 1
+
+    param_dicts.append(new_params_dict)
+  return param_dicts
+
+
+# TODO(kateslin): Add support for models with prior+likelihood written as
+#  a single JointDistribution.
+def build_asvi_surrogate_posterior(prior, name=None):
+  """Builds a structured surrogate posterior inspired by conjugate updating.
+
+  ASVI, or Automatic Structured Variational Inference, was proposed by
+  Ambrogioni et al. (2020) [1] as a method of automatically constructing a
+  surrogate posterior with the same structure as the prior. It does this by
+  reparameterizing the variational family of the surrogate posterior by
+  structuring each parameter according to the equation
+  ```none
+  prior_weight * prior_parameter + (1 - prior_weight) * mean_field_parameter
+  ```
+  In this equation, `prior_parameter` is a vector of prior parameters and
+  `mean_field_parameter` is a vector of trainable parameters with the same
+  domain as `prior_parameter`. `prior_weight` is a vector of learnable
+  parameters where `0. <= prior_weight <= 1.`. When `prior_weight =
+  0`, the surrogate posterior will be a mean-field surrogate, and when
+  `prior_weight = 1.`, the surrogate posterior will be the prior. This convex
+  combination equation, inspired by conjugacy in exponential families, thus
+  allows the surrogate posterior to balance between the structure of the prior
+  and the structure of a mean-field approximation.
+
+  Args:
+    prior: tfd.JointDistribution instance of the prior.
+    name: Optional string.
+
+  Returns:
+    surrogate_posterior: A `tfd.JointDistributionCoroutineAutoBatched` instance
+    whose samples have shape and structure matching that of `prior`.
+
+  ### Examples
+
+  Consider a Brownian motion model expressed as a JointDistribution:
+
+  ```python
+  prior_loc = 0.
+  innovation_noise = .1
+
+  def model_fn():
+    new = yield tfd.Normal(loc=prior_loc, scale=innovation_noise)
+    for i in range(4):
+      new = yield tfd.Normal(loc=new, scale=innovation_noise)
+
+  prior = tfd.JointDistributionCoroutineAutoBatched(model_fn)
+  ```
+
+  Let's use variational inference to approximate the posterior. We'll build a
+  surrogate posterior distribution by feeding in the prior distribution.
+
+  ```python
+  surrogate_posterior =
+    tfp.experimental.vi.build_asvi_surrogate_posterior(prior)
+  ```
+
+  This creates a trainable joint distribution, defined by variables in
+  `surrogate_posterior.trainable_variables`. We use `fit_surrogate_posterior`
+  to fit this distribution by minimizing a divergence to the true posterior.
+
+  ```python
+  losses = tfp.vi.fit_surrogate_posterior(
+    target_log_prob_fn,
+    surrogate_posterior=surrogate_posterior,
+    num_steps=100,
+    optimizer=tf.optimizers.Adam(0.1),
+    sample_size=10)
+
+  # After optimization, samples from the surrogate will approximate
+  # samples from the true posterior.
+  samples = surrogate_posterior.sample(100)
+  posterior_mean = [tf.reduce_mean(x) for x in samples]
+  posterior_std = [tf.math.reduce_std(x) for x in samples]
+  ```
+
+  #### References
+  [1]: Luca Ambrogioni, Max Hinne, Marcel van Gerven. Automatic structured
+        variational inference. _arXiv preprint arXiv:2002.00643_, 2020
+        https://arxiv.org/abs/2002.00643
+
+  """
+
+  with tf.name_scope(name or 'build_asvi_surrogate_posterior'):
+
+    param_dicts = make_asvi_trainable_variables(prior)
+
+    def posterior_generator():
+
+      prior_gen = prior._model_coroutine()  # pylint: disable=protected-access
+      dist = next(prior_gen)
+
+      i = 0
+      try:
+        while True:
+          actual_dist = dist.distribution if isinstance(dist, Root) else dist
+          dist_params = actual_dist.parameters
+          temp_params_dict = {}
+
+          for param, value in dist_params.items():
+            if param in _NON_STATISTICAL_PARAMS or value is None:
+              temp_params_dict[param] = value
+            else:
+              prior_weight = param_dicts[i]['{}_prior_weight'.format(param)]
+              mean_field_parameter = param_dicts[i][
+                  '{}_mean_field_parameter'.format(param)]
+              temp_params_dict[param] = prior_weight * value + (
+                  1. - prior_weight) * mean_field_parameter
+
+          surrogate_dist = type(actual_dist)(**temp_params_dict)
+
+          if isinstance(dist, Root):
+            value_out = yield Root(surrogate_dist)
+          else:
+            value_out = yield surrogate_dist
+
+          dist = prior_gen.send(value_out)
+          i += 1
+      except StopIteration:
+        pass
+
+    surrogate_posterior = tfd.JointDistributionCoroutineAutoBatched(
+        posterior_generator)
+    surrogate_posterior.also_track = param_dicts
+    return surrogate_posterior

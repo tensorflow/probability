@@ -30,9 +30,9 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 
-
 tfb = tfp.bijectors
 tfd = tfp.distributions
+_NON_STATISTICAL_PARAMS = ['name', 'validate_args', 'allow_nan_stats']
 
 
 @test_util.test_all_tf_execution_regimes
@@ -208,8 +208,9 @@ class FactoredSurrogatePosterior(test_util.TestCase):
 
   def test_that_gamma_fitting_example_runs(self):
 
-    # Build model.
     Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
+
+    # Build model.
     def model_fn():
       concentration = yield Root(tfd.Exponential(1.))
       rate = yield Root(tfd.Exponential(1.))
@@ -250,6 +251,118 @@ def _build_tensor(ndarray, dtype, use_static_shape):
   ndarray = np.asarray(ndarray).astype(dtype)
   return tf1.placeholder_with_default(
       input=ndarray, shape=ndarray.shape if use_static_shape else None)
+
+
+# TODO(kateslin): Add a test for make_param_dicts.
+@test_util.test_all_tf_execution_regimes
+class _TrainableASVISurrogate(object):
+
+  def test_dims_and_gradients(self):
+
+    prior_dist = self.make_prior_dist()
+
+    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+        prior=prior_dist)
+
+    # Test that the correct number of trainable variables are being tracked
+    prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
+    expected_num_trainable_vars = 0
+    for dist in prior_dists:
+      dist_params = dist.parameters
+      for param, value in dist_params.items():
+        if param not in _NON_STATISTICAL_PARAMS and value is not None:
+          expected_num_trainable_vars += 2  # prior_weight, mean_field_parameter
+
+    self.assertLen(surrogate_posterior.trainable_variables,
+                   expected_num_trainable_vars)
+
+    # Test that gradients are available wrt the variational parameters.
+    posterior_sample = surrogate_posterior.sample()
+    with tf.GradientTape() as tape:
+      posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
+    grad = tape.gradient(posterior_logprob,
+                         surrogate_posterior.trainable_variables)
+    self.assertTrue(all(g is not None for g in grad))
+
+    # Test that the sample shape is correct
+    three_posterior_samples = surrogate_posterior.sample(3)
+    three_prior_samples = prior_dist.sample(3)
+
+    self.assertAllEqualNested([s.shape for s in three_prior_samples],
+                              [s.shape for s in three_posterior_samples])
+
+  def test_fitting_surrogate_posterior(self):
+
+    prior_dist = self.make_prior_dist()
+    observations = self.get_observations(prior_dist)
+    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+        prior=prior_dist)
+    target_log_prob = self.get_target_log_prob(observations, prior_dist)
+
+    # Test vi fit surrogate posterior works
+    losses = tfp.vi.fit_surrogate_posterior(
+        target_log_prob,
+        surrogate_posterior,
+        num_steps=5,  # Don't optimize to completion.
+        optimizer=tf.optimizers.Adam(0.1),
+        sample_size=10)
+
+    # Compute posterior statistics.
+    with tf.control_dependencies([losses]):
+      posterior_samples = surrogate_posterior.sample(100)
+      posterior_mean = [tf.reduce_mean(x) for x in posterior_samples]
+      posterior_stddev = [tf.math.reduce_std(x) for x in posterior_samples]
+
+    self.evaluate(tf1.global_variables_initializer())
+    _ = self.evaluate(losses)
+    _ = self.evaluate(posterior_mean)
+    _ = self.evaluate(posterior_stddev)
+
+
+@test_util.test_all_tf_execution_regimes
+class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
+                                               _TrainableASVISurrogate):
+
+  def make_prior_dist(self):
+
+    def _prior_model_fn():
+      innovation_noise = 0.1
+      prior_loc = 0.
+      new = yield tfd.Normal(loc=prior_loc, scale=innovation_noise)
+      for _ in range(4):
+        new = yield tfd.Normal(loc=new, scale=innovation_noise)
+
+    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
+
+  def make_likelihood_model(self, x, observation_noise):
+
+    def _likelihood_model():
+      for i in range(5):
+        yield tfd.Normal(loc=x[i], scale=observation_noise)
+
+    return tfd.JointDistributionCoroutineAutoBatched(_likelihood_model)
+
+  def get_observations(self, prior_dist):
+    observation_noise = 0.15
+    ground_truth = prior_dist.sample()
+    likelihood = self.make_likelihood_model(
+        x=ground_truth, observation_noise=observation_noise)
+    return likelihood.sample(1)
+
+  def get_target_log_prob(self, observations, prior_dist):
+
+    def target_log_prob(*x):
+      observation_noise = 0.15
+      likelihood_dist = self.make_likelihood_model(
+          x=x, observation_noise=observation_noise)
+      return likelihood_dist.log_prob(observations) + prior_dist.log_prob(x)
+
+    return target_log_prob
+
+
+# TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.
+# TODO(kateslin): Add an ASVI surrogate posterior test with for a model with
+#  missing observations.
 
 if __name__ == '__main__':
   tf.test.main()

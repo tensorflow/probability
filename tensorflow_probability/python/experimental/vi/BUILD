@@ -36,10 +36,21 @@ py_library(
 )
 
 py_library(
+    name = "parameter_constraints",
+    srcs = ["parameter_constraints.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+    ],
+)
+
+py_library(
     name = "surrogate_posteriors",
     srcs = ["surrogate_posteriors.py"],
     srcs_version = "PY2AND3",
     deps = [
+        ":parameter_constraints",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -51,12 +62,13 @@ py_library(
 
 py_test(
     name = "surrogate_posteriors_test",
-    size = "small",
+    size = "large",
     srcs = ["surrogate_posteriors_test.py"],
     python_version = "PY3",
     shard_count = 5,
     srcs_version = "PY3",
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
