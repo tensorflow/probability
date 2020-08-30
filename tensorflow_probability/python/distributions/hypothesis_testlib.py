@@ -116,16 +116,29 @@ TF2_FRIENDLY_DISTS = (
 )
 
 
-# SPECIAL_DISTS are distributions that cannot be drawn by
-# base_distributions.
+# SPECIAL_DISTS are distributions that should not be drawn by
+# `base_distributions`, because they are parameterized by one or more
+# sub-distributions themselves.  This list is used to suppress warnings from
+# `_instantiable_base_dists`, below.
 SPECIAL_DISTS = (
+    'Autoregressive',
     'BatchReshape',
-    'Distribution',
-    'Empirical',
+    'Blockwise',
+    'Distribution',  # Base class; not a distribution at all
+    'Empirical',  # Special base distribution with custom instantiation
+    'JointDistribution',
+    'JointDistributionCoroutine',
+    'JointDistributionCoroutineAutoBatched',
+    'JointDistributionNamed',
+    'JointDistributionNamedAutoBatched',
+    'JointDistributionSequential',
+    'JointDistributionSequentialAutoBatched',
     'Independent',
     'Mixture',
     'MixtureSameFamily',
+    'Sample',
     'TransformedDistribution',
+    'QuantizedDistribution',
 )
 
 
@@ -406,7 +419,7 @@ def _instantiable_base_dists():
     try:
       params_event_ndims = dist_class._params_event_ndims()  # pylint: disable=protected-access
     except NotImplementedError:
-      msg = 'Unable to test tfd.%s: _params_event_ndims not implemented'
+      msg = 'Unable to test tfd.%s: _params_event_ndims not implemented.'
       logging.warning(msg, dist_name)
       continue
     result[dist_name] = DistInfo(dist_class, params_event_ndims)
@@ -435,6 +448,17 @@ INSTANTIABLE_META_DISTS = (
     'TransformedDistribution',
     'QuantizedDistribution',
 )
+
+
+def _report_non_instantiable_meta_dists():
+  for dist_name in SPECIAL_DISTS:
+    if dist_name in ['Distribution', 'Empirical']: continue
+    if dist_name in INSTANTIABLE_META_DISTS: continue
+    msg = 'Unable to test tfd.%s: no instantiation strategy.'
+    logging.warning(msg, dist_name)
+
+_report_non_instantiable_meta_dists()
+del _report_non_instantiable_meta_dists
 
 
 @hps.composite

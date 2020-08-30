@@ -3462,3 +3462,16 @@ py_test(
         "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
     ],
 )
+
+py_binary(
+    name = "untestable_distributions",
+    testonly = 1,
+    srcs = ["untestable_distributions.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # absl:app dep,
+        # absl/logging dep,
+        "//tensorflow_probability/python/distributions:hypothesis_testlib",
+    ],
+)
