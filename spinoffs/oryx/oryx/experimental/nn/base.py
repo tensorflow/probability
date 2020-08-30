@@ -452,7 +452,7 @@ def custom_layer_cau_batch(trace, f, tracers, params):
       f.call_wrapped(*tracers)
       return [batching.BatchTracer(trace, v, d)
               for v, d in zip(vals_out + update_out, dims_out + dims_update)]
-  f, dims_out = batching.batch_subtrace(f, trace.master, dims)
+  f, dims_out = batching.batch_subtrace(f, trace.main, dims)
   vals_out = layer_cau_p.subcall('batch').bind(f, *vals, **params)
   return [batching.BatchTracer(trace, v, d)
           for v, d in zip(vals_out, dims_out())]

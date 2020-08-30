@@ -87,11 +87,11 @@ def trees(f):
   return wrapped
 
 
-dynamic_contexts: Dict[jax_core.MasterTrace, List[Any]] = {}
+dynamic_contexts: Dict[jax_core.MainTrace, List[Any]] = {}
 
 
 @contextlib.contextmanager
-def new_dynamic_context(master: jax_core.MasterTrace,
+def new_dynamic_context(master: jax_core.MainTrace,
                         context: Any) -> Generator[None, None, None]:
   """Creates a dynamic context for a trace."""
   if master not in dynamic_contexts:
@@ -107,6 +107,6 @@ def new_dynamic_context(master: jax_core.MasterTrace,
 
 def get_dynamic_context(trace: jax_core.Trace) -> Any:
   """Returns the current active dynamic context for a trace."""
-  if trace.master not in dynamic_contexts:
+  if trace.main not in dynamic_contexts:
     raise ValueError(f'No dynamic context registered for trace: {trace}')
-  return dynamic_contexts[trace.master][-1]
+  return dynamic_contexts[trace.main][-1]

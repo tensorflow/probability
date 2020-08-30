@@ -356,7 +356,7 @@ class HarvestTrace(jax_core.Trace):
 
   def post_process_call(self, call_primitive, out_tracers, params):
     vals = tuple(t.val for t in out_tracers)
-    master = self.master
+    master = self.main
 
     def todo(x):
       trace = HarvestTrace(master, jax_core.cur_sublevel())
@@ -383,7 +383,7 @@ class HarvestTracer(jax_core.Tracer):
 
 
 @lu.transformation
-def harvest_function(master: jax_core.MasterTrace, settings: HarvestSettings,
+def harvest_function(master: jax_core.MainTrace, settings: HarvestSettings,
                      in_tree, args: Iterable[Any]):
   """A JAX linear_util transformation that runs a HarvestTrace."""
   trace = HarvestTrace(master, jax_core.cur_sublevel())
@@ -408,7 +408,7 @@ def harvest_function(master: jax_core.MasterTrace, settings: HarvestSettings,
 def harvest_eval(f: lu.WrappedFun, trace: HarvestTrace,
                  settings: HarvestSettings,
                  all_tree) -> Tuple[lu.WrappedFun, Callable[[], Any]]:
-  f = harvest_function(f, trace.master, settings, all_tree)
+  f = harvest_function(f, trace.main, settings, all_tree)
   return harvest_wrapper(f, trace)
 
 
@@ -555,7 +555,7 @@ def harvest(f,
     flat_args, in_tree = tree_util.tree_flatten(args)
     flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
     all_args, all_tree = tree_util.tree_flatten((plants, flat_args))
-    with jax_core.new_master(HarvestTrace) as master:
+    with jax_core.new_main(HarvestTrace) as master:
       flat_fun = harvest_function(flat_fun, master, settings, all_tree)
       out_flat, reaped = flat_fun.call_wrapped(all_args)
       del master

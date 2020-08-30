@@ -379,7 +379,7 @@ class UnzipTrace(jax_core.Trace):
 
 
 def unzip_eval(f, trace, keys, pvs, settings):
-  f = unzip_to_init_apply_subjaxprs(f, trace.master, settings, keys)
+  f = unzip_to_init_apply_subjaxprs(f, trace.main, settings, keys)
   return unzip_eval_wrapper(f, pvs)
 
 
@@ -555,7 +555,7 @@ def unzip(f, *, tag: str, key_args=0):
 
   def wrapped(*args, **kwargs):
     """Callable returned by unzip."""
-    with jax_core.new_master(UnzipTrace) as master:
+    with jax_core.new_main(UnzipTrace) as master:
       # Preparing args to be traced
       fun = lu.wrap_init(f, kwargs)
       avals = tree_util.tree_map(trace_util.get_shaped_aval, args)
