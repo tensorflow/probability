@@ -166,7 +166,7 @@ install_python_packages() {
   # Print out all versions, as an FYI in the logs.
   python --version
   python -m pip --version
-  python -m pip freeze
+  python -m pip list
 }
 
 check_for_common_package_conflicts
