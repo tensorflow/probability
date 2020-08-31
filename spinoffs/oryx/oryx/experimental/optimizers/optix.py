@@ -67,7 +67,7 @@ def clip(max_delta):
 
 
 def global_norm(items):
-  return np.sqrt(np.sum([np.sum(x**2) for x in tree_leaves(items)]))
+  return np.sqrt(np.sum(np.array([np.sum(x**2) for x in tree_leaves(items)])))
 
 
 def clip_by_global_norm(max_norm):

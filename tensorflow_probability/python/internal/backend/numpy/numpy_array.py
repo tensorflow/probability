@@ -318,7 +318,8 @@ def _shape(input, out_type=np.int32, name=None):  # pylint: disable=redefined-bu
 
 
 def _size(input, out_type=np.int32, name=None):  # pylint: disable=redefined-builtin, unused-argument
-  return np.asarray(np.prod(ops.convert_to_tensor(input).shape), dtype=out_type)
+  return np.asarray(
+      onp.prod(ops.convert_to_tensor(input).shape), dtype=out_type)
 
 
 builtin_slice = slice  # pylint: disable=invalid-name

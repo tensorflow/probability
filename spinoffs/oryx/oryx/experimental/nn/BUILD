@@ -124,6 +124,7 @@ py_library(
     deps = [
         ":base",
         # jax dep,
+        # numpy dep,
         "//oryx/core/state",
     ],
 )
