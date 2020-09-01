@@ -93,16 +93,17 @@ EXTRA_TENSOR_CONVERSION_DISTS = {
 # blocked for the autovectorization tests. Since not all distributions are
 # in INSTANTIABLE_BASE_DISTS, these should not be taken as exhaustive.
 SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
-    'DirichletMultinomial',  # Times out. (b/164143676)
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
+    'DirichletMultinomial',  # Times out. (b/164143676)
+    'Multinomial',  # TensorListConcatV2 fallback broken: b/166658748
     'PlackettLuce',  # No converter for TopKV2
     # 'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
-    'StudentT',  # Numerical problem: b/149785284
     'HalfStudentT',  # Numerical problem: b/149785284
+    'StudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/150811273
     'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
