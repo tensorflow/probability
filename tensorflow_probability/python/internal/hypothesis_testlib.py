@@ -44,6 +44,10 @@ def randomize_hypothesis():
   hypothesis_first = os.environ.get('TFP_HYPOTHESIS_RANDOMIZE', None)
   if randomize_first is None and hypothesis_first is None:
     return False
+  if randomize_first is None:
+    return bool(int(hypothesis_first))
+  if hypothesis_first is None:
+    return bool(int(randomize_first))
   if randomize_first == hypothesis_first:
     return bool(int(randomize_first))
   msg = ('Detected conflicting settings TFP_RANDOMIZE_HYPOTHESIS={} and '
