@@ -158,6 +158,7 @@ Lu = collections.namedtuple('Lu', 'lu,p')
 def _lu(input, output_idx_type=np.int32, name=None):  # pylint: disable=redefined-builtin
   """Returns Lu(lu, p), as TF does."""
   del name
+  input = ops.convert_to_tensor(input)
   if JAX_MODE:  # JAX uses XLA, which can do a batched factorization.
     lu_out, pivots = scipy_linalg.lu_factor(input)
     from jax import lax_linalg  # pylint: disable=g-import-not-at-top

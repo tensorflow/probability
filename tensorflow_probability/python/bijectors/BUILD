@@ -39,7 +39,6 @@ multi_substrate_py_library(
         ":batch_normalization",
         ":discrete_cosine_transform",
         ":ffjord",
-        ":scale_matvec_lu",
     ],
     deps = [
         ":absolute_value",
@@ -578,13 +577,14 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "scale_matvec_lu",
     srcs = ["scale_matvec_lu.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:linalg",
     ],
@@ -1476,12 +1476,10 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "scale_matvec_lu_test",
     size = "small",
     srcs = ["scale_matvec_lu_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":bijector_test_util",
         ":bijectors",

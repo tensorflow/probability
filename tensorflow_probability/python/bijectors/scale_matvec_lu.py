@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.linalg import lu_reconstruct
 from tensorflow_probability.python.math.linalg import lu_reconstruct_assertions
@@ -145,10 +146,10 @@ class ScaleMatvecLU(bijector.Bijector):
   def _broadcast_params(self):
     lower_upper = tf.convert_to_tensor(self.lower_upper)
     perm = tf.convert_to_tensor(self.permutation)
-    shape = tf.broadcast_dynamic_shape(tf.shape(lower_upper)[:-1],
-                                       tf.shape(perm))
+    shape = ps.broadcast_shape(ps.shape(lower_upper)[:-1],
+                               ps.shape(perm))
     lower_upper = tf.broadcast_to(
-        lower_upper, tf.concat([shape, shape[-1:]], 0))
+        lower_upper, ps.concat([shape, shape[-1:]], 0))
     perm = tf.broadcast_to(perm, shape)
     return lower_upper, perm
 
