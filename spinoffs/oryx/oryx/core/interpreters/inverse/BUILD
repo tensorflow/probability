@@ -99,7 +99,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core/interpreters:harvest",
-        # [tfp_jax dependency],
+        # tensorflow_probability/substrates:jax dep,
     ],
 )
 

@@ -3,7 +3,7 @@
 ## Overview
 
 The Inference Gym is the place to exercise inference methods to help make them
-get faster, leaner and more robust. The goal of the Inference Gym is to provide
+faster, leaner and more robust. The goal of the Inference Gym is to provide
 a set of probabilistic inference problems with a standardized interface, making
 it easy to test new inference techniques across a variety of challenging tasks.
 
@@ -30,10 +30,19 @@ Each model can additionally provide:
 
 ## Usage
 
+```bash
+pip install tfp-nightly inference_gym
+# Install at least one the folowing
+pip install tf-nightly  # For the TensorFlow backend.
+pip install jax jaxlib  # For the JAX backend.
+# Install to support external datasets
+pip install tfds-nightly
+```
+
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
-from tensorflow_probability.spinoffs.inference_gym import using_tensorflow as
+from inference_gym import using_tensorflow as
 inference_gym
 
 model = inference_gym.targets.GermanCreditNumericLogisticRegression()

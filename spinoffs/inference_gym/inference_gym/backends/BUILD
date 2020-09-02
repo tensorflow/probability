@@ -12,67 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# [internal] load strict.bzl
+# Description:
+#   A package for target densities and benchmarking of inference algorithms
+#   against the same.
+
 # [internal] load pytype.bzl (pytype_strict_library)
+# [internal] load strict.bzl
+
+package(
+    default_visibility = [
+        "//tensorflow_probability:__subpackages__",
+        "//inference_gym:__subpackages__",
+    ],
+)
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+exports_files(["LICENSE"])
 
 # pytype_strict
 py_library(
-    name = "mcmc",
-    srcs = ["__init__.py"],
+    name = "rewrite",
+    srcs = ["rewrite.py"],
     srcs_version = "PY3",
-    deps = [
-        ":kernels",
-        ":utils",
-    ],
 )
 
 # pytype_strict
 py_library(
-    name = "kernels",
-    srcs = ["kernels.py"],
+    name = "util",
+    srcs = ["util.py"],
     srcs_version = "PY3",
-    deps = [
-        # jax dep,
-        "//oryx/core:primitive",
-        "//oryx/core/interpreters:harvest",
-        "//oryx/core/ppl",
-        "//oryx/core/state",
-        "//oryx/distributions",
-    ],
 )
 
-# pytype_strict
-py_library(
-    name = "utils",
-    srcs = ["utils.py"],
+# py_strict
+py_test(
+    name = "jax_integration_test",
+    srcs = ["jax_integration_test.py"],
+    python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        # jax dep,
-        "//oryx/core/interpreters/inverse:core",
-        "//oryx/core/ppl",
+        # absl/testing:absltest dep,
+        "//inference_gym:using_jax",
     ],
 )
 
 # py_strict
 py_test(
-    name = "kernels_test",
-    srcs = ["kernels_test.py"],
+    name = "numpy_integration_test",
+    srcs = ["numpy_integration_test.py"],
     python_version = "PY3",
-    shard_count = 4,
     srcs_version = "PY3",
     deps = [
-        ":kernels",
-        ":utils",
         # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
-        # numpy dep,
-        "//inference_gym",
-        "//oryx/core/interpreters:harvest",
-        # tensorflow_probability/substrates:jax dep,
+        "//inference_gym:using_numpy",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "tensorflow_integration_test",
+    srcs = ["tensorflow_integration_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:absltest dep,
+        # tensorflow dep,
+        "//inference_gym:using_tensorflow",
     ],
 )

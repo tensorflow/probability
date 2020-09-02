@@ -28,7 +28,6 @@ package(
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
         "//discussion/fun_mcmc:__subpackages__",
-        "//spinoffs/inference_gym:__subpackages__",
     ],
 )
 

@@ -19,7 +19,7 @@ package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
         "//discussion/fun_mcmc:__subpackages__",
-        "//spinoffs/inference_gym:__subpackages__",
+        "//inference_gym:__subpackages__",
     ],
 )
 

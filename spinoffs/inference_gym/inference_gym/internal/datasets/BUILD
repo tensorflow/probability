@@ -12,67 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# [internal] load strict.bzl
+# Description:
+#   Checked in ground truth values.
+
 # [internal] load pytype.bzl (pytype_strict_library)
+
+package(
+    default_visibility = [
+        "//tensorflow_probability:__subpackages__",
+        "//inference_gym:__subpackages__",
+    ],
+)
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+exports_files(["LICENSE"])
 
 # pytype_strict
 py_library(
-    name = "mcmc",
+    name = "datasets",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":kernels",
-        ":utils",
+        ":brownian_motion_missing_middle_observations",
+        ":sp500_closing_prices",
+        ":synthetic_item_response_theory",
+        ":synthetic_log_gaussian_cox_process",
     ],
 )
 
 # pytype_strict
 py_library(
-    name = "kernels",
-    srcs = ["kernels.py"],
+    name = "synthetic_item_response_theory",
+    srcs = ["synthetic_item_response_theory.py"],
     srcs_version = "PY3",
     deps = [
-        # jax dep,
-        "//oryx/core:primitive",
-        "//oryx/core/interpreters:harvest",
-        "//oryx/core/ppl",
-        "//oryx/core/state",
-        "//oryx/distributions",
-    ],
-)
-
-# pytype_strict
-py_library(
-    name = "utils",
-    srcs = ["utils.py"],
-    srcs_version = "PY3",
-    deps = [
-        # jax dep,
-        "//oryx/core/interpreters/inverse:core",
-        "//oryx/core/ppl",
-    ],
-)
-
-# py_strict
-py_test(
-    name = "kernels_test",
-    srcs = ["kernels_test.py"],
-    python_version = "PY3",
-    shard_count = 4,
-    srcs_version = "PY3",
-    deps = [
-        ":kernels",
-        ":utils",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
         # numpy dep,
-        "//inference_gym",
-        "//oryx/core/interpreters:harvest",
-        # tensorflow_probability/substrates:jax dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "sp500_closing_prices",
+    srcs = ["sp500_closing_prices.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "brownian_motion_missing_middle_observations",
+    srcs = ["brownian_motion_missing_middle_observations.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "synthetic_log_gaussian_cox_process",
+    srcs = ["synthetic_log_gaussian_cox_process.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
     ],
 )

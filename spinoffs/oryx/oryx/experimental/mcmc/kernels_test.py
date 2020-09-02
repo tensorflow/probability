@@ -21,7 +21,7 @@ from jax import random
 import jax.numpy as np
 import numpy as onp
 
-from spinoffs.inference_gym import using_jax as inference_gym
+from inference_gym import using_jax as inference_gym
 from oryx.core.interpreters import harvest
 from oryx.experimental.mcmc import kernels
 from oryx.experimental.mcmc import utils
