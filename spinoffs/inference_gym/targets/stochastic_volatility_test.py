@@ -22,7 +22,7 @@ from spinoffs.inference_gym.targets import stochastic_volatility
 
 
 @test_util.multi_backend_test(globals(), 'targets.stochastic_volatility_test')
-class StochasticVolatilitySP500Test(test_util.InferenceGymTestCase):
+class StochasticVolatilityTest(test_util.InferenceGymTestCase):
 
   def testBasic(self):
     """Checks that unconstrained parameters yield finite joint densities."""
@@ -44,8 +44,6 @@ class StochasticVolatilitySP500Test(test_util.InferenceGymTestCase):
         stochastic_volatility.StochasticVolatility,
         centered_returns=tf.convert_to_tensor([5., -2.1, 8., 4., 1.1]))
 
-  # Verify that data loading works using the small model only, since the full
-  # dataset leads to an unwieldy prior containing 2518 RVs.
   def testSP500Small(self):
     """Checks that unconstrained parameters yield finite joint densities."""
     model = (
@@ -63,6 +61,23 @@ class StochasticVolatilitySP500Test(test_util.InferenceGymTestCase):
         check_ground_truth_mean=True,
         check_ground_truth_standard_deviation=True)
 
+  def testSP500(self):
+    """Checks that unconstrained parameters yield finite joint densities."""
+    self.skipTest('b/166833715')
+    model = (
+        stochastic_volatility.StochasticVolatilitySP500())
+    self.validate_log_prob_and_transforms(
+        model,
+        sample_transformation_shapes=dict(
+            identity={
+                'persistence_of_volatility': [],
+                'mean_log_volatility': [],
+                'white_noise_shock_scale': [],
+                'log_volatility': [2516]
+            }),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True)
 
 if __name__ == '__main__':
   tf.test.main()

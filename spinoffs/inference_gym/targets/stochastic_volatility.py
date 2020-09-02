@@ -85,7 +85,6 @@ def stochastic_volatility_log_likelihood_fn(values, centered_returns):
 
 
 class StochasticVolatility(bayesian_model.BayesianModel):
-  # pylint: disable=line-too-long
   """Stochastic model of asset price volatility over time.
 
   The model assumes that asset prices follow a random walk, in which the
@@ -115,9 +114,9 @@ class StochasticVolatility(bayesian_model.BayesianModel):
 
   #### References
 
-  [1] https://mc-stan.org/docs/2_23/stan-users-guide/stochastic-volatility-models.html
+  [1] <https://mc-stan.org/docs/2_23/stan-users-guide/
+      stochastic-volatility-models.html>
   """
-  # pylint: enable=line-too-long
 
   def __init__(
       self,
@@ -186,7 +185,7 @@ class StochasticVolatility(bayesian_model.BayesianModel):
   def _prior_distribution(self):
     return self._prior_dist
 
-  def log_likelihood(self, value):
+  def _log_likelihood(self, value):
     return self._log_likelihood_fn(value)
 
 

@@ -147,13 +147,13 @@ class HalfCauchy(distribution.Distribution):
     return loc + scale * tf.tan((np.pi / 2) * probs)
 
   def _log_prob(self, x):
+    npdt = dtype_util.as_numpy_dtype(self.dtype)
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     safe_x = self._get_safe_input(x, loc=loc, scale=scale)
-    log_prob = (np.log(2 / np.pi) - tf.math.log(scale) - tf.math.log1p(
-        ((safe_x - loc) / scale)**2))
-    return tf.where(x < loc, dtype_util.as_numpy_dtype(
-        self.dtype)(-np.inf), log_prob)
+    log_prob = npdt(np.log(2 / np.pi)) - tf.math.log(scale) - tf.math.log1p(
+        ((safe_x - loc) / scale)**2)
+    return tf.where(x < loc, npdt(-np.inf), log_prob)
 
   def _log_cdf(self, x):
     loc = tf.convert_to_tensor(self.loc)
@@ -222,4 +222,3 @@ class HalfCauchy(distribution.Distribution):
           self.scale,
           message='Argument `scale` must be positive.'))
     return assertions
-

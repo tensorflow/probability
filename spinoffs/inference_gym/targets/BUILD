@@ -49,6 +49,7 @@ py_library(
         ":sparse_logistic_regression",
         ":stochastic_volatility",
         ":vector_model",
+        ":vectorized_stochastic_volatility",
         "//spinoffs/inference_gym/backends:util",
     ],
 )
@@ -429,6 +430,40 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//spinoffs/inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "vectorized_stochastic_volatility",
+    srcs = ["vectorized_stochastic_volatility.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":bayesian_model",
+        ":model",
+        "//spinoffs/inference_gym/internal:data",
+        "//spinoffs/inference_gym/targets/ground_truth:stochastic_volatility_sp500",
+        "//spinoffs/inference_gym/targets/ground_truth:stochastic_volatility_sp500_small",
+    ],
+)
+
+# Not strict due to the TF internal nest import.
+py_test(
+    name = "vectorized_stochastic_volatility_test",
+    size = "large",
+    srcs = ["vectorized_stochastic_volatility_test.py"],
+    python_version = "PY3",
+    shard_count = 3,
+    srcs_version = "PY3",
+    deps = [
+        ":stochastic_volatility",
+        ":vectorized_stochastic_volatility",
+        # absl/logging dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
         "//spinoffs/inference_gym/internal:test_util",
     ],
 )

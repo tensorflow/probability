@@ -183,9 +183,10 @@ class Cauchy(distribution.Distribution):
     return self._quantile(probs, loc=loc, scale=scale)
 
   def _log_prob(self, x):
+    npdt = dtype_util.as_numpy_dtype(self.dtype)
     scale = tf.convert_to_tensor(self.scale)
     log_unnormalized_prob = -tf.math.log1p(tf.square(self._z(x, scale=scale)))
-    log_normalization = np.log(np.pi) + tf.math.log(scale)
+    log_normalization = npdt(np.log(np.pi)) + tf.math.log(scale)
     return log_unnormalized_prob - log_normalization
 
   def _cdf(self, x):
@@ -277,4 +278,3 @@ def _kl_cauchy_cauchy(a, b, name=None):
 
     return (tf.math.log(scale_sum_square + loc_diff_square) -
             np.log(4.) - tf.math.log(a_scale) - tf.math.log(b_scale))
-

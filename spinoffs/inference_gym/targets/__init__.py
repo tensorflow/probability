@@ -32,6 +32,12 @@ with util.silence_nonrewritten_import_errors():
   from spinoffs.inference_gym.targets.probit_regression import ProbitRegression
   from spinoffs.inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
   from spinoffs.inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
+  from spinoffs.inference_gym.targets.stochastic_volatility import StochasticVolatility
+  from spinoffs.inference_gym.targets.stochastic_volatility import StochasticVolatilitySP500
+  from spinoffs.inference_gym.targets.stochastic_volatility import StochasticVolatilitySP500Small
+  from spinoffs.inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatility
+  from spinoffs.inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatilitySP500
+  from spinoffs.inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatilitySP500Small
   from spinoffs.inference_gym.targets.vector_model import VectorModel
 
 __all__ = [
@@ -48,7 +54,13 @@ __all__ = [
     'NealsFunnel',
     'ProbitRegression',
     'SparseLogisticRegression',
+    'StochasticVolatility',
+    'StochasticVolatilitySP500',
+    'StochasticVolatilitySP500Small',
     'SyntheticItemResponseTheory',
     'SyntheticLogGaussianCoxProcess',
+    'VectorizedStochasticVolatility',
+    'VectorizedStochasticVolatilitySP500',
+    'VectorizedStochasticVolatilitySP500Small',
     'VectorModel',
 ]
