@@ -955,6 +955,7 @@ multi_substrate_py_test(
         # mock dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:cache_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

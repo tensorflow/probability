@@ -229,7 +229,8 @@ class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
 
 @hps.composite
 def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
-              enable_vars=False, allowed_bijectors=None, validate_args=True):
+              enable_vars=False, allowed_bijectors=None, validate_args=True,
+              return_duplicate=False):
   """Strategy for drawing Bijectors.
 
   The emitted bijector may be a basic bijector or an `Invert` of a basic
@@ -255,6 +256,9 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
       part of a meta-bijector (Chain, Invert, etc.). Defaults to
       `TF2_FRIENDLY_BIJECTORS`.
     validate_args: Python `bool`; whether to enable runtime checks.
+    return_duplicate: Python `bool`: If `False` return a single bijector. If
+      `True` return a tuple of two bijectors of the same type, instantiated with
+      the same parameters.
 
   Returns:
     bijectors: A strategy for drawing bijectors with the specified `batch_shape`
@@ -349,7 +353,10 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   ctor = getattr(tfb, bijector_name)
   hp.note('Forming {} bijector with params {}.'.format(
       bijector_name, bijector_params))
-  return ctor(validate_args=validate_args, **bijector_params)
+  bijector = ctor(validate_args=validate_args, **bijector_params)
+  if not return_duplicate:
+    return bijector
+  return (bijector, ctor(validate_args=validate_args, **bijector_params))
 
 
 def constrain_forward_shape(bijector, shape):
@@ -711,6 +718,19 @@ class BijectorPropertiesTest(test_util.TestCase):
     ildj = tf.broadcast_to(ildj_fn(ys), tf.shape(vectorized_ildj))
     self.assertAllClose(*self.evaluate((ildj, vectorized_ildj)),
                         atol=atol, rtol=rtol)
+
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in TF2_FRIENDLY_BIJECTORS)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testHashing(self, bijector_name, data):
+    bijector_1, bijector_2 = data.draw(
+        bijectors(bijector_name=bijector_name,
+                  enable_vars=True, return_duplicate=True))
+    self.assertEqual(hash(bijector_1), hash(bijector_2))
+    self.assertEqual(bijector_1, bijector_2)
+    self.assertFalse(bijector_1 != bijector_2)  # pylint: disable=g-generic-assert
 
 
 def ensure_nonzero(x):

@@ -719,6 +719,9 @@ class _DefaultJointBijector(bijector_lib.Bijector):
         for (bijector, input_shape) in zip(support_bijectors, input_shapes)]
     return self._jd._model_unflatten(output_shapes)
 
+  # We override the public methods so that the `default_event_space_bijector`s
+  # of the component distributions, instead of that of the `JointDistribution`,
+  # hit the global bijector cache.
   def forward(self, values, name=None):
     with tf.name_scope(name or 'forward'):
       values = self._jd._model_flatten(values)

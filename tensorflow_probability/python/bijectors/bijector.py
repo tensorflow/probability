@@ -31,7 +31,7 @@ from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import nest_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -440,6 +440,8 @@ class Bijector(tf.Module):
           '_inverse_min_event_ndims',
       ))
 
+  _cache = cache_util.BijectorCache()
+
   @abc.abstractmethod
   def __init__(self,
                graph_parents=None,
@@ -482,7 +484,11 @@ class Bijector(tf.Module):
         minimum number of dimensions on which `inverse` operates. Will be set to
         `forward_min_event_ndims` by default, if no value is provided.
       parameters: Python `dict` of parameters used to instantiate this
-        `Bijector`.
+        `Bijector`. Bijector instances with identical types, names, and
+        `parameters` share an input/output cache. `parameters` dicts are
+        keyed by strings and are identical if their keys are identical and if
+        corresponding values have identical hashes (or object ids, for
+        unhashable objects).
       name: The name to give Ops created by the initializer.
 
     Raises:
@@ -534,17 +540,6 @@ class Bijector(tf.Module):
     for i, t in enumerate(self._graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError('Graph parent item %d is not a Tensor; %s.' % (i, t))
-
-    # Setup caching after everything else is done.
-    self._cache = self._setup_cache()
-
-  def _setup_cache(self):
-    """Defines the cache for this bijector."""
-    # Wrap forward/inverse with getters so instance methods can be patched.
-    return cache_util.BijectorCache(
-        forward_impl=(lambda x, **kwargs: self._forward(x, **kwargs)),  # pylint: disable=unnecessary-lambda
-        inverse_impl=(lambda y, **kwargs: self._inverse(y, **kwargs)),  # pylint: disable=unnecessary-lambda
-        cache_type=cache_util.CachedDirectedFunction)
 
   @property
   def graph_parents(self):
@@ -621,6 +616,25 @@ class Bijector(tf.Module):
     # `parameters = dict(locals())`.
     return {k: v for k, v in self._parameters.items()
             if not k.startswith('__') and k != 'self'}
+
+  def __hash__(self):
+    return hash(cache_util.hashable_structure((
+        type(self), self._get_parameterization())))
+
+  def __eq__(self, other):
+    return (
+        type(self) is type(other)
+        and (cache_util.hashable_structure(self._get_parameterization())
+             == cache_util.hashable_structure(other._get_parameterization())))
+
+  def __ne__(self, other):
+    return (
+        type(self) is not type(other)
+        or (cache_util.hashable_structure(self._get_parameterization())
+            != cache_util.hashable_structure(other._get_parameterization())))
+
+  def _get_parameterization(self):
+    return self.parameters
 
   def __call__(self, value, name=None, **kwargs):
     """Applies or composes the `Bijector`, depending on input type.
@@ -962,7 +976,7 @@ class Bijector(tf.Module):
           dtype=None if SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
       reduce_shape, assertions = ldj_reduction_shape(
-          nest.map_structure(prefer_static.shape, y),
+          nest.map_structure(ps.shape, y),
           event_ndims=event_ndims,
           min_event_ndims=self._inverse_min_event_ndims,
           validate=self.validate_args)
@@ -977,7 +991,7 @@ class Bijector(tf.Module):
               for ildj in self._inverse_log_det_jacobian(y, **kwargs))
 
         # Make sure the unreduced ILDJ is in the cache.
-        attrs = self._cache.inverse.attributes(y, **kwargs)
+        attrs = self._cache.inverse_attributes(y, **kwargs)
         if 'ildj' in attrs:
           ildj = attrs['ildj']
         elif hasattr(self, '_inverse_log_det_jacobian'):
@@ -1069,7 +1083,7 @@ class Bijector(tf.Module):
           dtype=None if SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
       reduce_shape, assertions = ldj_reduction_shape(
-          nest.map_structure(prefer_static.shape, x),
+          nest.map_structure(ps.shape, x),
           event_ndims=event_ndims,
           min_event_ndims=self._forward_min_event_ndims,
           validate=self.validate_args)
@@ -1077,7 +1091,7 @@ class Bijector(tf.Module):
       # Make sure we have validated reduce_shape before continuing on.
       with tf.control_dependencies(assertions):
         # Make sure the unreduced ILDJ is in the cache.
-        attrs = self._cache.forward.attributes(x, **kwargs)
+        attrs = self._cache.forward_attributes(x, **kwargs)
         if 'ildj' in attrs:
           ildj = attrs['ildj']
         elif hasattr(self, '_forward_log_det_jacobian'):
@@ -1225,7 +1239,7 @@ class Bijector(tf.Module):
     # Broadcast LDJ to the reduce shape (in case of is_constant_jacobian)
     # and reduce over the trailing dimensions.
     ones = tf.ones(reduce_shape, unreduced.dtype)
-    reduce_dims = prefer_static.range(-prefer_static.size(reduce_shape), 0)
+    reduce_dims = ps.range(-ps.size(reduce_shape), 0)
     return tf.reduce_sum(ones * unreduced, axis=reduce_dims)
 
   def _parameter_control_dependencies(self, is_init):
@@ -1304,7 +1318,7 @@ def check_valid_ndims(ndims, validate=True):
   # Container for runtime assertions, when `validate=True`.
   assertions = []
 
-  shape = prefer_static.shape(ndims)
+  shape = ps.shape(ndims)
   if not tf.is_tensor(shape):
     if shape.tolist():
       raise ValueError('Expected scalar, saw shape {}.'.format(shape))
@@ -1513,7 +1527,7 @@ def ldj_reduction_shape(shape_structure,
         lambda nd: check_valid_ndims(nd, validate), event_ndims)
 
     # Get slice start/endpoint for the ldj_reduction_shape.
-    rank_structure = nest.map_structure(prefer_static.size, shape_structure)
+    rank_structure = nest.map_structure(ps.size, shape_structure)
     max_batch_ndims = aligned_batch_ndims(
         rank_structure, min_event_ndims, validate=validate,
         name='max_batch_ndims')
@@ -1541,7 +1555,7 @@ def ldj_reduction_shape(shape_structure,
     # The dimensions following batch-dims and preceeding maximum possible batch
     # dims are the LDJ reduce dims. This must be the same for all structured
     # elements, so we'll just pick the first.
-    reduce_shape = prefer_static.slice(
+    reduce_shape = ps.slice(
         flat_max_batch_shapes[0],
         begin=[batch_ndims],
         size=[max_batch_ndims-batch_ndims])

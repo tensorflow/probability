@@ -74,7 +74,11 @@ def assert_univariate_target_conservation(test, target_d, step_size):
   num_samples = int(5e4)
   num_steps = 1
   strm = test_util.test_seed_stream()
-  initialization = target_d.sample([num_samples], seed=strm())
+  # We wrap the initial values in `tf.identity` to avoid broken gradients
+  # resulting from a bijector cache hit, since bijectors of the same
+  # type/parameterization now share a cache.
+  # TODO(b/72831017): Fix broken gradients caused by bijector caching.
+  initialization = tf.identity(target_d.sample([num_samples], seed=strm()))
 
   @tf.function(autograph=False)
   def run_chain():

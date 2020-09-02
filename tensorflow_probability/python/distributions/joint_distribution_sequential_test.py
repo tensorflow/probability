@@ -575,10 +575,13 @@ class JointDistributionSequentialTest(test_util.TestCase):
             joint.sample(batch_shape, seed=test_util.test_seed())).shape)
 
   def test_default_event_space_bijector(self):
+    # Define dist parameters that also parameterize the event space
+    # bijector outside of the distribution constructor to ensure that
+    # bijector caching works.
+    low = tf.constant([0., 0.], dtype=tf.float32)
     dist_fns = [
         tfd.LogNormal(0., 1., validate_args=True),
-        lambda h: tfd.Independent(  # pylint: disable=g-long-lambda
-            tfd.Uniform([0., 0.], h, validate_args=True)),
+        lambda h: tfd.Independent(tfd.Uniform(low, h, validate_args=True)),
         lambda s: tfd.Normal(0., s, validate_args=True)
     ]
 
@@ -660,6 +663,18 @@ class JointDistributionSequentialTest(test_util.TestCase):
           self.evaluate(inverse_joint_event_shape[i]),
           self.evaluate(
               bijectors[i].inverse_event_shape_tensor(event_shapes[i])))
+
+    # test shared cache
+    joint_bijector_2 = jd._experimental_default_event_space_bijector()
+    y_1 = joint_bijector.forward(x)
+    y_2 = joint_bijector_2.forward(x)
+    for a, b in zip(y_1, y_2):
+      self.assertIs(a, b)
+
+    x_1 = joint_bijector.inverse(y_1)
+    x_2 = joint_bijector_2.inverse(y_1)
+    for a, b in zip(x_1, x_2):
+      self.assertIs(a, b)
 
   def test_sample_kwargs(self):
     joint = tfd.JointDistributionSequential([

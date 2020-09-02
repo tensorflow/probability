@@ -84,7 +84,11 @@ def assert_univariate_target_conservation(
   num_steps = 1
   target_d = mk_target()
   strm = tfp.util.SeedStream(salt='univariate_nuts_test', seed=1)
-  initialization = target_d.sample([num_samples], seed=strm())
+  # We wrap the initial values in `tf.identity` to avoid broken gradients
+  # resulting from a bijector cache hit, since bijectors of the same
+  # type/parameterization now share a cache.
+  # TODO(b/72831017): Fix broken gradients caused by bijector caching.
+  initialization = tf.identity(target_d.sample([num_samples], seed=strm()))
   def target(*args):
     # TODO(axch): Just use target_d.log_prob directly, and accept target_d
     # itself as an argument instead of a maker function.  Blocked by

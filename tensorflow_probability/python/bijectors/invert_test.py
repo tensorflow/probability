@@ -92,6 +92,18 @@ class InvertBijectorTest(test_util.TestCase):
     self.assertAllClose(np.log(x), tfb.Invert(tfb.Exp())(x),
                         atol=1e-5, rtol=1e-5)
 
+  def testSharedCaching(self):
+    for fwd in [
+        tfb.Exp(),
+        tfb.Shift(2.),
+    ]:
+      x = tf.constant([0.5, -1.], dtype=tf.float32)
+      inv = tfb.Invert(fwd)
+      y = fwd.forward(x)
+
+      self.assertIs(inv.forward(y), x)
+      self.assertIs(inv.inverse(x), y)
+
 
 if __name__ == "__main__":
   tf.test.main()
