@@ -31,150 +31,24 @@ from tensorflow_probability.python.internal import test_util
 
 
 @test_util.test_all_tf_execution_regimes
-class RealNVPTest(test_util.TestCase):
-
-  @parameterized.parameters((4, None), (None, 4. / 8.))
-  def testBijectorWithTrivialTransform(self, num_masked, fraction_masked):
-    input_depth = 8
-    flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
-    batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
-    for x_ in [flat_x_, batched_x_]:
-      nvp = tfb.RealNVP(
-          num_masked=num_masked,
-          fraction_masked=fraction_masked,
-          validate_args=True,
-          shift_and_log_scale_fn=lambda x, _: (x, x),
-          is_constant_jacobian=False)
-      x = tf.constant(x_)
-      forward_x = nvp.forward(x)
-      # Use identity to invalidate cache.
-      inverse_y = nvp.inverse(tf.identity(forward_x))
-      forward_inverse_y = nvp.forward(inverse_y)
-      fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
-      # Use identity to invalidate cache.
-      ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
-      forward_x_ = self.evaluate(forward_x)
-      inverse_y_ = self.evaluate(inverse_y)
-      forward_inverse_y_ = self.evaluate(forward_inverse_y)
-      ildj_ = self.evaluate(ildj)
-      fldj_ = self.evaluate(fldj)
-
-      self.assertStartsWith(nvp.name, 'real_nvp')
-      self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
-      self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
-      self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
-
-  @parameterized.parameters((-5, None), (None, -5. / 8.))
-  def testBijectorWithReverseMask(self, num_masked, fraction_masked):
-    input_depth = 8
-    flat_x_ = np.random.normal(0., 1., input_depth).astype(np.float32)
-    batched_x_ = np.random.normal(0., 1., (3, input_depth)).astype(np.float32)
-    for x_ in [flat_x_, batched_x_]:
-      flip_nvp = tfb.RealNVP(
-          num_masked=num_masked,
-          fraction_masked=fraction_masked,
-          validate_args=True,
-          shift_and_log_scale_fn=tfb.real_nvp_default_template(
-              hidden_layers=[3], shift_only=False),
-          is_constant_jacobian=False)
-
-      x = tf.constant(x_)
-
-      forward_x = flip_nvp.forward(x)
-
-      expected_num_masked = (
-          num_masked if num_masked is not None else np.floor(input_depth *
-                                                             fraction_masked))
-
-      self.assertEqual(flip_nvp._masked_size, expected_num_masked)
-
-      _, x2_ = np.split(x_, [input_depth - abs(flip_nvp._masked_size)], axis=-1)  # pylint: disable=unbalanced-tuple-unpacking
-
-      # Check latter half is the same after passing thru reversed mask RealNVP.
-      _, forward_x2 = tf.split(
-          forward_x, [
-              input_depth - abs(flip_nvp._masked_size),
-              abs(flip_nvp._masked_size)
-          ],
-          axis=-1)
-      self.evaluate(tf1.global_variables_initializer())
-      forward_x2_ = self.evaluate(forward_x2)
-
-      self.assertAllClose(forward_x2_, x2_, rtol=1e-4, atol=0.)
-
-  def testBijectorConditionKwargs(self):
-    batch_size = 3
-    x_ = np.linspace(-1.0, 1.0, (batch_size * 4 * 2)).astype(
-        np.float32).reshape((batch_size, 4 * 2))
-
-    conditions = {
-        'a': tf.random.normal((batch_size, 4), dtype=tf.float32, seed=584),
-        'b': tf.random.normal((batch_size, 2), dtype=tf.float32, seed=9817),
-    }
-
-    def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
-      x = tf.concat((x0, a, b), axis=-1)
-      out = tf1.layers.dense(inputs=x, units=2 * output_units)
-      shift, log_scale = tf.split(out, 2, axis=-1)
-      return shift, log_scale
-
-    condition_shift_and_log_scale_fn = tf1.make_template(
-        'real_nvp_condition_template', _condition_shift_and_log_scale_fn)
-
-    nvp = tfb.RealNVP(
-        num_masked=4,
-        validate_args=True,
-        is_constant_jacobian=False,
-        shift_and_log_scale_fn=condition_shift_and_log_scale_fn)
-
-    x = tf.constant(x_)
-
-    forward_x = nvp.forward(x, **conditions)
-    # Use identity to invalidate cache.
-    inverse_y = nvp.inverse(tf.identity(forward_x), **conditions)
-    forward_inverse_y = nvp.forward(inverse_y, **conditions)
-    fldj = nvp.forward_log_det_jacobian(x, event_ndims=1, **conditions)
-    # Use identity to invalidate cache.
-    ildj = nvp.inverse_log_det_jacobian(
-        tf.identity(forward_x), event_ndims=1, **conditions)
-    self.evaluate(tf1.global_variables_initializer())
-    [
-        forward_x_,
-        inverse_y_,
-        forward_inverse_y_,
-        ildj_,
-        fldj_,
-    ] = self.evaluate([
-        forward_x,
-        inverse_y,
-        forward_inverse_y,
-        ildj,
-        fldj,
-    ])
-    self.assertStartsWith(nvp.name, 'real_nvp')
-    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-5, atol=1e-5)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=1e-5)
-    self.assertAllClose(ildj_, -fldj_, rtol=1e-5, atol=1e-5)
-
-
-@test_util.test_all_tf_execution_regimes
-class RealNVPTestKwargs(
+class RealNVPTestBase(
     test_util.VectorDistributionTestHelpers,
     test_util.TestCase):
 
-  @property
-  def _real_nvp_kwargs(self):
-    return {
-        'shift_and_log_scale_fn':
-            tfb.real_nvp_default_template(hidden_layers=[3], shift_only=False),
-        'is_constant_jacobian':
-            False,
-    }
-
-  def testBatchedBijectorWithMLPTransform(self):
-    x_ = np.random.normal(0., 1., (3, 8)).astype(np.float32)
+  @parameterized.named_parameters(
+      ('BatchedNumMasked', 4, None, (3,)),
+      ('BatchedFractionmasked', None, 4. / 8., (3,)),
+      ('NonBatchedNumMasked', 4, None, ()),
+      ('NonBatchedFractionmasked', None, 4. / 8., ()),
+  )
+  def testRegularMask(self, num_masked, fraction_masked, batch_shape):
+    x_ = np.random.normal(0., 1., batch_shape + (8,)).astype(np.float32)
     nvp = tfb.RealNVP(
-        num_masked=4, validate_args=True, **self._real_nvp_kwargs)
+        num_masked=num_masked,
+        fraction_masked=fraction_masked,
+        validate_args=True,
+        **self._real_nvp_kwargs,
+    )
     x = tf.constant(x_)
     forward_x = nvp.forward(x)
     # Use identity to invalidate cache.
@@ -202,36 +76,45 @@ class RealNVPTestKwargs(
     self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
-  def testNonBatchedBijectorWithMLPTransform(self):
-    x_ = np.random.normal(0., 1., (8,)).astype(np.float32)
-    nvp = tfb.RealNVP(
-        num_masked=4, validate_args=True, **self._real_nvp_kwargs)
+  @parameterized.named_parameters(
+      ('BatchedNumMasked', -5, None, (3,)),
+      ('BatchedFractionmasked', None, -5. / 8., (3,)),
+      ('NonBatchedNumMasked', -5, None, ()),
+      ('NonBatchedFractionmasked', None, -5. / 8., ()),
+  )
+  def testReverseMask(self, num_masked, fraction_masked, batch_shape):
+    input_depth = 8
+    x_ = np.random.normal(0., 1.,
+                          batch_shape + (input_depth,)).astype(np.float32)
+    flip_nvp = tfb.RealNVP(
+        num_masked=num_masked,
+        fraction_masked=fraction_masked,
+        validate_args=True,
+        **self._real_nvp_kwargs,
+    )
     x = tf.constant(x_)
-    forward_x = nvp.forward(x)
-    # Use identity to invalidate cache.
-    inverse_y = nvp.inverse(tf.identity(forward_x))
-    forward_inverse_y = nvp.forward(inverse_y)
-    fldj = nvp.forward_log_det_jacobian(x, event_ndims=1)
-    # Use identity to invalidate cache.
-    ildj = nvp.inverse_log_det_jacobian(tf.identity(forward_x), event_ndims=1)
+
+    forward_x = flip_nvp.forward(x)
+
+    expected_num_masked = (
+        num_masked if num_masked is not None else np.floor(input_depth *
+                                                           fraction_masked))
+
+    self.assertEqual(flip_nvp._masked_size, expected_num_masked)
+
+    _, x2_ = np.split(x_, [input_depth - abs(flip_nvp._masked_size)], axis=-1)  # pylint: disable=unbalanced-tuple-unpacking
+
+    # Check latter half is the same after passing thru reversed mask RealNVP.
+    _, forward_x2 = tf.split(
+        forward_x, [
+            input_depth - abs(flip_nvp._masked_size),
+            abs(flip_nvp._masked_size)
+        ],
+        axis=-1)
     self.evaluate(tf1.global_variables_initializer())
-    [
-        forward_x_,
-        inverse_y_,
-        forward_inverse_y_,
-        ildj_,
-        fldj_,
-    ] = self.evaluate([
-        forward_x,
-        inverse_y,
-        forward_inverse_y,
-        ildj,
-        fldj,
-    ])
-    self.assertStartsWith(nvp.name, 'real_nvp')
-    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-4, atol=0.)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
-    self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
+    forward_x2_ = self.evaluate(forward_x2)
+
+    self.assertAllClose(forward_x2_, x2_, rtol=1e-4, atol=0.)
 
   def testMutuallyConsistent(self):
     dims = 4
@@ -271,7 +154,37 @@ class RealNVPTestKwargs(
 
 
 @test_util.test_all_tf_execution_regimes
-class NICETest(RealNVPTestKwargs):
+class TrivialTransformTest(RealNVPTestBase):
+
+  @property
+  def _real_nvp_kwargs(self):
+    return {
+        'shift_and_log_scale_fn':
+            lambda x, output_dims: (x[..., :output_dims], x[..., :output_dims]),
+        'is_constant_jacobian':
+            False,
+    }
+
+
+@test_util.numpy_disable_test_missing_functionality('tf.make_template')
+@test_util.jax_disable_test_missing_functionality('tf.make_template')
+@test_util.test_all_tf_execution_regimes
+class RealNVPTest(RealNVPTestBase):
+
+  @property
+  def _real_nvp_kwargs(self):
+    return {
+        'shift_and_log_scale_fn':
+            tfb.real_nvp_default_template(hidden_layers=[3], shift_only=False),
+        'is_constant_jacobian':
+            False,
+    }
+
+
+@test_util.numpy_disable_test_missing_functionality('tf.make_template')
+@test_util.jax_disable_test_missing_functionality('tf.make_template')
+@test_util.test_all_tf_execution_regimes
+class NICETest(RealNVPTestBase):
 
   @property
   def _real_nvp_kwargs(self):
@@ -284,7 +197,7 @@ class NICETest(RealNVPTestKwargs):
 
 
 @test_util.test_all_tf_execution_regimes
-class RealNVPConstantShiftScaleTest(RealNVPTestKwargs):
+class ConstantShiftScaleTest(RealNVPTestBase):
 
   @property
   def _real_nvp_kwargs(self):
@@ -318,8 +231,10 @@ def _make_gated_bijector_fn():
   return tf1.make_template('gated_bijector', _bijector_fn)
 
 
+@test_util.numpy_disable_test_missing_functionality('tf.make_template')
+@test_util.jax_disable_test_missing_functionality('tf.make_template')
 @test_util.test_all_tf_execution_regimes
-class GatedTest(RealNVPTestKwargs):
+class GatedTest(RealNVPTestBase):
 
   @property
   def _real_nvp_kwargs(self):
@@ -328,7 +243,7 @@ class GatedTest(RealNVPTestKwargs):
     }
 
 
-class RealNVPTestAsserts(test_util.TestCase):
+class RealNVPTestCommon(test_util.TestCase):
 
   def testMatrixBijectorRaises(self):
     with self.assertRaisesRegexp(
@@ -389,6 +304,56 @@ class RealNVPTestAsserts(test_util.TestCase):
           num_masked=num_masked, shift_and_log_scale_fn=lambda x, _: (x, x))
       rnvp.forward(np.zeros(1))
 
+  def testBijectorConditionKwargs(self):
+    batch_size = 3
+    x_ = np.linspace(-1.0, 1.0, (batch_size * 4 * 2)).astype(
+        np.float32).reshape((batch_size, 4 * 2))
+
+    conditions = {
+        'a': np.random.normal(size=(batch_size, 4)).astype(np.float32),
+        'b': np.random.normal(size=(batch_size, 4)).astype(np.float32),
+    }
+
+    def _condition_shift_and_log_scale_fn(x0, output_units, a, b):
+      del output_units
+      return x0 + a, x0 + b
+
+    nvp = tfb.RealNVP(
+        num_masked=4,
+        validate_args=True,
+        is_constant_jacobian=False,
+        shift_and_log_scale_fn=_condition_shift_and_log_scale_fn)
+
+    x = tf.constant(x_)
+
+    forward_x = nvp.forward(x, **conditions)
+    # Use identity to invalidate cache.
+    inverse_y = nvp.inverse(tf.identity(forward_x), **conditions)
+    forward_inverse_y = nvp.forward(inverse_y, **conditions)
+    fldj = nvp.forward_log_det_jacobian(x, event_ndims=1, **conditions)
+    # Use identity to invalidate cache.
+    ildj = nvp.inverse_log_det_jacobian(
+        tf.identity(forward_x), event_ndims=1, **conditions)
+    [
+        forward_x_,
+        inverse_y_,
+        forward_inverse_y_,
+        ildj_,
+        fldj_,
+    ] = self.evaluate([
+        forward_x,
+        inverse_y,
+        forward_inverse_y,
+        ildj,
+        fldj,
+    ])
+    self.assertStartsWith(nvp.name, 'real_nvp')
+    self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=1e-5)
+    self.assertAllClose(ildj_, -fldj_, rtol=1e-5, atol=1e-5)
+
+
+del RealNVPTestBase
 
 if __name__ == '__main__':
   tf.test.main()

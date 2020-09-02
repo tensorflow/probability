@@ -39,7 +39,6 @@ multi_substrate_py_library(
         ":batch_normalization",
         ":discrete_cosine_transform",
         ":ffjord",
-        ":real_nvp",
         ":scale_matvec_lu",
     ],
     deps = [
@@ -679,7 +678,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "real_nvp",
     srcs = ["real_nvp.py"],
     deps = [
@@ -1573,12 +1572,10 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "real_nvp_test",
     size = "small",
     srcs = ["real_nvp_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":bijectors",
         # absl/testing:parameterized dep,
