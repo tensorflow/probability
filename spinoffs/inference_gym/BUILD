@@ -17,6 +17,7 @@
 #   against the same.
 
 # [internal] load pytype.bzl (pytype_library, pytype_strict_library)
+# [internal] load dummy dependency
 
 package(
     default_visibility = [
@@ -107,3 +108,5 @@ py_library(
     srcs = ["dynamic/backend_tensorflow/__init__.py"],
     srcs_version = "PY3",
 )
+
+# third_party_dependency(package = "py/inference_gym")  # DisableOnExport
