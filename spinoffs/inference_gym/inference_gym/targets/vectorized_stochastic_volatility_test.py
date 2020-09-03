@@ -211,6 +211,8 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
     We check `unnormalized_log_prob` as well as the values of the sample
     transformations.
     """
+    if BACKEND == 'backend_jax':
+      self.skipTest('Too slow.')
     model = (
         vectorized_stochastic_volatility
         .VectorizedStochasticVolatilitySP500Small())
