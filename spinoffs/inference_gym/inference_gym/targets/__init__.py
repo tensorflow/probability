@@ -30,6 +30,8 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.neals_funnel import NealsFunnel
   from inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
   from inference_gym.targets.probit_regression import ProbitRegression
+  from inference_gym.targets.radon_contextual_effects import RadonContextualEffects
+  from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsMinnesota
   from inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
   from inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
   from inference_gym.targets.stochastic_volatility import StochasticVolatility
@@ -53,6 +55,8 @@ __all__ = [
     'Model',
     'NealsFunnel',
     'ProbitRegression',
+    'RadonContextualEffects',
+    'RadonContextualEffectsMinnesota',
     'SparseLogisticRegression',
     'StochasticVolatility',
     'StochasticVolatilitySP500',
