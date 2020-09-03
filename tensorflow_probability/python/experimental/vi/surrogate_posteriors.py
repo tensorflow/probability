@@ -19,6 +19,7 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
+import collections
 import functools
 
 import tensorflow.compat.v2 as tf
@@ -37,6 +38,9 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 Root = tfd.JointDistributionCoroutine.Root
 
 _NON_STATISTICAL_PARAMS = ['name', 'validate_args', 'allow_nan_stats']
+
+ASVIParameters = collections.namedtuple(
+    'ASVIParameters', ['prior_weight', 'mean_field_parameter'])
 
 
 def build_trainable_location_scale_distribution(initial_loc,
@@ -302,39 +306,31 @@ def build_factored_surrogate_posterior(
 
 def make_asvi_trainable_variables(prior):
   """Generates parameter dictionaries given a prior distribution and list."""
-  param_dicts = []
-  prior_dists = prior._get_single_sample_distributions()  # pylint: disable=protected-access
-  d = 0
+  with tf.name_scope('make_asvi_trainable_variables'):
+    param_dicts = []
+    prior_dists = prior._get_single_sample_distributions()  # pylint: disable=protected-access
 
-  for dist in prior_dists:
-    actual_dist = dist.distribution if isinstance(dist, Root) else dist
-    dist_params = actual_dist.parameters
-    new_params_dict = {}
+    for dist in prior_dists:
+      actual_dist = dist.distribution if isinstance(dist, Root) else dist
+      dist_params = actual_dist.parameters
+      new_params_dict = {}
 
-    # make and store mean_field_parameters & prior_weights in new_params_dict
-    for param, value in dist_params.items():
-      if param in _NON_STATISTICAL_PARAMS or value is None:
-        new_params_dict[param] = value
-      else:
-        # TODO(kateslin): Change dictionary naming scheme to use namedtuples.
-        prior_weight_name = 'prior_weight_{}'.format(d)
-        mean_field_parameter_name = 'mean_field_parameter_{}'.format(d)
-        prior_weight = tfp.util.TransformedVariable(
-            0.5, bijector=tfb.Sigmoid(), name=prior_weight_name)
-        new_params_dict['{}_prior_weight'.format(param)] = prior_weight
+      #  Build trainable ASVI representation for each distribution's parameters.
+      for param, value in dist_params.items():
+        if param in _NON_STATISTICAL_PARAMS or value is None:
+          continue
+        new_params_dict[param] = ASVIParameters(
+            prior_weight=tfp.util.TransformedVariable(
+                0.5,
+                bijector=tfb.Sigmoid(),
+                name='prior_weight/{}/{}'.format(dist.name, param)),
+            mean_field_parameter=tfp.util.TransformedVariable(
+                0.5,
+                bijector=parameter_constraints.constraint_for(param),
+                name='mean_field_parameter/{}/{}'.format(dist.name, param)))
 
-        mean_field_parameter_constraint_bijector = (
-            parameter_constraints.constraint_for(param))
-        mean_field_parameter = tfp.util.TransformedVariable(
-            0.5,
-            mean_field_parameter_constraint_bijector,
-            name=mean_field_parameter_name)
-        new_params_dict['{}_mean_field_parameter'.format(
-            param)] = mean_field_parameter
-      d += 1
-
-    param_dicts.append(new_params_dict)
-  return param_dicts
+      param_dicts.append(new_params_dict)
+    return param_dicts
 
 
 # TODO(kateslin): Add support for models with prior+likelihood written as
@@ -438,9 +434,8 @@ def build_asvi_surrogate_posterior(prior, name=None):
             if param in _NON_STATISTICAL_PARAMS or value is None:
               temp_params_dict[param] = value
             else:
-              prior_weight = param_dicts[i]['{}_prior_weight'.format(param)]
-              mean_field_parameter = param_dicts[i][
-                  '{}_mean_field_parameter'.format(param)]
+              prior_weight = param_dicts[i][param].prior_weight
+              mean_field_parameter = param_dicts[i][param].mean_field_parameter
               temp_params_dict[param] = prior_weight * value + (
                   1. - prior_weight) * mean_field_parameter
 
