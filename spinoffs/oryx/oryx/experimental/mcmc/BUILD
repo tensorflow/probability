@@ -71,7 +71,7 @@ py_test(
         # absl/testing:parameterized dep,
         # jax dep,
         # numpy dep,
-        "//inference_gym",
+        # inference_gym:using_jax dep,
         "//oryx/core/interpreters:harvest",
         # tensorflow_probability/substrates:jax dep,
     ],
