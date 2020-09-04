@@ -42,7 +42,7 @@ class _HiddenMarkovModelTest(
     return variables
 
   def test_reproducibility(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.01, 0.99], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.6, 0.4],
                                           [0.3, 0.7]], dtype=self.dtype)
     observation_locs_data = tf.constant([0.0, 1.0], dtype=self.dtype)
@@ -69,7 +69,7 @@ class _HiddenMarkovModelTest(
     self.assertAllEqual(s1, s2)
 
   def test_supports_dynamic_observation_size(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.01, 0.99], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.6, 0.4],
                                           [0.3, 0.7]], dtype=self.dtype)
     observation_locs_data = tf.constant([[0.0, 1.0],
@@ -97,7 +97,7 @@ class _HiddenMarkovModelTest(
     self.evaluate(model.posterior_mode(observation_data))
 
   def test_consistency(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.01, 0.99], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.6, 0.4],
                                           [0.3, 0.7]], dtype=self.dtype)
     observation_locs_data = tf.constant([0.0, 1.0], dtype=self.dtype)
@@ -124,7 +124,7 @@ class _HiddenMarkovModelTest(
         rtol=0.05, seed=test_util.test_seed())
 
   def test_broadcast_initial_probs(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.01, 0.99], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.6, 0.4],
                                           [0.3, 0.7]], dtype=self.dtype)
     observation_locs_data = tf.constant([0.0, 1.0], dtype=self.dtype)
@@ -151,7 +151,7 @@ class _HiddenMarkovModelTest(
         rtol=0.02, seed=test_util.test_seed())
 
   def test_broadcast_transitions(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.01, 0.99], dtype=self.dtype)
     transition_matrix_data = tf.constant([[[0.8, 0.2],
                                            [0.3, 0.7]],
                                           [[0.9, 0.1],
@@ -181,7 +181,7 @@ class _HiddenMarkovModelTest(
         rtol=2e-2, seed=test_util.test_seed())
 
   def test_broadcast_observations(self):
-    initial_prob_data = tf.constant([0.6, 0.4], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.01, 0.99], dtype=self.dtype)
     transition_matrix_data = tf.constant([[[0.8, 0.2],
                                            [0.3, 0.7]],
                                           [[0.9, 0.1],
@@ -211,7 +211,7 @@ class _HiddenMarkovModelTest(
         rtol=2e-2, seed=test_util.test_seed())
 
   def test_edge_case_sample_n_no_transitions(self):
-    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.9, 0.1], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.5, 0.5],
                                           [0.5, 0.5]], dtype=self.dtype)
     observation_probs_data = tf.constant([[1.0, 0.0],
@@ -230,13 +230,13 @@ class _HiddenMarkovModelTest(
         num_steps=num_steps,
         validate_args=True)
 
-    x = model._sample_n(1, seed=test_util.test_seed())
+    x = model.sample(2, seed=test_util.test_seed())
     x_shape = self.evaluate(tf.shape(x))
 
-    self.assertAllEqual(x_shape, [1, 1])
+    self.assertAllEqual(x_shape, [2, 1])
 
   def test_edge_case_log_prob_no_transitions(self):
-    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.9, 0.1], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.5, 0.5],
                                           [0.5, 0.5]], dtype=self.dtype)
     observation_probs_data = tf.constant([[1.0, 0.0],
@@ -261,10 +261,10 @@ class _HiddenMarkovModelTest(
 
     x = model.log_prob([0])
 
-    self.assertAllClose(x, np.log(0.5), rtol=1e-5, atol=0.0)
+    self.assertAllClose(x, np.log(0.9), rtol=1e-5, atol=0.0)
 
   def test_edge_case_mean_no_transitions(self):
-    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.9, 0.1], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.5, 0.5],
                                           [0.5, 0.5]], dtype=self.dtype)
     observation_locs_data = tf.constant([0.0, 1.0], dtype=self.dtype)
@@ -290,7 +290,7 @@ class _HiddenMarkovModelTest(
     self.assertAllEqual(x_shape, [1])
 
   def test_num_states(self):
-    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.9, 0.1], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.5, 0.5],
                                           [0.5, 0.5]], dtype=self.dtype)
     observation_probs_data = tf.constant([[0.5, 0.0, 0.5],
@@ -798,7 +798,7 @@ class _HiddenMarkovModelTest(
     self.assertAllEqual(inferred_states, expected_states_permuted)
 
   def test_posterior_mode_missing_continuous_observations(self):
-    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.9, 0.1], dtype=self.dtype)
     transition_matrix_data = tf.constant([[[0.6, 0.4],
                                            [0.6, 0.4]],
                                           [[0.4, 0.6],
@@ -1127,7 +1127,7 @@ class _HiddenMarkovModelTest(
 
   def test_dynamic_observation_posterior_is_appropriate(self):
     # This test forces evaluation of the _observation_log_probs method.
-    initial_prob_data = tf.constant([0.5, 0.5], dtype=self.dtype)
+    initial_prob_data = tf.constant([0.9, 0.1], dtype=self.dtype)
     transition_matrix_data = tf.constant([[0.9, 0.1],
                                           [0.1, 0.9]], dtype=self.dtype)
     observation_scale_data = tf.constant(0.1, dtype=self.dtype)
