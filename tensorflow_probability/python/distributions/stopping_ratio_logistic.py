@@ -29,7 +29,7 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python import math as tfm
+from tensorflow_probability.python.math import log1mexp
 
 
 def _broadcast_cat_event_and_params(event, params, base_dtype):
@@ -230,14 +230,18 @@ class StoppingRatioLogistic(distribution.Distribution):
     loc = self.loc
     num_cat = self._num_categories()
 
-    p = tf.math.log(tf.math.sigmoid(cutpoints - loc[..., tf.newaxis]))
-    q = tfm.log1mexp(p)
-    qs = tf.math.cumsum(q[..., :(num_cat - 2)], axis=-1)
-    p = tf.concat([p[..., :1], p[..., 1:num_cat] + qs], axis=-1)
-    qs = tf.math.reduce_sum(q[..., :num_cat], axis=-1)
-    p = tf.concat([p, qs[..., tf.newaxis]], axis=-1)
+    log_probs = tf.math.log_sigmoid(cutpoints - loc[..., tf.newaxis])
+    comp_log_probs = log1mexp(log_probs)
+    cumul_comp_lob_probs = tf.math.cumsum(
+        comp_log_probs[..., :(num_cat - 2)], axis=-1)
+    log_probs = tf.concat([log_probs[..., :1], log_probs[..., 1:num_cat] +
+                           cumul_comp_lob_probs], axis=-1)
+    cumul_comp_lob_probs = tf.math.reduce_sum(
+        comp_log_probs[..., :num_cat], axis=-1)
+    log_probs = tf.concat(
+        [log_probs, cumul_comp_lob_probs[..., tf.newaxis]], axis=-1)
 
-    return p
+    return log_probs
 
   def categorical_probs(self):
     """Probabilities for the `K + 1` sequential categories."""
@@ -272,13 +276,13 @@ class StoppingRatioLogistic(distribution.Distribution):
     return tf.TensorShape([])
 
   def _log_prob(self, x):
-    return self._get_broad_casted(x, self.categorical_log_probs())
+    return self._get_broadcasted(x, self.categorical_log_probs())
 
   def _cdf(self, x):
-    return self._get_broad_casted(
+    return self._get_broadcasted(
         x, tf.cumsum(self.categorical_probs(), axis=-1))
 
-  def _get_broad_casted(self, x, probs):
+  def _get_broadcasted(self, x, probs):
     x, probs = _broadcast_cat_event_and_params(
         event=x,
         params=probs,
