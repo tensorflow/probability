@@ -25,7 +25,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -156,12 +156,11 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
 
   def _batch_shape_tensor(self, shift=None, scale=None, tailweight=None):
     """Returns the batch shape of tensor parameter broadcasting."""
-    return prefer_static.shape(
-        prefer_static.shape(self.tailweight if tailweight is None
-                            else tailweight,
-                            prefer_static.shape(self.shift if shift is None
-                                                else shift)),
-        prefer_static.shape(self.scale if scale is None else scale))
+    return ps.shape(
+        ps.shape(self.tailweight if tailweight is None
+                 else tailweight,
+                 ps.shape(self.shift if shift is None else shift)),
+        ps.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -292,12 +291,11 @@ class LambertWNormal(LambertWDistribution):
 
   def _batch_shape_tensor(self, loc=None, scale=None, tailweight=None):
     """Returns the batch shape of tensor parameter broadcasting."""
-    return prefer_static.shape(
-        prefer_static.shape(self.tailweight if tailweight is None
-                            else tailweight,
-                            prefer_static.shape(self.loc if loc is None
-                                                else loc)),
-        prefer_static.shape(self.scale if scale is None else scale))
+    return ps.shape(
+        ps.shape(self.tailweight if tailweight is None
+                 else tailweight,
+                 ps.shape(self.loc if loc is None else loc)),
+        ps.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(

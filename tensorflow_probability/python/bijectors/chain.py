@@ -141,6 +141,18 @@ class Chain(bijector.Bijector):
     = tf.log(y - 1.)
     ```
 
+  Keyword arguments can be passed to the inner bijectors by utilizing the inner
+  bijector names, e.g.:
+
+  ```python
+  chain = Chain([Bijector1(name='b1'), Bijector2(name='b2')])
+  y = chain.forward(x, b1={'arg': 1}, b2={'arg': 2})
+
+  # Equivalent to:
+  z = Bijector2().forward(x, arg=1)
+  y = Bijector1().forward(z, arg=2)
+  ```
+
   """
 
   def __init__(self,
@@ -179,14 +191,6 @@ class Chain(bijector.Bijector):
               "Invert is not implemented for non-injective bijector "
               "({})".format(a_bijector.name))
 
-      dtype = list(set([b.dtype for b in bijectors if b.dtype is not None]))
-      if len(dtype) > 1:
-        raise ValueError("incompatible dtypes: %s" % dtype)
-      elif len(dtype) == 1:
-        dtype = dtype[0]
-      else:
-        dtype = None
-
       inverse_min_event_ndims = _compute_min_event_ndims(
           bijectors, compute_forward=False)
       forward_min_event_ndims = _compute_min_event_ndims(
@@ -197,7 +201,6 @@ class Chain(bijector.Bijector):
           inverse_min_event_ndims=inverse_min_event_ndims,
           is_constant_jacobian=all(b.is_constant_jacobian for b in bijectors),
           validate_args=validate_args,
-          dtype=dtype,
           parameters=parameters,
           name=name)
 
@@ -251,8 +254,8 @@ class Chain(bijector.Bijector):
     if not self.bijectors:
       return ildj
 
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.inverse_min_event_ndims)
+    # TODO(b/162764645): Remove explicit event_ndims in Composite CL.
+    event_ndims = self.inverse_min_event_ndims
 
     if _use_static_shape(y, event_ndims):
       event_shape = y.shape[tensorshape_util.rank(y.shape) - event_ndims:]
@@ -266,13 +269,12 @@ class Chain(bijector.Bijector):
 
       if _use_static_shape(y, event_ndims):
         event_shape = b.inverse_event_shape(event_shape)
-        event_ndims = self._maybe_get_static_event_ndims(
-            tensorshape_util.rank(event_shape))
+        event_ndims = tensorshape_util.rank(event_shape)
       else:
         event_shape = b.inverse_event_shape_tensor(event_shape)
         event_shape_ = distribution_util.maybe_get_static_value(event_shape)
         event_ndims = tf.size(event_shape)
-        event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
+        event_ndims_ = event_ndims
 
         if event_ndims_ is not None and event_shape_ is not None:
           event_ndims = event_ndims_
@@ -287,6 +289,7 @@ class Chain(bijector.Bijector):
     return dtype
 
   def _forward(self, x, **kwargs):
+    # TODO(b/162023850): Sanitize the kwargs better.
     for b in reversed(self.bijectors):
       x = b.forward(x, **kwargs.get(b.name, {}))
     return x
@@ -299,8 +302,7 @@ class Chain(bijector.Bijector):
     if not self.bijectors:
       return fldj
 
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.forward_min_event_ndims)
+    event_ndims = self.forward_min_event_ndims
 
     if _use_static_shape(x, event_ndims):
       event_shape = x.shape[tensorshape_util.rank(x.shape) - event_ndims:]
@@ -313,13 +315,12 @@ class Chain(bijector.Bijector):
           x, event_ndims=event_ndims, **kwargs.get(b.name, {}))
       if _use_static_shape(x, event_ndims):
         event_shape = b.forward_event_shape(event_shape)
-        event_ndims = self._maybe_get_static_event_ndims(
-            tensorshape_util.rank(event_shape))
+        event_ndims = tensorshape_util.rank(event_shape)
       else:
         event_shape = b.forward_event_shape_tensor(event_shape)
         event_shape_ = distribution_util.maybe_get_static_value(event_shape)
         event_ndims = tf.size(event_shape)
-        event_ndims_ = self._maybe_get_static_event_ndims(event_ndims)
+        event_ndims_ = event_ndims
 
         if event_ndims_ is not None and event_shape_ is not None:
           event_ndims = event_ndims_

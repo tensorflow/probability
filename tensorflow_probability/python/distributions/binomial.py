@@ -30,7 +30,7 @@ from tensorflow_probability.python.internal import batched_rejection_sampler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -117,10 +117,10 @@ def _log_concave_rejection_sampler(
       https://arxiv.org/abs/1711.10604
   """
   mode = tf.broadcast_to(
-      mode, tf.concat([sample_shape, prefer_static.shape(mode)], axis=0))
+      mode, ps.concat([sample_shape, ps.shape(mode)], axis=0))
 
   mode_height = prob_fn(mode)
-  mode_shape = prefer_static.shape(mode)
+  mode_shape = ps.shape(mode)
 
   top_width = 1. + mode_height / 2.  # w in ref [1].
   top_fraction = top_width / (1 + top_width)
@@ -166,10 +166,15 @@ def _log_concave_rejection_sampler(
     return potential_samples, envelope_height
 
   def target(values):
-    in_range_mask = (
-        (values >= distribution_minimum) & (values <= distribution_maximum))
-    in_range_values = tf.where(in_range_mask, values, 0.)
-    return tf.where(in_range_mask, prob_fn(in_range_values), 0.)
+    # Check for out of bounds rather than in bounds to avoid accidentally
+    # masking a `nan` value.
+    out_of_bounds_mask = (
+        (values < distribution_minimum) | (values > distribution_maximum))
+    in_bounds_values = tf.where(
+        out_of_bounds_mask, tf.constant(0., dtype=values.dtype), values)
+    probs = prob_fn(in_bounds_values)
+    return tf.where(
+        out_of_bounds_mask, tf.constant(0., dtype=probs.dtype), probs)
 
   return tf.stop_gradient(
       batched_rejection_sampler.batched_rejection_sampler(
@@ -188,11 +193,9 @@ def _random_binomial_cpu(
   with tf.name_scope(name or 'binomial_cpu'):
     if probs is None:
       probs = tf.where(counts > 0, tf.math.sigmoid(logits), 0)
-    batch_shape = prefer_static.broadcast_shape(
-        prefer_static.shape(counts),
-        prefer_static.shape(probs))
+    batch_shape = ps.broadcast_shape(ps.shape(counts), ps.shape(probs))
     samples = tf.random.stateless_binomial(
-        shape=tf.concat([shape, batch_shape], axis=0),
+        shape=ps.concat([shape, batch_shape], axis=0),
         seed=seed, counts=counts, probs=probs, output_dtype=output_dtype)
   return samples
 
@@ -217,6 +220,8 @@ def _random_binomial_noncpu(
 
 
 # tf.function required to access Grappler's implementation_selector.
+@implementation_selection.never_runs_functions_eagerly
+# TODO(b/163029794): Shape relaxation breaks XLA.
 @tf.function(autograph=False)
 def _random_binomial(
     shape,
@@ -244,7 +249,7 @@ def _random_binomial(
   """
   with tf.name_scope(name or 'random_binomial'):
     seed = samplers.sanitize_seed(seed)
-    shape = tf.convert_to_tensor(shape, dtype_hint=tf.int32, name='shape')
+    shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32, name='shape')
     params = dict(shape=shape, counts=counts, probs=probs, logits=logits,
                   output_dtype=output_dtype, seed=seed, name=name)
     sampler_impl = implementation_selection.implementation_selecting(
@@ -394,8 +399,8 @@ class Binomial(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     x = self._probs if self._logits is None else self._logits
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self._total_count), tf.shape(x))
+    return ps.broadcast_shape(
+        ps.shape(self._total_count), ps.shape(x))
 
   def _batch_shape(self):
     x = self._probs if self._logits is None else self._logits
@@ -432,7 +437,7 @@ class Binomial(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     seed = samplers.sanitize_seed(seed, salt='binomial')
     return _random_binomial(
-        shape=tf.convert_to_tensor([n]),
+        shape=ps.convert_to_shape_tensor([n]),
         counts=tf.convert_to_tensor(self._total_count),
         probs=(None if self._probs is None else
                tf.convert_to_tensor(self._probs)),
@@ -539,6 +544,17 @@ class Binomial(distribution.Distribution):
 def _log_unnormalized_prob_logits(logits, counts, total_count):
   """Log unnormalized probability from logits."""
   logits = tf.convert_to_tensor(logits)
+  # softplus(x) = log(1 + exp(x))
+  # sigmoid(x) = 1 / (1 + exp(-x)) = exp(x) / (exp(x) + 1)
+  # log(probs) = log(sigmoid(logits))
+  #            = -log(1 + exp(-logits))
+  #            = -softplus(-logits)
+  # log1p(-probs) = log(1 - sigmoid(logits))
+  #               = log(1 - 1 / (1 + exp(-logits)))
+  #               = log((1 + exp(-logits) - 1) / (1 + exp(-logits)))
+  #               = log(exp(-logits) / (1 + exp(-logits)))
+  #               = log(sigmoid(-logits))
+  #               = -softplus(logits)  # by log(sigmoid(x)) = -softplus(-x))
   return (-tf.math.multiply_no_nan(tf.math.softplus(-logits), counts) -
           tf.math.multiply_no_nan(
               tf.math.softplus(logits), total_count - counts))
@@ -548,8 +564,7 @@ def _log_unnormalized_prob_probs(probs, counts, total_count):
   """Log unnormalized probability from probs."""
   probs = tf.convert_to_tensor(probs)
   return (tf.math.multiply_no_nan(tf.math.log(probs), counts) +
-          tf.math.multiply_no_nan(
-              tf.math.log1p(-probs), total_count - counts))
+          tf.math.multiply_no_nan(tf.math.log1p(-probs), total_count - counts))
 
 
 def _log_normalization(counts, total_count):

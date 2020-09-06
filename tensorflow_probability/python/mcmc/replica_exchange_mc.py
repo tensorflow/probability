@@ -26,13 +26,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import kernel as kernel_base
-from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import random_walk_metropolis
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -108,13 +105,17 @@ class ReplicaExchangeMCKernelResults(
 
             # Random seed for this step.
             'seed',
+
+            # Count of how many steps have been taken. May be used to determine
+            # swaps.
+            'step_count',
         ])):
   """Internal state and diagnostics for Replica Exchange MC."""
   __slots__ = ()
 
 
 def default_swap_proposal_fn(prob_swap, name=None):
-  """Default swap proposal function, for replica swap MC.
+  """Make the default swap proposal func, with `P[swap]`, for replica swap MC.
 
   With probability `prob_swap`, propose combinations of replicas to swap
   When exchanging, create combinations of adjacent replicas in
@@ -137,16 +138,17 @@ def default_swap_proposal_fn(prob_swap, name=None):
   ```
 
   Args:
-    prob_swap: Scalar `Tensor` giving probability that any swaps will
-      be generated.
+    prob_swap: Scalar `Tensor` in `[0, 1]` giving probability that any swaps
+      will be generated.
     name: Python `str` name given to ops created by this function.
       Default value: `'adjacent_swaps'`.
 
   Returns:
     default_swap_proposal_fn_: Python callable which take a number of
-      replicas (a Python integer), and integer `Tensor` `batch_shape`, and
-      returns `swaps`, a shape `[num_replica] + batch_shape` `Tensor`, where
-      axis 0 indexes "one-time swaps", i.e., such that (if `rank(swaps) == 1`,
+      replicas (a Python integer), and integer `Tensor` `batch_shape`, an
+      unused `step_count`, a `seed`, and returns `swaps`, a shape
+      `[num_replica] + batch_shape` `Tensor`, where axis 0 indexes
+      "one-time swaps", i.e., such that (if `rank(swaps) == 1`,
       `range(num_replicas) == tf.gather(swaps, swaps)`.
 
   #### References
@@ -155,25 +157,26 @@ def default_swap_proposal_fn(prob_swap, name=None):
        Parallel Tempering: Theory, Applications, and New Perspectives
        https://arxiv.org/abs/physics/0508111
   """
-  def adjacent_swaps(num_replica, batch_shape=(), seed=None):
+  def adjacent_swaps(num_replica, batch_shape=(), step_count=None, seed=None):
     """Make random shuffle using only one time swaps."""
+    del step_count  # Unused for this function.
     with tf.name_scope(name or 'adjacent_swaps'):
       parity_seed, proposal_seed = samplers.split_seed(
           seed, salt='random_adjacent_shuffle')
       # u selects parity.  E.g.,
-      #  u==True ==>  [0, 2, 1, 4, 3] like swaps
-      #  u==False ==> [1, 0, 3, 2, 4] like swaps
+      #  u==False ==> [1, 0, 3, 2, 4] even parity swaps
+      #  u==True ==>  [0, 2, 1, 4, 3] odd parity swaps
       # If there are only 2 replicas, then the "True" swaps are null
       # swaps...which would contradict the user provided `prob_swap`.
       # So special case num_replica==2, forcing u==False in this case.
-      u_shape = prefer_static.concat((
-          tf.ones(1, dtype=tf.int32), tf.cast(batch_shape, tf.int32)), axis=0)
+      u_shape = ps.concat((
+          ps.ones(1, dtype=tf.int32), ps.cast(batch_shape, tf.int32)), axis=0)
       u = samplers.uniform(u_shape, seed=parity_seed) < 0.5
       u = tf.where(num_replica > 2, u, False)
 
       x = mcmc_util.left_justified_expand_dims_to(
-          tf.range(num_replica, dtype=tf.int64),
-          rank=prefer_static.size(u_shape))
+          ps.range(num_replica, dtype=tf.int64),
+          rank=ps.size(u_shape))
       y = tf.where(tf.equal(x % 2, tf.cast(u, dtype=tf.int64)), x + 1, x - 1)
       y = tf.clip_by_value(y, 0, num_replica - 1)
       # TODO(b/142689785): Consider using tf.cond and returning an empty list
@@ -182,6 +185,98 @@ def default_swap_proposal_fn(prob_swap, name=None):
           samplers.uniform(batch_shape, seed=proposal_seed) < prob_swap, y, x)
 
   return adjacent_swaps
+
+
+def even_odd_swap_proposal_fn(swap_frequency, name=None):
+  """Make a deterministic swap proposal function, alternating even/odd swaps.
+
+  This proposal function swaps deterministically `swap_frequency` fraction of
+  the time, alternating even and odd parity.
+  This was shown in [2] to mix better than random schemes.
+
+  Contrast this with `default_swap_proposal_fn`, which swaps randomly with
+  probability `prob_swap`.
+
+  ```
+  swap_fn = even_odd_swap_proposal_fn(swap_frequency=1)
+
+  even_odd_swap_proposal_fn(num_replica=4, step_count=0)
+  ==> [1, 0, 3, 2]  # Swap 0 <--> 1 and 2 <--> 3, even parity.
+
+  even_odd_swap_proposal_fn(num_replica=4, step_count=1)
+  ==> [0, 2, 1, 3]  # Swap 1 <--> 2, odd parity.
+  ```
+
+  Args:
+    swap_frequency: Scalar `Tensor` in `[0, 1]` giving the frequency of swaps.
+      Swaps will occur, with alternating parity, every `N` steps, where
+      `N = 1 / swap_frequency`.
+    name: Python `str` name given to ops created by this function.
+      Default value: `'even_odd_swaps'`.
+
+  Returns:
+    default_swap_proposal_fn_: Python callable which take a number of
+      replicas (a Python integer), and integer `Tensor` `batch_shape`, a
+      `step_count`, a `seed`, and returns `swaps`, a shape
+      `[num_replica] + batch_shape` `Tensor`, where axis 0 indexes
+      "one-time swaps", i.e., such that (if `rank(swaps) == 1`,
+      `range(num_replicas) == tf.gather(swaps, swaps)`.
+
+  #### References
+
+  [1]: S. Syed, A. Bouchard-Cote G. Deligiannidis, A. Doucet
+       Non-Reversible Parallel Tempering: a Scalable Highly Parallel MCMC Scheme
+       https://arxiv.org/abs/1905.02939
+  """
+
+  def even_odd_swaps(num_replica, batch_shape=(), step_count=None, seed=None):
+    """Make deterministic even_odd one time swaps."""
+    if step_count is None:
+      raise ValueError('`step_count` must be supplied. Found `None`.')
+    del seed  # Unused for this function.
+    with tf.name_scope(name or 'even_odd_swaps'):
+      # Period is 1 / frequency, and we want period = Inf if frequency = 0.
+      # safe_swap_period is the correct swap period in case swap_frequency > 0.
+      # If swap_frequency == 0, safe_swap_period is set to 1 (to avoid integer
+      # div by zero below). We will hard-set this case to "null swap."
+      swap_freq = tf.convert_to_tensor(swap_frequency, name='swap_frequency')
+      safe_swap_period = tf.cast(
+          tf.where(swap_freq > 0,
+                   tf.math.ceil(tf.math.reciprocal_no_nan(swap_freq)), 1),
+          # Although period = 1 / frequency may have roundoff error, and result
+          # in a period different than what the user intended, the
+          # user will end up with a single integer period, and thus well defined
+          # deterministic swaps.
+          tf.int32,
+      )
+
+      # u selects parity.  E.g.,
+      #  u==False ==> [1, 0, 3, 2, 4] even parity swaps
+      #  u==True ==>  [0, 2, 1, 4, 3] odd parity swaps
+      # If there are 2 replicas, then the "True" swaps are null
+      # swaps...which would contradict the user provided `swap_frequency`.
+      # So special case num_replica==2, forcing u==False in this case.
+      u_shape = ps.concat((
+          ps.ones(1, dtype=tf.int32), ps.cast(batch_shape, tf.int32)), axis=0)
+      u = tf.fill(u_shape, tf.cast((step_count // safe_swap_period) % 2,
+                                   tf.bool))
+      u = tf.where(num_replica > 2, u, False)
+
+      x = mcmc_util.left_justified_expand_dims_to(
+          tf.range(num_replica, dtype=tf.int64),
+          rank=ps.size(u_shape))
+      y = tf.where(tf.equal(x % 2, tf.cast(u, dtype=tf.int64)), x + 1, x - 1)
+      y = tf.clip_by_value(y, 0, num_replica - 1)
+      # TODO(b/142689785): Consider using tf.cond and returning an empty list
+      # then in REMC consider using a tf.cond for short-circuiting.
+      return tf.where(
+          (tf.cast(step_count % safe_swap_period, tf.bool) |
+           tf.math.equal(swap_freq, 0)),
+          x,  # Don't swap
+          y,  # Swap
+      )
+
+  return even_odd_swaps
 
 
 class ReplicaExchangeMC(kernel_base.TransitionKernel):
@@ -328,6 +423,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                inverse_temperatures,
                make_kernel_fn,
                swap_proposal_fn=default_swap_proposal_fn(1.),
+               state_includes_replicas=False,
                seed=None,
                validate_args=False,
                name=None):
@@ -349,6 +445,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         returns `swaps`, a shape `[num_replica] + batch_shape` `Tensor`, where
         axis 0 indexes a permutation of `{0,..., num_replica-1}`, designating
         replicas to swap.
+      state_includes_replicas: Boolean indicating whether the leftmost dimension
+        of each state sample should index replicas. If `True`, the leftmost
+        dimension of the `current_state` kwarg to `tfp.mcmc.sample_chain` will
+        be interpreted as indexing replicas.
       seed: Python integer to seed the random number generator. Deprecated, pass
         seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       validate_args: Python `bool`, default `False`. When `True` distribution
@@ -362,6 +462,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       ValueError: `inverse_temperatures` doesn't have statically known 1D shape.
     """
     self._parameters = {k: v for k, v in locals().items() if v is not self}
+    self._state_includes_replicas = state_includes_replicas
     self._seed_stream = SeedStream(seed, salt='replica_mc')
 
   @property
@@ -374,7 +475,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
   def num_replica(self):
     """Integer (`Tensor`) number of replicas being tracked."""
-    return tf.constant(prefer_static.size0(self.inverse_temperatures))
+    return tf.constant(ps.size0(self.inverse_temperatures))
 
   @property
   def make_kernel_fn(self):
@@ -504,12 +605,12 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           pre_swap_replica_results, 'target_log_prob')
 
       dtype = pre_swap_replica_target_log_prob.dtype
-      replica_and_batch_shape = prefer_static.shape(
+      replica_and_batch_shape = ps.shape(
           pre_swap_replica_target_log_prob)
       batch_shape = replica_and_batch_shape[1:]
-      replica_and_batch_rank = prefer_static.rank(
+      replica_and_batch_rank = ps.rank(
           pre_swap_replica_target_log_prob)
-      num_replica = prefer_static.size0(inverse_temperatures)
+      num_replica = ps.size0(inverse_temperatures)
 
       inverse_temperatures = mcmc_util.left_justified_broadcast_to(
           inverse_temperatures, replica_and_batch_shape)
@@ -522,10 +623,28 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       # E.g. if swaps = [1, 0, 2], we will consider swapping temperatures 0 and
       # 1, keeping 2 fixed.  This exact same swap is considered for *every*
       # batch member.  Of course some batch members may accept and some reject.
-      swaps = tf.cast(
-          self.swap_proposal_fn(  # pylint: disable=not-callable
-              num_replica, batch_shape=batch_shape, seed=swap_seed),
-          dtype=tf.int32)
+      try:
+        swaps = tf.cast(
+            self.swap_proposal_fn(  # pylint: disable=not-callable
+                num_replica,
+                batch_shape=batch_shape,
+                seed=swap_seed,
+                step_count=previous_kernel_results.step_count),
+            dtype=tf.int32)
+      except TypeError as e:
+        if 'step_count' not in str(e):
+          raise
+        warnings.warn(
+            'The `swap_proposal_fn` given to ReplicaExchangeMC did not accept '
+            'the `step_count` argument. Falling back to omitting the '
+            'argument. This fallback will be removed after 24-Oct-2020.')
+        swaps = tf.cast(
+            self.swap_proposal_fn(  # pylint: disable=not-callable
+                num_replica,
+                batch_shape=batch_shape,
+                seed=swap_seed),
+            dtype=tf.int32)
+
       null_swaps = mcmc_util.left_justified_expand_dims_like(
           tf.range(num_replica, dtype=swaps.dtype), swaps)
       swaps = _maybe_embed_swaps_validation(swaps, null_swaps,
@@ -602,7 +721,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           post_swap_replica_position,
           expanded_null_swaps)
 
-      post_swap_states = [s[0] for s in post_swap_replica_states]
+      if self._state_includes_replicas:
+        post_swap_states = post_swap_replica_states
+      else:
+        post_swap_states = [s[0] for s in post_swap_replica_states]
 
       post_swap_replica_results = _make_post_swap_replica_results(
           pre_swap_replica_results,
@@ -629,6 +751,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           # `tf.Variable`.
           inverse_temperatures=previous_kernel_results.inverse_temperatures,
           swaps=swaps,
+          step_count=previous_kernel_results.step_count + 1,
           seed=samplers.zeros_seed() if seed is None else seed,
       )
 
@@ -655,21 +778,33 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           self.inverse_temperatures,
           name='inverse_temperatures')
 
+      if self._state_includes_replicas:
+        it_n_replica = inverse_temperatures.shape[0]
+        state_n_replica = init_state[0].shape[0]
+        if ((it_n_replica is not None) and (state_n_replica is not None) and
+            (it_n_replica != state_n_replica)):
+          raise ValueError(
+              'Number of replicas implied by initial state ({}) must equal '
+              'number of replicas implied by inverse_temperatures ({}), but '
+              'did not'.format(it_n_replica, state_n_replica))
+
       # We will now replicate each of a possible batch of initial stats, one for
       # each inverse_temperature. So if init_state=[x, y] of shapes [Sx, Sy]
       # then the new shape is [(T, Sx), (T, Sy)] where (a, b) means
       # concatenation and T=shape(inverse_temperature).
-      num_replica = prefer_static.size0(inverse_temperatures)
+      num_replica = ps.size0(inverse_temperatures)
       replica_shape = tf.convert_to_tensor([num_replica])
 
-      replica_states = [
-          tf.broadcast_to(  # pylint: disable=g-complex-comprehension
-              x,
-              prefer_static.concat([replica_shape, prefer_static.shape(x)],
-                                   axis=0),
-              name='replica_states')
-          for x in init_state
-      ]
+      if self._state_includes_replicas:
+        replica_states = init_state
+      else:
+        replica_states = [
+            tf.broadcast_to(  # pylint: disable=g-complex-comprehension
+                x,
+                ps.concat([replica_shape, ps.shape(x)], axis=0),
+                name='replica_states')
+            for x in init_state
+        ]
 
       target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
           self.target_log_prob_fn,
@@ -700,7 +835,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       pre_swap_replica_target_log_prob = _get_field(
           replica_results, 'target_log_prob')
 
-      replica_and_batch_shape = prefer_static.shape(
+      replica_and_batch_shape = ps.shape(
           pre_swap_replica_target_log_prob)
       batch_shape = replica_and_batch_shape[1:]
 
@@ -733,6 +868,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           is_swap_accepted_adjacent=_sub_diag(is_swap_accepted),
           inverse_temperatures=self.inverse_temperatures,
           swaps=swaps,
+          step_count=tf.zeros(shape=(), dtype=tf.int32),
           seed=samplers.zeros_seed(),
       )
 
@@ -791,26 +927,22 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
   Raises:
     NotImplementedError: If type of [nested] results is not handled.
   """
-  if not isinstance(pre_swap_replica_results,
-                    metropolis_hastings.MetropolisHastingsKernelResults):
-    # TODO(b/143702650) Handle other kernels.
-    raise NotImplementedError(
-        '`pre_swap_replica_results` currently works only for '
-        'MetropolisHastingsKernelResults.  Found: {}. '
-        'Please file a request with the TensorFlow Probability team.'.format(
-            type(pre_swap_replica_results)))
 
   kr = pre_swap_replica_results
   dtype = swapped_inverse_temperatures.dtype
 
   # Hard to modify proposed_results in an um-ambiguous manner.
   # ...we also don't need to.
-  kr = kr._replace(
-      proposed_results=tf.convert_to_tensor(np.nan, dtype=dtype),
-      proposed_state=tf.convert_to_tensor(np.nan, dtype=dtype),
-  )
+  kr = _update_field(
+      kr,
+      'proposed_results',
+      tf.convert_to_tensor(np.nan, dtype=dtype))
+  kr = _update_field(
+      kr,
+      'proposed_state',
+      tf.convert_to_tensor(np.nan, dtype=dtype))
 
-  replica_and_batch_rank = prefer_static.rank(kr.log_accept_ratio)
+  replica_and_batch_rank = ps.rank(_get_field(kr, 'log_accept_ratio'))
 
   # After using swap_tensor_fn on "values", values will be multiplied by the
   # swapped_inverse_temperatures.  We need it to be multiplied instead by the
@@ -830,44 +962,23 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
       x = x[0]
     return x
 
-  if isinstance(kr.accepted_results,
-                hmc.UncalibratedHamiltonianMonteCarloKernelResults):
-    kr = kr._replace(
-        accepted_results=kr.accepted_results._replace(
-            target_log_prob=_swap_then_retemper(
-                kr.accepted_results.target_log_prob),
-            grads_target_log_prob=_swap_then_retemper(
-                kr.accepted_results.grads_target_log_prob)))
-  elif isinstance(kr.accepted_results,
-                  random_walk_metropolis.UncalibratedRandomWalkResults):
-    kr = kr._replace(
-        accepted_results=kr.accepted_results._replace(
-            target_log_prob=_swap_then_retemper(
-                kr.accepted_results.target_log_prob)))
-  else:
-    # TODO(b/143702650) Handle other kernels.
-    raise NotImplementedError(
-        'Only HMC and RWMH Kernels are handled at this time. Please file a '
-        'request with the TensorFlow Probability team.')
+  kr = _update_field(kr, 'target_log_prob', _swap_then_retemper(
+      _get_field(kr, 'target_log_prob')))
+  try:
+    new_grads_target_log_prob = _swap_then_retemper(
+        _get_field(kr, 'grads_target_log_prob'))
+    kr = _update_field(
+        kr, 'grads_target_log_prob', new_grads_target_log_prob)
+  # For transition kernels not involving the gradient of the log-probability,
+  # grads_target_log_prob will not exist in the (possibly multiply wrapped)
+  # kernel results and that's perfectly fine. But _get_field() /
+  # _update_field() (which wrap tfp.mcmc.internal.util.get_field /
+  # update_field) will throw a NotImplementedError, which we thus catch
+  # silently.
+  except REMCFieldNotFoundError:
+    pass
 
   return kr
-
-
-# TODO(b/111801087): Use a standardized API, when available.
-def _get_field(kernel_results, field_name):
-  """Get field value from kernel_results or kernel_results.accepted_results."""
-  attr = getattr(kernel_results, field_name, None)
-  if attr is not None:
-    return attr
-  accepted_results = getattr(kernel_results, 'accepted_results', None)
-  if accepted_results is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  attr = getattr(accepted_results, field_name)
-  if attr is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  return attr
 
 
 def _compute_swap_notmatrix(before_positions, after_positions):
@@ -915,12 +1026,12 @@ def _sub_diag(nonmatrix):
     # this special case return an empty matrix.
     # TODO(b/143702351) Remove this special case handling once
     # matrix_diag_part_v3 is ready.
-    matrix_dim = prefer_static.size0(nonmatrix)
+    matrix_dim = ps.size0(nonmatrix)
     if matrix_dim is not None and matrix_dim < 2:
       # Shape is [..., 0], so returned tensor is empty, thus contains no
       # values...and therefore the fact that we use 'ones' doesn't matter.
-      shape = prefer_static.pad(
-          prefer_static.shape(nonmatrix)[2:],
+      shape = ps.pad(
+          ps.shape(nonmatrix)[2:],
           paddings=[[0, 1]],
           constant_values=0)
       matrix_sub_diag = tf.cast(tf.ones(shape), nonmatrix.dtype)
@@ -930,7 +1041,36 @@ def _sub_diag(nonmatrix):
       # square), but is required for the API since this is raw gen_array_ops.
       matrix_sub_diag = tf.raw_ops.MatrixDiagPartV2(
           input=distribution_util.rotate_transpose(nonmatrix, shift=-2),
-          k=tf.convert_to_tensor(-1, dtype=tf.int32),
+          k=ps.convert_to_shape_tensor(-1, dtype=tf.int32),
           padding_value=tf.cast(0.0, dtype=nonmatrix.dtype))
 
     return distribution_util.rotate_transpose(matrix_sub_diag, shift=1)
+
+
+_kernel_result_not_implemented_message_template = (
+    '{} or a kernel '
+    'result nested within it is currently not supported by the '
+    'ReplicaExchangeMC kernel. Missing field {}. Please file an issue on '
+    'the TensorFlow Probability GitHub page.')
+
+
+class REMCFieldNotFoundError(AttributeError):
+  pass
+
+
+def _get_field(kernel_results, field_name):
+  try:
+    return mcmc_util.get_field(kernel_results, field_name)
+  except TypeError:
+    msg = _kernel_result_not_implemented_message_template.format(
+        kernel_results, field_name)
+    raise REMCFieldNotFoundError(msg)
+
+
+def _update_field(kernel_results, field_name, value):
+  try:
+    return mcmc_util.update_field(kernel_results, field_name, value)
+  except TypeError:
+    msg = _kernel_result_not_implemented_message_template.format(
+        kernel_results, field_name)
+    raise REMCFieldNotFoundError(msg)

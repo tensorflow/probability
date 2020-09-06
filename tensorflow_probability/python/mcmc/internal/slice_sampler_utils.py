@@ -20,8 +20,10 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions.bernoulli import Bernoulli
+from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
 
@@ -69,9 +71,9 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     step_size = tf.convert_to_tensor(value=step_size)
     dtype = dtype_util.base_dtype(step_size.dtype)
     # Output shape of the left increments tensor.
-    output_shape = tf.concat(([max_doublings + 1], batch_shape), axis=0)
+    output_shape = ps.concat(([max_doublings + 1], batch_shape), axis=0)
     # A sample realization of X_k.
-    expand_left = Bernoulli(
+    expand_left = bernoulli_lib.Bernoulli(
         0.5, dtype=dtype).sample(
             sample_shape=output_shape, seed=seed)
 
@@ -79,8 +81,8 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     # 2^max_doublings.
     width_multipliers = tf.cast(2 ** tf.range(0, max_doublings+1), dtype=dtype)
     # Output shape of the `widths` tensor.
-    widths_shape = tf.concat(([max_doublings + 1],
-                              tf.ones_like(batch_shape)), axis=0)
+    widths_shape = ps.concat(([max_doublings + 1],
+                              ps.ones_like(batch_shape)), axis=0)
     width_multipliers = tf.reshape(width_multipliers, shape=widths_shape)
     # Widths shape is [max_doublings + 1, 1, 1, 1...].
     widths = width_multipliers * step_size
@@ -119,13 +121,13 @@ def _find_best_interval_idx(x, name=None):
   """
   with tf.name_scope(name or 'find_best_interval_idx'):
     # Returns max_doublings + 1. Positive int32.
-    k = tf.shape(x)[0]
+    k = ps.shape(x)[0]
     dtype = dtype_util.base_dtype(x.dtype)
     # Factors by which to multiply the flag. Corresponds to (2 * k - i) above.
-    mults = tf.range(2 * k, k, -1, dtype=dtype)[:, tf.newaxis]
+    mults = ps.range(2 * k, k, -1, dtype=dtype)[:, tf.newaxis]
     # Factors by which to shift the flag. Corresponds to i above. Ensures the
     # widest bounds are selected if there are no bounds outside the slice.
-    shifts = tf.range(k, dtype=dtype)[:, tf.newaxis]
+    shifts = ps.range(k, dtype=dtype)[:, tf.newaxis]
     indices = tf.argmax(mults * x + shifts, axis=0, output_type=dtype)
     return indices
 
@@ -182,7 +184,7 @@ def slice_bounds_by_doubling(x_initial,
     left_seed, increments_seed = samplers.split_seed(
         seed, salt='slice_bounds_by_doubling')
     x_initial = tf.convert_to_tensor(value=x_initial)
-    batch_shape = tf.shape(x_initial)
+    batch_shape = ps.shape(x_initial)
     dtype = dtype_util.base_dtype(step_size.dtype)
     left_endpoints = x_initial + step_size * samplers.uniform(
         batch_shape, minval=-1.0, maxval=0.0, dtype=dtype, seed=left_seed)
@@ -211,7 +213,7 @@ def slice_bounds_by_doubling(x_initial,
     # Formats the above index as required to use with gather_nd.
     point_index_gather = tf.stack(
         [best_interval_idx,
-         tf.range(tf.size(best_interval_idx))],
+         ps.range(ps.size(best_interval_idx))],
         axis=1,
         name='point_index_gather')
     left_ep_f = tf.reshape(left_endpoints, [max_doublings + 1, -1])
@@ -344,7 +346,7 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
     found = tf.zeros_like(x_initial, dtype=tf.bool)
     cond = lambda found, *ignored_args: ~tf.reduce_all(found)
     x_next = tf.identity(x_initial)
-    x_initial_shape = tf.shape(x_initial)
+    x_initial_shape = ps.shape(x_initial)
     x_initial_dtype = dtype_util.base_dtype(x_initial.dtype)
     def _body(found, seed, left, right, x_next):
       """Iterates until every chain has found a suitable next state."""
@@ -417,8 +419,9 @@ def slice_sampler_one_dim(target_log_prob, x_initial, step_size=0.01,
     step_size = tf.convert_to_tensor(step_size, dtype=dtype)
     # Obtain the input dtype of the array.
     # Select the height of the slice. Tensor of shape x_initial.shape.
-    log_slice_heights = target_log_prob(x_initial) - samplers.gamma(
-        tf.shape(x_initial), alpha=1, dtype=dtype, seed=gamma_seed)
+    log_slice_heights = target_log_prob(x_initial) - gamma_lib.random_gamma(
+        ps.shape(x_initial), concentration=tf.ones([], dtype=dtype),
+        seed=gamma_seed)
     # Given the above x and slice heights, compute the bounds of the slice for
     # each chain.
     upper_bounds, lower_bounds, bounds_satisfied = slice_bounds_by_doubling(

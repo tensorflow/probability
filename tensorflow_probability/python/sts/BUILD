@@ -15,9 +15,7 @@
 # Description:
 #   Framework for Bayesian structural time series models
 
-# [internal] load python3.bzl
-
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -45,6 +43,7 @@ py_library(
         ":smooth_seasonal",
         ":structural_time_series",
         ":sum",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -59,11 +58,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "autoregressive_test",
     size = "medium",
     srcs = ["autoregressive_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -83,12 +83,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "decomposition_test",
     size = "medium",
     srcs = ["decomposition_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -109,11 +110,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "dynamic_regression_test",
     size = "small",
     srcs = ["dynamic_regression_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -139,12 +141,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "fitting_test",
     size = "large",
     srcs = ["fitting_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -165,12 +168,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "forecast_test",
     size = "medium",
     srcs = ["forecast_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -190,11 +194,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "local_level_test",
     size = "small",
     srcs = ["local_level_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -214,11 +219,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "local_linear_trend_test",
     size = "small",
     srcs = ["local_linear_trend_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -238,11 +244,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "regression_test",
     size = "medium",
     srcs = ["regression_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -263,12 +270,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "seasonal_test",
     size = "medium",
     srcs = ["seasonal_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -288,11 +296,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "semilocal_linear_trend_test",
     size = "small",
     srcs = ["semilocal_linear_trend_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -312,11 +321,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "smooth_seasonal_test",
     size = "small",
     srcs = ["smooth_seasonal_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -337,11 +347,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "structural_time_series_test",
     size = "medium",
     srcs = ["structural_time_series_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -361,12 +372,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "sum_test",
     size = "medium",
     srcs = ["sum_test.py"],
+    python_version = "PY3",
     shard_count = 2,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

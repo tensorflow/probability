@@ -22,14 +22,18 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import spherical_uniform
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -219,10 +223,10 @@ class VonMisesFisher(distribution.Distribution):
     return self._concentration
 
   def _batch_shape_tensor(self, mean_direction=None, concentration=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.mean_direction if mean_direction is None
+    return ps.broadcast_shape(
+        ps.shape(self.mean_direction if mean_direction is None
                  else mean_direction)[:-1],
-        tf.shape(self.concentration if concentration is None
+        ps.shape(self.concentration if concentration is None
                  else concentration))
 
   def _batch_shape(self):
@@ -231,7 +235,7 @@ class VonMisesFisher(distribution.Distribution):
         self.concentration.shape)
 
   def _event_shape_tensor(self, mean_direction=None):
-    return tf.shape(self.mean_direction if mean_direction is None
+    return ps.shape(self.mean_direction if mean_direction is None
                     else mean_direction)[-1:]
 
   def _event_shape(self):
@@ -308,46 +312,66 @@ class VonMisesFisher(distribution.Distribution):
     concentration = tf.convert_to_tensor(self.concentration)
     mean_direction = tf.convert_to_tensor(self.mean_direction)
 
-    event_dim = tf.compat.dimension_value(self.event_shape[0])
-    if event_dim is None:
-      raise ValueError('event shape must be statically known for _bessel_ive')
+    event_dimension = tf.cast(
+        self._event_shape_tensor(mean_direction)[0], self.dtype)
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))
     safe_mean = mean_direction * (
-        _bessel_ive(event_dim / 2, safe_conc) /
-        _bessel_ive(event_dim / 2 - 1, safe_conc))[..., tf.newaxis]
+        tfp_math.bessel_iv_ratio(
+            event_dimension / 2., safe_conc)[..., tf.newaxis])
     return tf.where(
         concentration[..., tf.newaxis] > 0.,
         safe_mean, tf.zeros_like(safe_mean))
 
   def _covariance(self):
     # Derivation: https://sachinruk.github.io/blog/von-Mises-Fisher/
-    event_dim = tf.compat.dimension_value(self.event_shape[0])
-    if event_dim is None:
-      raise ValueError('event shape must be statically known for _bessel_ive')
+
+    event_dimension_static = tf.compat.dimension_value(self.event_shape[0])
+
     # TODO(b/141142878): Enable this; numerically unstable.
-    if event_dim > 2:
+    if event_dimension_static is not None and event_dimension_static > 2:
       raise NotImplementedError(
           'vMF covariance is numerically unstable for dim>2')
+
     mean_direction = tf.convert_to_tensor(self.mean_direction)
     concentration = tf.convert_to_tensor(self.concentration)
+    event_dimension = tf.cast(self._event_shape_tensor(
+        mean_direction)[0], self.dtype)
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))[..., tf.newaxis]
-    h = (_bessel_ive(event_dim / 2, safe_conc) /
-         _bessel_ive(event_dim / 2 - 1, safe_conc))
+    h = tfp_math.bessel_iv_ratio(event_dimension / 2, safe_conc)
     intermediate = (
         tf.matmul(mean_direction[..., :, tf.newaxis],
                   mean_direction[..., tf.newaxis, :]) *
-        (1 - event_dim * h / safe_conc - h**2)[..., tf.newaxis])
+        (1 - event_dimension * h / safe_conc - h**2)[..., tf.newaxis])
     cov = tf.linalg.set_diag(
         intermediate,
         tf.linalg.diag_part(intermediate) + (h / safe_conc))
     return tf.where(
         concentration[..., tf.newaxis, tf.newaxis] > 0., cov,
-        tf.linalg.eye(event_dim,
+        tf.linalg.eye(event_dimension_static,
                       batch_shape=self._batch_shape_tensor(
                           mean_direction=mean_direction,
-                          concentration=concentration)) / event_dim)
+                          concentration=concentration)) / event_dimension)
+
+  def _entropy(self):
+    mean_direction = tf.convert_to_tensor(self.mean_direction)
+    event_dimension = tf.cast(
+        self._event_shape_tensor(
+            mean_direction=mean_direction)[0], dtype=self.dtype)
+    concentration = tf.convert_to_tensor(self.concentration)
+    # Compared to [1] (see the KL(VonMisesFisher || SphericalUniform) for the
+    # exact reference, we add the log normalization constant rather than
+    # subtract it. This is because in TFP, we have the convention that we
+    # normalize our distributions p(x) by a constant 1 / Z. Taking the log
+    # gives us a negative sign.
+    entropy = -concentration * tfp_math.bessel_iv_ratio(
+        event_dimension / 2., concentration) + self._log_normalization(
+            concentration=concentration)
+
+    return tf.broadcast_to(
+        entropy, self._batch_shape_tensor(
+            mean_direction=mean_direction, concentration=concentration))
 
   def _rotate(self, samples, mean_direction):
     """Applies a Householder rotation to `samples`."""
@@ -361,7 +385,7 @@ class VonMisesFisher(distribution.Distribution):
 
   def _sample_3d(self, n, mean_direction, concentration, seed=None):
     """Specialized inversion sampler for 3D."""
-    u_shape = tf.concat([[n], self._batch_shape_tensor(
+    u_shape = ps.concat([[n], self._batch_shape_tensor(
         mean_direction=mean_direction, concentration=concentration)], axis=0)
     z = samplers.uniform(u_shape, seed=seed, dtype=self.dtype)
     # TODO(bjp): Higher-order odd dim analytic CDFs are available in [1], could
@@ -409,7 +433,7 @@ class VonMisesFisher(distribution.Distribution):
         tf.compat.dimension_value(self.event_shape[0]) or
         self._event_shape_tensor(mean_direction=mean_direction)[0])
 
-    sample_batch_shape = tf.concat([[n], self._batch_shape_tensor(
+    sample_batch_shape = ps.concat([[n], self._batch_shape_tensor(
         mean_direction=mean_direction, concentration=concentration)], axis=0)
     dim = tf.cast(event_dim - 1, self.dtype)
     if event_dim == 3:
@@ -474,7 +498,7 @@ class VonMisesFisher(distribution.Distribution):
               dtype_util.as_numpy_dtype(self.dtype)(-1.01)),
       ]):
         samples_dim0 = tf.identity(samples_dim0)
-    samples_otherdims_shape = tf.concat([sample_batch_shape, [event_dim - 1]],
+    samples_otherdims_shape = ps.concat([sample_batch_shape, [event_dim - 1]],
                                         axis=0)
     unit_otherdims = tf.math.l2_normalize(
         samplers.normal(
@@ -554,3 +578,44 @@ class VonMisesFisher(distribution.Distribution):
           assert_util.assert_non_negative(
               concentration, message='`concentration` must be non-negative'))
     return assertions
+
+
+@kullback_leibler.RegisterKL(VonMisesFisher, spherical_uniform.SphericalUniform)
+def _kl_vmf_spherical_uniform(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b).
+
+  Args:
+    a: instance of a VonMisesFisher distribution object.
+    b: instance of a SphericalUniform distribution object.
+    name: (optional) Name to use for created operations.
+      default is "kl_vmf_spherical_uniform".
+
+  Returns:
+    Batchwise KL(a || b)
+
+  Raises:
+    ValueError: If the two distributions are over spheres of different
+      dimensions.
+
+  #### References
+
+  [1] T. Davidson, L. Falorsi, N. Cao, T. Kipf, J. Tomczak. Hyperspherical
+      Variational Auto-Encoders. Uncertainty In Artifical Intelligence
+      (UAI) 2020.
+      https://arxiv.org/abs/1804.00891.
+  """
+  with tf.name_scope(name or 'kl_vmf_spherical_uniform'):
+    msg = (
+        'Can not compute the KL divergence between a `VonMisesFisher` and '
+        '`SphericalUniform` of different dimensions.')
+    deps = []
+    if a.event_shape[-1] is not None:
+      if a.event_shape[-1] != b.dimension:
+        raise ValueError(
+            (msg + 'Got {} vs. {}').format(a.event_shape[-1], b.dimension))
+    elif a.validate_args or b.validate_args:
+      deps += [assert_util.assert_equal(
+          a.event_shape_tensor()[-1], b.dimension, message=msg)]
+
+    with tf.control_dependencies(deps):
+      return b.entropy() - a.entropy()

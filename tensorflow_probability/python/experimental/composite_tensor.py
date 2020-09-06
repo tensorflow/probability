@@ -19,22 +19,22 @@ from __future__ import division
 from __future__ import print_function
 
 import inspect
+import six
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.framework.composite_tensor import CompositeTensor  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
 
-
 __all__ = ['as_composite', 'register_composite']
-
 
 _registry = {}  # Mapping from (python pkg, class name) -> class.
 
 
-class _DistributionTypeSpec(tf.TypeSpec):
-  """A tf.TypeSpec for `tfp.distributions.Distribution` objects."""
+class _TFPTypeSpec(tf.TypeSpec):
+  """A tf.TypeSpec for `tfp.distributions.Distribution` and related objects."""
 
   __slots__ = ('_clsid', '_kwargs', '_param_specs')
 
@@ -48,8 +48,9 @@ class _DistributionTypeSpec(tf.TypeSpec):
     return _registry[self._clsid]
 
   def _to_components(self, obj):
-    return {k: getattr(obj, k, obj.parameters[k])
-            for k in sorted(self._param_specs)}
+    return {
+        k: getattr(obj, k, obj.parameters[k]) for k in sorted(self._param_specs)
+    }
 
   def _from_components(self, components):
     kwargs = dict(self._kwargs)
@@ -78,8 +79,8 @@ class _DistributionTypeSpec(tf.TypeSpec):
 
 
 _TypeSpecCodec = nested_structure_coder._TypeSpecCodec  # pylint: disable=protected-access
-_TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO[275837168] = _DistributionTypeSpec
-_TypeSpecCodec.TYPE_SPEC_CLASS_TO_PROTO[_DistributionTypeSpec] = 275837168
+_TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO[275837168] = _TFPTypeSpec
+_TypeSpecCodec.TYPE_SPEC_CLASS_TO_PROTO[_TFPTypeSpec] = 275837168
 del _TypeSpecCodec
 
 
@@ -102,22 +103,40 @@ def _make_convertible(cls):
         return ()
 
       result = tuple(
-          super(_CompositeTensorDist, self)._parameter_control_dependencies(
-              is_init=True))
+          super(_CompositeTensorDist,
+                self)._parameter_control_dependencies(is_init=True))
       result += tuple(
-          super(_CompositeTensorDist, self)._parameter_control_dependencies(
-              is_init=True))
+          super(_CompositeTensorDist,
+                self)._parameter_control_dependencies(is_init=True))
       return result
 
     @property
     def _type_spec(self):
-      kwargs = dict(self.parameters)
+      def get_default_args(fn_or_object):
+        fn = type(fn_or_object) if isinstance(fn_or_object,
+                                              object) else fn_or_object
+        return {
+            k: v.default
+            for k, v in inspect.signature(fn).parameters.items()
+            if v.default is not inspect.Parameter.empty
+        }
+
+      if six.PY3:
+        default_kwargs = get_default_args(self)
+        missing = object()
+        kwargs = {
+            k: v
+            for k, v in self.parameters.items()
+            if default_kwargs.get(k, missing) is not v
+        }  # non-default kwargs only
+      else:
+        kwargs = dict(self.parameters)
       param_specs = {}
       try:
-        params_event_ndims = self._params_event_ndims()  # pylint: disable=protected-access
+        composite_tensor_params = self._composite_tensor_params  # pylint: disable=protected-access
       except NotImplementedError:
-        params_event_ndims = {}
-      for k in params_event_ndims:
+        composite_tensor_params = ()
+      for k in composite_tensor_params:
         if k in kwargs and kwargs[k] is not None:
           v = kwargs.pop(k)
           param_specs[k] = tf.TensorSpec.from_tensor(v)
@@ -125,7 +144,10 @@ def _make_convertible(cls):
         if isinstance(v, CompositeTensor):
           param_specs[k] = v._type_spec  # pylint: disable=protected-access
           kwargs.pop(k)
-      return _DistributionTypeSpec(
+        elif callable(v):
+          raise NotImplementedError(
+              'Unable to make CompositeTensor including callable argument.' + k)
+      return _TFPTypeSpec(
           clsid, param_specs=param_specs, kwargs=kwargs)
 
   _CompositeTensorDist.__name__ = '{}CT'.format(cls.__name__)
@@ -219,16 +241,18 @@ def as_composite(obj):
     return obj
   cls = _make_convertible(type(obj))
   kwargs = dict(obj.parameters)
+
   def mk_err_msg(suffix=''):
-    return (
-        'Unable to make a CompositeTensor for "{}" of type `{}`. Email '
-        '`tfprobability@tensorflow.org` or file an issue on github if you '
-        'would benefit from this working. {}'.format(obj, type(obj), suffix))
+    return ('Unable to make a CompositeTensor for "{}" of type `{}`. Email '
+            '`tfprobability@tensorflow.org` or file an issue on github if you '
+            'would benefit from this working. {}'.format(
+                obj, type(obj), suffix))
+
   try:
-    params_event_ndims = obj._params_event_ndims()  # pylint: disable=protected-access
+    composite_tensor_params = obj._composite_tensor_params  # pylint: disable=protected-access
   except NotImplementedError:
-    params_event_ndims = {}
-  for k in params_event_ndims:
+    composite_tensor_params = ()
+  for k in composite_tensor_params:
     # Use dtype inference from ctor.
     if k in kwargs and kwargs[k] is not None:
       v = getattr(obj, k, kwargs[k])
@@ -236,20 +260,20 @@ def as_composite(obj):
         kwargs[k] = tf.convert_to_tensor(v, name=k)
       except TypeError as e:
         raise NotImplementedError(
-            mk_err_msg(
-                '(Unable to convert dependent entry \'{}\' of object '
-                '\'{}\': {})'.format(k, obj, str(e))))
+            mk_err_msg('(Unable to convert dependent entry \'{}\' of object '
+                       '\'{}\': {})'.format(k, obj, str(e))))
   for k, v in kwargs.items():
     if isinstance(v, distributions.Distribution):
+      kwargs[k] = as_composite(v)
+    if isinstance(v, bijectors.Bijector):
       kwargs[k] = as_composite(v)
     if tensor_util.is_ref(v):
       try:
         kwargs[k] = tf.convert_to_tensor(v, name=k)
       except TypeError as e:
         raise NotImplementedError(
-            mk_err_msg(
-                '(Unable to convert dependent entry \'{}\' of object '
-                '\'{}\': {})'.format(k, obj, str(e))))
+            mk_err_msg('(Unable to convert dependent entry \'{}\' of object '
+                       '\'{}\': {})'.format(k, obj, str(e))))
   result = cls(**kwargs)
   struct_coder = nested_structure_coder.StructureCoder()
   try:
@@ -261,12 +285,13 @@ def as_composite(obj):
 
 
 def register_composite(cls):
-  """A decorator that registers a Distribution as composite-friendly.
+  """A decorator that registers a TFP object as composite-friendly.
 
   This registration is not required to call `as_composite` on instances
-  of a given distribution, but it *is* required if a `SavedModel` with
-  functions accepting or returning composite wrappers of this distribution
-  will be loaded in python (without having called `as_composite` already).
+  of a given distribution (or bijector or other TFP object), but it *is*
+  required if a `SavedModel` with functions accepting or returning composite
+  wrappers of this object will be loaded in python (without having called
+  `as_composite` already).
 
   Example:
 
@@ -298,12 +323,11 @@ def register_composite(cls):
     distribution.
 
   Raises:
-    TypeError: If `cls` is not a subclass of Distribution, or if
+    TypeError: If `cls` does not have _composite_tensor_params, or if
       registration fails (`cls` is not convertible).
     NotImplementedError: If registration fails (`cls` is not convertible).
   """
-  if not issubclass(cls, distributions.Distribution):
-    raise TypeError('Expected cls to be a subclass of Distribution but saw: {}'
-                    .format(cls))
+  if not hasattr(cls, '_composite_tensor_params'):
+    raise TypeError('Expected cls to have property "_composite_tensor_params".')
   _make_convertible(cls)
   return cls

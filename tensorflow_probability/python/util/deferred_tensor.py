@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import numpy as np
 import six
 
 import tensorflow.compat.v2 as tf
@@ -25,8 +26,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-
-from tensorflow.python.framework.ops import numpy_text  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -36,37 +35,41 @@ __all__ = [
 
 
 JAX_MODE = False
+NUMPY_MODE = False
 
 
 _identity = lambda x: x
-_tensor_op_fn = lambda fn, s, *a, **k: fn(s._value(), *a, **k)  # pylint: disable=protected-access
 
 
-def _wrap_method(cls_or_instance, attr, new_fn):
-  """Replaces one function with another.
+def _numpy_text(tensor):
+  """Human readable representation of a tensor's numpy value."""
+  if dtype_util.is_numpy_compatible(tensor.dtype):
+    value = np.array(tensor)
+    if value.shape:
+      text = repr(value)
+    else:
+      text = str(value)
+  else:
+    text = '<unprintable>'
+  if '\n' in text:
+    text = '\n' + text
+  return text
 
-  This function is used by `_get_tensor_like_attributes` to take existing
-  `Tensor` member functions and make them operate on `self._value()`, i.e., the
-  concretization of a `Distribution`.
+
+def _wrap_method(attr):
+  """Wraps a method to operate on the concretized value.
 
   Args:
-    cls_or_instance: The `class` from which we will look up the `attr`.
     attr: Python `str` representing the `attr` to inject a new notion of `self`.
-    new_fn: Python `callable which takes `old_fn, self, *args, **kwargs`.
 
   Returns:
-    dependency_injected_function: Python `callable` (or `property`)
-      corresponding to `cls_or_instance.attr` but implemented by `new_fn`.
+    dependency_injected_function: Python `callable`
+      corresponding to `type(self).attr` but implemented by `new_fn`.
   """
-  old_fn = getattr(cls_or_instance, attr)
-  is_property = isinstance(old_fn, property)
-  if is_property:
-    old_fn = old_fn.fget
-  @functools.wraps(old_fn)
   def new_fn_like_old_fn(self, *args, **kwargs):
-    return new_fn(old_fn, self, *args, **kwargs)
-  if is_property:
-    new_fn_like_old_fn = property(new_fn_like_old_fn)
+    value = self._value()  # pylint: disable=protected-access
+    old_fn = getattr(type(value), attr)
+    return old_fn(value, *args, **kwargs)
   return new_fn_like_old_fn
 
 
@@ -82,20 +85,27 @@ class TensorMetaClass(type):
     operators = set(tf.Tensor.OVERLOADABLE_OPERATORS)
     operators.difference_update({'__eq__', '__ne__'})
     operators.update({'__iter__'})
-    attrs.update((attr, _wrap_method(tf.Tensor, attr, _tensor_op_fn))
-                 for attr in operators)
+    attrs.update((attr, _wrap_method(attr)) for attr in operators)
 
     # Support methods for __iter__ and __bool__
     private_methods = {
         name for name in dir(tf.Tensor) if name.startswith('_disallow')
     }
     attrs.update(
-        (attr, _wrap_method(tf.Tensor, attr, _tensor_op_fn))
+        (attr, _wrap_method(attr))
         for attr in private_methods)
 
-    attrs.update(
-        (attr, getattr(tf.Tensor, attr))
-        for attr in {'__nonzero__', '__bool__', '__array_priority__'})
+    if JAX_MODE or NUMPY_MODE:
+      other_attrs = {'__array_priority__'}
+      if six.PY2:
+        other_attrs.add('__nonzero__')
+      else:
+        other_attrs.add('__bool__')
+      attrs.update((attr, getattr(np.ndarray, attr)) for attr in other_attrs)
+    else:
+      attrs.update(
+          (attr, getattr(tf.Tensor, attr))
+          for attr in {'__bool__', '__array_priority__', '__nonzero__'})
     cls = super(TensorMetaClass, mcs).__new__(mcs, name, bases, attrs)
     tf.register_tensor_conversion_function(cls, conversion_func=_tensorize)
     return cls
@@ -104,8 +114,7 @@ class TensorMetaClass(type):
 NONE_SPECIFIED = 'None'
 
 
-@six.add_metaclass(TensorMetaClass)
-class DeferredTensor(tf.Module):
+class DeferredTensor(six.with_metaclass(TensorMetaClass, tf.Module)):
   """Variable tracking object which applies function upon `convert_to_tensor`.
 
   #### Example
@@ -168,7 +177,7 @@ class DeferredTensor(tf.Module):
   """
 
   def __init__(self, pretransformed_input, transform_fn, dtype=None,
-               shape=NONE_SPECIFIED, name=None):
+               shape=NONE_SPECIFIED, also_track=None, name=None):
     """Creates the `DeferredTensor` object.
 
     Args:
@@ -188,6 +197,12 @@ class DeferredTensor(tf.Module):
          Default value: `'None'` (i.e.,
          `getattr(transform_fn, 'forward_event_shape', lambda x: x)(
               pretransformed_input.shape)`).
+      also_track: Optional instance or structure of instances of `tf.Variable`
+        and/or `tf.Module`, containing any additional trainable variables that
+        the `transform_fn` may access beyond the given
+        `pretransformed_input`. This ensures that such variables
+        will be correctly tracked in `self.trainable_variables`.
+        Default value: `None`.
       name: Python `str` representing this object's `name`; used only in graph
         mode.
         Default value: `None` (i.e.,
@@ -234,18 +249,17 @@ class DeferredTensor(tf.Module):
 
     if hasattr(transform_fn, 'forward'):
       fwd_name = '"{}"'.format(transform_fn.name)
-      transform_fn = transform_fn.forward
     else:
       fwd_name = transform_fn.__name__
-
-    if not callable(transform_fn):
-      raise TypeError('Argument `transform_fn` must be `callable`.')
+      if not callable(transform_fn):
+        raise TypeError('Argument `transform_fn` must be `callable`.')
 
     super(DeferredTensor, self).__init__(name=name)
     self._pretransformed_input = pretransformed_input
     self._transform_fn = transform_fn
     self._dtype = dtype
     self._shape = shape
+    self._also_track = also_track
     self._name = name
     self._fwd_name = fwd_name
 
@@ -261,6 +275,8 @@ class DeferredTensor(tf.Module):
   @property
   def transform_fn(self):
     """Function which characterizes the `Tensor`ization of this object."""
+    if hasattr(self._transform_fn, 'forward'):
+      return self._transform_fn.forward
     return self._transform_fn
 
   @property
@@ -284,6 +300,11 @@ class DeferredTensor(tf.Module):
     return self._shape
 
   @property
+  def also_track(self):
+    """Additional variables tracked by tf.Module in self.trainable_variables."""
+    return self._also_track
+
+  @property
   def name(self):
     """The string name of this object."""
     return self._name
@@ -291,10 +312,10 @@ class DeferredTensor(tf.Module):
   def numpy(self):
     """Returns (copy of) deferred values as a NumPy array or scalar."""
     value = self._value()
-    if not hasattr(value, 'numpy'):
+    if not tf.executing_eagerly():
       raise NotImplementedError(
           'DeferredTensor.numpy() is only supported in eager execution mode.')
-    return value.numpy()
+    return np.array(value)
 
   def set_shape(self, shape):
     """Updates the shape of this pretransformed_input.
@@ -321,16 +342,16 @@ class DeferredTensor(tf.Module):
       except Exception as e:  # pylint: disable=broad-except
         value = e
       value_str = ', numpy={}'.format(value if isinstance(value, Exception)
-                                      else numpy_text(value, is_repr=True))
+                                      else _numpy_text(value))
     else:
       value_str = ''
     return '<{}: dtype={}, shape={}, fn={}{}>'.format(
         type(self).__name__,
-        self.dtype.name if self.dtype else '?',
-        str(self.shape.as_list()
-            if self.shape.ndims is not None else '?').replace('None', '?'),
-        self._fwd_name,
-        value_str)
+        dtype_util.name(self.dtype) if self.dtype else '?',
+        str(
+            tensorshape_util.as_list(self.shape)
+            if tensorshape_util.rank(self.shape) is not None else '?').replace(
+                'None', '?'), self._fwd_name, value_str)
 
   def __getitem__(self, i):
     return self._value()[i]
@@ -353,7 +374,7 @@ class DeferredTensor(tf.Module):
       raise NotImplementedError(
           'Cannot convert a symbolic (graph mode) `DeferredTensor` to a '
           'numpy array.')
-    return self._value(dtype=dtype)
+    return np.array(self._value(dtype=dtype))
 
 
 class TransformedVariable(DeferredTensor):
@@ -480,6 +501,7 @@ class TransformedVariable(DeferredTensor):
 
   @functools.wraps(tf.Variable.assign_add)
   def assign_add(self, value, use_locking=False, name=None, read_value=True):
+    value = tf.convert_to_tensor(value, self.dtype)
     new_value = self.transform_fn(self.pretransformed_input) + value  # pylint: disable=not-callable
     return self.pretransformed_input.assign(
         self.bijector.inverse(new_value),
@@ -489,23 +511,10 @@ class TransformedVariable(DeferredTensor):
 
   @functools.wraps(tf.Variable.assign_sub)
   def assign_sub(self, value, use_locking=False, name=None, read_value=True):
+    value = tf.convert_to_tensor(value, self.dtype)
     new_value = self.transform_fn(self.pretransformed_input) - value  # pylint: disable=not-callable
     return self.pretransformed_input.assign(
         self.bijector.inverse(new_value),
         use_locking=use_locking,
         name=name,
         read_value=read_value)
-
-
-if JAX_MODE:
-
-  def DeferredTensor(pretransformed_input, transform_fn,  # pylint: disable=function-redefined,invalid-name
-                     dtype=None, shape='None', name=None):  # pylint: disable=unused-argument
-    # DeferredTensor is used to address tape-safety issues in TF2
-    # which do not exist in the JAX backend
-    # so it is safe to evaluate the function immediately
-    return transform_fn(pretransformed_input)
-
-  def TransformedVariable(initial_value, bijector,  # pylint: disable=unused-argument,function-redefined,invalid-name
-                          dtype=None, name=None, **kwargs):  # pylint: disable=unused-argument
-    return DeferredTensor(initial_value, bijector)

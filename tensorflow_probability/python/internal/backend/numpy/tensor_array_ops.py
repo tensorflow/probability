@@ -51,6 +51,11 @@ class TensorArray(object):
     if data is None:
       if JAX_MODE and size is not None and element_shape is not None:
         data = np.empty((size,) + tuple(element_shape), dtype=self._dtype)
+      # Can be useful for finding failure cases in JAX TensorArray-using code.
+      # elif JAX_MODE:
+      #   raise ValueError(
+      #       'Missing shape argument: size {} element_shape {}'.format(
+      #           size, element_shape))
       else:
         data = [None]*(0 if size is None else int(size))
     self._data = data

@@ -15,8 +15,8 @@
 """Module for probability bijectors and related functions."""
 import inspect
 
-from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx.bijectors import bijector_extensions
+from tensorflow_probability.substrates import jax as tfp
 
 __all__ = [
     'bijector_extensions'

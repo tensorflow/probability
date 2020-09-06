@@ -41,6 +41,8 @@ from tensorflow_probability.python.distributions.dirichlet_multinomial import Di
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.empirical import Empirical
+from tensorflow_probability.python.distributions.exp_gamma import ExpGamma
+from tensorflow_probability.python.distributions.exp_gamma import ExpInverseGamma
 from tensorflow_probability.python.distributions.exponential import Exponential
 from tensorflow_probability.python.distributions.finite_discrete import FiniteDiscrete
 from tensorflow_probability.python.distributions.gamma import Gamma
@@ -109,6 +111,7 @@ from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
 from tensorflow_probability.python.distributions.triangular import Triangular
+from tensorflow_probability.python.distributions.truncated_cauchy import TruncatedCauchy
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
@@ -165,6 +168,8 @@ __all__ = [
     'DoublesidedMaxwell',
     'VectorDeterministic',
     'Empirical',
+    'ExpGamma',
+    'ExpInverseGamma',
     'Exponential',
     'VectorExponentialDiag',
     'Gamma',
@@ -214,6 +219,7 @@ __all__ = [
     'StudentT',
     'StudentTProcess',
     'Triangular',
+    'TruncatedCauchy',
     'TruncatedNormal',
     'Uniform',
     'MultivariateNormalDiag',

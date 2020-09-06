@@ -131,6 +131,7 @@ from oryx.core import kwargs_util
 from oryx.core import primitive
 from oryx.core import state
 from oryx.core.interpreters import unzip
+from oryx.core.interpreters.inverse import core as inverse_core
 
 __all__ = [
     'LayerParams',
@@ -309,7 +310,7 @@ def template_build(cls, init_key, *args, name=None, **kwargs):
     raise ValueError('Cannot initialize template with `None` PRNGKey.')
   layer_params = cls.initialize(init_key, *args, **kwargs)
   if init_key is not None:
-    new_params = tree_util.tree_map(lambda x: lax.tie_in(init_key, x),
+    new_params = tree_util.tree_map(lambda x: primitive.tie_in(init_key, x),
                                     (layer_params.params, layer_params.state))
     layer_params = LayerParams(params=new_params[0], state=new_params[1],
                                info=layer_params.info)
@@ -451,7 +452,7 @@ def custom_layer_cau_batch(trace, f, tracers, params):
       f.call_wrapped(*tracers)
       return [batching.BatchTracer(trace, v, d)
               for v, d in zip(vals_out + update_out, dims_out + dims_update)]
-  f, dims_out = batching.batch_subtrace(f, trace.master, dims)
+  f, dims_out = batching.batch_subtrace(f, trace.main, dims)
   vals_out = layer_cau_p.subcall('batch').bind(f, *vals, **params)
   return [batching.BatchTracer(trace, v, d)
           for v, d in zip(vals_out, dims_out())]
@@ -467,6 +468,18 @@ def _layer_cau_batched(layer, *args, **kwargs):
     kwargs['rng'] = rng
   kwargs = kwargs_util.filter_kwargs(layer._call_and_update_batched, kwargs)  # pylint: disable=protected-access
   return layer._call_and_update_batched(*args, **kwargs)  # pylint: disable=protected-access
+
+
+def _layer_cau_ildj_rule(incells, outcells, **params):
+  """InverseAndILDJ rule for layer_cau primitive."""
+  del params
+  f, incells = incells[0], incells[1:]
+  # TODO(sharadmv): update rule to use primitive when possible
+  subenv = f.call_wrapped(incells, outcells)
+  new_incells = [subenv.read(var) for var in subenv.jaxpr.invars]
+  new_outcells = [subenv.read(var) for var in subenv.jaxpr.outvars]
+  return new_incells, new_outcells, subenv
+inverse_core.ildj_registry[layer_cau_p] = _layer_cau_ildj_rule
 
 
 # Registrations

@@ -505,7 +505,7 @@ def _sample_bates(total_count, low, high, n, seed=None):
   """
 
   # 1. Sample Uniform(0, 1)s, flattening the batch dimension into axis 0.
-  uniform_sample_shape = tf.concat([[tf.reduce_sum(total_count)], [n]], axis=0)
+  uniform_sample_shape = ps.concat([[ps.reduce_sum(total_count)], [n]], axis=0)
   uniform_samples = samplers.uniform(
       uniform_sample_shape, minval=0., maxval=1., dtype=low.dtype, seed=seed)
   # 2. Produce segment means.

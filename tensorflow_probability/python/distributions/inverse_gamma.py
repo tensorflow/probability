@@ -26,11 +26,12 @@ from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import reciprocal as reciprocal_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -185,8 +186,8 @@ class InverseGamma(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.concentration), tf.shape(self.scale))
+    return ps.broadcast_shape(
+        ps.shape(self.concentration), ps.shape(self.scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.concentration.shape,
@@ -202,12 +203,12 @@ class InverseGamma(distribution.Distribution):
       """Note: See `tf.random.gamma` docstring for sampling details and
       caveats.""")
   def _sample_n(self, n, seed=None):
-    return 1. / samplers.gamma(
+    return tf.math.exp(-gamma_lib.random_gamma(
         shape=[n],
-        alpha=self.concentration,
-        beta=self.scale,
-        dtype=self.dtype,
-        seed=seed)
+        concentration=self.concentration,
+        rate=self.scale,
+        seed=seed,
+        log_space=True))
 
   def _log_prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)

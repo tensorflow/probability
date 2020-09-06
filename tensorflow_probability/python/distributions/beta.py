@@ -25,11 +25,12 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -217,10 +218,10 @@ class Beta(distribution.Distribution):
       return self.concentration1 + self.concentration0
 
   def _batch_shape_tensor(self, concentration1=None, concentration0=None):
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(
+    return ps.broadcast_shape(
+        ps.shape(
             self.concentration1 if concentration1 is None else concentration1),
-        prefer_static.shape(
+        ps.shape(
             self.concentration0 if concentration0 is None else concentration0))
 
   def _batch_shape(self):
@@ -240,12 +241,13 @@ class Beta(distribution.Distribution):
     shape = self._batch_shape_tensor(concentration1, concentration0)
     expanded_concentration1 = tf.broadcast_to(concentration1, shape)
     expanded_concentration0 = tf.broadcast_to(concentration0, shape)
-    gamma1_sample = samplers.gamma(
-        shape=[n], alpha=expanded_concentration1, dtype=self.dtype, seed=seed1)
-    gamma2_sample = samplers.gamma(
-        shape=[n], alpha=expanded_concentration0, dtype=self.dtype, seed=seed2)
-    beta_sample = gamma1_sample / (gamma1_sample + gamma2_sample)
-    return beta_sample
+    log_gamma1 = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration1, seed=seed1,
+        log_space=True)
+    log_gamma2 = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration0, seed=seed2,
+        log_space=True)
+    return tf.math.sigmoid(log_gamma1 - log_gamma2)
 
   @distribution_util.AppendDocstring(_beta_sample_note)
   def _log_prob(self, x):

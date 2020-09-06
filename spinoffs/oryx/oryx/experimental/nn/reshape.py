@@ -15,6 +15,7 @@
 """Contains layers that reshape arrays."""
 
 import jax.numpy as np
+import numpy as onp
 
 from oryx.core import state
 from oryx.experimental.nn import base
@@ -44,7 +45,7 @@ class Flatten(base.Layer):
   @classmethod
   def spec(cls, in_spec):
     in_shape = in_spec.shape
-    out_shape = (int(np.prod(in_shape)),)
+    out_shape = (int(onp.prod(in_shape)),)
     return state.Shape(out_shape, dtype=in_spec.dtype)
 
   def _call(self, x):

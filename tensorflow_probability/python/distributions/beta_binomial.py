@@ -23,13 +23,13 @@ import functools
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import binomial
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -225,8 +225,8 @@ class BetaBinomial(distribution.Distribution):
     if params is None:
       params = self._params_list()
     return functools.reduce(
-        prefer_static.broadcast_shape,
-        [prefer_static.shape(t) for t in params])
+        ps.broadcast_shape,
+        [ps.shape(t) for t in params])
 
   def _batch_shape(self):
     return functools.reduce(tf.broadcast_static_shape,
@@ -239,19 +239,30 @@ class BetaBinomial(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    beta_seed, binomial_seed = samplers.split_seed(seed, salt='beta_binomial')
+    gamma1_seed, gamma2_seed, binomial_seed = samplers.split_seed(
+        seed, n=3, salt='beta_binomial')
 
     params = self._params_list_as_tensors()
     batch_shape = self._batch_shape_tensor(params=params)
     total_count, concentration1, concentration0 = params
 
-    probs = beta.Beta(
-        tf.broadcast_to(concentration1, batch_shape),
-        concentration0,
-        validate_args=self.validate_args).sample(
-            n, seed=beta_seed)
+    expanded_concentration1 = tf.broadcast_to(concentration1, batch_shape)
+    expanded_concentration0 = tf.broadcast_to(concentration0, batch_shape)
+    # probs = g1 / (g1 + g2)
+    # logits = log(probs) - log(1 - probs)
+    #        = log(g1 / (g1 + g2)) - log(1 - g1 / (g1 + g2))
+    #        = log(g1) - log(g1 + g2) - log(((g1 + g2) - g1) / (g1 + g2))
+    #        = log(g1) - log(g1 + g2) - (log(g1 + g2 - g1) - log(g1 + g2))
+    #        = log(g1) - log(g1 + g2) - log(g2) + log(g1 + g2))
+    #        = log(g1) - log(g2)
+    log_gamma1 = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration1, seed=gamma1_seed,
+        log_space=True)
+    log_gamma2 = gamma_lib.random_gamma(
+        shape=[n], concentration=expanded_concentration0, seed=gamma2_seed,
+        log_space=True)
     return binomial.Binomial(
-        total_count, probs=probs,
+        total_count, logits=log_gamma1 - log_gamma2,
         validate_args=self.validate_args).sample(seed=binomial_seed)
 
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)

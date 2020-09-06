@@ -64,6 +64,7 @@ from tensorflow_probability.python.bijectors.pad import Pad
 from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
 from tensorflow_probability.python.bijectors.rational_quadratic_spline import RationalQuadraticSpline
+from tensorflow_probability.python.bijectors.rayleigh_cdf import RayleighCDF
 from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_template
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
 from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
@@ -137,6 +138,7 @@ __all__ = [
     "Permute",
     "PowerTransform",
     "RationalQuadraticSpline",
+    "RayleighCDF",
     "RealNVP",
     "Reciprocal",
     "Reshape",

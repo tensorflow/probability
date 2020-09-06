@@ -151,7 +151,7 @@ class AffineLinearOperatorTest(test_util.TestCase):
     b = tfb.AffineLinearOperator(shift=tf.Variable(-1.))
 
     with tf.GradientTape() as tape:
-      y = b.forward(.1)
+      y = b.forward([.1])
     self.assertIsNotNone(tape.gradient(y, b.shift))
 
 if __name__ == "__main__":

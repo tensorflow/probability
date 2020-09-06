@@ -17,6 +17,7 @@
 import contextlib
 from typing import Any, Dict, Generator, List
 
+import jax
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -52,7 +53,7 @@ def pv_like(x, abstract=True):
     return pe.PartialVal((None, x))  # pytype: disable=wrong-arg-types
 
 
-def stage(f):
+def stage(f, dynamic=True):
   """Returns a function that stages a function to a TypedJaxpr and its Pytrees."""
 
   def wrapped(*args, **kwargs):
@@ -60,14 +61,17 @@ def stage(f):
     flat_args, in_tree = tree_util.tree_flatten(args)
     flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
     flat_avals = safe_map(get_shaped_aval, flat_args)
-    pvals = [pe.PartialVal((aval, jax_core.unit)) for aval in flat_avals]
-    jaxpr, out_pvals, consts = pe.trace_to_jaxpr(
-        flat_fun,
-        pvals,
-        instantiate=True,
-        stage_out=True,
-        trace_type=pe.StagingJaxprTrace)
-    out_avals = [pval.get_aval() for pval in out_pvals]
+    if dynamic and jax.config.omnistaging_enabled:
+      jaxpr, out_avals, consts = pe.trace_to_jaxpr_dynamic(
+          flat_fun,
+          flat_avals)
+    else:
+      pvals = [pe.PartialVal((aval, jax_core.unit)) for aval in flat_avals]
+      jaxpr, out_pvals, consts = pe.trace_to_jaxpr(
+          flat_fun,
+          pvals,
+          instantiate=True, stage_out=True)
+      out_avals = [pval.get_aval() for pval in out_pvals]
     typed_jaxpr = jax_core.TypedJaxpr(jaxpr, consts, flat_avals, out_avals)
     return typed_jaxpr, (in_tree, out_tree())
 
@@ -83,11 +87,11 @@ def trees(f):
   return wrapped
 
 
-dynamic_contexts: Dict[jax_core.MasterTrace, List[Any]] = {}
+dynamic_contexts: Dict[jax_core.MainTrace, List[Any]] = {}
 
 
 @contextlib.contextmanager
-def new_dynamic_context(master: jax_core.MasterTrace,
+def new_dynamic_context(master: jax_core.MainTrace,
                         context: Any) -> Generator[None, None, None]:
   """Creates a dynamic context for a trace."""
   if master not in dynamic_contexts:
@@ -103,6 +107,6 @@ def new_dynamic_context(master: jax_core.MasterTrace,
 
 def get_dynamic_context(trace: jax_core.Trace) -> Any:
   """Returns the current active dynamic context for a trace."""
-  if trace.master not in dynamic_contexts:
+  if trace.main not in dynamic_contexts:
     raise ValueError(f'No dynamic context registered for trace: {trace}')
-  return dynamic_contexts[trace.master][-1]
+  return dynamic_contexts[trace.main][-1]

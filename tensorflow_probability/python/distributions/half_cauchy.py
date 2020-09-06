@@ -28,6 +28,7 @@ from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -122,9 +123,9 @@ class HalfCauchy(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self, loc=None, scale=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc if loc is None else loc),
-        tf.shape(self.scale if scale is None else scale))
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
@@ -138,7 +139,7 @@ class HalfCauchy(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    shape = tf.concat([[n], self._batch_shape_tensor(
+    shape = ps.concat([[n], self._batch_shape_tensor(
         loc=loc, scale=scale)], 0)
     probs = samplers.uniform(
         shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
@@ -146,13 +147,13 @@ class HalfCauchy(distribution.Distribution):
     return loc + scale * tf.tan((np.pi / 2) * probs)
 
   def _log_prob(self, x):
+    npdt = dtype_util.as_numpy_dtype(self.dtype)
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     safe_x = self._get_safe_input(x, loc=loc, scale=scale)
-    log_prob = (np.log(2 / np.pi) - tf.math.log(scale) - tf.math.log1p(
-        ((safe_x - loc) / scale)**2))
-    return tf.where(x < loc, dtype_util.as_numpy_dtype(
-        self.dtype)(-np.inf), log_prob)
+    log_prob = npdt(np.log(2 / np.pi)) - tf.math.log(scale) - tf.math.log1p(
+        ((safe_x - loc) / scale)**2)
+    return tf.where(x < loc, npdt(-np.inf), log_prob)
 
   def _log_cdf(self, x):
     loc = tf.convert_to_tensor(self.loc)
@@ -221,4 +222,3 @@ class HalfCauchy(distribution.Distribution):
           self.scale,
           message='Argument `scale` must be positive.'))
     return assertions
-

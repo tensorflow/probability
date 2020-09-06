@@ -26,10 +26,10 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":harvest",
-        ":inverse",
         ":log_prob",
         ":propagate",
         ":unzip",
+        "//oryx/core/interpreters/inverse",
     ],
 )
 
@@ -55,6 +55,7 @@ py_library(
     deps = [
         # dataclasses dep,
         # jax dep,
+        "//oryx/core:pytree",
     ],
 )
 
@@ -73,28 +74,14 @@ py_library(
 
 # pytype_strict
 py_library(
-    name = "inverse",
-    srcs = ["inverse.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":harvest",
-        ":propagate",
-        # jax dep,
-        "//oryx/core:primitive",
-        "//oryx/core:trace_util",
-    ],
-)
-
-# pytype_strict
-py_library(
     name = "log_prob",
     srcs = ["log_prob.py"],
     srcs_version = "PY3",
     deps = [
-        ":inverse",
         ":propagate",
         # jax dep,
         "//oryx/core:trace_util",
+        "//oryx/core/interpreters/inverse",
     ],
 )
 
@@ -105,12 +92,12 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        ":harvest",
         ":unzip",
         # absl/testing:absltest dep,
         # jax dep,
         # numpy dep,
         "//oryx/core:trace_util",
-        "//oryx/core/interpreters:harvest",
         "//oryx/core/state",
     ],
 )
@@ -141,20 +128,6 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core:trace_util",
-    ],
-)
-
-# py_strict
-py_test(
-    name = "inverse_test",
-    srcs = ["inverse_test.py"],
-    python_version = "PY3",
-    deps = [
-        ":harvest",
-        ":inverse",
-        # absl/testing:absltest dep,
-        # jax dep,
-        # numpy dep,
     ],
 )
 

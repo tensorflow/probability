@@ -27,7 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -160,9 +160,9 @@ class Cauchy(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self, loc=None, scale=None):
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(self.loc if loc is None else loc),
-        prefer_static.shape(self.scale if scale is None else scale))
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
@@ -177,15 +177,16 @@ class Cauchy(distribution.Distribution):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     batch_shape = self._batch_shape_tensor(loc=loc, scale=scale)
-    shape = tf.concat([[n], batch_shape], 0)
+    shape = ps.concat([[n], batch_shape], 0)
     probs = samplers.uniform(
         shape=shape, minval=0., maxval=1., dtype=self.dtype, seed=seed)
     return self._quantile(probs, loc=loc, scale=scale)
 
   def _log_prob(self, x):
+    npdt = dtype_util.as_numpy_dtype(self.dtype)
     scale = tf.convert_to_tensor(self.scale)
     log_unnormalized_prob = -tf.math.log1p(tf.square(self._z(x, scale=scale)))
-    log_normalization = np.log(np.pi) + tf.math.log(scale)
+    log_normalization = npdt(np.log(np.pi)) + tf.math.log(scale)
     return log_unnormalized_prob - log_normalization
 
   def _cdf(self, x):
@@ -277,4 +278,3 @@ def _kl_cauchy_cauchy(a, b, name=None):
 
     return (tf.math.log(scale_sum_square + loc_diff_square) -
             np.log(4.) - tf.math.log(a_scale) - tf.math.log(b_scale))
-

@@ -15,8 +15,8 @@
 """Module for probability distributions and related functions."""
 import inspect
 
-from tensorflow_probability.python.experimental.substrates import jax as tfp
 from oryx.distributions import distribution_extensions
+from tensorflow_probability.substrates import jax as tfp
 
 __all__ = [
     'distribution_extensions'

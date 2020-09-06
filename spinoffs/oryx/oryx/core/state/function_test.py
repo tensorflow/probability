@@ -18,11 +18,11 @@
 from absl.testing import absltest
 import jax
 from jax import core as jax_core
-from jax import lax
 from jax import random
 import jax.numpy as np
 import numpy as onp
 
+from oryx.core import primitive
 from oryx.core.state import api
 from oryx.core.state import function
 from oryx.core.state import module
@@ -104,7 +104,7 @@ class FunctionModuleTest(absltest.TestCase):
     def f(x, init_key=None):
       y = module.variable(np.zeros(x.shape), name='y', key=init_key)
       next_y = module.assign(y + 1., name='y')
-      return lax.tie_in(next_y, x) + y
+      return primitive.tie_in(next_y, x) + y
 
     m = api.init(f)(random.PRNGKey(0), 1.)
     self.assertIsInstance(m, function.FunctionModule)
@@ -117,7 +117,7 @@ class FunctionModuleTest(absltest.TestCase):
     def f(x, init_key=None):
       y = module.variable(np.zeros(x.shape), name='y', key=init_key)
       next_y = module.assign(y + 1., name='y')
-      return lax.tie_in(next_y, x) + y
+      return primitive.tie_in(next_y, x) + y
 
     def g(x, init_key=None):
       return f(x, init_key=init_key)
@@ -133,7 +133,7 @@ class FunctionModuleTest(absltest.TestCase):
     def f(x, init_key=None):
       y = module.variable(np.zeros(x.shape), name='y', key=init_key)
       next_y = module.assign(y + 1., name='y')
-      return lax.tie_in(next_y, x) + y
+      return primitive.tie_in(next_y, x) + y
 
     def g(x, init_key=None):
       return api.init(f)(init_key, x)(x)
@@ -149,7 +149,7 @@ class FunctionModuleTest(absltest.TestCase):
     def f(x, init_key=None):
       y = module.variable(np.zeros(x.shape), name='y', key=init_key)
       next_y = module.assign(y + 1., name='y')
-      return lax.tie_in(next_y, x) + y
+      return primitive.tie_in(next_y, x) + y
 
     def g(x, init_key=None):
       return api.init(f, name='f')(init_key, x)(x)

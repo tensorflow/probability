@@ -21,7 +21,6 @@ from __future__ import print_function
 import inspect
 from absl.testing import parameterized
 import numpy as np
-import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -186,7 +185,8 @@ class GeneratedRandomVariablesTest(test_util.TestCase):
                        self.evaluate(log_joint_scoped(x=7.)))
 
   def testAllDistributionsAreRVs(self):
-    for (dist_name, dist_class)  in six.iteritems(tfd.__dict__):
+    for dist_name in dir(tfd):
+      dist_class = getattr(tfd, dist_name)
       if inspect.isclass(dist_class) and issubclass(
           dist_class, tfd.Distribution):
         self.assertIn(dist_name, ed.__dict__)

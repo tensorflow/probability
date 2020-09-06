@@ -34,6 +34,7 @@ __all__ = [
     'is_complex',
     'is_floating',
     'is_integer',
+    'is_numpy_compatible',
     'max',
     'min',
     'name',
@@ -42,7 +43,17 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+NUMPY_MODE = False
 SKIP_DTYPE_CHECKS = False
+
+
+def is_numpy_compatible(dtype):
+  """Returns if dtype has a corresponding NumPy dtype."""
+  if JAX_MODE or NUMPY_MODE:
+    return True
+  else:
+    return tf.as_dtype(dtype).is_numpy_compatible
 
 
 def as_numpy_dtype(dtype):

@@ -15,15 +15,13 @@
 # Description:
 #   TensorFlow Probability ODE solvers.
 
-# [internal] load python3.bzl
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -75,11 +73,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "bdf_util_test",
     size = "small",
     srcs = ["bdf_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":bdf",
         ":bdf_util",
@@ -102,11 +101,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "runge_kutta_util_test",
     size = "small",
     srcs = ["runge_kutta_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":runge_kutta_util",
         # numpy dep,
@@ -126,12 +126,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "ode_test",
     size = "large",
     srcs = ["ode_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -141,13 +142,14 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "xla_test_cpu",
     srcs = ["xla_test.py"],
     args = ["--test_device=cpu"],
     main = "xla_test.py",
+    python_version = "PY3",
     shard_count = 1,
+    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -161,13 +163,14 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "xla_test_gpu",
     srcs = ["xla_test.py"],
     args = ["--test_device=gpu"],
     main = "xla_test.py",
+    python_version = "PY3",
     shard_count = 1,
+    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -192,11 +195,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":util",
         # absl/testing:parameterized dep,

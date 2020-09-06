@@ -26,9 +26,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -162,8 +164,8 @@ class GammaGamma(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
-    return functools.reduce(tf.broadcast_dynamic_shape,
-                            [tf.shape(tensor) for tensor in tensors])
+    return functools.reduce(ps.broadcast_shape,
+                            [ps.shape(tensor) for tensor in tensors])
 
   def _batch_shape(self):
     tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
@@ -184,18 +186,17 @@ class GammaGamma(distribution.Distribution):
     mixing_concentration = tf.convert_to_tensor(self.mixing_concentration)
     mixing_rate = tf.convert_to_tensor(self.mixing_rate)
     seed_rate, seed_samples = samplers.split_seed(seed, salt='gamma_gamma')
-    rate = samplers.gamma(
+    log_rate = gamma_lib.random_gamma(
         shape=[n],
         # Be sure to draw enough rates for the fully-broadcasted gamma-gamma.
-        alpha=mixing_concentration + tf.zeros_like(concentration),
-        beta=mixing_rate,
-        dtype=self.dtype,
-        seed=seed_rate)
-    return samplers.gamma(
+        concentration=mixing_concentration + tf.zeros_like(concentration),
+        rate=mixing_rate,
+        seed=seed_rate,
+        log_space=True)
+    return gamma_lib.random_gamma(
         shape=[],
-        alpha=concentration,
-        beta=rate,
-        dtype=self.dtype,
+        concentration=concentration,
+        log_rate=log_rate,
         seed=seed_samples)
 
   def _log_prob(self, x):

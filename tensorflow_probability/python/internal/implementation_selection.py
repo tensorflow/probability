@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import uuid
 
 import tensorflow.compat.v2 as tf
@@ -25,6 +26,7 @@ import tensorflow.compat.v2 as tf
 
 __all__ = [
     'implementation_selecting',
+    'never_runs_functions_eagerly',
 ]
 
 
@@ -70,6 +72,18 @@ def _generate_defun_backend(func, unique_api_name, preferred_device=None):
     function_attributes[_FUNCTION_DEVICE_ATTRIBUTE] = preferred_device
   return function.defun_with_attributes(
       func=func, attributes=function_attributes, autograph=False)
+
+
+def never_runs_functions_eagerly(f):
+  @functools.wraps(f)
+  def f_wrapped(*args, **kwargs):
+    orig = tf.config.functions_run_eagerly()
+    try:
+      tf.config.run_functions_eagerly(False)
+      return f(*args, **kwargs)
+    finally:
+      tf.config.run_functions_eagerly(orig)
+  return f_wrapped
 
 
 def implementation_selecting(fn_name, default_fn, cpu_fn):

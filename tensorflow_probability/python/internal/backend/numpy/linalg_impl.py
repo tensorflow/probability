@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 # Dependency imports
 import numpy as np
 
@@ -46,6 +47,7 @@ __all__ = [
     'matrix_transpose',
     'norm',
     'pinv',
+    'qr',
     'set_diag',
     'slogdet',
     'solve',
@@ -62,7 +64,6 @@ __all__ = [
     # 'logm',
     # 'lstsq',
     # 'l2_normalize'
-    # 'qr',
     # 'sqrtm',
     # 'tensor_diag',
     # 'tensor_diag_part',
@@ -75,7 +76,7 @@ JAX_MODE = False
 
 def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redefined-builtin
   del name
-  result = input
+  result = ops.convert_to_tensor(input)
   if num_lower > -1:
     result = np.triu(result, -num_lower)
   if num_upper > -1:
@@ -157,6 +158,7 @@ Lu = collections.namedtuple('Lu', 'lu,p')
 def _lu(input, output_idx_type=np.int32, name=None):  # pylint: disable=redefined-builtin
   """Returns Lu(lu, p), as TF does."""
   del name
+  input = ops.convert_to_tensor(input)
   if JAX_MODE:  # JAX uses XLA, which can do a batched factorization.
     lu_out, pivots = scipy_linalg.lu_factor(input)
     from jax import lax_linalg  # pylint: disable=g-import-not-at-top
@@ -191,6 +193,8 @@ def _matmul(a, b,
             a_is_sparse=False, b_is_sparse=False,
             name=None):  # pylint: disable=unused-argument
   """Numpy matmul wrapper."""
+  a = ops.convert_to_tensor(a)
+  b = ops.convert_to_tensor(b)
   if a_is_sparse or b_is_sparse:
     raise NotImplementedError('Numpy backend does not support sparse matmul.')
   if transpose_a or adjoint_a:
@@ -232,6 +236,17 @@ def _norm(tensor, ord='euclidean', axis=None, keepdims=None,  # pylint: disable=
       tensor,
       ord=2 if ord == 'euclidean' else ord,
       axis=axis, keepdims=bool(keepdims))
+
+
+Qr = collections.namedtuple('Qr', 'q,r')
+
+
+def _qr(input, full_matrices=False, name=None):  # pylint: disable=redefined-builtin,unused-argument
+  mode = 'complete' if full_matrices else 'reduced'
+  op = functools.partial(np.linalg.qr, mode=mode)
+  if not JAX_MODE:
+    op = np.vectorize(op, signature='(m,n)->(m,r),(r,n)')
+  return Qr(*op(input))
 
 
 def _set_diag(input, diagonal, name=None, k=0, align='RIGHT_LEFT'):  # pylint: disable=unused-argument,redefined-builtin
@@ -347,7 +362,8 @@ diag = utils.copy_docstring(
 
 diag_part = utils.copy_docstring(
     'tf.linalg.diag_part',
-    lambda input, name=None: np.diagonal(input, axis1=-2, axis2=-1))
+    lambda input, name=None: np.diagonal(  # pylint: disable=g-long-lambda
+        ops.convert_to_tensor(input), axis1=-2, axis2=-1))
 
 einsum = utils.copy_docstring(
     'tf.linalg.einsum',
@@ -393,6 +409,8 @@ try:
       'tf.linalg.pinv', lambda input, name=None: np.linalg.pinv(input))
 except AttributeError:
   pass
+
+qr = utils.copy_docstring('tf.linalg.qr', _qr)
 
 set_diag = utils.copy_docstring(
     'tf.linalg.set_diag',

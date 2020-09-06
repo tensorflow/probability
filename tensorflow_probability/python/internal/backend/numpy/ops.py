@@ -18,14 +18,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
+import functools
+
 # Dependency imports
 import numpy as np
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
 import six
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
-import wrapt
+try:  # May not be available, not a core dep for TFP.
+  import wrapt  # pylint: disable=g-import-not-at-top
+except ImportError:
+  wrapt = None
 
 __all__ = [
     'bitcast',
@@ -40,10 +47,12 @@ __all__ = [
     'custom_gradient',
     'device',
     'enable_v2_behavior',
+    'ensure_shape',
     'executing_eagerly',
     'get_static_value',
     'group',
     'identity',
+    'init_scope',
     'is_tensor',
     'name_scope',
     'newaxis',
@@ -58,6 +67,10 @@ __all__ = [
 
 
 JAX_MODE = False
+
+
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
 
 
 class _NullContext(object):
@@ -129,11 +142,11 @@ def _convert_to_tensor(value, dtype=None, dtype_hint=None, name=None):  # pylint
   """Emulates tf.convert_to_tensor."""
   dtype = utils.numpy_dtype(dtype)
   dtype_hint = utils.numpy_dtype(dtype_hint)
-  if is_tensor(value):
-    if dtype is not None:
-      # In NumPy mode, we are lenient on the dtype compatibility check because
-      # some codepaths rely on flexible conversion from int/float64 to 32.
-      if JAX_MODE and value.dtype != dtype:
+  if is_tensor(value) and not isinstance(value, Variable):
+    # In NumPy mode, we are lenient on the dtype compatibility check because
+    # some codepaths rely on flexible conversion from int/float64 to 32.
+    if dtype is not None and value.dtype != dtype:
+      if JAX_MODE:
         raise TypeError(('Tensor conversion requested dtype {} for array with '
                          'dtype {}: {}').format(dtype, value.dtype, value))
       return value.astype(dtype)
@@ -168,16 +181,18 @@ def _infer_dtype(value, default_dtype):
     return np.float32
   elif isinstance(value, complex):
     return np.complex128
-  else:
-    # Try inferring the type of first item in the object if possible.
-    try:
+  elif isinstance(value, (tuple, list)):
+    # Try inferring the type from items in the object if possible.
+    for v in nest.flatten(value):
+      if hasattr(v, 'dtype'):
+        return v.dtype
+    try:  # Finally fall back to raw types (int, bool).
       return _infer_dtype(value[0], default_dtype)
     except (IndexError, TypeError):
       return default_dtype
-    except KeyError:
-      raise ValueError(('Attempt to convert a value ({})'
-                        ' with an unsupported type ({}) to a Tensor.').format(
-                            value, type(value)))
+  raise ValueError(('Attempt to convert a value ({})'
+                    ' with an unsupported type ({}) to a Tensor.').format(
+                        value, type(value)))
 
 
 class _Int64ToInt32Error(TypeError):
@@ -309,6 +324,12 @@ def _default_convert_to_tensor_with_dtype(value, dtype,
            ' unsupported type {} to a Tensor.').format(value, type(value)))
   return np.array(value, dtype=dtype)
 
+
+@contextlib.contextmanager
+def _init_scope():
+  yield
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
@@ -352,9 +373,18 @@ broadcast_to = utils.copy_docstring(
     'tf.broadcast_to',
     lambda input, shape, name=None: np.broadcast_to(input, shape))
 
+
+def _cast(x, dtype):
+  x = np.asarray(x)
+  if (np.issubdtype(x.dtype, np.complexfloating) and
+      not np.issubdtype(dtype, np.complexfloating)):
+    x = np.real(x)
+  return x.astype(dtype)
+
+
 cast = utils.copy_docstring(
     'tf.cast',
-    lambda x, dtype, name=None: np.array(x, dtype=utils.numpy_dtype(dtype)))
+    lambda x, dtype, name=None: _cast(x, utils.numpy_dtype(dtype)))
 
 clip_by_value = utils.copy_docstring(
     'tf.clip_by_value',
@@ -375,7 +405,7 @@ convert_to_tensor = utils.copy_docstring(
 
 
 def _custom_gradient(f):
-  """Jax implementation of tf.custom_gradient."""
+  """JAX implementation of tf.custom_gradient."""
   if not JAX_MODE:
     # Numpy backend ignores custom gradients, so we do too.
     return lambda *args, **kwargs: f(*args, **kwargs)[0]
@@ -390,6 +420,7 @@ def _custom_gradient(f):
       return cts_in
     return value, vjp_
   @jax.custom_transforms
+  @functools.wraps(f)
   def wrapped(*args, **kwargs):
     value, _ = f(*args, **kwargs)
     return value
@@ -401,23 +432,50 @@ custom_gradient = utils.copy_docstring(
 
 device = lambda _: _NullContext()
 
+
+def _ensure_shape(x, shape, name=None):  # pylint: disable=unused-argument
+  x_shape = tensor_shape.TensorShape(x.shape)
+  shape = tensor_shape.TensorShape(shape)
+  if not shape.is_compatible_with(x_shape):
+    msg = 'Shape of tensor x {} is not compatible with expected shape {}'
+    raise ValueError(msg.format(x_shape, shape))
+  return x
+
+
+ensure_shape = utils.copy_docstring(
+    'tf.ensure_shape', _ensure_shape)
+
 executing_eagerly = utils.copy_docstring(
     'tf.executing_eagerly',
     lambda: True)
 
 
 def _get_static_value_jax(tensor, partial=False):
+  """JAX implementation of tf.get_static_value."""
   del partial
   if isinstance(tensor, jax.core.Tracer):
+    return None
+  if isinstance(tensor, NumpyVariable):
+    return None
+  if isinstance(tensor, Module):
     return None
   if isinstance(tensor, np.ndarray):
     return onp.array(tensor)
   return tensor
 
+
+def _get_static_value_numpy(tensor, partial=False):
+  """NumPy implementation of tf.get_static_value."""
+  del partial
+  if isinstance(tensor, NumpyVariable):
+    return None
+  if isinstance(tensor, Module):
+    return None
+  return tensor
+
 get_static_value = utils.copy_docstring(
     'tf.get_static_value',
-    _get_static_value_jax if JAX_MODE else
-    lambda tensor, partial=False: tensor)
+    _get_static_value_jax if JAX_MODE else _get_static_value_numpy)
 
 group = utils.copy_docstring(
     'tf.group',
@@ -430,6 +488,8 @@ identity = utils.copy_docstring(
 is_tensor = utils.copy_docstring(
     'tf.is_tensor',
     lambda x: isinstance(x, Tensor))
+
+init_scope = utils.copy_docstring('tf.init_scope', _init_scope)
 
 
 class name_scope(object):  # pylint: disable=invalid-name
@@ -520,7 +580,7 @@ register_tensor_conversion_function(tensor_shape.Dimension,
                                     _convert_dimension_to_tensor)
 
 
-class NumpyVariable(wrapt.ObjectProxy):
+class NumpyVariable(getattr(wrapt, 'ObjectProxy', object)):
   """Stand-in for tf.Variable."""
 
   __slots__ = ('initializer',)
@@ -560,23 +620,21 @@ class NumpyVariable(wrapt.ObjectProxy):
     # to `float64`. Thus we handle this case separately.
     return self.__wrapped__.__array__()
 
-  def assign(self, value):
+  def assign(self, value, **_):
     super(NumpyVariable, self).__init__(onp.array(value, dtype=self.dtype))
     return self
 
-  def assign_add(self, value):
+  def assign_add(self, value, **_):
     super(NumpyVariable, self).__init__(
         onp.array(self, dtype=self.dtype) + onp.array(value, dtype=self.dtype))
     return self
 
-  def assign_sub(self, value):
+  def assign_sub(self, value, **_):
     super(NumpyVariable, self).__init__(
         onp.array(self, dtype=self.dtype) - onp.array(value, dtype=self.dtype))
     return self
 
-
 if JAX_MODE:
-  import jax  # pylint: disable=g-import-not-at-top
   jax.interpreters.xla.canonicalize_dtype_handlers[NumpyVariable] = (
       jax.interpreters.xla.canonicalize_dtype_handlers[onp.ndarray])
   jax.interpreters.xla.pytype_aval_mappings[NumpyVariable] = (
@@ -584,6 +642,10 @@ if JAX_MODE:
   jax.core.pytype_aval_mappings[NumpyVariable] = (
       jax.core.pytype_aval_mappings[onp.ndarray])
 
+
+def _convert_variable_to_tensor(value, dtype=None):
+  return convert_to_tensor(value.__wrapped__, dtype=dtype)
+register_tensor_conversion_function(NumpyVariable, _convert_variable_to_tensor)
 
 Variable = NumpyVariable
 
@@ -599,7 +661,42 @@ class _TensorMeta(type(np.ndarray)):
 
 
 class Tensor(six.with_metaclass(_TensorMeta)):
-  OVERLOADABLE_OPERATORS = ()
+  OVERLOADABLE_OPERATORS = frozenset((
+      # Binary.
+      '__add__',
+      '__radd__',
+      '__sub__',
+      '__rsub__',
+      '__mul__',
+      '__rmul__',
+      '__truediv__',
+      '__rtruediv__',
+      '__floordiv__',
+      '__rfloordiv__',
+      '__mod__',
+      '__rmod__',
+      '__lt__',
+      '__le__',
+      '__gt__',
+      '__ge__',
+      '__ne__',
+      '__eq__',
+      '__and__',
+      '__rand__',
+      '__or__',
+      '__ror__',
+      '__xor__',
+      '__rxor__',
+      '__getitem__',
+      '__pow__',
+      '__rpow__',
+      # Unary.
+      '__invert__',
+      '__neg__',
+      '__abs__',
+      '__matmul__',
+      '__rmatmul__'
+  ))
 
 
 class Module(object):

@@ -20,8 +20,6 @@ from __future__ import print_function
 
 import numpy as np
 from scipy.stats import special_ortho_group
-
-
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -200,7 +198,7 @@ class NelderMeadTest(test_util.TestCase):
       """
       x, y = coord[0], coord[1]
       fv = (1 - x)**2 + 100 * (y - x**2)**2
-      return fv
+      return tf.cast(fv, x.dtype)
 
     start = tf.constant([-1.0, 1.0])
     results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
@@ -208,6 +206,25 @@ class NelderMeadTest(test_util.TestCase):
         initial_vertex=start,
         func_tolerance=1e-12,
         batch_evaluate_objective=False))
+    self.assertTrue(results.converged)
+    self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
+
+  def test_rosenbrock_2d_compiled(self):
+    """Tests XLA compilation."""
+    self.skip_if_no_xla()
+    def rosenbrock(coord):
+      x, y = coord[0], coord[1]
+      fv = (1 - x)**2 + 100 * (y - x**2)**2
+      return tf.cast(fv, x.dtype)
+
+    start = tf.constant([-1.0, 1.0])
+    results = tf.function(
+        tfp.optimizer.nelder_mead_minimize, experimental_compile=True)(
+            rosenbrock,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=False)
+    results = self.evaluate(results)
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
 
@@ -320,7 +337,7 @@ class NelderMeadTest(test_util.TestCase):
       x, y = coord[0], coord[1]
       fv = ((1.5 - x + x * y)**2 + (2.25 - x + x * y**2)**2 +
             (2.625 - x + x * y**3)**2)
-      return fv
+      return tf.cast(fv, x.dtype)
 
     start = tf.constant([0.1, 1.0])
     # First evaluate without any iteration bounds to find the number of

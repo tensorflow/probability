@@ -133,6 +133,7 @@ JAX_MODE = False  # Rewritten by script.
 if JAX_MODE:
   import jax  # pylint: disable=g-import-not-at-top
   import jax.numpy as np  # pylint: disable=g-import-not-at-top
+  import numpy as onp  # pylint: disable=g-import-not-at-top
 
   def value_and_gradient(f,  # pylint: disable=function-redefined
                          xs,
@@ -149,13 +150,26 @@ if JAX_MODE:
       dydx = dydx[0]
     return y, dydx
 
-  def value_and_batch_jacobian(f, xs):  # pylint: disable=function-redefined,unused-argument
-    raise NotImplementedError('f(xs) non-vmap, jacobian(f) vmap = incompatible')
+  def value_and_batch_jacobian(f, xs):  # pylint: disable=function-redefined
+    """JAX implementation of value_and_batch_jacobian."""
+    xs, is_xs_list_like = _prepare_args(xs)
+    y, f_vjp = jax.vjp(f, *xs)
+
+    # Let `[B, E_1, ..., E_k]` be the shape of `y`, where the first dimension
+    # is a batch dimension.  We construct a basis for the cotangent space
+    # `[E_1, ..., E_k]`.
+    size = onp.prod(y.shape[1:])
+    basis = np.reshape(np.eye(size, dtype=y.dtype),
+                       (1, size,) + y.shape[1:])  # `[1, size, E_1, ..., E_k]`
+    basis = np.broadcast_to(
+        basis, y.shape[:1] + basis.shape[1:])  # `[B, size, E_1, ..., E_k]`
+
+    jacobian = jax.vmap(f_vjp, in_axes=1, out_axes=1)(basis)
+    jacobian = [x.reshape(y.shape + x.shape[2:]) for x in jacobian]
+    if not is_xs_list_like:
+      jacobian = jacobian[0]
+    return y, jacobian
 
   def batch_jacobian(f, xs):  # pylint: disable=function-redefined
     """Computes the batch jacobian of `f(xs)` w.r.t. `xs`."""
-    xs, is_xs_list_like = _prepare_args(xs)
-    jacobian = jax.vmap(jax.jacrev(f, argnums=tuple(range(len(xs)))))(*xs)
-    if not is_xs_list_like:
-      jacobian = jacobian[0]
-    return jacobian
+    return value_and_batch_jacobian(f, xs)[1]

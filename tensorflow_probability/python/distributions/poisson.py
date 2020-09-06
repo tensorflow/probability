@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import batched_rejection_sampler as 
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -63,7 +64,7 @@ def _random_poisson_noncpu(
   with tf.name_scope(name or 'poisson_noncpu'):
     if log_rates is None:
       log_rates = tf.math.log(rates)
-    shape = tf.concat([shape, tf.shape(log_rates)], axis=0)
+    shape = ps.concat([shape, ps.shape(log_rates)], axis=0)
     good_params_mask = ~tf.math.is_nan(log_rates)
     internal_dtype = tf.float64
 
@@ -99,6 +100,8 @@ def _random_poisson_noncpu(
 
 
 # tf.function required to access Grappler's implementation_selector.
+@implementation_selection.never_runs_functions_eagerly
+# TODO(b/163029794): Shape relaxation breaks XLA.
 @tf.function(autograph=False)
 def _random_poisson(
     shape,
@@ -124,7 +127,7 @@ def _random_poisson(
   """
   with tf.name_scope(name or 'random_poisson'):
     seed = samplers.sanitize_seed(seed)
-    shape = tf.convert_to_tensor(shape, dtype_hint=tf.int32, name='shape')
+    shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32, name='shape')
     params = dict(shape=shape, rates=rates, log_rates=log_rates,
                   output_dtype=output_dtype, seed=seed, name=name)
     sampler_impl = implementation_selection.implementation_selecting(
@@ -295,7 +298,7 @@ class Poisson(distribution.Distribution):
   def _sample_n(self, n, seed=None):
     seed = samplers.sanitize_seed(seed)
     return _random_poisson(
-        shape=tf.convert_to_tensor([n]),
+        shape=ps.convert_to_shape_tensor([n]),
         rates=(None if self._rate is None else
                tf.convert_to_tensor(self._rate)),
         log_rates=(None if self._log_rate is None else

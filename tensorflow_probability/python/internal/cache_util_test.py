@@ -123,33 +123,35 @@ class HashableRefTest(test_util.TestCase):
       tf.nest.assert_same_structure(weak_ref(), tensor_struct)
 
 
+class _BareBonesBijector(object):
+  """Minimal specification of a `Bijector`."""
+
+  def __init__(self, forward_impl, inverse_impl):
+    self.forward_call_count = 0
+    self.inverse_call_count = 0
+    self._forward_impl = forward_impl
+    self._inverse_impl = inverse_impl
+
+  def _forward(self, x):
+    self.forward_call_count += 1
+    return self._forward_impl(x)
+
+  def _inverse(self, y):
+    self.inverse_call_count += 1
+    return self._inverse_impl(y)
+
+
 class CacheTestBase(object):
   """Common tests for CachedDirectedFunction."""
-  CACHE_TYPE = cache_util.CachedDirectedFunction
 
   def setUp(self):
     if not tf.executing_eagerly():
       self.skipTest('Not interesting in graph mode.')
 
-    self.forward_call_count = 0
-    self.inverse_call_count = 0
-    # Build a cache for every test case.
+    self.bijector = _BareBonesBijector(self.forward_impl, self.inverse_impl)
     self.cache = cache_util.BijectorCache(
-        self._call_forward, self._call_inverse)
-    # Stick cached methods on the instance for convenience.
-    self.forward = self.cache.forward
-    self.inverse = self.cache.inverse
+        bijector=self.bijector, bijector_class=type(self.bijector))
     super(CacheTestBase, self).setUp()
-
-  # Lightweight mocks that don't keep references to inputs.
-
-  def _call_forward(self, *args, **kwargs):
-    self.forward_call_count += 1
-    return self.forward_impl(*args, **kwargs)
-
-  def _call_inverse(self, *args, **kwargs):
-    self.inverse_call_count += 1
-    return self.inverse_impl(*args, **kwargs)
 
   ### Abstract methods
 
@@ -161,6 +163,20 @@ class CacheTestBase(object):
 
   def test_arg(self):
     raise NotImplementedError()
+
+  def forward(self, x):
+    return self.cache.forward(x)
+
+  def inverse(self, y):
+    return self.cache.inverse(y)
+
+  @property
+  def forward_keys(self):
+    return self.cache.weak_keys(direction='forward')
+
+  @property
+  def inverse_keys(self):
+    return self.cache.weak_keys(direction='inverse')
 
 
 class CacheTestCommon(CacheTestBase):
@@ -175,19 +191,21 @@ class CacheTestCommon(CacheTestBase):
       struct = self.forward(struct)
 
     print(type(struct), struct)
-    self.assertEqual(len(self.forward), steps)
-    self.assertEqual(self.forward_call_count, steps)
-    self.assertEqual(len(self.inverse), steps)
-    self.assertEqual(self.inverse_call_count, 0)
+    self.assertLen(self.forward_keys, steps)
+    self.assertEqual(self.bijector.forward_call_count, steps)
+    self.assertLen(self.cache.items(direction='forward'), steps)
+    self.assertLen(self.inverse_keys, steps)
+    self.assertEqual(self.bijector.inverse_call_count, 0)
+    self.assertLen(self.cache.items(direction='inverse'), steps)
 
     # Now invert our calls
     for _ in range(steps):
       struct = self.inverse(struct)
 
-    self.assertEqual(len(self.forward), 1)            # Has cached attrs.
-    self.assertEqual(self.forward_call_count, steps)  # No new calls.
-    self.assertEqual(len(self.inverse), 0)            # Refs are all gone.
-    self.assertEqual(self.inverse_call_count, 0)      # All cache hits.
+    self.assertLen(self.forward_keys, 1)  # Has cached attrs.
+    self.assertEqual(self.bijector.forward_call_count, steps)    # No new calls.
+    self.assertLen(self.inverse_keys, 0)  # Refs are all gone.
+    self.assertEqual(self.bijector.inverse_call_count, 0)      # All cache hits.
 
     # Original is recoverable. Contents are referentially equal.
     self.assertTrue(weak_start.alive)
@@ -195,83 +213,113 @@ class CacheTestCommon(CacheTestBase):
 
     struct = None
     self.assertFalse(weak_start.alive)
-    self.assertEqual(len(self.forward), 0)
-    self.assertEqual(len(self.inverse), 0)
+    self.assertLen(self.forward_keys, 0)
+    self.assertLen(self.inverse_keys, 0)
 
   def testOutputsWaterfall(self, steps=4):
     struct = self.test_arg()
 
     # Call forward a few times.
     for i in range(steps):
-      self.assertEqual(len(self.forward), i)
-      self.assertEqual(len(self.inverse), i)
+      self.assertLen(self.forward_keys, i)
+      self.assertLen(self.inverse_keys, i)
       struct = self.forward(struct)
 
     # Grab a reference, and call forward some more.
     mid_ref = struct
     for i in range(steps):
-      self.assertEqual(len(self.forward), steps + i)
-      self.assertEqual(len(self.inverse), steps + i)
+      self.assertLen(self.forward_keys, steps + i)
+      self.assertLen(self.inverse_keys, steps + i)
       struct = self.forward(struct)
 
     # Clear strong references to the final output
     del struct
-    self.assertEqual(len(self.inverse), steps)
-    self.assertEqual(len(self.forward), steps + 1)
+    self.assertLen(self.inverse_keys, steps)
+    self.assertLen(self.forward_keys, steps + 1)
 
     # Clear strong references to the midpoint
     del mid_ref
-    self.assertEqual(len(self.forward), 0)
-    self.assertEqual(len(self.inverse), 0)
+    self.assertLen(self.forward_keys, 0)
+    self.assertLen(self.inverse_keys, 0)
 
   def testAttrsGetCleanedUp(self):
     x = self.test_arg()
-    x_attrs = self.forward.attributes(x)
+    x_attrs = self.cache.forward_attributes(x)
     x_attrs['foo'] = 'bar'
 
     # Attributes only exist in from_x
     self.assertEqual(x_attrs, {'foo': 'bar'})
-    self.assertEqual(len(self.forward), 1)  # Holding attrs
-    self.assertEqual(len(self.inverse), 0)  # from_x not called; nothing here.
+    self.assertLen(self.forward_keys, 1)  # Holding attrs
+    self.assertLen(self.inverse_keys, 0)  # from_x not called; nothing here.
 
     x = None
     # When x goes out of scope, it's cleared from the cache.
-    self.assertEqual(len(self.forward), 0)
-    self.assertEqual(len(self.inverse), 0)
+    self.assertLen(self.forward_keys, 0)
+    self.assertLen(self.inverse_keys, 0)
     # But external references to attrs may be retained.
     self.assertEqual(x_attrs, {'foo': 'bar'})
 
   def testAttributesAreLazilyPropagated(self):
     x = self.test_arg()
-    attrs = self.forward.attributes(x)
+    attrs = self.cache.forward_attributes(x)
     attrs['foo'] = 'bar'
 
     # Attributes only exist in from_x
     self.assertEqual(attrs, {'foo': 'bar'})
-    self.assertEqual(len(self.forward), 1)
-    self.assertEqual(len(self.inverse), 0)
+    self.assertLen(self.forward_keys, 1)
+    self.assertLen(self.inverse_keys, 0)
 
     # Once we call from_x, they get shared.
     y = self.forward(x)
-    attrs = self.inverse.attributes(y)
+    attrs = self.cache.inverse_attributes(y)
     self.assertEqual(attrs, {'foo': 'bar'})
-    self.assertEqual(len(self.forward), 1)
-    self.assertEqual(len(self.inverse), 1)
+    self.assertLen(self.forward_keys, 1)
+    self.assertLen(self.inverse_keys, 1)
 
     # Add some attrs to y, and clear the reference.
     y = None
     attrs['xxx'] = 'yyy'
-    self.assertEqual(len(self.inverse), 0)
-    self.assertEqual(len(self.forward), 1)
+    self.assertLen(self.inverse_keys, 0)
+    self.assertLen(self.forward_keys, 1)
 
     # Cached attributes still exist for `x`
-    self.assertEqual(self.forward.attributes(x),
+    self.assertEqual(self.cache.forward_attributes(x),
                      {'foo': 'bar', 'xxx': 'yyy'})
 
     # Clear x, and the rest of the attrs are gone.
     x = None
-    self.assertEqual(len(self.forward), 0)
-    self.assertEqual(len(self.inverse), 0)
+    self.assertLen(self.forward_keys, 0)
+    self.assertLen(self.inverse_keys, 0)
+
+  def testClear(self):
+
+    bijector_2 = _BareBonesBijector(self.forward_impl, self.inverse_impl)
+    cache_2 = cache_util.BijectorCache(
+        bijector=bijector_2,
+        bijector_class=_BareBonesBijector,
+        storage=self.cache.storage)
+    class_cache = cache_util.BijectorCache(
+        bijector=None,
+        bijector_class=_BareBonesBijector,
+        storage=self.cache.storage)
+
+    x = self.test_arg()
+    _ = self.forward(x)
+    _ = cache_2.forward(x)
+
+    y = self.test_arg()
+    _ = self.forward(y)
+
+    # Class cache has three entries
+    self.assertLen(class_cache.weak_keys(direction='forward'), 3)
+
+    # Clear entry associated with bijector_2
+    cache_2.clear()
+    self.assertLen(class_cache.weak_keys(direction='forward'), 2)
+
+    # Clear class cache
+    class_cache.clear()
+    self.assertLen(class_cache.weak_keys(direction='forward'), 0)
 
 
 class SinglePartCacheTest(CacheTestCommon, test_util.TestCase):
@@ -326,23 +374,23 @@ class IdentityCacheTest(CacheTestBase):
 
     # Transform and add to cache.
     struct = self.forward(struct)
-    self.assertEqual(len(self.forward), 1)
-    self.assertEqual(len(self.inverse), 1)
+    self.assertLen(self.forward_keys, 1)
+    self.assertLen(self.inverse_keys, 1)
 
     # Outputs are the same as inputs; nothing's been cleared or added.
     struct = self.inverse(struct)
-    self.assertEqual(len(self.forward), 1)
-    self.assertEqual(len(self.inverse), 1)
+    self.assertLen(self.forward_keys, 1)
+    self.assertLen(self.inverse_keys, 1)
 
     # We haven't called inverse on the original yet!
     struct = self.inverse(struct)
-    self.assertEqual(len(self.forward), 2)
-    self.assertEqual(len(self.inverse), 2)
+    self.assertLen(self.forward_keys, 2)
+    self.assertLen(self.inverse_keys, 2)
 
     # Cache is emptied without leaks.
     struct = None
-    self.assertEqual(len(self.forward), 0)
-    self.assertEqual(len(self.inverse), 0)
+    self.assertLen(self.forward_keys, 0)
+    self.assertLen(self.inverse_keys, 0)
 
 
 if __name__ == '__main__':

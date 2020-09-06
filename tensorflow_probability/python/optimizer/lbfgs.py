@@ -32,8 +32,8 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -225,10 +225,10 @@ def minimize(value_and_gradients_function,
     if initial_position is not None:
       initial_position = tf.convert_to_tensor(
           initial_position, name='initial_position')
-      dtype = initial_position.dtype.base_dtype
+      dtype = dtype_util.base_dtype(initial_position.dtype)
 
     if previous_optimizer_results is not None:
-      dtype = previous_optimizer_results.position.dtype.base_dtype
+      dtype = dtype_util.base_dtype(previous_optimizer_results.position.dtype)
 
     tolerance = tf.convert_to_tensor(
         tolerance, dtype=dtype, name='grad_tolerance')
@@ -338,16 +338,17 @@ def _get_search_direction(state):
     along which to perform line search.
   """
   # The number of correction pairs that have been collected so far.
-  num_elements = tf.minimum(
-      state.num_iterations,
-      distribution_util.prefer_static_shape(state.position_deltas)[0])
+  num_elements = ps.minimum(
+      state.num_iterations,  # TODO(b/162733947): Change loop state -> closure.
+      ps.shape(state.position_deltas)[0])
 
   def _two_loop_algorithm():
     """L-BFGS two-loop algorithm."""
     # Correction pairs are always appended to the end, so only the latest
-    # `num_elements` vectors have valid position/gradient deltas.
-    position_deltas = state.position_deltas[-num_elements:]
-    gradient_deltas = state.gradient_deltas[-num_elements:]
+    # `num_elements` vectors have valid position/gradient deltas. Vectors
+    # that haven't been computed yet are zero.
+    position_deltas = state.position_deltas
+    gradient_deltas = state.gradient_deltas
 
     # Pre-compute all `inv_rho[i]`s.
     inv_rhos = tf.reduce_sum(
@@ -356,14 +357,14 @@ def _get_search_direction(state):
     def first_loop(acc, args):
       _, q_direction = acc
       position_delta, gradient_delta, inv_rho = args
-      alpha = tf.reduce_sum(
-          position_delta * q_direction, axis=-1) / inv_rho
+      alpha = tf.math.divide_no_nan(
+          tf.reduce_sum(position_delta * q_direction, axis=-1), inv_rho)
       direction_delta = alpha[..., tf.newaxis] * gradient_delta
       return (alpha, q_direction - direction_delta)
 
     # Run first loop body computing and collecting `alpha[i]`s, while also
     # computing the updated `q_direction` at each step.
-    zero = tf.zeros_like(inv_rhos[0])
+    zero = tf.zeros_like(inv_rhos[-num_elements])
     alphas, q_directions = tf.scan(
         first_loop, [position_deltas, gradient_deltas, inv_rhos],
         initializer=(zero, state.objective_gradient), reverse=True)
@@ -372,12 +373,12 @@ def _get_search_direction(state):
     # hessian for the k-th iteration; then `r_direction = H^0_k * q_direction`.
     gamma_k = inv_rhos[-1] / tf.reduce_sum(
         gradient_deltas[-1] * gradient_deltas[-1], axis=-1)
-    r_direction = gamma_k[..., tf.newaxis] * q_directions[0]
+    r_direction = gamma_k[..., tf.newaxis] * q_directions[-num_elements]
 
     def second_loop(r_direction, args):
       alpha, position_delta, gradient_delta, inv_rho = args
-      beta = tf.reduce_sum(
-          gradient_delta * r_direction, axis=-1) / inv_rho
+      beta = tf.math.divide_no_nan(
+          tf.reduce_sum(gradient_delta * r_direction, axis=-1), inv_rho)
       direction_delta = (alpha - beta)[..., tf.newaxis] * position_delta
       return r_direction + direction_delta
 
@@ -388,9 +389,9 @@ def _get_search_direction(state):
         initializer=r_direction)
     return -r_directions[-1]
 
-  return prefer_static.cond(tf.equal(num_elements, 0),
-                            (lambda: -state.objective_gradient),
-                            _two_loop_algorithm)
+  return ps.cond(ps.equal(num_elements, 0),
+                 lambda: -state.objective_gradient,
+                 _two_loop_algorithm)
 
 
 def _make_empty_queue_for(k, element):
@@ -422,9 +423,8 @@ def _make_empty_queue_for(k, element):
     A zero-filed `tf.Tensor` of shape `(k,) + tf.shape(element)` and same dtype
     as `element`.
   """
-  queue_shape = tf.concat(
-      [[k], distribution_util.prefer_static_shape(element)], axis=0)
-  return tf.zeros(queue_shape, dtype=element.dtype.base_dtype)
+  queue_shape = ps.concat([[k], ps.shape(element)], axis=0)
+  return tf.zeros(queue_shape, dtype=dtype_util.base_dtype(element.dtype))
 
 
 def _queue_push(queue, should_update, new_vecs):

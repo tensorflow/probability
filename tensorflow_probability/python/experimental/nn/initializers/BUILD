@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -28,6 +28,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":initializers_lib",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

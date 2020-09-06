@@ -50,14 +50,20 @@ class Weibull(transformed_distribution.TransformedDistribution):
 
   The cumulative density function of this distribution is,
 
-  ```cdf(x; lambda, k) = 1 - exp(-(x / lambda) ** k)```
+  ```none
+  cdf(x; lambda, k) = 1 - exp(-(x / lambda) ** k)
+  ```
 
   The Weibull distribution includes the Exponential and Rayleigh distributions
   as special cases:
 
-  ```Exponential(rate) = Weibull(concentration=1., 1. / rate)```
+  ```none
+  Exponential(rate) = Weibull(concentration=1., 1. / rate)
+  ```
 
-  ```Rayleigh(scale) = Weibull(concentration=2., sqrt(2.) * scale)```
+  ```none
+  Rayleigh(scale) = Weibull(concentration=2., sqrt(2.) * scale)
+  ```
 
   #### Examples
 

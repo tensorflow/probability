@@ -230,8 +230,8 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.assertAllNotNone(grads)
 
   def testSampleKolmogorovSmirnovMultiDimensional(self):
-    loc = np.linspace(-10, 10, 3).reshape(3, 1, 1)
-    scale = np.linspace(1e-6, 7, 5).reshape(5, 1)
+    loc = np.linspace(-10, 10, 3).reshape([3, 1, 1])
+    scale = np.linspace(1e-6, 7, 5).reshape([5, 1])
     conc = np.linspace(-1.3, 1.3, 7)
 
     dist = tfd.GeneralizedPareto(
@@ -334,6 +334,69 @@ class GeneralizedParetoTest(test_util.TestCase):
     self.assertLen(grads, 2)
     self.assertAllNotNone(grads)
 
+  def testQuantile(self):
+    scale = tf.Variable(2.)
+    concentration = tf.Variable(0.5)
+    loc = tf.Variable(1.)
 
+    self.evaluate(scale.initializer)
+    self.evaluate(concentration.initializer)
+    self.evaluate(loc.initializer)
+
+    d = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+    p = tf.linspace(0., 1., 1000)[1:-1]
+    q = d.quantile(p)
+    self.assertAllFinite(q)
+
+    q_scipy = sp_stats.genpareto.ppf(
+        np.linspace(0., 1., 1000)[1:-1], 0.5, 1., 2.)
+    self.assertAllClose(q, q_scipy, rtol=1.e-5)
+
+  def testQuantileZeroConcetration(self):
+    scale = tf.Variable(0.5)
+    concentration = tf.Variable(0.)
+    loc = tf.Variable(1.)
+
+    self.evaluate(scale.initializer)
+    self.evaluate(concentration.initializer)
+    self.evaluate(loc.initializer)
+
+    d = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+    p = tf.linspace(0., 1., 1000)[1:-1]
+    q = d.quantile(p)
+    self.assertAllFinite(q)
+
+    q_scipy = sp_stats.genpareto.ppf(
+        np.linspace(0., 1., 1000)[1:-1], 0., 1., 0.5)
+    self.assertAllClose(q, q_scipy, rtol=1.e-5)
+
+  def testQuantilesBroadcasting(self):
+    loc = tf.constant([0.1, 0.2])[:, tf.newaxis, tf.newaxis]
+    scale = tf.constant([0.9, 1., 1.1])[:, tf.newaxis]
+    concentration = tf.constant([0.0, 0.4, 0.5, 0.6, 1.0])
+
+    d = tfd.GeneralizedPareto(
+        loc=loc, scale=scale, concentration=concentration, validate_args=True)
+    p = tf.linspace(0., 1., 1000)[1:-1][:, tf.newaxis, tf.newaxis, tf.newaxis]
+    q = d.quantile(p)
+    self.assertAllFinite(q)
+
+    loc_numpy = self.evaluate(loc)
+    scale_numpy = self.evaluate(scale)
+    conc_numpy = self.evaluate(concentration)
+
+    q_scipys = []
+    for i in range(5):
+      q_scipys.append(sp_stats.genpareto.ppf(
+          np.linspace(0., 1., 1000)[1:-1].reshape(998, 1, 1, 1),
+          conc_numpy[i].reshape(1, 1, 1, 1),
+          loc_numpy.reshape(1, 2, 1, 1),
+          scale_numpy.reshape(1, 1, 3, 1)))
+    q_scipy = np.concatenate(q_scipys, axis=-1)
+
+    print(q.shape, q_scipy.shape)
+    self.assertAllClose(q, q_scipy, rtol=1.e-5)
 if __name__ == '__main__':
   tf.test.main()

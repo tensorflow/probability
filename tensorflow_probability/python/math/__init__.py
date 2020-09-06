@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math import psd_kernels
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
@@ -56,6 +57,7 @@ from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import bessel_iv_ratio
+from tensorflow_probability.python.math.special import erfcinv
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
@@ -66,7 +68,6 @@ from tensorflow_probability.python.random import rademacher as random_rademacher
 from tensorflow_probability.python.random import rayleigh as random_rayleigh
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 random_rademacher = deprecation.deprecated(
     '2020-09-20', 'Use tfp.random.rademacher')(random_rademacher)
@@ -84,6 +85,7 @@ _allowed_symbols = [
     'custom_gradient',
     'dense_to_sparse',
     'diag_jacobian',
+    'erfcinv',
     'fill_triangular',
     'fill_triangular_inverse',
     'interp_regular_1d_grid',
@@ -122,4 +124,4 @@ _allowed_symbols = [
     'value_and_gradient',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

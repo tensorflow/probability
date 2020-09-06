@@ -21,11 +21,9 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
-
-# [internal] load python3.bzl
 
 py_library(
     name = "auto_batching",
@@ -43,6 +41,7 @@ py_library(
         ":type_inference",
         ":virtual_machine",
         ":xla",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -224,14 +223,15 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "virtual_machine_test_cpu",
     size = "medium",
     srcs = ["virtual_machine_test.py"],
     args = ["--test_device=cpu"],
     main = "virtual_machine_test.py",
+    python_version = "PY3",
     shard_count = 10,
+    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -245,14 +245,15 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "virtual_machine_test_gpu",
     size = "medium",
     srcs = ["virtual_machine_test.py"],
     args = ["--test_device=gpu"],
     main = "virtual_machine_test.py",
+    python_version = "PY3",
     shard_count = 10,
+    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -267,11 +268,12 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "instructions_test",
     size = "small",
     srcs = ["instructions_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":instructions",
         ":test_programs",
@@ -280,11 +282,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "numpy_backend_test",
     size = "small",
     srcs = ["numpy_backend_test.py"],
+    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":backend_test_lib",
@@ -297,11 +299,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "tf_backend_test",
     size = "large",
     srcs = ["tf_backend_test.py"],
+    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":backend_test_lib",
@@ -315,11 +317,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "lowering_test",
     size = "small",
     srcs = ["lowering_test.py"],
+    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":allocation_strategy",
@@ -332,11 +334,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "allocation_strategy_test",
     size = "small",
     srcs = ["allocation_strategy_test.py"],
+    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":allocation_strategy",
@@ -347,11 +349,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "stackless_test",
     size = "small",
     srcs = ["stackless_test.py"],
+    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":allocation_strategy",
@@ -363,11 +365,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "stack_optimization_test",
     size = "small",
     srcs = ["stack_optimization_test.py"],
+    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":stack_optimization",
@@ -376,11 +378,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "type_inference_test",
     size = "small",
     srcs = ["type_inference_test.py"],
+    python_version = "PY3",
     shard_count = 4,
     srcs_version = "PY2AND3",
     deps = [
@@ -398,11 +400,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "dsl_test",
     size = "small",
     srcs = ["dsl_test.py"],
+    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":allocation_strategy",
@@ -418,11 +420,11 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "frontend_test",
     size = "small",
     srcs = ["frontend_test.py"],
+    python_version = "PY3",
     shard_count = 4,
     srcs_version = "PY2AND3",
     deps = [

@@ -31,6 +31,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import masked_autoregressive
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -40,13 +41,13 @@ tfkl = tf.keras.layers
 
 def _funnel_bijector_fn(x):
   """Funnel transform."""
-  batch_shape = tf.shape(x)[:-1]
+  batch_shape = ps.shape(x)[:-1]
   ndims = 4
   scale = tf.concat(
       [
-          tf.ones(tf.concat([batch_shape, [1]], axis=0)),
+          tf.ones(ps.concat([batch_shape, [1]], axis=0)),
           tf.exp(x[..., :1] / 2) *
-          tf.ones(tf.concat([batch_shape, [ndims - 1]], axis=0)),
+          tf.ones(ps.concat([batch_shape, [ndims - 1]], axis=0)),
       ],
       axis=-1,
   )
@@ -57,14 +58,14 @@ def _masked_autoregressive_2d_template(base_template, event_shape):
 
   def wrapper(x):
     x_flat = tf.reshape(
-        x, tf.concat([tf.shape(x)[:-len(event_shape)], [-1]], -1))
+        x, ps.concat([ps.shape(x)[:-len(event_shape)], [-1]], -1))
     t = base_template(x_flat)
     if tf.is_tensor(t):
       x_shift, x_log_scale = tf.unstack(t, axis=-1)
     else:
       x_shift, x_log_scale = t
-    return tf.reshape(x_shift, tf.shape(x)), tf.reshape(
-        x_log_scale, tf.shape(x))
+    return (tf.reshape(x_shift, ps.shape(x)),
+            tf.reshape(x_log_scale, ps.shape(x)))
 
   return wrapper
 
@@ -331,7 +332,7 @@ class _MaskedAutoregressiveFlowTest(test_util.VectorDistributionTestHelpers,
     ])
     self.assertStartsWith(ma.name, "masked_autoregressive_flow")
     self.assertAllClose(forward_x_, forward_inverse_y_, rtol=1e-6, atol=0.)
-    self.assertAllClose(x_, inverse_y_, rtol=1e-5, atol=0.)
+    self.assertAllClose(x_, inverse_y_, rtol=1e-4, atol=0.)
     self.assertAllClose(ildj_, -fldj_, rtol=1e-6, atol=0.)
 
   def testBatchedBijector(self):

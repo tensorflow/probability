@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -52,7 +53,7 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
   if not shape_known_statically or params.shape[:-1] != event.shape:
     params = params * tf.ones_like(event[..., tf.newaxis],
                                    dtype=params.dtype)
-    params_shape = tf.shape(params)[:-1]
+    params_shape = ps.shape(params)[:-1]
     event = event * tf.ones(params_shape, dtype=event.dtype)
     if tensorshape_util.rank(params.shape) is not None:
       tensorshape_util.set_shape(event, params.shape[:-1])
@@ -187,10 +188,11 @@ class Categorical(distribution.Distribution):
     if (probs is None) == (logits is None):
       raise ValueError('Must pass probs or logits, but not both.')
     with tf.name_scope(name) as name:
+      prob_logit_dtype = dtype_util.common_dtype([probs, logits], tf.float32)
       self._probs = tensor_util.convert_nonref_to_tensor(
-          probs, dtype_hint=tf.float32, name='probs')
+          probs, dtype_hint=prob_logit_dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
-          logits, dtype_hint=tf.float32, name='logits')
+          logits, dtype_hint=prob_logit_dtype, name='logits')
       super(Categorical, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -217,7 +219,7 @@ class Categorical(distribution.Distribution):
     if x is None:
       x = tf.convert_to_tensor(
           self._probs if self._logits is None else self._logits)
-    return tf.shape(x)[:-1]
+    return ps.shape(x)[:-1]
 
   def _batch_shape(self):
     x = self._probs if self._logits is None else self._logits
@@ -243,7 +245,7 @@ class Categorical(distribution.Distribution):
     draws = tf.cast(draws, self.dtype)
     return tf.reshape(
         tf.transpose(draws),
-        shape=tf.concat([[n], self._batch_shape_tensor(logits)], axis=0))
+        shape=ps.concat([[n], self._batch_shape_tensor(logits)], axis=0))
 
   def _cdf(self, k):
     # TODO(b/135263541): Improve numerical precision of categorical.cdf.
@@ -311,8 +313,17 @@ class Categorical(distribution.Distribution):
     x = logits - m
     sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
     lse_logits = m[..., 0] + tf.math.log(sum_exp_x)
+    # TODO(b/161014180): Workaround to support correct gradient calculations
+    # with -inf logits.
+    is_inf_logits = tf.cast(tf.math.is_inf(logits), dtype=tf.float32)
+    is_negative_logits = tf.cast(logits < 0, dtype=tf.float32)
+    masked_logits = tf.where(
+        tf.cast((is_inf_logits * is_negative_logits), dtype=bool),
+        tf.cast(1.0, dtype=logits.dtype), logits)
+
     return lse_logits - tf.reduce_sum(
-        tf.math.multiply_no_nan(logits, tf.math.exp(x)), axis=-1) / sum_exp_x
+        tf.math.multiply_no_nan(masked_logits, tf.math.exp(x)),
+        axis=-1) / sum_exp_x
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits

@@ -15,8 +15,7 @@
 # Description:
 #   TensorFlow Probability utility functions.
 
-# [internal] load python3.bzl
-load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_test", "multi_substrate_py_library")
+load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
 
 package(
     default_visibility = [
@@ -24,7 +23,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -35,6 +34,7 @@ multi_substrate_py_library(
     deps = [
         ":deferred_tensor",
         ":seed_stream",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -43,6 +43,7 @@ multi_substrate_py_library(
     srcs = ["deferred_tensor.py"],
     srcs_version = "PY2AND3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
@@ -51,8 +52,7 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "deferred_tensor_test",
     size = "small",
     srcs = ["deferred_tensor_test.py"],
@@ -62,6 +62,7 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

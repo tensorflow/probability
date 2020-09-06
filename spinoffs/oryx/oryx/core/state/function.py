@@ -54,6 +54,7 @@ from oryx.core import kwargs_util
 from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import unzip
+from oryx.core.interpreters.inverse import custom_inverse
 from oryx.core.state import api
 from oryx.core.state import module
 
@@ -73,7 +74,8 @@ def _function_register(generic_func):
   def wrapped(f):
     for pytype in [types.FunctionType, types.MethodType, types.LambdaType,
                    types.BuiltinMethodType, types.BuiltinFunctionType,
-                   functools.partial]:
+                   functools.partial, custom_inverse.CustomInverse,
+                   jax.custom_jvp, jax.custom_vjp]:
       generic_func.register(pytype, f)
     return f
   return wrapped
@@ -259,8 +261,8 @@ def function_init(f, *, name=None, init_keyword='init_key'):
       init_f = harvest.nest(init_f, scope=name)
       cau_f = harvest.nest(cau_f, scope=name)
     variables = init_f(init_key)
-    cau_jaxpr, (in_tree, out_tree) = trace_util.stage(cau_f)(variables, *args,
-                                                             **kwargs)
+    cau_jaxpr, (in_tree, out_tree) = trace_util.stage(cau_f, dynamic=True)(
+        variables, *args, **kwargs)
     if name is None:
       variables = {
           k: module.variable(val, name=k, key=init_key)

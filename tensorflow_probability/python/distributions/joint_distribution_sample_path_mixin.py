@@ -102,17 +102,23 @@ class JointDistributionSamplePathMixin(object):
   def event_shape(self):
     if not hasattr(self, '_cached_event_shape'):
       self._cached_event_shape = list([
-          d.batch_shape[self.batch_ndims:].concatenate(d.event_shape)
-          for d in self._get_single_sample_distributions()])
+          tf.nest.map_structure(  # Recurse over joint component distributions.
+              d.batch_shape[self.batch_ndims:].concatenate,
+              d.event_shape) for d in self._get_single_sample_distributions()])
     return self._model_unflatten(self._cached_event_shape)
 
   def event_shape_tensor(self, sample_shape=(), name='event_shape_tensor'):
+    """Shape of a single sample from a single batch."""
     del sample_shape  # Unused.
     with self._name_and_control_scope(name):
-      return self._model_unflatten(
-          [prefer_static.concat([d.batch_shape_tensor()[self.batch_ndims:],
-                                 d.event_shape_tensor()], axis=0)
-           for d in self._get_single_sample_distributions()])
+      component_shapes = []
+      for d in self._get_single_sample_distributions():
+        iid_event_shape = d.batch_shape_tensor()[self.batch_ndims:]
+        # Recurse over the (potentially joint) component distribution's event.
+        component_shapes.append(tf.nest.map_structure(
+            lambda a, b=iid_event_shape: prefer_static.concat([b, a], axis=0),
+            d.event_shape_tensor()))
+      return self._model_unflatten(component_shapes)
 
   def _map_and_reduce_measure_over_dists(self, attr, reduce_fn, value):
     """Reduces all non-batch dimensions of the provided measure."""

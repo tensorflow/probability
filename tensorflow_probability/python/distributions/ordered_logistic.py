@@ -27,7 +27,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -267,12 +267,12 @@ class OrderedLogistic(distribution.Distribution):
   def _augmented_cutpoints(self):
     cutpoints = tf.convert_to_tensor(self.cutpoints)
     inf = tf.fill(
-        prefer_static.shape(cutpoints[..., :1]),
+        ps.shape(cutpoints[..., :1]),
         tf.constant(np.inf, dtype=cutpoints.dtype))
     return tf.concat([-inf, cutpoints, inf], axis=-1)
 
   def _num_categories(self):
-    return prefer_static.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
+    return ps.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
 
   def _sample_n(self, n, seed=None):
     # TODO(b/149334734): Consider sampling from the Logistic distribution,
@@ -283,14 +283,14 @@ class OrderedLogistic(distribution.Distribution):
     draws = samplers.categorical(logits, n, dtype=self.dtype, seed=seed)
     return tf.reshape(
         tf.transpose(draws),
-        shape=tf.concat([[n], self._batch_shape_tensor()], axis=0))
+        shape=ps.concat([[n], self._batch_shape_tensor()], axis=0))
 
   def _batch_shape_tensor(self, cutpoints=None, loc=None):
     cutpoints = self.cutpoints if cutpoints is None else cutpoints
     loc = self.loc if loc is None else loc
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(cutpoints)[:-1],
-        prefer_static.shape(loc))
+    return ps.broadcast_shape(
+        ps.shape(cutpoints)[:-1],
+        ps.shape(loc))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -329,7 +329,7 @@ class OrderedLogistic(distribution.Distribution):
     minus_inf = tf.constant(-np.inf, dtype=log_prob_flat.dtype)
     log_prob_flat = tf.where(
         x_flat > num_categories - 1, minus_inf, log_prob_flat)
-    return tf.reshape(log_prob_flat, shape=tf.shape(x))
+    return tf.reshape(log_prob_flat, shape=ps.shape(x))
 
   def _log_cdf(self, x):
     return tfp_math.log1mexp(self._log_survival_function(x))
@@ -348,7 +348,7 @@ class OrderedLogistic(distribution.Distribution):
         params=augmented_log_survival_flat,
         indices=tf.clip_by_value(x_flat + 1, 0, num_categories),
         batch_dims=1)
-    return tf.reshape(log_survival_flat, shape=tf.shape(x))
+    return tf.reshape(log_survival_flat, shape=ps.shape(x))
 
   def _entropy(self):
     log_probs = self.categorical_log_probs()

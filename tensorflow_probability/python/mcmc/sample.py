@@ -99,11 +99,14 @@ def sample_chain(
   stationary distribution is governed by the supplied `TransitionKernel`
   instance (`kernel`).
 
-  This function can sample from multiple chains, in parallel. (Whether or not
-  there are multiple chains is dictated by the `kernel`.)
-
   The `current_state` can be represented as a single `Tensor` or a `list` of
   `Tensors` which collectively represent the current state.
+
+  This function can sample from multiple chains, in parallel.  Whether or not
+  there are multiple chains is dictated by how the `kernel` treats its inputs.
+  Typically, the shape of the independent chains is shape of the result of the
+  `target_log_prob_fn` used by the `kernel` when applied to the given
+  `current_state`.
 
   Since MCMC states are correlated, it is sometimes desirable to produce
   additional intermediate states, and then discard them, ending up with a set of

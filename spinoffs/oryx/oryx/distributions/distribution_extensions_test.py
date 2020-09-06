@@ -26,45 +26,42 @@ from oryx import distributions as bd
 from oryx.core import ppl
 
 
+# Use lambdas to defer construction of distributions
+# pylint: disable=g-long-lambda
 DISTRIBUTIONS = [
-    ('normal_scalar_args', bd.Normal, (0., 1.), {}, 0., [0., 1.]),
-    ('normal_scalar_kwargs', bd.Normal, (), {
-        'loc': 0.,
-        'scale': 1.
-    }, 0., [0., 1.]),
+    ('normal_scalar_args', bd.Normal, lambda: (0., 1.), lambda: {},
+     0., [0., 1.]),
+    ('normal_scalar_kwargs', bd.Normal, lambda: (),
+     lambda: {'loc': 0., 'scale': 1.}, 0., [0., 1.]),
     ('mvn_diag_args', bd.MultivariateNormalDiag,
-     (onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)), {},
+     lambda: (onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)),
+     lambda: {},
+     onp.zeros(5, dtype=onp.float32),
+     [onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)]),
+    ('mvn_diag_kwargs', bd.MultivariateNormalDiag, lambda: (),
+     lambda: {'loc': onp.zeros(5, dtype=onp.float32),
+              'scale_diag': onp.ones(5, dtype=onp.float32)},
      onp.zeros(5, dtype=onp.float32),
      [onp.zeros(5, dtype=onp.float32),
       onp.ones(5, dtype=onp.float32)]),
-    ('mvn_diag_kwargs', bd.MultivariateNormalDiag, (), {
-        'loc': onp.zeros(5, dtype=onp.float32),
-        'scale_diag': onp.ones(5, dtype=onp.float32)
-    }, onp.zeros(5, dtype=onp.float32),
+    ('independent_normal_args', bd.Independent, lambda: (bd.Normal(
+        onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)),),
+     lambda: {'reinterpreted_batch_ndims': 1}, onp.zeros(5, dtype=onp.float32),
      [onp.zeros(5, dtype=onp.float32),
       onp.ones(5, dtype=onp.float32)]),
-    ('independent_normal_args', bd.Independent, (bd.Normal(
-        onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)),), {
-            'reinterpreted_batch_ndims': 1
-        }, onp.zeros(5, dtype=onp.float32),
-     [onp.zeros(5, dtype=onp.float32),
-      onp.ones(5, dtype=onp.float32)]),
-    ('independent_normal_args2', bd.Independent, (bd.Normal(
+    ('independent_normal_args2', bd.Independent, lambda: (bd.Normal(
         loc=onp.zeros(5, dtype=onp.float32),
-        scale=onp.ones(5, dtype=onp.float32)),), {
+        scale=onp.ones(5, dtype=onp.float32)),), lambda: {
             'reinterpreted_batch_ndims': 1
         }, onp.zeros(5, dtype=onp.float32),
      [onp.zeros(5, dtype=onp.float32),
       onp.ones(5, dtype=onp.float32)]),
-    ('independent_normal_kwargs', bd.Independent, (), {
-        'reinterpreted_batch_ndims':
-            1,
-        'distribution':
-            bd.Normal(
-                onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32))
-    }, onp.zeros(5, dtype=onp.float32),
-     [onp.zeros(5, dtype=onp.float32),
-      onp.ones(5, dtype=onp.float32)]),
+    ('independent_normal_kwargs', bd.Independent, lambda: (), lambda: {
+        'reinterpreted_batch_ndims': 1,
+        'distribution': bd.Normal(onp.zeros(5, dtype=onp.float32),
+                                  onp.ones(5, dtype=onp.float32))},
+     onp.zeros(5, dtype=onp.float32),
+     [onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)]),
 ]
 
 
@@ -73,18 +70,24 @@ class DistributionsExtensionsTest(parameterized.TestCase):
   @parameterized.named_parameters(DISTRIBUTIONS)
   def test_sample(self, dist, args, kwargs, out, flat):
     del out, flat
+    args = args()
+    kwargs = kwargs()
     p = dist(*args, **kwargs)
     p.sample(seed=random.PRNGKey(0))
 
   @parameterized.named_parameters(DISTRIBUTIONS)
   def test_log_prob(self, dist, args, kwargs, out, flat):
     del flat
+    args = args()
+    kwargs = kwargs()
     p = dist(*args, **kwargs)
     p.log_prob(out)
 
   @parameterized.named_parameters(DISTRIBUTIONS)
   def test_flatten(self, dist, args, kwargs, out, flat):
     del out
+    args = args()
+    kwargs = kwargs()
     p = dist(*args, **kwargs)
     flat_p, _ = jax.tree_flatten(p)
     self.assertEqual(len(flat_p), len(flat))
@@ -94,6 +97,8 @@ class DistributionsExtensionsTest(parameterized.TestCase):
   @parameterized.named_parameters(DISTRIBUTIONS)
   def test_log_prob_transformation(self, dist, args, kwargs, out, flat):
     del out, flat
+    args = args()
+    kwargs = kwargs()
     p = dist(*args, **kwargs)
 
     def sample(key):
@@ -106,6 +111,8 @@ class DistributionsExtensionsTest(parameterized.TestCase):
   @parameterized.named_parameters(DISTRIBUTIONS)
   def test_unzip_transformation(self, dist, args, kwargs, out, flat):
     del out, flat
+    args = args()
+    kwargs = kwargs()
     p = dist(*args, **kwargs)
 
     def model(key):

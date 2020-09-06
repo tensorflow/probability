@@ -31,7 +31,7 @@ from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
@@ -204,11 +204,11 @@ class HalfStudentT(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self, df=None, loc=None, scale=None):
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(self.df if df is None else df),
-        prefer_static.broadcast_shape(
-            prefer_static.shape(self.loc if loc is None else loc),
-            prefer_static.shape(self.scale if scale is None else scale)))
+    return ps.broadcast_shape(
+        ps.shape(self.df if df is None else df),
+        ps.broadcast_shape(
+            ps.shape(self.loc if loc is None else loc),
+            ps.shape(self.scale if scale is None else scale)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(

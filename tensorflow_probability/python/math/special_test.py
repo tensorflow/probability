@@ -271,7 +271,7 @@ class BesselTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
+      "Gradient of `bessel_iv_ratio` does not currently work in JAX.")
   def testBesselIvRatioGradient(self):
     v = tf.constant([0.5, 1., 10., 20.])[..., tf.newaxis]
     x = tf.constant([0.1, 0.5, 0.9, 1., 12., 14., 22.])
@@ -282,6 +282,21 @@ class BesselTest(test_util.TestCase):
 
 
 class SpecialTest(test_util.TestCase):
+
+  def testErfcinv(self):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=0.,
+        maxval=1.,
+        seed=test_util.test_seed())
+    erfcinv = tfp.math.erfcinv(x)
+    x_prime = tf.math.erfc(erfcinv)
+    x_prime, erfcinv = self.evaluate([x_prime, erfcinv])
+
+    self.assertFalse(np.all(np.isnan(erfcinv)))
+    self.assertGreaterEqual(np.min(erfcinv), 0.)
+    # Check that erfc(erfcinv(x)) = x.
+    self.assertAllClose(x_prime, x, rtol=1e-6)
 
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
   # for a list of special values and known identities.
@@ -327,16 +342,10 @@ class SpecialTest(test_util.TestCase):
   @parameterized.named_parameters(("0", 0., 1.),
                                   ("exp(1)", np.exp(1.), 1. / (np.exp(1.) * 2)))
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   def testLambertWGradient(self, value, expected):
     """Tests the gradient of the LambertW function on some known identities."""
     x = tf.constant(value, dtype=tf.float64)
-    with tf.GradientTape() as g:
-      g.watch(x)
-      y = tfp.math.lambertw(x)
-
-    dy_dx = g.gradient(y, x)
+    _, dy_dx = tfp.math.value_and_gradient(tfp.math.lambertw, x)
     self.assertAllClose(dy_dx, expected)
 
   def testLogGammaCorrection(self):

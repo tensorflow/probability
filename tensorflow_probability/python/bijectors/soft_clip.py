@@ -203,6 +203,7 @@ class SoftClip(bijector.Bijector):
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
+    parameters = dict(locals())
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype(
           [low, high, hinge_softness], dtype_hint=tf.float32)
@@ -263,6 +264,7 @@ class SoftClip(bijector.Bijector):
         forward_min_event_ndims=0,
         dtype=dtype,
         validate_args=validate_args,
+        parameters=parameters,
         is_constant_jacobian=not components,
         name=name)
 

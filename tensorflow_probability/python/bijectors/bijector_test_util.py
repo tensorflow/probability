@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 from absl import logging
 import numpy as np
@@ -32,9 +30,6 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
-
-
-JAX_MODE = False
 
 
 def assert_finite(array):
@@ -319,8 +314,6 @@ def get_fldj_theoretical(bijector,
         f_x_unconstrained,
         [int(np.prod(batch_shape)), f_x_unconstrained.shape[-1]])
 
-  if JAX_MODE:
-    f_unconstrained = functools.partial(f_unconstrained, batch_shape=[])
   jacobian = batch_jacobian(f_unconstrained, x_unconstrained)
   jacobian = tf.reshape(
       jacobian, tensorshape_util.concatenate(batch_shape, jacobian.shape[-2:]))

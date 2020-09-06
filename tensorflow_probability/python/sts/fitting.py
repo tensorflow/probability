@@ -231,7 +231,7 @@ def fit_with_hmc(model,
       time-series model. This represents a joint distribution over
       time-series and their parameters with batch shape `[b1, ..., bN]`.
     observed_time_series: `float` `Tensor` of shape
-      `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
+      `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
       dimension may (optionally) be omitted if `num_timesteps > 1`. May
       optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes

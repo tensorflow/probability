@@ -109,8 +109,7 @@ class GeneralizedPareto(bijector_lib.Bijector):
                     self._non_negative_concentration_bijector.inverse(y))
 
   def _forward_log_det_jacobian(self, x):
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.forward_min_event_ndims)
+    event_ndims = self.forward_min_event_ndims
     return tf.where(
         self._concentration < 0.,
         self._negative_concentration_bijector().forward_log_det_jacobian(
@@ -119,8 +118,7 @@ class GeneralizedPareto(bijector_lib.Bijector):
             x, event_ndims=event_ndims))
 
   def _inverse_log_det_jacobian(self, y):
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.inverse_min_event_ndims)
+    event_ndims = self.inverse_min_event_ndims
     return tf.where(
         self._concentration < 0.,
         self._negative_concentration_bijector().inverse_log_det_jacobian(

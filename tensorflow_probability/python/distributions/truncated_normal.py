@@ -23,17 +23,20 @@ import functools
 # Dependency imports
 import numpy as np
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.generic import log_sub_exp as _log_sub_exp
+from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import random_ops  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -73,7 +76,7 @@ class TruncatedNormal(distribution.Distribution):
         { (2 pi)**(-0.5) exp(-0.5 y**2) / (scale * z) for low <= x <= high
         { 0                                    otherwise
     y = (x - loc)/scale
-    z = NormalCDF((high - loc) / scale) - NormalCDF((lower - loc) / scale)
+    z = NormalCDF((high - loc) / scale) - NormalCDF((low - loc) / scale)
   ```
 
   where:
@@ -88,8 +91,8 @@ class TruncatedNormal(distribution.Distribution):
   ```python
 
   tfd = tfp.distributions
-  # Define a batch of two scalar TruncatedNormals which modes at 0. and 1.0
-  dist = tfd.TruncatedNormal(loc=[0., 1.], scale=1.0,
+  # Define a batch of two scalar TruncatedNormals with modes at 0. and 1.0
+  dist = tfd.TruncatedNormal(loc=[0., 1.], scale=1.,
                              low=[-1., 0.],
                              high=[1., 1.])
 
@@ -238,11 +241,11 @@ class TruncatedNormal(distribution.Distribution):
 
   def _batch_shape_tensor(self, loc=None, scale=None, low=None, high=None):
     return functools.reduce(
-        prefer_static.broadcast_shape,
-        (prefer_static.shape(self.loc if loc is None else loc),
-         prefer_static.shape(self.scale if scale is None else scale),
-         prefer_static.shape(self.low if low is None else low),
-         prefer_static.shape(self.high if high is None else high)))
+        ps.broadcast_shape,
+        (ps.shape(self.loc if loc is None else loc),
+         ps.shape(self.scale if scale is None else scale),
+         ps.shape(self.low if low is None else low),
+         ps.shape(self.high if high is None else high)))
 
   def _event_shape(self):
     return tf.TensorShape([])
@@ -251,9 +254,20 @@ class TruncatedNormal(distribution.Distribution):
     loc, scale, low, high = self._loc_scale_low_high()
     batch_shape = self._batch_shape_tensor(
         loc=loc, scale=scale, low=low, high=high)
-    sample_and_batch_shape = tf.concat([[n], batch_shape], 0)
-    flat_batch_and_sample_shape = tf.stack([tf.reduce_prod(batch_shape), n])
+    sample_and_batch_shape = ps.concat([[n], batch_shape], 0)
+    # TODO(b/162522020): Use this behavior unconditionally.
+    if (tf.executing_eagerly() or
+        not control_flow_util.GraphOrParentsInXlaContext(
+            tf1.get_default_graph())):
+      return tf.random.stateless_parameterized_truncated_normal(
+          shape=sample_and_batch_shape,
+          means=loc,
+          stddevs=scale,
+          minvals=low,
+          maxvals=high,
+          seed=samplers.sanitize_seed(seed))
 
+    flat_batch_and_sample_shape = tf.stack([tf.reduce_prod(batch_shape), n])
     # In order to be reparameterizable we sample on the truncated_normal of
     # unit variance and mean and scale (but with the standardized
     # truncation bounds).

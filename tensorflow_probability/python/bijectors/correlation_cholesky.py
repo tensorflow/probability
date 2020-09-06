@@ -24,7 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import fill_triangular
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -156,21 +156,20 @@ class CorrelationCholesky(bijector.Bijector):
 
   def _forward(self, x):
     x = tf.convert_to_tensor(x, name='x')
-    batch_shape = prefer_static.shape(x)[:-1]
+    batch_shape = ps.shape(x)[:-1]
 
     # Pad zeros on the top row and right column.
     y = fill_triangular.FillTriangular().forward(x)
-    rank = prefer_static.rank(y)
-    paddings = tf.concat([
-        tf.zeros(shape=(rank - 2, 2), dtype=tf.int32),
-        tf.constant([[1, 0], [0, 1]], dtype=tf.int32)
-    ],
-                         axis=0)
+    rank = ps.rank(y)
+    paddings = ps.concat(
+        [ps.zeros([rank - 2, 2], dtype=tf.int32),
+         [[1, 0], [0, 1]]],
+        axis=0)
     y = tf.pad(y, paddings)
 
     # Set diagonal to 1s.
-    n = prefer_static.shape(y)[-1]
-    diag = tf.ones(tf.concat([batch_shape, [n]], axis=-1), dtype=x.dtype)
+    n = ps.shape(y)[-1]
+    diag = tf.ones(ps.concat([batch_shape, [n]], axis=-1), dtype=x.dtype)
     y = tf.linalg.set_diag(y, diag)
 
     # Normalize each row to have Euclidean (L2) norm 1.
@@ -178,15 +177,15 @@ class CorrelationCholesky(bijector.Bijector):
     return y
 
   def _inverse(self, y):
-    n = prefer_static.shape(y)[-1]
-    batch_shape = prefer_static.shape(y)[:-2]
+    n = ps.shape(y)[-1]
+    batch_shape = ps.shape(y)[:-2]
 
     # Extract the reciprocal of the row norms from the diagonal.
     diag = tf.linalg.diag_part(y)[..., tf.newaxis]
 
     # Set the diagonal to 0s.
     y = tf.linalg.set_diag(
-        y, tf.zeros(tf.concat([batch_shape, [n]], axis=-1), dtype=y.dtype))
+        y, tf.zeros(ps.concat([batch_shape, [n]], axis=-1), dtype=y.dtype))
 
     # Multiply with the norm (or divide by its reciprocal) to recover the
     # unconstrained reals in the (strictly) lower triangular part.
@@ -232,7 +231,7 @@ class CorrelationCholesky(bijector.Bijector):
     #   equality follows from s^2 - x^Tx = s^2 - sum x_i^2 = 1. Hence,
     #   det(J) = s^{-3k} s^{2k - 2} = s^{-(k + 2)}.
     #
-    n = prefer_static.shape(y)[-1]
+    n = ps.shape(y)[-1]
     return -tf.reduce_sum(
         tf.range(2, n + 2, dtype=y.dtype) * tf.math.log(tf.linalg.diag_part(y)),
         axis=-1)

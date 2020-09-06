@@ -92,6 +92,46 @@ class ConvolutionTest(test_util.TestCase):
   def test_works_correctly(self):
     pass
 
+  def test_non_bayesian_conv(self):
+    x = tfn.Convolution(
+        1, 5, 5, strides=2, padding='same')(tf.random.normal([3, 28, 28, 1]))
+    self.assertShapeEqual(np.zeros([3, 14, 14, 5]), x)
+
+  def test_bayesian_conv(self):
+    def sample(kernel_shape,
+               bias_shape,
+               kernel_initializer=None,  # pylint: disable=unused-argument
+               bias_initializer=None,  # pylint: disable=unused-argument
+               kernel_batch_ndims=0,  # pylint: disable=unused-argument
+               bias_batch_ndims=0,  # pylint: disable=unused-argument
+               dtype=tf.float32,  # pylint: disable=unused-argument
+               kernel_prior_scale_scale=None,  # pylint: disable=unused-argument
+               kernel_scale_init_value=None,  # pylint: disable=unused-argument
+               bias_prior_scale=None,  # pylint: disable=unused-argument
+               bias_scale_init_value=None,  # pylint: disable=unused-argument
+               kernel_prior=None):  # pylint: disable=unused-argument
+      k = tfd.Normal(0., 1.).sample(kernel_shape)
+      b = tfd.Normal(0., 1.).sample(bias_shape)
+      return k, b
+    def tile_for_batch(x, batch_shape):
+      x_shape = tf.shape(x)
+      x_ndims = tf.rank(x)
+      x = tf.reshape(x, shape=tf.concat([
+          x_shape[:-1],
+          tf.ones_like(batch_shape),
+          x_shape[-1:],
+          ], axis=0))
+      return tf.tile(x, multiples=tf.pad(
+          batch_shape,
+          paddings=[[x_ndims - 1, 1]],
+          constant_values=1))
+
+    nn = tfn.Convolution(1, 5, 5, strides=2, padding='same', batch_shape=1,
+                         make_kernel_bias_fn=sample)
+    x = nn(tile_for_batch(tf.random.normal([3, 28, 28, 1]),
+                          tf.reshape(1, [-1])))
+    self.assertShapeEqual(np.zeros([3, 14, 14, 1, 5]), x)
+
 
 @test_util.test_all_tf_execution_regimes
 class ConvolutionVariationalReparameterizationTest(

@@ -25,7 +25,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -156,7 +156,7 @@ class OneHotCategorical(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     param = self._logits if self._logits is not None else self._probs
-    return prefer_static.shape(param)[:-1]
+    return ps.shape(param)[:-1]
 
   def _batch_shape(self):
     param = self._logits if self._logits is not None else self._probs
@@ -167,7 +167,7 @@ class OneHotCategorical(distribution.Distribution):
     # NOTE: If the last dimension of `param.shape` is statically-known, but
     # the `param.shape` is not statically-known, then we will *not* return a
     # statically-known event size here.  This could be fixed.
-    return prefer_static.shape(param)[-1:]
+    return ps.shape(param)[-1:]
 
   def _event_shape(self):
     param = self._logits if self._logits is not None else self._probs
@@ -175,7 +175,7 @@ class OneHotCategorical(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     logits = self._logits_parameter_no_checks()
-    sample_shape = prefer_static.concat([[n], prefer_static.shape(logits)], 0)
+    sample_shape = ps.concat([[n], ps.shape(logits)], 0)
     event_size = self._event_size(logits)
     if tensorshape_util.rank(logits.shape) == 2:
       logits_2d = logits
@@ -202,7 +202,7 @@ class OneHotCategorical(distribution.Distribution):
       logits = tf.broadcast_to(logits, broadcast_shape)
       x = tf.broadcast_to(x, broadcast_shape)
 
-    logits_shape = tf.shape(tf.reduce_sum(logits, axis=-1))
+    logits_shape = ps.shape(tf.reduce_sum(logits, axis=-1))
     logits_2d = tf.reshape(logits, [-1, event_size])
     x_2d = tf.reshape(x, [-1, event_size])
     ret = -tf.nn.softmax_cross_entropy_with_logits(

@@ -15,9 +15,7 @@
 # Description:
 #   Experimental linear algebra tools.
 
-# [internal] load python3.bzl
-
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -33,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":linear_operator_psd_kernel",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -49,11 +48,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "linear_operator_psd_kernel_test",
     size = "small",
     srcs = ["linear_operator_psd_kernel_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

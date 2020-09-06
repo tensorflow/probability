@@ -15,7 +15,7 @@
 # Description:
 #   TensorFlow Probability random samplers/utilities.
 
-load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_test", "multi_substrate_py_library")
+load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
 
 package(
     default_visibility = [
@@ -23,7 +23,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -33,6 +33,7 @@ multi_substrate_py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":random_ops",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:samplers",
     ],
 )

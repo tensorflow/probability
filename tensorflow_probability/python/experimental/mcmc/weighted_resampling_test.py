@@ -30,7 +30,6 @@ from tensorflow_probability.python.experimental.mcmc.weighted_resampling import 
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import test_util
 
-
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
@@ -40,6 +39,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_categorical_resampler_chi2(self):
+    strm = test_util.test_seed_stream()
     # Test categorical resampler using chi-squared test.
     if self.use_xla and tf.executing_eagerly():
       self.skipTest('No need to test XLA under all execution regimes.')
@@ -48,7 +48,7 @@ class _SMCResamplersTest(test_util.TestCase):
     num_distributions = 3
     unnormalized_probs = tfd.Uniform(
         low=self.dtype(0),
-        high=self.dtype(1.)).sample([num_distributions, num_probs], seed=42)
+        high=self.dtype(1.)).sample([num_distributions, num_probs], seed=strm)
     probs = unnormalized_probs / tf.reduce_sum(
         unnormalized_probs, axis=-1, keepdims=True)
 
@@ -62,26 +62,22 @@ class _SMCResamplersTest(test_util.TestCase):
                                              source_idx=-1,
                                              dest_idx=0)),
         num_particles,
-        [num_samples])
-    sample = dist_util.move_dimension(sample,
-                                      source_idx=0,
-                                      dest_idx=-1)
-    # TODO(dpiponi): reimplement this test in vectorized form rather than with
-    # loops.
-    for sample_index in range(num_samples):
-      for prob_index in range(num_distributions):
-        counts = tf.scatter_nd(
-            indices=sample[sample_index, prob_index][:, tf.newaxis],
-            updates=tf.ones(num_particles, dtype=tf.int32),
-            shape=[num_probs])
-        expected_samples = probs[prob_index] * num_particles
-        chi2 = tf.reduce_sum(
-            (tf.cast(counts, self.dtype) -
-             expected_samples)**2 / expected_samples,
-            axis=-1)
-        self.assertAllLess(
-            tfd.Chi2(df=self.dtype(num_probs - 1)).cdf(chi2),
-            0.9999)
+        [num_samples],
+        seed=strm)
+    elems = tf.range(num_probs)
+    initializer = tf.zeros([num_samples, num_distributions], dtype=sample.dtype)
+    counts = tf.scan(
+        lambda _, x: tf.reduce_sum(  # pylint: disable=g-long-lambda
+            tf.cast(tf.equal(sample, x), sample.dtype), axis=0),
+        elems,
+        initializer)
+    counts = dist_util.move_dimension(
+        tf.cast(counts, self.dtype), source_idx=0, dest_idx=-1)
+    expected_samples = probs * num_particles
+    chi2 = tf.reduce_sum(
+        (counts - expected_samples)**2 / expected_samples, axis=-1)
+    self.assertAllLess(
+        tfd.Chi2(df=self.dtype(num_probs - 1)).cdf(chi2), 0.99995)
 
   def test_categorical_resampler_zero_final_class(self):
     if self.use_xla and tf.executing_eagerly():
@@ -89,7 +85,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
     probs = self.dtype([1.0, 0.0])
     resampled = self.maybe_compiler(resample_independent)(
-        tf.math.log(probs), 1000, [], seed=test_util.test_seed())
+        tf.math.log(probs), 1000, [], seed=test_util.test_seed_stream())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
   def test_systematic_resampler_zero_final_class(self):
@@ -98,7 +94,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
     probs = self.dtype([1.0, 0.0])
     resampled = self.maybe_compiler(resample_systematic)(
-        tf.math.log(probs), 1000, [])
+        tf.math.log(probs), 1000, [], seed=test_util.test_seed_stream())
     self.assertAllClose(resampled, tf.zeros((1000,), dtype=tf.int32))
 
   def test_categorical_resampler_large(self):
@@ -108,7 +104,7 @@ class _SMCResamplersTest(test_util.TestCase):
     num_probs = 10000
     log_probs = tf.fill([num_probs], -tf.math.log(self.dtype(num_probs)))
     self.evaluate(self.maybe_compiler(resample_independent)(
-        log_probs, num_probs, [], seed=test_util.test_seed()))
+        log_probs, num_probs, [], seed=test_util.test_seed_stream()))
 
   def test_systematic_resampler_large(self):
     if self.use_xla and tf.executing_eagerly():
@@ -118,10 +114,11 @@ class _SMCResamplersTest(test_util.TestCase):
     log_probs = tf.fill([num_probs], -tf.math.log(self.dtype(num_probs)))
     self.evaluate(self.maybe_compiler(resample_systematic)(
         log_probs, num_probs, [],
-        seed=test_util.test_seed()))
+        seed=test_util.test_seed_stream()))
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_systematic_resampler_means(self):
+    strm = test_util.test_seed_stream()
     if self.use_xla and tf.executing_eagerly():
       self.skipTest('No need to test XLA under all execution regimes.')
 
@@ -134,7 +131,7 @@ class _SMCResamplersTest(test_util.TestCase):
     num_probs = 16
     probs = tfd.Uniform(
         low=self.dtype(0.0),
-        high=self.dtype(1.0)).sample([num_distributions, num_probs])
+        high=self.dtype(1.0)).sample([num_distributions, num_probs], seed=strm)
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
     num_samples = 10000
     num_particles = 20
@@ -142,7 +139,7 @@ class _SMCResamplersTest(test_util.TestCase):
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
-        num_particles, [num_samples])
+        num_particles, [num_samples], seed=test_util.test_seed_stream())
     resampled = dist_util.move_dimension(resampled,
                                          source_idx=0,
                                          dest_idx=-1)
@@ -165,6 +162,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_minimum_error_resampler_means(self):
+    strm = test_util.test_seed_stream()
     if self.use_xla and tf.executing_eagerly():
       self.skipTest('No need to test XLA under all execution regimes.')
 
@@ -177,8 +175,7 @@ class _SMCResamplersTest(test_util.TestCase):
     num_probs = 8
     probs = tfd.Uniform(
         low=self.dtype(0.0),
-        high=self.dtype(1.0)).sample([num_distributions, num_probs],
-                                     seed=test_util.test_seed())
+        high=self.dtype(1.0)).sample([num_distributions, num_probs], seed=strm)
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
     num_samples = 4
     num_particles = 10000
@@ -186,7 +183,7 @@ class _SMCResamplersTest(test_util.TestCase):
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
-        num_particles, [num_samples])
+        num_particles, [num_samples], seed=test_util.test_seed_stream())
     resampled = dist_util.move_dimension(resampled,
                                          source_idx=0,
                                          dest_idx=-1)
@@ -206,6 +203,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_stratified_resampler_means(self):
+    strm = test_util.test_seed_stream()
     if self.use_xla and tf.executing_eagerly():
       self.skipTest('No need to test XLA under all execution regimes.')
 
@@ -218,9 +216,7 @@ class _SMCResamplersTest(test_util.TestCase):
     num_probs = 8
     probs = tfd.Uniform(
         low=self.dtype(0.0),
-        high=self.dtype(1.0)).sample(
-            [num_distributions, num_probs],
-            seed=test_util.test_seed())
+        high=self.dtype(1.0)).sample([num_distributions, num_probs], seed=strm)
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
     num_samples = 4
     num_particles = 10000
@@ -228,7 +224,7 @@ class _SMCResamplersTest(test_util.TestCase):
         tf.math.log(dist_util.move_dimension(probs,
                                              source_idx=-1,
                                              dest_idx=0)),
-        num_particles, [num_samples])
+        num_particles, [num_samples], seed=test_util.test_seed_stream())
     resampled = dist_util.move_dimension(resampled,
                                          source_idx=0,
                                          dest_idx=-1)

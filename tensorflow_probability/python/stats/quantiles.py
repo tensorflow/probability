@@ -25,7 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -154,10 +154,10 @@ def count_integers(arr,
     _get_static_ndims(flat_counts_t, expect_ndims=2, expect_static=True)
 
     # not_axis_shape = arr.shape[~axis]
-    not_axis_shape = tf.gather(tf.shape(arr), indices=not_axis)
+    not_axis_shape = ps.gather(ps.shape(arr), indices=not_axis)
 
     # The first index of flat_counts_t indexes bins 0,..,K-1, the rest are ~axis
-    out_shape = tf.concat([[-1], not_axis_shape], axis=0)
+    out_shape = ps.concat([[-1], not_axis_shape], axis=0)
 
     return tf.reshape(flat_counts_t, out_shape)
 
@@ -556,7 +556,7 @@ def percentile(x,
     # only once (under the hood) and use CSE.
     sorted_y = tf.sort(y, axis=-1, direction='ASCENDING')
 
-    d = tf.cast(tf.shape(y)[-1], tf.float64)
+    d = ps.cast(ps.shape(y)[-1], tf.float64)
 
     def _get_indices(interp_type):
       """Get values of y at the indices implied by interp_type."""
@@ -570,7 +570,7 @@ def percentile(x,
       # So clip to avoid out of bounds errors.
       return tf.clip_by_value(
           tf.cast(indices, tf.int32), 0,
-          tf.shape(y)[-1] - 1)
+          ps.shape(y)[-1] - 1)
 
     if interpolation in ['nearest', 'lower', 'higher']:
       gathered_y = tf.gather(sorted_y, _get_indices(interpolation), axis=-1)
@@ -607,9 +607,9 @@ def percentile(x,
     if x.dtype in (tf.bfloat16, tf.float16, tf.float32, tf.float64):
       # Apparently tf.is_nan doesn't like other dtypes
       nan_batch_members = tf.reduce_any(tf.math.is_nan(x), axis=axis)
-      right_rank_matched_shape = tf.pad(
-          tf.shape(nan_batch_members),
-          paddings=[[0, tf.rank(q)]],
+      right_rank_matched_shape = ps.pad(
+          ps.shape(nan_batch_members),
+          paddings=[[0, ps.rank(q)]],
           constant_values=1)
       nan_batch_members = tf.reshape(
           nan_batch_members, shape=right_rank_matched_shape)
@@ -629,7 +629,7 @@ def percentile(x,
     # If q is a scalar, then result has the right shape.
     # If q is a vector, then result has trailing dim of shape q.shape, which
     # needs to be rotated to dim 0.
-    return distribution_util.rotate_transpose(gathered_y, tf.rank(q))
+    return distribution_util.rotate_transpose(gathered_y, ps.rank(q))
 
 
 @deprecation.deprecated_args(
@@ -843,7 +843,7 @@ def _make_static_axis_non_negative_list(axis, ndims):
   Raises:
     ValueError: If `axis` is not statically defined.
   """
-  axis = prefer_static.non_negative_axis(axis, ndims)
+  axis = ps.non_negative_axis(axis, ndims)
 
   axis_const = tf.get_static_value(axis)
   if axis_const is None:
@@ -891,7 +891,7 @@ def _move_dims_to_flat_end(x, axis, x_ndims, right_end=True):
     full_shape = (
         other_shape + end_shape if right_end else end_shape + other_shape)
   else:
-    other_shape = tf.gather(tf.shape(x), tf.constant(other_dims, tf.int64))
-    full_shape = tf.concat(
+    other_shape = ps.gather(ps.shape(x), ps.cast(other_dims, tf.int64))
+    full_shape = ps.concat(
         [other_shape, [-1]] if right_end else [[-1], other_shape], axis=0)
   return tf.reshape(x_permed, shape=full_shape)

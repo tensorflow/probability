@@ -21,7 +21,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -31,5 +31,6 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         "//tensorflow_probability/python/experimental/edward2",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )

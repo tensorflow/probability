@@ -19,21 +19,18 @@ from typing import Optional
 from jax import tree_util
 from jax import util as jax_util
 from six.moves import zip
-from tensorflow_probability.python.experimental.substrates import jax as tfp
-from oryx import core
 from oryx.core import ppl
+from oryx.core import primitive
 from oryx.core.interpreters import inverse
-
-__all__ = [
-    'make_type',
-]
-
+from oryx.core.interpreters import log_prob
+from oryx.core.interpreters import unzip
+from tensorflow_probability.substrates import jax as tfp
 
 tf = tfp.tf2jax
 tfd = tfp.distributions
 
 
-InverseAndILDJ = inverse.InverseAndILDJ
+InverseAndILDJ = inverse.core.InverseAndILDJ
 
 _registry = {}
 
@@ -83,41 +80,28 @@ class _JaxDistributionTypeSpec(object):
     return cls(clsid, param_specs, kwargs)
 
 
-random_variable_p = core.HigherOrderPrimitive('random_variable')
-core.interpreters.unzip.block_registry.add(random_variable_p)
+random_variable_p = primitive.InitialStylePrimitive('random_variable')
+unzip.block_registry.add(random_variable_p)
 
 
-def random_variable_log_prob_rule(flat_invals, flat_outvals, **params):
+def random_variable_log_prob_rule(flat_incells, flat_outcells, **params):
   """Registers Oryx distributions with the log_prob transformation."""
-  flat_invals = flat_invals[1:]
-  num_consts = len(flat_invals) - params['num_args']
-  const_invals, flat_invals = jax_util.split_list(flat_invals, [num_consts])
-  arg_vals = tree_util.tree_unflatten(params['in_tree'], flat_invals)
-  seed_val, dist_val = arg_vals[0], arg_vals[1]
-  if not (seed_val.is_unknown() or all(
-      v.is_unknown() for v in tree_util.tree_flatten(dist_val)[0])):
-    dist = tree_util.tree_map(lambda x: x.val, dist_val)
-    s = dist.sample(seed=seed_val.val, **params['kwargs'])
-    return const_invals + flat_invals, [InverseAndILDJ.new(s)], True, None
-  elif not all(val.is_unknown() for val in flat_outvals):
-    return const_invals + flat_invals, flat_outvals, True, None
-  return const_invals + flat_invals, flat_outvals, False, None
-core.interpreters.log_prob.log_prob_rules[
-    random_variable_p] = random_variable_log_prob_rule
+  del params
+  return flat_incells, flat_outcells, None
+log_prob.log_prob_rules[random_variable_p] = random_variable_log_prob_rule
 
 
-def random_variable_log_prob(flat_invals, val, **params):
+def random_variable_log_prob(flat_incells, val, *, num_consts, in_tree, **_):
   """Registers Oryx distributions with the log_prob transformation."""
-  num_consts = len(flat_invals) - params['num_args']
-  _, flat_invals = jax_util.split_list(flat_invals, [num_consts])
-  _, dist = tree_util.tree_unflatten(params['in_tree'], flat_invals)
-  if any(val.is_unknown() for val in flat_invals[1:]
+  _, flat_incells = jax_util.split_list(flat_incells, [num_consts])
+  _, dist = tree_util.tree_unflatten(in_tree, flat_incells)
+  if any(not cell.top() for cell in flat_incells[1:]
          if isinstance(val, InverseAndILDJ)):
     return None
   return dist.log_prob(val)
 
 
-core.interpreters.log_prob.log_prob_registry[
+log_prob.log_prob_registry[
     random_variable_p] = random_variable_log_prob
 
 
@@ -128,8 +112,12 @@ def _sample_distribution(key, dist):
 @ppl.random_variable.register(tfd.Distribution)
 def distribution_random_variable(dist: tfd.Distribution, *,
                                  name: Optional[str] = None):
+  """Converts a distribution into a sampling function."""
   def wrapped(key):
-    result = core.call_bind(random_variable_p)(_sample_distribution)(key, dist)
+    result = primitive.initial_style_bind(
+        random_variable_p,
+        distribution_name=dist.__class__.__name__)(_sample_distribution)(
+            key, dist)
     if name is not None:
       result = ppl.random_variable(result, name=name)
     return result
@@ -144,7 +132,7 @@ def distribution_log_prob(dist: tfd.Distribution):
 
 
 def make_wrapper_type(cls):
-  """Creates a flattenable Distribution type that has lazily evaluated attributes."""
+  """Creates a flattenable Distribution type."""
 
   clsid = (cls.__module__, cls.__name__)
 
@@ -155,20 +143,13 @@ def make_wrapper_type(cls):
       def __init__(self, *args, **kwargs):
         self._args = args
         self._kwargs = kwargs
-
-      def _get_instance(self):
-        obj = object.__new__(cls)
-        cls.__init__(obj, *self._args, **self._kwargs)
-        return obj
+        self._instance = object.__new__(cls)
+        cls.__init__(self._instance, *self._args, **self._kwargs)
 
       def __getattr__(self, key):
-        if key not in ('_args', '_kwargs', 'parameters', '_type_spec'):
-          return getattr(self._get_instance(), key)
+        if key not in ('_args', '_kwargs', '_type_spec', '_instance'):
+          return getattr(self._instance, key)
         return object.__getattribute__(self, key)
-
-      @property
-      def parameters(self):
-        return self._get_instance().parameters
 
       @property
       def _type_spec(self):

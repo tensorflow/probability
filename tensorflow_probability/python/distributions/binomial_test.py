@@ -360,6 +360,19 @@ class BinomialTest(test_util.TestCase):
          total_count))
     self.assertAllEqual(samples, expected_samples)
 
+  def testSampleWithNonZeroCountsAndNanSuccessProbability(self):
+    # With non-zero counts, should forward the nan from the success probability,
+    # but should not interfere with the rest of the batch.
+    # Testing this case because it came up from us using Binomial as a
+    # subroutine in BetaBinomial (b/163433191).
+    total_count = tf.constant([23., 6.], dtype=tf.float32)
+    probs = tf.constant([1., np.nan], dtype=tf.float32)
+    expected_samples = [23., np.nan]
+    dist = tfd.Binomial(
+        total_count=total_count, probs=probs, validate_args=False)
+    samples = self.evaluate(dist.sample(5, seed=test_util.test_seed()))
+    self.assertAllEqual(samples, [expected_samples] * 5)
+
   def testSampleInBounds(self):
     # Regression test for b/152660887.
     # This number of samples suffices to make the test fail about 45 times out

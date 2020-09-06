@@ -105,15 +105,23 @@ class Softplus(bijector.Bijector):
       kwargs_dict={
           'hinge_softness': (
               'Nonzero floating point `Tensor`.  Controls the softness of what '
-              'would otherwise be a kink at the origin.  Default is 1.0')})
+              'would otherwise be a kink at the origin.  Default is 1.0'),
+          'low': (
+              'Nonzero floating point `Tensor` lower bound on output values. '
+              'Implicitly zero if `None`. Otherwise, the '
+              'transformation `y = softplus(x) + low` is implemented. This '
+              'is equivalent to a `Chain([Shift(low), Softplus()])` bijector '
+              'and is provided for convenience.')})
   def __init__(self,
                hinge_softness=None,
+               low=None,
                validate_args=False,
                name='softplus'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._hinge_softness = tensor_util.convert_nonref_to_tensor(
           hinge_softness, name='hinge_softness')
+      self._low = tensor_util.convert_nonref_to_tensor(low, name='low')
       super(Softplus, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
@@ -126,11 +134,14 @@ class Softplus(bijector.Bijector):
 
   def _forward(self, x):
     if self.hinge_softness is None:
-      return _stable_grad_softplus(x)
-    hinge_softness = tf.cast(self.hinge_softness, x.dtype)
-    return hinge_softness * _stable_grad_softplus(x / hinge_softness)
+      y = _stable_grad_softplus(x)
+    else:
+      hinge_softness = tf.cast(self.hinge_softness, x.dtype)
+      y = hinge_softness * _stable_grad_softplus(x / hinge_softness)
+    return y + self.low if self.low is not None else y
 
   def _inverse(self, y):
+    y = y - self.low if self.low is not None else y
     if self.hinge_softness is None:
       return tfp_math.softplus_inverse(y)
     hinge_softness = tf.cast(self.hinge_softness, y.dtype)
@@ -147,6 +158,7 @@ class Softplus(bijector.Bijector):
     #           = 1 / (1 - exp{-Y}),
     # which is the most stable for large Y > 0. For small Y, we use
     # 1 - exp{-Y} approx Y.
+    y = y - self.low if self.low is not None else y
     if self.hinge_softness is not None:
       y = y / tf.cast(self.hinge_softness, y.dtype)
     return -tf.math.log(-tf.math.expm1(-y))
@@ -159,6 +171,10 @@ class Softplus(bijector.Bijector):
   @property
   def hinge_softness(self):
     return self._hinge_softness
+
+  @property
+  def low(self):
+    return self._low
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

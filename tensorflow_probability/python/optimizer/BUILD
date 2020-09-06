@@ -15,7 +15,7 @@
 # Description:
 #   Optimizers.
 
-load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_test", "multi_substrate_py_library")
+load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
 
 package(
     default_visibility = [
@@ -23,7 +23,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -32,11 +32,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
     substrates_omit_deps = [
-        ":bfgs",
-        ":bfgs_utils",
         ":differential_evolution",
-        ":lbfgs",
-        ":nelder_mead",
         ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
@@ -50,6 +46,7 @@ multi_substrate_py_library(
         ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/optimizer/convergence_criteria",
         "//tensorflow_probability/python/optimizer/linesearch",
     ],
@@ -115,13 +112,13 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["bfgs_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -140,7 +137,6 @@ multi_substrate_py_test(
     name = "lbfgs_test",
     timeout = "long",
     srcs = ["lbfgs_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
@@ -148,6 +144,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -177,13 +174,13 @@ multi_substrate_py_test(
     name = "nelder_mead_test",
     size = "medium",
     srcs = ["nelder_mead_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 

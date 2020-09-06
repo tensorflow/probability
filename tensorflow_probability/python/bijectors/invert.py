@@ -75,9 +75,9 @@ class Invert(bijector_lib.Bijector):
       super(Invert, self).__init__(
           forward_min_event_ndims=bijector.inverse_min_event_ndims,
           inverse_min_event_ndims=bijector.forward_min_event_ndims,
+          dtype=bijector.dtype,
           is_constant_jacobian=bijector.is_constant_jacobian,
           validate_args=validate_args,
-          dtype=bijector.dtype,
           parameters=parameters,
           name=name)
 
@@ -117,4 +117,3 @@ class Invert(bijector_lib.Bijector):
 
   def inverse_dtype(self, dtype, **kwargs):
     return self.bijector.forward_dtype(dtype, **kwargs)
-

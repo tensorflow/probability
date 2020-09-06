@@ -41,10 +41,7 @@
 # directory.
 
 virtualenv_is_active() {
-  # This is apparently the most reliable way to check whether the script is
-  # being run in a virtualenv. Source:
-  # https://stackoverflow.com/questions/1871549/determine-if-python-is-running-inside-virtualenv
-  python -c 'import sys; sys.exit(not hasattr(sys, "real_prefix"))'
+  python testing/virtualenv_is_active.py
 }
 
 SCRIPT_ARGS=$@
@@ -152,12 +149,15 @@ install_python_packages() {
   TF_VERSION_STR=$(find_good_tf_nightly_version_str $TF_NIGHTLY_PACKAGE)
   python -m pip install $PIP_FLAGS $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR
 
+  # For the JAX backend.
+  python -m pip install jax jaxlib
+
   # The following unofficial dependencies are used only by tests.
   # TODO(b/148685448): Unpin Hypothesis and coverage versions.
   python -m pip install $PIP_FLAGS hypothesis==3.56.5 coverage==4.4.2 matplotlib mock scipy
 
   # Install additional TFP dependencies.
-  python -m pip install $PIP_FLAGS decorator cloudpickle dm-tree
+  python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
 
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
@@ -166,7 +166,7 @@ install_python_packages() {
   # Print out all versions, as an FYI in the logs.
   python --version
   python -m pip --version
-  python -m pip freeze
+  python -m pip list
 }
 
 check_for_common_package_conflicts

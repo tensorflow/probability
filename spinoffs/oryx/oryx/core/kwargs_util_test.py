@@ -104,6 +104,13 @@ class KwargsUtilTest(absltest.TestCase):
         kwargs_util.check_in_kwargs(foo3, 'rng'))
     self.assertTrue(
         kwargs_util.check_in_kwargs(foo3, 'training'))
+    def foo4(x, y, *, rng, training):
+      del rng, training
+      return x + y
+    self.assertTrue(
+        kwargs_util.check_in_kwargs(foo4, 'rng'))
+    self.assertTrue(
+        kwargs_util.check_in_kwargs(foo4, 'training'))
 
 if __name__ == '__main__':
   absltest.main()

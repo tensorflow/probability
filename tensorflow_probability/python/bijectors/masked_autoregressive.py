@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 import numpy as np
-import numpy as onp  # JAX rewrites numpy import  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -158,13 +157,16 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   dims = 2
 
   # A common choice for a normalizing flow is to use a Gaussian for the base
-  # distribution.  (However, any continuous distribution would work.) E.g.,
+  # distribution.  (However, any continuous distribution would work.) Here, we
+  # use `tfd.Sample` to create a joint Gaussian distribution with diagonal
+  # covariance for the base distribution (note that in the Gaussian case,
+  # `tfd.MultivariateNormalDiag` could also be used.)
   maf = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
       bijector=tfb.MaskedAutoregressiveFlow(
           shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
-              params=2, hidden_units=[512, 512])),
-      event_shape=[dims])
+              params=2, hidden_units=[512, 512])))
 
   x = maf.sample()  # Expensive; uses `tf.while_loop`, no Bijector caching.
   maf.log_prob(x)   # Almost free; uses Bijector caching.
@@ -174,11 +176,11 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   # [Papamakarios et al. (2016)][3] also describe an Inverse Autoregressive
   # Flow [(Kingma et al., 2016)][2]:
   iaf = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
       bijector=tfb.Invert(tfb.MaskedAutoregressiveFlow(
           shift_and_log_scale_fn=tfb.AutoregressiveNetwork(
-              params=2, hidden_units=[512, 512]))),
-      event_shape=[dims])
+              params=2, hidden_units=[512, 512]))))
 
   x = iaf.sample()  # Cheap; no `tf.while_loop` despite no Bijector caching.
   iaf.log_prob(x)   # Almost free; uses Bijector caching.
@@ -190,11 +192,11 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
   # different number/depth of hidden layers.
   made = tfb.AutoregressiveNetwork(params=1, hidden_units=[32])
   maf_no_scale_hidden2 = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
       bijector=tfb.MaskedAutoregressiveFlow(
           lambda y: (made(y)[..., 0], None),
-          is_constant_jacobian=True),
-      event_shape=[dims])
+          is_constant_jacobian=True))
   maf_no_scale_hidden2._made = made  # Ensure maf_no_scale_hidden2.trainable
   # NOTE: The last line ensures that maf_no_scale_hidden2.trainable_variables
   # will include all variables from `made`.
@@ -352,7 +354,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
         y = self._bijector_fn(y, **kwargs).forward(x)
       return y
 
-    event_size = tf.reduce_prod(tf.shape(x)[-self._event_ndims:])
+    event_size = ps.reduce_prod(ps.shape(x)[-self._event_ndims:])
     y0 = tf.zeros_like(x, name='y0')
     # call the template once to ensure creation
     if not tf.executing_eagerly():
@@ -411,7 +413,7 @@ def _gen_mask(num_blocks,
               dtype=tf.float32):
   """Generate the mask for building an autoregressive dense layer."""
   # TODO(b/67594795): Better support of dynamic shape.
-  mask = onp.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
+  mask = np.zeros([n_out, n_in], dtype=dtype_util.as_numpy_dtype(dtype))
   slices = _gen_slices(num_blocks, n_in, n_out, mask_type=mask_type)
   for [row_slice, col_slice] in slices:
     mask[row_slice, col_slice] = 1
@@ -649,9 +651,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
 
   distribution = tfd.TransformedDistribution(
-      distribution=tfd.Normal(loc=0., scale=1.),
-      bijector=tfb.MaskedAutoregressiveFlow(made),
-      event_shape=[2])
+      distribution=tfd.Sample(tfd.Normal(loc=0., scale=1.), sample_shape=[2]),
+      bijector=tfb.MaskedAutoregressiveFlow(made))
 
   # Construct and fit model.
   x_ = tfkl.Input(shape=(2,), dtype=tf.float32)
@@ -708,9 +709,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       made = tfb.AutoregressiveNetwork(params=2, event_shape=event_shape,
                                        hidden_units=[20, 20], activation='relu')
       distribution = tfd.TransformedDistribution(
-          distribution=tfd.Normal(loc=0., scale=1.),
-          bijector=tfb.MaskedAutoregressiveFlow(made),
-          event_shape=event_shape)
+      distribution=tfd.Sample(
+          tfd.Normal(loc=0., scale=1.), sample_shape=[dims]),
+      bijector=tfb.MaskedAutoregressiveFlow(made))
 
       # Construct and fit model.
       x_ = tfkl.Input(shape=event_shape, dtype=tf.float32)
@@ -1019,6 +1020,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     self._network = tf.keras.models.Model(
         inputs=inputs,
         outputs=outputs[-1])
+    # Allow network to be called with inputs of shapes that don't match
+    # the specs of the network's input layers.
+    self._network.input_spec = None
     # Record that the layer has been built.
     super(AutoregressiveNetwork, self).build(input_shape)
 
@@ -1158,7 +1162,7 @@ def _make_dense_autoregressive_masks(
     input_order_seed = None
     degrees_seed = None
   else:
-    input_order_seed, degrees_seed = onp.random.RandomState(seed).randint(
+    input_order_seed, degrees_seed = np.random.RandomState(seed).randint(
         2**31, size=2)
   input_order = _create_input_order(
       event_size, input_order, seed=input_order_seed)
@@ -1199,11 +1203,11 @@ def _create_input_order(input_size, input_order='left-to-right', seed=None):
     elif input_order == 'right-to-left':
       return np.arange(start=input_size, stop=0, step=-1)
     elif input_order == 'random':
-      ret = onp.arange(start=1, stop=input_size + 1)
+      ret = np.arange(start=1, stop=input_size + 1)
       if seed is None:
-        rng = onp.random
+        rng = np.random
       else:
-        rng = onp.random.RandomState(seed)
+        rng = np.random.RandomState(seed)
       rng.shuffle(ret)
       return ret
   elif np.all(np.sort(np.array(input_order)) == np.arange(1, input_size + 1)):
@@ -1250,9 +1254,9 @@ def _create_degrees(input_size,
     if isinstance(hidden_degrees, six.string_types):
       if hidden_degrees == 'random':
         if seed is None:
-          rng = onp.random
+          rng = np.random
         else:
-          rng = onp.random.RandomState(seed)
+          rng = np.random.RandomState(seed)
         # samples from: [low, high)
         degrees.append(
             rng.randint(low=min(np.min(degrees[-1]), input_size - 1),

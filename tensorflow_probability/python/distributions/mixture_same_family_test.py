@@ -162,27 +162,23 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     if not self.use_static_shape:
       return
 
-    # Testing using GradientTape in both eager and graph modes.
-    # GradientTape does not support some control flow ops in graph mode, which
-    # is not a problem here as this code does not use any control flow.
-    logits = self._build_tensor([[0.1, 0.5]])
-    with tf.GradientTape() as g:
-      g.watch(logits)
-      with tf.GradientTape() as gg:
-        gg.watch(logits)
-        mixture = tfd.MixtureSameFamily(
-            mixture_distribution=tfd.Categorical(logits=logits),
-            components_distribution=tfd.Normal(
-                loc=self._build_tensor([[0.4, 0.25]]),
-                scale=self._build_tensor([[0.1, 0.5]])),
-            reparameterize=True,
-            validate_args=True)
+    def sample(logits):
+      mixture = tfd.MixtureSameFamily(
+          mixture_distribution=tfd.Categorical(logits=logits),
+          components_distribution=tfd.Normal(
+              loc=self._build_tensor([[0.4, 0.25]]),
+              scale=self._build_tensor([[0.1, 0.5]])),
+          reparameterize=True,
+          validate_args=True)
 
-        sample = mixture.sample(seed=test_util.test_seed())
-      grad = gg.gradient(sample, logits)
+      return mixture.sample(seed=test_util.test_seed())
+
+    logits = self._build_tensor([[0.1, 0.5]])
 
     with self.assertRaises(LookupError):
-      g.gradient(grad, logits)
+      _, grad = tfp.math.value_and_gradient(
+          lambda x: tfp.math.value_and_gradient(sample, x)[1], logits)
+      self.evaluate(grad)
 
   def _testMixtureReparameterizationGradients(
       self, mixture_func, parameters, function, num_samples):
@@ -533,6 +529,7 @@ class MixtureSameFamilyTestStatic64(
 
 class SamplerBackwardCompatibilityTest(test_util.TestCase):
 
+  @test_util.substrate_disable_stateful_random_test
   def testStatefulComponentDist(self):
 
     class StatefulNormal(tfd.Distribution):
@@ -562,6 +559,7 @@ class SamplerBackwardCompatibilityTest(test_util.TestCase):
         any('Falling back to stateful sampling for `components_distribution`'
             in str(warning.message) for warning in triggered))
 
+  @test_util.substrate_disable_stateful_random_test
   def testStatefulMixtureDist(self):
 
     class StatefulCategorical(tfd.Distribution):
@@ -586,6 +584,30 @@ class SamplerBackwardCompatibilityTest(test_util.TestCase):
     self.assertTrue(
         any('Falling back to stateful sampling for `mixture_distribution`'
             in str(warning.message) for warning in triggered))
+
+  def testGithubIssue1010(self):
+    dtype = np.float64
+    npredict = int(1e2)
+    ncomponent = 5
+    ngrid = int(1e2)
+    pi_sim = np.random.uniform(size=(npredict, ncomponent)).astype(dtype)
+    pi_sim = pi_sim / pi_sim.sum(axis=1, keepdims=True)
+    mean_sim = np.random.uniform(
+        low=5, high=10, size=(npredict, ncomponent)).astype(dtype)
+    sd_sim = np.random.uniform(
+        low=0.1, high=1, size=(npredict, ncomponent)).astype(dtype)
+    mixture_distribution = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(probs=pi_sim),
+        components_distribution=tfd.Normal(
+            loc=mean_sim,
+            scale=sd_sim,
+            validate_args=True,
+            allow_nan_stats=False,
+        )
+    )
+
+    grid = np.linspace(-10, 10, num=ngrid).astype(dtype)
+    self.evaluate(mixture_distribution.prob(grid))
 
 
 if __name__ == '__main__':

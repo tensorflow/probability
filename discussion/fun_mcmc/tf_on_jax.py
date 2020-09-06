@@ -156,6 +156,14 @@ def _eye(num_rows, num_columns=None, batch_shape=None, dtype=np.float32):
   return x
 
 
+@_impl()
+def _get_static_value(value):
+  try:
+    return onp.array(value)
+  except TypeError:
+    return None
+
+
 _impl(name='add_n')(sum)
 _impl(['nn'], name='softmax')(stax.softmax)
 _impl(name='custom_gradient')(jax.custom_gradient)

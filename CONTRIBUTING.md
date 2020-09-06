@@ -84,23 +84,33 @@ example invocation (presumed to run from the root of the TFP repo:
 
 ```shell
 # Run all TFP tests.
-./testing/tfp_test.sh //tensorflow_probability/...
+./testing/run_tfp_test.sh //tensorflow_probability/...
 ```
 
 ```shell
-# Run one TFP test
-tfp_test //tensorflow_probability/python/distributions:joint_distribution_coroutine_test
+# Run one TFP test.
+./testing/run_tfp_test.sh //tensorflow_probability/python/distributions:joint_distribution_coroutine_test
+```
+
+```shell
+# Lint a file (requires pylint installed, e.g. via pip install pylint).
+./testing/run_tfp_lints.sh tensorflow_probability/python/distributions/joint_distribution_coroutine.py
 ```
 
 See comments at the top of the script for more info.
 
 For convenience, also consider sourcing the following script to alias `tfp_test`
-to the above script:
+and `tfp_lints` to the above script:
 
 ```shell
 source ./testing/define_testing_alias.sh
+source ./testing/define_linting_alias.sh
 # Run all TFP tests.
 tfp_test //tensorflow_probability/...
+# Run one TFP test.
+tfp_test //tensorflow_probability/python/distributions:joint_distribution_coroutine_test
+# Lint a file.
+tfp_lints tensorflow_probability/python/distributions/joint_distribution_coroutine.py
 ```
 
 #### Dependencies

@@ -393,8 +393,7 @@ class LBfgsTest(test_util.TestCase):
           gradient: A `Tensor` of shape [2] containing the gradient of the
             function along the two axes.
       """
-      return tf.reduce_sum(x**2 -
-                           10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
+      return tf.reduce_sum(x**2 - 10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
 
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
 
@@ -417,6 +416,45 @@ class LBfgsTest(test_util.TestCase):
                          res2.position_deltas.reshape([-1]), 1e-5)
     self.assertArrayNear(res1.gradient_deltas.reshape([-1]),
                          res2.gradient_deltas.reshape([-1]), 1e-5)
+
+  def test_compile(self):
+    """Tests that the computation can be XLA-compiled."""
+
+    self.skip_if_no_xla()
+
+    dim = 25
+
+    @_make_val_and_grad_fn
+    def rastrigin(x):
+      """The value and gradient of the Rastrigin function.
+
+      The Rastrigin function is a standard optimization test case. It is a
+      multimodal non-convex function. While it has a large number of local
+      minima, the global minimum is located at the origin and where the function
+      value is zero. The standard search domain for optimization problems is the
+      hypercube [-5.12, 5.12]**d in d-dimensions.
+
+      Args:
+        x: Real `Tensor` of shape [2]. The position at which to evaluate the
+          function.
+
+      Returns:
+        value_and_gradient: A tuple of two `Tensor`s containing
+          value: A scalar `Tensor` of the function value at the supplied point.
+          gradient: A `Tensor` of shape [2] containing the gradient of the
+            function along the two axes.
+      """
+      return tf.reduce_sum(x**2 - 10.0 * tf.cos(2 * np.pi * x)) + 10.0 * dim
+
+    start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
+
+    res = tf.function(tfp.optimizer.lbfgs_minimize, experimental_compile=True)(
+        rastrigin,
+        initial_position=tf.constant(start_position),
+        tolerance=1e-5)
+
+    # We simply verify execution & convergence.
+    self.assertTrue(self.evaluate(res.converged))
 
   def test_dynamic_shapes(self):
     """Can build an lbfgs_op with dynamic shapes in graph mode."""

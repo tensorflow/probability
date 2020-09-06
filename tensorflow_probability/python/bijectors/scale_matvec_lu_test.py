@@ -52,6 +52,8 @@ def trainable_lu_factorization(
 @test_util.test_all_tf_execution_regimes
 class ScaleMatvecLUTest(test_util.TestCase):
 
+  @test_util.numpy_disable_variable_test
+  @test_util.jax_disable_variable_test
   def test_invertible_from_trainable_lu_factorization(self):
     channels = 3
     lower_upper, permutation = trainable_lu_factorization(channels, seed=42)
@@ -84,6 +86,8 @@ class ScaleMatvecLUTest(test_util.TestCase):
     self.assertTrue(np.mean(np.abs(x_ - fwd_) > 0.1 * x_) > 0.5)
     self.assertTrue(np.mean(np.abs(x_ - rev_) > 0.1 * x_) > 0.5)
 
+  @test_util.numpy_disable_variable_test
+  @test_util.jax_disable_variable_test
   def test_trainable_lu_factorization_init(self):
     """Initial LU factorization parameters do not change per execution."""
     channels = 8
@@ -109,18 +113,18 @@ class ScaleMatvecLUTest(test_util.TestCase):
                                 validate_args=True)
 
     channels = tf.compat.dimension_value(lower_upper.shape[-1])
-    x = tf.random.uniform(shape=[2, 28, 28, channels])
+    x_ = np.random.uniform(size=[2, 28, 28, channels]).astype(np.float32)
 
-    fwd = conv1x1.forward(x)
+    fwd = conv1x1.forward(x_)
     rev_fwd = conv1x1.inverse(fwd)
-    fldj = conv1x1.forward_log_det_jacobian(x, event_ndims=3)
+    fldj = conv1x1.forward_log_det_jacobian(x_, event_ndims=3)
 
-    rev = conv1x1.inverse(x)
+    rev = conv1x1.inverse(x_)
     fwd_rev = conv1x1.forward(rev)
-    ildj = conv1x1.inverse_log_det_jacobian(x, event_ndims=3)
+    ildj = conv1x1.inverse_log_det_jacobian(x_, event_ndims=3)
 
-    [x_, fwd_, rev_, fwd_rev_, rev_fwd_, fldj_, ildj_] = self.evaluate([
-        x, fwd, rev, fwd_rev, rev_fwd, fldj, ildj])
+    [fwd_, rev_, fwd_rev_, rev_fwd_, fldj_, ildj_] = self.evaluate([
+        fwd, rev, fwd_rev, rev_fwd, fldj, ildj])
 
     self.assertAllClose(x_, fwd_rev_, atol=1e-3, rtol=1e-6)
     self.assertAllClose(x_, rev_fwd_, atol=1e-3, rtol=1e-6)
@@ -133,6 +137,7 @@ class ScaleMatvecLUTest(test_util.TestCase):
     self.assertTrue(np.mean(np.abs(x_ - fwd_) > 0.1 * x_) > 0.5)
     self.assertTrue(np.mean(np.abs(x_ - rev_) > 0.1 * x_) > 0.5)
 
+  @test_util.numpy_disable_gradient_test
   def testTheoreticalFldj(self):
     raw_mat = tf.constant([[1., 2, 3],
                            [4, 5, 6],
@@ -167,7 +172,18 @@ class ScaleMatvecLUTest(test_util.TestCase):
         atol=1e-5,
         rtol=1e-5)
 
-  def testNonInvertibleLUAssert(self):
+  def testNonInvertibleLUAssertStatic(self):
+    lower_upper, permutation = self.evaluate(
+        tf.linalg.lu([[1., 2, 3], [4, 5, 6], [0.5, 0., 0.25]]))
+    np.fill_diagonal(lower_upper, 0.)
+    with self.assertRaisesOpError('`lower_upper` must have nonzero diagonal'):
+      bijector = tfb.ScaleMatvecLU(
+          lower_upper=lower_upper, permutation=permutation, validate_args=True)
+      self.evaluate(bijector.forward([1., 2, 3]))
+
+  @test_util.numpy_disable_variable_test
+  @test_util.jax_disable_variable_test
+  def testNonInvertibleLUAssertVariable(self):
     lower_upper, permutation = self.evaluate(
         tf.linalg.lu([[1., 2, 3], [4, 5, 6], [0.5, 0., 0.25]]))
     lower_upper = tf.Variable(lower_upper)

@@ -27,6 +27,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import test_util
 
 
@@ -35,6 +36,14 @@ tfd = tfp.distributions
 
 
 Root = tfd.JointDistributionCoroutine.Root
+
+
+def basic_model_fn():
+  yield Root(tfd.Normal(0., 1.))
+  e = yield Root(tfd.Independent(
+      tfd.Exponential(rate=[100, 120]),
+      reinterpreted_batch_ndims=1, name='e'))
+  yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1])
 
 
 def basic_model_with_names_fn():
@@ -348,7 +357,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       ('basic', basic_model_with_names_fn),
-      ('nested_lists', nested_lists_with_names_model_fn))
+      ('nested_lists', nested_lists_with_names_model_fn),
+      ('basic_unnamed', basic_model_fn))
   def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):
     d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
 
@@ -383,6 +393,24 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
+
+  def test_log_prob_with_manual_kwargs(self):
+    d = tfd.JointDistributionCoroutine(basic_model_fn, validate_args=True)
+    x = d.sample(seed=test_util.test_seed())
+    lp1 = d.log_prob(var0=x[0], e=x[1], var2=x[2])
+    lp2 = d.log_prob(x)
+    lp1_, lp2_ = self.evaluate([lp1, lp2])
+    self.assertAllClose(lp1_, lp2_)
+
+  def test_duplicate_names_error(self):
+
+    @tfd.JointDistributionCoroutine
+    def dist():
+      yield Root(tfd.Normal(0., 1., name='a'))
+      yield Root(tfd.Normal(0., 1., name='a'))
+
+    with self.assertRaisesRegexp(ValueError, 'Duplicated distribution name: a'):
+      dist.log_prob((1, 2))
 
   @parameterized.named_parameters(
       ('singleton_float', singleton_normal_model_fn),
@@ -848,8 +876,9 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     # define a sample in the unconstrained space and construct the component
     # distributions
-    xs = [tf.constant(w) for w in [0.2, [-1.3, 0.1], -2.]]
+    xs = type(jd.dtype)(*[tf.constant(w) for w in [0.2, [-1.3, 0.1], -2.]])
     bijectors, ys = _get_support_bijectors(dists, xs=xs)
+    ys = type(jd.dtype)(*ys)
 
     # Test forward and inverse values.
     self.assertAllClose(joint_bijector.forward(xs), ys)
@@ -929,6 +958,117 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     with self.assertRaisesRegex(
         ValueError, r'Supplied both `value` and keyword arguments .*'):
       joint.sample(a=1., value={'a': 1})
+
+  def test_named_dtype(self):
+    """Test using names for component distributions."""
+
+    def model_fn():
+      c = yield Root(tfd.LogNormal(0., 1., name='c'))
+      b = yield tfd.Normal(c, 1., name='b')
+      yield tfd.Normal(c + b, 1e-3, name='a')
+
+    model = tfd.JointDistributionCoroutine(
+        model_fn, validate_args=True)
+
+    seed = test_util.test_seed_stream()
+
+    sample = self.evaluate(model.sample(seed=seed()))
+    sample_type = type(sample)
+    # Note the order is not alphabetic, but rather than the call older in the
+    # coroutine.
+    self.assertEqual(['c', 'b', 'a'], list(sample._asdict().keys()))
+
+    # Passing the sample by value or by kwargs should both work.
+    lp_by_val = model.log_prob(sample)
+    lp_by_args = model.log_prob(*sample)
+    lp_by_kwargs = model.log_prob(**sample._asdict())
+    self.assertAllEqual(lp_by_val, lp_by_kwargs)
+    self.assertAllEqual(lp_by_val, lp_by_args)
+
+    # Partially specifying the values works when sampling.
+    sample_partial = model.sample(c=1., b=2., seed=seed())
+    self.assertAllClose(1., sample_partial.c)
+    self.assertAllClose(2., sample_partial.b)
+    self.assertAllClose(3., sample_partial.a, atol=0.1)
+    sample_partial = model.sample(value=sample_type(c=1., b=2.), seed=seed())
+    self.assertAllClose(1., sample_partial.c)
+    self.assertAllClose(2., sample_partial.b)
+    self.assertAllClose(3., sample_partial.a, atol=0.1)
+
+    # Check that the distribution properties return the expected type.
+    dtype = model.dtype
+    self.assertEqual(
+        sample_type(a=tf.float32, b=tf.float32, c=tf.float32), dtype)
+
+    def assert_equal_part(a, b):
+      self.assertAllEqual(a, b)
+
+    def assert_equal(a, b):
+      self.assertAllAssertsNested(assert_equal_part, a, b, shallow=dtype)
+
+    assert_equal(sample_type(a=[], b=[], c=[]), model.event_shape)
+    assert_equal(sample_type(a=[], b=[], c=[]), model.event_shape_tensor())
+    assert_equal(sample_type(a=[], b=[], c=[]), model.batch_shape)
+    assert_equal(sample_type(a=[], b=[], c=[]), model.batch_shape_tensor())
+
+    # Check the default bijector.
+    b = model._experimental_default_event_space_bijector()
+    sample2 = self.evaluate(b.forward(b.inverse(sample)))
+    self.assertAllClose(sample2, sample)
+
+    # Verify that event shapes are passed through and flattened/unflattened
+    # correctly.
+    forward_event_shapes = b.forward_event_shape(model.event_shape)
+    inverse_event_shapes = b.inverse_event_shape(model.event_shape)
+    self.assertEqual(forward_event_shapes, model.event_shape)
+    self.assertEqual(inverse_event_shapes, model.event_shape)
+
+    # Verify that the outputs of other methods have the correct structure.
+    forward_event_shape_tensors = b.forward_event_shape_tensor(
+        model.event_shape_tensor())
+    inverse_event_shape_tensors = b.inverse_event_shape_tensor(
+        model.event_shape_tensor())
+    tf.nest.assert_same_structure(forward_event_shape_tensors,
+                                  inverse_event_shape_tensors)
+
+  def test_automatic_naming(self):
+    """Test leaving some distributions unnamed."""
+
+    def model_fn():
+      c = yield Root(tfd.LogNormal(0., 1., name='c'))
+      b = yield tfd.Normal(c, 1.)
+      b = yield Root(tfd.Normal(c, 1., name='a'))
+      yield tfd.Normal(c + b, 1.)
+
+    model = tfd.JointDistributionCoroutine(
+        model_fn, validate_args=True)
+
+    sample = self.evaluate(model.sample(seed=test_util.test_seed()))
+    self.assertEqual(['c', 'var1', 'a', 'var3'], list(sample._asdict().keys()))
+
+  def test_target_log_prob_fn(self):
+    """Test the construction `target_log_prob_fn` from a joint distribution."""
+
+    def model_fn():
+      c = yield Root(tfd.LogNormal(0., 1., name='c'))
+      b = yield tfd.Normal(c, 1., name='b')
+      yield tfd.Normal(c + b, 1., name='a')
+
+    model = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+
+    def target_log_prob_fn(*args):
+      return model.log_prob(args + (1.,))
+
+    dtype = model.dtype[:-1]
+    event_shape = model.event_shape[:-1]
+    self.assertAllEqual(('c', 'b'), dtype._fields)
+    self.assertAllEqual(('c', 'b'), event_shape._fields)
+
+    test_point = tf.nest.map_structure(tf.zeros, event_shape, dtype)
+    lp_manual = model.log_prob(test_point + (1.,))
+    lp_tlp = nest_util.call_fn(target_log_prob_fn, test_point)
+
+    self.assertAllClose(self.evaluate(lp_manual), self.evaluate(lp_tlp))
 
 
 if __name__ == '__main__':

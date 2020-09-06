@@ -20,6 +20,7 @@ from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math import log_cumsum_exp
+from tensorflow_probability.python.math import value_and_gradient
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = [
@@ -270,7 +271,7 @@ def resample_systematic(log_probs, event_size, sample_shape,
         low=ps.cast(0., dtype=log_probs.dtype),
         high=interval_width).sample(
             working_shape, seed=seed)[..., tf.newaxis]
-    even_spacing = tf.linspace(
+    even_spacing = ps.linspace(
         start=ps.cast(0., dtype=log_probs.dtype),
         stop=1 - interval_width,
         num=event_size) + offsets
@@ -377,14 +378,12 @@ def _scatter_nd_batch(indices, updates, shape, batch_dims=0):
   dtype = updates.dtype
   internal_dtype = tf.float64
   multipliers = ps.cast(updates, internal_dtype)
-  with tf.GradientTape() as tape:
-    zeros = tf.zeros(shape, dtype=internal_dtype)
-    tape.watch(zeros)
-    weighted_gathered = multipliers * tf.gather_nd(
-        zeros,
-        indices,
-        batch_dims=batch_dims)
-  grad = tape.gradient(weighted_gathered, zeros)
+
+  def weighted_gathered(zeros):
+    return multipliers * tf.gather_nd(zeros, indices, batch_dims=batch_dims)
+
+  zeros = tf.zeros(shape, dtype=internal_dtype)
+  _, grad = value_and_gradient(weighted_gathered, zeros)
   return ps.cast(grad, dtype=dtype)
 
 

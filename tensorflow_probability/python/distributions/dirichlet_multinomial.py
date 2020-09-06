@@ -22,10 +22,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -244,9 +246,9 @@ class DirichletMultinomial(distribution.Distribution):
       concentration = tf.convert_to_tensor(self._concentration)
     if total_count is None:
       total_count = tf.convert_to_tensor(self._total_count)
-    return tf.broadcast_dynamic_shape(
-        tf.shape(total_count[..., tf.newaxis]),
-        tf.shape(concentration))[:-1]
+    return ps.broadcast_shape(
+        ps.shape(total_count[..., tf.newaxis]),
+        ps.shape(concentration))[:-1]
 
   def _batch_shape(self):
     return tensorshape_util.with_rank_at_least(
@@ -259,7 +261,7 @@ class DirichletMultinomial(distribution.Distribution):
     if concentration is None:
       concentration = tf.convert_to_tensor(self.concentration)
     # Event shape depends only on concentration, not total_count.
-    return tf.shape(concentration)[-1:]
+    return ps.shape(concentration)[-1:]
 
   def _event_shape(self):
     # Event shape depends only on concentration, not total_count.
@@ -279,15 +281,11 @@ class DirichletMultinomial(distribution.Distribution):
         concentration,
         name='alpha')
 
-    unnormalized_logits = tf.math.log(
-        samplers.gamma(
-            shape=[n],
-            alpha=alpha,
-            dtype=self.dtype,
-            seed=gamma_seed))
+    unnormalized_logits = gamma_lib.random_gamma(
+        shape=[n], concentration=alpha, seed=gamma_seed, log_space=True)
     x = multinomial.draw_sample(
         1, k, unnormalized_logits, n_draws, self.dtype, multinomial_seed)
-    final_shape = tf.concat(
+    final_shape = ps.concat(
         [[n], self._batch_shape_tensor(concentration, total_count), [k]], 0)
     return tf.reshape(x, final_shape)
 

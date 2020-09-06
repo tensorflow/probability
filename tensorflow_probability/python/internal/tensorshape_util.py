@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as onp
+import numpy as np
 
 import tensorflow.compat.v2 as tf
 
@@ -67,10 +67,10 @@ def as_list(x):
 def _cast_tensorshape(x, x_type):
   if issubclass(x_type, tf.TensorShape):
     return x
-  if issubclass(x_type, onp.ndarray):
+  if issubclass(x_type, np.ndarray):
     # np.ndarray default constructor will place x
     # as the shape, which we don't want.
-    return onp.array(as_list(x), dtype=onp.int32)
+    return np.array(as_list(x), dtype=np.int32)
   return x_type(as_list(x))
 
 
@@ -161,9 +161,10 @@ def constant_value_as_shape(tensor):  # pylint: disable=invalid-name
     # DeferredTensor, because that creates a BUILD dependency cycle.
     # Why is it necessary to mention DeferredTensor at all?
     # Because TF's `constant_value_as_shape` barfs on it: b/142254634.
+    # NOTE: In the JAX/NumPy backends, DeferredTensor is not a class/type.
     # pylint: disable=g-import-not-at-top
     from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
-    if isinstance(tensor, DeferredTensor):
+    if isinstance(DeferredTensor, type) and isinstance(tensor, DeferredTensor):
       # Presumably not constant if deferred
       return tf.TensorShape(None)
   except ImportError:
@@ -172,7 +173,7 @@ def constant_value_as_shape(tensor):  # pylint: disable=invalid-name
     pass
   if tf.executing_eagerly():
     # Working around b/142251799
-    if isinstance(tensor, ops.EagerTensor):
+    if hasattr(ops, 'EagerTensor') and isinstance(tensor, ops.EagerTensor):
       return tensor_shape.as_shape(
           [dim if dim != -1 else None for dim in tensor.numpy()])
     else:

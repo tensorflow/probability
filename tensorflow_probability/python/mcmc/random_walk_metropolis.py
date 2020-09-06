@@ -25,6 +25,7 @@ import warnings
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
@@ -117,7 +118,7 @@ def random_walk_normal_fn(scale=1., name=None):
           samplers.normal(  # pylint: disable=g-complex-comprehension
               mean=state_part,
               stddev=scale_part,
-              shape=tf.shape(state_part),
+              shape=ps.shape(state_part),
               dtype=dtype_util.base_dtype(state_part.dtype),
               seed=seed_part)
           for scale_part, state_part, seed_part

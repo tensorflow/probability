@@ -14,14 +14,13 @@
 # ============================================================================
 # Library for representation of positive-semidefinite kernel functions.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -43,6 +42,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         ":rational_quadratic",
         ":schur_complement",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal",
     ],
@@ -315,12 +315,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "psd_kernel_properties_test",
     size = "medium",
     srcs = ["psd_kernel_properties_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         # absl/logging dep,

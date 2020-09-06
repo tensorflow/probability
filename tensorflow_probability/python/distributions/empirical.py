@@ -23,7 +23,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -41,10 +41,10 @@ def _broadcast_event_and_samples(event, samples, event_ndims):
   # of the result of a call to dist.sample(). This way we can broadcast it with
   # event to get a properly-sized event, then add the singleton dim back at
   # -event_ndims - 1.
-  samples_shape = tf.concat(
+  samples_shape = ps.concat(
       [
-          tf.shape(samples)[:-event_ndims - 1],
-          tf.shape(samples)[tf.rank(samples) - event_ndims:]
+          ps.shape(samples)[:-event_ndims - 1],
+          ps.shape(samples)[ps.rank(samples) - event_ndims:]
       ],
       axis=0)
   event = event * tf.ones(samples_shape, dtype=event.dtype)
@@ -157,8 +157,9 @@ class Empirical(distribution.Distribution):
       # Note: this tf.rank call affects the graph, but is ok in `__init__`
       # because we don't expect shapes (or ranks) to be runtime-variable, nor
       # ever need to differentiate with respect to them.
-      samples_rank = prefer_static.rank(self.samples)
-      self._samples_axis = samples_rank - self._event_ndims - 1
+      samples_rank = ps.rank(self._samples)
+      self._samples_axis = ps.cast(
+          samples_rank - self._event_ndims - 1, tf.int32)
 
       super(Empirical, self).__init__(
           dtype=dtype,
@@ -194,7 +195,7 @@ class Empirical(distribution.Distribution):
 
   def _compute_num_samples(self, samples):
     samples_shape = distribution_util.prefer_static_shape(samples)
-    return tf.convert_to_tensor(
+    return ps.convert_to_shape_tensor(
         samples_shape[self._samples_axis],
         dtype_hint=tf.int32,
         name='num_samples')
@@ -202,7 +203,7 @@ class Empirical(distribution.Distribution):
   def _batch_shape_tensor(self, samples=None):
     if samples is None:
       samples = tf.convert_to_tensor(self.samples)
-    return tf.shape(samples)[:self._samples_axis]
+    return ps.shape(samples)[:self._samples_axis]
 
   def _batch_shape(self):
     if tensorshape_util.rank(self.samples.shape) is None:
@@ -212,7 +213,7 @@ class Empirical(distribution.Distribution):
   def _event_shape_tensor(self, samples=None):
     if samples is None:
       samples = tf.convert_to_tensor(self.samples)
-    return tf.shape(samples)[self._samples_axis + 1:]
+    return ps.shape(samples)[self._samples_axis + 1:]
 
   def _event_shape(self):
     if tensorshape_util.rank(self.samples.shape) is None:
@@ -236,10 +237,10 @@ class Empirical(distribution.Distribution):
     indices = samplers.uniform([n], maxval=self._compute_num_samples(samples),
                                dtype=tf.int32, seed=seed)
     draws = tf.gather(samples, indices, axis=self._samples_axis)
-    axes = tf.concat(
+    axes = ps.concat(
         [[self._samples_axis],
-         tf.range(self._samples_axis, dtype=tf.int32),
-         tf.range(self._event_ndims, dtype=tf.int32) + self._samples_axis + 1],
+         ps.range(self._samples_axis, dtype=tf.int32),
+         ps.range(self._event_ndims, dtype=tf.int32) + self._samples_axis + 1],
         axis=0)
     draws = tf.transpose(a=draws, perm=axes)
     return draws
@@ -248,8 +249,21 @@ class Empirical(distribution.Distribution):
     # Samples count can vary by batch member. Use map_fn to compute mode for
     # each batch separately.
     def _get_mode(samples):
-      count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0]).count
-      return tf.argmax(count)
+      _, idx, count = tf.raw_ops.UniqueWithCountsV2(x=samples, axis=[0])
+      # TODO(b/161402486): Remove this hack for fixing the wrong static shape
+      # of `idx` in graph mode.
+      idx = tf.vectorized_map(lambda x: tf.reshape(x, [-1])[0], idx)
+      # NOTE:
+      #  - `count` has shape `[K]`, where `K` is the number of unique elements,
+      #    and `count[j]` is the number of times the j-th unique element occurs
+      #    in `samples`.
+      #  - `idx` has shape `[samples.shape[0]]`, and `idx[i] == j` means that
+      #    `samples[i]` is equal to the `j`-th unique element.
+      max_count_idx = tf.argmax(count, output_type=tf.int32)
+      # Return an index `i` for which `idx[i] == max_count_idx`.
+      return tf.argmax(
+          tf.cast(tf.math.equal(idx, max_count_idx), dtype=tf.int32),
+          output_type=tf.int32)
 
     if samples is None:
       samples = tf.convert_to_tensor(self._samples)
@@ -261,18 +275,16 @@ class Empirical(distribution.Distribution):
       mode_shape = self._batch_shape_tensor(samples)
     else:
       event_size = tf.reduce_prod(self._event_shape_tensor(samples))
-      mode_shape = tf.concat(
+      mode_shape = ps.concat(
           [self._batch_shape_tensor(samples),
            self._event_shape_tensor(samples)],
           axis=0)
       flattened_samples = tf.reshape(samples, [-1, num_samples, event_size])
 
-    indices = tf.map_fn(_get_mode,
-                        flattened_samples,
-                        fn_output_signature=tf.int64)
-    full_indices = tf.stack(
-        [tf.range(tf.shape(indices)[0]),
-         tf.cast(indices, tf.int32)], axis=1)
+    indices = tf.map_fn(
+        _get_mode, flattened_samples,
+        fn_output_signature=tf.int32)
+    full_indices = tf.stack([tf.range(tf.shape(indices)[0]), indices], axis=1)
 
     mode = tf.gather_nd(flattened_samples, full_indices)
     return tf.reshape(mode, mode_shape)

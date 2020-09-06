@@ -472,8 +472,8 @@ from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shap
 from tensorflow_probability.python.internal.backend.numpy import private
 distribution_util = private.LazyLoader(
     "distribution_util", globals(),
-    "tensorflow_probability.python.internal._numpy.distribution_util")
+    "tensorflow_probability.substrates.numpy.internal.distribution_util")
 tensorshape_util = private.LazyLoader(
-   "tensorshape_util", globals(),
-    "tensorflow_probability.python.internal._numpy.tensorshape_util")
+    "tensorshape_util", globals(),
+    "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
 

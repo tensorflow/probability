@@ -15,14 +15,13 @@
 # Description:
 #   Internal utilities for TensorFlow probability.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -38,6 +37,37 @@ multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
+    deps = [
+        ":test_util",  # EnableOnExport
+    ],
+)
+
+py_library(
+    name = "all_util",
+    srcs = ["all_util.py"],
+    srcs_version = "PY2AND3",
+    deps = [],
+)
+
+multi_substrate_py_library(
+    name = "auto_composite_tensor",
+    srcs = ["auto_composite_tensor.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "auto_composite_tensor_test",
+    srcs = ["auto_composite_tensor_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
 )
 
 multi_substrate_py_library(
@@ -55,6 +85,7 @@ multi_substrate_py_library(
     srcs = ["batched_rejection_sampler.py"],
     deps = [
         ":samplers",
+        # numpy dep,  # For np.nan
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
     ],
@@ -84,11 +115,21 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
+multi_substrate_py_library(
+    name = "custom_gradient",
+    srcs = ["custom_gradient.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
 py_test(
     name = "cache_util_test",
     size = "small",
     srcs = ["cache_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":cache_util",
         # numpy dep,
@@ -107,11 +148,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "docstring_util_test",
     size = "small",
     srcs = ["docstring_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":docstring_util",
         # numpy dep,
@@ -159,11 +201,12 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "distribution_util_test",
     size = "small",
     srcs = ["distribution_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":distribution_util",
         ":tensorshape_util",
@@ -195,17 +238,24 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "implementation_selection_test_gpu",
     srcs = ["implementation_selection_test.py"],
     main = "implementation_selection_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         ":implementation_selection",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
     ],
+)
+
+py_library(
+    name = "lazy_loader",
+    srcs = ["lazy_loader.py"],
+    srcs_version = "PY2AND3",
 )
 
 multi_substrate_py_library(
@@ -285,6 +335,7 @@ multi_substrate_py_library(
     srcs = ["samplers.py"],
     deps = [
         ":dtype_util",
+        ":prefer_static",
         # numpy dep,
         # tensorflow dep,
     ],
@@ -334,14 +385,16 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
-# py2and3
 py_test(
     name = "tensor_util_test",
     size = "small",
     srcs = ["tensor_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":tensor_util",
         # numpy dep,
@@ -360,8 +413,7 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "tensorshape_util_test",
     size = "small",
     srcs = ["tensorshape_util_test.py"],
@@ -386,7 +438,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_library(
     name = "hypothesis_testlib",
-    testonly = 1,
+#     testonly = 1,  # DisableOnExport
     srcs = ["hypothesis_testlib.py"],
     srcs_version = "PY2AND3",
     deps = [
@@ -399,13 +451,13 @@ multi_substrate_py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "hypothesis_testlib_test",
     size = "small",
     srcs = ["hypothesis_testlib_test.py"],
+    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":hypothesis_testlib",
         # absl/testing:parameterized dep,
@@ -417,8 +469,25 @@ py_test(
 )
 
 multi_substrate_py_library(
+    name = "structural_tuple",
+    srcs = ["structural_tuple.py"],
+    srcs_version = "PY2AND3",
+)
+
+multi_substrate_py_test(
+    name = "structural_tuple_test",
+    srcs = ["structural_tuple_test.py"],
+    deps = [
+        ":nest_util",
+        ":structural_tuple",
+        ":test_util",
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
     name = "test_util",
-    testonly = 1,
+#     testonly = 1,  # DisableOnExport
     srcs = ["test_util.py"],
     srcs_version = "PY2AND3",
     deps = [
@@ -450,7 +519,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_library(
     name = "test_combinations",
-    testonly = 1,
+#     testonly = 1,  # DisableOnExport
     srcs = ["test_combinations.py"],
     srcs_version = "PY2AND3",
     deps = [

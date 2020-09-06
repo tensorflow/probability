@@ -28,7 +28,7 @@ from tensorflow_probability.python.bijectors import identity as identity_bijecto
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -175,9 +175,9 @@ class DoublesidedMaxwell(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self, loc=None, scale=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc if loc is None else loc),
-        tf.shape(self.scale if scale is None else scale))
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.shape(self.scale if scale is None else scale))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
@@ -210,13 +210,13 @@ class DoublesidedMaxwell(distribution.Distribution):
 
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    shape = prefer_static.pad(
+    shape = ps.pad(
         self._batch_shape_tensor(loc=loc, scale=scale),
         paddings=[[1, 0]], constant_values=n)
 
     # Generate one-sided Maxwell variables by using 3 Gaussian variates
     norm_rvs = samplers.normal(
-        shape=prefer_static.pad(shape, paddings=[[0, 1]], constant_values=3),
+        shape=ps.pad(shape, paddings=[[0, 1]], constant_values=3),
         dtype=self.dtype,
         seed=normal_seed)
     maxwell_rvs = tf.norm(norm_rvs, axis=-1)

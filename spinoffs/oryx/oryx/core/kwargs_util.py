@@ -65,7 +65,8 @@ def check_in_kwargs(func, key):
   if accepts_all_kwargs:
     return True
   defaults = argspec.defaults
-  if defaults is None:
+  kwonly = argspec.kwonlyargs
+  if defaults is None and not kwonly:
     return False
-  kws = argspec.args[-len(defaults):]
-  return key in kws
+  kws = argspec.args[-len(defaults):] if defaults else ()
+  return key in kws or key in kwonly

@@ -50,7 +50,7 @@ class Split(bijector.Bijector):
        <`Tensor`, shape=(5, 6, 3)>]
 
   # The inverse of `split` concatenates a list of `Tensor`s along `axis`.
-  x_ = split.inverse(y_)
+  x_ = split.inverse(y)
   x_.shape
   ==> TensorShape([5, 6, 8])
   ```
@@ -104,10 +104,8 @@ class Split(bijector.Bijector):
       self._axis = tf.convert_to_tensor(axis, tf.int32)
 
       super(Split, self).__init__(
-          forward_min_event_ndims=-static_axis,
-          # TODO(emilyaf): Replace with structured inverse_min_event_ndims when
-          # that is supported (for now leave an unused placeholder).
-          inverse_min_event_ndims=0,
+          forward_min_event_ndims=-axis,
+          inverse_min_event_ndims=[-axis] * self.num_splits,
           is_constant_jacobian=True,
           validate_args=validate_args,
           parameters=parameters,
@@ -125,14 +123,11 @@ class Split(bijector.Bijector):
   def axis(self):
     return self._axis
 
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def inverse(self, y, name='inverse'):
+  def _inverse(self, y):
     """Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 
     Args:
       y: List of `Tensor`s. The input to the 'inverse' evaluation.
-      name: The name to give this op.
 
     Returns:
       `Tensor`.
@@ -141,65 +136,46 @@ class Split(bijector.Bijector):
       TypeError: if `self.dtype` is specified and `y.dtype` is not
         `self.dtype`.
     """
-    with self._name_and_control_scope(name):
-      y = [tf.convert_to_tensor(y_, dtype_hint=self.dtype, name='y')
-           for y_ in y]
+    # Validate `y` statically, if possible, and get assertions.
+    is_validated = self._validate_output_shapes([y_.shape for y_ in y])
 
-      # TODO(emilyaf): Modify `_maybe_assert_dtype` to operate on structures.
-      # self._maybe_assert_dtype(y)
+    if is_validated or not self.validate_args:
+      assertions = []
+    else:
+      assertions = self._validate_output_shape_tensors(
+          [prefer_static.shape(y_) for y_ in y])
 
-      # Validate `y` statically, if possible, and get assertions.
-      is_validated = self._validate_output_shapes([y_.shape for y_ in y])
+    with tf.control_dependencies(assertions):
+      return tf.concat(y, axis=self.axis)
 
-      if is_validated or not self.validate_args:
-        assertions = []
-      else:
-        assertions = self._validate_output_shape_tensors(
-            [prefer_static.shape(y_) for y_ in y])
-
-      with tf.control_dependencies(assertions):
-        return tf.concat(y, axis=self.axis)
-
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def forward(self, x, name='forward'):
+  def _forward(self, x):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y).
 
     Equivalent to `tf.split(x)`.
 
     Args:
       x: `Tensor`. The input to the 'forward' evaluation.
-      name: The name to give this op.
 
     Returns:
       List of `Tensor`s.
 
     Raises:
-      TypeError: if `self.dtype` is specified and `x.dtype` is not
-        `self.dtype`.
       ValueError: if the sum of `split_sizes` does not equal the size of the
         `axis` dimension of `x`.
     """
+    # Validate `x` statically if possible and get assertions.
+    is_validated = self._validate_input_shape(x.shape)
+    if is_validated or not self.validate_args:
+      assertions = []
+    else:
+      assertions = self._validate_input_shape_tensor(prefer_static.shape(x))
 
-    with self._name_and_control_scope(name):
-      x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
-      self._maybe_assert_dtype(x)
+    with tf.control_dependencies(assertions):
+      if self.split_sizes is None:
+        return tf.split(x, self.num_splits, axis=self.axis)
+      return tf.split(x, self.split_sizes, axis=self.axis)
 
-      # Validate `x` statically if possible and get assertions.
-      is_validated = self._validate_input_shape(x.shape)
-      if is_validated or not self.validate_args:
-        assertions = []
-      else:
-        assertions = self._validate_input_shape_tensor(prefer_static.shape(x))
-
-      with tf.control_dependencies(assertions):
-        if self.split_sizes is None:
-          return tf.split(x, self.num_splits, axis=self.axis)
-        return tf.split(x, self.split_sizes, axis=self.axis)
-
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def forward_event_shape(self, input_shape):
+  def _forward_event_shape(self, input_shape):
     """Shape of a single sample from a single batch as a list of `TensorShape`s.
 
     Same meaning as `forward_event_shape_tensor`. May be only partially defined.
@@ -254,107 +230,90 @@ class Split(bijector.Bijector):
 
     return [tf.TensorShape(shape) for shape in output_shapes]
 
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def forward_event_shape_tensor(self,
-                                 input_shape,
-                                 name='forward_event_shape_tensor'):
+  def _forward_event_shape_tensor(self, input_shape):
     """Shape of a sample from a single batch as a list of `int32` 1D `Tensor`s.
 
     Args:
       input_shape: `Tensor`, `int32` vector indicating event-portion shape
         passed into `forward` function.
-      name: name to give to the op
 
     Returns:
       forward_event_shape_tensor: A list of `Tensor`, `int32` vectors indicating
         event-portion shape after applying `forward`. The length of the list is
         equal to the number of splits.
     """
-    with self._name_and_control_scope(name):
-      input_shape = tf.convert_to_tensor(
-          input_shape, dtype_hint=tf.int32, name='input_shape')
+    # Validate `input_shape` statically if possible and get assertions.
+    is_validated = self._validate_input_shape(
+        tensorshape_util.constant_value_as_shape(input_shape))
+    if is_validated or not self.validate_args:
+      assertions = []
+    else:
+      assertions = self._validate_input_shape_tensor(input_shape)
 
-      # Validate `input_shape` statically if possible and get assertions.
-      is_validated = self._validate_input_shape(
-          tensorshape_util.constant_value_as_shape(input_shape))
-      if is_validated or not self.validate_args:
-        assertions = []
+    with tf.control_dependencies(assertions):
+      if self.split_sizes is None:
+        split_sizes = tf.convert_to_tensor(
+            [input_shape[self.axis] // self.num_splits] * self.num_splits)
       else:
-        assertions = self._validate_input_shape_tensor(input_shape)
+        # Deduce the value of the unknown element of `split_sizes`, if any.
+        split_sizes = tf.convert_to_tensor(self.split_sizes)
+        split_sizes = tf.where(
+            split_sizes < 0,
+            input_shape[self.axis] -
+            tf.reduce_sum(split_sizes) - 1,  # Cancel the unknown size `-1`.
+            split_sizes)
 
-      with tf.control_dependencies(assertions):
-        if self.split_sizes is None:
-          split_sizes = tf.convert_to_tensor(
-              [input_shape[self.axis] // self.num_splits] * self.num_splits)
-        else:
-          # Deduce the value of the unknown element of `split_sizes`, if any.
-          split_sizes = tf.convert_to_tensor(self.split_sizes)
-          split_sizes = tf.where(
-              split_sizes < 0,
-              input_shape[self.axis] -
-              tf.reduce_sum(split_sizes) - 1,  # Cancel the unknown size `-1`.
-              split_sizes)
+      # Each element of the `output_shape_tensor` list is equal to the
+      # `input_shape`, with the corresponding element of `split_sizes`
+      # substituted in the `axis` position.
+      positive_axis = prefer_static.rank_from_shape(input_shape) + self.axis
+      tiled_input_shape = tf.tile(
+          input_shape[tf.newaxis, :], [self.num_splits, 1])
+      fused_output_shapes = tf.concat([
+          tiled_input_shape[:, :positive_axis],
+          split_sizes[..., tf.newaxis],
+          tiled_input_shape[:, positive_axis + 1:]], axis=1)
 
-        # Each element of the `output_shape_tensor` list is equal to the
-        # `input_shape`, with the corresponding element of `split_sizes`
-        # substituted in the `axis` position.
-        positive_axis = prefer_static.rank_from_shape(input_shape) + self.axis
-        tiled_input_shape = tf.tile(
-            input_shape[tf.newaxis, :], [self.num_splits, 1])
-        fused_output_shapes = tf.concat([
-            tiled_input_shape[:, :positive_axis],
-            split_sizes[..., tf.newaxis],
-            tiled_input_shape[:, positive_axis + 1:]], axis=1)
+      output_shapes = tf.unstack(fused_output_shapes, num=self.num_splits)
+      return [tf.identity(tf.convert_to_tensor(
+          t, dtype_hint=tf.int32, name='forward_event_shape'))
+              for t in output_shapes]
 
-        output_shapes = tf.unstack(fused_output_shapes, num=self.num_splits)
-        return [tf.identity(tf.convert_to_tensor(
-            t, dtype_hint=tf.int32, name='forward_event_shape'))
-                for t in output_shapes]
-
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def inverse_event_shape_tensor(self,
-                                 output_shapes,
-                                 name='inverse_event_shape_tensor'):
+  def _inverse_event_shape_tensor(self, output_shapes):
     """Shape of a single sample from a single batch as an `int32` 1D `Tensor`.
 
     Args:
       output_shapes: An iterable of `Tensor`, `int32` vectors indicating
         event-shapes passed into `inverse` function. The length of the iterable
         must be equal to the number of splits.
-      name: Name to give to the op.
 
     Returns:
       inverse_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `inverse`.
     """
-    with self._name_and_control_scope(name):
-      output_shapes = [
-          tf.convert_to_tensor(t, dtype_hint=tf.int32, name='output_shape')
-          for t in output_shapes]
+    output_shapes = [
+        tf.convert_to_tensor(t, dtype_hint=tf.int32, name='output_shape')
+        for t in output_shapes]
 
-      # Validate `output_shapes` statically if possible and get assertions.
-      is_validated = self._validate_output_shapes(
-          [tensorshape_util.constant_value_as_shape(s) for s in output_shapes])
-      if is_validated or not self.validate_args:
-        assertions = []
-      else:
-        assertions = self._validate_output_shape_tensors(output_shapes)
+    # Validate `output_shapes` statically if possible and get assertions.
+    is_validated = self._validate_output_shapes(
+        [tensorshape_util.constant_value_as_shape(s) for s in output_shapes])
+    if is_validated or not self.validate_args:
+      assertions = []
+    else:
+      assertions = self._validate_output_shape_tensors(output_shapes)
 
-      with tf.control_dependencies(assertions):
-        total_size = tf.reduce_sum([t[self.axis] for t in output_shapes])
-        inverse_event_shape = tf.tensor_scatter_nd_update(
-            output_shapes[0],
-            [[prefer_static.rank_from_shape(output_shapes[0]) + self.axis]],
-            [total_size])
-        return tf.identity(tf.convert_to_tensor(
-            inverse_event_shape, dtype_hint=tf.int32,
-            name='inverse_event_shape'))
+    with tf.control_dependencies(assertions):
+      total_size = tf.reduce_sum([t[self.axis] for t in output_shapes])
+      inverse_event_shape = tf.tensor_scatter_nd_update(
+          output_shapes[0],
+          [[prefer_static.rank_from_shape(output_shapes[0]) + self.axis]],
+          [total_size])
+      return tf.identity(tf.convert_to_tensor(
+          inverse_event_shape, dtype_hint=tf.int32,
+          name='inverse_event_shape'))
 
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def inverse_event_shape(self, output_shapes):
+  def _inverse_event_shape(self, output_shapes):
     """Shape of a sample from a single batch as a [nested] `TensorShape`.
 
     Same meaning as `inverse_event_shape_tensor`. May be only partially defined.
@@ -404,46 +363,11 @@ class Split(bijector.Bijector):
     shape[axis] = total_size
     return tf.TensorShape(shape)
 
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def forward_log_det_jacobian(self,
-                               x,
-                               event_ndims,
-                               name='forward_log_det_jacobian'):
-    """Returns the forward_log_det_jacobian.
+  def _forward_log_det_jacobian(self, x):
+    return tf.convert_to_tensor(0., dtype=tf.float32)
 
-    Args:
-      x: `Tensor`. The input to the 'forward' Jacobian determinant evaluation.
-      event_ndims: Number of dimensions in the probabilistic events being
-        transformed. Must be greater than or equal to
-        `self.forward_min_event_ndims`. The result is summed over the final
-        dimensions to produce a scalar Jacobian determinant for each event, i.e.
-        it has shape `rank(x) - event_ndims` dimensions.
-      name: The name to give this op.
-
-    Returns:
-      `Tensor`, if this bijector is injective.
-        If not injective this is not implemented.
-    """
-    with self._name_and_control_scope(name), tf.control_dependencies(
-        self._check_valid_event_ndims(
-            min_event_ndims=self.forward_min_event_ndims,
-            event_ndims=event_ndims)):
-      x = tf.convert_to_tensor(x, name='x')
-      self._maybe_assert_dtype(x)
-      return 0.
-
-  # TODO(emilyaf): Override the private method instead when the Bijector base
-  # class supports nested args.
-  def inverse_log_det_jacobian(self,
-                               y,
-                               event_ndims,
-                               name='inverse_log_det_jacobian'):
-    with self._name_and_control_scope(name):
-      y = [tf.convert_to_tensor(y_, name='y') for y_ in y]
-      # TODO(emilyaf): Modify `_maybe_assert_dtype` to operate on structures.
-      # self._maybe_assert_dtype(y)
-      return 0.
+  def _inverse_log_det_jacobian(self, y):
+    return tf.convert_to_tensor(0., dtype=tf.float32)
 
   def _forward_dtype(self, dtype):
     return [dtype] * self.num_splits

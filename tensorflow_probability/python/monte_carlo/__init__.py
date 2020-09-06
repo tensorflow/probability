@@ -14,13 +14,12 @@
 # ============================================================================
 """Support for Monte Carlo expectations."""
 
+from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.monte_carlo.expectation import expectation
-
-from tensorflow.python.util.all_util import remove_undocumented
 
 
 _allowed_symbols = [
     "expectation",
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 import decorator
 import numpy as np
-import numpy as onp  # Avoid jax rewrite  # pylint: disable=reimported
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -101,12 +100,17 @@ def _numpy_dtype(dtype):
 
 def _get_static_value(pred):
   """Helper function for getting static values from maybe-tensor objects."""
+  if JAX_MODE:
+    try:
+      return np.asarray(pred)
+    except:  # JAX sometimes raises raw Exception in __array__.  # pylint: disable=bare-except
+      return None
   if tf.is_tensor(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
     # pylint: disable=protected-access
-    if not JAX_MODE and pred_value is None:
+    if pred_value is None:
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
@@ -124,6 +128,16 @@ def _get_static_predicate(pred):
     raise TypeError('`pred` must be a Tensor, or a Python bool, or 1 or 0. '
                     'Found instead: {}'.format(pred))
   return pred_value
+
+
+def _convert_to_shape_tensor_jax(value, dtype=None, dtype_hint=None, name=None):  # pylint: disable=unused-argument
+  """Converts vectors and scalars of `int`-like to `ndarray`."""
+  dtype = dtype_util.as_numpy_dtype(dtype or dtype_hint or np.int32)
+  try:
+    return np.array([int(v) for v in value], dtype=dtype)
+  except:  # JAX throws raw Exception in some cases.  # pylint: disable=bare-except
+    pass
+  return np.array(int(value), dtype=dtype)
 
 
 def smart_where(condition, x_fn, y_fn):
@@ -339,7 +353,7 @@ def _setdiff1d(a, b, aminusb=True, validate_indices=True):
     a_ = np.array(a_, dtype=dtype)
     b_ = np.array(b_, dtype=dtype)
     # TODO(https://github.com/google/jax/issues/70): Jax lacks setdiff1d
-    return onp.setdiff1d(a_, b_)
+    return np.setdiff1d(a_, b_)
 setdiff1d = _copy_docstring(
     tf.sets.difference,
     _setdiff1d)
@@ -358,11 +372,11 @@ size = _copy_docstring(tf.size, _size)
 
 def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-builtin,missing-docstring
   if not hasattr(input, 'shape'):
-    x = onp.array(input)
+    x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object else x
   input_shape = tf.TensorShape(input.shape)
   if tensorshape_util.is_fully_defined(input.shape):
-    return onp.array(tensorshape_util.as_list(input_shape)).astype(
+    return np.array(tensorshape_util.as_list(input_shape)).astype(
         _numpy_dtype(out_type))
   # NOTE: tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**, so we
   # pre-emptively convert-to-tensor.
@@ -416,6 +430,9 @@ broadcast_to = _prefer_static(tf.broadcast_to, nptf.broadcast_to)
 cast = _prefer_static(tf.cast, nptf.cast)
 ceil = _prefer_static(tf.math.ceil, nptf.math.ceil)
 concat = _prefer_static(tf.concat, nptf.concat)
+convert_to_shape_tensor = _prefer_static(
+    tf.convert_to_tensor,
+    _convert_to_shape_tensor_jax if JAX_MODE else tf.convert_to_tensor)
 cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)
@@ -424,10 +441,13 @@ floor = _prefer_static(tf.math.floor, nptf.math.floor)
 gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)
+invert_permutation = _prefer_static(
+    tf.math.invert_permutation, nptf.invert_permutation)
 is_finite = _prefer_static(tf.math.is_finite, nptf.math.is_finite)
 is_inf = _prefer_static(tf.math.is_inf, nptf.math.is_inf)
 is_nan = _prefer_static(tf.math.is_nan, nptf.math.is_nan)
 less = _prefer_static(tf.less, nptf.less)
+linspace = _prefer_static(tf.linspace, nptf.linspace)
 log = _prefer_static(tf.math.log, nptf.math.log)
 log1p = _prefer_static(tf.math.log1p, nptf.math.log1p)
 logical_and = _prefer_static(tf.logical_and, nptf.logical_and)
@@ -439,6 +459,7 @@ nextafter = _prefer_static(tf.math.nextafter, nptf.math.nextafter)
 one_hot = _prefer_static(tf.one_hot, nptf.one_hot)
 ones = _prefer_static(tf.ones, nptf.ones)
 pad = _prefer_static(tf.pad, nptf.pad)
+pow = _prefer_static(tf.math.pow, nptf.pow)  # pylint: disable=redefined-builtin
 range = _prefer_static(tf.range, nptf.range)  # pylint: disable=redefined-builtin
 reduce_all = _prefer_static(tf.reduce_all, nptf.reduce_all)
 reduce_any = _prefer_static(tf.reduce_any, nptf.reduce_any)
@@ -449,6 +470,7 @@ reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
 round = _prefer_static(tf.math.round, nptf.math.round)  # pylint: disable=redefined-builtin
 rsqrt = _prefer_static(tf.math.rsqrt, nptf.math.rsqrt)
+slice = _prefer_static(tf.slice, nptf.slice)  # pylint: disable=redefined-builtin
 sort = _prefer_static(tf.sort, nptf.sort)
 split = _prefer_static(tf.split, nptf.split)
 sqrt = _prefer_static(tf.sqrt, nptf.sqrt)

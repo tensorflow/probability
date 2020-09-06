@@ -116,6 +116,16 @@ class SoftplusBijectorTest(test_util.TestCase):
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
 
+  def testScalarCongruencyWithLowerBound(self):
+    bijector = tfb.Softplus(low=1.6)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
+
+  def testScalarCongruencyWithHingeSoftnessAndLowerBound(self):
+    bijector = tfb.Softplus(hinge_softness=1.3, low=1.6)
+    bijector_test_util.assert_scalar_congruency(
+        bijector, lower_x=-2., upper_x=2., eval_func=self.evaluate, rtol=.02)
+
   def testBijectiveAndFinite32bit(self):
     bijector = tfb.Softplus()
     x = np.linspace(-20., 20., 100).astype(np.float32)

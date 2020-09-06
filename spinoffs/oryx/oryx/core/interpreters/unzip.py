@@ -74,7 +74,20 @@ class UnzipCustomRules:
 
   def __getitem__(self, key):
     if key not in self.rules:
-      return pe.custom_partial_eval_rules[key]
+      def custom_rule(*tracers, **params):
+        out_jaxpr_tracers = pe.custom_partial_eval_rules[key](
+            *tracers, **params)
+        out_tracers = [
+            UnzipTracer(out_tracer._trace, out_tracer.pval, out_tracer.recipe,  # pylint: disable=protected-access
+                        False, None) for out_tracer in out_jaxpr_tracers
+        ]
+        for out_tracer in out_tracers:
+          recipe = out_tracer.recipe
+          out_tracer.recipe = pe.new_eqn_recipe(
+              recipe.invars, out_tracers,
+              recipe.primitive, recipe.params, recipe.source_info)  # pytype: disable=wrong-arg-types
+        return out_tracers
+      return custom_rule
     return self.rules[key]
 
   def __setitem__(self, key, val):
@@ -134,8 +147,6 @@ class UnzipTrace(jax_core.Trace):
   as keys using `trace.new_arg` and if all the inputs to any primitive are
   "keys", the outputs are also "keys".
   """
-
-  trace_type = pe.StagingJaxprTrace
 
   def pure(self, val):
     return self.new_const(val)
@@ -200,6 +211,8 @@ class UnzipTrace(jax_core.Trace):
       return primitive.bind(*consts, **params)
     settings = trace_util.get_dynamic_context(self).settings
     tracers = safe_map(self.instantiate_const, tracers)
+    if any(not isinstance(t, UnzipTracer) for t in tracers):
+      assert False
     key = all(t.is_key() for t in tracers)
     avals = [t.aval for t in tracers]
     ans = primitive.abstract_eval(*avals, **params)
@@ -366,7 +379,7 @@ class UnzipTrace(jax_core.Trace):
 
 
 def unzip_eval(f, trace, keys, pvs, settings):
-  f = unzip_to_init_apply_subjaxprs(f, trace.master, settings, keys)
+  f = unzip_to_init_apply_subjaxprs(f, trace.main, settings, keys)
   return unzip_eval_wrapper(f, pvs)
 
 
@@ -542,9 +555,8 @@ def unzip(f, *, tag: str, key_args=0):
 
   def wrapped(*args, **kwargs):
     """Callable returned by unzip."""
-    with jax_core.new_master(UnzipTrace) as master:
+    with jax_core.new_main(UnzipTrace) as master:
       # Preparing args to be traced
-      trace = UnzipTrace(master, jax_core.cur_sublevel())
       fun = lu.wrap_init(f, kwargs)
       avals = tree_util.tree_map(trace_util.get_shaped_aval, args)
       flat_avals, flat_keys, in_tree = (flatten_args_into_keys(avals, key_args))
@@ -553,7 +565,7 @@ def unzip(f, *, tag: str, key_args=0):
 
       # Trace to jaxpr
       settings = UnzipSettings(tag, False)
-      fun = unzip_to_init_apply_subjaxprs(flat_fun, trace, settings)  # pylint: disable=no-value-for-parameter
+      fun = unzip_to_init_apply_subjaxprs(flat_fun, master, settings)  # pylint: disable=no-value-for-parameter
       success, results = fun.call_wrapped(flat_keys, flat_pvals)
       if not success:
         raise ValueError('Variables do not cut dependence graph.')

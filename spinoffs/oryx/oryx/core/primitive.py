@@ -14,16 +14,22 @@
 # ============================================================================
 # Lint as: python3
 """Module for higher order primitives."""
+import itertools as it
+from typing import Callable
+
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
 from jax import linear_util as lu
 from jax import tree_util
+from jax import util as jax_util
 from jax.interpreters import ad
 from jax.interpreters import batching
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 from jax.lib.xla_bridge import xla_client as xc
+
+from oryx.core import trace_util
 
 __all__ = [
     'HigherOrderPrimitive',
@@ -37,6 +43,19 @@ __all__ = [
 safe_map = jax_core.safe_map
 
 custom_batch_rules = {}
+hop_transformation_rules = {}
+initial_transformation_rules = {}
+
+
+def register_hop_transformation_rule(name: str, register_func: Callable[...,
+                                                                        None]):
+  hop_transformation_rules[name] = register_func
+
+
+def register_initial_transformation_rule(
+    name: str,
+    register_func: Callable[..., None]):
+  initial_transformation_rules[name] = register_func
 
 
 class HigherOrderPrimitive(jax_core.Primitive):
@@ -60,15 +79,8 @@ class HigherOrderPrimitive(jax_core.Primitive):
     self.call_primitive = True
     self.multiple_results = True
     pe.staged_out_calls.add(self)
-    def _transpose_rule(*args, **kwargs):
-      return ad.call_transpose(self.subcall('transpose'), *args, **kwargs)
-    ad.primitive_transposes[self] = _transpose_rule
-    def _translation_rule(*args, backend, name, call_jaxpr, **kwargs):
-      del kwargs
-      return xla._xla_call_translation_rule(*args, name=name, backend=backend,  # pylint: disable=protected-access
-                                            call_jaxpr=call_jaxpr,
-                                            donated_invars=(False,) * len(args))
-    xla.call_translations[self] = _translation_rule
+    for register_func in hop_transformation_rules.values():
+      register_func(self)
 
   def impl(self, f, *args, **params):
     del params
@@ -76,7 +88,8 @@ class HigherOrderPrimitive(jax_core.Primitive):
 
   def bind(self, f, *args, **params):
     top_trace = jax_core.find_top_trace(args)
-    level = (jax_core.trace_state.trace_stack.next_level(True)
+    trace_stack = jax_core.thread_local_state.trace_state.trace_stack
+    level = (trace_stack.next_level(True)
              if top_trace is None else top_trace.level)
     params_tuple = tuple(params.items())
     f, env_trace_todo = jax_core.process_env_traces(
@@ -86,15 +99,16 @@ class HigherOrderPrimitive(jax_core.Primitive):
         outs = self.impl(f, *args, **params)
     else:
       tracers = safe_map(top_trace.full_raise, args)
-      if isinstance(top_trace, batching.BatchTrace):
-        if self in custom_batch_rules:
-          return custom_batch_rules[self](top_trace, f, tracers, params)
-      if isinstance(top_trace, ad.JVPTrace):
-        prim = self.subcall('jvp')
+      if (isinstance(top_trace, batching.BatchTrace)
+          and self in custom_batch_rules):
+        outs = custom_batch_rules[self](top_trace, f, tracers, params)
       else:
-        prim = self
-      outs = safe_map(jax_core.full_lower,
-                      top_trace.process_call(prim, f, tracers, params))
+        if isinstance(top_trace, ad.JVPTrace):
+          prim = self.subcall('jvp')
+        else:
+          prim = self
+        outs = safe_map(jax_core.full_lower,
+                        top_trace.process_call(prim, f, tracers, params))
     return jax_core.apply_todos(env_trace_todo(), outs)
 
   def subcall(self, name):
@@ -105,6 +119,25 @@ class HigherOrderPrimitive(jax_core.Primitive):
 
   def post_process(self, trace, out_tracers, params):
     return trace.post_process_call(self, out_tracers, params)
+
+
+def hop_transpose_rule(prim):
+  def rule(*args, **kwargs):
+    return ad.call_transpose(prim.subcall('transpose'), *args, **kwargs)
+  ad.primitive_transposes[prim] = rule
+  return rule
+register_hop_transformation_rule('transpose', hop_transpose_rule)
+
+
+def hop_translation_rule(prim):
+  def rule(*args, backend, name, call_jaxpr, **params):
+    new_params = dict(name=name, backend=backend, call_jaxpr=call_jaxpr)
+    new_params['donated_invars'] = params.get('donated_invars',
+                                              (False,) * len(args))
+    return xla._xla_call_translation_rule(*args, **new_params)  # pylint: disable=protected-access
+  xla.call_translations[prim] = rule
+  return rule
+register_hop_transformation_rule('translation', hop_translation_rule)
 
 
 class FlatPrimitive(jax_core.Primitive):
@@ -124,7 +157,9 @@ class FlatPrimitive(jax_core.Primitive):
     ad.primitive_jvps[self] = _jvp
 
     def _batch(args, dims, **params):
-      return batching.batch_fun(lu.wrap_init(self.impl, params), args, dims)
+      batched, out_dims = batching.batch_fun2(lu.wrap_init(self.impl, params),
+                                              dims)
+      return batched.call_wrapped(*args), out_dims()
     batching.primitive_batchers[self] = _batch
 
     def _xla(c, *xla_args, **params):
@@ -152,6 +187,36 @@ def call_bind(prim, **params):
       return tree_util.tree_unflatten(out_tree_dest, out)
     return wrapped
   return bind
+
+
+def initial_style_bind(prim, **params):
+  """Binds a primitive to a function call."""
+  def bind(f):
+    """Wraps a function to be bound to a primitive, keeping track of Pytree information."""
+    def wrapped(*args, **kwargs):
+      """Runs a function and binds it to a call primitive."""
+      jaxpr, (in_tree, out_tree) = trace_util.stage(f, dynamic=True)(
+          *args, **kwargs)
+      flat_args = tree_util.tree_leaves(args)
+      outs = prim.bind(*it.chain(jaxpr.literals, flat_args),
+                       jaxpr=jaxpr.jaxpr, in_tree=in_tree, out_tree=out_tree,
+                       num_consts=len(jaxpr.literals), **params)
+      return tree_util.tree_unflatten(out_tree, outs)
+    return wrapped
+  return bind
+
+
+class InitialStylePrimitive(FlatPrimitive):
+  """Contains default implementations of transformations."""
+
+  def __init__(self, name):
+    super().__init__(name)
+    def fun_impl(*args, **params):
+      consts, args = jax_util.split_list(args, [params['num_consts']])
+      return jax_core.eval_jaxpr(params['jaxpr'], consts, *args)
+    self.def_impl(fun_impl)
+    for register_func in initial_transformation_rules.values():
+      register_func(self)
 
 
 tie_all_p = jax_core.Primitive('tie_all')

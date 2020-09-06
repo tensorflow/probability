@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
@@ -126,7 +127,7 @@ class Exponential(gamma.Gamma):
 
   def _sample_n(self, n, seed=None):
     rate = tf.convert_to_tensor(self.rate)
-    shape = tf.concat([[n], tf.shape(rate)], 0)
+    shape = ps.concat([[n], ps.shape(rate)], 0)
     # Uniform variates must be sampled from the open-interval `(0, 1)` rather
     # than `[0, 1)`. To do so, we use
     # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny`

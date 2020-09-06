@@ -16,12 +16,30 @@
 
 from discussion.fun_mcmc import tf_on_jax
 from discussion.fun_mcmc import util_jax as util
-from tensorflow_probability.python.experimental.substrates import jax as tfp
+from tensorflow_probability.substrates import jax as tfp
 
 tf = tf_on_jax.tf
 
 __all__ = [
+    'BACKEND_NAME',
+    'multi_backend_test',
     'tf',
     'tfp',
     'util',
 ]
+
+BACKEND_NAME = 'jax'
+
+
+def multi_backend_test(globals_dict,
+                       relative_module_name,
+                       backends=('jax', 'tf'),
+                       test_case=None):
+  """See backend.multi_backend_test."""
+  if test_case is None:
+    return lambda test_case: multi_backend_test(  # pylint: disable=g-long-lambda
+        globals_dict=globals_dict,
+        relative_module_name=relative_module_name,
+        backends=backends,
+        test_case=test_case)
+  return test_case

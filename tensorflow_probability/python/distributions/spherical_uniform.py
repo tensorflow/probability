@@ -29,6 +29,7 @@ from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -114,7 +115,8 @@ class SphericalUniform(distribution.Distribution):
       shape_dtype = dtype_util.common_dtype([batch_shape], dtype_hint=tf.int32)
       self._dimension = dimension
       self._batch_shape_parameter = tensor_util.convert_nonref_to_tensor(
-          batch_shape, dtype=shape_dtype, name='batch_shape')
+          batch_shape, dtype=shape_dtype, name='batch_shape',
+          as_shape_tensor=True)
       self._batch_shape_static = tensorshape_util.constant_value_as_shape(
           self._batch_shape_parameter)
 
@@ -157,13 +159,13 @@ class SphericalUniform(distribution.Distribution):
     log_nsphere_surface_area = (
         np.log(2.) + (self.dimension / 2) * np.log(np.pi) -
         tf.math.lgamma(tf.cast(self.dimension / 2., self.dtype)))
-    batch_shape = tf.broadcast_dynamic_shape(
-        tf.shape(x)[:-1], self.batch_shape)
+    batch_shape = ps.broadcast_shape(
+        ps.shape(x)[:-1], self.batch_shape)
     return tf.fill(batch_shape, -log_nsphere_surface_area)
 
   def _sample_n(self, n, seed=None):
     raw = samplers.normal(
-        shape=tf.concat([[n], self.batch_shape, [self.dimension]], axis=0),
+        shape=ps.concat([[n], self.batch_shape, [self.dimension]], axis=0),
         seed=seed, dtype=self.dtype)
     unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
     return unit_norm
@@ -173,6 +175,22 @@ class SphericalUniform(distribution.Distribution):
         np.log(2.) + (self.dimension / 2) * np.log(np.pi) -
         tf.math.lgamma(tf.cast(self.dimension / 2., self.dtype)))
     return tf.fill(self.batch_shape_tensor(), log_nsphere_surface_area)
+
+  def _mean(self):
+    # This can be seen due to symmetry. If (X_1, ... X_k, ..., X_n) is
+    # uniformly distributed on the sphere, then so is
+    # (X_1, ..., -X_k, ..., X_n). Thus E[X_k] = E[-X_k] = 0.
+    return tf.fill(
+        tf.concat([self.batch_shape_tensor(), [self.dimension]], axis=0),
+        tf.cast(0., self.dtype))
+
+  def _covariance(self):
+    # By a similar argument for the mean case, we can show that
+    # E[X_i X_j] = -E[X_i X_j], so the covariance terms are zero.
+    return tf.eye(
+        num_rows=self.dimension,
+        batch_shape=self.batch_shape_tensor(),
+        dtype=self.dtype) / self.dimension
 
   def _default_event_space_bijector(self):
     # TODO(b/145620027) Finalize choice of bijector.

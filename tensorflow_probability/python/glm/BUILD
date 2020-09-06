@@ -15,15 +15,13 @@
 # Description:
 #   Generalized Linear Model specification, fitting, and related utilities.
 
-# [internal] load python3.bzl
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -35,6 +33,7 @@ py_library(
         ":family",
         ":fisher_scoring",
         ":proximal_hessian",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -52,11 +51,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "fisher_scoring_test",
     size = "small",
     srcs = ["fisher_scoring_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -78,17 +78,19 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "proximal_hessian_test",
     size = "medium",
     srcs = ["proximal_hessian_test.py"],
+    python_version = "PY3",
     shard_count = 4,
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -105,11 +107,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "family_test",
     size = "small",
     srcs = ["family_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

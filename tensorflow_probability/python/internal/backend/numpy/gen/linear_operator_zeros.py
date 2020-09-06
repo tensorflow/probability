@@ -195,6 +195,19 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
       ValueError:  If any of the following is not `True`:
         `{is_self_adjoint, is_non_singular, is_positive_definite}`.
     """
+    parameters = dict(
+        num_rows=num_rows,
+        num_columns=num_columns,
+        batch_shape=batch_shape,
+        dtype=dtype,
+        is_non_singular=is_non_singular,
+        is_self_adjoint=is_self_adjoint,
+        is_positive_definite=is_positive_definite,
+        is_square=is_square,
+        assert_proper_shapes=assert_proper_shapes,
+        name=name
+    )
+
     dtype = dtype or dtypes.float32
     self._assert_proper_shapes = assert_proper_shapes
 
@@ -213,6 +226,7 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
           is_square=is_square,
+          parameters=parameters,
           name=name)
 
       linear_operator_util.assert_not_ref_type(num_rows, "num_rows")
@@ -485,8 +499,8 @@ from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shap
 from tensorflow_probability.python.internal.backend.numpy import private
 distribution_util = private.LazyLoader(
     "distribution_util", globals(),
-    "tensorflow_probability.python.internal._numpy.distribution_util")
+    "tensorflow_probability.substrates.numpy.internal.distribution_util")
 tensorshape_util = private.LazyLoader(
-   "tensorshape_util", globals(),
-    "tensorflow_probability.python.internal._numpy.tensorshape_util")
+    "tensorshape_util", globals(),
+    "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
 

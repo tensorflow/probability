@@ -19,7 +19,7 @@ from jax import tree_util
 import jax.numpy as np
 
 from oryx.core import ppl
-from oryx.core.interpreters import inverse
+from oryx.core.interpreters.inverse import core as inverse
 
 __all__ = [
     'constrain'

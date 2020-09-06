@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -105,7 +106,7 @@ class Bernoulli(distribution.Distribution):
 
   def _batch_shape_tensor(self):
     x = self._probs if self._logits is None else self._logits
-    return tf.shape(x)
+    return ps.shape(x)
 
   def _batch_shape(self):
     x = self._probs if self._logits is None else self._logits
@@ -119,7 +120,7 @@ class Bernoulli(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     probs = self._probs_parameter_no_checks()
-    new_shape = tf.concat([[n], tf.shape(probs)], 0)
+    new_shape = ps.concat([[n], ps.shape(probs)], 0)
     uniform = samplers.uniform(new_shape, seed=seed, dtype=probs.dtype)
     sample = tf.less(uniform, probs)
     return tf.cast(sample, self.dtype)
@@ -141,6 +142,10 @@ class Bernoulli(distribution.Distribution):
     #  logits = -inf ==> log_probs0 = 0, log_probs1 = -inf (as desired)
     #  logits = +inf ==> log_probs0 = -inf, log_probs1 = 0 (as desired)
     return -tf.math.softplus(s), -tf.math.softplus(-s)
+
+  def _cdf(self, event):
+    prob = self._probs_parameter_no_checks()
+    return tf.where(event < 0, 0.0, tf.where(event < 1, 1.0 - prob, 1.0))
 
   def _entropy(self):
     probs0, probs1, log_probs0, log_probs1 = _probs_and_log_probs(

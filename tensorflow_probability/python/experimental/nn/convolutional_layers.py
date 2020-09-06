@@ -130,7 +130,7 @@ class Convolution(layers_lib.KernelBiasLayer):
         the leftmost `rank` dimensions' sizes of `kernel`.
       rank: An integer, the rank of the convolution, e.g. "2" for 2D
         convolution. This argument implies the number of `kernel` dimensions,
-        i.e.`, `kernel.shape.rank == rank + 2`.
+        i.e., `kernel.shape.rank == rank + 2`.
         In Keras, this argument has the same name and semantics.
         Default value: `2`.
       strides: An integer or tuple/list of n integers, specifying the stride
@@ -391,7 +391,7 @@ class ConvolutionVariationalReparameterization(
         the leftmost `rank` dimensions' sizes of `kernel`.
       rank: An integer, the rank of the convolution, e.g. "2" for 2D
         convolution. This argument implies the number of `kernel` dimensions,
-        i.e.`, `kernel.shape.rank == rank + 2`.
+        i.e., `kernel.shape.rank == rank + 2`.
         In Keras, this argument has the same name and semantics.
         Default value: `2`.
       strides: An integer or tuple/list of n integers, specifying the stride
@@ -584,7 +584,7 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
         the leftmost `rank` dimensions' sizes of `kernel`.
       rank: An integer, the rank of the convolution, e.g. "2" for 2D
         convolution. This argument implies the number of `kernel` dimensions,
-        i.e.`, `kernel.shape.rank == rank + 2`.
+        i.e., `kernel.shape.rank == rank + 2`.
         In Keras, this argument has the same name and semantics.
         Default value: `2`.
       strides: An integer or tuple/list of n integers, specifying the stride
@@ -740,6 +740,27 @@ def prepare_tuple_argument(x, n, arg_name):
   return x
 
 
+def prepare_strides(x, n, arg_name):
+  """Mimics prepare_tuple_argument, but puts a 1 for the 0th and 3rd element."""
+  if isinstance(x, int):
+    return (1,) + (x,) * (n-2) + (1,)
+  try:
+    x = tuple(x)
+  except TypeError:
+    raise ValueError('Argument {} must be convertible to tuple.'.format(
+        arg_name))
+  if n != len(x):
+    raise ValueError('Argument {} has invalid length; expected:{}, '
+                     'saw:{}.'.format(arg_name, n, len(x)))
+  for x_ in x:
+    try:
+      int(x_)
+    except (ValueError, TypeError):
+      raise ValueError('Argument {} contains non-integer input; '
+                       'saw: {}.'.format(arg_name, x_))
+  return x
+
+
 def _prepare_padding_argument(x):
   """Helper which processes the padding argument."""
   if not hasattr(x, 'upper'):
@@ -776,7 +797,7 @@ def convolution_batch(x, kernel, rank, strides, padding, data_format=None,
         dilations,
         data_format,
     ] = prepare_conv_args(rank, strides, padding, dilations)
-    strides = prepare_tuple_argument(strides, rank + 2, arg_name='strides')
+    strides = prepare_strides(strides, rank + 2, arg_name='strides')
 
     dtype = dtype_util.common_dtype([x, kernel], dtype_hint=tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')

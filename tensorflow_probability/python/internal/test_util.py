@@ -27,9 +27,6 @@ from absl import flags
 from absl import logging
 from absl.testing import parameterized
 import numpy as np
-# Reimporting numpy to prevent the reference to onp.random from being rewritten
-# for the Jax backend, while allowing rewrites of other numpy references.
-import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -45,6 +42,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'substrate_disable_stateful_random_test',
     'numpy_disable_gradient_test',
+    'numpy_disable_variable_test',
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
     'disable_test_for_backend',
@@ -66,11 +64,15 @@ NUMPY_MODE = False
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
-                   'With --runs_per_test=N, produces N iid runs.'))
+                   'With --runs_per_test=N, produces N iid runs.'),
+                  allow_override=True)
 
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
-                     'Takes precedence over --vary-seed when both appear.'))
+                     'Takes precedence over --vary-seed when both appear.'),
+                    allow_override=True,
+                    allow_override_cpp=False,
+                    allow_hide_cpp=True)
 
 
 class TestCase(tf.test.TestCase, parameterized.TestCase):
@@ -282,6 +284,33 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         .format([i for i, x in enumerate(each_is) if not x]))
     raise AssertionError(msg)
 
+  def evaluate_dict(self, dictionary):
+    """Invokes `self.evaluate` on the `Tensor`s in `dictionary`.
+
+    Reconstructs the results as a dictionary with the same keys and values.
+    Leaves non-`Tensor` values alone (lest `self.evaluate` fail on them).
+
+    This can be useful to debug Hypothesis examples, with
+    `hp.note(self.evaluate_dict(dist.parameters()))`.  The standard
+    `self.evaluate` can fail if the `parameters` dictionary contains
+    non-`Tensor` values (which it typically does).
+
+    Args:
+      dictionary: Dictionary to traverse.
+
+    Returns:
+      result: Dictionary with the same keys, but with `Tensor` values
+        replaced by the results of `self.evaluate`.
+    """
+    python_values = {}
+    tensor_values = {}
+    for k, v in dictionary.items():
+      if tf.is_tensor(v):
+        tensor_values[k] = v
+      else:
+        python_values[k] = v
+    return dict(self.evaluate(tensor_values), **python_values)
+
   def compute_max_gradient_error(self, f, args, delta=1e-3):
     """Wrapper around TF's gradient_checker_v2.
 
@@ -377,8 +406,9 @@ if JAX_MODE:
     def grad_i(d):
       return (f(*(xs[:i] + [xs[i] + d * scale] + xs[i+1:]))
               - f(*(xs[:i] + [xs[i] - d * scale] + xs[i+1:]))) / (2. * scale)
-    ret = vmap(grad_i, out_axes=-1)(
+    ret = vmap(grad_i)(
         np.eye(size_i, dtype=dtype_i).reshape((size_i,) + shape_i))
+    ret = np.moveaxis(ret, 0, -1)
     return np.reshape(ret, ret.shape[:-1] + shape_i)
 
 
@@ -577,6 +607,19 @@ def numpy_disable_gradient_test(test_fn_or_reason, reason=None):
   def new_test(self, *args, **kwargs):  # pylint: disable=unused-argument
     self.skipTest('gradient-using test disabled for numpy{}'.format(
         ': {}'.format(reason) if reason else ''))
+
+  return new_test
+
+
+def numpy_disable_variable_test(test_fn):
+  """Disable a Variable-using test when using the numpy backend."""
+
+  if not NUMPY_MODE:
+    return test_fn
+
+  def new_test(self, *args, **kwargs):
+    self.skipTest('tf.Variable-using test disabled for numpy')
+    return test_fn(self, *args, **kwargs)
 
   return new_test
 
@@ -823,7 +866,7 @@ def test_np_rng(hardcoded_seed=None):
   raw_seed = test_seed(hardcoded_seed=hardcoded_seed)
   # Jax backend doesn't have the random module; but it shouldn't be needed,
   # because this helper should only be used to generate test data.
-  return onp.random.RandomState(seed=raw_seed % 2**32)
+  return np.random.RandomState(seed=raw_seed % 2**32)
 
 
 def floats_near(target, how_many, dtype=np.float32):

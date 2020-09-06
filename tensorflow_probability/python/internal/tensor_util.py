@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
     'convert_nonref_to_tensor',
@@ -33,7 +34,8 @@ __all__ = [
 ]
 
 
-def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
+def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None,
+                             as_shape_tensor=False, name=None):
   """Converts the given `value` to a `Tensor` if input is nonreference type.
 
   This function converts Python objects of various types to `Tensor` objects
@@ -55,6 +57,9 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
       dtype in mind when converting to a tensor, so dtype_hint
       can be used as a soft preference.  If the conversion to
       `dtype_hint` is not possible, this argument has no effect.
+    as_shape_tensor: Optional boolean when if `True` uses
+      `prefer_static.convert_to_shape_tensor` instead of `tf.convert_to_tensor`
+      for JAX compatibility.
     name: Optional name to use if a new `Tensor` is created.
 
   Returns:
@@ -111,6 +116,9 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
       raise TypeError('Mutable type must be of dtype "{}" but is "{}".'.format(
           dtype_util.name(dtype_base), dtype_util.name(value_dtype_base)))
     return value
+  if as_shape_tensor:
+    return prefer_static.convert_to_shape_tensor(
+        value, dtype=dtype, dtype_hint=dtype_hint, name=name)
   return tf.convert_to_tensor(
       value, dtype=dtype, dtype_hint=dtype_hint, name=name)
 

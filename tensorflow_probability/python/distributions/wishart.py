@@ -29,9 +29,10 @@ from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scal
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import transform_diagonal as transform_diagonal_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -157,7 +158,7 @@ class WishartLinearOperator(distribution.Distribution):
 
   def _event_shape_tensor(self):
     dimension = self._scale.domain_dimension_tensor()
-    return tf.stack([dimension, dimension])
+    return ps.stack([dimension, dimension])
 
   def _event_shape(self):
     dimension = self._scale.domain_dimension
@@ -165,8 +166,8 @@ class WishartLinearOperator(distribution.Distribution):
 
   def _batch_shape_tensor(self, df=None):
     df = tf.convert_to_tensor(self.df) if df is None else df
-    return tf.broadcast_dynamic_shape(
-        tf.shape(df), self._scale.batch_shape_tensor())
+    return ps.broadcast_shape(
+        ps.shape(df), self._scale.batch_shape_tensor())
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -176,10 +177,10 @@ class WishartLinearOperator(distribution.Distribution):
     df = tf.convert_to_tensor(self.df)
     batch_shape = self._batch_shape_tensor(df)
     event_shape = self._event_shape_tensor()
-    batch_ndims = tf.shape(batch_shape)[0]
+    batch_ndims = ps.shape(batch_shape)[0]
 
     ndims = batch_ndims + 3  # sample_ndims=1, event_ndims=2
-    shape = tf.concat([[n], batch_shape, event_shape], 0)
+    shape = ps.concat([[n], batch_shape, event_shape], 0)
     normal_seed, gamma_seed = samplers.split_seed(seed, salt='Wishart')
 
     # Complexity: O(nbk**2)
@@ -193,24 +194,25 @@ class WishartLinearOperator(distribution.Distribution):
         self._scale.batch_shape_tensor(),
         dtype=dtype_util.base_dtype(df.dtype))
 
-    g = samplers.gamma(
+    g = gamma_lib.random_gamma(
         shape=[n],
-        alpha=self._multi_gamma_sequence(0.5 * expanded_df, self._dimension()),
-        beta=0.5,
-        dtype=self.dtype,
-        seed=gamma_seed)
+        concentration=self._multi_gamma_sequence(
+            0.5 * expanded_df, self._dimension()),
+        log_rate=tf.convert_to_tensor(np.log(0.5), self.dtype),
+        seed=gamma_seed,
+        log_space=True)
 
     # Complexity: O(nbk**2)
     x = tf.linalg.band_part(x, -1, 0)  # Tri-lower.
 
     # Complexity: O(nbk)
-    x = tf.linalg.set_diag(x, tf.sqrt(g))
+    x = tf.linalg.set_diag(x, tf.math.exp(g * 0.5))
 
     # Make batch-op ready.
     # Complexity: O(nbk**2)
-    perm = tf.concat([tf.range(1, ndims), [0]], 0)
+    perm = ps.concat([ps.range(1, ndims), [0]], 0)
     x = tf.transpose(a=x, perm=perm)
-    shape = tf.concat([batch_shape, [event_shape[0]], [event_shape[1] * n]], 0)
+    shape = ps.concat([batch_shape, [event_shape[0]], [event_shape[1] * n]], 0)
     x = tf.reshape(x, shape)
 
     # Complexity: O(nbM) where M is the complexity of the operator solving a
@@ -220,9 +222,9 @@ class WishartLinearOperator(distribution.Distribution):
 
     # Undo make batch-op ready.
     # Complexity: O(nbk**2)
-    shape = tf.concat([batch_shape, event_shape, [n]], 0)
+    shape = ps.concat([batch_shape, event_shape, [n]], 0)
     x = tf.reshape(x, shape)
-    perm = tf.concat([[ndims - 1], tf.range(0, ndims - 1)], 0)
+    perm = ps.concat([[ndims - 1], ps.range(0, ndims - 1)], 0)
     x = tf.transpose(a=x, perm=perm)
 
     if not self.input_output_cholesky:
@@ -242,18 +244,18 @@ class WishartLinearOperator(distribution.Distribution):
     batch_shape = self._batch_shape_tensor(df)
     event_shape = self._event_shape_tensor()
     dimension = self._dimension()
-    x_ndims = tf.rank(x_sqrt)
+    x_ndims = ps.rank(x_sqrt)
     num_singleton_axes_to_prepend = (
-        tf.maximum(tf.size(batch_shape) + 2, x_ndims) - x_ndims)
-    x_with_prepended_singletons_shape = tf.concat([
-        tf.ones([num_singleton_axes_to_prepend], dtype=tf.int32),
-        tf.shape(x_sqrt)
+        ps.maximum(ps.size(batch_shape) + 2, x_ndims) - x_ndims)
+    x_with_prepended_singletons_shape = ps.concat([
+        ps.ones([num_singleton_axes_to_prepend], dtype=tf.int32),
+        ps.shape(x_sqrt)
     ], 0)
     x_sqrt = tf.reshape(x_sqrt, x_with_prepended_singletons_shape)
-    ndims = tf.rank(x_sqrt)
+    ndims = ps.rank(x_sqrt)
     # sample_ndims = ndims - batch_ndims - event_ndims
-    sample_ndims = ndims - tf.size(batch_shape) - 2
-    sample_shape = tf.shape(x_sqrt)[:sample_ndims]
+    sample_ndims = ndims - ps.size(batch_shape) - 2
+    sample_shape = ps.shape(x_sqrt)[:sample_ndims]
 
     # We need to be able to pre-multiply each matrix by its corresponding
     # batch scale matrix. Since a Distribution Tensor supports multiple
@@ -268,15 +270,15 @@ class WishartLinearOperator(distribution.Distribution):
 
     # Complexity: O(nbk**2) since transpose must access every element.
     scale_sqrt_inv_x_sqrt = x_sqrt
-    perm = tf.concat([tf.range(sample_ndims, ndims),
-                      tf.range(0, sample_ndims)], 0)
+    perm = ps.concat([ps.range(sample_ndims, ndims),
+                      ps.range(0, sample_ndims)], 0)
     scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
     last_dim_size = (
-        tf.cast(dimension, dtype=tf.int32) *
-        tf.reduce_prod(x_with_prepended_singletons_shape[:sample_ndims]))
-    shape = tf.concat(
+        ps.cast(dimension, dtype=tf.int32) *
+        ps.reduce_prod(x_with_prepended_singletons_shape[:sample_ndims]))
+    shape = ps.concat(
         [x_with_prepended_singletons_shape[sample_ndims:-2],
-         [tf.cast(dimension, dtype=tf.int32), last_dim_size]],
+         [ps.cast(dimension, dtype=tf.int32), last_dim_size]],
         axis=0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
 
@@ -287,13 +289,13 @@ class WishartLinearOperator(distribution.Distribution):
 
     # Undo make batch-op ready.
     # Complexity: O(nbk**2)
-    shape = tf.concat(
-        [tf.shape(scale_sqrt_inv_x_sqrt)[:-2], event_shape, sample_shape],
+    shape = ps.concat(
+        [ps.shape(scale_sqrt_inv_x_sqrt)[:-2], event_shape, sample_shape],
         axis=0)
     scale_sqrt_inv_x_sqrt = tf.reshape(scale_sqrt_inv_x_sqrt, shape)
-    perm = tf.concat([
-        tf.range(ndims - sample_ndims, ndims),
-        tf.range(0, ndims - sample_ndims)
+    perm = ps.concat([
+        ps.range(ndims - sample_ndims, ndims),
+        ps.range(0, ndims - sample_ndims)
     ], 0)
     scale_sqrt_inv_x_sqrt = tf.transpose(a=scale_sqrt_inv_x_sqrt, perm=perm)
 
@@ -394,9 +396,9 @@ class WishartLinearOperator(distribution.Distribution):
     """Creates sequence used in multivariate (di)gamma; shape = shape(a)+[p]."""
     with tf.name_scope(name):
       # Linspace only takes scalars, so we'll add in the offset afterwards.
-      seq = tf.linspace(
+      seq = ps.linspace(
           tf.constant(0., dtype=self.dtype),
-          0.5 - 0.5 * p, tf.cast(p, tf.int32))
+          0.5 - 0.5 * p, ps.cast(p, tf.int32))
       return seq + a[..., tf.newaxis]
 
   def _multi_lgamma(self, a, p, name='multi_lgamma'):
@@ -421,7 +423,7 @@ class WishartLinearOperator(distribution.Distribution):
             dtype=self._scale.dtype,
             name='dimension')
       else:
-        return tf.convert_to_tensor(
+        return ps.convert_to_shape_tensor(
             tf.compat.dimension_value(self._scale.shape[-1]),
             dtype=self._scale.dtype,
             name='dimension')
@@ -601,7 +603,7 @@ class WishartTriL(WishartLinearOperator):
       return []
 
     if is_init != tensor_util.is_ref(self._scale_tril):
-      shape = prefer_static.shape(self._scale_tril)
+      shape = ps.shape(self._scale_tril)
       assertions.extend(
           [assert_util.assert_positive(
               tf.linalg.diag_part(self._scale_tril),

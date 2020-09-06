@@ -26,7 +26,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
@@ -296,7 +296,6 @@ class QuantizedDistribution(distributions.Distribution):
 
   def _sample_n(self, n, seed=None):
     with tf.name_scope('transform'):
-      n = tf.convert_to_tensor(n, name='n')
       x_samps = self.distribution.sample(n, seed=seed)
 
       # Snap values to the intervals (j - 1, j].
@@ -532,8 +531,8 @@ class QuantizedDistribution(distributions.Distribution):
 
     assertions = []
     if self._low is not None and is_init != tensor_util.is_ref(self._low):
-      low_shape = prefer_static.shape(low)
-      broadcast_shape = prefer_static.broadcast_shape(sample_shape, low_shape)
+      low_shape = ps.shape(low)
+      broadcast_shape = ps.broadcast_shape(sample_shape, low_shape)
       assertions.extend(
           [distribution_util.assert_integer_form(
               low, message='`low` has non-integer components.'),
@@ -543,8 +542,8 @@ class QuantizedDistribution(distributions.Distribution):
                message=('Shape of `low` adds extra batch dimensions to '
                         'sample shape.'))])
     if self._high is not None and is_init != tensor_util.is_ref(self._high):
-      high_shape = prefer_static.shape(high)
-      broadcast_shape = prefer_static.broadcast_shape(sample_shape, high_shape)
+      high_shape = ps.shape(high)
+      broadcast_shape = ps.broadcast_shape(sample_shape, high_shape)
       assertions.extend(
           [distribution_util.assert_integer_form(
               high, message='`high` has non-integer components.'),

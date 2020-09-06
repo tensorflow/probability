@@ -157,6 +157,9 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
       self.assertAllClose(self.evaluate(dist.log_prob(event)),
                           np.log(expected_pmf))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='UniqueWithCountsV2 is not implemented in the JAX, NumPy backends')
   def testEntropy(self):
     samples = [
         [0],
@@ -192,12 +195,14 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
           dist.batch_shape_tensor())
 
       n = 1000
-      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
+      seed = test_util.test_seed()
+      if tf.executing_eagerly():
+        tf.random.set_seed(seed)
       samples1 = dist.sample(n, seed)
-      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
+      if tf.executing_eagerly():
+        tf.random.set_seed(seed)
       samples2 = dist.sample(n, seed)
-      self.assertAllEqual(
-          self.evaluate(samples1), self.evaluate(samples2))
+      self.assertAllEqual(self.evaluate(samples1), self.evaluate(samples2))
 
   def testMean(self):
     samples = [
@@ -219,15 +224,20 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
       dist = tfd.Empirical(samples=input_ph, validate_args=True)
       self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='UniqueWithCountsV2 is not implemented in the JAX, NumPy backends')
   def testMode(self):
     samples = [
         [0, 1, 1, 2],
+        [0, 1, 1, 1, 2, 2, 3, 4, 5, 9, 11, 11, 11, 11, 11],
         [[0, 0, 1], [0, 1, 1], [2, 2, 2]],
         [[[0, 0, 0, 0], [0, 0, 1, 1]],
          [[1, 1, 1, 2], [0, 1, 2, 2]]]
     ]
     expected_modes = [
         1,
+        11.,
         [0, 1, 2],
         [[0, 0], [1, 2]]
     ]
@@ -412,9 +422,13 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
           expected_shape)
 
       n = 1000
-      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
+      seed = test_util.test_seed()
+      if tf.executing_eagerly():
+        tf.random.set_seed(seed)
       samples1 = dist.sample(n, seed)
-      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
+      seed = test_util.test_seed()
+      if tf.executing_eagerly():
+        tf.random.set_seed(seed)
       samples2 = dist.sample(n, seed)
       self.assertAllEqual(
           self.evaluate(samples1), self.evaluate(samples2))
@@ -437,11 +451,14 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='UniqueWithCountsV2 is not implemented in the JAX, NumPy backends')
   def testMode(self):
     samples = [
         [[0, 0], [0, 1], [0, 1]],
-        [[[0, 0], [0, 1], [0, 1], [1, 1]],
-         [[1, 1], [2, 2], [2, 2], [2, 2]]]
+        [[[0, 0], [0, 1], [1, 0], [0, 1], [1, 1], [7, 9]],
+         [[1, 1], [1, 2], [1, 7], [2, 2], [2, 2], [2, 2]]]
     ]
     expected_modes = [
         [0, 1],
@@ -455,6 +472,9 @@ class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):
       dist = tfd.Empirical(samples=input_ph, event_ndims=1, validate_args=True)
       self.assertAllClose(self.evaluate(dist.mode()), expected_mode)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='UniqueWithCountsV2 is not implemented in the JAX, NumPy backends')
   def testEntropy(self):
     samples = [
         [[0, 0], [0, 1]],
@@ -595,9 +615,13 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
               dist.sample(seed=test_util.test_seed()))), expected_shape)
 
       n = 1000
-      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
+      seed = test_util.test_seed()
+      if tf.executing_eagerly():
+        tf.random.set_seed(seed)
       samples1 = dist.sample(n, seed)
-      seed = tf.random.set_seed(42) if tf.executing_eagerly() else 42
+      seed = test_util.test_seed()
+      if tf.executing_eagerly():
+        tf.random.set_seed(seed)
       samples2 = dist.sample(n, seed)
       self.assertAllEqual(
           self.evaluate(samples1), self.evaluate(samples2))
@@ -616,8 +640,13 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
     self.assertAllClose(self.evaluate(dist.mean()), expected_mean)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='UniqueWithCountsV2 is not implemented in the JAX, NumPy backends')
   def testMode(self):
     sample = [[[0, 0], [0, 1]],
+              [[0, 0], [2, 4]],
+              [[0, 1], [2, 4]],
               [[0, 1], [1, 2]],
               [[0, 1], [1, 2]],
               [[0, 2], [2, 4]]]
@@ -630,6 +659,9 @@ class EmpiricalNdTest(test_util.VectorDistributionTestHelpers,
     dist = tfd.Empirical(samples=input_ph, event_ndims=2, validate_args=True)
     self.assertAllClose(self.evaluate(dist.mode()), expected_mode)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='UniqueWithCountsV2 is not implemented in the JAX, NumPy backends')
   def testEntropy(self):
     sample = [[[0, 0], [0, 1]],
               [[0, 1], [1, 2]],

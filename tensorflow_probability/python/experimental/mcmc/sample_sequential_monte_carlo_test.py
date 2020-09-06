@@ -41,8 +41,7 @@ tfd = tfp.distributions
 
 def make_test_nuts_kernel_fn(target_log_prob_fn,
                              init_state,
-                             scalings,
-                             seed=None):
+                             scalings):
   """Set up a function to generate nuts kernel for testing."""
   max_tree_depth = 3
 
@@ -54,19 +53,20 @@ def make_test_nuts_kernel_fn(target_log_prob_fn,
   return tfp.mcmc.NoUTurnSampler(
       target_log_prob_fn=target_log_prob_fn,
       step_size=step_size,
-      max_tree_depth=max_tree_depth,
-      seed=seed)
+      max_tree_depth=max_tree_depth)
 
 
 @test_util.test_all_tf_execution_regimes
 class SampleSequentialMonteCarloTest(test_util.TestCase):
 
   def testCorrectStepSizeTransformedkernel(self):
+    strm = test_util.test_seed_stream()
     scalings = .1
     bijector = tfb.Sigmoid()
     prior = tfd.Beta(.1, .1)
     likelihood = tfd.Beta(5., 5.)
-    init_state = [tf.clip_by_value(prior.sample(10000), 1e-5, 1.-1e-5)]
+    init_state = [tf.clip_by_value(prior.sample(10000, seed=strm()),
+                                   1e-5, 1.-1e-5)]
     make_transform_kernel_fn = gen_make_transform_hmc_kernel_fn(
         [bijector], num_leapfrog_steps=1)
 
@@ -74,8 +74,8 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
                                       init_state,
                                       scalings=scalings)
     step_size, expected_step_size = self.evaluate([
-        tf.squeeze(kernel.inner_kernel.step_size),
-        scalings * tf.math.reduce_std(bijector.inverse(init_state))
+        tf.squeeze(kernel.inner_kernel.step_size[0]),
+        scalings * tf.math.reduce_std(bijector.inverse(init_state[0]))
     ])
     self.assertAllGreater(step_size, 0.)
     self.assertAllEqual(step_size, expected_step_size)
@@ -117,8 +117,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         tuning_fn=functools.partial(simple_heuristic_tuning,
                                     optimal_accept=optimal_accept),
         max_num_steps=50,
-        parallel_iterations=1,
-        seed=None if tf.executing_eagerly() else seed)
+        seed=seed)
 
     assert_cdf_equal_sample = st.assert_true_cdf_equal_by_dkwm_two_sample(
         final_state, likelihood_dist.sample(5000, seed=seed), 1e-5)
@@ -163,8 +162,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
         tuning_fn=functools.partial(simple_heuristic_tuning,
                                     optimal_accept=0.8),
         max_num_steps=50,
-        parallel_iterations=1,
-        seed=None if tf.executing_eagerly() else seed)
+        seed=seed)
 
     assert_cdf_equal_sample = st.assert_true_cdf_equal_by_dkwm_two_sample(
         final_state, likelihood_dist.sample(5000, seed=seed), 1e-5)
@@ -249,7 +247,6 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
           tuning_fn=functools.partial(simple_heuristic_tuning,
                                       optimal_accept=.6),
           min_num_steps=5,
-          parallel_iterations=1,
           seed=seed)
 
     n_stage, (b0, b1, mu_out, sigma_out, weight), _ = run_smc()

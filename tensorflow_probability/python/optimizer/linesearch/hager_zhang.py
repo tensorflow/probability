@@ -37,6 +37,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'hager_zhang',
@@ -66,6 +67,10 @@ HagerZhangLineSearchResult = collections.namedtuple(
     ])
 
 
+@deprecation.deprecated_args(
+    '2020-10-13',
+    '`step_size_shrink_param` is ignored, and will stop being accepted.',
+    'step_size_shrink_param')
 def hager_zhang(value_and_gradients_function,
                 initial_step_size=None,
                 value_at_initial_step=None,
@@ -217,10 +222,8 @@ def hager_zhang(value_and_gradients_function,
     curvature_param: Positive scalar `Tensor` of real dtype. Bounded above
       by `1.`. Corresponds to 'sigma' in the terminology of
       [Hager and Zhang (2006)][2].
-    step_size_shrink_param: Positive scalar `Tensor` of real dtype. Bounded
-      above by `1`. If the supplied step size is too big (i.e. either the
-      objective value or the gradient at that point is infinite), this factor
-      is used to shrink the step size until it is finite.
+    step_size_shrink_param: Ignored; deprecated; retained for backward
+      compatibility.
     max_iterations: Positive scalar `Tensor` of integral dtype or None. The
       maximum number of iterations to perform in the line search. The number of
       iterations used to bracket the minimum are also counted against this
@@ -246,6 +249,7 @@ def hager_zhang(value_and_gradients_function,
         equal to those of `left` on batch members where converged is True.
         Otherwise, it corresponds to the last interval computed.
   """
+  del step_size_shrink_param
   with tf.name_scope(name or 'hager_zhang'):
     val_0, val_initial, f_lim, prepare_evals = _prepare_args(
         value_and_gradients_function,
@@ -263,21 +267,14 @@ def hager_zhang(value_and_gradients_function,
       init_converged = tf.convert_to_tensor(converged)
 
     failed = ~init_converged & ~valid_inputs
-    active = ~init_converged & valid_inputs
-
-    # Note: _fix_step_size returns immediately if either all inputs are invalid
-    # or none of the active ones need fixing.
-    fix_step_evals, val_c, fix_failed = _fix_step_size(
-        value_and_gradients_function, val_initial, active,
-        step_size_shrink_param)
 
     init_interval = HagerZhangLineSearchResult(
         converged=init_converged,
-        failed=failed | fix_failed,
-        func_evals=prepare_evals + fix_step_evals,
+        failed=failed,
+        func_evals=prepare_evals,
         iterations=tf.convert_to_tensor(0),
         left=val_0,
-        right=hzl.val_where(init_converged, val_0, val_c))
+        right=hzl.val_where(init_converged, val_0, val_initial))
 
     def _apply_bracket_and_search():
       """Bracketing and searching to do for valid inputs."""
@@ -291,30 +288,6 @@ def hager_zhang(value_and_gradients_function,
         tf.reduce_any(init_active),
         _apply_bracket_and_search,
         lambda: init_interval)
-
-
-def _fix_step_size(value_and_gradients_function,
-                   val_c_input,
-                   active,
-                   step_size_shrink_param):
-  """Shrinks the input step size until the value and grad become finite."""
-  # The maximum iterations permitted are determined as the number of halvings
-  # it takes to reduce 1 to 0 in the given dtype.
-  iter_max = np.ceil(-np.log2(_machine_eps(val_c_input.x.dtype)))
-
-  def _cond(i, val_c, to_fix):
-    del val_c  # Unused.
-    return (i < iter_max) & tf.reduce_any(to_fix)
-
-  def _body(i, val_c, to_fix):
-    next_c = tf.where(to_fix, val_c.x * step_size_shrink_param, val_c.x)
-    next_val_c = value_and_gradients_function(next_c)
-    still_to_fix = to_fix & ~hzl.is_finite(next_val_c)
-    return (i + 1, next_val_c, still_to_fix)
-
-  to_fix = active & ~hzl.is_finite(val_c_input)
-  return tf.while_loop(
-      cond=_cond, body=_body, loop_vars=(0, val_c_input, to_fix))
 
 
 _LineSearchInnerResult = collections.namedtuple('_LineSearchInnerResult', [

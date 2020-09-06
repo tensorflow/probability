@@ -25,7 +25,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
@@ -759,7 +759,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       for part_seed, x in zip(seeds, current_state_parts):
         current_momentum_parts.append(
             samplers.normal(
-                shape=tf.shape(x),
+                shape=ps.shape(x),
                 dtype=self._momentum_dtype or dtype_util.base_dtype(x.dtype),
                 seed=part_seed))
 
@@ -781,7 +781,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       def maybe_flatten(x):
         return x if mcmc_util.is_list_like(current_state) else x[0]
 
-      independent_chain_ndims = prefer_static.rank(current_target_log_prob)
+      independent_chain_ndims = ps.rank(current_target_log_prob)
 
       new_kernel_results = previous_kernel_results._replace(
           log_acceptance_correction=_compute_log_acceptance_correction(
@@ -917,8 +917,8 @@ def _compute_log_acceptance_correction(current_momentums,
       acceptance-correction.  (See docstring for mathematical definition.)
   """
   with tf.name_scope(name or 'compute_log_acceptance_correction'):
-    sum_sq = lambda v: tf.reduce_sum(v**2., axis=prefer_static.range(  # pylint: disable=g-long-lambda
-        independent_chain_ndims, prefer_static.rank(v)))
+    sum_sq = lambda v: tf.reduce_sum(v**2., axis=ps.range(  # pylint: disable=g-long-lambda
+        independent_chain_ndims, ps.rank(v)))
     current_kinetic = tf.add_n([sum_sq(v) for v in current_momentums])
     proposed_kinetic = tf.add_n([sum_sq(v) for v in proposed_momentums])
     return 0.5 * mcmc_util.safe_sum([current_kinetic, -proposed_kinetic])

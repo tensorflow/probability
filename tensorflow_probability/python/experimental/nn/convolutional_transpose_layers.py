@@ -128,7 +128,7 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
         the leftmost `rank` dimensions' sizes of `kernel`.
       rank: An integer, the rank of the convolution, e.g. "2" for 2D
         convolution. This argument implies the number of `kernel` dimensions,
-        i.e.`, `kernel.shape.rank == rank + 2`.
+        i.e., `kernel.shape.rank == rank + 2`.
         In Keras, this argument has the same name and semantics.
         Default value: `2`.
       strides: An integer or tuple/list of n integers, specifying the stride
@@ -386,7 +386,7 @@ class ConvolutionTransposeVariationalReparameterization(
         the leftmost `rank` dimensions' sizes of `kernel`.
       rank: An integer, the rank of the convolution, e.g. "2" for 2D
         convolution. This argument implies the number of `kernel` dimensions,
-        i.e.`, `kernel.shape.rank == rank + 2`.
+        i.e., `kernel.shape.rank == rank + 2`.
         In Keras, this argument has the same name and semantics.
         Default value: `2`.
       strides: An integer or tuple/list of n integers, specifying the stride
@@ -600,7 +600,7 @@ class ConvolutionTransposeVariationalFlipout(
         the leftmost `rank` dimensions' sizes of `kernel`.
       rank: An integer, the rank of the convolution, e.g. "2" for 2D
         convolution. This argument implies the number of `kernel` dimensions,
-        i.e.`, `kernel.shape.rank == rank + 2`.
+        i.e., `kernel.shape.rank == rank + 2`.
         In Keras, this argument has the same name and semantics.
         Default value: `2`.
       strides: An integer or tuple/list of n integers, specifying the stride

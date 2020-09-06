@@ -56,6 +56,7 @@ py_library(
         "//oryx/core:trace_util",
         "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:unzip",
+        "//oryx/core/interpreters/inverse:custom_inverse",
     ],
 )
 
@@ -69,6 +70,8 @@ py_library(
         "//oryx/core:primitive",
         "//oryx/core:pytree",
         "//oryx/core/interpreters:harvest",
+        "//oryx/core/interpreters:log_prob",
+        "//oryx/core/ppl",
     ],
 )
 
@@ -96,6 +99,7 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,
         # numpy dep,
+        "//oryx/core:primitive",
     ],
 )
 

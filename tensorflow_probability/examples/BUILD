@@ -15,20 +15,13 @@
 # Description:
 #   TensorFlow Probability examples.
 
-# py_test rules are rewritten to py3_test on export to OSS, for reasons of
-# reversibility of import<->export transforms. This is only necessary until we
-# eliminate all py2and3_test targets, after which everything can safely use
-# py_test, interanlly and externally, and no rewrites will be needed.
-# @unused  <-- satisfy buildifier errors
-load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -56,8 +49,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "bayesian_neural_network_test",
     size = "medium",
     srcs = ["bayesian_neural_network.py"],
@@ -103,8 +95,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "grammar_vae_test",
     size = "small",
     srcs = ["grammar_vae.py"],
@@ -145,8 +136,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "disentangled_vae_dry_run_test",
     size = "medium",
     srcs = ["disentangled_vae.py"],
@@ -174,8 +164,7 @@ py3_test(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "disentangled_vae_test",
     size = "medium",
     srcs = ["disentangled_vae_test.py"],
@@ -218,8 +207,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "deep_exponential_family_test",
     size = "small",
     srcs = ["deep_exponential_family.py"],
@@ -255,6 +243,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         # absl/flags dep,
+        # absl/logging dep,
         # numpy dep,
         # scipy dep,
         # six dep,
@@ -264,8 +253,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "latent_dirichlet_allocation_distributions_test",
     size = "small",
     srcs = ["latent_dirichlet_allocation_distributions.py"],
@@ -306,8 +294,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "logistic_regression_test",
     size = "small",
     srcs = [
@@ -360,8 +347,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "vae_test",
     size = "medium",
     srcs = ["vae.py"],
@@ -402,8 +388,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "vq_vae_test",
     size = "medium",
     srcs = ["vq_vae.py"],
@@ -449,8 +434,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "cifar10_bnn_test",
     size = "medium",
     srcs = ["cifar10_bnn.py"],

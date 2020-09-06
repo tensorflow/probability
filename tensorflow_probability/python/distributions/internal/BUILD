@@ -15,14 +15,13 @@
 # Description:
 #   Internal helper libraries for distributions.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -96,12 +95,13 @@ py_binary(
     ],
 )
 
-# py2and3
 py_test(
     name = "correlation_matrix_volumes_test",
     size = "small",
     srcs = ["correlation_matrix_volumes_test.py"],
+    python_version = "PY3",
     shard_count = 4,
+    srcs_version = "PY3",
     tags = [
         "no_pip",
         "optonly",

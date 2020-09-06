@@ -17,7 +17,7 @@
 #   methods, including modeling and Bayesian inference. APIs here are
 #   meant to evolve over time.
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -41,6 +41,7 @@ py_library(
         "//tensorflow_probability/python/experimental",
         "//tensorflow_probability/python/glm",
         "//tensorflow_probability/python/internal",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/layers",
         "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc",

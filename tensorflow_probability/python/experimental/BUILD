@@ -15,7 +15,6 @@
 # Description:
 #   API-unstable code that is part of the TFP package.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
@@ -27,7 +26,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -39,28 +38,33 @@ multi_substrate_py_library(
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/edward2",
+        "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
-        "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/sequential",
+        "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/vi",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
     ],
     deps = [
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/edward2",
-        "//tensorflow_probability/python/experimental/inference_gym",
+        "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/sequential",
+        "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/vi",
+        "//tensorflow_probability/python/internal:all_util",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
     ],
 )
 
@@ -74,10 +78,11 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "composite_tensor_test",
     srcs = ["composite_tensor_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

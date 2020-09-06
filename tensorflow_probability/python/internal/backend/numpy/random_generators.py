@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import numpy as onp  # Avoids JAX rewrite.  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -31,6 +32,7 @@ __all__ = [
     'gamma',
     'stateless_gamma',
     'stateless_normal',
+    'stateless_parameterized_truncated_normal',
     'stateless_poisson',
     'stateless_shuffle',
     'stateless_uniform',
@@ -49,25 +51,31 @@ __all__ = [
 JAX_MODE = False
 
 
-def _ensure_tuple(t):
+def _ensure_shape_tuple(t):
   try:
-    return tuple(t)
+    return tuple(int(x) for x in t)
   except TypeError:
-    return (t,)
+    pass
+  try:
+    return (int(t),)
+  except TypeError:
+    pass
+  raise TypeError('Non-shape-like value: {} (type {})'.format(t, type(t)))
 
 
 def _bcast_shape(base_shape, args):
-  base_shape = _ensure_tuple(base_shape)
+  base_shape = _ensure_shape_tuple(base_shape)
   if not args:
     return base_shape
-  bc_arr = np.zeros(base_shape + (0,))
+  bc_arr = onp.zeros(base_shape + (0,))
   for arg in args:
     if arg is not None:
-      bc_arr = bc_arr + np.zeros(np.shape(arg) + (0,))
+      bc_arr = bc_arr + onp.zeros(np.asarray(arg).shape + (0,))
   return bc_arr.shape[:-1]
 
 
 def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # pylint: disable=unused-argument
+  """Massaging dtype and nan handling of np.random.binomial."""
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   invalid_count = (np.int64(counts) < 0) != (counts < 0)
   if np.any(invalid_count):
@@ -75,8 +83,10 @@ def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # 
         counts[np.where(invalid_count)],
         np.int64(counts)[np.where(invalid_count)]))
   probs = np.where(counts > 0, probs, 0)
-  samps = rng.binomial(np.int64(counts), np.float64(probs), shape)
-  return samps.astype(utils.numpy_dtype(output_dtype))
+  nans = np.isnan(probs)
+  probs_for_np = np.where(nans, 0, probs)
+  samps = rng.binomial(np.int64(counts), np.float64(probs_for_np), shape)
+  return np.where(nans, np.nan, samps.astype(utils.numpy_dtype(output_dtype)))
 
 
 def _categorical(logits, num_samples, dtype=None, seed=None, name=None):  # pylint: disable=unused-argument
@@ -106,9 +116,8 @@ def _categorical_jax(logits, num_samples, dtype=None, seed=None, name=None):  # 
 def _gamma(shape, alpha, beta=None, dtype=np.float32, seed=None,
            name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
-  dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   scale = 1. if beta is None else (1. / beta)
-  shape = _ensure_tuple(shape)
+  shape = _ensure_shape_tuple(shape)
   return rng.gamma(shape=alpha, scale=scale, size=shape).astype(dtype)
 
 
@@ -117,7 +126,7 @@ def _gamma_jax(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
   dtype = utils.common_dtype([alpha, beta], dtype_hint=dtype)
   alpha = np.array(alpha, dtype=dtype)
   beta = None if beta is None else np.array(beta, dtype=dtype)
-  shape = _ensure_tuple(shape)
+  shape = _ensure_shape_tuple(shape)
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
@@ -152,7 +161,7 @@ def _poisson(shape, lam, dtype=np.float32, seed=None,
              name=None):  # pylint: disable=unused-argument
   rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
   dtype = utils.common_dtype([lam], dtype_hint=dtype)
-  shape = _ensure_tuple(shape)
+  shape = _ensure_shape_tuple(shape)
   return rng.poisson(lam=lam, size=shape).astype(dtype)
 
 
@@ -178,7 +187,7 @@ if JAX_MODE:
     # lam > 10. A reference implementation can be found here:
     # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc#L159-L239
 
-    shape = _ensure_tuple(shape)
+    shape = _ensure_shape_tuple(shape)
     max_iters = (max_iters
                  if max_iters is not None
                  else np.iinfo(np.int32).max)
@@ -220,6 +229,28 @@ def _shuffle_jax(value, seed=None, name=None):  # pylint: disable=unused-argumen
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
   return jaxrand.shuffle(seed, value, axis=0)
+
+
+def _truncated_normal(
+    shape, seed, means=0.0, stddevs=1.0, minvals=-2.0, maxvals=2.0, name=None):  # pylint: disable=unused-argument
+  from scipy import stats  # pylint: disable=g-import-not-at-top
+  rng = np.random if seed is None else np.random.RandomState(seed & 0xffffffff)
+  std_low = (minvals - means) / stddevs
+  std_high = (maxvals - means) / stddevs
+  std_samps = stats.truncnorm.rvs(
+      std_low, std_high, size=shape, random_state=rng)
+  return std_samps * stddevs + means
+
+
+def _truncated_normal_jax(
+    shape, seed, means=0.0, stddevs=1.0, minvals=-2.0, maxvals=2.0, name=None):  # pylint: disable=unused-argument
+  import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
+  if seed is None:
+    raise ValueError('Must provide PRNGKey to sample in JAX.')
+  std_low = (minvals - means) / stddevs
+  std_high = (maxvals - means) / stddevs
+  std_samps = jaxrand.truncated_normal(seed, std_low, std_high, shape)
+  return std_samps * stddevs + means
 
 
 def _uniform(shape, minval=0, maxval=None, dtype=np.float32, seed=None,
@@ -296,7 +327,7 @@ def gamma(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
   # `tf.random.stateless_gamma` interprets shape as the full output shape,
   # including as suffix the broadcast of alpha and beta shapes.
   scale = 1 if beta is None else beta
-  shape = _ensure_tuple(shape) + _bcast_shape((), [alpha, scale])
+  shape = _ensure_shape_tuple(shape) + _bcast_shape((), [alpha, scale])
   return stateless_gamma(shape=shape, alpha=alpha, beta=beta, dtype=dtype,
                          seed=seed, name=name)
 
@@ -304,6 +335,10 @@ def gamma(shape, alpha, beta=None, dtype=np.float32, seed=None, name=None):
 stateless_normal = utils.copy_docstring(
     'tf.random.normal',
     _normal_jax if JAX_MODE else _normal)
+
+stateless_parameterized_truncated_normal = utils.copy_docstring(
+    'tf.random.stateless_parameterized_truncated_normal',
+    _truncated_normal_jax if JAX_MODE else _truncated_normal)
 
 stateless_poisson = utils.copy_docstring(
     'tf.random.poisson',

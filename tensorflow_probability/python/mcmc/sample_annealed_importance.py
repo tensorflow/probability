@@ -139,10 +139,10 @@ def sample_annealed_importance_chain(
      loc=tf.zeros([dims], dtype=dtype))
 
   target = tfd.TransformedDistribution(
-    distribution=tfd.Gamma(concentration=dtype(2),
-                           rate=dtype(3)),
-    bijector=tfp.bijectors.Invert(tfp.bijectors.Exp()),
-    event_shape=[dims])
+    distribution=tfd.Sample(
+        tfd.Gamma(concentration=dtype(2), rate=dtype(3)),
+        sample_shape=[dims])
+    bijector=tfp.bijectors.Invert(tfp.bijectors.Exp()))
 
   chains_state, ais_weights, kernels_results = (
       tfp.mcmc.sample_annealed_importance_chain(

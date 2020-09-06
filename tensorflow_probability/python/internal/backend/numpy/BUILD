@@ -15,9 +15,7 @@
 # Description:
 #   Numpy backend.
 
-# [internal] load python3.bzl
-
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -33,6 +31,7 @@ py_library(
     deps = [
         ":bitwise",
         ":compat",
+        ":config",
         ":control_flow",
         ":debugging",
         ":deprecation",
@@ -77,6 +76,11 @@ py_library(
         ":v1",
         ":v2",
     ],
+)
+
+py_library(
+    name = "config",
+    srcs = ["config.py"],
 )
 
 py_library(
@@ -270,11 +274,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "tensor_array_ops_test",
     size = "small",
     srcs = ["tensor_array_ops_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     tags = ["tfp_numpy"],
     deps = [
         ":tensor_array_ops",
@@ -328,8 +333,8 @@ genrule(
     name = "rewrite_tensor_shape",
     srcs = [],
     outs = ["tensor_shape_gen.py"],
-    cmd = ("$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@"),
-    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
+    cmd = "$(location //tensorflow_probability/python/internal/backend/meta:gen_tensor_shape) > $@",
+    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_tensor_shape"],
 )
 
 py_library(
@@ -357,12 +362,13 @@ py_library(
     deps = [],
 )
 
-# py2and3
 py_test(
     name = "numpy_test",
     size = "small",
     srcs = ["numpy_test.py"],
+    python_version = "PY3",
     shard_count = 11,
+    srcs_version = "PY3",
     tags = ["tfp_numpy"],
     deps = [
         ":numpy",
@@ -481,7 +487,6 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "rewrite_equivalence_test",
     srcs = ["rewrite_equivalence_test.py"],
@@ -489,8 +494,11 @@ py_test(
         "--modules_to_check",
         ",".join(LINOP_FILES + ["tensor_shape"]),
     ],
-    srcs_version = "PY2AND3",
-    tags = ["no-oss-ci"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = [
+        "no-oss-ci",
+    ],
     deps = [
         ":linear_operator_gen",
         ":static_rewrites",

@@ -52,7 +52,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         # jax dep,
-        "//oryx/core/interpreters:inverse",
+        "//oryx/core/interpreters/inverse:core",
         "//oryx/core/ppl",
     ],
 )
@@ -71,7 +71,8 @@ py_test(
         # absl/testing:parameterized dep,
         # jax dep,
         # numpy dep,
-        # [tfp_jax dependency],
+        # inference_gym:using_jax dep,
         "//oryx/core/interpreters:harvest",
+        # tensorflow_probability/substrates:jax dep,
     ],
 )

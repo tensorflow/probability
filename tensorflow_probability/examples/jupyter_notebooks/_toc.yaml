@@ -29,10 +29,8 @@ toc:
   path: /probability/examples/Probabilistic_Layers_Regression
 - title: Modeling COVID-19 spread in Europe
   path: /probability/examples/Estimating_COVID_19_in_11_European_countries
-  status: new
 - title: Estimation of undocumented SARS-CoV2 cases
   path: /probability/examples/Undocumented_Infection_and_the_Dissemination_of_SARS-CoV2
-  status: new
 - title: Bayesian Gaussian mixture model
   path: /probability/examples/Bayesian_Gaussian_Mixture_Model
 - title: Bayesian switchpoint
@@ -71,6 +69,9 @@ toc:
   path: /probability/examples/Structural_Time_Series_Modeling_Case_Studies_Atmospheric_CO2_and_Electricity_Demand
 - title: Covariance estimation
   path: /probability/examples/TensorFlow_Probability_Case_Study_Covariance_Estimation
+- heading: "Releases"
+- title: TFP 0.11.0
+  path: /probability/examples/TFP_Release_Notebook_0_11_0
 - title: "Tutorials (TF1)"
   style: accordion
   status: deprecated

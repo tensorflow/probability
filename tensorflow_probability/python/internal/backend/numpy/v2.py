@@ -19,10 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
+
+import numpy as np
 
 # pylint: disable=unused-import
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import bitwise
+from tensorflow_probability.python.internal.backend.numpy import config
 from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import keras
@@ -52,15 +56,45 @@ from tensorflow_probability.python.internal.backend.numpy.tensor_array_ops impor
 JAX_MODE = False
 
 
+Assert = debugging.Assert
+
+
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
               experimental_relax_shapes=False, experimental_compile=None):  # pylint: disable=unused-argument
-  """Dummy version of `tf.function`."""
+  """Like `tf.function`, for JAX."""
   transform = lambda fn: fn
   if experimental_compile:
     if JAX_MODE:
       from jax import jit  # pylint: disable=g-import-not-at-top
-      transform = jit
+
+      def non_jittable(arg):
+        # Use static args for callables and for bools, which will sometimes
+        # be used in a `if` block and fail if they are tracers.
+        return callable(arg) or np.asarray(arg).dtype == np.bool
+
+      def jit_decorator(f):
+        cache = {}
+
+        def jit_wrapper(*args, **kwargs):
+
+          @functools.wraps(f)
+          def unflatten_f(*args_flat):
+            unflat_args, unflat_kwargs = nest.pack_sequence_as(
+                (args, kwargs), args_flat)
+            return f(*unflat_args, **unflat_kwargs)
+
+          args_flat = nest.flatten((args, kwargs))
+          static_argnums = tuple(
+              i for (i, arg) in enumerate(args_flat) if non_jittable(arg))
+          cache_key = (static_argnums, len(args), tuple(kwargs.keys()))
+          if cache.get(cache_key, None) is None:
+            cache[cache_key] = jit(unflatten_f, static_argnums=static_argnums)
+          return cache[cache_key](*args_flat)
+
+        return jit_wrapper
+
+      transform = jit_decorator
     else:
       raise NotImplementedError('Could not find compiler: Numpy only.')
   # This code path is for the `foo = tf.function(foo, ...)` use case.

@@ -511,16 +511,17 @@ class JohnsonSUTest(test_util.TestCase):
     with self.assertRaisesRegexp(tf.errors.OpError, r'Incompatible shapes'):
       d = tfd.JohnsonSU(skewness=1., tailweight=2., loc=tf.zeros([2, 3]),
                         scale=scale, validate_args=True)
-      self.evaluate(d.mean())
+      self.evaluate(d.batch_shape_tensor())
 
   def testIncompatibleArgShapesEager(self):
     if not tf.executing_eagerly(): return
     scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
+    d = tfd.JohnsonSU(skewness=1., tailweight=2., loc=tf.zeros([2, 3]),
+                      scale=scale, validate_args=True)
     with self.assertRaisesWithLiteralMatch(
         ValueError,
         'Incompatible shapes for broadcasting: (2, 3) and (4, 1)'):
-      tfd.JohnsonSU(skewness=1., tailweight=2., loc=tf.zeros([2, 3]),
-                    scale=scale, validate_args=True)
+      d.batch_shape_tensor()
 
 
 if __name__ == '__main__':

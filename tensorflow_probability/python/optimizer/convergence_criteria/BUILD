@@ -17,8 +17,8 @@
 
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -27,7 +27,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -41,6 +41,7 @@ multi_substrate_py_library(
         ":successive_gradients_are_uncorrelated",
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 

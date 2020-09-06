@@ -133,7 +133,7 @@ class StructuralTimeSeries(object):
 
   def make_state_space_model(self,
                              num_timesteps,
-                             param_vals=None,
+                             param_vals,
                              initial_state_prior=None,
                              initial_step=0):
     """Instantiate this model as a Distribution over specified `num_timesteps`.

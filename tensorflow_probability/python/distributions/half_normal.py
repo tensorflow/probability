@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -131,7 +132,7 @@ class HalfNormal(distribution.Distribution):
     return self._scale
 
   def _batch_shape_tensor(self):
-    return tf.shape(self.scale)
+    return ps.shape(self.scale)
 
   def _batch_shape(self):
     return self.scale.shape
@@ -144,7 +145,7 @@ class HalfNormal(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     scale = tf.convert_to_tensor(self.scale)
-    shape = tf.concat([[n], tf.shape(scale)], 0)
+    shape = ps.concat([[n], ps.shape(scale)], 0)
     sampled = samplers.normal(
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
     return tf.abs(sampled * scale)

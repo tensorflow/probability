@@ -1,0 +1,57 @@
+# Copyright 2020 The TensorFlow Probability Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+book_path: /probability/oryx/_book.yaml
+project_path: /probability/oryx/_project.yaml
+description: A library for probabilistic programming and deep learning built on top of JAX.
+landing_page:
+  custom_css_path: /site-assets/css/style.css
+  rows:
+  - heading: Oryx is a library for probabilistic programming and deep learning built on top of JAX.
+    items:
+    - classname: devsite-landing-row-50
+      description: >
+        Oryx's approach is to expose a set of function transformations that
+        compose and integrate with JAX's existing transformations. To install Oryx,
+        you can run:
+
+        <pre class="devsite-terminal devsite-click-to-copy prettyprint lang-shell">
+        pip install --upgrade oryx
+        </pre>
+      code_block: |
+        <pre class = "prettyprint">
+        import oryx
+        import jax.numpy as jnp
+        ppl = oryx.core.ppl
+        tfd = oryx.distributions
+
+        # Define sampling function
+        def sample(key):
+          x = ppl.random_variable(tfd.Normal(0., 1.))(key)
+          return jnp.exp(x / 2.) + 2.
+
+        # Transform sampling function into a log-density function
+        ppl.log_prob(sample)(1.)  # ==> -0.9189
+        </pre>
+  - classname: devsite-landing-row-cards
+    items:
+    - heading: "A Tour of Oryx"
+      image_path: /resources/images/tf-logo-card-16x9.png
+      path: https://tensorflow.org/probability/oryx/notebooks/a_tour_of_oryx
+    - heading: "Oryx on GitHub"
+      image_path: /resources/images/github-card-16x9.png
+      path: https://github.com/tensorflow/probability/tree/master/spinoffs/oryx
+      buttons:
+      - label: View on GitHub
+        path: https://github.com/tensorflow/probability

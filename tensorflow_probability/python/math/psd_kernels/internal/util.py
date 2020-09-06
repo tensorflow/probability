@@ -22,7 +22,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -68,11 +68,11 @@ def pad_shape_with_ones(x, ndims, start=-1):
     return x
   x = tf.convert_to_tensor(value=x)
   original_shape = x.shape
-  rank = tf.rank(x)
-  first_shape = tf.shape(x)[:rank + start + 1]
-  second_shape = tf.shape(x)[rank + start + 1:]
-  new_shape = tf.pad(first_shape, paddings=[[0, ndims]], constant_values=1)
-  new_shape = tf.concat([new_shape, second_shape], axis=0)
+  rank = ps.rank(x)
+  first_shape = ps.shape(x)[:rank + start + 1]
+  second_shape = ps.shape(x)[rank + start + 1:]
+  new_shape = ps.pad(first_shape, paddings=[[0, ndims]], constant_values=1)
+  new_shape = ps.concat([new_shape, second_shape], axis=0)
   x = tf.reshape(x, new_shape)
   if start == -1:
     tensorshape_util.set_shape(
@@ -102,8 +102,8 @@ def sum_rightmost_ndims_preserving_shape(x, ndims):
     known at runtime.
   """
   x = tf.convert_to_tensor(x)
-  x_ndims = prefer_static.rank(x)
-  return tf.reduce_sum(x, axis=prefer_static.range(x_ndims - ndims, x_ndims))
+  x_ndims = ps.rank(x)
+  return tf.reduce_sum(x, axis=ps.range(x_ndims - ndims, x_ndims))
 
 
 @tf.custom_gradient
@@ -227,12 +227,12 @@ def pairwise_square_distance_matrix(x1, x2, feature_ndims):
   row_norm_x2 = sum_rightmost_ndims_preserving_shape(
       tf.square(x2), feature_ndims)[..., tf.newaxis, :]
 
-  x1 = tf.reshape(x1, tf.concat(
-      [tf.shape(x1)[:-feature_ndims], [
-          prefer_static.reduce_prod(tf.shape(x1)[-feature_ndims:])]], axis=0))
-  x2 = tf.reshape(x2, tf.concat(
-      [tf.shape(x2)[:-feature_ndims], [
-          prefer_static.reduce_prod(tf.shape(x2)[-feature_ndims:])]], axis=0))
+  x1 = tf.reshape(x1, ps.concat(
+      [ps.shape(x1)[:-feature_ndims], [
+          ps.reduce_prod(ps.shape(x1)[-feature_ndims:])]], axis=0))
+  x2 = tf.reshape(x2, ps.concat(
+      [ps.shape(x2)[:-feature_ndims], [
+          ps.reduce_prod(ps.shape(x2)[-feature_ndims:])]], axis=0))
   pairwise_sq = row_norm_x1 + row_norm_x2 - 2 * tf.linalg.matmul(
       x1, x2, transpose_b=True)
   pairwise_sq = tf.clip_by_value(pairwise_sq, 0., np.inf)

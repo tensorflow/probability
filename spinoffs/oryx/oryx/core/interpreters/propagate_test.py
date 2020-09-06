@@ -23,7 +23,6 @@ import numpy as onp
 from oryx.core import trace_util
 from oryx.core.interpreters.propagate import Cell
 from oryx.core.interpreters.propagate import propagate
-from oryx.core.interpreters.propagate import unknown
 
 
 inverse_rules = {}
@@ -31,43 +30,64 @@ inverse_rules = {}
 
 class Inverse(Cell):
 
-  def __init__(self, val):
+  def __init__(self, aval, val):
+    super().__init__(aval)
     self.val = val
+
+  def __lt__(self, other):
+    return self.bottom() and other.top()
+
+  def top(self):
+    return self.val is not None
+
+  def bottom(self):
+    return self.val is None
+
+  def join(self, other):
+    if other.bottom():
+      return self
+    else:
+      return other
 
   @classmethod
   def new(cls, val):
-    return Inverse(val)
+    aval = trace_util.get_shaped_aval(val)
+    return Inverse(aval, val)
+
+  @classmethod
+  def unknown(cls, aval):
+    return Inverse(aval, None)
+
+  def flatten(self):
+    return (self.val,), (self.aval,)
+
+  @classmethod
+  def unflatten(cls, data, xs):
+    return Inverse(data[0], xs[0])
 
 
 def exp_rule(invals, outvals):
   outval, = outvals
   inval, = invals
-  done = False
-  if inval.is_unknown() and not outval.is_unknown():
-    invals = [Inverse(np.log(outval.val))]
-    done = True
-  elif outval.is_unknown() and not inval.is_unknown():
-    outvals = [Inverse(np.exp(inval.val))]
-    done = True
-  return invals, outvals, done, None
+  if inval.bottom() and not outval.bottom():
+    invals = [Inverse.new(np.log(outval.val))]
+  elif outval.bottom() and not inval.bottom():
+    outvals = [Inverse.new(np.exp(inval.val))]
+  return invals, outvals, None
 inverse_rules[lax.exp_p] = exp_rule
 
 
 def add_rule(invals, outvals):
   outval, = outvals
   left, right = invals
-  done = False
-  if not outval.is_unknown():
-    if left is not unknown:
-      invals = [left, Inverse(outval.val - left.val)]
-      done = True
-    elif not right.is_unknown():
-      invals = [Inverse(outval.val - right.val), right]
-      done = True
-  elif outval.is_unknown() and not left.is_unknown() and not right.is_unknown():
-    outvals = [Inverse(left.val + right.val)]
-    done = True
-  return invals, outvals, done, None
+  if not outval.bottom():
+    if not left.bottom():
+      invals = [left, Inverse.new(outval.val - left.val)]
+    elif not right.bottom():
+      invals = [Inverse.new(outval.val - right.val), right]
+  elif outval.bottom() and not left.bottom() and not right.bottom():
+    outvals = [Inverse.new(left.val + right.val)]
+  return invals, outvals, None
 inverse_rules[lax.add_p] = add_rule
 
 
@@ -77,8 +97,7 @@ def xla_call_rule(invals, outvals, **params):
   subenv = f.call_wrapped(invals, outvals)
   new_invals = [subenv.read(invar) for invar in subenv.jaxpr.invars]
   new_outvals = [subenv.read(outvar) for outvar in subenv.jaxpr.outvars]
-  done = all(not val.is_unknown() for val in new_invals + new_outvals)
-  return new_invals, new_outvals, done, subenv
+  return new_invals, new_outvals, subenv
 inverse_rules[xla.xla_call_p] = xla_call_rule
 
 
@@ -87,47 +106,68 @@ ildj_rules = {}
 
 class ILDJ(Cell):
 
-  def __init__(self, val, ildj):
+  def __init__(self, aval, val, ildj):
+    super().__init__(aval)
     self.val = val
     self.ildj = ildj
 
+  def __lt__(self, other):
+    return self.bottom() and other.top()
+
+  def top(self):
+    return self.val is not None
+
+  def bottom(self):
+    return self.val is None
+
+  def join(self, other):
+    if other.bottom():
+      return self
+    else:
+      return other
+
   @classmethod
   def new(cls, val):
-    return ILDJ(val, 0.)
+    aval = trace_util.get_shaped_aval(val)
+    return ILDJ(aval, val, 0.)
+
+  @classmethod
+  def unknown(cls, aval):
+    return ILDJ(aval, None, 0.)
+
+  def flatten(self):
+    return (self.val, self.ildj), (self.aval,)
+
+  @classmethod
+  def unflatten(cls, data, xs):
+    return ILDJ(data[0], xs[0], xs[1])
 
 
 def exp_ildj(invals, outvals):
   inval, = invals
   outval, = outvals
-  done = False
-  if inval.is_unknown() and not outval.is_unknown():
+  if not inval.top() and outval.top():
     val, ildj = outval.val, outval.ildj
-    invals = [ILDJ(np.log(val), ildj - np.log(val))]
-    done = True
-  elif outval.is_unknown() and not inval.is_unknown():
+    invals = [ILDJ(inval.aval, np.log(val), ildj - np.log(val))]
+  elif not outval.top() and inval.top():
     val, ildj = inval.val, inval.ildj
-    outvals = [ILDJ(np.exp(val), ildj)]
-    done = True
-  return invals, outvals, done, None
+    outvals = [ILDJ(outval.aval, np.exp(val), ildj)]
+  return invals, outvals, None
 ildj_rules[lax.exp_p] = exp_ildj
 
 
 def add_ildj(invals, outvals):
   outval, = outvals
   left, right = invals
-  done = False
-  if not outval.is_unknown():
+  if outval.top():
     val, ildj = outval.val, outval.ildj
-    if not left.is_unknown():
-      invals = [left, ILDJ(val - left.val, ildj)]
-      done = True
-    elif not right.is_unknown():
-      invals = [ILDJ(val - right.val, ildj), right]
-      done = True
-  elif outval.is_unknown() and not left.is_unknown() and not right.is_unknown():
-    outvals = [ILDJ(left.val + right.val, 0.)]
-    done = True
-  return invals, outvals, done, None
+    if left.top():
+      invals = [left, ILDJ(right.aval, val - left.val, ildj)]
+    elif right.top():
+      invals = [ILDJ(left.aval, val - right.val, ildj), right]
+  elif not outval.top() and left.top() and right.top():
+    outvals = [ILDJ(outval.aval, left.val + right.val, 0.)]
+  return invals, outvals, None
 ildj_rules[lax.add_p] = add_ildj
 
 
@@ -141,7 +181,7 @@ class PropagateTest(absltest.TestCase):
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
     env = propagate(Inverse, inverse_rules, jaxpr,
                     list(map(Inverse.new, consts)),
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(Inverse.new, (1.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 1.)
@@ -154,7 +194,7 @@ class PropagateTest(absltest.TestCase):
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
     env = propagate(Inverse, inverse_rules, jaxpr,
                     list(map(Inverse.new, consts)),
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(Inverse.new, (1.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 0.)
@@ -167,7 +207,7 @@ class PropagateTest(absltest.TestCase):
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
     env = propagate(Inverse, inverse_rules, jaxpr,
                     list(map(Inverse.new, consts)),
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(Inverse.new, (3.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 0.)
@@ -180,7 +220,7 @@ class PropagateTest(absltest.TestCase):
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
     env = propagate(Inverse, inverse_rules, jaxpr,
                     list(map(Inverse.new, consts)),
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(Inverse.new, (3.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 0.)
@@ -196,9 +236,9 @@ class PropagateTest(absltest.TestCase):
     env = propagate(Inverse, inverse_rules, jaxpr,
                     list(map(Inverse.new, consts)),
 
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(Inverse.new, (1.,))))
-    self.assertNotIn(jaxpr.invars[0], env)
+    self.assertTrue(env.read(jaxpr.invars[0]).bottom())
 
   def test_should_propagate_forward_and_backward(self):
     def f(x, y):
@@ -208,7 +248,7 @@ class PropagateTest(absltest.TestCase):
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
     env = propagate(Inverse, inverse_rules, jaxpr,
                     list(map(Inverse.new, consts)),
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(Inverse.new, (0., 2.))))
     invals = [env[invar].val for invar in jaxpr.invars]
     onp.testing.assert_allclose(invals, (-1., 1.))
@@ -221,7 +261,7 @@ class PropagateTest(absltest.TestCase):
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
     env = propagate(ILDJ, ildj_rules, jaxpr,
                     list(map(ILDJ.new, consts)),
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(ILDJ.new, (2.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.ildj, -np.log(2.))
@@ -234,7 +274,7 @@ class PropagateTest(absltest.TestCase):
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
     env = propagate(ILDJ, ildj_rules, jaxpr,
                     list(map(ILDJ.new, consts)),
-                    [unknown] * len(jaxpr.invars),
+                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
                     list(map(ILDJ.new, (4.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.ildj, -np.log(2.))

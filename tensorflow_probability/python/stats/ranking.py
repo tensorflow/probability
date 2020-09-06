@@ -19,7 +19,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 def quantile_auc(q0, n0, q1, n1, curve='ROC', name=None):
@@ -229,10 +229,10 @@ def quantile_auc(q0, n0, q1, n1, curve='ROC', name=None):
     q1 = q1 + tf.zeros((1, 1), dtype=dtype)
     q0 = q0 + tf.zeros((1, 1), dtype=dtype)
 
-    q1_shape = prefer_static.shape(q1)
+    q1_shape = ps.shape(q1)
     batch_shape = q1_shape[:-1]
     n_q1 = q1_shape[-1]
-    n_q0 = prefer_static.shape(q0)[-1]
+    n_q0 = ps.shape(q0)[-1]
     static_batch_shape = q1.shape[:-1]
 
     n0 = tf.broadcast_to(n0, batch_shape)

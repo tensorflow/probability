@@ -38,8 +38,8 @@ from tensorflow_probability.python.experimental.auto_batching.instructions impor
 from tensorflow_probability.python.experimental.auto_batching.instructions import Type
 from tensorflow_probability.python.experimental.auto_batching.numpy_backend import NumpyBackend
 from tensorflow_probability.python.experimental.auto_batching.tf_backend import TensorFlowBackend
+from tensorflow_probability.python.internal import all_util
 
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
 
 _allowed_symbols = [
     'Context',
@@ -63,4 +63,4 @@ _allowed_symbols = [
     'xla',
 ]
 
-remove_undocumented(__name__, _allowed_symbols)
+all_util.remove_undocumented(__name__, _allowed_symbols)

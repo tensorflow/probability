@@ -26,9 +26,10 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -133,15 +134,15 @@ class BatchReshape(distribution_lib.Distribution):
       # dtype information.
       original_size = 1
     else:
-      original_size = prefer_static.reduce_prod(original_shape)
-    original_size = tf.cast(original_size, tf.int32)
+      original_size = ps.reduce_prod(original_shape)
+    original_size = ps.cast(original_size, tf.int32)
     # Compute the new shape, filling in the `-1` dimension if present.
     new_shape = self._batch_shape_unexpanded
-    implicit_dim_mask = prefer_static.equal(new_shape, -1)
+    implicit_dim_mask = ps.equal(new_shape, -1)
     size_implicit_dim = (
-        original_size // prefer_static.maximum(
-            1, -prefer_static.reduce_prod(new_shape)))
-    expanded_new_shape = tf.where(  # Assumes exactly one `-1`.
+        original_size // ps.maximum(
+            1, -ps.reduce_prod(new_shape)))
+    expanded_new_shape = ps.where(  # Assumes exactly one `-1`.
         implicit_dim_mask, size_implicit_dim, new_shape)
     # Return the original size on the side because one caller would otherwise
     # have to recompute it.
@@ -153,7 +154,7 @@ class BatchReshape(distribution_lib.Distribution):
       return []
     assertions = []
     if is_init != tensor_util.is_ref(self._batch_shape_unexpanded):
-      implicit_dim_mask = prefer_static.equal(self._batch_shape_unexpanded, -1)
+      implicit_dim_mask = ps.equal(self._batch_shape_unexpanded, -1)
       assertions.append(assert_util.assert_rank(
           self._batch_shape_unexpanded, 1,
           message='New shape must be a vector.'))
@@ -165,7 +166,7 @@ class BatchReshape(distribution_lib.Distribution):
           message='Shape elements must be >=-1.'))
       # Check that the old and new shapes are the same size.
       expanded_new_shape, original_size = self._calculate_new_shape()
-      new_size = prefer_static.reduce_prod(expanded_new_shape)
+      new_size = ps.reduce_prod(expanded_new_shape)
       assertions.append(assert_util.assert_equal(
           new_size, tf.cast(original_size, new_size.dtype),
           message='Shape sizes do not match.'))
@@ -190,7 +191,7 @@ class BatchReshape(distribution_lib.Distribution):
 
   def _sample_n(self, n, seed=None, **kwargs):
     x = self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
-    new_shape = tf.concat(
+    new_shape = ps.concat(
         [
             [n],
             self._batch_shape_unexpanded,
@@ -316,7 +317,7 @@ class BatchReshape(distribution_lib.Distribution):
 
     sample_shape, static_sample_shape = self._sample_shape(
         x, static_input_event_shape, input_event_shape_tensor)
-    old_shape = tf.concat(
+    old_shape = ps.concat(
         [
             sample_shape,
             self.distribution.batch_shape_tensor(),
@@ -325,13 +326,13 @@ class BatchReshape(distribution_lib.Distribution):
         axis=0)
     x_reshape = tf.reshape(x, old_shape)
     result = fn(x_reshape, **extra_kwargs) if extra_kwargs else fn(x_reshape)
-    new_shape = tf.concat(
+    new_shape = ps.concat(
         [
             sample_shape,
             self._batch_shape_unexpanded,
         ], axis=0)
     if keep_event_dims:
-      new_shape = tf.concat([new_shape, output_event_shape_tensor], axis=0)
+      new_shape = ps.concat([new_shape, output_event_shape_tensor], axis=0)
     result = tf.reshape(result, new_shape)
     if (tensorshape_util.rank(static_sample_shape) is not None and
         tensorshape_util.rank(self.batch_shape) is not None):
@@ -358,7 +359,7 @@ class BatchReshape(distribution_lib.Distribution):
       event_shape_list = [self._event_shape_tensor()]
     if static_event_shape_list is None:
       static_event_shape_list = [self.event_shape]
-    new_shape = tf.concat(
+    new_shape = ps.concat(
         [self._batch_shape_unexpanded] + event_shape_list, axis=0)
     result = tf.reshape(fn(**extra_kwargs) if extra_kwargs else fn(),
                         new_shape)
@@ -483,7 +484,7 @@ def validate_init_args_statically(distribution, batch_shape):
 
 
 class _BatchReshapeBijector(bijector_lib.Bijector):
-  """The `default_event_shape_bijector` for `tfd.BatchReshape`."""
+  """The `default_event_space_bijector` for `tfd.BatchReshape`."""
 
   def __init__(
       self,
@@ -491,16 +492,32 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
       reshape_fn,
       static_inverse_event_shape,
       inverse_event_shape_tensor):
+    parameters = dict(locals())
     self._base_bijector = base_bijector
     self._reshape_fn = reshape_fn
     self._inverse_event_shapes = (
         static_inverse_event_shape, inverse_event_shape_tensor)
+
+    # Infer min_event_ndims based on the distribution's event shapes.
+    # Note that the `inverse_event_shape_tensor` argument to the constructor
+    # describes the *output* of `BatchReshape.inverse_event_shape`.
+    forward_min_event_ndims = nest.map_structure(
+        ps.size, inverse_event_shape_tensor)
+
+    inverse_min_event_ndims = nest.map_structure(
+        ps.size,
+        # Prefer static shape-inference if possible.
+        base_bijector.forward_event_shape(static_inverse_event_shape)
+        if static_inverse_event_shape is not None else
+        base_bijector.forward_event_shape_tensor(inverse_event_shape_tensor))
+
     super(_BatchReshapeBijector, self).__init__(
         is_constant_jacobian=base_bijector.is_constant_jacobian,
         validate_args=base_bijector.validate_args,
         dtype=base_bijector.dtype,
-        forward_min_event_ndims=base_bijector.forward_min_event_ndims,
-        inverse_min_event_ndims=base_bijector.inverse_min_event_ndims,
+        inverse_min_event_ndims=inverse_min_event_ndims,
+        forward_min_event_ndims=forward_min_event_ndims,
+        parameters=parameters,
         name='batch_reshape_bijector')
 
   def _is_increasing(self):
@@ -521,22 +538,24 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
         keep_event_dims=True)
 
   def _forward_log_det_jacobian(self, x):
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.forward_min_event_ndims)
     return self._reshape_fn(
         lambda x_: self._base_bijector.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
-            x_, event_ndims=event_ndims),
+            x_, event_ndims=self._forward_min_event_ndims),
         x,
         input_event_shape=self._inverse_event_shapes)
 
   def _inverse_log_det_jacobian(self, y):
-    event_ndims = self._maybe_get_static_event_ndims(
-        self.forward_min_event_ndims)
     return self._reshape_fn(
         lambda y_: self._base_bijector.inverse_log_det_jacobian(  # pylint: disable=g-long-lambda
-            y_, event_ndims=event_ndims),
+            y_, event_ndims=self._inverse_min_event_ndims),
         y,
         output_event_shape=self._inverse_event_shapes)
+
+  def _forward_dtype(self, dtype):
+    return self._base_bijector.forward_dtype(dtype)
+
+  def _inverse_dtype(self, dtype):
+    return self._base_bijector.inverse_dtype(dtype)
 
   def _forward_event_shape_tensor(self, input_shape):
     return self._base_bijector.forward_event_shape_tensor(input_shape)

@@ -15,9 +15,7 @@
 # Description:
 #   TransitionKernel for NeuTra.
 
-# [internal] load python3.bzl
-
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -48,12 +46,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "neutra_kernel_test",
     size = "medium",
     srcs = ["neutra_kernel_test.py"],
+    python_version = "PY3",
     shard_count = 5,
+    srcs_version = "PY3",
     deps = [
         ":neutra",
         # absl/testing:parameterized dep,

@@ -72,8 +72,12 @@ class Pooling(base.Layer, metaclass=abc.ABCMeta):
       raise ValueError('Need to `jax.vmap` in order to batch')
     in_shape = (1,) + in_shape
     dims = (1,) + window_shape + (1,)  # NHWC or NHC
+    non_spatial_axes = 0, len(window_shape) + 1
     strides = strides or (1,) * len(window_shape)
-    strides = (1,) + strides + (1,)
+    for i in sorted(non_spatial_axes):
+      window_shape = window_shape[:i] + (1,) + window_shape[i:]
+      strides = strides[:i] + (1,) + strides[i:]
+    padding = lax.padtype_to_pads(in_shape, window_shape, strides, padding)
     out_shape = lax.reduce_window_shape_tuple(in_shape, dims, strides, padding)
     out_shape = out_shape[1:]
     return state.Shape(out_shape, dtype=in_spec.dtype)

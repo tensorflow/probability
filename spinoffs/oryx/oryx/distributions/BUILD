@@ -26,7 +26,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":distribution_extensions",
-        # [tfp_jax dependency],
+        # tensorflow_probability/substrates:jax dep,
     ],
 )
 
@@ -38,10 +38,12 @@ py_library(
     deps = [
         # jax dep,
         # six dep,
-        # [tfp_jax dependency],
-        "//oryx/core",
-        "//oryx/core/interpreters:inverse",
+        "//oryx/core:primitive",
+        "//oryx/core/interpreters:log_prob",
+        "//oryx/core/interpreters:unzip",
+        "//oryx/core/interpreters/inverse",
         "//oryx/core/ppl",
+        # tensorflow_probability/substrates:jax dep,
     ],
 )
 

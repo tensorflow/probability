@@ -361,6 +361,22 @@ class CategoricalTest(test_util.TestCase):
     self.assertAllClose(res['true_entropy_g'],
                         res['categorical_entropy_g'])
 
+  @test_util.numpy_disable_gradient_test
+  def testEntropyGradientNegInfLogits(self):
+
+    def get_entropy_fn(logit):
+      logits = [logit, tf.constant(-np.inf, dtype=tf.float32)]
+      categorical_distribution = tfd.Categorical(
+          logits=logits, validate_args=True)
+      return categorical_distribution.entropy()
+
+    logit = 0.
+
+    categorical_entropy, categorical_entropy_g = tfp.math.value_and_gradient(
+        get_entropy_fn, logit)
+    self.assertAllClose(categorical_entropy, 0.)
+    self.assertAllClose(categorical_entropy_g, 0.)
+
   def testEntropyWithZeroProbabilities(self):
     probs = np.array([[0, 0.5, 0.5], [0, 1, 0]])
     dist = tfd.Categorical(probs=probs, validate_args=True)

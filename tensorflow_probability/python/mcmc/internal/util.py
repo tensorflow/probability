@@ -28,7 +28,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.gradient import value_and_gradient as tfp_math_value_and_gradients
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
@@ -82,32 +82,31 @@ class PrettyNamedTupleMixin(object):
 def left_justified_expand_dims_like(x, reference, name=None):
   """Right pads `x` with `rank(reference) - rank(x)` ones."""
   with tf.name_scope(name or 'left_justified_expand_dims_like'):
-    return left_justified_expand_dims_to(x, prefer_static.rank(reference))
+    return left_justified_expand_dims_to(x, ps.rank(reference))
 
 
 def left_justified_expand_dims_to(x, rank, name=None):
   """Right pads `x` with `rank - rank(x)` ones."""
   with tf.name_scope(name or 'left_justified_expand_dims_to'):
-    rank = tf.convert_to_tensor(rank, dtype=tf.int32)
-    expand_ndims = prefer_static.maximum(rank - prefer_static.rank(x), 0)
-    expand_shape = prefer_static.concat(
-        [prefer_static.shape(x),
-         prefer_static.ones(shape=[expand_ndims], dtype=tf.int32)],
+    expand_ndims = ps.maximum(rank - ps.rank(x), 0)
+    expand_shape = ps.concat(
+        [ps.shape(x),
+         ps.ones(shape=[expand_ndims], dtype=tf.int32)],
         axis=0)
-    return prefer_static.reshape(x, expand_shape)
+    return ps.reshape(x, expand_shape)
 
 
 def left_justified_broadcast_like(x, reference, name=None):
   """Broadcasts `x` to shape of reference, in a left-justified manner."""
   with tf.name_scope(name or 'left_justified_broadcast_like'):
-    return left_justified_broadcast_to(x, prefer_static.shape(reference))
+    return left_justified_broadcast_to(x, ps.shape(reference))
 
 
 def left_justified_broadcast_to(x, shape, name=None):
   """Broadcasts `x` to shape, in a left-justified manner."""
   with tf.name_scope(name or 'left_justified_broadcast_to'):
     return tf.broadcast_to(
-        left_justified_expand_dims_to(x, prefer_static.size(shape)), shape)
+        left_justified_expand_dims_to(x, ps.size(shape)), shape)
 
 
 def prepare_state_parts(state_or_state_part, dtype=None, name=None):
@@ -306,8 +305,8 @@ def maybe_call_fn_and_grads(fn,
 
 
 def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
-                   parallel_iterations=10, name=None):
-  """Construct a for loop, preferring a python loop if `n` is staticaly known.
+                   parallel_iterations=10, unroll_threshold=1, name=None):
+  """Construct a for loop, preferring a python loop if `n` is statically known.
 
   Given `loop_num_iter` and `body_fn`, return an op corresponding to executing
   `body_fn` `loop_num_iter` times, feeding previous outputs of `body_fn` into
@@ -325,6 +324,11 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
     parallel_iterations: The number of iterations allowed to run in parallel.
       It must be a positive integer. See `tf.while_loop` for more details.
       Default value: `10`.
+    unroll_threshold: Integer denoting the maximum number of iterations to
+      unroll, if possible. If `loop_num_iter > unroll_threshold` a
+      `tf.while_loop` will always be used, even if `loop_num_iter` is
+      statically known.
+      Default value: `1`.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., "smart_for_loop").
   Returns:
@@ -332,8 +336,12 @@ def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
   """
   with tf.name_scope(name or 'smart_for_loop'):
     loop_num_iter_ = tf.get_static_value(loop_num_iter)
-    if (loop_num_iter_ is None or tf.executing_eagerly() or
-        control_flow_util.GraphOrParentsInXlaContext(
+    if (loop_num_iter_ is None
+        or tf.executing_eagerly()
+        # large values for loop_num_iter_ will cause ridiculously slow
+        # graph compilation time (GitHub issue #1033)
+        or loop_num_iter_ > unroll_threshold
+        or control_flow_util.GraphOrParentsInXlaContext(
             tf1.get_default_graph())):
       # Cast to int32 to run the comparison against i in host memory,
       # where while/LoopCond needs it.
@@ -408,7 +416,7 @@ def trace_scan(loop_fn,
         initial_state)
     elems = tf.convert_to_tensor(elems, name='elems')
 
-    length = prefer_static.size0(elems)
+    length = ps.size0(elems)
 
     # This is an TensorArray in part because of XLA, which had trouble with
     # non-statically known indices. I.e. elems[i] errored, but
@@ -441,7 +449,7 @@ def trace_scan(loop_fn,
       elem = elems_array.read(i)
       state = loop_fn(state, elem)
 
-      trace_arrays, num_steps_traced = prefer_static.cond(
+      trace_arrays, num_steps_traced = ps.cond(
           trace_criterion_fn(state) if trace_criterion_fn else True,
           lambda: (trace_one_step(num_steps_traced, trace_arrays, state),  # pylint: disable=g-long-lambda
                    num_steps_traced + 1),
@@ -565,7 +573,12 @@ def enable_store_parameters_in_results(kernel):
 def _is_tensor_like(param):
   if is_list_like(param):
     return all([_is_tensor_like(p) for p in param])
-  return isinstance(param, tf.Tensor) or (np.array(param).dtype != np.object)
+  if isinstance(param, tf.Tensor):
+    return True
+  elif isinstance(param, tf.Variable):
+    return False
+  else:
+    return np.array(param).dtype != np.object
 
 
 def warn_if_parameters_are_not_simple_tensors(params_dict):
@@ -644,9 +657,9 @@ def index_remapping_gather(params,
     params_ndims = tensorshape_util.rank(params.shape)
     indices_ndims = tensorshape_util.rank(indices.shape)
     # `axis` dtype must match ndims, which are 64-bit Python ints.
-    axis = tf.get_static_value(tf.convert_to_tensor(axis, dtype=tf.int64))
+    axis = tf.get_static_value(ps.convert_to_shape_tensor(axis, dtype=tf.int64))
     indices_axis = tf.get_static_value(
-        tf.convert_to_tensor(indices_axis, dtype=tf.int64))
+        ps.convert_to_shape_tensor(indices_axis, dtype=tf.int64))
 
     if params_ndims is None:
       raise ValueError(
@@ -699,12 +712,12 @@ def index_remapping_gather(params,
 
     # Next we broadcast `indices` so that its shape has the same prefix as
     # `params.shape`.
-    transposed_params_shape = prefer_static.shape(transposed_params)
-    result_shape = prefer_static.concat([
+    transposed_params_shape = ps.shape(transposed_params)
+    result_shape = ps.concat([
         transposed_params_shape[:broadcast_indices_ndims - 1],
-        prefer_static.shape(indices)[indices_axis:indices_axis + 1],
+        ps.shape(indices)[indices_axis:indices_axis + 1],
         transposed_params_shape[broadcast_indices_ndims:]], axis=0)
-    broadcast_indices = prefer_static.broadcast_to(
+    broadcast_indices = ps.broadcast_to(
         transposed_indices,
         result_shape[:broadcast_indices_ndims])
 
@@ -715,3 +728,30 @@ def index_remapping_gather(params,
     return dist_util.move_dimension(result_t,
                                     source_idx=broadcast_indices_ndims - 1,
                                     dest_idx=axis)
+
+
+# TODO(b/111801087): Use a standardized API, when available.
+@make_innermost_getter
+def get_field(kernel_results, field_name):
+  """Get field value from kernel_results or kernel_results.accepted_results."""
+  attr = getattr(kernel_results, field_name, None)
+  if attr is not None:
+    return attr
+  accepted_results = getattr(kernel_results, 'accepted_results', None)
+  if accepted_results is None:
+    raise TypeError('Cannot extract {} from {}'.format(
+        field_name, kernel_results))
+  return get_field(accepted_results, field_name)
+
+
+@make_innermost_setter
+def update_field(kernel_results, field_name, value):
+  """Set field value in kernel_results or kernel_results.accepted_results."""
+  if hasattr(kernel_results, field_name):
+    return kernel_results._replace(**{field_name: value})
+  accepted_results = getattr(kernel_results, 'accepted_results', None)
+  if accepted_results is None:
+    raise TypeError('Cannot set {} in {}'.format(
+        field_name, kernel_results))
+  return kernel_results._replace(
+      accepted_results=update_field(accepted_results, field_name, value))

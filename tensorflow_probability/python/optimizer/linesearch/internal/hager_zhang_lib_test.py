@@ -334,6 +334,35 @@ class HagerZhangLibTest(test_util.TestCase):
     self.assertArrayNear(result.left.x, expected_left, 1e-5)
     self.assertArrayNear(result.right.x, expected_right, 1e-5)
 
+  def test_bisect_infty(self):
+    """Tests that bisection is robust to +-inf, but fails on nan."""
+    wolfe_threshold = 1e-6
+    def fdf(x):
+      f = (x - 2.0) ** 2  # Minimum at 2
+      df = 2 * (x - 2.0)
+      # Cut the function to infinity at 4.
+      # Different "bad" values at different batch members.
+      infs = tf.constant([float('inf'), float('-inf'), float('nan')])
+      nans = tf.constant([float('nan'), float('nan'), float('nan')])
+      return ValueAndGradient(
+          x=x,
+          f=tf.where(x > 4, infs, f),
+          df=tf.where(x > 4, nans, df))
+
+    val_a = fdf(tf.constant([0.0, 0.0, 0.0]))
+    val_b = fdf(tf.constant([5.0, 5.0, 5.0]))  # Value isn't finite
+    f_lim = 4 + wolfe_threshold * 4
+    result = self.evaluate(hzl.bisect(fdf, val_a, val_b, f_lim))
+    self.assertTrue(np.all(result.stopped))
+    self.assertAllEqual(result.failed, [False, False, True])
+    self.assertAllEqual((result.left.df < 0), [True, False, True])
+    self.assertAllEqual((result.right.df >= 0), [True, False, False])
+    # TODO(axch): Actually expect something sensible
+    expected_left = np.array([0.0, 5.0, 0.0])
+    expected_right = np.array([2.5, 5.0, 5.0])
+    self.assertArrayNear(result.left.x, expected_left, 1e-5)
+    self.assertArrayNear(result.right.x, expected_right, 1e-5)
+
 
 if __name__ == '__main__':
   tf.test.main()

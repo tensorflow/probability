@@ -24,12 +24,13 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -206,7 +207,7 @@ class Dirichlet(distribution.Distribution):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
     # so we pre-emptively convert-to-tensor.
     concentration = tf.convert_to_tensor(self.concentration)
-    return tf.shape(concentration)[:-1]
+    return ps.shape(concentration)[:-1]
 
   def _batch_shape(self):
     return self.concentration.shape[:-1]
@@ -215,15 +216,20 @@ class Dirichlet(distribution.Distribution):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
     # so we pre-emptively convert-to-tensor.
     concentration = tf.convert_to_tensor(self.concentration)
-    return tf.shape(concentration)[-1:]
+    return ps.shape(concentration)[-1:]
 
   def _event_shape(self):
     return tensorshape_util.with_rank(self.concentration.shape[-1:], rank=1)
 
   def _sample_n(self, n, seed=None):
-    gamma_sample = samplers.gamma(
-        shape=[n], alpha=self.concentration, dtype=self.dtype, seed=seed)
-    return gamma_sample / tf.reduce_sum(gamma_sample, axis=-1, keepdims=True)
+    # We use the log-space gamma sampler to avoid the bump-up-from-0 correction,
+    # and to apply the concentration < 1 recurrence in log-space. This improves
+    # accuracy for small concentrations.
+    log_gamma_sample = gamma_lib.random_gamma(
+        shape=[n], concentration=self.concentration, seed=seed, log_space=True)
+    return tf.math.exp(
+        log_gamma_sample -
+        tf.math.reduce_logsumexp(log_gamma_sample, axis=-1, keepdims=True))
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):

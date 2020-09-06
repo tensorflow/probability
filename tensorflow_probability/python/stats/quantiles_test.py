@@ -26,28 +26,26 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 
-rng = np.random.RandomState(0)
-
 
 @test_util.test_all_tf_execution_regimes
 class BincountTest(test_util.TestCase):
 
   def test_like_tf_math_bincount_if_axis_is_none(self):
-    arr = rng.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
+    arr = np.random.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
     tf_counts, tfp_counts = self.evaluate(
         [tf.math.bincount(arr),
          tfp.stats.count_integers(arr)])
     self.assertAllEqual(tf_counts, tfp_counts)
 
   def test_like_tf_math_bincount_if_axis_is_all_the_dims(self):
-    arr = rng.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
+    arr = np.random.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
     tf_counts, tfp_counts = self.evaluate(
         [tf.math.bincount(arr),
          tfp.stats.count_integers(arr, axis=[0, 1, 2])])
     self.assertAllEqual(tf_counts, tfp_counts)
 
   def test_3d_arr_axis_1_neg1_no_weights(self):
-    arr = rng.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
+    arr = np.random.randint(0, 10, size=(2, 3, 4)).astype(np.int32)
     counts = tfp.stats.count_integers(
         arr, weights=None, axis=[1, -1], minlength=10)
 
@@ -68,8 +66,8 @@ class BincountTest(test_util.TestCase):
     self.assertAllClose(counts_1_, counts_[:, 1])
 
   def test_2d_arr_axis_0_yes_weights(self):
-    arr = rng.randint(0, 4, size=(3, 2)).astype(np.int32)
-    weights = rng.rand(3, 2)
+    arr = np.random.randint(0, 4, size=(3, 2)).astype(np.int32)
+    weights = np.random.rand(3, 2)
     counts = tfp.stats.count_integers(arr, weights=weights, axis=0, minlength=4)
 
     # The first index will be length 4, but it isn't known statically because
@@ -154,7 +152,7 @@ class FindBinsTest(test_util.TestCase):
     self.assertAllEqual(expected_bins, bins_)
 
   def test_3d_array_has_expected_bins(self):
-    x = np.linspace(0., 1000, 1000, dtype=np.float32).reshape(10, 10, 10)
+    x = np.linspace(0., 1000, 1000, dtype=np.float32).reshape((10, 10, 10))
     edges = [0., 500., 1000.]
     bins = tfp.stats.find_bins(x, edges)
     self.assertAllEqual(x.shape, bins.shape)
@@ -168,9 +166,9 @@ class FindBinsTest(test_util.TestCase):
     self.assertAllEqual(np.ones((500,)), flat_bins_[500:])
 
   def test_large_random_array_has_expected_bin_fractions(self):
-    x = rng.rand(100, 99, 98)
+    x = np.random.rand(100, 99, 98)
     edges = np.linspace(0., 1., 11)  # Deciles
-    edges = edges.reshape(11, 1, 1) + np.zeros((99, 98))
+    edges = edges.reshape((11, 1, 1)) + np.zeros((99, 98))
     bins = tfp.stats.find_bins(x, edges)
 
     self.assertAllEqual(x.shape, bins.shape)
@@ -184,7 +182,7 @@ class FindBinsTest(test_util.TestCase):
     self.assertAllEqual(3. * np.ones((mask.sum(),)), bins_[mask])
 
   def test_large_random_array_has_expected_bin_fractions_with_broadcast(self):
-    x = rng.rand(100, 99, 98)
+    x = np.random.rand(100, 99, 98)
     # rank(edges) < rank(x), so it will broadcast.
     edges = np.linspace(0., 1., 11)  # Deciles
     bins = tfp.stats.find_bins(x, edges)
@@ -211,7 +209,7 @@ class HistogramTest(test_util.TestCase):
 
   def test_uniform_dist_in_1d_specify_extend_interval_and_dtype(self):
     n_samples = 1000
-    x = rng.rand(n_samples)
+    x = np.random.rand(n_samples)
 
     counts = tfp.stats.histogram(
         x,
@@ -242,7 +240,8 @@ class HistogramTest(test_util.TestCase):
     n_samples = 1000
 
     # Shape [n_samples, 2]
-    x = np.stack([rng.rand(n_samples), 1 + rng.rand(n_samples)], axis=-1)
+    x = np.stack([np.random.rand(n_samples), 1 + np.random.rand(n_samples)],
+                 axis=-1)
 
     # Intervals are:
     edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
@@ -283,7 +282,8 @@ class HistogramTest(test_util.TestCase):
     n_samples = 1000
 
     # Shape [2, n_samples]
-    x = np.stack([rng.rand(n_samples), 1 + rng.rand(n_samples)], axis=0)
+    x = np.stack([np.random.rand(n_samples), 1 + np.random.rand(n_samples)],
+                 axis=0)
 
     # Intervals are:
     edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
@@ -324,7 +324,8 @@ class HistogramTest(test_util.TestCase):
     n_samples = 1000
 
     # Shape [n_samples, 2]
-    x = np.stack([rng.rand(n_samples), 1 + rng.rand(n_samples)], axis=-1)
+    x = np.stack([np.random.rand(n_samples), 1 + np.random.rand(n_samples)],
+                 axis=-1)
 
     # Intervals are:
     edges = np.float64([
@@ -446,7 +447,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input(self):
-    x = rng.rand(2, 3, 4, 5)
+    x = np.random.rand(2, 3, 4, 5)
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x, q=0.77, interpolation=self._interpolation, axis=axis)
@@ -456,7 +457,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_q_vector(self):
-    x = rng.rand(3, 4, 5, 6)
+    x = np.random.rand(3, 4, 5, 6)
     q = [0.25, 0.75]
     for axis in [None, 0, (-1, 1)]:
       expected_percentile = np.percentile(
@@ -467,7 +468,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_q_vector_and_keepdims(self):
-    x = rng.rand(3, 4, 5, 6)
+    x = np.random.rand(3, 4, 5, 6)
     q = [0.25, 0.75]
     for axis in [None, 0, (-1, 1)]:
       expected_percentile = np.percentile(
@@ -478,7 +479,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_and_keepdims(self):
-    x = rng.rand(2, 3, 4, 5)
+    x = np.random.rand(2, 3, 4, 5)
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
           x,
@@ -496,7 +497,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_x_static_ndims_but_dynamic_sizes(self):
-    x = rng.rand(2, 3, 4, 5)
+    x = np.random.rand(2, 3, 4, 5)
     x_ph = tf1.placeholder_with_default(x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
@@ -506,7 +507,7 @@ class PercentileTestWithLowerInterpolation(test_util.TestCase):
       self.assertAllClose(expected_percentile, self.evaluate(pct))
 
   def test_four_dimensional_input_and_keepdims_x_static_ndims_dynamic_sz(self):
-    x = rng.rand(2, 3, 4, 5)
+    x = np.random.rand(2, 3, 4, 5)
     x_ph = tf1.placeholder_with_default(x, shape=[None, None, None, None])
     for axis in [None, 0, 1, -2, (0,), (-1,), (-1, 1), (3, 1), (-3, 0)]:
       expected_percentile = np.percentile(
@@ -782,7 +783,7 @@ class QuantilesTest(test_util.TestCase):
     self.assertAllClose([0., 250., 500., 750., 1000.], cut_points_, rtol=0.002)
 
   def test_deciles_of_rank_3_tensor(self):
-    x = rng.rand(3, 100000, 2)
+    x = np.random.rand(3, 100000, 2)
     cut_points = tfp.stats.quantiles(x, num_quantiles=10, axis=1)
     self.assertAllEqual((11, 3, 2), cut_points.shape)
     cut_points_ = self.evaluate(cut_points)

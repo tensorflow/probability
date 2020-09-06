@@ -29,7 +29,7 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -273,9 +273,9 @@ class MultivariateNormalLinearOperator(
 
     return tf.broadcast_to(
         variance,
-        prefer_static.broadcast_shape(
-            prefer_static.shape(variance),
-            prefer_static.shape(self.loc)))
+        ps.broadcast_shape(
+            ps.shape(variance),
+            ps.shape(self.loc)))
 
   def _stddev(self):
     if distribution_util.is_diagonal_scale(self.scale):

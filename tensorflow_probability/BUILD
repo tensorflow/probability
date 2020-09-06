@@ -17,7 +17,7 @@
 #   methods, including modeling and Bayesian inference. APIs here are
 #   meant to evolve over time.
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -30,5 +30,20 @@ py_library(
 #         "//tensorflow_probability/google/staging",  # DisableOnExport
 #         "//tensorflow_probability/google/tfp_google",  # DisableOnExport
         "//tensorflow_probability/python",
+        "//tensorflow_probability/substrates",
     ],
+)
+
+# The public target for `import tensorflow_probability.substrates.jax as tfp`
+py_library(
+    name = "jax",
+    visibility = ["//visibility:public"],
+    deps = ["//tensorflow_probability/substrates:jax"],
+)
+
+# The public target for `import tensorflow_probability.substrates.numpy as tfp`
+py_library(
+    name = "numpy",
+    visibility = ["//visibility:public"],
+    deps = ["//tensorflow_probability/substrates:numpy"],
 )

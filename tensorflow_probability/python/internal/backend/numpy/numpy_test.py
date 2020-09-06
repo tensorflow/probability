@@ -33,13 +33,13 @@ import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability.python.experimental.substrates.numpy as tfp
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 from tensorflow_probability.python.internal.backend.numpy import functional_ops as np_pfor
+import tensorflow_probability.substrates.numpy as tfp
 from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -153,6 +153,8 @@ def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
       elements = integers()
     elif dtype in (np.complex64, np.complex128):
       elements = complex_numbers()
+    elif dtype == np.bool:
+      elements = hps.booleans()
     else:
       raise ValueError('Unexpected dtype: {}'.format(dtype))
   shape = tuple(batch_shape) + draw(shape)
@@ -273,6 +275,25 @@ def batched_probabilities(draw, batch_shape, num_classes):
 
 def tensorshapes_to_tuples(tensorshapes):
   return tuple(tuple(tensorshape.as_list()) for tensorshape in tensorshapes)
+
+
+@hps.composite
+def where_params(draw, version=2):
+  shape = draw(shapes())
+  if version == 2:
+    cond_shape, x_shape, y_shape = draw(
+        tfp_hps.broadcasting_shapes(shape, 3).map(tensorshapes_to_tuples))
+  elif version == 1:
+    max_cond_ndim = min(1, len(shape))
+    cond_dims = draw(hps.sampled_from(np.arange(max_cond_ndim + 1)))
+    cond_shape = shape[:cond_dims]
+    x_shape, y_shape = shape, shape
+  else:
+    raise ValueError('unexpected tf.where version {}'.format(version))
+  condition = draw(single_arrays(shape=hps.just(cond_shape), dtype=np.bool))
+  x = draw(single_arrays(shape=hps.just(x_shape)))
+  y = draw(single_arrays(shape=hps.just(y_shape), dtype=x.dtype))
+  return condition, x, y
 
 
 @hps.composite
@@ -587,6 +608,11 @@ def _svd_post_process(vals):
       np.swapaxes(v, -2, -1))
 
 
+def _qr_post_process(qr):
+  """Values of q corresponding to zero values of r may have arbitrary values."""
+  return np.matmul(qr.q, qr.r), np.float32(qr.q.shape), np.float32(qr.r.shape)
+
+
 # __Currently untested:__
 # broadcast_dynamic_shape
 # broadcast_static_shape
@@ -711,6 +737,16 @@ NUMPY_TEST_CASES = [
     TestCase('linalg.svd',
              [single_arrays(shape=shapes(min_dims=2))],
              post_processor=_svd_post_process),
+    TestCase('linalg.qr',
+             [hps.tuples(
+                 single_arrays(dtype=np.float64, shape=shapes(min_dims=2)),
+                 hps.booleans()),
+              hps.tuples(
+                  single_arrays(dtype=np.complex128, shape=shapes(min_dims=2)),
+                  hps.booleans()),
+              ],
+             post_processor=_qr_post_process,
+             atol=1e-3),
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -747,7 +783,9 @@ NUMPY_TEST_CASES = [
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [pd_matrices()]),
     TestCase('linalg.lu', [nonsingular_matrices()], rtol=1e-4,
-             disabled=NUMPY_MODE and six.PY2),
+             # TODO(b/161242015) do not disable unconditionally.  Was
+             # disabled=NUMPY_MODE and six.PY2
+             disabled=True),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
     TestCase('raw_ops.MatrixDiagPartV2', [
         hps.fixed_dictionaries(dict(
@@ -1018,6 +1056,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('linspace', [linspace_params()]),
     TestCase('one_hot', [one_hot_params()]),
     TestCase('slice', [sliceable_and_slices()]),
+    TestCase('compat.v1.where', [where_params(version=1)]),
+    TestCase('where', [where_params(version=2)]),
 
     # Misc
     TestCase('histogram_fixed_width',
@@ -1277,6 +1317,14 @@ class NumpyTest(test_util.TestCase):
       with self.assertRaises(error):
         nptf.convert_to_tensor(value, dtype=dtype, dtype_hint=dtype_hint)
 
+  def test_nested_stack_to_tensor(self):
+    state = nptf.cast([2., 3.], nptf.float64)
+    self.assertEqual(nptf.float64,
+                     nptf.stack([
+                         [0., 1.],
+                         [-2000. * state[0] * state[1] - 1.,
+                          1000. * (1. - state[0]**2)]]).dtype)
+
   def test_concat_infers_dtype(self):
     self.assertEqual(np.int32, nptf.concat([[1], []], 0).dtype)
     self.assertEqual(np.float32, nptf.concat([[], [1]], 0).dtype)
@@ -1428,6 +1476,22 @@ class NumpyTest(test_util.TestCase):
         self.evaluate(tf_pfor.pfor(tf_fn, 7)),
         np_pfor.pfor(np_fn, 7))
 
+  def test_convert_variable_to_tensor(self):
+    v = nptf.Variable([0., 1., 2.], dtype=tf.float64)
+    x = nptf.convert_to_tensor(v)
+    v.assign([3., 3., 3.])
+
+    self.assertEqual(type(np.array([0.])), type(x))
+    self.assertEqual(np.float64, x.dtype)
+    self.assertAllEqual([0., 1., 2.], x)
+
+  def test_get_static_value(self):
+    x = nptf.get_static_value(nptf.zeros((3, 2), dtype=nptf.float32))
+    self.assertEqual(onp.ndarray, type(x))
+    self.assertAllEqual(onp.zeros((3, 2), dtype=np.float32), x)
+
+    self.assertIsNone(nptf.get_static_value(nptf.Variable(0.)))
+
   def evaluate(self, tensors):
     if tf.executing_eagerly():
       return self._eval_helper(tensors)
@@ -1489,14 +1553,15 @@ class NumpyTest(test_util.TestCase):
 
         kwargs.update(jax_kwargs() if JAX_MODE else {})
         numpy_value = np_fn(*args, **kwargs)
-        if post_processor is not None:
-          numpy_value = post_processor(numpy_value)
-          tensorflow_value = post_processor(tensorflow_value)
 
         def assert_same_dtype(x, y):
           self.assertEqual(dtype_util.as_numpy_dtype(x.dtype),
                            dtype_util.as_numpy_dtype(y.dtype))
         tf.nest.map_structure(assert_same_dtype, tensorflow_value, numpy_value)
+
+        if post_processor is not None:
+          numpy_value = post_processor(numpy_value)
+          tensorflow_value = post_processor(tensorflow_value)
 
         if assert_shape_only:
 

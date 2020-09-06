@@ -243,6 +243,14 @@ class FFJORD(bijector.Bijector):
         http://arxiv.org.abs/1810.01367
   """
 
+  # FFJORD simultaneously computes `forward` and `fldj` (and `inverse`/`ildj`),
+  # so we override the bijector cache to update the LDJ entries of attrs on
+  # forward/inverse inverse calls (instead of updating them only when the LDJ
+  # methods themselves are called).
+  _cache = cache_util.BijectorCacheWithGreedyAttrs(
+      forward_name='_augmented_forward',
+      inverse_name='_augmented_inverse')
+
   def __init__(
       self,
       state_time_derivative_fn,
@@ -320,13 +328,6 @@ class FFJORD(bijector.Bijector):
           parameters=parameters,
           name=name)
 
-  def _setup_cache(self):
-    """Overrides the bijector cache to update attrs on forward/inverse."""
-    return cache_util.BijectorCache(
-        forward_impl=self._augmented_forward,
-        inverse_impl=self._augmented_inverse,
-        cache_type=cache_util.CachedDirectedFunctionWithGreedyAttrs)
-
   def _solve_ode(self, ode_fn, state):
     """Solves the initial value problem defined by `ode_fn`.
 
@@ -350,16 +351,16 @@ class FFJORD(bijector.Bijector):
   def _augmented_forward(self, x):
     """Computes forward and forward_log_det_jacobian transformations."""
     augmented_ode_fn = self._trace_augmentation_fn(
-        self._state_time_derivative_fn, x.shape, self._dtype)
-    augmented_x = (x, tf.zeros(shape=x.shape, dtype=self._dtype))
+        self._state_time_derivative_fn, x.shape, x.dtype)
+    augmented_x = (x, tf.zeros(shape=x.shape, dtype=x.dtype))
     y, fldj = self._solve_ode(augmented_ode_fn, augmented_x)
     return y, {'ildj': -fldj, 'fldj': fldj}
 
   def _augmented_inverse(self, y):
     """Computes inverse and inverse_log_det_jacobian transformations."""
     augmented_inv_ode_fn = self._trace_augmentation_fn(
-        self._inv_state_time_derivative_fn, y.shape, self._dtype)
-    augmented_y = (y, tf.zeros(shape=y.shape, dtype=self._dtype))
+        self._inv_state_time_derivative_fn, y.shape, y.dtype)
+    augmented_y = (y, tf.zeros(shape=y.shape, dtype=y.dtype))
     x, ildj = self._solve_ode(augmented_inv_ode_fn, augmented_y)
     return x, {'ildj': ildj, 'fldj': -ildj}
 
@@ -372,7 +373,7 @@ class FFJORD(bijector.Bijector):
     return x
 
   def _forward_log_det_jacobian(self, x):
-    cached = self._cache.forward.attributes(x)
+    cached = self._cache.forward_attributes(x)
     # If LDJ isn't in the cache, call forward once.
     if 'fldj' not in cached:
       _, attrs = self._augmented_forward(x)
@@ -380,7 +381,7 @@ class FFJORD(bijector.Bijector):
     return cached['fldj']
 
   def _inverse_log_det_jacobian(self, y):
-    cached = self._cache.inverse.attributes(y)
+    cached = self._cache.inverse_attributes(y)
     # If LDJ isn't in the cache, call inverse once.
     if 'ildj' not in cached:
       _, attrs = self._augmented_inverse(y)

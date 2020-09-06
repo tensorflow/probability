@@ -17,8 +17,7 @@
 
 There are a few key differences:
 1. We use Oryx's state API to handle variables.
-2. We include the params as an input to the optimizer so we can build optimizers
-like LARS and LAMB.
+2. We change the order of the arguments of the optimiser's update function.
 """
 import itertools
 
@@ -68,7 +67,7 @@ def clip(max_delta):
 
 
 def global_norm(items):
-  return np.sqrt(np.sum([np.sum(x**2) for x in tree_leaves(items)]))
+  return np.sqrt(np.sum(np.array([np.sum(x**2) for x in tree_leaves(items)])))
 
 
 def clip_by_global_norm(max_norm):
@@ -284,8 +283,8 @@ def apply_updates(params, updates):
 
 def gradient_descent(update, objective):
 
-  def step(params, init_key=None):
-    out, updates = jax.value_and_grad(objective)(params)
+  def step(params, *args, init_key=None):
+    out, updates = jax.value_and_grad(objective)(params, *args)
     updates = primitive.tie_in(out, update(params, updates, init_key=init_key))
     return apply_updates(params, updates)
 

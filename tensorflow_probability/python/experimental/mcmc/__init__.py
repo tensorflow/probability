@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""TensorFlow Probability experimental NUTS package."""
+"""TensorFlow Probability experimental MCMC package."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.mcmc.covariance_reducer import CovarianceReducer
+from tensorflow_probability.python.experimental.mcmc.covariance_reducer import VarianceReducer
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
-from tensorflow_probability.python.experimental.mcmc.nuts import NoUTurnSampler
+from tensorflow_probability.python.experimental.mcmc.expectations_reducer import ExpectationsReducer
+from tensorflow_probability.python.experimental.mcmc.nuts_autobatching import NoUTurnSampler
 from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
 from tensorflow_probability.python.experimental.mcmc.particle_filter import reconstruct_trajectories
@@ -27,6 +30,12 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_observation_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import augment_with_state_history
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
+from tensorflow_probability.python.experimental.mcmc.potential_scale_reduction_reducer import PotentialScaleReductionReducer
+from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
+from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
+from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
@@ -37,14 +46,19 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
+from tensorflow_probability.python.experimental.mcmc.tracing_reducer import TracingReducer
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
-from tensorflow.python.util.all_util import remove_undocumented  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductions
+from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductionsKernelResults
 
-_allowed_symbols = [
+
+__all__ = [
+    'CovarianceReducer',
     'EllipticalSliceSampler',
+    'ExpectationsReducer',
     'NoUTurnSampler',
     'SequentialMonteCarlo',
     'SequentialMonteCarloResults',
@@ -60,14 +74,21 @@ _allowed_symbols = [
     'gen_make_transform_hmc_kernel_fn',
     'make_rwmh_kernel_fn',
     'particle_filter',
+    'PotentialScaleReductionReducer',
     'reconstruct_trajectories',
+    'Reducer',
     'resample_deterministic_minimum_error',
     'resample_independent',
     'resample_stratified',
     'resample_systematic',
+    'SampleDiscardingKernel',
+    'sample_chain',
+    'sample_fold',
     'sample_sequential_monte_carlo',
     'simple_heuristic_tuning',
-
+    'step_kernel',
+    'TracingReducer',
+    'VarianceReducer',
+    'WithReductions',
+    'WithReductionsKernelResults',
 ]
-
-remove_undocumented(__name__, _allowed_symbols)

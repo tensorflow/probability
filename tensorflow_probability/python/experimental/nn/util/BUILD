@@ -13,9 +13,7 @@
 # limitations under the License.
 # ============================================================================
 
-# [internal] load python3.bzl
-
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -33,6 +31,7 @@ py_library(
         ":im2row",
         ":random_variable",
         ":utils",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -46,11 +45,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "im2row_test",
     size = "medium",
     srcs = ["im2row_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -69,11 +69,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "random_variable_test",
     size = "medium",
     srcs = ["random_variable_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

@@ -33,13 +33,18 @@ __all__ = [
 ]
 
 
-def independent_joint_distribution_from_structure(structure_of_distributions):
+def independent_joint_distribution_from_structure(structure_of_distributions,
+                                                  validate_args=False):
   """Turns a (potentially nested) structure of dists into a single dist.
 
   Args:
     structure_of_distributions: instance of `tfd.Distribution`, or nested
       structure (tuple, list, dict, etc.) in which all leaves are
       `tfd.Distribution` instances.
+    validate_args: Python `bool`. Whether the joint distribution should validate
+      input with asserts. This imposes a runtime cost. If `validate_args` is
+      `False`, and the inputs are invalid, correct behavior is not guaranteed.
+      Default value: `False`.
   Returns:
     distribution: instance of `tfd.Distribution` such that
       `distribution.sample()` is equivalent to
@@ -72,6 +77,6 @@ def independent_joint_distribution_from_structure(structure_of_distributions):
   if (hasattr(structure_of_distributions, '_asdict') or
       isinstance(structure_of_distributions, collections.Mapping)):
     return joint_distribution_named.JointDistributionNamed(
-        structure_of_distributions)
+        structure_of_distributions, validate_args=validate_args)
   return joint_distribution_sequential.JointDistributionSequential(
-      structure_of_distributions)
+      structure_of_distributions, validate_args=validate_args)

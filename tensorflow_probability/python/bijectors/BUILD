@@ -16,14 +16,13 @@
 #   Contains ops for bijectors.
 #   APIs here are meant to evolve over time.
 
-# [internal] load python3.bzl
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -40,8 +39,6 @@ multi_substrate_py_library(
         ":batch_normalization",
         ":discrete_cosine_transform",
         ":ffjord",
-        ":real_nvp",
-        ":scale_matvec_lu",
     ],
     deps = [
         ":absolute_value",
@@ -83,6 +80,7 @@ multi_substrate_py_library(
         ":permute",
         ":power_transform",
         ":rational_quadratic_spline",
+        ":rayleigh_cdf",
         ":real_nvp",
         ":reciprocal",
         ":reshape",
@@ -124,19 +122,20 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:cache_util",
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
-# py2and3
 py_test(
     name = "bijector_properties_test",
     size = "large",
     srcs = ["bijector_properties_test.py"],
+    python_version = "PY3",
     shard_count = 25,
+    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":bijectors",
@@ -284,6 +283,7 @@ multi_substrate_py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -577,13 +577,14 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "scale_matvec_lu",
     srcs = ["scale_matvec_lu.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:linalg",
     ],
@@ -666,7 +667,18 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
+    name = "rayleigh_cdf",
+    srcs = ["rayleigh_cdf.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "real_nvp",
     srcs = ["real_nvp.py"],
     deps = [
@@ -853,6 +865,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -941,6 +954,7 @@ multi_substrate_py_test(
         # mock dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:cache_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1175,7 +1189,9 @@ multi_substrate_py_test(
     name = "correlation_cholesky_test",
     size = "medium",
     srcs = ["correlation_cholesky_test.py"],
+    jax_size = "large",
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1419,7 +1435,6 @@ multi_substrate_py_test(
     size = "small",
     timeout = "moderate",
     srcs = ["masked_autoregressive_test.py"],
-    jax_tags = ["omni_fail"],
     deps = [
         ":bijectors",
         ":masked_autoregressive",
@@ -1461,8 +1476,7 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "scale_matvec_lu_test",
     size = "small",
     srcs = ["scale_matvec_lu_test.py"],
@@ -1542,8 +1556,21 @@ multi_substrate_py_test(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
+    name = "rayleigh_cdf_test",
+    size = "small",
+    srcs = ["rayleigh_cdf_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "real_nvp_test",
     size = "small",
     srcs = ["real_nvp_test.py"],

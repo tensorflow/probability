@@ -33,7 +33,12 @@ mkdir -p "$1"
 DEST=$(dirname "${1}/does_not_exist")
 DEST=$(cd "$DEST" && pwd)
 
-cd bazel-bin/pip_pkg.runfiles/tensorflow_probability
+# Use cp -L to resolve symlinks added as part of bazel build. Otherwise wheel
+# does not follow them and fails to include TFP on JAX/Numpy.
+pip_tmp="$(mktemp -d)"
+cp -L -R bazel-bin/pip_pkg.runfiles/tensorflow_probability "${pip_tmp}"
+cd "${pip_tmp}/tensorflow_probability"
+
 echo >>tensorflow_probability/python/version.py \
   "if __version__.endswith('dev'): __version__ += '$(date --utc +%Y%m%d)'"
 # Pass through remaining arguments (following the first argument, which

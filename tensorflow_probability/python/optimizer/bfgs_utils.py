@@ -22,9 +22,8 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.optimizer import linesearch
 
 # A namedtuple to hold the point at which a line function is evaluated, the
@@ -177,7 +176,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
         ls_result.left.full_gradient,
         grad_tolerance, f_relative_tolerance, x_tolerance)
 
-  return prefer_static.cond(
+  return ps.cond(
       stopping_condition(state.converged, state.failed),
       true_fn=lambda: state_after_ls,
       false_fn=_do_update_position)
@@ -340,4 +339,4 @@ def _broadcast(value, target):
   """
   return tf.broadcast_to(
       tf.convert_to_tensor(value, dtype=target.dtype),
-      distribution_util.prefer_static_shape(target)[:-1])
+      ps.shape(target)[:-1])

@@ -508,14 +508,15 @@ class JointDistribution(distribution_lib.Distribution):
   def _flat_resolve_names(self, dummy_name='var'):
     """Resolves a name for each random variable in the model."""
     names = []
-    dummy_idx = 1
-    for d in self._get_single_sample_distributions():
+    names_used = set()
+    for dummy_idx, d in enumerate(self._get_single_sample_distributions()):
       name = get_explicit_name_for_component(d)
       if name is None:
-        # Wrapping dummy names with <> prevents users from passing them as
-        # kwargs.
-        name = '<{}{}>'.format(dummy_name, dummy_idx)
-        dummy_idx += 1
+        name = '{}{}'.format(dummy_name, dummy_idx)
+      if name in names_used:
+        raise ValueError('Duplicated distribution name: {}'.format(name))
+      else:
+        names_used.add(name)
       names.append(name)
     return names
 
@@ -657,14 +658,23 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
     return tuple(tf.identity(x) for x in flat_xs)
 
 
+# TODO(b/162764645): Implement as a Composite bijector.
+# The Composite CL generalizes Chain to arbitrary bijector DAGs. It will:
+#   1) Define an abstract `CompositeBijector` class (for any bijector that
+#      wraps other bijectors, and does nothing else)
+#   2) Express `Chain` and friends (including this) in terms of Composite.
+#   3) Introduce `JointMap` (this class sans coroutine)
+#   4) Introduce `Restructure`, as Chain+JM are pretty useless without it.
 class _DefaultJointBijector(bijector_lib.Bijector):
   """Minimally-viable event space bijector for `JointDistribution`."""
 
   # TODO(b/148485798): Support joint bijectors in TransformedDistribution.
   def __init__(self, jd):
     with tf.name_scope('default_joint_bijector') as name:
+      structure = tf.nest.map_structure(lambda _: None, jd.dtype)
       super(_DefaultJointBijector, self).__init__(
-          forward_min_event_ndims=0,  # Dummy value, unused.
+          forward_min_event_ndims=structure,
+          inverse_min_event_ndims=structure,
           validate_args=jd.validate_args,
           name=name)
       self._jd = jd
@@ -709,6 +719,9 @@ class _DefaultJointBijector(bijector_lib.Bijector):
         for (bijector, input_shape) in zip(support_bijectors, input_shapes)]
     return self._jd._model_unflatten(output_shapes)
 
+  # We override the public methods so that the `default_event_space_bijector`s
+  # of the component distributions, instead of that of the `JointDistribution`,
+  # hit the global bijector cache.
   def forward(self, values, name=None):
     with tf.name_scope(name or 'forward'):
       values = self._jd._model_flatten(values)
@@ -781,4 +794,3 @@ class _DefaultJointBijector(bijector_lib.Bijector):
     with tf.name_scope('inverse_event_shape_tensor'):
       self._check_inputs_not_none(output_shapes)
       return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
-

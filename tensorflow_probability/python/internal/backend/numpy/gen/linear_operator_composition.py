@@ -162,6 +162,14 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
       TypeError:  If all operators do not have the same `dtype`.
       ValueError:  If `operators` is empty.
     """
+    parameters = dict(
+        operators=operators,
+        is_non_singular=is_non_singular,
+        is_self_adjoint=is_self_adjoint,
+        is_positive_definite=is_positive_definite,
+        is_square=is_square,
+        name=name)
+
     # Validate operators.
     check_ops.assert_proper_iterable(operators)
     operators = list(operators)
@@ -201,6 +209,7 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
           is_square=is_square,
+          parameters=parameters,
           name=name)
     # TODO(b/143910018) Remove graph_parents in V3.
     self._set_graph_parents(graph_parents)
@@ -305,8 +314,8 @@ from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shap
 from tensorflow_probability.python.internal.backend.numpy import private
 distribution_util = private.LazyLoader(
     "distribution_util", globals(),
-    "tensorflow_probability.python.internal._numpy.distribution_util")
+    "tensorflow_probability.substrates.numpy.internal.distribution_util")
 tensorshape_util = private.LazyLoader(
-   "tensorshape_util", globals(),
-    "tensorflow_probability.python.internal._numpy.tensorshape_util")
+    "tensorshape_util", globals(),
+    "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
 

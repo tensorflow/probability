@@ -22,11 +22,18 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector as bijector_base
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'Blockwise',
 ]
+
+
+def _get_static_splits(splits):
+  # Convert to a static value so that one could run tf.split on TPU.
+  static_splits = tf.get_static_value(splits)
+  return splits if static_splits is None else static_splits
 
 
 class Blockwise(bijector_base.Bijector):
@@ -51,12 +58,28 @@ class Blockwise(bijector_base.Bijector):
   y_1 = tfb.Sigmoid().forward(x_1)
   y = tf.concat([y_0, y_1], axis=-1)
   ```
+
+  Keyword arguments can be passed to the inner bijectors by utilizing the inner
+  bijector names, e.g.:
+
+  ```python
+  blockwise = tfb.Blockwise([Bijector1(name='b1'), Bijector2(name='b2')])
+  y = blockwise.forward(x, b1={'arg': 1}, b2={'arg': 2})
+
+  # Equivalent to:
+  x_0, x_1 = tf.split(x, [1, 1], axis=-1)
+  y_0 = Bijector1().forward(x_0, arg=1)
+  y_1 = Bijector2().forward(x_1, arg=2)
+  y = tf.concat([y_0, y_1], axis=-1)
+  ```
+
   """
 
   def __init__(self,
                bijectors,
                block_sizes=None,
                validate_args=False,
+               maybe_changes_size=True,
                name=None):
     """Creates the bijector.
 
@@ -68,13 +91,16 @@ class Blockwise(bijector_base.Bijector):
         `bijectors`. If left as None, a vector of 1's is used.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
+      maybe_changes_size: Python `bool` indicating that this bijector might
+        change the event size. If this is known to be false and set
+        appropriately, then this will lead to improved static shape inference
+        when the block sizes are not statically known.
       name: Python `str`, name given to ops managed by this object. Default:
         E.g., `Blockwise([Exp(), Softplus()]).name ==
         'blockwise_of_exp_and_softplus'`.
 
     Raises:
-      NotImplementedError: If a bijector with `event_ndims` > 1 or one that
-        reshapes events is passed.
+      NotImplementedError: If there is a bijector with `event_ndims` > 1.
       ValueError: If `bijectors` list is empty.
       ValueError: If size of `block_sizes` does not equal to the length of
         bijectors or is not a vector.
@@ -95,16 +121,15 @@ class Blockwise(bijector_base.Bijector):
 
       for bijector in bijectors:
         if (bijector.forward_min_event_ndims > 1 or
-            (bijector.inverse_min_event_ndims !=
-             bijector.forward_min_event_ndims)):
+            bijector.inverse_min_event_ndims > 1):
           # TODO(siege): In the future, it can be reasonable to support N-D
           # bijectors by concatenating along some specific axis, broadcasting
           # low-D bijectors appropriately.
           raise NotImplementedError('Only scalar and vector event-shape '
-                                    'bijectors that do not alter the '
-                                    'shape are supported at this time.')
+                                    'bijectors are supported at this time.')
 
       self._bijectors = bijectors
+      self._maybe_changes_size = maybe_changes_size
 
       if block_sizes is None:
         block_sizes = tf.ones(len(bijectors), dtype=tf.int32)
@@ -122,32 +147,82 @@ class Blockwise(bijector_base.Bijector):
   def block_sizes(self):
     return self._block_sizes
 
-  def _forward(self, x):
-    split_x = tf.split(x, self.block_sizes, axis=-1, num=len(self.bijectors))
-    split_y = [b.forward(x_) for b, x_ in zip(self.bijectors, split_x)]
+  def _output_block_sizes(self):
+    return [
+        b.forward_event_shape_tensor(bs[tf.newaxis])[0]
+        for b, bs in zip(self.bijectors,
+                         tf.unstack(self.block_sizes, num=len(self.bijectors)))
+    ]
+
+  def _forward_event_shape(self, input_shape):
+    input_shape = tensorshape_util.with_rank_at_least(input_shape, 1)
+    static_block_sizes = tf.get_static_value(self.block_sizes)
+    if static_block_sizes is None:
+      return tensorshape_util.concatenate(input_shape[:-1], [None])
+
+    output_size = sum(
+        b.forward_event_shape([bs])[0]
+        for b, bs in zip(self.bijectors, static_block_sizes))
+
+    return tensorshape_util.concatenate(input_shape[:-1], [output_size])
+
+  def _forward_event_shape_tensor(self, input_shape):
+    output_size = ps.reduce_sum(self._output_block_sizes())
+    return ps.concat([input_shape[:-1], output_size[tf.newaxis]], -1)
+
+  def _inverse_event_shape(self, output_shape):
+    output_shape = tensorshape_util.with_rank_at_least(output_shape, 1)
+    static_block_sizes = tf.get_static_value(self.block_sizes)
+    if static_block_sizes is None:
+      return tensorshape_util.concatenate(output_shape[:-1], [None])
+
+    input_size = sum(static_block_sizes)
+
+    return tensorshape_util.concatenate(output_shape[:-1], [input_size])
+
+  def _inverse_event_shape_tensor(self, output_shape):
+    input_size = ps.reduce_sum(self.block_sizes)
+    return ps.concat([output_shape[:-1], input_size[tf.newaxis]], -1)
+
+  def _forward(self, x, **kwargs):
+    split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
+                       num=len(self.bijectors))
+    # TODO(b/162023850): Sanitize the kwargs better.
+    split_y = [
+        b.forward(x_, **kwargs.get(b.name, {}))
+        for b, x_ in zip(self.bijectors, split_x)
+    ]
     y = tf.concat(split_y, axis=-1)
-    tensorshape_util.set_shape(y, x.shape)
+    if not self._maybe_changes_size:
+      tensorshape_util.set_shape(y, x.shape)
     return y
 
-  def _inverse(self, y):
-    split_y = tf.split(y, self.block_sizes, axis=-1, num=len(self.bijectors))
-    split_x = [b.inverse(y_) for b, y_ in zip(self.bijectors, split_y)]
+  def _inverse(self, y, **kwargs):
+    split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
+                       axis=-1, num=len(self.bijectors))
+    split_x = [
+        b.inverse(y_, **kwargs.get(b.name, {}))
+        for b, y_ in zip(self.bijectors, split_y)
+    ]
     x = tf.concat(split_x, axis=-1)
-    tensorshape_util.set_shape(x, y.shape)
+    if not self._maybe_changes_size:
+      tensorshape_util.set_shape(x, y.shape)
     return x
 
-  def _forward_log_det_jacobian(self, x):
-    split_x = tf.split(x, self.block_sizes, axis=-1, num=len(self.bijectors))
+  def _forward_log_det_jacobian(self, x, **kwargs):
+    split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
+                       num=len(self.bijectors))
     fldjs = [
-        b.forward_log_det_jacobian(x_, event_ndims=1)
+        b.forward_log_det_jacobian(x_, event_ndims=1, **kwargs.get(b.name, {}))
         for b, x_ in zip(self.bijectors, split_x)
     ]
     return sum(fldjs)
 
-  def _inverse_log_det_jacobian(self, y):
-    split_y = tf.split(y, self.block_sizes, axis=-1, num=len(self.bijectors))
+  def _inverse_log_det_jacobian(self, y, **kwargs):
+    split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
+                       axis=-1, num=len(self.bijectors))
     ildjs = [
-        b.inverse_log_det_jacobian(y_, event_ndims=1)
+        b.inverse_log_det_jacobian(y_, event_ndims=1, **kwargs.get(b.name, {}))
         for b, y_ in zip(self.bijectors, split_y)
     ]
     return sum(ildjs)

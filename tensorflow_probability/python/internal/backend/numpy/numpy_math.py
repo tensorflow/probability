@@ -251,6 +251,19 @@ _cumprod = utils.partial(_cumop, np.cumprod, initial_value=1.)
 _cumsum = utils.partial(_cumop, np.cumsum, initial_value=0.)
 
 
+def _equal(x, y, name=None):
+  del name
+  x = _convert_to_tensor(x)
+  y = _convert_to_tensor(y)
+  return np.equal(x, y)
+
+
+def _invert_permutation(x, name=None):
+  del name
+  x = _convert_to_tensor(x, dtype_hint=np.int32)
+  return np.argsort(x).astype(x.dtype)
+
+
 def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=unused-argument
   x = _convert_to_tensor(x)
   return x / np.linalg.norm(x, ord=2, axis=_astuple(axis), keepdims=True)
@@ -534,7 +547,7 @@ divide_no_nan = utils.copy_docstring(
 
 equal = utils.copy_docstring(
     'tf.math.equal',
-    lambda x, y, name=None: np.equal(x, y))
+    _equal)
 
 erf = utils.copy_docstring(
     'tf.math.erf',
@@ -595,7 +608,7 @@ imag = utils.copy_docstring(
 # TODO(b/256095991): Add unit-test.
 invert_permutation = utils.copy_docstring(
     'tf.math.invert_permutation',
-    lambda x, name=None: np.argsort(x))
+    _invert_permutation)
 
 is_finite = utils.copy_docstring(
     'tf.math.is_finite',
@@ -672,38 +685,33 @@ logical_xor = utils.copy_docstring(
 
 if JAX_MODE:
 
-  @jax.custom_transforms
-  def _maximum_(x, y, name=None):  # pylint: disable=unused-argument
+  # TF and Jax have differing behavior when the inputs to maximum/minimum are
+  # equal. We modify to match TF's behavior.
+
+  @jax.custom_jvp
+  def _maximum_(x, y):
     return np.maximum(x, y)
 
-  @jax.custom_transforms
-  def _minimum_(x, y, name=None):  # pylint: disable=unused-argument
+  @_maximum_.defjvp
+  def _maximum_jvp(primals, tangents):
+    x, y = primals
+    dx, dy = tangents
+    selected_x = np.where(x >= y, np.ones_like(x), np.zeros_like(x))
+    return _maximum_(x, y), selected_x * dx + (1 - selected_x) * dy
+
+  @jax.custom_jvp
+  def _minimum_(x, y):
     return np.minimum(x, y)
 
-  # TF and Jax have differing behavior
-  # when the inputs to maximum/minimum are equal.
-  # This custom transforms rule
-  # modifies Jax to match TF's behavior.
+  @_minimum_.defjvp
+  def _minimum_fwd(primals, tangents):
+    x, y = primals
+    dx, dy = tangents
+    selected_x = np.where(x <= y, np.ones_like(x), np.zeros_like(x))
+    return _minimum_(x, y), selected_x * dx + (1 - selected_x) * dy
 
-  def _maximum_vjp(x, y):
-    out_primals = _maximum_(x, y)
-    def vjp(g):
-      gx = g * np.where(x >= y, np.ones_like(x), np.zeros_like(x))
-      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
-    return out_primals, vjp
-  jax.defvjp_all(_maximum_, _maximum_vjp)
-
-  def _minimum_vjp(x, y):
-    out_primals = _minimum_(x, y)
-    def vjp(g):
-      gx = g * np.where(x <= y, np.ones_like(x), np.zeros_like(x))
-      return (gx.astype(x.dtype), (g - gx).astype(y.dtype))
-    return out_primals, vjp
-  jax.defvjp_all(_minimum_, _minimum_vjp)
-
-  # Need to wrap in a function because custom_transforms
-  # returns an object, not a function
-  # which breaks docstring wrapping
+  # Need to wrap in a function because jax custom transforms returns an object,
+  # not a function which breaks docstring wrapping.
 
   def _promote_dtypes(x, y):
     # Need to explicitly promote types because of custom_transforms.
@@ -719,8 +727,10 @@ if JAX_MODE:
 
 else:
 
-  _minimum = lambda x, y, name=None: np.minimum(x, y)
-  _maximum = lambda x, y, name=None: np.maximum(x, y)
+  _minimum = lambda x, y, name=None: np.minimum(_convert_to_tensor(x),  # pylint: disable=g-long-lambda
+                                                _convert_to_tensor(y))
+  _maximum = lambda x, y, name=None: np.maximum(_convert_to_tensor(x),  # pylint: disable=g-long-lambda
+                                                _convert_to_tensor(y))
 
 maximum = utils.copy_docstring(
     'tf.math.maximum', _maximum)
@@ -764,7 +774,7 @@ not_equal = utils.copy_docstring(
 
 polygamma = utils.copy_docstring(
     'tf.math.polygamma',
-    lambda a, x, name=None: scipy_special.polygamma(a, x).astype(  # pylint: disable=unused-argument,g-long-lambda
+    lambda a, x, name=None: scipy_special.polygamma(np.int32(a), x).astype(  # pylint: disable=unused-argument,g-long-lambda
         utils.common_dtype([a, x], dtype_hint=np.float32)))
 
 polyval = utils.copy_docstring(
@@ -796,13 +806,17 @@ reciprocal_no_nan = utils.copy_docstring(
 
 def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # pylint: disable=unused-argument
                      include_dtype_kwarg=False, replace_nan=None):
+  """Implements reduce_* for nptf."""
   input_tensor = _convert_to_tensor(input_tensor)
+  axis = _astuple(axis)
   if replace_nan is not None and np.issubdtype(input_tensor.dtype, np.floating):
-    input_tensor = np.where(np.isnan(input_tensor),
-                            np.asarray(replace_nan, dtype=input_tensor.dtype),
-                            input_tensor)
+    loc_is_nan = np.isnan(input_tensor)
+    input_tensor = np.where(  # reduce_*([nan, nan], 0) in TF returns nan.
+        loc_is_nan & ~np.all(loc_is_nan, axis=axis, keepdims=True),
+        np.asarray(replace_nan, dtype=input_tensor.dtype),
+        input_tensor)
   kwargs = dict(dtype=input_tensor.dtype) if include_dtype_kwarg else {}
-  return op(input_tensor, axis=_astuple(axis), keepdims=keepdims, **kwargs)
+  return op(input_tensor, axis=axis, keepdims=keepdims, **kwargs)
 
 reduce_all = utils.copy_docstring(
     'tf.math.reduce_all',

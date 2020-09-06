@@ -26,6 +26,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 __all__ = [
     'assert_same_shallow_tree',
+    'block_until_ready',
     'flatten_tree',
     'inverse_fn',
     'make_tensor_seed',
@@ -293,3 +294,18 @@ def inverse_fn(fn):
   ```
   """
   return fn.inverse
+
+
+def block_until_ready(tensors):
+  """Blocks computation until it is ready.
+
+  Does nothing on the TensorFlow backend, as the computation is eagerly
+  computed.
+
+  Args:
+    tensors: A nest of Tensors.
+
+  Returns:
+    tensors: Tensors that are are guaranteed to be ready to materialize.
+  """
+  return tensors

@@ -137,6 +137,7 @@ class _HeavyTailOnly(bijector.Bijector):
         outputs.
       name: Python `str` name prefixed to Ops created by this class.
     """
+    parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([tailweight], tf.float32)
       self._tailweight = tensor_util.convert_nonref_to_tensor(
@@ -144,6 +145,7 @@ class _HeavyTailOnly(bijector.Bijector):
 
       super(_HeavyTailOnly, self).__init__(validate_args=validate_args,
                                            forward_min_event_ndims=0,
+                                           parameters=parameters,
                                            name=name)
 
   def _is_increasing(self):

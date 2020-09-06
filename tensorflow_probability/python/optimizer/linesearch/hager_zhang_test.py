@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -47,37 +48,29 @@ ValueAndGradient = collections.namedtuple('ValueAndGradient', ['x', 'f', 'df'])
 class HagerZhangTest(test_util.TestCase):
   """Tests for Hager Zhang line search algorithm."""
 
-  def test_quadratic(self):
+  @parameterized.named_parameters(
+      [{'testcase_name': 'close_start', 'start': 0.1},  # Start doesn't bracket
+       {'testcase_name': 'far_start', 'start': 7.0}])  # Start does bracket
+  def test_quadratic(self, start):
     fdf = lambda x: ValueAndGradient(x=x, f=(x-1.3)**2, df=2*(x-1.3))
 
-    # Case 1: The starting value is close to 0 and doesn't bracket the min.
-    close_start, far_start = tf.constant(0.1), tf.constant(7.0)
-    results_close = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
-        fdf, initial_step_size=close_start))
-    self.assertTrue(results_close.converged)
-    self.assertAlmostEqual(results_close.left.x, results_close.right.x)
+    start = tf.constant(start)
+    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        fdf, initial_step_size=start))
+    self.assertTrue(results.converged)
+    self.assertAlmostEqual(results.left.x, results.right.x)
     val_0 = fdf(0.0)
-    self.assertTrue(_is_exact_wolfe(results_close.left.x,
-                                    results_close.left.f,
-                                    results_close.left.df,
+    self.assertTrue(_is_exact_wolfe(results.left.x,
+                                    results.left.f,
+                                    results.left.df,
                                     val_0.f,
                                     val_0.df,
                                     0.1,
                                     0.9))
 
-    results_far = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
-        fdf, initial_step_size=far_start))
-    self.assertTrue(results_far.converged)
-    self.assertAlmostEqual(results_far.left.x, results_far.right.x)
-    self.assertTrue(_is_exact_wolfe(results_far.left.x,
-                                    results_far.left.f,
-                                    results_far.left.df,
-                                    val_0.f,
-                                    val_0.df,
-                                    0.1,
-                                    0.9))
-
-  def test_multiple_minima(self):
+  @parameterized.parameters(
+      [0.1, 1.5, 2.0, 4.0])
+  def test_multiple_minima(self, start):
     # This function has two minima in the direction of positive x.
     # The first is around x=0.46 and the second around 2.65.
     def fdf(x):
@@ -86,21 +79,19 @@ class HagerZhangTest(test_util.TestCase):
       dval = 4.94 * x**4 - 19.84 * x**3 + 14.934 * x**2 + 10.03 * x - 6.043
       return ValueAndGradient(x, val, dval)
 
-    starts = (tf.constant(0.1), tf.constant(1.5), tf.constant(2.0),
-              tf.constant(4.0))
-    for start in starts:
-      results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
-          fdf, initial_step_size=start))
-      self.assertTrue(results.converged)
-      self.assertAlmostEqual(results.left.x, results.right.x)
-      val_0 = fdf(0.0)
-      self.assertTrue(_is_exact_wolfe(results.left.x,
-                                      results.left.f,
-                                      results.left.df,
-                                      val_0.f,
-                                      val_0.df,
-                                      0.1,
-                                      0.9))
+    start = tf.constant(start)
+    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        fdf, initial_step_size=start))
+    self.assertTrue(results.converged)
+    self.assertAlmostEqual(results.left.x, results.right.x)
+    val_0 = fdf(0.0)
+    self.assertTrue(_is_exact_wolfe(results.left.x,
+                                    results.left.f,
+                                    results.left.df,
+                                    val_0.f,
+                                    val_0.df,
+                                    0.1,
+                                    0.9))
 
   def test_batched_multiple_minima(self):
     # This function has two minima in the direction of positive x.
@@ -130,7 +121,7 @@ class HagerZhangTest(test_util.TestCase):
     self.assertArrayNear(results_batched.left.x, results_mapped_left, 1e-5)
     self.assertArrayNear(results_batched.right.x, results_mapped_right, 1e-5)
 
-    # Batching is more efficient that mapping.
+    # Batching is more efficient than mapping.
     self.assertLess(results_batched.func_evals,
                     sum(r.func_evals for r in results_mapped))
 
@@ -176,16 +167,16 @@ class HagerZhangTest(test_util.TestCase):
 
   @test_util.jax_disable_test_missing_functionality(
       'JAX traces value_and_gradient_fn so eval count cannot be tracked.')
-  def test_eval_count(self):
+  @parameterized.parameters(
+      [0.1, 4.0])
+  def test_eval_count(self, start):
     """Tests that the evaluation count is reported correctly."""
     if tf.executing_eagerly():
-      self._test_eval_count_eager()
+      self._test_eval_count_eager(start)
     else:
-      self._test_eval_count_graph()
+      self._test_eval_count_graph(start)
 
-  def _test_eval_count_eager(self):
-    starts = [0.1, 4.0]
-
+  def _test_eval_count_eager(self, start):
     def get_val_and_grad_fn():
       def _val_and_grad_fn(x):
         _val_and_grad_fn.num_calls += 1
@@ -196,14 +187,12 @@ class HagerZhangTest(test_util.TestCase):
       _val_and_grad_fn.num_calls = 0
       return _val_and_grad_fn
 
-    for start in starts:
-      fdf = get_val_and_grad_fn()
-      results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
-          fdf, initial_step_size=tf.constant(start)))
-      self.assertEqual(fdf.num_calls, results.func_evals)
+    fdf = get_val_and_grad_fn()
+    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        fdf, initial_step_size=tf.constant(start)))
+    self.assertEqual(fdf.num_calls, results.func_evals)
 
-  def _test_eval_count_graph(self):
-    starts = [0.1, 4.0]
+  def _test_eval_count_graph(self, start):
     def get_fn():
       eval_count = tf.Variable(0)
       def _fdf(x):
@@ -217,15 +206,14 @@ class HagerZhangTest(test_util.TestCase):
           return ValueAndGradient(x, f, df)
       return _fdf, eval_count
 
-    for start in starts:
-      fdf, counter = get_fn()
-      results = tfp.optimizer.linesearch.hager_zhang(
-          fdf, initial_step_size=tf.constant(start))
-      self.evaluate(counter.initializer)
-      results = self.evaluate(results)
-      actual_evals = self.evaluate(counter)
-      self.assertTrue(results.converged)
-      self.assertEqual(actual_evals, results.func_evals)
+    fdf, counter = get_fn()
+    results = tfp.optimizer.linesearch.hager_zhang(
+        fdf, initial_step_size=tf.constant(start))
+    self.evaluate(counter.initializer)
+    results = self.evaluate(results)
+    actual_evals = self.evaluate(counter)
+    self.assertTrue(results.converged)
+    self.assertEqual(actual_evals, results.func_evals)
 
   def test_approx_wolfe(self):
     """Tests appropriate usage of approximate Wolfe conditions."""
@@ -311,6 +299,39 @@ class HagerZhangTest(test_util.TestCase):
     self.assertAlmostEqual(actual.f, results.left.f)
     self.assertAlmostEqual(actual.df, results.left.df)
 
+  def test_inf_recovery(self):
+    # This reproduces the corner case reported in b/156869514,
+    # namely finding an interval bracketing the minimum when
+    # 1. the first step doesn't bracket, and
+    # 2. interval expansion hits an infinite value
+    def fdf(x):
+      x = tf.convert_to_tensor(x)
+      f = (x - 2.0) ** 2  # Minimum at 2
+      df = 2 * (x - 2.0)
+      # Cut the function to infinity at 4.
+      return ValueAndGradient(
+          x=x,
+          f=tf.where(x > 4, float('inf'), f),
+          df=tf.where(x > 4, float('nan'), df))
+
+    # Test the default initial bracketing sequence, which is
+    # x=0, x=initial_step_size, x=expansion_param * initial_step_size
+    results = self.evaluate(
+        tfp.optimizer.linesearch.hager_zhang(
+            fdf,
+            initial_step_size=1.0,
+            expansion_param=5.0
+        ))
+    self.assertTrue(results.converged)
+    self.assertAlmostEqual(results.left.x, results.right.x)
+    val_0 = self.evaluate(fdf(0.0))
+    self.assertTrue(_is_exact_wolfe(results.left.x,
+                                    results.left.f,
+                                    results.left.df,
+                                    val_0.f,
+                                    val_0.df,
+                                    0.1,
+                                    0.9))
 
 if __name__ == '__main__':
   tf.test.main()

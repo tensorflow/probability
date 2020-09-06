@@ -26,7 +26,6 @@ from absl import logging
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
-import numpy as onp  # pylint: disable=reimported
 import six
 import tensorflow.compat.v2 as tf
 
@@ -46,16 +45,100 @@ JAX_MODE = False
 # pylint: disable=no-value-for-parameter
 
 
-# SPECIAL_DISTS are distributions that cannot be drawn by
-# base_distributions.
-SPECIAL_DISTS = (
-    'BatchReshape',
-    'Distribution',
+TF2_FRIENDLY_DISTS = (
+    'Bates',
+    'Bernoulli',
+    'Beta',
+    'BetaBinomial',
+    'Binomial',
+    'Chi',
+    'Chi2',
+    'CholeskyLKJ',
+    'Categorical',
+    'Cauchy',
+    'ContinuousBernoulli',
+    'Deterministic',
+    'Dirichlet',
+    'DirichletMultinomial',
+    'DoublesidedMaxwell',
     'Empirical',
+    'Exponential',
+    'ExpGamma',
+    'ExpInverseGamma',
+    'FiniteDiscrete',
+    'Gamma',
+    'GammaGamma',
+    'GeneralizedNormal',
+    'GeneralizedPareto',
+    'Geometric',
+    'Gumbel',
+    'HalfCauchy',
+    'HalfNormal',
+    'HalfStudentT',
+    'Horseshoe',
+    'InverseGamma',
+    'InverseGaussian',
+    'JohnsonSU',
+    'Kumaraswamy',
+    'Laplace',
+    'LKJ',
+    'LogLogistic',
+    'LogNormal',
+    'Logistic',
+    'Normal',
+    'Moyal',
+    'Multinomial',
+    'NegativeBinomial',
+    'OneHotCategorical',
+    'OrderedLogistic',
+    'Pareto',
+    'PERT',
+    'PlackettLuce',
+    'Poisson',
+    'PowerSpherical',
+    # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
+    # for hypothesis testing
+    'ProbitBernoulli',
+    'RelaxedBernoulli',
+    'ExpRelaxedOneHotCategorical',
+    # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
+    'SphericalUniform',
+    'StudentT',
+    'Triangular',
+    'TruncatedCauchy',
+    'TruncatedNormal',
+    'Uniform',
+    'VonMises',
+    'VonMisesFisher',
+    'Weibull',
+    'WishartTriL',
+    'Zipf',
+)
+
+
+# SPECIAL_DISTS are distributions that should not be drawn by
+# `base_distributions`, because they are parameterized by one or more
+# sub-distributions themselves.  This list is used to suppress warnings from
+# `_instantiable_base_dists`, below.
+SPECIAL_DISTS = (
+    'Autoregressive',
+    'BatchReshape',
+    'Blockwise',
+    'Distribution',  # Base class; not a distribution at all
+    'Empirical',  # Special base distribution with custom instantiation
+    'JointDistribution',
+    'JointDistributionCoroutine',
+    'JointDistributionCoroutineAutoBatched',
+    'JointDistributionNamed',
+    'JointDistributionNamedAutoBatched',
+    'JointDistributionSequential',
+    'JointDistributionSequentialAutoBatched',
     'Independent',
     'Mixture',
     'MixtureSameFamily',
+    'Sample',
     'TransformedDistribution',
+    'QuantizedDistribution',
 )
 
 
@@ -65,6 +148,7 @@ MUTEX_PARAMS = (
     set(['logits', 'probs']),
     set(['probits', 'probs']),
     set(['rate', 'log_rate']),
+    set(['scale', 'log_scale']),
     set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
 )
 
@@ -223,6 +307,8 @@ CONSTRAINTS = {
         lambda x: tfb.Ordered().inverse(10 * tf.math.tanh(x)),
     'log_rate':
         lambda x: tf.maximum(x, -16.),
+    'log_scale':
+        lambda x: tf.maximum(x, -16.),
     'mixing_concentration':
         tfp_hps.softplus_plus_eps(),
     'mixing_rate':
@@ -257,6 +343,8 @@ CONSTRAINTS = {
         fix_pert,
     'Triangular':
         fix_triangular,
+    'TruncatedCauchy':
+        lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
     'TruncatedNormal':
         lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
     'Uniform':
@@ -322,7 +410,8 @@ def _instantiable_base_dists():
       instantiate it.
   """
   result = {}
-  for (dist_name, dist_class) in six.iteritems(tfd.__dict__):
+  for dist_name in dir(tfd):
+    dist_class = getattr(tfd, dist_name)
     if (not inspect.isclass(dist_class) or
         not issubclass(dist_class, tfd.Distribution) or
         dist_name in SPECIAL_DISTS):
@@ -330,7 +419,7 @@ def _instantiable_base_dists():
     try:
       params_event_ndims = dist_class._params_event_ndims()  # pylint: disable=protected-access
     except NotImplementedError:
-      msg = 'Unable to test tfd.%s: _params_event_ndims not implemented'
+      msg = 'Unable to test tfd.%s: _params_event_ndims not implemented.'
       logging.warning(msg, dist_name)
       continue
     result[dist_name] = DistInfo(dist_class, params_event_ndims)
@@ -359,6 +448,17 @@ INSTANTIABLE_META_DISTS = (
     'TransformedDistribution',
     'QuantizedDistribution',
 )
+
+
+def _report_non_instantiable_meta_dists():
+  for dist_name in SPECIAL_DISTS:
+    if dist_name in ['Distribution', 'Empirical']: continue
+    if dist_name in INSTANTIABLE_META_DISTS: continue
+    msg = 'Unable to test tfd.%s: no instantiation strategy.'
+    logging.warning(msg, dist_name)
+
+_report_non_instantiable_meta_dists()
+del _report_non_instantiable_meta_dists
 
 
 @hps.composite
@@ -482,9 +582,38 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
+def prime_factors(v):
+  """Compute the prime factors of v."""
+  factors = []
+  primes = []
+  factor = 2
+  while v > 1:
+    while any(factor % p == 0 for p in primes):
+      factor += 1
+    primes.append(factor)
+    while v % factor == 0:
+      factors.append(factor)
+      v //= factor
+  return factors
+
+
+@hps.composite
+def reshapes_of(draw, shape, max_ndims=4):
+  """Strategy for valid reshapes of the given shape, rank at most max_ndims."""
+  factors = draw(hps.permutations(
+      prime_factors(tensorshape_util.num_elements(shape))))
+  split_points = sorted(draw(
+      hps.lists(hps.integers(min_value=0, max_value=len(factors)),
+                min_size=0, max_size=max_ndims - 1)))
+  result = ()
+  for start, stop in zip([0] + split_points, split_points + [len(factors)]):
+    result += (int(np.prod(factors[start:stop])),)
+  return result
+
+
 def assert_shapes_unchanged(target_shaped_dict, possibly_bcast_dict):
   for param, target_param_val in six.iteritems(target_shaped_dict):
-    onp.testing.assert_array_equal(
+    np.testing.assert_array_equal(
         tensorshape_util.as_list(target_param_val.shape),
         tensorshape_util.as_list(possibly_bcast_dict[param].shape))
 
@@ -551,9 +680,7 @@ def constrain_params(params_unconstrained, dist_name):
   # ignoring the value.  We similarly reinstate raw tf.Variables, so they
   # appear in the distribution's `variables` list and can be initialized.
   for k in params_constrained:
-    # In JAX_MODE, tfp_util.DeferredTensor is a function, not a class, so we
-    # disable this check entirely.
-    if (not JAX_MODE and k in params_unconstrained and
+    if (k in params_unconstrained and
         isinstance(params_unconstrained[k],
                    (tfp_util.DeferredTensor, tf.Variable))
         and params_unconstrained[k] is not params_constrained[k]):
@@ -730,14 +857,9 @@ def batch_reshapes(
     depth = draw(depths())
 
   if batch_shape is None:
-    batch_shape = draw(tfp_hps.shapes(min_ndims=1, max_side=4))
+    batch_shape = draw(tfp_hps.shapes(min_ndims=1, max_side=13))
 
-  # TODO(b/142135119): Wanted to draw general input and output shapes like the
-  # following, but Hypothesis complained about filtering out too many things.
-  # underlying_batch_shape = draw(tfp_hps.shapes(min_ndims=1))
-  # hp.assume(
-  #   batch_shape.num_elements() == underlying_batch_shape.num_elements())
-  underlying_batch_shape = [tensorshape_util.num_elements(batch_shape)]
+  underlying_batch_shape = draw(reshapes_of(batch_shape))
 
   underlying = draw(
       distributions(
@@ -874,20 +996,19 @@ def transformed_distributions(draw,
   hp.note('Drawing TransformedDistribution with bijector {}'.format(bijector))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
-  underlying_batch_shape = batch_shape
-  # TODO(b/151180729): Remove `batch_shape_arg` when `TransformedDistribution`
-  # shape overrides are deprecated.
-  batch_shape_arg = None
-  if draw(hps.booleans()):
-    # Use batch_shape overrides.
-    underlying_batch_shape = tf.TensorShape([])  # scalar underlying batch
-    batch_shape_arg = batch_shape
+
+  def eligibility_fn(name):
+    if not eligibility_filter(name):
+      return False
+
+    return bijector_hps.distribution_eligilibility_filter_for(bijector)(name)
+
   underlyings = distributions(
-      batch_shape=underlying_batch_shape,
+      batch_shape=batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars,
       depth=depth - 1,
-      eligibility_filter=eligibility_filter,
+      eligibility_filter=eligibility_fn,
       validate_args=validate_args).filter(
           bijector_hps.distribution_filter_for(bijector))
   to_transform = draw(underlyings)
@@ -897,7 +1018,6 @@ def transformed_distributions(draw,
   result_dist = tfd.TransformedDistribution(
       bijector=bijector,
       distribution=to_transform,
-      batch_shape=batch_shape_arg,
       validate_args=validate_args)
   if batch_shape != result_dist.batch_shape:
     msg = ('TransformedDistribution strategy generated a bad batch shape '

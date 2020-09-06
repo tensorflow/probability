@@ -17,8 +17,8 @@
 
 load(
     "//tensorflow_probability/python:build_defs.bzl",
-    "multi_substrate_py_test",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -27,7 +27,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -48,6 +48,7 @@ multi_substrate_py_library(
     srcs_version = "PY2AND3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:gamma",
     ],
 )
 
@@ -91,7 +92,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "leapfrog_integrator_test",
-    size = "small",
+    size = "medium",
     srcs = ["leapfrog_integrator_test.py"],
     disabled_substrates = ["numpy"],
     deps = [

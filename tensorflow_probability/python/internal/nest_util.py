@@ -74,10 +74,15 @@ def _force_leaf(struct):
   return hasattr(struct, '_tfp_nest_expansion_force_leaf')
 
 
+def _force_expand_as_args(struct):
+  return hasattr(struct, '_tfp_nest_expansion_force_args')
+
+
 def expand_as_args(args):
   """Returns `True` if `args` should be expanded as `*args`."""
-  return (isinstance(args, collections.Sequence) and
-          not _is_namedtuple(args) and not _force_leaf(args))
+  return ((isinstance(args, collections.Sequence) and
+           not _is_namedtuple(args) and not _force_leaf(args)) or
+          _force_expand_as_args(args))
 
 
 def _expand_as_kwargs(args):
@@ -212,6 +217,7 @@ def call_fn(fn, args):
 
 
 def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
+                             allow_packing=False,
                              name=None):
   """Converts the given `value` to a (structure of) `Tensor`.
 
@@ -228,6 +234,9 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
     dtype_hint: Optional structure of dtypes defining the structure of outputs
       and the `dtype_hint` argument for nested calls to `convert_to_tensor`. If
       not nested, will be broadcasted to match the structure of `dtype`.
+    allow_packing: Python `bool`, default `False`. If `True`, allow
+      `convert_to_nested_tensor` to stack nested lists of Tensors along the
+      leading dimension. Otherwise, raise.
     name: Optional name to use if a new `Tensor` is created. If inputs are
       structured, elements are named accoring to '{name}/{path}.{to}.{elem}'.
 
@@ -245,7 +254,7 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
     dtype = broadcast_structure(dtype_hint, dtype)
 
   def convert_fn(path, value, dtype, dtype_hint, name=None):
-    if nest.is_nested(value) and any(
+    if not allow_packing and nest.is_nested(value) and any(
         # Treat arrays like Tensors for full parity in JAX backend.
         tf.is_tensor(x) or isinstance(x, np.ndarray)
         for x in nest.flatten(value)):

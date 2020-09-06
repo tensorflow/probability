@@ -201,6 +201,18 @@ class LinearOperatorLowRankUpdate(linear_operator.LinearOperator):
     Raises:
       ValueError:  If `is_X` flags are set in an inconsistent way.
     """
+    parameters = dict(
+        base_operator=base_operator,
+        u=u,
+        diag_update=diag_update,
+        v=v,
+        is_diag_update_positive=is_diag_update_positive,
+        is_non_singular=is_non_singular,
+        is_self_adjoint=is_self_adjoint,
+        is_positive_definite=is_positive_definite,
+        is_square=is_square,
+        name=name
+    )
     dtype = base_operator.dtype
 
     if diag_update is not None:
@@ -272,6 +284,7 @@ class LinearOperatorLowRankUpdate(linear_operator.LinearOperator):
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
           is_square=is_square,
+          parameters=parameters,
           name=name)
       self._set_graph_parents(graph_parents)
 
@@ -474,8 +487,8 @@ from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shap
 from tensorflow_probability.python.internal.backend.numpy import private
 distribution_util = private.LazyLoader(
     "distribution_util", globals(),
-    "tensorflow_probability.python.internal._numpy.distribution_util")
+    "tensorflow_probability.substrates.numpy.internal.distribution_util")
 tensorshape_util = private.LazyLoader(
-   "tensorshape_util", globals(),
-    "tensorflow_probability.python.internal._numpy.tensorshape_util")
+    "tensorshape_util", globals(),
+    "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
 

@@ -52,7 +52,7 @@ class JointDistributionCoroutineAutoBatched(
     x = yield tfd.JointDistributionCoroutine.Root(
       tfd.Normal(0., tf.ones([3])))
     y = yield tfd.JointDistributionCoroutine.Root(
-      tfd.Normal(0., 1.)))
+      tfd.Normal(0., 1.))
     z = yield tfd.Normal(x[..., :2] + y[..., tf.newaxis], 1.)
 
   can be written in auto-vectorized form as
@@ -60,7 +60,7 @@ class JointDistributionCoroutineAutoBatched(
   ```python
   def model_fn():
     x = yield tfd.Normal(0., tf.ones([3]))
-    y = yield tfd.Normal(0., 1.))
+    y = yield tfd.Normal(0., 1.)
     z = yield tfd.Normal(x[:2] + y, 1.)
   ```
 
@@ -193,10 +193,60 @@ class JointDistributionCoroutineAutoBatched(
   # ==> []
   ```
 
+  For improved readability of sampled values, the yielded distributions can also
+  be named:
+
+  ```python
+  tfd = tfp.distributions
+  def model():
+    global_log_rate = yield tfd.Normal(
+      loc=0., scale=1., name='global_log_rate')
+    local_log_rates = yield tfd.Normal(
+      loc=0., scale=tf.ones([20]), name='local_log_rates')
+    observed_counts = yield tfd.Poisson(
+      rate=tf.exp(global_log_rate + local_log_rates), name='observed_counts')
+  joint = tfd.JointDistributionCoroutineAutoBatched(model)
+
+  print(joint.event_shape)
+  # ==> StructTuple(global_log_rate=[], local_log_rates=[20],
+  #      observed_counts=[20])
+  print(joint.batch_shape)
+  # ==> []
+  xs = joint.sample()
+  print(['{}: {}'.format(k, x.shape) for k, x in xs._asdict().items()])
+  # ==> global_log_scale: []
+  #     local_log_rates: [20]
+  #     observed_counts: [20]
+  lp = joint.log_prob(xs)
+  print(lp.shape)
+  # ==> []
+
+  # Passing via `kwargs` also works.
+  lp = joint.log_prob(**xs._asdict())
+  # Or:
+  lp = joint.log_prob(
+      global_log_scale=...,
+      local_log_rates=...,
+      observed_counts=...,
+  )
+  ```
+
+  If any of the yielded distributions are not explicitly named, they will
+  automatically be given a name of the form `var#` where `#` is the index of the
+  associated distribution. E.g. the first yielded distribution will have a
+  default name of `var0`.
+
   """
 
-  def __init__(self, model, sample_dtype=None, batch_ndims=0,
-               use_vectorized_map=True, validate_args=False, name=None):
+  def __init__(
+      self,
+      model,
+      sample_dtype=None,
+      batch_ndims=0,
+      use_vectorized_map=True,
+      validate_args=False,
+      name=None,
+  ):
     """Construct the `JointDistributionCoroutineAutoBatched` distribution.
 
     Args:
@@ -206,7 +256,7 @@ class JointDistributionCoroutineAutoBatched(
         `tf.nest.pack_sequence_as(sample_dtype, list_)`. `sample_dtype` is only
         used for `tf.nest.pack_sequence_as` structuring of outputs, never
         casting (which is the responsibility of the component distributions).
-        Default value: `None` (i.e., `tuple`).
+        Default value: `None` (i.e. `namedtuple`).
       batch_ndims: `int` `Tensor` number of batch dimensions. The `batch_shape`s
         of all component distributions must be such that the prefixes of
         length `batch_ndims` broadcast to a consistent joint batch shape.

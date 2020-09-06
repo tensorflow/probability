@@ -14,7 +14,7 @@
 # ============================================================================
 # Line search optimization methods
 
-load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_test", "multi_substrate_py_library")
+load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
 
 package(
     default_visibility = [
@@ -22,7 +22,7 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -31,6 +31,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     deps = [
         ":hager_zhang",
+        "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/optimizer/linesearch/internal",
     ],
 )
@@ -48,11 +49,12 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "hager_zhang_test",
-    size = "small",
+    size = "medium",
     srcs = ["hager_zhang_test.py"],
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

@@ -15,15 +15,13 @@
 # Description:
 #   Tools for sequential inference/filtering.
 
-# [internal] load python3.bzl
-
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
@@ -37,6 +35,7 @@ py_library(
         ":extended_kalman_filter",
         ":iterated_filter",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -75,12 +74,13 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "extended_kalman_filter_test",
     size = "large",
     timeout = "long",
     srcs = ["extended_kalman_filter_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     # shard_count = 6,
     deps = [
         ":extended_kalman_filter",
@@ -92,11 +92,12 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "ensemble_kalman_filter_test",
     size = "medium",
     srcs = ["ensemble_kalman_filter_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":ensemble_kalman_filter",
         # numpy dep,
@@ -107,11 +108,12 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
     name = "ensemble_adjustment_kalman_filter_test",
     size = "medium",
     srcs = ["ensemble_adjustment_kalman_filter_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":ensemble_adjustment_kalman_filter",
         # numpy dep,
@@ -134,10 +136,11 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "iterated_filter_test",
     srcs = ["iterated_filter_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":iterated_filter",
         # numpy dep,

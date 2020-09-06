@@ -24,6 +24,7 @@ import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import dtype
+from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy import ops
 
 
@@ -81,9 +82,12 @@ def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-na
                     maximum_iterations=None, name=None):  # pylint: disable=unused-argument
   """Jax implementation of `tf.while_loop`."""
   from jax import lax  # pylint: disable=g-import-not-at-top
+
+  pack_body = lambda x: nest.pack_sequence_as(loop_vars, nest.flatten(x))
+
   if maximum_iterations is None:
     def override_body_fn(args):
-      return body(*args)
+      return pack_body(body(*args))
     def override_cond_fn(args):
       return cond(*args)
     return lax.while_loop(override_cond_fn, override_body_fn, loop_vars)
@@ -92,10 +96,10 @@ def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-na
       c = cond(*args)
       sc = ops.get_static_value(c)
       if sc is None:
-        args = lax.cond(c, args, lambda args: body(*args), args,
+        args = lax.cond(c, args, lambda args: pack_body(body(*args)), args,
                         lambda args: args)
       elif sc:
-        args = body(*args)
+        args = pack_body(body(*args))
       return args, ()
 
     loop_vars, _ = lax.scan(
@@ -104,7 +108,7 @@ def _while_loop_jax(cond, body, loop_vars,  # pylint: disable=redefined-outer-na
   else:
     def override_body_fn(args):
       i, args = args
-      return i + 1, body(*args)
+      return i + 1, pack_body(body(*args))
     def override_cond_fn(args):
       i, args = args
       return cond(*args) & (i < maximum_iterations)

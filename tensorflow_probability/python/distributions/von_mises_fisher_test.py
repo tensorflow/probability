@@ -306,6 +306,100 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     # TODO(bjp): Enable self._verifyCovariance(vmf)
     self._verifyPdfWithNumpy(vmf, atol=2e-4)
 
+  def VerifyVonMisesFisherUniformZeroKL(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        shape=[5, dim],
+        minval=1.,
+        maxval=2.,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    # Zero concentration is the same as a uniform distribution on the sphere.
+    # Check that the KL divergence is zero.
+    concentration = 0.
+
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction,
+        concentration=concentration)
+    su = tfp.distributions.SphericalUniform(dimension=dim)
+
+    x = vmf.sample(int(5e4), seed=test_util.test_seed())
+
+    kl_sample = tf.reduce_mean(vmf.log_prob(x) - su.log_prob(x), axis=0)
+    true_kl = tfp.distributions.kl_divergence(vmf, su)
+    vmf_entropy = vmf.entropy()
+    su_entropy = su.entropy()
+    print(self.evaluate([vmf_entropy, su_entropy]))
+    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
+    self.assertAllClose(true_kl_, kl_sample_, atol=5e-8, rtol=1e-1)
+    self.assertAllClose(true_kl_, np.zeros_like(true_kl_), atol=1e-4)
+
+  def VerifyVonMisesFisherUniformKL(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        shape=[4, dim],
+        minval=1.,
+        maxval=4.,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    concentration = tf.math.log(
+        tf.random.uniform(
+            shape=[2, 1],
+            minval=2.,
+            maxval=20.,
+            seed=seed_stream()))
+
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction,
+        concentration=concentration)
+    su = tfp.distributions.SphericalUniform(dimension=dim)
+
+    x = vmf.sample(int(5e4), seed=test_util.test_seed())
+
+    kl_sample = tf.reduce_mean(vmf.log_prob(x) - su.log_prob(x), axis=0)
+    true_kl = tfp.distributions.kl_divergence(vmf, su)
+    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
+    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=7e-2)
+
+  def testKLVonMisesFisherSphericalUniformDim2(self):
+    self.VerifyVonMisesFisherUniformZeroKL(dim=2)
+    self.VerifyVonMisesFisherUniformKL(dim=2)
+
+  def testKLVonMisesFisherSphericalUniformDim3(self):
+    self.VerifyVonMisesFisherUniformZeroKL(dim=3)
+    self.VerifyVonMisesFisherUniformKL(dim=3)
+
+  def VerifyEntropy(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        shape=[5, dim],
+        minval=1.,
+        maxval=2.,
+        seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    concentration = tf.math.log(
+        tf.random.uniform(
+            shape=[2, 1],
+            minval=1.,
+            maxval=100.,
+            seed=seed_stream()))
+    vmf = tfp.distributions.VonMisesFisher(
+        mean_direction=mean_direction,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
+    samples = vmf.sample(int(3e4), seed=test_util.test_seed())
+    sample_entropy = -tf.reduce_mean(vmf.log_prob(samples), axis=0)
+    true_entropy, sample_entropy = self.evaluate([
+        vmf.entropy(), sample_entropy])
+    self.assertAllClose(sample_entropy, true_entropy, rtol=3e-2)
+
+  def testEntropyDim2(self):
+    self.VerifyEntropy(dim=2)
+
+  def testEntropyDim3(self):
+    self.VerifyEntropy(dim=3)
+
   def testInternalShapeInference(self):
     # Regression test for the effect of b/139013403 on vMF sampling.
     sample_shape = tf.constant([2])

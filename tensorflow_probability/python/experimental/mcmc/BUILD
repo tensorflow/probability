@@ -18,7 +18,11 @@
 #   //tensorflow_probability/python/internal/auto_batching
 #   internally.
 
-# [internal] load python3.bzl
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 package(
     default_visibility = [
@@ -26,23 +30,49 @@ package(
     ],
 )
 
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 exports_files(["LICENSE"])
 
-py_library(
+multi_substrate_py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
     srcs_version = "PY2AND3",
-    deps = [
+    substrates_omit_deps = [
+        ":covariance_reducer",
         ":elliptical_slice_sampler",
+        ":expectations_reducer",
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
+        ":potential_scale_reduction_reducer",
+        ":reducer",
+        ":sample",
+        ":sample_discarding_kernel",
+        ":sample_fold",
+        ":sequential_monte_carlo_kernel",
+        ":tracing_reducer",
+        ":with_reductions",
+    ],
+    deps = [
+        ":covariance_reducer",
+        ":elliptical_slice_sampler",
+        ":expectations_reducer",
+        ":nuts_autobatching",
+        ":particle_filter",
+        ":particle_filter_augmentation",
+        ":potential_scale_reduction_reducer",
+        ":reducer",
+        ":sample",
+        ":sample_discarding_kernel",
+        ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":tracing_reducer",
         ":weighted_resampling",
+        ":with_reductions",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -59,13 +89,14 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "elliptical_slice_sampler_test",
     size = "large",
     timeout = "long",
     srcs = ["elliptical_slice_sampler_test.py"],
+    python_version = "PY3",
     shard_count = 6,
+    srcs_version = "PY3",
     deps = [
         ":elliptical_slice_sampler",
         # numpy dep,
@@ -77,7 +108,7 @@ py_test(
 
 py_library(
     name = "nuts_autobatching",
-    srcs = ["nuts.py"],
+    srcs = ["nuts_autobatching.py"],
     srcs_version = "PY2AND3",
     deps = [
         # numpy dep,
@@ -91,9 +122,9 @@ py_library(
 )
 
 py_library(
-    name = "nuts_testlib",
+    name = "nuts_autobatching_testlib",
     testonly = 1,
-    srcs = ["nuts_test.py"],
+    srcs = ["nuts_autobatching_test.py"],
     srcs_version = "PY2AND3",
     deps = [
         # absl/testing:parameterized dep,
@@ -105,25 +136,25 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
-    name = "nuts_test",
+    name = "nuts_autobatching_test",
     size = "medium",
-    srcs = ["nuts_test.py"],
+    srcs = ["nuts_autobatching_test.py"],
+    python_version = "PY3",
     shard_count = 7,
     srcs_version = "PY2AND3",
     tags = ["nozapfhahn"],
     deps = [
-        ":nuts_testlib",
+        ":nuts_autobatching_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-# py2and3
 py_test(
-    name = "nuts_test_gpu",
-    srcs = ["nuts_test.py"],
-    main = "nuts_test.py",
+    name = "nuts_autobatching_test_gpu",
+    srcs = ["nuts_autobatching_test.py"],
+    main = "nuts_autobatching_test.py",
+    python_version = "PY3",
     shard_count = 7,
     srcs_version = "PY2AND3",
     tags = [
@@ -132,19 +163,20 @@ py_test(
         "requires-gpu-nvidia",
     ],
     deps = [
-        ":nuts_testlib",
+        ":nuts_autobatching_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-# py2and3
 py_test(
-    name = "nuts_xla_test_cpu",
+    name = "nuts_autobatching_xla_test_cpu",
     size = "large",
-    srcs = ["nuts_xla_test.py"],
+    srcs = ["nuts_autobatching_xla_test.py"],
     args = ["--test_device=cpu"],
-    main = "nuts_xla_test.py",
+    main = "nuts_autobatching_xla_test.py",
+    python_version = "PY3",
     shard_count = 1,
+    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -158,14 +190,15 @@ py_test(
     ],
 )
 
-# py2and3
 py_test(
-    name = "nuts_xla_test_gpu",
+    name = "nuts_autobatching_xla_test_gpu",
     size = "large",
-    srcs = ["nuts_xla_test.py"],
+    srcs = ["nuts_autobatching_xla_test.py"],
     args = ["--test_device=gpu"],
-    main = "nuts_xla_test.py",
+    main = "nuts_autobatching_xla_test.py",
+    python_version = "PY3",
     shard_count = 1,
+    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -196,11 +229,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "particle_filter_test",
     size = "large",
     srcs = ["particle_filter_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":particle_filter",
         # numpy dep,
@@ -221,11 +255,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "particle_filter_augmentation_test",
     size = "medium",
     srcs = ["particle_filter_augmentation_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         ":particle_filter_augmentation",
         # numpy dep,
@@ -235,7 +270,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample_sequential_monte_carlo",
     srcs = ["sample_sequential_monte_carlo.py"],
     srcs_version = "PY2AND3",
@@ -250,12 +285,12 @@ py_library(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "sample_sequential_monte_carlo_test",
     size = "medium",
     timeout = "long",
     srcs = ["sample_sequential_monte_carlo_test.py"],
+    disabled_substrates = ["numpy"],
     shard_count = 2,
     deps = [
         # numpy dep,
@@ -282,11 +317,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "sequential_monte_carlo_kernel_test",
     size = "medium",
     srcs = ["sequential_monte_carlo_kernel_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -297,7 +333,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "weighted_resampling",
     srcs = ["weighted_resampling.py"],
     srcs_version = "PY2AND3",
@@ -311,11 +347,11 @@ py_library(
     ],
 )
 
-# py2and3
-py_test(
+multi_substrate_py_test(
     name = "weighted_resampling_test",
     size = "medium",
     srcs = ["weighted_resampling_test.py"],
+    disabled_substrates = ["numpy"],
     shard_count = 2,
     deps = [
         # numpy dep,
@@ -323,5 +359,227 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "sample",
+    srcs = ["sample.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "sample_test",
+    size = "small",
+    srcs = ["sample_test.py"],
+    python_version = "PY3",
+    shard_count = 5,
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "reducer",
+    srcs = ["reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # six dep,
+    ],
+)
+
+py_library(
+    name = "covariance_reducer",
+    srcs = ["covariance_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/stats",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "covariance_reducer_test",
+    size = "small",
+    srcs = ["covariance_reducer_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":covariance_reducer",
+        ":sample",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "with_reductions",
+    srcs = ["with_reductions.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "with_reductions_test",
+    srcs = ["with_reductions_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "sample_fold",
+    srcs = ["sample_fold.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":sample",
+        ":sample_discarding_kernel",
+        ":tracing_reducer",
+        ":with_reductions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "sample_fold_test",
+    size = "small",
+    srcs = ["sample_fold_test.py"],
+    python_version = "PY3",
+    shard_count = 5,
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "sample_discarding_kernel",
+    srcs = ["sample_discarding_kernel.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":sample",
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+py_test(
+    name = "sample_discarding_kernel_test",
+    size = "small",
+    srcs = ["sample_discarding_kernel_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "tracing_reducer",
+    srcs = ["tracing_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "tracing_reducer_test",
+    size = "small",
+    srcs = ["tracing_reducer_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "expectations_reducer",
+    srcs = ["expectations_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "expectations_reducer_test",
+    srcs = ["expectations_reducer_test.py"],
+    python_version = "PY3",
+    shard_count = 5,
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "potential_scale_reduction_reducer",
+    srcs = ["potential_scale_reduction_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/stats",
+    ],
+)
+
+py_test(
+    name = "potential_scale_reduction_reducer_test",
+    size = "small",
+    srcs = ["potential_scale_reduction_reducer_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

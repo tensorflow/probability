@@ -15,9 +15,7 @@
 # Description:
 #   Support for Monte Carlo expectations
 
-# [internal] load python3.bzl
-
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -33,6 +31,7 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         ":expectation",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -47,11 +46,12 @@ py_library(
     ],
 )
 
-# py2and3
 py_test(
     name = "expectation_test",
     size = "small",
     srcs = ["expectation_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

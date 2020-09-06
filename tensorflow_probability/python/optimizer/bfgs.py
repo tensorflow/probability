@@ -33,7 +33,8 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.optimizer import bfgs_utils
 
 
@@ -201,7 +202,7 @@ def minimize(value_and_gradients_function,
   with tf.name_scope(name or 'minimize'):
     initial_position = tf.convert_to_tensor(
         initial_position, name='initial_position')
-    dtype = initial_position.dtype.base_dtype
+    dtype = dtype_util.base_dtype(initial_position.dtype)
     tolerance = tf.convert_to_tensor(
         tolerance, dtype=dtype, name='grad_tolerance')
     f_relative_tolerance = tf.convert_to_tensor(
@@ -210,7 +211,7 @@ def minimize(value_and_gradients_function,
         x_tolerance, dtype=dtype, name='x_tolerance')
     max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
 
-    input_shape = distribution_util.prefer_static_shape(initial_position)
+    input_shape = ps.shape(initial_position)
     batch_shape, domain_size = input_shape[:-1], input_shape[-1]
 
     if stopping_condition is None:
@@ -238,7 +239,7 @@ def minimize(value_and_gradients_function,
         control_inputs = _inv_hessian_control_inputs(initial_inv_hessian)
       else:
         control_inputs = None
-      hessian_shape = tf.concat([batch_shape, [domain_size, domain_size]], 0)
+      hessian_shape = ps.concat([batch_shape, [domain_size, domain_size]], 0)
       initial_inv_hessian = tf.broadcast_to(initial_inv_hessian, hessian_shape)
 
     # The `state` here is a `BfgsOptimizerResults` tuple with values for the
@@ -322,12 +323,13 @@ def _inv_hessian_control_inputs(inv_hessian):
 
   # Simply adding a control dependencies on these results is not enough to
   # trigger them, we need to add asserts on the results.
-  return [tf.Assert(is_positive_definite,
-                    ['Initial inverse Hessian is not positive definite.',
-                     inv_hessian]),
-          tf.Assert(is_symmetric,
-                    ['Initial inverse Hessian is not symmetric',
-                     inv_hessian])]
+  return [
+      tf.debugging.Assert(
+          is_positive_definite,
+          ['Initial inverse Hessian is not positive definite.', inv_hessian]),
+      tf.debugging.Assert(
+          is_symmetric,
+          ['Initial inverse Hessian is not symmetric', inv_hessian])]
 
 
 def _get_search_direction(inv_hessian_approx, gradient):
@@ -357,8 +359,8 @@ def _update_inv_hessian(prev_state, next_state):
             next_inv_hessian,
             prev_state.inverse_hessian_estimate))
 
-  return prefer_static.cond(
-      tf.reduce_any(should_update),
+  return ps.cond(
+      ps.reduce_any(should_update),
       _do_update_inv_hessian,
       lambda: next_state)
 

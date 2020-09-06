@@ -196,13 +196,14 @@ class GradientTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class SmartForLoopTest(test_util.TestCase):
 
-  def test_python_for_loop(self):
+  @parameterized.parameters(0, 1, 10)
+  def test_static_num_iters(self, iters):
     counter = None
-    # Not @parameterized because the tf.constants would be executed outside the
-    # Eager mode that @test_util.test_all_tf_execution_regimes creates, and
-    # TF is unhappy about that.
-    for n in [10, tf.constant(10, dtype=tf.int64),
-              tf.constant(10, dtype=tf.int32)]:
+    # following loop variables not @parameterized because the tf.constants
+    # would be executed outside the Eager mode that
+    # @test_util.test_all_tf_execution_regimes creates
+    for n in [iters, tf.constant(iters, dtype=tf.int64),
+              tf.constant(iters, dtype=tf.int32)]:
       counter = collections.Counter()
       def body(x):
         counter['body_calls'] += 1
@@ -210,11 +211,16 @@ class SmartForLoopTest(test_util.TestCase):
 
       result = util.smart_for_loop(
           loop_num_iter=n, body_fn=body, initial_loop_vars=[tf.constant(1)])
-      expected_calls = 1 if JAX_MODE else 10  # JAX always traces loops
-      self.assertEqual(expected_calls, counter['body_calls'])
-      self.assertAllClose([11], self.evaluate(result))
+      if JAX_MODE:  # JAX always traces loop bodies exactly once
+        self.assertEqual(1, counter['body_calls'])
+      elif tf.executing_eagerly():
+        self.assertEqual(iters, counter['body_calls'])
+      else:
+        expected_num_calls = 1 if iters > 0 else 0
+        self.assertEqual(expected_num_calls, counter['body_calls'])
+      self.assertAllClose([iters + 1], self.evaluate(result))
 
-  def test_tf_while_loop(self):
+  def test_placeholder_num_iters(self):
     iters = 10
     n = tf1.placeholder_with_default(np.int64(iters), shape=())
     counter = collections.Counter()
@@ -229,6 +235,24 @@ class SmartForLoopTest(test_util.TestCase):
     else:
       self.assertEqual(1, counter['body_calls'])
     self.assertAllClose([11], self.evaluate(result))
+
+  def test_unroll_threshold(self):
+    iters = 50
+    counter = collections.Counter()
+    def body(x):
+      counter['body_calls'] += 1
+      return [x + 1]
+
+    result = util.smart_for_loop(
+        loop_num_iter=iters,
+        body_fn=body,
+        initial_loop_vars=[tf.constant(1)],
+        unroll_threshold=iters)
+    if JAX_MODE:  # JAX always traces loop bodies exactly once
+      self.assertEqual(1, counter['body_calls'])
+    else:
+      self.assertEqual(iters, counter['body_calls'])
+    self.assertAllClose([iters + 1], self.evaluate(result))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -554,6 +578,54 @@ class SimpleTensorWarningTest(test_util.TestCase):
     self.assertFalse(
         any('Please consult the docstring' in str(warning.message)
             for warning in triggered))
+
+
+FakeKernelResults = collections.namedtuple('FakeKernelResults', 'some_field')
+
+
+FakeKernelAcceptedResults = collections.namedtuple(
+    'FakeKernelAcceptedResults',
+    'accepted_results')
+
+
+class GetFieldTest(test_util.TestCase):
+
+  @parameterized.parameters(
+      [FakeKernelResults(some_field='yak')],
+      [FakeKernelAcceptedResults(
+          accepted_results=FakeKernelResults(some_field='yak'))]
+  )
+  def testValidKernelResults(self, kernel_results):
+    self.assertEqual(util.get_field(kernel_results, 'some_field'), 'yak')
+    with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
+      util.get_field(kernel_results, 'some_other_field')
+
+  def testIncompleteKernelResults(self):
+    kernel_results = FakeKernelResults(some_field='zebra')
+    with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
+      util.get_field(kernel_results, 'some_other_field')
+
+
+class UpdateFieldTest(test_util.TestCase):
+
+  @parameterized.parameters(
+      [FakeKernelResults(some_field='yak')],
+      [FakeKernelAcceptedResults(
+          accepted_results=FakeKernelResults(some_field='yak'))]
+    )
+  def testValidKernelResults(self, kernel_results):
+    updated_kernel_results = util.update_field(
+        kernel_results, 'some_field', 'moose')
+    self.assertEqual(
+        util.get_field(
+            updated_kernel_results, 'some_field'), 'moose')
+    with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
+      util.update_field(kernel_results, 'some_other_field', 'antelope')
+
+  def testIncompletedKernelResults(self):
+    kernel_results = FakeKernelResults(some_field='ibex')
+    with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
+      util.update_field(kernel_results, 'some_other_field', 'goat')
 
 
 if __name__ == '__main__':

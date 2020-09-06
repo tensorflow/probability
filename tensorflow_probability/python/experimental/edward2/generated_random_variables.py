@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import functools
 import inspect
-import six
 
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.experimental.edward2.interceptor import interceptable
@@ -30,7 +29,8 @@ from tensorflow_probability.python.internal import docstring_util
 
 # Dictionary between RV names and their original TFP distribution.
 rv_dict = {}
-for (dist_name_, dist_class)  in six.iteritems(tfd.__dict__):
+for dist_name_ in dir(tfd):
+  dist_class = getattr(tfd, dist_name_)
   if inspect.isclass(dist_class) and issubclass(dist_class, tfd.Distribution):
     rv_dict[dist_name_] = dist_class
 

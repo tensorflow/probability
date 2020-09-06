@@ -17,14 +17,7 @@
 
 # [internal] load pytype.bzl (pytype_library)
 
-# py_test rules are rewritten to py3_test on export to OSS, for reasons of
-# reversibility of import<->export transforms. This is only necessary until we
-# eliminate all py2and3_test targets, after which everything can safely use
-# py_test, interanlly and externally, and no rewrites will be needed.
-# @unused  <-- satisfy buildifier errors
-load("//tensorflow_probability/python:build_defs.bzl", "py3_test")
-
-licenses(["notice"])  # Apache 2.0
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -98,11 +91,12 @@ py_library(
     srcs = ["backend.py"],
     srcs_version = "PY3",
     deps = [
+        ":rewrite",
         ":tf_on_jax",
         ":util_jax",
         ":util_tf",
         "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/substrates/jax",
+        "//tensorflow_probability/substrates:jax",
     ],
 )
 
@@ -151,7 +145,7 @@ py_library(
     deps = [
         ":tf_on_jax",
         ":util_jax",
-        "//tensorflow_probability/python/experimental/substrates/jax",
+        "//tensorflow_probability/substrates:jax",
     ],
 )
 
@@ -186,8 +180,7 @@ py_library(
     srcs_version = "PY3",
 )
 
-# py_test
-py3_test(
+py_test(
     name = "fun_mcmc_test",
     srcs = ["fun_mcmc_test.py"],
     python_version = "PY3",
@@ -214,8 +207,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "prefab_test",
     srcs = ["prefab_test.py"],
     python_version = "PY3",
@@ -240,8 +232,7 @@ py_library(
     ],
 )
 
-# py_test
-py3_test(
+py_test(
     name = "util_tfp_test",
     srcs = ["util_tfp_test.py"],
     python_version = "PY3",

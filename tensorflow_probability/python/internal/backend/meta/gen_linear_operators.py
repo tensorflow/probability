@@ -64,10 +64,24 @@ UTIL_IMPORTS = """
 from tensorflow_probability.python.internal.backend.numpy import private
 distribution_util = private.LazyLoader(
     "distribution_util", globals(),
-    "tensorflow_probability.python.internal._numpy.distribution_util")
+    "tensorflow_probability.substrates.numpy.internal.distribution_util")
 tensorshape_util = private.LazyLoader(
-   "tensorshape_util", globals(),
-    "tensorflow_probability.python.internal._numpy.tensorshape_util")
+    "tensorshape_util", globals(),
+    "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+"""
+
+LINOP_UTIL_SUFFIX = """
+
+JAX_MODE = False
+if JAX_MODE:
+
+  def shape_tensor(shape, name=None):  # pylint: disable=unused-argument,function-redefined
+    import numpy as onp
+    try:
+      return onp.array(tuple(int(x) for x in shape), dtype=np.int32)
+    except:  # JAX raises raw Exception on __array__  # pylint: disable=bare-except
+      pass
+    return onp.array(int(shape), dtype=np.int32)
 """
 
 DISABLED_LINTS = ('g-import-not-at-top', 'g-direct-tensorflow-import',
@@ -147,6 +161,8 @@ def gen_module(module_name):
                       'linalg_ops.triangular_solve')
   code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
+  code = code.replace('ops.convert_to_tensor_v2_with_dispatch(',
+                      'ops.convert_to_tensor(')
 
   code = code.replace('self.dtype.real_dtype', 'dtypes.real_dtype(self.dtype)')
   code = code.replace('dtype.real_dtype', 'dtypes.real_dtype(dtype)')
@@ -177,6 +193,8 @@ def gen_module(module_name):
         'ops as _ops')
   print('from tensorflow_probability.python.internal.backend.numpy.gen import '
         'tensor_shape')
+  if module_name == 'linear_operator_util':
+    print(LINOP_UTIL_SUFFIX)
   print(UTIL_IMPORTS)
 
 

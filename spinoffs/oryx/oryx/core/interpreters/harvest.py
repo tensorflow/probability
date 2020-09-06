@@ -356,7 +356,7 @@ class HarvestTrace(jax_core.Trace):
 
   def post_process_call(self, call_primitive, out_tracers, params):
     vals = tuple(t.val for t in out_tracers)
-    master = self.master
+    master = self.main
 
     def todo(x):
       trace = HarvestTrace(master, jax_core.cur_sublevel())
@@ -383,7 +383,7 @@ class HarvestTracer(jax_core.Tracer):
 
 
 @lu.transformation
-def harvest_function(master: jax_core.MasterTrace, settings: HarvestSettings,
+def harvest_function(master: jax_core.MainTrace, settings: HarvestSettings,
                      in_tree, args: Iterable[Any]):
   """A JAX linear_util transformation that runs a HarvestTrace."""
   trace = HarvestTrace(master, jax_core.cur_sublevel())
@@ -408,7 +408,7 @@ def harvest_function(master: jax_core.MasterTrace, settings: HarvestSettings,
 def harvest_eval(f: lu.WrappedFun, trace: HarvestTrace,
                  settings: HarvestSettings,
                  all_tree) -> Tuple[lu.WrappedFun, Callable[[], Any]]:
-  f = harvest_function(f, trace.master, settings, all_tree)
+  f = harvest_function(f, trace.main, settings, all_tree)
   return harvest_wrapper(f, trace)
 
 
@@ -555,7 +555,7 @@ def harvest(f,
     flat_args, in_tree = tree_util.tree_flatten(args)
     flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
     all_args, all_tree = tree_util.tree_flatten((plants, flat_args))
-    with jax_core.new_master(HarvestTrace) as master:
+    with jax_core.new_main(HarvestTrace) as master:
       flat_fun = harvest_function(flat_fun, master, settings, all_tree)
       out_flat, reaped = flat_fun.call_wrapped(all_args)
       del master
@@ -666,7 +666,7 @@ def _find_sows(typed_jaxpr: jax_core.TypedJaxpr,
 
 
 def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
-                       num_consts, num_carry, linear):
+                       num_consts, num_carry, linear, unroll):
   """Collects and injects values into/from the scan body."""
   context = trace_util.get_dynamic_context(trace)
   settings = context.settings
@@ -739,7 +739,8 @@ def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       jaxpr=body_jaxpr,
       num_consts=len(new_consts),
       num_carry=num_carry,
-      linear=new_linear)
+      linear=new_linear,
+      unroll=unroll)
   outs = safe_map(trace.pure, outs)
   carry, (ys, reaps) = tree_util.tree_unflatten(out_tree, outs)
   out_reaps = {}

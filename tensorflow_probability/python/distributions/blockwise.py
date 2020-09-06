@@ -77,6 +77,9 @@ class _Cast(distribution_lib.Distribution):
     x = tf.nest.map_structure(tf.cast, x, self._distribution.dtype)
     return tf.cast(self._distribution.log_prob(x), self._dtype)
 
+  def _entropy(self):
+    return self._distribution.entropy()
+
   def _mean(self):
     return tf.nest.map_structure(lambda x: tf.cast(x, self._dtype),
                                  self._distribution.mean())
@@ -314,6 +317,9 @@ class Blockwise(distribution_lib.Distribution):
 
   def _log_prob(self, x):
     return self._distribution.log_prob(self._split_and_reshape_event(x))
+
+  def _entropy(self):
+    return self._distribution.entropy()
 
   def _prob(self, x):
     return self._distribution.prob(self._split_and_reshape_event(x))

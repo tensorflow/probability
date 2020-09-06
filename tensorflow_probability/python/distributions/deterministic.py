@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -147,7 +148,7 @@ class _BaseDeterministic(distribution.Distribution):
     loc = tf.convert_to_tensor(self.loc)
     return tf.broadcast_to(
         loc,
-        tf.concat([[n], self._batch_shape_tensor(loc=loc),
+        ps.concat([[n], self._batch_shape_tensor(loc=loc),
                    self._event_shape_tensor(loc=loc)],
                   axis=0))
 
@@ -274,9 +275,9 @@ class Deterministic(_BaseDeterministic):
     return dict(loc=0, atol=0, rtol=0)
 
   def _batch_shape_tensor(self, loc=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc if loc is None else loc),
-        tf.broadcast_dynamic_shape(tf.shape(self.atol), tf.shape(self.rtol)))
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.broadcast_shape(ps.shape(self.atol), ps.shape(self.rtol)))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -398,10 +399,9 @@ class VectorDeterministic(_BaseDeterministic):
     return dict(loc=1, atol=1, rtol=1)
 
   def _batch_shape_tensor(self, loc=None):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self.loc if loc is None else loc),
-        tf.broadcast_dynamic_shape(tf.shape(self.atol),
-                                   tf.shape(self.rtol)))[:-1]
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.broadcast_shape(ps.shape(self.atol), ps.shape(self.rtol)))[:-1]
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
@@ -409,7 +409,7 @@ class VectorDeterministic(_BaseDeterministic):
         tf.broadcast_static_shape(self.atol.shape, self.rtol.shape))[:-1]
 
   def _event_shape_tensor(self, loc=None):
-    return tf.shape(self.loc if loc is None else loc)[-1:]
+    return ps.shape(self.loc if loc is None else loc)[-1:]
 
   def _event_shape(self):
     return self.loc.shape[-1:]

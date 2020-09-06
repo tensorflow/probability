@@ -21,6 +21,7 @@ from __future__ import print_function
 import functools
 # Dependency imports
 import numpy as np
+import numpy as onp  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -172,6 +173,7 @@ def _gather_nd(  # pylint: disable=unused-argument
     batch_dims=0,
     name=None):
   """gather_nd."""
+  params = ops.convert_to_tensor(params)
   indices = ops.convert_to_tensor(indices, dtype_hint=np.int32)
   if batch_dims < 0:
     raise NotImplementedError('Negative `batch_dims` is currently unsupported.')
@@ -237,6 +239,8 @@ def _pad(  # pylint: disable=unused-argument
     mode='CONSTANT',
     constant_values=0,
     name=None):
+  tensor = ops.convert_to_tensor(tensor)
+  constant_values = ops.convert_to_tensor(constant_values)
   return np.pad(
       tensor, paddings,
       mode=mode.lower(),
@@ -245,11 +249,14 @@ def _pad(  # pylint: disable=unused-argument
 
 def _range(start, limit=None, delta=1, dtype=None, name='range'):  # pylint: disable=unused-argument
   """Emulates tf.range."""
-   # Emulating dtype inference logic from tf.range
+  # Emulating dtype inference logic from tf.range
   dtype = utils.numpy_dtype(dtype)
-  start = ops.convert_to_tensor(start, dtype=dtype)
-  limit = None if limit is None else ops.convert_to_tensor(limit, dtype=dtype)
-  delta = ops.convert_to_tensor(delta, dtype=dtype)
+  infer_dtype = lambda t: ops.convert_to_tensor(t, dtype=dtype).dtype
+  # We must keep start, limit, and delta static np.array since they determine
+  # the size of the result array, which JAX requires to be static.
+  start = onp.array(start, dtype=infer_dtype(start))
+  limit = None if limit is None else onp.array(limit, dtype=infer_dtype(limit))
+  delta = onp.array(delta, dtype=infer_dtype(delta))
   if dtype is None:
     dtype_hierarchy = [np.int32, np.int64, np.float32, np.float64]
     inferred_dtype = max([arg.dtype for arg in [start, limit, delta]
@@ -311,7 +318,8 @@ def _shape(input, out_type=np.int32, name=None):  # pylint: disable=redefined-bu
 
 
 def _size(input, out_type=np.int32, name=None):  # pylint: disable=redefined-builtin, unused-argument
-  return np.asarray(np.prod(ops.convert_to_tensor(input).shape), dtype=out_type)
+  return np.asarray(
+      onp.prod(ops.convert_to_tensor(input).shape), dtype=out_type)
 
 
 builtin_slice = slice  # pylint: disable=invalid-name
@@ -325,7 +333,7 @@ def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,r
 
 def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint: disable=unused-argument
   """Map tf.split -> np.split."""
-  indices_or_sections = np.array(num_or_size_splits)
+  indices_or_sections = onp.array(num_or_size_splits)
   if indices_or_sections.ndim == 1:
     if any(idx == -1 for idx in indices_or_sections):
       # Numpy parameterizes by split indices and returns nsplits+1 arrays.
@@ -334,13 +342,21 @@ def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint
       indices_or_sections = [
           idx if idx != -1 else remainder for idx in indices_or_sections
       ]
-    indices_or_sections = np.cumsum(np.array(indices_or_sections))[:-1]
+    indices_or_sections = onp.cumsum(onp.array(indices_or_sections))[:-1]
   return np.split(value, indices_or_sections, axis)
 
 
 def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disable=unused-argument
   x = np.transpose(a, perm)
   return np.conjugate(x) if conjugate else x
+
+
+def _unstack(value, num=None, axis=0, name='unstack'):
+  del name
+  value = np.array(value)
+  return list(
+      np.squeeze(x, axis=axis)
+      for x in np.split(value, value.shape[axis] if num is None else num, axis))
 
 
 def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
@@ -352,7 +368,7 @@ def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-buil
 
 concat = utils.copy_docstring(
     'tf.concat',
-    lambda values, axis, name='concat': _concat(values, axis))
+    _concat)
 
 
 expand_dims = utils.copy_docstring(
@@ -446,7 +462,8 @@ squeeze = utils.copy_docstring(
     lambda input, axis=None, name=None: np.squeeze(input, _astuple(axis)))
 
 stack = utils.copy_docstring(
-    'tf.stack', lambda values, axis=0, name='stack': np.stack(values, axis))
+    'tf.stack', lambda values, axis=0, name='stack': np.moveaxis(  # pylint: disable=g-long-lambda
+        ops.convert_to_tensor(values), 0, axis))
 
 tile = utils.copy_docstring(
     'tf.tile',
@@ -458,12 +475,10 @@ transpose = utils.copy_docstring(
 
 unstack = utils.copy_docstring(
     'tf.unstack',
-    lambda value, num=None, axis=0, name='unstack': tuple(  # pylint: disable=g-long-lambda
-        np.squeeze(x, axis=axis) for x in
-        np.split(value, value.shape[axis] if num is None else num, axis)))
+    _unstack)
 
 where = utils.copy_docstring(
-    'tf1.where',
+    'tf.where',
     lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
 
 zeros = utils.copy_docstring(

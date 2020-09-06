@@ -173,6 +173,10 @@ class RationalQuadraticSplineTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=5)
   def testTheoreticalFldj(self, data):
+    if not tf.executing_eagerly():
+      msg = ('Testing eager mode only because graph is very slow, '
+             'presumably due to costly graph construction.')
+      self.skipTest(msg)
     if JAX_MODE:  # TODO(b/160167257): Eliminate this workaround.
       # get_fldj_theoretical uses tfp.math.batch_jacobian and assumes the
       # behavior of the bijector does not vary by position. In this case, it

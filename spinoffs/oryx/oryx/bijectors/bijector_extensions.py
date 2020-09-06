@@ -19,9 +19,10 @@ from jax import util as jax_util
 import jax.numpy as np
 
 from six.moves import zip
-from tensorflow_probability.python.experimental.substrates import jax as tfp
-from oryx import core
+from oryx.core import primitive
 from oryx.core.interpreters import inverse
+from oryx.core.interpreters.inverse import slice as slc
+from tensorflow_probability.substrates import jax as tfp
 
 __all__ = [
     'make_type',
@@ -33,7 +34,8 @@ tfb = tfp.bijectors
 
 _registry = {}
 
-InverseAndILDJ = inverse.InverseAndILDJ
+InverseAndILDJ = inverse.core.InverseAndILDJ
+NDSlice = slc.NDSlice
 
 
 class _JaxBijectorTypeSpec(object):
@@ -81,7 +83,7 @@ class _JaxBijectorTypeSpec(object):
     return cls(clsid, param_specs, kwargs)
 
 
-bijector_p = core.HigherOrderPrimitive('bijector')
+bijector_p = primitive.InitialStylePrimitive('bijector')
 
 
 class _CellProxy:
@@ -91,21 +93,18 @@ class _CellProxy:
     self.cell = cell
 
 
-def bijector_ildj_rule(incells, outcells, **params):
+def bijector_ildj_rule(incells, outcells, *, in_tree, num_consts, direction,
+                       **_):
   """Inverse/ILDJ rule for bijectors."""
-  incells = incells[1:]
-  num_consts = len(incells) - params['num_args']
   const_incells, flat_incells = jax_util.split_list(incells, [num_consts])
   flat_inproxies = safe_map(_CellProxy, flat_incells)
-  in_tree = params['in_tree']
   bijector_proxies, inproxy = tree_util.tree_unflatten(in_tree,
                                                        flat_inproxies)
   flat_bijector_cells = [proxy.cell for proxy
                          in tree_util.tree_leaves(bijector_proxies)]
-  if any(cell.is_unknown() for cell in flat_bijector_cells):
-    return const_incells + flat_incells, outcells, False, None
+  if any(not cell.top() for cell in flat_bijector_cells):
+    return (const_incells + flat_incells, outcells, None)
   bijector = tree_util.tree_multimap(lambda x: x.cell.val, bijector_proxies)
-  direction = params['direction']
   if direction == 'forward':
     forward_func = bijector.forward
     inv_func = bijector.inverse
@@ -120,18 +119,19 @@ def bijector_ildj_rule(incells, outcells, **params):
 
   outcell, = outcells
   incell = inproxy.cell
-  done = False
-  if incell.is_unknown() and not outcell.is_unknown():
+  if incell.bottom() and not outcell.bottom():
     val, ildj = outcell.val, outcell.ildj
-    incells = [InverseAndILDJ(inv_func(val),
-                              ildj + ildj_func(val, np.ndim(val)))]
-    done = True
+    inildj = ildj + ildj_func(val, np.ndim(val))
+    ndslice = NDSlice.new(inv_func(val), inildj)
+    flat_incells = [
+        InverseAndILDJ(incell.aval, [ndslice])
+    ]
+    new_outcells = outcells
   elif outcell.is_unknown() and not incell.is_unknown():
-    outcells = [InverseAndILDJ.new(forward_func(incell.val))]
-    done = True
-  new_flat_incells = flat_bijector_cells + incells
-  return const_incells + new_flat_incells, outcells, done, None
-inverse.custom_rules[bijector_p] = bijector_ildj_rule
+    new_outcells = [InverseAndILDJ.new(forward_func(incell.val))]
+  new_incells = flat_bijector_cells + flat_incells
+  return (const_incells + new_incells, new_outcells, None)
+inverse.core.ildj_registry[bijector_p] = bijector_ildj_rule
 
 
 def make_wrapper_type(cls):
@@ -140,8 +140,10 @@ def make_wrapper_type(cls):
   clsid = (cls.__module__, cls.__name__)
 
   def bijector_bind(bijector, x, **kwargs):
-    return core.call_bind(bijector_p, direction=kwargs['direction'])(_bijector)(
-        bijector, x, **kwargs)
+    return primitive.initial_style_bind(
+        bijector_p, direction=kwargs['direction'],
+        bijector_name=bijector.__class__.__name__)(_bijector)(
+            bijector, x, **kwargs)
 
   def _bijector(bij, x, **kwargs):
     direction = kwargs.pop('direction', 'forward')

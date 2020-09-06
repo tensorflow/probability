@@ -23,7 +23,6 @@ import inspect
 
 from absl import logging
 import hypothesis.strategies as hps
-import six
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -63,7 +62,8 @@ def instantiable_bijectors():
     return INSTANTIABLE_BIJECTORS
 
   result = {}
-  for (bijector_name, bijector_class) in six.iteritems(tfb.__dict__):
+  for bijector_name in dir(tfb):
+    bijector_class = getattr(tfb, bijector_name)
     if (not inspect.isclass(bijector_class) or
         not issubclass(bijector_class, tfb.Bijector) or
         bijector_name in SPECIAL_BIJECTORS):
@@ -201,6 +201,9 @@ def bijector_supports():
       'RationalQuadraticSpline':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'RayleighCDF':
+          BijectorSupport(Support.SCALAR_NON_NEGATIVE,
+                          Support.SCALAR_IN_0_1),
       'Reciprocal':
           BijectorSupport(Support.SCALAR_NON_ZERO, Support.SCALAR_NON_ZERO),
       'Reshape':
@@ -319,6 +322,14 @@ def unconstrained_bijectors(draw, max_forward_event_ndims=None,
   return instantiable_bijectors()[bijector_name][0](validate_args=True)
 
 
+def distribution_eligilibility_filter_for(bijector):
+  """Returns a function which filters distribution names, where possible."""
+  if isinstance(bijector, tfb.CorrelationCholesky):
+    return 'LKJ'.__eq__
+
+  return lambda name: True
+
+
 def distribution_filter_for(bijector):
   """Returns a function checking Distribution compatibility with this bijector.
 
@@ -344,6 +355,9 @@ def distribution_filter_for(bijector):
   elif isinstance(bijector, tfb.CorrelationCholesky):
 
     def additional_check(dist):
+      # The isinstance check will be redundant when the
+      # `distribution_eligilibility_filter_for` above has been used, but we keep
+      # it here for safety.
       return isinstance(dist, tfd.LKJ) and dist.input_output_cholesky
   else:
     additional_check = lambda dist: True

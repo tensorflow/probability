@@ -28,10 +28,12 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 
 # Tolerance to check for floating point zeros.
 _EPSILON = 1e-10
@@ -350,7 +352,7 @@ def nelder_mead_one_step(current_simplex,
                          name=None):
   """A single iteration of the Nelder Mead algorithm."""
   with tf.name_scope(name or 'nelder_mead_one_step'):
-    domain_dtype = current_simplex.dtype.base_dtype
+    domain_dtype = dtype_util.base_dtype(current_simplex.dtype)
     order = tf.argsort(
         current_objective_values, direction='ASCENDING', stable=True)
     (
@@ -388,7 +390,7 @@ def nelder_mead_one_step(current_simplex,
                                        func_tolerance,
                                        position_tolerance)
     def _converged_fn():
-      return (True, current_simplex, current_objective_values, 0)
+      return (True, current_simplex, current_objective_values, np.int32(0))
     case0 = has_converged, _converged_fn
     accept_reflected = (
         (objective_at_reflected < second_worst_objective_value) &
@@ -440,10 +442,11 @@ def nelder_mead_one_step(current_simplex,
         converged,
         next_simplex,
         next_objective_at_simplex,
-        case_evals) = prefer_static.case([case0, case1, case2, case3],
-                                         default=default_fn, exclusive=False)
-    next_simplex.set_shape(current_simplex.shape)
-    next_objective_at_simplex.set_shape(current_objective_values.shape)
+        case_evals) = ps.case([case0, case1, case2, case3],
+                              default=default_fn, exclusive=False)
+    tensorshape_util.set_shape(next_simplex, current_simplex.shape)
+    tensorshape_util.set_shape(next_objective_at_simplex,
+                               current_objective_values.shape)
     return (
         converged,
         next_simplex,
@@ -462,7 +465,7 @@ def _accept_reflected_fn(simplex,
     next_simplex = _replace_at_index(simplex, worst_index, reflected)
     next_objective_values = _replace_at_index(objective_values, worst_index,
                                               objective_at_reflected)
-    return False, next_simplex, next_objective_values, 0
+    return False, next_simplex, next_objective_values, np.int32(0)
   return _replace_worst_with_reflected
 
 
@@ -483,13 +486,13 @@ def _expansion_fn(objective_function,
                           objective_at_reflected)
     accept_expanded_fn = lambda: (expanded, expanded_objective_value)
     accept_reflected_fn = lambda: (reflected, objective_at_reflected)
-    next_pt, next_objective_value = prefer_static.cond(
+    next_pt, next_objective_value = ps.cond(
         expanded_is_better, accept_expanded_fn, accept_reflected_fn)
     next_simplex = _replace_at_index(simplex, worst_index, next_pt)
     next_objective_at_simplex = _replace_at_index(objective_values,
                                                   worst_index,
                                                   next_objective_value)
-    return False, next_simplex, next_objective_at_simplex, 1
+    return False, next_simplex, next_objective_at_simplex, np.int32(1)
   return _expand_and_maybe_replace
 
 
@@ -519,7 +522,7 @@ def _outside_contraction_fn(objective_function,
       return (False,
               next_simplex,
               objective_at_next_simplex,
-              1)
+              np.int32(1))
 
     def _reject_contraction():
       return _shrink_towards_best(objective_function,
@@ -528,9 +531,9 @@ def _outside_contraction_fn(objective_function,
                                   shrinkage,
                                   batch_evaluate_objective)
 
-    return prefer_static.cond(is_contracted_acceptable,
-                              _accept_contraction,
-                              _reject_contraction)
+    return ps.cond(is_contracted_acceptable,
+                   _accept_contraction,
+                   _reject_contraction)
   return _contraction
 
 
@@ -561,16 +564,16 @@ def _inside_contraction_fn(objective_function,
           False,
           next_simplex,
           objective_at_next_simplex,
-          1
+          np.int32(1)
       )
 
     def _reject_contraction():
       return _shrink_towards_best(objective_function, simplex, best_index,
                                   shrinkage, batch_evaluate_objective)
 
-    return prefer_static.cond(is_contracted_acceptable,
-                              _accept_contraction,
-                              _reject_contraction)
+    return ps.cond(is_contracted_acceptable,
+                   _accept_contraction,
+                   _reject_contraction)
   return _contraction
 
 
@@ -597,9 +600,7 @@ def _shrink_towards_best(objective_function,
 
 def _replace_at_index(x, index, replacement):
   """Replaces an element at supplied index."""
-  x_new = tf.concat([x[:index], tf.expand_dims(replacement, axis=0),
-                     x[(index + 1):]], axis=0)
-  return x_new
+  return tf.tensor_scatter_nd_update(x, [[index]], [replacement])
 
 
 def _check_convergence(simplex,
@@ -769,7 +770,7 @@ def _prepare_args_with_initial_simplex(objective_function,
   # as n - 1 where n is the number of vertices specified.
   num_vertices = tf.shape(initial_simplex)[0]
   dim = num_vertices - 1
-  num_evaluations = 0
+  num_evaluations = np.int32(0)
 
   if objective_at_initial_simplex is None:
     objective_at_initial_simplex, n_evals = _evaluate_objective_multiple(
@@ -790,32 +791,32 @@ def _prepare_args_with_initial_vertex(objective_function,
                                       objective_at_initial_vertex,
                                       batch_evaluate_objective):
   """Constructs a standard axes aligned simplex."""
-  dim = tf.size(initial_vertex)
+  dim = ps.size(initial_vertex)
+  # tf.eye complains about np.array(.., np.int32) num_rows, only welcomes numpy
+  # scalars. TODO(b/162529062): Remove the following line.
+  dim = dim if tf.is_tensor(dim) else int(dim)
   num_vertices = dim + 1
   unit_vectors_along_axes = tf.reshape(
-      tf.eye(dim, dim, dtype=initial_vertex.dtype.base_dtype),
-      tf.concat([[dim], tf.shape(initial_vertex)], axis=0))
+      tf.eye(dim, dim, dtype=dtype_util.base_dtype(initial_vertex.dtype)),
+      ps.concat([[dim], ps.shape(initial_vertex)], axis=0))
 
   # If step_sizes does not broadcast to initial_vertex, the multiplication
   # in the second term will fail.
   simplex_face = initial_vertex + step_sizes * unit_vectors_along_axes
   simplex = tf.concat([tf.expand_dims(initial_vertex, axis=0),
                        simplex_face], axis=0)
-  num_evaluations = 0
   # Evaluate the objective function at the simplex vertices.
   if objective_at_initial_vertex is None:
-    objective_at_initial_vertex = objective_function(initial_vertex)
-    num_evaluations += 1
-
-  objective_at_simplex_face, num_evals = _evaluate_objective_multiple(
-      objective_function, simplex_face, batch_evaluate_objective)
-  num_evaluations += num_evals
-
-  objective_at_simplex = tf.concat(
-      [
-          tf.expand_dims(objective_at_initial_vertex, axis=0),
-          objective_at_simplex_face
-      ], axis=0)
+    objective_at_simplex, num_evaluations = _evaluate_objective_multiple(
+        objective_function, simplex, batch_evaluate_objective)
+  else:
+    objective_at_simplex_face, num_evaluations = _evaluate_objective_multiple(
+        objective_function, simplex_face, batch_evaluate_objective)
+    objective_at_simplex = tf.concat(
+        [
+            tf.expand_dims(objective_at_initial_vertex, axis=0),
+            objective_at_simplex_face
+        ], axis=0)
 
   return (dim,
           num_vertices,
