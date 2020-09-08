@@ -23,13 +23,14 @@ import numpy as onp
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters.inverse import core
 from oryx.core.interpreters.inverse import rules
+from oryx.internal import test_util
 from tensorflow_probability.substrates import jax as tfp
 tfb = tfp.bijectors
 
 del rules  # needed for registration only
 
 
-class InverseTest(absltest.TestCase):
+class InverseTest(test_util.TestCase):
 
   def test_trivial_inverse(self):
     def f(x):

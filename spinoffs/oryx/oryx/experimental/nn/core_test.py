@@ -25,9 +25,10 @@ import numpy as np
 
 from oryx.core import state
 from oryx.experimental.nn import core
+from oryx.internal import test_util
 
 
-class DenseTest(absltest.TestCase):
+class DenseTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()
@@ -90,7 +91,7 @@ class DenseTest(absltest.TestCase):
     jtu.check_grads(net, (x,), 2, atol=0.03, rtol=0.03)
 
 
-class ActivationsTest(parameterized.TestCase):
+class ActivationsTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

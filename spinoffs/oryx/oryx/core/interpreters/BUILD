@@ -99,6 +99,7 @@ py_test(
         # numpy dep,
         "//oryx/core:trace_util",
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -114,6 +115,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core:trace_util",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -128,6 +130,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core:trace_util",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -145,5 +148,6 @@ py_test(
         "//oryx/core",
         "//oryx/core/state",
         "//oryx/distributions",
+        "//oryx/internal:test_util",
     ],
 )

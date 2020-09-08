@@ -61,7 +61,9 @@ def stage(f, dynamic=True):
     flat_args, in_tree = tree_util.tree_flatten(args)
     flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
     flat_avals = safe_map(get_shaped_aval, flat_args)
-    if dynamic and jax.config.omnistaging_enabled:
+    if not jax.config.omnistaging_enabled:
+      raise ValueError('Oryx must be used with JAX omnistaging enabled.')
+    if dynamic:
       jaxpr, out_avals, consts = pe.trace_to_jaxpr_dynamic(
           flat_fun,
           flat_avals)
@@ -70,7 +72,7 @@ def stage(f, dynamic=True):
       jaxpr, out_pvals, consts = pe.trace_to_jaxpr(
           flat_fun,
           pvals,
-          instantiate=True, stage_out=True)
+          instantiate=True)
       out_avals = [pval.get_aval() for pval in out_pvals]
     typed_jaxpr = jax_core.TypedJaxpr(jaxpr, consts, flat_avals, out_avals)
     return typed_jaxpr, (in_tree, out_tree())

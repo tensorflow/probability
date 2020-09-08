@@ -691,7 +691,8 @@ def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
   }
 
   def jaxpr_fun(carry, x):
-    body_out = jax_core.eval_jaxpr(jaxpr.jaxpr, [], *(consts + carry + x))
+    body_out = jax_core.eval_jaxpr(jaxpr.jaxpr, jaxpr.literals,
+                                   *(consts + carry + x))
     carry, y = jax_util.split_list(body_out, [num_carry])
     return carry, y
 

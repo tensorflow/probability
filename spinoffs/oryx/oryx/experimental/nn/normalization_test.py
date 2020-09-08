@@ -23,9 +23,10 @@ import numpy as np
 
 from oryx.core import state
 from oryx.experimental.nn import normalization
+from oryx.internal import test_util
 
 
-class NormalizationTest(parameterized.TestCase):
+class NormalizationTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()
@@ -184,7 +185,7 @@ def reconstruct_loss(net, x, **kwargs):
   return mse(x, preds), net
 
 
-class GradTest(absltest.TestCase):
+class GradTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

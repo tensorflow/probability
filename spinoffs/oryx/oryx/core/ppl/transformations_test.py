@@ -22,6 +22,7 @@ import jax.numpy as np
 
 from oryx.core.interpreters import log_prob as lp
 from oryx.core.ppl import transformations
+from oryx.internal import test_util
 
 seed = random.PRNGKey
 conditional = transformations.conditional
@@ -58,7 +59,7 @@ random_normal_p.def_abstract_eval(random_normal_abstract)
 lp.log_prob_registry[random_normal_p] = random_normal_log_prob
 
 
-class SampleTest(absltest.TestCase):
+class SampleTest(test_util.TestCase):
 
   def test_random_variable_should_tag_output_of_function(self):
 
@@ -162,7 +163,7 @@ class SampleTest(absltest.TestCase):
             random.PRNGKey(0), 1.).keys()), {'z'})
 
 
-class LogProbTest(absltest.TestCase):
+class LogProbTest(test_util.TestCase):
 
   def test_log_prob_should_propagate_on_trivial_model(self):
 
@@ -241,7 +242,7 @@ class LogProbTest(absltest.TestCase):
         log_prob(conditioned_model)(1., 1.), random_normal_log_prob(None, 0.))
 
 
-class GraphReplaceTest(absltest.TestCase):
+class GraphReplaceTest(test_util.TestCase):
 
   def test_graph_replace_correctly_computes_outputs(self):
 

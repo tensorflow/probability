@@ -73,10 +73,7 @@ py_library(
     name = "trace_util",
     srcs = ["trace_util.py"],
     srcs_version = "PY3",
-    deps = [
-        # dataclasses dep,
-        # jax dep,
-    ],
+    deps = [# jax dep],
 )
 
 # pytype_strict
@@ -101,6 +98,7 @@ py_test(
         # numpy dep,
         "//oryx/core/state",
         "//oryx/experimental/nn",
+        "//oryx/internal:test_util",
     ],
 )
 

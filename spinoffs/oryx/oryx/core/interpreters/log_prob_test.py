@@ -26,9 +26,9 @@ from oryx import bijectors as bb
 from oryx import core
 from oryx import distributions as bd
 from oryx.core import state
-
 from oryx.core.interpreters.log_prob import log_prob
 from oryx.core.interpreters.log_prob import log_prob_registry
+from oryx.internal import test_util
 
 random_normal_p = jax_core.Primitive('random_normal')
 
@@ -66,7 +66,7 @@ def call(f):
 jax_core.call_p.call_primitive = True
 
 
-class LogProbTest(absltest.TestCase):
+class LogProbTest(test_util.TestCase):
 
   def test_normal_log_prob(self):
     def f(rng):

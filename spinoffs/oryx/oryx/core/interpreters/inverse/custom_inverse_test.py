@@ -21,13 +21,14 @@ import jax.numpy as jnp
 from oryx.core.interpreters.inverse import core
 from oryx.core.interpreters.inverse import custom_inverse
 from oryx.core.interpreters.inverse import rules
+from oryx.internal import test_util
 
 
 # `rules` is only needed to populate the inverse registry.
 del rules
 
 
-class CustomInverseTest(absltest.TestCase):
+class CustomInverseTest(test_util.TestCase):
 
   def test_unary_inverse(self):
 

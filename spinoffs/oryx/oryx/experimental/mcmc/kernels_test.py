@@ -25,6 +25,7 @@ from inference_gym import using_jax as inference_gym
 from oryx.core.interpreters import harvest
 from oryx.experimental.mcmc import kernels
 from oryx.experimental.mcmc import utils
+from oryx.internal import test_util
 from tensorflow_probability.substrates import jax as tfp
 
 
@@ -42,7 +43,7 @@ MAKE_KERNELS = [
 ]
 
 
-class KernelsTest(parameterized.TestCase):
+class KernelsTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

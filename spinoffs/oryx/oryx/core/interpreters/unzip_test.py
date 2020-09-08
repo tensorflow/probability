@@ -24,10 +24,12 @@ from jax import core as jax_core
 from jax import linear_util as lu
 import jax.numpy as np
 import numpy as onp
+
 from oryx.core import state
 from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import unzip
+from oryx.internal import test_util
 
 variable = state.variable
 unzip_variable = functools.partial(unzip.unzip, tag=state.VARIABLE)
@@ -88,7 +90,7 @@ def pytree(x, y):
   return params['a'] + params['b'] + y
 
 
-class UnzipTest(absltest.TestCase):
+class UnzipTest(test_util.TestCase):
 
   def test_empty(self):
     init, apply = unzip_variable(empty)()

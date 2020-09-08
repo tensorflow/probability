@@ -23,9 +23,10 @@ import numpy as onp
 
 from oryx.core import state
 from oryx.experimental.optimizers import optix
+from oryx.internal import test_util
 
 
-class OptixTest(absltest.TestCase):
+class OptixTest(test_util.TestCase):
 
   def test_clip_should_clip_updates(self):
     self.assertEqual(optix.clip(1.)(0., .5), .5)
@@ -151,7 +152,7 @@ UPDATES = [
 ]
 
 
-class OptimizerTest(parameterized.TestCase):
+class OptimizerTest(test_util.TestCase):
 
   @parameterized.named_parameters(UPDATES)
   def test_optimizer(self, update):

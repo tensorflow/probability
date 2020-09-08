@@ -21,9 +21,11 @@ import jax
 from jax import random
 import jax.numpy as np
 import numpy as onp
+
 from oryx import core
 from oryx import distributions as bd
 from oryx.core import ppl
+from oryx.internal import test_util
 
 
 # Use lambdas to defer construction of distributions
@@ -65,7 +67,7 @@ DISTRIBUTIONS = [
 ]
 
 
-class DistributionsExtensionsTest(parameterized.TestCase):
+class DistributionsExtensionsTest(test_util.TestCase):
 
   @parameterized.named_parameters(DISTRIBUTIONS)
   def test_sample(self, dist, args, kwargs, out, flat):
