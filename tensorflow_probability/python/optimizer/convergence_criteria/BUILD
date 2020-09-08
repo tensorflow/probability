@@ -34,7 +34,7 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "convergence_criteria",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":convergence_criterion",
         ":loss_not_decreasing",
@@ -48,7 +48,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "convergence_criterion",
     srcs = ["convergence_criterion.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # six dep,
         # tensorflow dep,
@@ -58,7 +58,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "loss_not_decreasing",
     srcs = ["loss_not_decreasing.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":convergence_criterion",
         # numpy dep,
@@ -69,7 +69,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "successive_gradients_are_uncorrelated",
     srcs = ["successive_gradients_are_uncorrelated.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":convergence_criterion",
         # numpy dep,

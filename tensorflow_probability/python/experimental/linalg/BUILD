@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "linalg",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":linear_operator_psd_kernel",
         "//tensorflow_probability/python/internal:all_util",
@@ -38,7 +38,7 @@ py_library(
 py_library(
     name = "linear_operator_psd_kernel",
     srcs = ["linear_operator_psd_kernel.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

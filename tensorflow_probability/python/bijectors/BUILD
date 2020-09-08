@@ -655,7 +655,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "rational_quadratic_spline",
     srcs = ["rational_quadratic_spline.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":bijector",
         # tensorflow dep,

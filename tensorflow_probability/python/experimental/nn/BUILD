@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "nn",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":affine_layers",
         ":convolutional_layers",
@@ -44,7 +44,7 @@ py_library(
 py_library(
     name = "affine_layers",
     srcs = ["affine_layers.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":layers",
         ":variational_base",
@@ -74,7 +74,7 @@ py_test(
 py_library(
     name = "convolutional_layers",
     srcs = ["convolutional_layers.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":layers",
         ":variational_base",
@@ -104,7 +104,7 @@ py_test(
 py_library(
     name = "convolutional_transpose_layers",
     srcs = ["convolutional_transpose_layers.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":convolutional_layers",
         ":layers",
@@ -132,7 +132,7 @@ py_test(
 py_library(
     name = "layers",
     srcs = ["layers.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/nn/util",
@@ -156,7 +156,7 @@ py_test(
 py_library(
     name = "variational_base",
     srcs = ["variational_base.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":layers",
         # tensorflow dep,

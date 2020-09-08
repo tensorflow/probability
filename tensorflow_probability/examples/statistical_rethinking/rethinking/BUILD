@@ -28,14 +28,14 @@ exports_files(["LICENSE"])
 py_library(
     name = "rethinking",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [":quap"],
 )
 
 py_library(
     name = "quap",
     srcs = ["quap.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

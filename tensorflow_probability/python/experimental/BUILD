@@ -33,7 +33,7 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "experimental",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     substrates_omit_deps = [
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
@@ -71,7 +71,7 @@ multi_substrate_py_library(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",

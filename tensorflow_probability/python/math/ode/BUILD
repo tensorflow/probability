@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "base",
     srcs = ["base.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # six dep,
         # tensorflow dep,
@@ -39,7 +39,7 @@ py_library(
 py_library(
     name = "bdf",
     srcs = ["bdf.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":base",
         ":bdf_util",
@@ -53,7 +53,7 @@ py_library(
 py_library(
     name = "dormand_prince",
     srcs = ["dormand_prince.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":base",
         ":runge_kutta_util",
@@ -66,7 +66,7 @@ py_library(
 py_library(
     name = "bdf_util",
     srcs = ["bdf_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -92,7 +92,7 @@ py_test(
 py_library(
     name = "runge_kutta_util",
     srcs = ["runge_kutta_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -118,7 +118,7 @@ py_test(
 py_library(
     name = "ode",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":base",
         ":bdf",

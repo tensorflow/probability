@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "edward2",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         "//tensorflow_probability/python/experimental/edward2",
         "//tensorflow_probability/python/internal:all_util",

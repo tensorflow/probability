@@ -452,7 +452,7 @@ LINOP_FILES = [
         filename,
         ",".join(LINOP_FILES),
     ),
-    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 # Rules helpful for generating new rewritten files.
@@ -466,14 +466,14 @@ LINOP_FILES = [
         filename,
         ",".join(LINOP_FILES),
     ),
-    tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
+    exec_tools = ["//tensorflow_probability/python/internal/backend/meta:gen_linear_operators"],
 ) for filename in LINOP_FILES]
 
 py_library(
     name = "generated_files",
     testonly = 1,
     srcs = ["gen_new/{}.py".format(filename) for filename in LINOP_FILES],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
 )
 
 py_library(

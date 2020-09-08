@@ -26,7 +26,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":missing_values_util",
         ":util",
@@ -38,7 +38,7 @@ py_library(
     srcs = [
         "missing_values_util.py",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -65,7 +65,7 @@ py_library(
     srcs = [
         "util.py",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

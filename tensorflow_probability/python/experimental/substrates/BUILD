@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "substrates",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:lazy_loader",

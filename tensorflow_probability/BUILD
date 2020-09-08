@@ -24,7 +24,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "tensorflow_probability",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
 #         "//tensorflow_probability/google/staging",  # DisableOnExport

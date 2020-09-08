@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "vi",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":csiszar_divergence",
         ":mutual_information",
@@ -40,7 +40,7 @@ py_library(
 py_library(
     name = "csiszar_divergence",
     srcs = ["csiszar_divergence.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -71,7 +71,7 @@ py_test(
 py_library(
     name = "mutual_information",
     srcs = ["mutual_information.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -100,7 +100,7 @@ py_test(
 py_library(
     name = "optimization",
     srcs = ["optimization.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

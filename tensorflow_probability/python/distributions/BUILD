@@ -2245,7 +2245,7 @@ multi_substrate_py_test(
 
 py_test(
     name = "gamma_test_gpu",
-    size = "medium",
+    size = "large",
     srcs = ["gamma_test.py"],
     main = "gamma_test.py",
     python_version = "PY3",
@@ -3371,7 +3371,7 @@ py_test(
 py_library(
     name = "jax_transformation_testlib",
     testonly = 1,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":hypothesis_testlib.jax",
         # absl/testing:parameterized dep,

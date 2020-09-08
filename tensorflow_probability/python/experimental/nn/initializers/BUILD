@@ -25,7 +25,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "initializers",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":initializers_lib",
         "//tensorflow_probability/python/internal:all_util",
@@ -35,7 +35,7 @@ py_library(
 py_library(
     name = "initializers_lib",
     srcs = ["initializers.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",

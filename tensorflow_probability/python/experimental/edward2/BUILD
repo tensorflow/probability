@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "edward2",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":generated_random_variables",
         ":interceptor",
@@ -41,7 +41,7 @@ py_library(
 py_library(
     name = "generated_random_variables",
     srcs = ["generated_random_variables.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":interceptor",
         ":random_variable",
@@ -68,7 +68,7 @@ py_test(
 py_library(
     name = "interceptor",
     srcs = ["interceptor.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
 )
 
 py_test(
@@ -88,7 +88,7 @@ py_test(
 py_library(
     name = "program_transformations",
     srcs = ["program_transformations.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":interceptor",
         # tensorflow dep,
@@ -111,7 +111,7 @@ py_test(
 py_library(
     name = "random_variable",
     srcs = ["random_variable.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],

@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "turnkey_inference_candidate",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":window_tune_nuts_sampling",
     ],
@@ -37,7 +37,7 @@ py_library(
 py_library(
     name = "window_tune_nuts_sampling",
     srcs = ["window_tune_nuts_sampling.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

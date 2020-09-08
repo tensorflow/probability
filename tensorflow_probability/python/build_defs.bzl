@@ -165,7 +165,7 @@ def multi_substrate_py_library(
         jax_omit_deps = [],
         numpy_omit_deps = [],
         testonly = 0,
-        srcs_version = "PY2AND3"):
+        srcs_version = "PY3"):
     """A TFP `py_library` for each of TF, NumPy, and JAX.
 
     Args:
@@ -271,7 +271,7 @@ def multi_substrate_py_test(
         numpy_tags = [],
         jax_tags = [],
         disabled_substrates = [],
-        srcs_version = "PY2AND3",
+        srcs_version = "PY3",
         timeout = None,
         shard_count = None):
     """A TFP `py_test` for each of TF, NumPy, and JAX.
