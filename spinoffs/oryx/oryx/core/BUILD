@@ -82,6 +82,7 @@ py_library(
     srcs = ["kwargs_util.py"],
     srcs_version = "PY3",
     deps = [
+        # jax dep,
     ],
 )
 
@@ -111,5 +112,7 @@ py_test(
     deps = [
         ":kwargs_util",
         # absl/testing:absltest dep,
+        # jax dep,
+        "//oryx/core/interpreters/inverse:custom_inverse",
     ],
 )

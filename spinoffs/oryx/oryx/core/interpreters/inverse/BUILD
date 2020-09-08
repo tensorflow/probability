@@ -83,6 +83,7 @@ py_library(
         ":core",
         ":slice",
         # jax dep,
+        "//oryx/core:kwargs_util",
         "//oryx/core:primitive",
     ],
 )
