@@ -37,8 +37,9 @@ safe_map = jax_core.safe_map
 safe_zip = jax_core.safe_zip
 
 
-def _flat_layer_cau(*flat_args, in_tree, kwargs, **params):
+def _flat_layer_cau(*flat_args, num_consts, in_tree, kwargs, **params):
   del params
+  flat_args = flat_args[num_consts:]
   layer, *args = tree_util.tree_unflatten(in_tree, flat_args)
   kwargs = dict(kwargs)
   has_rng = kwargs.pop('has_rng', False)
@@ -52,8 +53,9 @@ flat_layer_cau_p = primitive.FlatPrimitive('flat_layer_cau')
 flat_layer_cau_p.def_impl(_flat_layer_cau)
 
 
-def flat_layer_cau_kwargs_rule(*flat_args, in_tree, kwargs, **_):
+def flat_layer_cau_kwargs_rule(*flat_args, num_consts, in_tree, kwargs, **_):
   """Custom kwargs rule for flat_layer_cau primitive."""
+  flat_args = flat_args[num_consts:]
   layer, *args = tree_util.tree_unflatten(in_tree, flat_args)
   kwargs = dict(kwargs)
   has_rng = kwargs.pop('has_rng', False)
@@ -67,8 +69,7 @@ def flat_layer_cau_kwargs_rule(*flat_args, in_tree, kwargs, **_):
 state.kwargs_rules[flat_layer_cau_p] = flat_layer_cau_kwargs_rule
 
 
-def _custom_layer_cau_unzip(trace, f, *tracers, **params):
-  f.call_wrapped(*tracers)
+def _custom_layer_cau_unzip(trace, *tracers, **params):
   return trace.default_process_primitive(flat_layer_cau_p, tracers, params)
 
 

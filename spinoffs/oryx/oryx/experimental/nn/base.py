@@ -122,16 +122,14 @@ import itertools as it
 
 import jax
 from jax import lax
+from jax import linear_util as lu
 from jax import tree_util
-from jax import util as jax_util
 from jax.experimental import stax
 from jax.interpreters import batching
 
 from oryx.core import kwargs_util
 from oryx.core import primitive
 from oryx.core import state
-from oryx.core.interpreters import unzip
-from oryx.core.interpreters.inverse import core as inverse_core
 
 __all__ = [
     'LayerParams',
@@ -254,7 +252,7 @@ class Layer(state.Module, metaclass=abc.ABCMeta):
       args = (rng,) + args
       has_rng = True
     kwargs = dict(kwargs, has_rng=has_rng)
-    return primitive.call_bind(layer_cau_p, kwargs=kwargs)(
+    return primitive.initial_style_bind(layer_cau_p, kwargs=kwargs)(
         Layer._call_and_update)(self, *args, **kwargs)
 
   def _call_and_update(self, *args, has_rng=False, **kwargs):
@@ -345,7 +343,7 @@ class Template(object):
         init_args=self.init_args,
         init_kwargs=self.init_kwargs,
     )
-    layer = primitive.call_bind(template_init_p)(
+    layer = primitive.initial_style_bind(template_init_p)(
         _template_build)(init_key, name=name, **kwargs)
     if name is not None:
       layer = state.variable(layer, name=name)
@@ -397,7 +395,7 @@ def _layer_to_args(layer, *args, **kwargs):
   return flattened_layer, args, kwargs
 
 
-layer_cau_p = primitive.HigherOrderPrimitive('layer_cau')
+layer_cau_p = primitive.InitialStylePrimitive('layer_cau')
 
 
 class NoneProxy:
@@ -405,18 +403,21 @@ class NoneProxy:
 not_mapped = NoneProxy()
 
 
-def custom_layer_cau_batch(trace, f, tracers, params):
+def custom_layer_cau_batch(vals, dims, *, num_consts, in_tree, out_tree, kwargs,
+                           **params):
   """Batching rule for layer_cau primitive to handle custom layers."""
-  vals, dims = jax_util.unzip2((t.val, t.batch_dim) for t in tracers)
   if all(dim is batching.not_mapped for dim in dims):
-    return layer_cau_p.bind(f, *vals, **params)
-  args = tree_util.tree_unflatten(params['in_tree'], vals)
+    return layer_cau_p.bind(*vals, num_consts=num_consts, in_tree=in_tree,
+                            out_tree=out_tree, kwargs=kwargs, **params)
+  orig_vals, orig_dims = vals, dims
+  vals, dims = vals[num_consts:], dims[num_consts:]
+  args = tree_util.tree_unflatten(in_tree, vals)
   dims_ = [not_mapped if dim is None else dim for dim in dims]
   layer, args = args[0], args[1:]
   if hasattr(layer, '_call_and_update_batched'):
     num_params = len(tree_util.tree_leaves(layer))
     layer_dims, arg_dims = dims_[:num_params], dims_[num_params:]
-    if params['kwargs']['has_rng']:
+    if kwargs['has_rng']:
       rng, args = args[0], args[1:]
       rng_dim, arg_dims = arg_dims[0], arg_dims[1:]
     mapping_over_layer = all(layer_dim is not not_mapped for
@@ -425,38 +426,36 @@ def custom_layer_cau_batch(trace, f, tracers, params):
                             arg_dim in arg_dims)
     assert mapping_over_layer or mapping_over_args, (layer_dims, arg_dims)
     if not mapping_over_layer and mapping_over_args:
-      if params['kwargs']['has_rng']:
+      if kwargs['has_rng']:
         if rng_dim is not not_mapped:
           arg_dims = tuple(None if dim is not_mapped else dim
                            for dim in arg_dims)
           map_fun = jax.vmap(
               lambda layer, rng, *args: _layer_cau_batched(layer, rng, *args,  # pylint: disable=unnecessary-lambda, g-long-lambda
-                                                           **params['kwargs']),
+                                                           **kwargs),
               in_axes=(None, rng_dim) + (None,) * len(arg_dims))
         else:
           map_fun = lambda layer, *args: _layer_cau_batched(layer, *args,  # pylint: disable=unnecessary-lambda, g-long-lambda
-                                                            **params['kwargs'])
+                                                            **kwargs)
         vals_out, update_out = map_fun(layer, rng, *args)
       else:
         vals_out, update_out = _layer_cau_batched(layer, *args,
-                                                  **params['kwargs'])
+                                                  **kwargs)
       vals_out = tree_util.tree_leaves(vals_out)
       update_out = tree_util.tree_leaves(update_out)
       assert all(dim == 0 for dim in arg_dims)
       # Assume dimensions out are consistent
       dims_out = (0,) * len(vals_out)
       dims_update = (None,) * len(update_out)
-      dims_out = dims_out + dims_update
-
-      # Call wrapped function to avoid linear_util error
-      f.call_wrapped(*tracers)
-      return [batching.BatchTracer(trace, v, d)
-              for v, d in zip(vals_out + update_out, dims_out + dims_update)]
-  f, dims_out = batching.batch_subtrace(f, trace.main, dims)
-  vals_out = layer_cau_p.subcall('batch').bind(f, *vals, **params)
-  return [batching.BatchTracer(trace, v, d)
-          for v, d in zip(vals_out, dims_out())]
-primitive.custom_batch_rules[layer_cau_p] = custom_layer_cau_batch
+      assert len(vals_out) == len(dims_out)
+      assert len(update_out) == len(dims_update)
+      return vals_out + update_out, dims_out + dims_update
+  batched, out_dims = batching.batch_fun2(lu.wrap_init(
+      layer_cau_p.impl, dict(params, num_consts=num_consts, in_tree=in_tree,
+                             out_tree=out_tree,
+                             kwargs=kwargs)), orig_dims)
+  return batched.call_wrapped(*orig_vals), out_dims()
+batching.primitive_batchers[layer_cau_p] = custom_layer_cau_batch
 
 
 def _layer_cau_batched(layer, *args, **kwargs):
@@ -468,18 +467,6 @@ def _layer_cau_batched(layer, *args, **kwargs):
     kwargs['rng'] = rng
   kwargs = kwargs_util.filter_kwargs(layer._call_and_update_batched, kwargs)  # pylint: disable=protected-access
   return layer._call_and_update_batched(*args, **kwargs)  # pylint: disable=protected-access
-
-
-def _layer_cau_ildj_rule(incells, outcells, **params):
-  """InverseAndILDJ rule for layer_cau primitive."""
-  del params
-  f, incells = incells[0], incells[1:]
-  # TODO(sharadmv): update rule to use primitive when possible
-  subenv = f.call_wrapped(incells, outcells)
-  new_incells = [subenv.read(var) for var in subenv.jaxpr.invars]
-  new_outcells = [subenv.read(var) for var in subenv.jaxpr.outvars]
-  return new_incells, new_outcells, subenv
-inverse_core.ildj_registry[layer_cau_p] = _layer_cau_ildj_rule
 
 
 # Registrations
@@ -504,8 +491,7 @@ def template_call_and_update(template, *args, **kwargs):
   return template._call(*args, **kwargs), template  # pylint: disable=protected-access
 
 
-template_init_p = primitive.HigherOrderPrimitive('template_init')
-unzip.block_registry.add(template_init_p)
+template_init_p = primitive.InitialStylePrimitive('template_init')
 
 
 def _template_build(init_key, *, cls, specs, init_args, init_kwargs, name=None):

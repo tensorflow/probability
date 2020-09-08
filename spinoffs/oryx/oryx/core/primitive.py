@@ -218,6 +218,9 @@ class InitialStylePrimitive(FlatPrimitive):
     for register_func in initial_transformation_rules.values():
       register_func(self)
 
+  def subcall(self, name):
+    return InitialStylePrimitive(f'{self.name}/{name}')
+
 
 tie_all_p = jax_core.Primitive('tie_all')
 tie_all_p.multiple_results = True
