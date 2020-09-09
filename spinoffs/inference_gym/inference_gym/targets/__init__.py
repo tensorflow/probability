@@ -19,6 +19,8 @@ with util.silence_nonrewritten_import_errors():
   # pylint: disable=g-import-not-at-top
   from inference_gym.targets.banana import Banana
   from inference_gym.targets.bayesian_model import BayesianModel
+  from inference_gym.targets.brownian_motion import BrownianMotion
+  from inference_gym.targets.brownian_motion import BrownianMotionMissingMiddleObservations
   from inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
   from inference_gym.targets.item_response_theory import ItemResponseTheory
   from inference_gym.targets.item_response_theory import SyntheticItemResponseTheory
@@ -45,6 +47,8 @@ with util.silence_nonrewritten_import_errors():
 __all__ = [
     'Banana',
     'BayesianModel',
+    'BrownianMotion',
+    'BrownianMotionMissingMiddleObservations',
     'GermanCreditNumericLogisticRegression',
     'GermanCreditNumericProbitRegression',
     'GermanCreditNumericSparseLogisticRegression',
