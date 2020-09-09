@@ -38,6 +38,7 @@ py_library(
         ":banana",
         ":bayesian_model",
         ":brownian_motion",
+        ":eight_schools",
         ":ill_conditioned_gaussian",
         ":item_response_theory",
         ":log_gaussian_cox_process",
@@ -127,6 +128,30 @@ py_test(
         ":brownian_motion",
         # numpy dep,
         # tensorflow dep,
+        "//inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "eight_schools",
+    srcs = ["eight_schools.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":model",
+        # numpy dep,
+    ],
+)
+
+# py_strict
+py_test(
+    name = "eight_schools_test",
+    srcs = ["eight_schools_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":eight_schools",
+        # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )

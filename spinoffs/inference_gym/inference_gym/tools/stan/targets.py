@@ -17,6 +17,7 @@
 
 from inference_gym.internal import data
 from inference_gym.tools.stan import brownian_motion
+from inference_gym.tools.stan import eight_schools as eight_schools_lib
 from inference_gym.tools.stan import item_response_theory
 from inference_gym.tools.stan import log_gaussian_cox_process
 from inference_gym.tools.stan import logistic_regression
@@ -27,6 +28,7 @@ from inference_gym.tools.stan import stochastic_volatility
 
 __all__ = [
     'brownian_motion_missing_middle_observations',
+    'eight_schools',
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
     'german_credit_numeric_sparse_logistic_regression',
@@ -46,6 +48,11 @@ def brownian_motion_missing_middle_observations():
   """
   dataset = data.brownian_motion_missing_middle_observations()
   return brownian_motion.brownian_motion(**dataset)
+
+
+def eight_schools():
+  """Eight schools hierarchical regression model."""
+  return eight_schools_lib.eight_schools()
 
 
 def german_credit_numeric_logistic_regression():

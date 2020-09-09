@@ -38,6 +38,17 @@ py_library(
 )
 
 py_library(
+    name = "eight_schools",
+    srcs = ["eight_schools.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+        # numpy dep,
+    ],
+)
+
+py_library(
     name = "item_response_theory",
     srcs = ["item_response_theory.py"],
     srcs_version = "PY3",
@@ -119,6 +130,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":brownian_motion",
+        ":eight_schools",
         ":item_response_theory",
         ":log_gaussian_cox_process",
         ":logistic_regression",
