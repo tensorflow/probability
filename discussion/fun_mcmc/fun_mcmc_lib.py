@@ -2098,7 +2098,7 @@ def potential_scale_reduction_extract(
     # across parts.
     num_points = tf.cast(num_points, dtype)
     num_chains = tf.cast(
-        tf.math.reduce_prod(tf.shape(mean)[:independent_chain_ndims]), dtype)
+        np.prod(tf.shape(mean)[:independent_chain_ndims]), dtype)
 
     independent_dims = list(range(independent_chain_ndims))
     # Within chain variance.
