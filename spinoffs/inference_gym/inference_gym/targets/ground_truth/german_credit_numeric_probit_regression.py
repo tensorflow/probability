@@ -18,8 +18,9 @@ r"""Ground truth values for `german_credit_numeric_probit_regression`.
 Automatically generated using the command:
 
 ```
-bazel run //tools/inference_gym_ground_truth:get_ground_truth --   --target \
-  german_credit_numeric_probit_regression \
+python -m inference_gym.tools.get_ground_truth \
+  --target \
+  german_credit_numeric_probit_regression
 ```
 """
 

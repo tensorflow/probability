@@ -118,6 +118,11 @@ def make_sample_fn(model, **sample_kwargs):
       keep_outputs = True
     final_kwargs = sample_kwargs.copy()
     final_kwargs.update(kwargs)
+    if 'data' in final_kwargs:
+      # Canonicalize the data to be all NumPy arrays,
+      final_kwargs['data'] = {
+          k: np.array(v) for k, v in final_kwargs['data'].items()
+      }
     try:
       yield model.sample(output_dir=output_dir, **final_kwargs)
     except RuntimeError as e:

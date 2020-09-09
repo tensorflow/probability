@@ -18,7 +18,8 @@ r"""Ground truth values for `german_credit_numeric_sparse_logistic_regression`.
 Automatically generated using the command:
 
 ```
-bazel run //tools/inference_gym_ground_truth:get_ground_truth --   --target \
+python -m inference_gym.tools.get_ground_truth \
+  --target \
   german_credit_numeric_sparse_logistic_regression \
 ```
 """

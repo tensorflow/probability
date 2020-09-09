@@ -15,18 +15,18 @@
 # ============================================================================
 r"""Run a Stan model to get the ground truth.
 
-This will run your target distribution using PyStan and generate a Python source
-file with global variables containing the ground truth values.
+This will run your target distribution using CmdStanPy and generate a Python
+source file with global variables containing the ground truth values.
 
-Usage (run from TensorFlow Probability source directory):
+Usage (run from Inference Gym source directory):
 ```
 venv=$(mktemp -d)
 virtualenv -p python3.6 $venv
 source $venv/bin/activate
-pip install cmdstanpy==0.8 pandas numpy tf-nightly tfds-nightly
+pip install cmdstanpy==0.8 pandas numpy tf-nightly tfp-nightly tfds-nightly
 install_cmdstan
 
-bazel run //tools/inference_gym_ground_truth:get_ground_truth -- \
+python -m inference_gym.tools.get_ground_truth \
   --target=<function name from targets.py>
 ```
 
@@ -148,10 +148,10 @@ def main(argv):
                 sestd=None,
             ))
 
-  argv_str = '\n'.join(['  {} \\'.format(arg) for arg in sys.argv[1:]])
+  argv_str = ' \\\n'.join(['  {}'.format(arg) for arg in sys.argv[1:]])
   command_str = (
-      """bazel run //spinoffs/inference_gym/tools:get_ground_truth -- \
-{argv_str}""".format(argv_str=argv_str))
+      'python -m inference_gym.tools.get_ground_truth \\\n{argv_str}'.format(
+          argv_str=argv_str))
 
   file_str = ground_truth_encoding.get_ground_truth_module_source(
       target_name=FLAGS.target, command_str=command_str, array_strs=array_strs)

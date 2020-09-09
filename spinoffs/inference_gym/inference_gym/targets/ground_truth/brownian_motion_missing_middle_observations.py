@@ -18,9 +18,9 @@ r"""Ground truth values for `brownian_motion_missing_middle_observations`.
 Automatically generated using the command:
 
 ```
-bazel run //tools/inference_gym_ground_truth:get_ground_truth --
+python -m inference_gym.tools.get_ground_truth \
 --target=brownian_motion_missing_middle_observations \
-  --stan_samples=20000 \
+  --stan_samples=20000
 ```
 """
 
