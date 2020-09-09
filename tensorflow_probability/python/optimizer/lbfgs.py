@@ -247,6 +247,7 @@ def minimize(value_and_gradients_function,
 
     def _body(current_state):
       """Main optimization loop."""
+      current_state = bfgs_utils.terminate_if_not_finite(current_state)
       search_direction = _get_search_direction(current_state)
 
       # TODO(b/120134934): Check if the derivative at the start point is not

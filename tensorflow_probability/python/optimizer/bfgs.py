@@ -251,6 +251,7 @@ def minimize(value_and_gradients_function,
 
     def _body(state):
       """Main optimization loop."""
+      state = bfgs_utils.terminate_if_not_finite(state)
       search_direction = _get_search_direction(state.inverse_hessian_estimate,
                                                state.objective_gradient)
       derivative_at_start_pt = tf.reduce_sum(

@@ -114,6 +114,7 @@ multi_substrate_py_test(
     srcs = ["bfgs_test.py"],
     numpy_tags = ["notap"],
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -140,6 +141,7 @@ multi_substrate_py_test(
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

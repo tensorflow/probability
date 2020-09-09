@@ -19,6 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+
+from absl.testing import parameterized
 import numpy as np
 from scipy.stats import special_ortho_group
 
@@ -480,6 +482,71 @@ class LBfgsTest(test_util.TestCase):
       self.assertTrue(results.converged)
       self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
       self.assertArrayNear(results.position, minimum, 1e-5)
+
+  @parameterized.named_parameters(
+      [{'testcase_name': '_from_start', 'start': np.array([0.8, 0.8])},
+       {'testcase_name': '_during_opt', 'start': np.array([0.0, 0.0])},
+       {'testcase_name': '_mixed', 'start': np.array([[0.8, 0.8], [0.0, 0.0]])},
+      ])
+  def test_stop_at_negative_infinity(self, start):
+    """Stops gently when encountering a -inf objective."""
+    minimum = np.array([1.0, 1.0])
+    scales = np.array([2.0, 3.0])
+
+    @_make_val_and_grad_fn
+    def quadratic_with_hole(x):
+      quadratic = tf.reduce_sum(
+          scales * tf.math.squared_difference(x, minimum), axis=-1)
+      square_hole = tf.reduce_all(tf.logical_and((x > 0.7), (x < 1.3)), axis=-1)
+      minus_infty = tf.constant(float('-inf'), dtype=quadratic.dtype)
+      answer = tf.where(square_hole, minus_infty, quadratic)
+      return answer
+
+    start = tf.constant(start)
+    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
+        quadratic_with_hole, initial_position=start, tolerance=1e-8))
+    self.assertAllTrue(results.converged)
+    self.assertAllFalse(results.failed)
+    self.assertAllNegativeInf(results.objective_value)
+    self.assertAllFinite(results.position)
+    self.assertAllNegativeInf(quadratic_with_hole(results.position)[0])
+
+  @parameterized.named_parameters(
+      [{'testcase_name': '_from_start', 'start': np.array([0.8, 0.8])},
+       {'testcase_name': '_during_opt', 'start': np.array([0.0, 0.0])},
+       {'testcase_name': '_mixed', 'start': np.array([[0.8, 0.8], [0.0, 0.0]])},
+      ])
+  def test_fail_at_non_finite(self, start):
+    """Fails promptly when encountering a non-finite but not -inf objective."""
+    # Meaning, +inf (tested here) and nan (not tested separately due to nearly
+    # identical code paths) objective values cause a "stop with failure".
+    # Actually, there is a further nitpick: +inf is currently treated a little
+    # inconsistently.  To wit, if the outer loop hits a +inf, it gives up and
+    # reports failure, because it assumes the gradient from a +inf value is
+    # garbage and no further progress is possible.  However, if the line search
+    # encounters an intermediate +inf, it in some cases knows to just treat it
+    # as a large finite value and avoid it.  So in principle, minimizing this
+    # test function starting outside the +inf region could stop at the actual
+    # minimum at the edge of said +inf region.  However, currently it happens to
+    # fail.
+    minimum = np.array([1.0, 1.0])
+    scales = np.array([2.0, 3.0])
+
+    @_make_val_and_grad_fn
+    def quadratic_with_spike(x):
+      quadratic = tf.reduce_sum(
+          scales * tf.math.squared_difference(x, minimum), axis=-1)
+      square_hole = tf.reduce_all(tf.logical_and((x > 0.7), (x < 1.3)), axis=-1)
+      infty = tf.constant(float('+inf'), dtype=quadratic.dtype)
+      answer = tf.where(square_hole, infty, quadratic)
+      return answer
+
+    start = tf.constant(start)
+    results = self.evaluate(tfp.optimizer.lbfgs_minimize(
+        quadratic_with_spike, initial_position=start, tolerance=1e-8))
+    self.assertAllFalse(results.converged)
+    self.assertAllTrue(results.failed)
+    self.assertAllFinite(results.position)
 
 
 if __name__ == '__main__':

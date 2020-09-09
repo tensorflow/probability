@@ -201,6 +201,18 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         check_types=check_types,
         msg='AllCloseNested failed')
 
+  def assertAllTrue(self, a):
+    """Assert that all entries in a boolean `Tensor` are True."""
+    a_ = self._GetNdArray(a)
+    all_true = np.ones_like(a_, dtype=np.bool)
+    self.assertAllEqual(all_true, a_)
+
+  def assertAllFalse(self, a):
+    """Assert that all entries in a boolean `Tensor` are False."""
+    a_ = self._GetNdArray(a)
+    all_false = np.zeros_like(a_, dtype=np.bool)
+    self.assertAllEqual(all_false, a_)
+
   def assertAllFinite(self, a):
     """Assert that all entries in a `Tensor` are finite.
 
