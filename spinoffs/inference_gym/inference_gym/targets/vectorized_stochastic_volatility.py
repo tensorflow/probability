@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
 from inference_gym.targets import model
@@ -204,9 +205,9 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
 
           scale_rest = (
               white_noise_shock_scale[..., tf.newaxis] * tf.ones(
-                  tf.concat([
-                      tf.shape(white_noise_shock_scale),
-                      tf.shape(std_log_volatility)[-1:] - 1
+                  ps.concat([
+                      ps.shape(white_noise_shock_scale),
+                      ps.shape(std_log_volatility)[-1:] - 1
                   ], 0)))
 
           scale = tf.concat([scale0[..., tf.newaxis], scale_rest], -1)

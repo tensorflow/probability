@@ -18,6 +18,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import prefer_static as ps
 
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
@@ -34,7 +35,7 @@ __all__ = [
 
 
 def _add_bias(features):
-  return tf.concat([features, tf.ones([tf.shape(features)[0], 1])], axis=-1)
+  return tf.concat([features, tf.ones([ps.shape(features)[0], 1])], axis=-1)
 
 
 class SparseLogisticRegression(bayesian_model.BayesianModel):
