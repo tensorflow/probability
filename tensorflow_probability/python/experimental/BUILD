@@ -37,7 +37,6 @@ multi_substrate_py_library(
     substrates_omit_deps = [
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/edward2",
         "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
@@ -52,7 +51,6 @@ multi_substrate_py_library(
     deps = [
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/edward2",
         "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",

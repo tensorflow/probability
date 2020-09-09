@@ -67,7 +67,6 @@ _allowed_symbols = [
     'bijectors',
     'debugging',
     'distributions',
-    'edward2',
     'experimental',
     'glm',
     'layers',

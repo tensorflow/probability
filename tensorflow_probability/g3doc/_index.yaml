@@ -31,7 +31,7 @@ landing_page:
         <ul style="padding-left: 20px; margin: 20px 0;">
           <li>A wide selection of probability distributions and bijectors.</li>
           <li>Tools to build deep probabilistic models, including probabilistic
-          layers and the Edward2 language.</li>
+          layers and a `JointDistribution` abstraction.</li>
           <li>Variational inference and Markov chain Monte Carlo.</li>
           <li>Optimizers such as Nelder-Mead, BFGS, and SGLD.</li>
         </ul>

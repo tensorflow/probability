@@ -72,46 +72,6 @@ py_test(
 )
 
 py_binary(
-    name = "grammar_vae",
-    srcs = ["grammar_vae.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":grammar_vae_lib",
-    ],
-)
-
-py_library(
-    name = "grammar_vae_lib",
-    srcs = ["grammar_vae.py"],
-    srcs_version = "PY3",
-    deps = [
-        # absl/flags dep,
-        # numpy dep,
-        # scipy dep,
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "grammar_vae_test",
-    size = "small",
-    srcs = ["grammar_vae.py"],
-    args = [
-        "--max_steps=5",
-        "--latent_size=2",
-        "--num_units=3",
-    ],
-    main = "grammar_vae.py",
-    python_version = "PY3",
-    deps = [
-        ":grammar_vae_lib",
-    ],
-)
-
-py_binary(
     name = "disentangled_vae",
     srcs = ["disentangled_vae.py"],
     python_version = "PY3",
@@ -181,49 +141,6 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-    ],
-)
-
-py_binary(
-    name = "deep_exponential_family",
-    srcs = ["deep_exponential_family.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":deep_exponential_family_lib",
-    ],
-)
-
-py_library(
-    name = "deep_exponential_family_lib",
-    srcs = ["deep_exponential_family.py"],
-    srcs_version = "PY3",
-    deps = [
-        # absl/flags dep,
-        # numpy dep,
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_test(
-    name = "deep_exponential_family_test",
-    size = "small",
-    srcs = ["deep_exponential_family.py"],
-    args = [
-        "--fake_data",
-        "--max_steps=5",
-        "--layer_sizes=5,3,2",
-    ],
-    main = "deep_exponential_family.py",
-    python_version = "PY3",
-    tags = [
-        "tf2-broken",
-        "tf2-kokoro-broken",
-    ],
-    deps = [
-        ":deep_exponential_family_lib",
     ],
 )
 

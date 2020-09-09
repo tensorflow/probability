@@ -76,7 +76,7 @@ TF_REPLACEMENTS = {
 
 DISABLED_BY_PKG = {
     'experimental':
-        ('auto_batching', 'composite_tensor', 'edward2', 'linalg',
+        ('auto_batching', 'composite_tensor', 'linalg',
          'marginalize', 'nn', 'sequential', 'substrates', 'vi'),
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
