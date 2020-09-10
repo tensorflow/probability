@@ -61,7 +61,9 @@ FILENAMES = [
     "v1",
     "v2",
     "_utils",
-] + [
+]
+
+GEN_FILENAMES = [
     "gen/__init__",
     "gen/tensor_shape",
     "gen/adjoint_registrations",
@@ -96,22 +98,33 @@ FILENAMES = [
         name = "rewrite_{}".format(f),
         srcs = ["//tensorflow_probability/python/internal/backend/numpy:{}.py".format(f)],
         outs = ["{}.py".format(f)],
-        cmd = "$(location //tensorflow_probability/python/internal/backend/jax:rewrite) $(SRCS) > $@",
+        cmd = "$(location //tensorflow_probability/python/internal/backend/jax:rewrite) $(SRCS) --rewrite_numpy_import=1 > $@",
         tools = ["//tensorflow_probability/python/internal/backend/jax:rewrite"],
     )
     for f in FILENAMES
 ]
 
+[
+    genrule(
+        name = "rewrite_{}".format(f),
+        srcs = ["//tensorflow_probability/python/internal/backend/numpy:{}.py".format(f)],
+        outs = ["{}.py".format(f)],
+        cmd = "$(location //tensorflow_probability/python/internal/backend/jax:rewrite) $(SRCS) --rewrite_numpy_import=0 > $@",
+        tools = ["//tensorflow_probability/python/internal/backend/jax:rewrite"],
+    )
+    for f in GEN_FILENAMES
+]
+
 py_library(
     name = "jax",
-    srcs = [":{}.py".format(f) for f in FILENAMES if "_test" not in f],
+    srcs = [":{}.py".format(f) for f in FILENAMES + GEN_FILENAMES if "_test" not in f],
     deps = [],  # The JAX dependency is a weak dependency, opt-in by user.
 )
 
 py_library(
     name = "jax_testlib",
     testonly = 1,
-    srcs = [":{}.py".format(f) for f in FILENAMES if "_test" in f],
+    srcs = [":{}.py".format(f) for f in FILENAMES + GEN_FILENAMES if "_test" in f],
     deps = [
         ":jax",
     ],
@@ -161,5 +174,6 @@ py_binary(
     python_version = "PY3",
     deps = [
         # absl:app dep,
+        # absl/flags dep,
     ],
 )
