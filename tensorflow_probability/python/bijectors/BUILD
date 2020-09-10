@@ -281,6 +281,7 @@ multi_substrate_py_library(
     srcs = ["blockwise.py"],
     deps = [
         ":bijector",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",

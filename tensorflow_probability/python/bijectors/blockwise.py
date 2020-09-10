@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector as bijector_base
@@ -132,8 +133,8 @@ class Blockwise(bijector_base.Bijector):
       self._maybe_changes_size = maybe_changes_size
 
       if block_sizes is None:
-        block_sizes = tf.ones(len(bijectors), dtype=tf.int32)
-      self._block_sizes = tf.convert_to_tensor(
+        block_sizes = np.ones(len(bijectors), dtype=np.int32)
+      self._block_sizes = ps.convert_to_shape_tensor(
           block_sizes, name='block_sizes', dtype_hint=tf.int32)
 
       self._block_sizes = _validate_block_sizes(self._block_sizes, bijectors,
