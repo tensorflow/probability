@@ -293,7 +293,7 @@ class Independent(distribution_lib.Distribution):
     axis = 1 + prefer_static.range(self._get_reinterpreted_batch_ndims())
     return op(stat, axis=-axis)
 
-  _composite_tensor_nonshape_params = ()
+  _composite_tensor_nonshape_params = ('distribution',)
 
   _composite_tensor_shape_params = ('reinterpreted_batch_ndims',)
 

@@ -569,6 +569,8 @@ class QuantizedDistribution(distributions.Distribution):
         x, message='Sample has non-integer components.'))
     return assertions
 
+  _composite_tensor_nonshape_params = ('distribution', 'low', 'high')
+
 
 def _logsum_expbig_minus_expsmall(big, small):
   """Stable evaluation of `Log[exp{big} - exp{small}]`.

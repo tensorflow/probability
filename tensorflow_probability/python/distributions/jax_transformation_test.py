@@ -81,6 +81,10 @@ VJP_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_PARAM_BLOCKLIST = ()
 
+PYTREE_BLOCKLIST = (
+    'Bates',
+    'TransformedDistribution',
+)
 
 DEFAULT_MAX_EXAMPLES = 3
 
@@ -343,6 +347,48 @@ class VJPTest(_GradTest):
 
 del _GradTest  # not intended for standalone execution
 
+
+class PytreeTest(test_util.TestCase):
+
+  @test_all_distributions
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
+  def testFlattenUnflatten(self, dist_name, data):
+
+    if (dist_name in PYTREE_BLOCKLIST) != FLAGS.blocklists_only:
+      self.skipTest('Distribution currently broken.')
+
+    dist = data.draw(dhps.distributions(
+        enable_vars=False,
+        dist_name=dist_name,
+        validate_args=False,
+        eligibility_filter=lambda dname: dname not in PYTREE_BLOCKLIST))
+    flat_dist, dist_tree = jax.tree_util.tree_flatten(dist)
+    new_dist = jax.tree_util.tree_unflatten(dist_tree, flat_dist)
+    for old_param, new_param in zip(
+        flat_dist, jax.tree_util.tree_leaves(new_dist)):
+      self.assertEqual(type(old_param), type(new_param))
+      if isinstance(old_param, np.ndarray):
+        self.assertTupleEqual(old_param.shape, new_param.shape)
+
+  @test_all_distributions
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings(default_max_examples=DEFAULT_MAX_EXAMPLES)
+  def testInputOutputOfJittedFunction(self, dist_name, data):
+
+    if (dist_name in PYTREE_BLOCKLIST) != FLAGS.blocklists_only:
+      self.skipTest('Distribution currently broken.')
+
+    @jax.jit
+    def dist_and_sample(dist):
+      return dist, dist.sample(seed=test_util.test_seed())
+
+    dist = data.draw(dhps.distributions(
+        enable_vars=False,
+        dist_name=dist_name,
+        validate_args=False,
+        eligibility_filter=lambda dname: dname not in PYTREE_BLOCKLIST))
+    dist_and_sample(dist)
 
 if __name__ == '__main__':
   config.enable_omnistaging()
