@@ -21,6 +21,7 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.bayesian_model import BayesianModel
   from inference_gym.targets.brownian_motion import BrownianMotion
   from inference_gym.targets.brownian_motion import BrownianMotionMissingMiddleObservations
+  from inference_gym.targets.eight_schools import EightSchools
   from inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
   from inference_gym.targets.item_response_theory import ItemResponseTheory
   from inference_gym.targets.item_response_theory import SyntheticItemResponseTheory
@@ -49,6 +50,7 @@ __all__ = [
     'BayesianModel',
     'BrownianMotion',
     'BrownianMotionMissingMiddleObservations',
+    'EightSchools',
     'GermanCreditNumericLogisticRegression',
     'GermanCreditNumericProbitRegression',
     'GermanCreditNumericSparseLogisticRegression',
