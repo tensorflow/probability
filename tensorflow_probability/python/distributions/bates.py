@@ -292,10 +292,6 @@ class Bates(distribution.Distribution):
 
     return assertions
 
-  _composite_tensor_nonshape_params = ('low', 'high')
-
-  _composite_tensor_shape_params = ('total_count',)
-
 
 # TODO(b/157665707): Investigate alternative PDF formulas / computations.
 def _bates_pdf(total_count, low, high, dtype, value):

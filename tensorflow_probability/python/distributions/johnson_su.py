@@ -30,7 +30,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -203,7 +202,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
 
       bijector = shift(scale(sinh(norm_scale(norm_shift))))
 
-      batch_rank = ps.reduce_max([
+      batch_rank = tf.reduce_max([
           distribution_util.prefer_static_rank(x)
           for x in (self._skewness, self._tailweight, self._loc, self._scale)])
 
@@ -212,7 +211,7 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
           # `batch_shape` and `batch_shape_tensor` when
           # TransformedDistribution's bijector can modify its `batch_shape`.
           distribution=normal.Normal(
-              loc=tf.zeros(ps.ones(batch_rank, tf.int32), dtype=dtype),
+              loc=tf.zeros(tf.ones(batch_rank, tf.int32), dtype=dtype),
               scale=tf.ones([], dtype=dtype),
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats),

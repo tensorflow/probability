@@ -314,28 +314,6 @@ class _DistributionMeta(abc.ABCMeta):
     return super(_DistributionMeta, mcs).__new__(
         mcs, classname, baseclasses, attrs)
 
-  def __init__(cls, name, bases, dct):
-    super(_DistributionMeta, cls).__init__(name, bases, dct)
-    if not JAX_MODE:
-      return
-    def flatten(dist):
-      param_names = set(dist._composite_tensor_nonshape_params)  # pylint: disable=protected-access
-      components = {param_name: value for param_name, value
-                    in dist.parameters.items() if param_name in param_names}
-      metadata = {param_name: value for param_name, value
-                  in dist.parameters.items() if param_name not in param_names}
-      if components:
-        keys, values = zip(*sorted(components.items()))
-      else:
-        keys, values = (), ()
-      return values, (keys, metadata)
-    def unflatten(info, xs):
-      keys, metadata = info
-      parameters = dict(list(zip(keys, xs)), **metadata)
-      return cls(**parameters)
-    from jax import tree_util  # pylint: disable=g-import-not-at-top
-    tree_util.register_pytree_node(cls, flatten, unflatten)
-
 
 @six.add_metaclass(_DistributionMeta)
 class Distribution(_BaseDistribution):
