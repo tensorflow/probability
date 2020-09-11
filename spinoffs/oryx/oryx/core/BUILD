@@ -73,7 +73,9 @@ py_library(
     name = "trace_util",
     srcs = ["trace_util.py"],
     srcs_version = "PY3",
-    deps = [# jax dep],
+    deps = [
+        # jax dep,
+    ],
 )
 
 # pytype_strict

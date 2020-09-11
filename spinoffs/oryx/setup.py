@@ -20,12 +20,10 @@ from setuptools import setup
 
 REQUIRED_PACKAGES = [
     'dataclasses;python_version<"3.7"',
-    'jax==0.1.71',
-    'jaxlib',
+    'jax==0.1.76',
+    'jaxlib==0.1.55',
     # Pin a TF version while TFP-on-JAX still depends on TF
-    'tensorflow==2.2.0',
-    # Pin a TFP version until a new release
-    'tfp-nightly==0.11.0.dev20200629',
+    'tfp-nightly==0.12.0.dev20200910',
 ]
 
 
