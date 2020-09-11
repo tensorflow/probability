@@ -329,12 +329,13 @@ def hop_inverse_rule(prim):
 primitive.register_hop_transformation_rule('inverse', hop_inverse_rule)
 
 
-def initial_ildj(incells, outcells, *, jaxpr, **_):
-  env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr, [], incells,
-                            outcells)
+def initial_ildj(incells, outcells, *, jaxpr, num_consts, **_):
+  const_cells, incells = jax_util.split_list(incells, [num_consts])
+  env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr, const_cells,
+                            incells, outcells)
   new_incells = [env.read(invar) for invar in jaxpr.invars]
   new_outcells = [env.read(outvar) for outvar in jaxpr.outvars]
-  return new_incells, new_outcells, None
+  return const_cells + new_incells, new_outcells, None
 
 
 def initial_inverse_rule(prim):
