@@ -242,7 +242,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
        Autoregressive Flow. In _Neural Information Processing Systems_, 2016.
        https://arxiv.org/abs/1606.04934
 
-  [3]: George Papamakarios  , Theo Pavlakou, and Iain Murray. Masked
+  [3]: George Papamakarios, Theo Pavlakou, and Iain Murray. Masked
        Autoregressive Flow for Density Estimation. In _Neural Information
        Processing Systems_, 2017. https://arxiv.org/abs/1705.07057
 
@@ -686,41 +686,41 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   # Generate data as the mixture of two distributions.
   n = 2000
   c = np.r_[
-    np.zeros(n/2),
-    np.ones(n/2)
+  np.zeros(n//2),
+  np.ones(n//2)
   ]
   x = np.r_[
-    np.random.randn(n/2).astype(dtype=np.float32) * 2,
-    np.random.randn(n/2).astype(dtype=np.float32) + 5
+  np.random.randn(n//2).astype(dtype=np.float32) * 2,
+  np.random.randn(n//2).astype(dtype=np.float32) + 5
   ]
 
   # Density estimation with MADE.
   made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
 
   distribution = tfd.TransformedDistribution(
-      distribution=tfd.Sample(tfd.Normal(loc=0., scale=1.), sample_shape=[1]),
-      bijector=tfb.MaskedAutoregressiveFlow(made))
+    distribution=tfd.Sample(tfd.Normal(loc=0., scale=1.), sample_shape=[1]),
+    bijector=tfb.MaskedAutoregressiveFlow(made))
 
   # Construct and fit model.
   x_ = tfkl.Input(shape=(1,), dtype=tf.float32)
   c_ = tfkl.Input(shape=(1,), dtype=tf.float32)
   log_prob_ = distribution.log_prob(x_, bijector_kwargs={'conditional_input': c_})
-  model = tfk.Model(x_, log_prob_)
+  model = tfk.Model([x_, c_], log_prob_)
 
   model.compile(optimizer=tf.optimizers.Adam(),
-                loss=lambda _, log_prob: -log_prob)
+              loss=lambda _, log_prob: -log_prob)
 
   batch_size = 25
   model.fit(x=[x, c],
-            y=np.zeros((n, 0), dtype=np.float32),
-            batch_size=batch_size,
-            epochs=1,
-            steps_per_epoch=1,  # Usually `n // batch_size`.
-            shuffle=True,
-            verbose=True)
+          y=np.zeros((n, 0), dtype=np.float32),
+          batch_size=batch_size,
+          epochs=1,
+          steps_per_epoch=1,  # Usually `n // batch_size`.
+          shuffle=True,
+          verbose=True)
 
   # Use the fitted distribution to sample condition on c = 1
-  distribution.sample((3,), bijector_kwargs={'conditional_input': np.ones(3, 1))})
+  distribution.sample((3,), bijector_kwargs={'conditional_input': np.ones((3, 1))})
   ```
 
   #### Examples: Handling Rank-2+ Tensors
