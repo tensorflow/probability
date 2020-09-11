@@ -20,6 +20,8 @@ from __future__ import print_function
 from tensorflow_probability.python.experimental.nn.util.im2row import im2row
 from tensorflow_probability.python.experimental.nn.util.random_variable import CallOnce
 from tensorflow_probability.python.experimental.nn.util.random_variable import RandomVariable
+from tensorflow_probability.python.experimental.nn.util.utils import batchify_op
+from tensorflow_probability.python.experimental.nn.util.utils import convolution_batch
 from tensorflow_probability.python.experimental.nn.util.utils import display_imgs
 from tensorflow_probability.python.experimental.nn.util.utils import expand_dims
 from tensorflow_probability.python.experimental.nn.util.utils import flatten_rightmost
@@ -29,6 +31,9 @@ from tensorflow_probability.python.experimental.nn.util.utils import make_kernel
 from tensorflow_probability.python.experimental.nn.util.utils import make_kernel_bias_posterior_mvn_diag
 from tensorflow_probability.python.experimental.nn.util.utils import make_kernel_bias_prior_spike_and_slab
 from tensorflow_probability.python.experimental.nn.util.utils import negloglik
+from tensorflow_probability.python.experimental.nn.util.utils import prepare_conv_args
+from tensorflow_probability.python.experimental.nn.util.utils import prepare_strides
+from tensorflow_probability.python.experimental.nn.util.utils import prepare_tuple_argument
 from tensorflow_probability.python.experimental.nn.util.utils import tfcompile
 from tensorflow_probability.python.experimental.nn.util.utils import trace
 from tensorflow_probability.python.experimental.nn.util.utils import tune_dataset
@@ -39,7 +44,9 @@ from tensorflow_probability.python.internal import all_util
 
 
 _allowed_symbols = [
+    'batchify_op',
     'CallOnce',
+    'convolution_batch',
     'RandomVariable',
     'display_imgs',
     'expand_dims',
@@ -51,6 +58,9 @@ _allowed_symbols = [
     'make_kernel_bias_posterior_mvn_diag',
     'make_kernel_bias_prior_spike_and_slab',
     'negloglik',
+    'prepare_conv_args',
+    'prepare_strides',
+    'prepare_tuple_argument',
     'tfcompile',
     'trace',
     'tune_dataset',

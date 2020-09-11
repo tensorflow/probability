@@ -30,9 +30,9 @@ from tensorflow_probability.python.internal import prefer_static
 
 
 __all__ = [
-    'Convolution',
-    'ConvolutionVariationalFlipout',
-    'ConvolutionVariationalReparameterization',
+    'ConvolutionV2',
+    'ConvolutionVariationalFlipoutV2',
+    'ConvolutionVariationalReparameterizationV2',
 ]
 
 
@@ -42,11 +42,16 @@ kl_divergence_monte_carlo = vi_lib.kl_divergence_monte_carlo
 unpack_kernel_and_bias = vi_lib.unpack_kernel_and_bias
 
 
-class Convolution(layers_lib.KernelBiasLayer):
+class ConvolutionV2(layers_lib.KernelBiasLayer):
   """Convolution layer.
 
   This layer creates a Convolution kernel that is convolved (actually
   cross-correlated) with the layer input to produce a tensor of outputs.
+
+  This V2 version supports alternative batch semantics. V1 layers, with batch
+  size `B` produced outputs of shape `[N, H, W, B, C]` (where N, H, W, C are
+  minibatch size, height, width and number of channels, as usual). V2 layers
+  reorder these to `[N, B, H, W, C]`.
 
   This layer has two learnable parameters, `kernel` and `bias`.
   - The `kernel` (aka `filters` argument of `tf.nn.convolution`) is a
@@ -76,9 +81,9 @@ class Convolution(layers_lib.KernelBiasLayer):
   tfd = tfp.distributions
   tfn = tfp.experimental.nn
 
-  Convolution1D = functools.partial(tfn.Convolution, rank=1)
-  Convolution2D = tfn.Convolution
-  Convolution3D = functools.partial(tfn.Convolution, rank=3)
+  Convolution1DV2 = functools.partial(tfn.ConvolutionV2, rank=1)
+  Convolution2DV2 = tfn.ConvolutionV2
+  Convolution3DV2 = functools.partial(tfn.ConvolutionV2, rank=3)
   ```
 
   """
@@ -161,7 +166,7 @@ class Convolution(layers_lib.KernelBiasLayer):
       activation_fn: ...
         Default value: `None`.
       name: ...
-        Default value: `None` (i.e., `'Convolution'`).
+        Default value: `None` (i.e., `'ConvolutionV2'`).
     """
     filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
@@ -186,7 +191,7 @@ class Convolution(layers_lib.KernelBiasLayer):
           rank=rank,
           strides=strides,
           padding=padding,
-          data_format='NHWBC',
+          data_format='NBHWC',
           dilations=dilations)
     kernel, bias = make_kernel_bias_fn(
         kernel_shape, bias_shape,
@@ -194,7 +199,7 @@ class Convolution(layers_lib.KernelBiasLayer):
         batch_ndims, batch_ndims,
         dtype)
     self._make_kernel_bias_fn = make_kernel_bias_fn  # For tracking.
-    super(Convolution, self).__init__(
+    super(ConvolutionV2, self).__init__(
         kernel=kernel,
         bias=bias,
         apply_kernel_fn=apply_kernel_fn,
@@ -203,7 +208,7 @@ class Convolution(layers_lib.KernelBiasLayer):
         name=name)
 
 
-class ConvolutionVariationalReparameterization(
+class ConvolutionVariationalReparameterizationV2(
     vi_lib.VariationalReparameterizationKernelBiasLayer):
   """Convolution layer class with reparameterization estimator.
 
@@ -235,6 +240,11 @@ class ConvolutionVariationalReparameterization(
   You can access the `kernel` and/or `bias` posterior and prior distributions
   after the layer is built via the `kernel_posterior`, `kernel_prior`,
   `bias_posterior` and `bias_prior` properties.
+
+  This V2 version supports alternative batch semantics. V1 layers, with batch
+  size `B` produced outputs of shape `[N, H, W, B, C]` (where N, H, W, C are
+  minibatch size, height, width and number of channels, as usual). V2 layers
+  reorder these to `[N, B, H, W, C]`.
 
   #### Examples
 
@@ -283,7 +293,7 @@ class ConvolutionVariationalReparameterization(
   n = tf.cast(train_size, tf.float32)
 
   BayesConv2D = functools.partial(
-      tfn.ConvolutionVariationalReparameterization,
+      tfn.ConvolutionVariationalReparameterizationV2,
       rank=2,
       padding='same',
       filter_shape=5,
@@ -435,7 +445,7 @@ class ConvolutionVariationalReparameterization(
         Default value: `None` (i.e., no seed).
       name: ...
         Default value: `None` (i.e.,
-        `'ConvolutionVariationalReparameterization'`).
+        `'ConvolutionVariationalReparameterizationV2'`).
     """
     filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
@@ -443,7 +453,7 @@ class ConvolutionVariationalReparameterization(
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
     self._make_prior_fn = make_prior_fn  # For variable tracking.
     batch_ndims = 0
-    super(ConvolutionVariationalReparameterization, self).__init__(
+    super(ConvolutionVariationalReparameterizationV2, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
             init_kernel_fn, init_bias_fn,
@@ -466,7 +476,7 @@ class ConvolutionVariationalReparameterization(
         name=name)
 
 
-class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
+class ConvolutionVariationalFlipoutV2(vi_lib.VariationalFlipoutKernelBiasLayer):
   """Convolution layer class with Flipout estimator.
 
   This layer implements the Bayesian variational inference analogue to
@@ -501,6 +511,11 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       [0], tf.range(2, tf.rank(inputs)), [1]], axis=0))
   ```
 
+  This V2 version supports alternative batch semantics. V1 layers, with batch
+  size `B` produced outputs of shape `[N, H, W, B, C]` (where N, H, W, C are
+  minibatch size, height, width and number of channels, as usual). V2 layers
+  reorder these to `[N, B, H, W, C]`.
+
   #### Examples
 
   We illustrate a Bayesian neural network with [variational inference](
@@ -510,9 +525,9 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
   ```python
   # Using the following substitution, see:
   tfn = tfp.experimental.nn
-  help(tfn.ConvolutionVariationalReparameterization)
+  help(tfn.ConvolutionVariationalReparameterizationV2)
   BayesConv2D = functools.partial(
-      tfn.ConvolutionVariationalFlipout,
+      tfn.ConvolutionVariationalFlipoutV2,
       penalty_weight=1. / n)
   ```
 
@@ -628,7 +643,7 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
         Default value: `None` (i.e., no seed).
       name: ...
         Default value: `None` (i.e.,
-        `'ConvolutionVariationalFlipout'`).
+        `'ConvolutionVariationalFlipoutV2'`).
     """
     filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
@@ -636,7 +651,7 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
     self._make_prior_fn = make_prior_fn  # For variable tracking.
     batch_ndims = 0
-    super(ConvolutionVariationalFlipout, self).__init__(
+    super(ConvolutionVariationalFlipoutV2, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
             init_kernel_fn, init_bias_fn,
@@ -678,4 +693,26 @@ def _make_convolution_fn(rank, strides, padding, dilations):
         padding=padding,
         data_format=data_format,
         dilations=dilations)
-  return lambda x, kernel: nn_util_lib.batchify_op(op, rank + 1, x, kernel)
+  return lambda x, kernel: batchify_op(op, rank + 1, x, kernel)
+
+
+def batchify_op(op, op_min_input_ndims, x, *other_op_args):
+  """Reshape `op` input `x` to be a vec of `op_min_input_ndims`-rank tensors."""
+  if x.shape.rank == op_min_input_ndims + 1:
+    # Input is already a vector of `op_min_input_ndims`-rank tensors.
+    return op(x, *other_op_args)
+  batch_shape, op_shape = prefer_static.split(
+      prefer_static.shape(x),
+      num_or_size_splits=[-1, op_min_input_ndims])
+  flat_shape = prefer_static.pad(
+      op_shape,
+      paddings=[[1, 0]],
+      constant_values=-1)
+  y = tf.reshape(x, flat_shape)
+  y = op(y, *other_op_args)
+  unflat_shape = prefer_static.concat([
+      batch_shape,
+      prefer_static.shape(y)[1:],
+  ], axis=0)
+  y = tf.reshape(y, unflat_shape)
+  return y
