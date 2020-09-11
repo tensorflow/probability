@@ -50,7 +50,6 @@ __all__ = [
     'ensure_shape',
     'executing_eagerly',
     'get_static_value',
-    'group',
     'identity',
     'init_scope',
     'is_tensor',
@@ -476,10 +475,6 @@ def _get_static_value_numpy(tensor, partial=False):
 get_static_value = utils.copy_docstring(
     'tf.get_static_value',
     _get_static_value_jax if JAX_MODE else _get_static_value_numpy)
-
-group = utils.copy_docstring(
-    'tf.group',
-    lambda *inputs, **kwargs: None)
 
 identity = utils.copy_docstring(
     'tf.identity',
