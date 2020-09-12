@@ -139,7 +139,10 @@ def _make_convertible(cls):
       for k in composite_tensor_params:
         if k in kwargs and kwargs[k] is not None:
           v = kwargs.pop(k)
-          param_specs[k] = tf.TensorSpec.from_tensor(v)
+          if isinstance(v, CompositeTensor):
+            param_specs[k] = v._type_spec  # pylint: disable=protected-access
+          elif tf.is_tensor(v):
+            param_specs[k] = tf.TensorSpec.from_tensor(v)
       for k, v in list(kwargs.items()):
         if isinstance(v, CompositeTensor):
           param_specs[k] = v._type_spec  # pylint: disable=protected-access
@@ -258,10 +261,8 @@ def as_composite(obj):
       v = getattr(obj, k, kwargs[k])
       try:
         kwargs[k] = tf.convert_to_tensor(v, name=k)
-      except TypeError as e:
-        raise NotImplementedError(
-            mk_err_msg('(Unable to convert dependent entry \'{}\' of object '
-                       '\'{}\': {})'.format(k, obj, str(e))))
+      except (ValueError, TypeError) as e:
+        kwargs[k] = v
   for k, v in kwargs.items():
     if isinstance(v, distributions.Distribution):
       kwargs[k] = as_composite(v)
