@@ -713,19 +713,17 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   log_prob_ = distribution.log_prob(x_, bijector_kwargs={'conditional_input': c_})
   model = tfk.Model([x_, c_], log_prob_)
 
-  model.compile(
-		optimizer=tf.optimizers.Adam(),
- 	  loss=lambda _, log_prob: -log_prob
-	)
+  model.compile(optimizer=tf.optimizers.Adam(),
+ 	              loss=lambda _, log_prob: -log_prob)
 
   batch_size = 25
   model.fit(x=[x, c],
-          y=np.zeros((n, 0), dtype=np.float32),
-          batch_size=batch_size,
-          epochs=1,
-          steps_per_epoch=1,  # Usually `n // batch_size`.
-          shuffle=True,
-          verbose=True)
+						y=np.zeros((n, 0), dtype=np.float32),
+						batch_size=batch_size,
+						epochs=1,
+						steps_per_epoch=1,  # Usually `n // batch_size`.
+						shuffle=True,
+						verbose=True)
 
   # Use the fitted distribution to sample condition on c = 1
   distribution.sample((3,), bijector_kwargs={'conditional_input': np.ones((3, 1))})
