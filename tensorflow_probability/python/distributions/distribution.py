@@ -1428,6 +1428,71 @@ class Distribution(_BaseDistribution):
     # must ensure that assertions are applied for both `self` and `other`.
     return self._kl_divergence(other)
 
+  def cross_entropy_with_quantiles(self, pred_true, quantiles,
+                                   name="cross_entropy_with_quantiles"):
+    """Computes the cross entropy given quantiles.
+
+
+    Generalization of the sigmoid cross entropy where the underlying distribution is not the logistic
+    but can be any distribution.
+
+    Measures the probability error in discrete classification tasks
+    in which each class is independent and not mutually exclusive` [1]
+    where the underlying probability is the distribution (`self`).
+
+    For brevity, let `x = quantiles`, `z = pred_true`.
+    The logistic loss is
+    ```
+    - z * log(sigmoid(x)) - (1 - z) * log(1 - sigmoid(x))
+    ```
+
+    Noting that the logistic cdf is the sigmoid,
+    this can be generalized to any distribution with `cdf`
+    ```
+    - z * log(cdf(x)) - (1 - z) * log(1 - cdf(x))
+    = - z * log(P[X <= x]) - (1 - z) * log(1 - P[X <= x])
+    ```
+
+    To ensure stability and avoid overflow, the implementation uses this formulation
+    ```
+    - z * log_cdf(x) - (1 - z) * log_survival(x)
+    ```
+
+    When this distribution (`self`) is a logistic distribution,
+    the binary regression is called the `logistic regression` (`logit model`)[2],
+    and it reduces to a version of `sigmoid_cross_entropy_with_logits` [3].
+
+    While when this distribution (`self`) is a normal distribution,
+    the binary regression is called the `probit regression` (`probit model`)[2].
+
+    [1] Lu C., Zou Y. (2019) Using Coarse Label Constraint for Fine-Grained Visual Classification. In: Kompatsiaris I., Huet B., Mezaris V., Gurrin C., Cheng WH., Vrochidis S. (eds) MultiMedia Modeling. MMM 2019. Lecture Notes in Computer Science, vol 11296. Springer, Cham
+    [2] https://en.wikipedia.org/wiki/Binary_regression
+    [3] https://www.tensorflow.org/api_docs/python/tf/nn/sigmoid_cross_entropy_with_logits
+
+    Args:
+      pred_true: A `Tensor` of the same type and shape as `quantiles`.
+      quantiles: A `Tensor` of type `self.dtype`.
+      name: Python `str` prepended to names of ops created by this function.
+
+    Returns:
+      cross_entropy: `self.dtype` `Tensor` of the same shape as `quantiles`
+      with the componentwise cross entropy losses.
+
+    Raises:
+      ValueError: If `quantiles` and `pred_true` do not have the same shape.
+    """
+    with self._name_and_control_scope(name):
+      try:
+        pred_true.get_shape().merge_with(quantiles.get_shape())
+      except ValueError:
+        raise ValueError(
+          "quantiles and pred_true must have the same shape (%s vs %s)" %
+          (quantiles.get_shape(), pred_true.get_shape()))
+      ft = - tf.math.multiply_no_nan(self.log_cdf(quantiles), pred_true)
+      st = - tf.math.multiply_no_nan(self.log_survival_function(quantiles),
+                                     1.-pred_true)
+      return ft + st
+
   def _default_event_space_bijector(self):
     raise NotImplementedError(
         '_default_event_space_bijector` is not implemented: {}'.format(
