@@ -686,16 +686,22 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   # Generate data as the mixture of two distributions.
   n = 2000
   c = np.r_[
-  np.zeros(n//2),
-  np.ones(n//2)
+		np.zeros(n//2),
+		np.ones(n//2)
   ]
   x = np.r_[
-  np.random.randn(n//2).astype(dtype=np.float32) * 2,
-  np.random.randn(n//2).astype(dtype=np.float32) + 5
+		np.random.randn(n//2).astype(dtype=np.float32) * 2,
+		np.random.randn(n//2).astype(dtype=np.float32) + 5
   ]
 
   # Density estimation with MADE.
-  made = tfb.AutoregressiveNetwork(params=2, hidden_units=[10, 10])
+  made = tfb.AutoregressiveNetwork(
+		params=2, 
+		hidden_units=[10, 10],
+		event_shape=(1,),
+    conditional=True, 
+		conditional_event_shape=(1,)
+	)
 
   distribution = tfd.TransformedDistribution(
     distribution=tfd.Sample(tfd.Normal(loc=0., scale=1.), sample_shape=[1]),
@@ -707,8 +713,10 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   log_prob_ = distribution.log_prob(x_, bijector_kwargs={'conditional_input': c_})
   model = tfk.Model([x_, c_], log_prob_)
 
-  model.compile(optimizer=tf.optimizers.Adam(),
-              loss=lambda _, log_prob: -log_prob)
+  model.compile(
+		optimizer=tf.optimizers.Adam(),
+ 	  loss=lambda _, log_prob: -log_prob
+	)
 
   batch_size = 25
   model.fit(x=[x, c],
