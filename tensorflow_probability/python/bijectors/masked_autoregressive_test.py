@@ -778,7 +778,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     n_samples = 1000
     cond = 1
     samples = distribution.sample(
-      (n_samples,), 
+      (n_samples,),
       bijector_kwargs={'conditional_input': cond * np.ones((n_samples, 1))})
     # Assert mean is close to conditional mean
     self.assertAllClose(tf.reduce_mean(samples).numpy(), mean_1, atol=0.2)
