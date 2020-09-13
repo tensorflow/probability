@@ -679,7 +679,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   distribution.log_prob(np.ones((3, 2), dtype=np.float32))
   ```
 
-  The `conditional` argument can be used to instead build a conditional density.  
+  The `conditional` argument can be used to instead build a conditional density.
   estimator. To do this the conditioning variable must be passed as a `kwarg`:
 
   ```python
@@ -697,10 +697,10 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
   # Density estimation with MADE.
   made = tfb.AutoregressiveNetwork(
-    params=2, 
+    params=2,
     hidden_units=[2, 2],
     event_shape=(1,),
-    conditional=True, 
+    conditional=True,
     conditional_event_shape=(1,)
   )
 
@@ -711,7 +711,8 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   # Construct and fit model.
   x_ = tfkl.Input(shape=(1,), dtype=tf.float32)
   c_ = tfkl.Input(shape=(1,), dtype=tf.float32)
-  log_prob_ = distribution.log_prob(x_, bijector_kwargs={'conditional_input': c_})
+  log_prob_ = distribution.log_prob(
+    x_, bijector_kwargs={'conditional_input': c_})
   model = tfk.Model([x_, c_], log_prob_)
 
   model.compile(optimizer=tf.optimizers.Adam(),
@@ -722,14 +723,16 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
             y=np.zeros((n, 0), dtype=np.float32),
             batch_size=batch_size,
             epochs=2,
-            steps_per_epoch=n // batch_size,  
+            steps_per_epoch=n // batch_size,
             shuffle=True,
             verbose=True)
 
   # Use the fitted distribution to sample condition on c = 1
   n_samples = 1000
   cond = 1
-  samples = distribution.sample((n_samples,), bijector_kwargs={'conditional_input': cond * np.ones((n_samples, 1))})
+  samples = distribution.sample(
+    (n_samples,), 
+    bijector_kwargs={'conditional_input': cond * np.ones((n_samples, 1))})
   ```
 
   #### Examples: Handling Rank-2+ Tensors
