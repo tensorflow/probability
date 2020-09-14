@@ -185,7 +185,7 @@ class ConvolutionV2(layers_lib.KernelBiasLayer):
       kernel_shape = prefer_static.concat([
           batch_shape, filter_shape, [input_size, output_size]], axis=0)
       bias_shape = prefer_static.concat(
-          [batch_shape, [output_size]], axis=0)
+          [batch_shape, tf.ones(rank), [output_size]], axis=0)
       apply_kernel_fn = lambda x, k: nn_util_lib.convolution_batch(  # pylint: disable=g-long-lambda
           x, k,
           rank=rank,
