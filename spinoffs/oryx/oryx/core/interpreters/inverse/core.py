@@ -145,10 +145,10 @@ class InverseAndILDJ(Cell):
 
   @classmethod
   def new(cls, val):
+    if val is jax_core.unit:
+      return InverseAndILDJ.unknown(jax_core.abstract_unit)
     val = np.array(val)
     aval = jax_core.get_aval(val)
-    if aval is jax_core.abstract_unit:
-      return InverseAndILDJ.unknown(aval)
     aval = abstract_arrays.raise_to_shaped(aval)
     ndslice = NDSlice.new(val, np.zeros_like(val))
     return InverseAndILDJ(aval, frozenset([ndslice]))

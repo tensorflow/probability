@@ -291,6 +291,10 @@ class Sample(distribution_lib.Distribution):
 
     return assertions
 
+  _composite_tensor_nonshape_params = ('distribution,')
+
+  _composite_tensor_shape_params = ('sample_shape,')
+
 
 @kullback_leibler.RegisterKL(Sample, Sample)
 def _kl_sample(a, b, name='kl_sample'):

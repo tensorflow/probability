@@ -13,8 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Module for probability distributions and related functions."""
-import inspect
-
 from oryx.distributions import distribution_extensions
 from tensorflow_probability.substrates import jax as tfp
 
@@ -22,15 +20,13 @@ __all__ = [
     'distribution_extensions'
 ]
 
+
 tfd = tfp.distributions
 
 _distributions = {}
 
 for name in dir(tfd):
   dist = getattr(tfd, name)
-  if inspect.isclass(dist) and issubclass(dist, tfd.Distribution):
-    if dist is not tfd.Distribution:
-      dist = distribution_extensions.make_type(dist)
   _distributions[name] = dist
 
 
@@ -39,3 +35,4 @@ for key, val in _distributions.items():
 
 
 del _distributions
+del distribution_extensions  # Only needed for registration.
