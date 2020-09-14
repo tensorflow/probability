@@ -28,7 +28,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import stats
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -263,8 +263,8 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
         #   R[k, m] := auto_corr[k, m, ...], auto-correlation indexed by chain.
         #   var^+ := (N - 1) / N * W + B / N
 
-        cross_chain_dims = prefer_static.non_negative_axis(
-            cross_chain_dims, prefer_static.rank(states))
+        cross_chain_dims = ps.non_negative_axis(
+            cross_chain_dims, ps.rank(states))
         # B / N
         between_chain_variance_div_n = _reduce_variance(
             tf.reduce_mean(states, axis=0),
@@ -306,10 +306,10 @@ def _effective_sample_size_single_state(states, filter_beyond_lag,
 
     if filter_beyond_positive_pairs:
       def _sum_pairs(x):
-        x_len = tf.shape(x)[0]
+        x_len = ps.shape(x)[0]
         # For odd sequences, we drop the final value.
         x = x[:x_len - x_len % 2]
-        new_shape = tf.concat([[x_len // 2, 2], tf.shape(x)[1:]], axis=0)
+        new_shape = ps.concat([[x_len // 2, 2], ps.shape(x)[1:]], axis=0)
         return tf.reduce_sum(tf.reshape(x, new_shape), 1)
 
       # Pairwise sums are all positive for auto-correlation spectra derived from
@@ -521,13 +521,13 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
     elif validate_args:
       if split_chains:
         assertions = [assert_util.assert_greater(
-            tf.shape(state)[0], 4,
+            ps.shape(state)[0], 4,
             message='Must provide at least 4 samples when splitting chains.')]
         with tf.control_dependencies(assertions):
           state = tf.identity(state)
       else:
         assertions = [assert_util.assert_greater(
-            tf.shape(state)[0], 2,
+            ps.shape(state)[0], 2,
             message='Must provide at least 2 samples.')]
         with tf.control_dependencies(assertions):
           state = tf.identity(state)
@@ -541,7 +541,7 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
       # independent chains.
 
       # For odd number of samples, keep all but the last sample.
-      state_shape = prefer_static.shape(state)
+      state_shape = ps.shape(state)
       n_samples = state_shape[0]
       state = state[:n_samples - n_samples % 2]
 
@@ -550,14 +550,14 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
       # E.g. reshape states of shape [a, b] into [2, a//2, b].
       state = tf.reshape(
           state,
-          prefer_static.concat([[2, n_samples // 2], state_shape[1:]], axis=0)
+          ps.concat([[2, n_samples // 2], state_shape[1:]], axis=0)
       )
       # Step 2: Put the size `2` dimension in the right place to be treated as a
       # chain, changing [[0, 1, 2], [3, 4, 5]] into [[0, 3], [1, 4], [2, 5]],
       # reshaping [2, a//2, b] into [a//2, 2, b].
       state = tf.transpose(
           a=state,
-          perm=prefer_static.concat(
+          perm=ps.concat(
               [[1, 0], tf.range(2, tf.rank(state))], axis=0))
 
       # We're treating the new dim as indexing 2 chains, so increment.
@@ -605,10 +605,10 @@ def _reduce_variance(x, axis=None, biased=True, keepdims=False):
 def _axis_size(x, axis=None):
   """Get number of elements of `x` in `axis`, as type `x.dtype`."""
   if axis is None:
-    return prefer_static.cast(prefer_static.size(x), x.dtype)
-  return prefer_static.cast(
-      prefer_static.reduce_prod(
-          prefer_static.gather(prefer_static.shape(x), axis)), x.dtype)
+    return ps.cast(ps.size(x), x.dtype)
+  return ps.cast(
+      ps.reduce_prod(
+          ps.gather(ps.shape(x), axis)), x.dtype)
 
 
 def _is_list_like(x):

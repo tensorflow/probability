@@ -218,6 +218,8 @@ def _one_hot(  # pylint: disable=unused-argument
     off_value = 0
   if dtype is None:
     dtype = utils.common_dtype([on_value, off_value], np.float32)
+  else:
+    dtype = utils.numpy_dtype(dtype)
   indices = np.array(indices)
   depth = np.array(depth)
   pred = abs(np.arange(depth, dtype=indices.dtype) -

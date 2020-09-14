@@ -1191,7 +1191,7 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
   with tf.name_scope(name or 'pad'):
     x = tf.convert_to_tensor(x, name='x')
     value = tf.convert_to_tensor(value, dtype=x.dtype, name='value')
-    count = tf.convert_to_tensor(count, name='count')
+    count = ps.convert_to_shape_tensor(count, name='count')
     if not dtype_util.is_integer(count.dtype):
       raise TypeError('`count.dtype` (`{}`) must be `int`-like.'.format(
           dtype_util.name(count.dtype)))
@@ -1225,8 +1225,8 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
       final_shape = None
     x = tf.pad(
         x,
-        paddings=tf.one_hot(
-            indices=tf.stack([axis if front else -1, axis if back else -1]),
+        paddings=ps.one_hot(
+            indices=ps.stack([axis if front else -1, axis if back else -1]),
             depth=ndims,
             axis=0,
             on_value=count,
