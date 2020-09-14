@@ -53,7 +53,9 @@ def effective_sample_size(states,
   variables `X_1, X_2, ..., X_N`, identically distributed, ESS is the
   number such that
 
-  ```Variance{ N**-1 * Sum{X_i} } = ESS**-1 * Variance{ X_1 }.```
+  ```
+  Variance{ N**-1 * Sum{X_i} } = ESS**-1 * Variance{ X_1 }.
+  ```
 
   If the sequence is uncorrelated, `ESS = N`.  If the sequence is positively
   auto-correlated, `ESS` will be less than `N`. If there are negative
@@ -62,7 +64,9 @@ def effective_sample_size(states,
   Some math shows that, with `R_k` the auto-correlation sequence,
   `R_k := Covariance{X_1, X_{1+k}} / Variance{X_1}`, we have
 
-  ```ESS(N) =  N / [ 1 + 2 * ( (N - 1) / N * R_1 + ... + 1 / N * R_{N-1}  ) ]```
+  ```
+  ESS(N) =  N / [ 1 + 2 * ( (N - 1) / N * R_1 + ... + 1 / N * R_{N-1}  ) ]
+  ```
 
   This function estimates the above by first estimating the auto-correlation.
   Since `R_k` must be estimated using only `N - k` samples, it becomes
