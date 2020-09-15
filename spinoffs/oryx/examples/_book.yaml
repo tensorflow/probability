@@ -32,6 +32,6 @@ upper_tabs:
     - name: API
       skip_translation: true
       contents:
-      - include: /probability/oryx/api_docs/python/_toc.yaml
+      - include: /probability/oryx/api_docs/python/oryx/_toc.yaml
 
 - include: /_upper_tabs_right.yaml
