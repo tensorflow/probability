@@ -330,7 +330,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
       # Still do this assignment for variable tracking.
       self._shift_and_log_scale_fn = shift_and_log_scale_fn
       self._bijector_fn = bijector_fn
-      super(MaskedAutoregressiveFlow, self).__init__(
+      super().__init__(
           forward_min_event_ndims=self._event_ndims,
           is_constant_jacobian=is_constant_jacobian,
           validate_args=validate_args,
@@ -943,7 +943,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       **kwargs: Additional keyword arguments passed to this layer (but not to
         the `tf.keras.layer.Dense` layers constructed by this layer).
     """
-    super(AutoregressiveNetwork, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self._params = params
     self._event_shape = _list(event_shape) if event_shape is not None else None
@@ -1083,7 +1083,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     # the specs of the network's input layers.
     self._network.input_spec = None
     # Record that the layer has been built.
-    super(AutoregressiveNetwork, self).build(input_shape)
+    super().build(input_shape)
 
   def call(self, x, conditional_input=None):
     """Transforms the inputs and returns the outputs.
