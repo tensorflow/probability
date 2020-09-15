@@ -78,7 +78,6 @@ class HigherOrderPrimitive(jax_core.Primitive):
     super(HigherOrderPrimitive, self).__init__(name)
     self.call_primitive = True
     self.multiple_results = True
-    pe.staged_out_calls.add(self)
     for register_func in hop_transformation_rules.values():
       register_func(self)
 
