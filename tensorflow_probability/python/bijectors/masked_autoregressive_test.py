@@ -730,7 +730,6 @@ class AutoregressiveNetworkTest(test_util.TestCase):
         (3,), distribution.log_prob(np.ones((3, 2), dtype=np.float32)).shape)
 
   def test_doc_string_2(self):
-    np.random.seed(123)
     n = 10000
     c = np.r_[
       np.zeros(n//2),
@@ -781,7 +780,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
       (n_samples,),
       bijector_kwargs={'conditional_input': cond * np.ones((n_samples, 1))})
     # Assert mean is close to conditional mean
-    self.assertAllClose(tf.reduce_mean(samples).numpy(), mean_1, atol=0.2)
+    self.assertAllClose(tf.reduce_mean(samples), mean_1, atol=0.2)
 
   def test_doc_string_images_case_1(self):
     # Generate fake images.

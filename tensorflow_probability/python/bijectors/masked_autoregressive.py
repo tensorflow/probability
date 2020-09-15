@@ -731,7 +731,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   n_samples = 1000
   cond = 1
   samples = distribution.sample(
-    (n_samples,), 
+    (n_samples,),
     bijector_kwargs={'conditional_input': cond * np.ones((n_samples, 1))})
   ```
 
