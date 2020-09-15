@@ -730,7 +730,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
         (3,), distribution.log_prob(np.ones((3, 2), dtype=np.float32)).shape)
 
   def test_doc_string_2(self):
-    n = 10000
+    n = 20000
     c = np.r_[
       np.zeros(n//2),
       np.ones(n//2)
@@ -768,13 +768,13 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     model.fit(x=[x, c],
               y=np.zeros((n, 0), dtype=np.float32),
               batch_size=batch_size,
-              epochs=2,
+              epochs=3,
               steps_per_epoch=n // batch_size,
               shuffle=True,
               verbose=True)
 
     # Use the fitted distribution to sample condition on c = 1
-    n_samples = 1000
+    n_samples = 10000
     cond = 1
     samples = distribution.sample(
       (n_samples,),
