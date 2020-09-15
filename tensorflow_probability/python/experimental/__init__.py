@@ -40,6 +40,7 @@ from tensorflow_probability.python.experimental import nn
 from tensorflow_probability.python.experimental import sequential
 from tensorflow_probability.python.experimental import stats
 from tensorflow_probability.python.experimental import substrates
+from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.composite_tensor import as_composite
 from tensorflow_probability.python.experimental.composite_tensor import register_composite
@@ -60,6 +61,7 @@ _allowed_symbols = [
     'sequential',
     'stats',
     'substrates',
+    'util',
     'vi',
 ]
 

@@ -60,6 +60,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/experimental/vi",
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
