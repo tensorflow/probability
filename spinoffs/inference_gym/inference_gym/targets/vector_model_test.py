@@ -47,10 +47,32 @@ class TestStructuredModel(targets.Model):
             first_moment=targets.Model.SampleTransformation(
                 fn=lambda x: x,
                 pretty_name='First moment',
+                # These are wrong, we'll only be checking them for
+                # shapes/dtypes.
+                ground_truth_mean=(tf.nest.map_structure(
+                    tf.zeros, self._model.event_shape, self._model.dtype)),
+                ground_truth_standard_deviation=tf.nest.map_structure(
+                    tf.zeros, self._model.event_shape, self._model.dtype),
+                ground_truth_mean_standard_error=tf.nest.map_structure(
+                    tf.zeros, self._model.event_shape, self._model.dtype),
+                ground_truth_standard_deviation_standard_error=(
+                    tf.nest.map_structure(tf.zeros, self._model.event_shape,
+                                          self._model.dtype)),
             ),
             second_moment=targets.Model.SampleTransformation(
                 fn=lambda x: tf.nest.map_structure(tf.square, x),
                 pretty_name='Second moment',
+                # These are wrong, we'll only be checking them for
+                # shapes/dtypes.
+                ground_truth_mean=(tf.nest.map_structure(
+                    tf.zeros, self._model.event_shape, self._model.dtype)),
+                ground_truth_standard_deviation=tf.nest.map_structure(
+                    tf.zeros, self._model.event_shape, self._model.dtype),
+                ground_truth_mean_standard_error=tf.nest.map_structure(
+                    tf.zeros, self._model.event_shape, self._model.dtype),
+                ground_truth_standard_deviation_standard_error=(
+                    tf.nest.map_structure(tf.zeros, self._model.event_shape,
+                                          self._model.dtype)),
             ),
         ),
     )
@@ -109,17 +131,42 @@ class TestBadModel(targets.Model):
     return self._model.log_prob(value)
 
 
+class TestBadSampleTransformationModel(targets.Model):
+  """Has a sample transform that mixes dtypes, making it un-flattenable."""
+
+  def __init__(self):
+    self._model = tfd.CholeskyLKJ(dimension=3, concentration=1.)
+
+    super(TestBadSampleTransformationModel, self).__init__(
+        default_event_space_bijector=tfb.CorrelationCholesky(),
+        event_shape=self._model.event_shape,
+        dtype=self._model.dtype,
+        name='test_bad_sample_transformation_model',
+        pretty_name='TestBadSampleTransformationModel',
+        sample_transformations=dict(
+            bad=targets.Model.SampleTransformation(
+                fn=lambda x: (x, tf.cast(x, tf.float64)),
+                pretty_name='Bad',
+                dtype=(tf.float32, tf.float64),
+            ),
+        ),
+    )
+
+  def _unnormalized_log_prob(self, value):
+    return self._model.log_prob(value)
+
+
 @test_util.multi_backend_test(globals(), 'targets.vector_model_test')
 @test_util.test_all_tf_execution_regimes
 class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('Structured', TestStructuredModel, 3 + 3, []),
-      ('Unstructured', TestUnstructuredModel, 3, []),
-      ('BatchedStructured', TestStructuredModel, 3 + 3, [2]),
-      ('BatchedUnstructured', TestUnstructuredModel, 3, [2]),
+      ('Structured', TestStructuredModel, 3 + 9, []),
+      ('Unstructured', TestUnstructuredModel, 9, []),
+      ('BatchedStructured', TestStructuredModel, 3 + 9, [2]),
+      ('BatchedUnstructured', TestUnstructuredModel, 9, [2]),
   )
-  def testBasic(self, model_class, vec_event_size, batch_size):
+  def testBasic(self, model_class, vec_event_size, batch_shape):
     base_model = model_class()
     vec_model = targets.VectorModel(base_model)
 
@@ -136,7 +183,8 @@ class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
     # z - unconstrained space
     structured_z = tf.nest.map_structure(
         lambda s, d, b: tf.fill(  # pylint: disable=g-long-lambda
-            batch_size + list(b.inverse_event_shape(s)), tf.cast(rand_elem, d)),
+            batch_shape + list(b.inverse_event_shape(s)), tf.cast(rand_elem, d)
+        ),
         base_model.event_shape,
         base_model.dtype,
         base_model.default_event_space_bijector)
@@ -146,15 +194,13 @@ class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
         lambda b, z: b(z), base_model.default_event_space_bijector,
         structured_z)
 
-    vec_z = tf.nest.map_structure(
-        lambda s, d, b: tf.fill(  # pylint: disable=g-long-lambda
-            batch_size + list(b.inverse_event_shape(s)), tf.cast(rand_elem, d)),
-        vec_model.event_shape,
-        vec_model.dtype,
-        vec_model.default_event_space_bijector)
-
-    vec_x = tf.nest.map_structure(lambda b, z: b(z),
-                                  vec_model.default_event_space_bijector, vec_z)
+    vec_z = tf.fill(
+        batch_shape + list(
+            vec_model.default_event_space_bijector.inverse_event_shape(
+                vec_model.event_shape)),
+        tf.cast(rand_elem, vec_model.dtype),
+    )
+    vec_x = vec_model.default_event_space_bijector(vec_z)
 
     self.assertAllEqual(
         base_model.unnormalized_log_prob(structured_x),
@@ -166,10 +212,56 @@ class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
         base_model.sample_transformations['second_moment'](structured_x),
         vec_model.sample_transformations['second_moment'](vec_x))
 
+    # Verify that generating values directly from the vector event space works
+    # as well.
+    vec_x = tf.zeros(batch_shape + vec_model.event_shape, vec_model.dtype)
+    self.assertAllEqual(batch_shape,
+                        vec_model.unnormalized_log_prob(vec_x).shape)
+
+  @parameterized.named_parameters(
+      ('Unbatched', []),
+      ('Batched', [2]),
+  )
+  def testFlattenSampleTransformations(self, batch_shape):
+    model = targets.VectorModel(
+        TestStructuredModel(), flatten_sample_transformations=True)
+
+    x_init = tf.zeros(batch_shape + model.event_shape, model.dtype)
+    first_moment_transform = model.sample_transformations['first_moment']
+    first_moment = first_moment_transform(x_init)
+    self.assertAllEqual(batch_shape + model.event_shape, first_moment.shape)
+    self.assertAllEqual(
+        model.event_shape,
+        first_moment_transform.ground_truth_mean.shape,
+    )
+    self.assertAllEqual(
+        model.event_shape,
+        first_moment_transform.ground_truth_standard_deviation.shape,
+    )
+    self.assertAllEqual(
+        model.event_shape,
+        first_moment_transform.ground_truth_mean_standard_error.shape,
+    )
+    self.assertAllEqual(
+        model.event_shape,
+        first_moment_transform.ground_truth_standard_deviation_standard_error
+        .shape,
+    )
+
   def testBadModel(self):
     with self.assertRaisesRegex(TypeError,
                                 'Model must have only one Tensor dtype'):
       targets.VectorModel(TestBadModel())
+
+  def testBadSampleTransformation(self):
+    # If we don't flatten the transformations, we don't expect an error
+    targets.VectorModel(TestBadSampleTransformationModel())
+    with self.assertRaisesRegex(
+        TypeError,
+        'Sample transformation \'bad\' must have only one Tensor dtype'):
+      targets.VectorModel(
+          TestBadSampleTransformationModel(),
+          flatten_sample_transformations=True)
 
   def testExample(self):
     base_model = targets.SyntheticItemResponseTheory()
