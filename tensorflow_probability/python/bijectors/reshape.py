@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -150,9 +151,11 @@ class Reshape(bijector.Bijector):
       dtype = dtype_util.common_dtype(
           [event_shape_out, event_shape_in], dtype_hint=tf.int32)
       event_shape_out = tensor_util.convert_nonref_to_tensor(
-          event_shape_out, name='event_shape_out', dtype=dtype)
+          event_shape_out, name='event_shape_out', dtype=dtype,
+          as_shape_tensor=True)
       event_shape_in = tensor_util.convert_nonref_to_tensor(
-          event_shape_in, name='event_shape_in', dtype=dtype)
+          event_shape_in, name='event_shape_in', dtype=dtype,
+          as_shape_tensor=True)
 
       forward_min_event_ndims_ = _rank_from_shape(event_shape_in)
       if forward_min_event_ndims_ is None:
@@ -189,7 +192,7 @@ class Reshape(bijector.Bijector):
 
   def _forward(self, x):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
-        tf.shape(x), self._event_shape_in, self._event_shape_out,
+        ps.shape(x), self._event_shape_in, self._event_shape_out,
         self.validate_args)
     y = tf.reshape(x, output_shape)
     tensorshape_util.set_shape(y, output_tensorshape)
@@ -197,7 +200,7 @@ class Reshape(bijector.Bijector):
 
   def _inverse(self, y):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
-        tf.shape(y), self._event_shape_out, self._event_shape_in,
+        ps.shape(y), self._event_shape_out, self._event_shape_in,
         self.validate_args)
     x = tf.reshape(y, output_shape)
     tensorshape_util.set_shape(x, output_tensorshape)
@@ -259,27 +262,19 @@ def _replace_event_shape_in_shape_tensor(
       event_shape_in,
       event_shape_out)
 
-  # TODO(b/124240153): Remove map(tf.identity, deps) once tf.function
-  # correctly supports control_dependencies.
-  validation_dependencies = (
-      map(tf.identity, (event_shape_in, event_shape_out))
-      if validate_args else ())
-
   if (tensorshape_util.is_fully_defined(output_tensorshape) and
       (is_validated or not validate_args)):
-    with tf.control_dependencies(validation_dependencies):
-      output_shape = tf.convert_to_tensor(
-          tensorshape_util.as_list(output_tensorshape), name='output_shape',
-          dtype_hint=tf.int32)
+    output_shape = ps.convert_to_shape_tensor(
+        tensorshape_util.as_list(output_tensorshape), name='output_shape',
+        dtype_hint=tf.int32)
     return output_shape, output_tensorshape
 
-  with tf.control_dependencies(validation_dependencies):
-    event_shape_in_ndims = (
-        tf.size(event_shape_in)
-        if tensorshape_util.num_elements(event_shape_in.shape) is None else
-        tensorshape_util.num_elements(event_shape_in.shape))
-    input_non_event_shape, input_event_shape = tf.split(
-        input_shape, num_or_size_splits=[-1, event_shape_in_ndims])
+  event_shape_in_ndims = (
+      tf.size(event_shape_in)
+      if tensorshape_util.num_elements(event_shape_in.shape) is None else
+      tensorshape_util.num_elements(event_shape_in.shape))
+  input_non_event_shape, input_event_shape = tf.split(
+      input_shape, num_or_size_splits=[-1, event_shape_in_ndims])
 
   additional_assertions = []
   if is_validated:
