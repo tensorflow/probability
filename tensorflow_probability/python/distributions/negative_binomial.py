@@ -106,7 +106,7 @@ class NegativeBinomial(distribution.Distribution):
       self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, dtype=dtype, name='total_count')
 
-      super(NegativeBinomial, self).__init__(
+      super().__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
