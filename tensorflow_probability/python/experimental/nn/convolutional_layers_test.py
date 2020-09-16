@@ -126,11 +126,10 @@ class ConvolutionTest(test_util.TestCase):
           paddings=[[x_ndims - 1, 1]],
           constant_values=1))
 
-    nn = tfn.Convolution(1, 5, 5, strides=2, padding='same', batch_shape=1,
+    nn = tfn.Convolution(1, 5, 5, strides=2, padding='same', batch_shape=[10],
                          make_kernel_bias_fn=sample)
-    x = nn(tile_for_batch(tf.random.normal([3, 28, 28, 1]),
-                          tf.reshape(1, [-1])))
-    self.assertShapeEqual(np.zeros([3, 14, 14, 1, 5]), x)
+    x = nn(tile_for_batch(tf.random.normal([3, 28, 28, 1]), [10]))
+    self.assertShapeEqual(np.zeros([3, 14, 14, 10, 5]), x)
 
 
 @test_util.test_all_tf_execution_regimes
