@@ -2481,7 +2481,6 @@ multi_substrate_py_test(
     name = "joint_distribution_auto_batched_test",
     size = "large",
     srcs = ["joint_distribution_auto_batched_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 2,
     deps = [

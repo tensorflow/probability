@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 
 # Dependency imports
 
@@ -26,6 +27,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
@@ -612,12 +614,66 @@ class JointDistributionNamedTest(test_util.TestCase):
         'These names were invalid:\n'
         'z')
     with self.assertRaisesRegex(ValueError, expected_error):
-      joint.sample(z=2.)
+      joint.sample(seed=seed, z=2.)
 
     # Raise if value and keywords are passed.
     with self.assertRaisesRegex(
         ValueError, r'Supplied both `value` and keyword arguments .*'):
-      joint.sample(a=1., value={'a': 1})
+      joint.sample(seed=seed, a=1., value={'a': 1})
+
+  @test_util.jax_disable_test_missing_functionality('stateful samplers')
+  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
+  def test_legacy_dists(self):
+
+    class StatefulNormal(tfd.Normal):
+
+      def _sample_n(self, n, seed=None):
+        return self.loc + self.scale * tf.random.normal(
+            tf.concat([[n], self.batch_shape_tensor()], axis=0),
+            seed=seed)
+
+    # pylint: disable=bad-whitespace
+    d = tfd.JointDistributionNamed(dict(
+        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+        loc  =          StatefulNormal(loc=0, scale=2.),
+        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        m    =          tfd.Normal,
+        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12)),
+                                   validate_args=True)
+    # pylint: enable=bad-whitespace
+
+    warnings.simplefilter('always')
+    with warnings.catch_warnings(record=True) as w:
+      d.sample(seed=test_util.test_seed())
+    self.assertRegexpMatches(
+        str(w[0].message),
+        r'Falling back to stateful sampling for.*of type.*StatefulNormal.*'
+        r'component name "loc" and `dist.name` "Normal"',
+        msg=w)
+
+  @test_util.jax_disable_test_missing_functionality('stateful samplers')
+  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
+  def test_legacy_dists_stateless_seed_raises(self):
+
+    class StatefulNormal(tfd.Normal):
+
+      def _sample_n(self, n, seed=None):
+        return self.loc + self.scale * tf.random.normal(
+            tf.concat([[n], self.batch_shape_tensor()], axis=0),
+            seed=seed)
+
+    # pylint: disable=bad-whitespace
+    d = tfd.JointDistributionNamed(dict(
+        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+        loc  =          StatefulNormal(loc=0, scale=2.),
+        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        m    =          tfd.Normal,
+        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12)),
+                                   validate_args=True)
+    # pylint: enable=bad-whitespace
+
+    with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
+      d.sample(seed=samplers.zeros_seed())
 
 
 if __name__ == '__main__':

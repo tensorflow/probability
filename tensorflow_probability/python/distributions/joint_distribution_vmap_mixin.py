@@ -20,8 +20,12 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import vectorization_util
+
+
+JAX_MODE = False
 
 
 def _might_have_nonzero_size(sample_shape):
@@ -97,6 +101,9 @@ class JointDistributionVmapMixin(object):
     self._use_vectorized_map = kwargs.pop('use_vectorized_map', True)
     super(JointDistributionVmapMixin, self).__init__(*args, **kwargs)
 
+  # TODO(b/166658748): Drop this (make it always True).
+  _stateful_to_stateless = JAX_MODE
+
   @property
   def use_vectorized_map(self):
     return self._use_vectorized_map
@@ -164,7 +171,7 @@ class JointDistributionVmapMixin(object):
     value_core_ndims = None
     if value is not None:
       value_core_ndims = tf.nest.map_structure(
-          lambda v, nd: nd if v is not None else None,
+          lambda v, nd: None if v is None else nd,
           value, self._model_unflatten(self._single_sample_ndims),
           check_types=False)
     batch_flat_sample = vectorization_util.make_rank_polymorphic(
@@ -189,8 +196,12 @@ class JointDistributionVmapMixin(object):
       value = self._model_flatten(value)
 
     def map_measure_fn(value):
-      return [getattr(d, attr)(x) for (d, x) in zip(
-          *self._flat_sample_distributions(value=value))]
+      # We always provide a seed, since _flat_sample_distributions will
+      # unconditionally split the seed.
+      with tf.name_scope('map_measure_fn'):
+        constant_seed = joint_distribution_lib.dummy_seed()
+        return [getattr(d, attr)(x) for (d, x) in zip(
+            *self._flat_sample_distributions(value=value, seed=constant_seed))]
     if self.use_vectorized_map:
       map_measure_fn = vectorization_util.make_rank_polymorphic(
           map_measure_fn,

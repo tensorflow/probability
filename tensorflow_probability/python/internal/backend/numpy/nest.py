@@ -47,12 +47,27 @@ from tree import flatten_up_to
 from tree import flatten_with_path
 from tree import flatten_with_path_up_to
 from tree import is_nested
-from tree import map_structure
+from tree import map_structure as dm_tree_map_structure
 from tree import map_structure_up_to
 from tree import map_structure_with_path
 from tree import map_structure_with_path_up_to
 from tree import unflatten_as
 # pylint: enable=unused-import
+
+
+JAX_MODE = False
+
+
+def map_structure(func, *structure, **kwargs):
+  """Add expand_composites support for JAX."""
+  expand_composites = kwargs.pop('expand_composites', False)
+  if expand_composites and JAX_MODE:
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    leaves = [func(*leaves) for leaves in zip(
+        *(tree_util.tree_leaves(struct) for struct in structure))]
+    return tree_util.tree_unflatten(tree_util.tree_structure(structure[0]),
+                                    leaves)
+  return dm_tree_map_structure(func, *structure, **kwargs)
 
 
 def _is_namedtuple(v):

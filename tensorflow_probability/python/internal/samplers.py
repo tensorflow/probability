@@ -33,6 +33,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 __all__ = [
     'categorical',
     'gamma',
+    'is_stateful_seed',
     'normal',
     'poisson',
     'sanitize_seed',
@@ -52,42 +53,48 @@ def zeros_seed():
   return tf.constant([0, 0], dtype=SEED_DTYPE)
 
 
-def sanitize_seed(seed, salt=None):
+def is_stateful_seed(seed):
+  return seed is None or isinstance(seed, six.integer_types)
+
+
+def sanitize_seed(seed, salt=None, name=None):
   """Map various types to a seed `Tensor`."""
   if callable(seed):  # e.g. SeedStream.
     seed = seed()
   if salt is not None and not isinstance(salt, str):
     raise TypeError('`salt` must be a python `str`, got {}'.format(repr(salt)))
-  if seed is None or isinstance(seed, six.integer_types):
-    if JAX_MODE:
-      raise ValueError('TFP-on-JAX requires a `jax.random.PRNGKey` `seed` arg.')
-    # TODO(b/147874898): Do we deprecate `int` seeds, migrate ints to stateless?
+  with tf.name_scope(name or 'sanitize_seed'):
+    if is_stateful_seed(seed):
+      if JAX_MODE:
+        raise ValueError(
+            'TFP-on-JAX requires a `jax.random.PRNGKey` `seed` arg.')
+      # TODO(b/147874898): Deprecate `int` seeds, migrate ints to stateless?
+      if salt is not None:
+        # Prefer to incorporate salt as a constant.
+        if seed is not None:
+          seed = int(hashlib.sha512(
+              str((seed, salt)).encode('utf-8')).hexdigest(), 16) % (2**31 - 1)
+        salt = None
+      # Convert "stateful-indicating" `int`/`None` seed to stateless Tensor seed
+      # by way of a stateful sampler.
+      seed = tf.random.uniform([2], seed=seed, minval=np.iinfo(SEED_DTYPE).min,
+                               maxval=np.iinfo(SEED_DTYPE).max,
+                               dtype=SEED_DTYPE, name='seed')
+
+    # TODO(b/159209541): Consider ignoring salts for stateless seeds, for
+    # performance and because using stateless seeds already requires the
+    # discipline of splitting.
+
     if salt is not None:
-      # Prefer to incorporate salt as a constant.
-      if seed is not None:
-        seed = int(hashlib.sha512(
-            str((seed, salt)).encode('utf-8')).hexdigest(), 16) % (2**31 - 1)
-      salt = None
-    # Convert "stateful-indicating" `int`/`None` seed to stateless Tensor seed,
-    # by way of a stateful sampler.
-    seed = tf.random.uniform([2], seed=seed, minval=np.iinfo(SEED_DTYPE).min,
-                             maxval=np.iinfo(SEED_DTYPE).max, dtype=SEED_DTYPE,
-                             name='seed')
+      salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
+      if JAX_MODE:
+        from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
+        seed = jaxrand.fold_in(seed, salt & (2**32 - 1))
+      else:
+        seed = tf.bitwise.bitwise_xor(
+            seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
 
-  # TODO(b/159209541): Consider ignoring salts for stateless seeds, for
-  # performance and because using stateless seeds already requires the
-  # discipline of splitting.
-
-  if salt is not None:
-    salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
-    if JAX_MODE:
-      from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
-      seed = jaxrand.fold_in(seed, salt & (2**32 - 1))
-    else:
-      seed = tf.bitwise.bitwise_xor(
-          seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
-
-  return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
+    return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
 
 
 def split_seed(seed, n=2, salt=None, name=None):
@@ -112,7 +119,7 @@ def split_seed(seed, n=2, salt=None, name=None):
           or tf.is_tensor(n)):  # avoid confusion with salt.
     raise TypeError(
         '`n` must be a python `int` or an int Tensor, got {}'.format(repr(n)))
-  with tf.name_scope(name or 'split'):
+  with tf.name_scope(name or 'split_seed'):
     seed = sanitize_seed(seed, salt=salt)
     if JAX_MODE:
       from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
@@ -170,7 +177,7 @@ def normal(
   """As `tf.random.normal`, but handling stateful/stateless `seed`s."""
   with tf.name_scope(name or 'normal'):
     # TODO(b/147874898): Remove workaround for seed-sensitive tests.
-    if seed is None or isinstance(seed, six.integer_types):
+    if is_stateful_seed(seed):
       return tf.random.normal(
           shape=shape, seed=seed, mean=mean, stddev=stddev, dtype=dtype)
 

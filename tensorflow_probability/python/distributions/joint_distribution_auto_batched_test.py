@@ -99,14 +99,13 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllEqual(batch_shape, [])
 
   @parameterized.named_parameters(
-      {'testcase_name': 'coroutine',
-       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
-      {'testcase_name': 'sequential',
-       'jd_class': tfd.JointDistributionSequentialAutoBatched},
-      {'testcase_name': 'named',
-       'jd_class': tfd.JointDistributionNamedAutoBatched})
-  def test_model_with_nontrivial_batch_shape(self, jd_class):
-
+      *(dict(  # pylint: disable=g-complex-comprehension
+          testcase_name=jd_type + '_' + sampler_type,
+          jd_class=getattr(tfd, 'JointDistribution' + jd_type + 'AutoBatched'),
+          sampler_type=sampler_type)
+        for jd_type in ('Coroutine', 'Sequential', 'Named')
+        for sampler_type in ('stateful', 'stateless')))
+  def test_model_with_nontrivial_batch_shape(self, jd_class, sampler_type):
     models = {}
     def coroutine_model():
       g = yield tfd.LogNormal(0., [1., 2.])
@@ -145,7 +144,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     batch_shape = self.evaluate(joint.batch_shape_tensor())
     self.assertAllEqual(batch_shape, [2])
 
-    x = joint.sample([5], seed=test_util.test_seed())
+    x = joint.sample([5], seed=test_util.test_seed(sampler_type=sampler_type))
     lp = self.evaluate(joint.log_prob(x))
     self.assertAllEqual(lp.shape, [5, 2])
 
@@ -339,8 +338,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
       b = yield tfd.Sample(tfd.Normal(0, 1.), 3)
       # The following line fails if not autovectorized.
       yield tfd.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)
-    x = self.evaluate(dist.sample(123))
-    x2 = self.evaluate(dist.sample(value=x))
+    x = self.evaluate(dist.sample(123, seed=test_util.test_seed()))
+    x2 = self.evaluate(dist.sample(value=x, seed=test_util.test_seed()))
     self.assertAllCloseNested(x, x2)
 
     # Also test a dict-type value (JDNamed).
@@ -349,11 +348,14 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         'b': tfd.Sample(tfd.Normal(0, 1.), 3),
         'c': lambda a, b: tfd.Normal(  # pylint: disable=g-long-lambda
             a[tf.newaxis, ...] * b[..., tf.newaxis], 1.)})
-    x = self.evaluate(dist.sample(123))
-    x2 = self.evaluate(dist.sample(value=x))
+    x = self.evaluate(dist.sample(123, seed=test_util.test_seed()))
+    x2 = self.evaluate(dist.sample(value=x, seed=test_util.test_seed()))
     self.assertAllCloseNested(x, x2)
 
-  def test_sample_with_partially_specified_value(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='stateful', sampler_type='stateful'),
+      dict(testcase_name='stateless', sampler_type='stateless'))
+  def test_sample_with_partially_specified_value(self, sampler_type):
 
     num_features = 5
 
@@ -374,30 +376,41 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     value = [None if v is None else tf.cast(v, tf.float32) for v in value_]
 
     # The sample should keep the specified values.
-    xs = self.evaluate(joint.sample(value=value))
-    self.assertAllEqual(xs[0], value_[0]  * tf.ones_like(xs[0]))
-    self.assertAllEqual(xs[3], value_[3])
-    self.assertAllEqual(xs[1].shape[-1:], [num_features])
-    self.assertAllEqual(xs[2].shape[-1:], [num_features])
+    xs = self.evaluate(
+        joint.sample(
+            value=value, seed=test_util.test_seed(sampler_type=sampler_type)))
+    self.assertAllEqual(xs[0], tf.fill([value_partial_batch_dim], value[0]))
+    self.assertAllEqual(xs[1].shape, [value_partial_batch_dim, num_features])
+    self.assertAllEqual(xs[2].shape, [value_partial_batch_dim, num_features])
+    self.assertAllEqual(xs[3], value[3])
 
+    # With sample shape.
     sample_shape = [6, 2]
-    samples = joint.sample(sample_shape, value=value)
+    samples = joint.sample(sample_shape, value=value,
+                           seed=test_util.test_seed(sampler_type=sampler_type))
     xs = self.evaluate(samples)
-    self.assertAllEqual(xs[0], value_[0] * tf.ones_like(xs[0]))
-    self.assertAllEqual(xs[1].shape,
-                        sample_shape + [value_partial_batch_dim, num_features])
-    self.assertAllEqual(xs[3], value_[3] * tf.ones_like(xs[3]))
+    expect_shp = sample_shape + [value_partial_batch_dim, num_features]
+    self.assertAllEqual(
+        xs[0], tf.fill(sample_shape + [value_partial_batch_dim], value[0]))
+    self.assertAllEqual(xs[1].shape, expect_shp)
+    self.assertAllEqual(xs[2].shape, expect_shp)
+    self.assertAllEqual(xs[3], value[3] * tf.ones(expect_shp))
 
     sample_shape_dynamic = tf1.placeholder_with_default(
         sample_shape, shape=None)
-    samples = joint.sample(sample_shape_dynamic, value=value)
+    samples = joint.sample(sample_shape_dynamic, value=value,
+                           seed=test_util.test_seed(sampler_type=sampler_type))
     xs = self.evaluate(samples)
-    self.assertAllEqual(xs[0], value_[0] * tf.ones_like(xs[0]))
-    self.assertAllEqual(xs[1].shape,
-                        sample_shape + [value_partial_batch_dim, num_features])
-    self.assertAllEqual(xs[3], value_[3] * tf.ones_like(xs[3]))
+    self.assertAllEqual(
+        xs[0], tf.fill(sample_shape + [value_partial_batch_dim], value[0]))
+    self.assertAllEqual(xs[1].shape, expect_shp)
+    self.assertAllEqual(xs[2].shape, expect_shp)
+    self.assertAllEqual(xs[3], value[3] * tf.ones(expect_shp))
 
-  def test_sample_with_prefix_of_values(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='stateful', sampler_type='stateful'),
+      dict(testcase_name='stateless', sampler_type='stateless'))
+  def test_sample_with_prefix_of_values(self, sampler_type):
     num_rows = 4
     num_columns = 5
     def dist():
@@ -423,7 +436,9 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     for joint in (tuple_joint, namedtuple_joint):
       for value in (tuple_value, namedtuple_value):
-        xs = self.evaluate(joint.sample(value=value))
+        xs = self.evaluate(
+            joint.sample(value=value,
+                         seed=test_util.test_seed(sampler_type=sampler_type)))
         self.assertAllEqual(xs[0], v0)
         self.assertAllEqual(xs[1].shape,
                             [value_partial_batch_dim, num_columns])
@@ -622,15 +637,16 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         tfd.JointDistributionCoroutineAutoBatched(inner_fn,
                                                   batch_ndims=1,
                                                   name='a')])
-    z = joint.sample()
+    z = joint.sample(seed=test_util.test_seed())
 
     # Batch and event shape.
     self.assertAllEqual(joint.batch_shape, [])
-    self.assertAllEqualNested(tf.nest.map_structure(lambda x: x.shape, z),
-                              joint.event_shape)
+    self.assertAllEqualNested(
+        tf.nest.map_structure(lambda x: tf.TensorShape(x.shape), z),
+        joint.event_shape)
 
     # Sample shape.
-    z2 = joint.sample(5)
+    z2 = joint.sample(5, seed=test_util.test_seed())
     lp2 = joint.log_prob(z2)
     self.assertAllEqual(lp2.shape, [5])
 

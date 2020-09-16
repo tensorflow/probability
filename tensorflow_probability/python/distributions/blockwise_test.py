@@ -57,7 +57,7 @@ class BlockwiseTest(test_util.TestCase):
         dtype_override=tf.float32,
         validate_args=True,
     )
-    x = d.sample([2, 1], seed=42)
+    x = d.sample([2, 1], seed=test_util.test_seed())
     y = d.log_prob(x)
     x_, y_ = self.evaluate([x, y])
     self.assertEqual((2, 1, 4 + 2), x_.shape)
@@ -80,7 +80,7 @@ class BlockwiseTest(test_util.TestCase):
     joint = tfd.JointDistributionCoroutine(model)
     d = tfd.Blockwise(joint, validate_args=True)
 
-    x = d.sample([2, 1], seed=42)
+    x = d.sample([2, 1], seed=test_util.test_seed())
     y = d.log_prob(x)
     x_, y_ = self.evaluate([x, y])
     self.assertEqual((2, 1, 2 + 1 + 1 + 1), x_.shape)
