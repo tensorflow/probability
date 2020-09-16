@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -112,6 +113,25 @@ class NegativeBinomial(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def from_mean_dispersion(cls, mu, disp):
+    """
+    Constructs a Negative Binomial distribution from its mean (mu)
+    and dispersion (disp) parametrization.
+    The dispersion is defined as the reciprocal of the total number of
+    failures to stop at `disp = 1 / f`
+    """
+    dtype = dtype_util.common_dtype([mu, disp], dtype_hint=tf.float32)
+    disp_t = tensor_util.convert_nonref_to_tensor(disp, dtype=dtype)
+    mu_t = tensor_util.convert_nonref_to_tensor(mu, dtype=dtype)
+
+    total_count = DeferredTensor(disp_t, lambda x: 1. / x, dtype=dtype)
+
+    return cls(
+      total_count=total_count,
+      probs=DeferredTensor(mu_t, lambda x: x / (x + total_count)),
+    )
 
   @classmethod
   def _params_event_ndims(cls):

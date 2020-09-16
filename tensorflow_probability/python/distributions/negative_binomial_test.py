@@ -141,6 +141,17 @@ class NegativeBinomialTest(test_util.TestCase):
     self.assertEqual([6], pmf.shape)
     self.assertAllClose(np.exp(expected_log_pmf), self.evaluate(pmf))
 
+  def testNegativeBinomialFromMeanDispersion(self):
+    total_count = 5.
+    probs = np.repeat(0.2, 3).astype(np.float32)
+    x = np.array([4., 5., 6.], dtype=np.float32)
+    mu = stats.nbinom.mean(total_count, 1 - probs)
+    negbinom_mean_disp = tfd.NegativeBinomial.from_mean_dispersion(
+      mu, 1 / total_count)
+    expected_log_pmf = stats.nbinom.logpmf(x, n=total_count, p=1 - probs)
+    log_pmf = negbinom_mean_disp.log_prob(x)
+    self.assertAllClose(expected_log_pmf, self.evaluate(log_pmf))
+
   def testNegativeBinomialLogPmfValidateArgs(self):
     batch_size = 6
     probs = [.9] * batch_size
