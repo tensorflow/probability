@@ -362,14 +362,10 @@ py_library(
     deps = [],
 )
 
-py_test(
-    name = "numpy_test",
-    size = "small",
-    srcs = ["numpy_test.py"],
-    python_version = "PY3",
-    shard_count = 11,
-    srcs_version = "PY3",
-    tags = ["tfp_numpy"],
+py_library(
+    name = "numpy_testlib",
+    testonly = 1,
+    srcs_version = "PY2AND3",
     deps = [
         ":numpy",
         # absl/testing:parameterized dep,
@@ -379,6 +375,67 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "numpy_test",
+    size = "small",
+    srcs = ["numpy_test.py"],
+    python_version = "PY3",
+    shard_count = 15,
+    srcs_version = "PY3",
+    tags = ["tfp_numpy"],
+    deps = [
+        ":numpy_testlib",
+    ],
+)
+
+py_test(
+    name = "xla_test_cpu",
+    size = "medium",
+    srcs = ["numpy_test.py"],
+    args = ["--test_mode=xla"],
+    main = "numpy_test.py",
+    python_version = "PY3",
+    shard_count = 15,
+    srcs_version = "PY3",
+    tags = [
+        "hypothesis",
+        "no-oss-ci",
+        "tfp_xla",
+    ],
+    deps = [
+        ":numpy_testlib",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_test(
+    name = "xla_test_gpu",
+    size = "small",
+    srcs = ["numpy_test.py"],
+    args = ["--test_mode=xla"],
+    main = "numpy_test.py",
+    python_version = "PY3",
+    shard_count = 11,
+    srcs_version = "PY3",
+    tags = [
+        "no-oss-ci",
+        "requires-gpu-nvidia",
+        "tfp_xla",
+    ],
+    deps = [
+        ":numpy_testlib",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+test_suite(
+    name = "xla_test",
+    tests = [
+        ":xla_test_cpu",
+        ":xla_test_gpu",
     ],
 )
 
