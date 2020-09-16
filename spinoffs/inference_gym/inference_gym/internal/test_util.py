@@ -336,15 +336,17 @@ class InferenceGymTestCase(test_util.TestCase):
     for name, sample_transformation in model.sample_transformations.items():
       transformed_points = self.evaluate(sample_transformation(test_points))
 
-      def _assertions_part(expected_shape, transformed_part):
+      def _assertions_part(expected_shape, expected_dtype, transformed_part):
         self.assertAllFinite(transformed_part)
         self.assertEqual(
             (batch_size,) + tuple(expected_shape),
             tuple(list(transformed_part.shape)))
+        self.assertEqual(expected_dtype, transformed_part.dtype)
 
       self.assertAllAssertsNested(
           _assertions_part,
           sample_transformation_shapes[name],
+          sample_transformation.dtype,
           transformed_points,
           shallow=transformed_points,
           msg='Checking outputs of: {}'.format(name))

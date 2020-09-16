@@ -44,7 +44,7 @@ def autoregressive_series_fn(num_timesteps,
   """Generative process for an order-1 autoregressive process."""
   x_t = yield Root(tfd.Normal(
       loc=mean,
-      scale=noise_scale / tf.math.sqrt(1 - persistence**2),
+      scale=noise_scale / tf.math.sqrt(tf.ones([]) - persistence**2),
       name='x_{:06d}'.format(0)))
   for t in range(1, num_timesteps):
     # The 'centered' representation used here is challenging for inference
@@ -148,10 +148,10 @@ class StochasticVolatility(bayesian_model.BayesianModel):
 
       def _ext_identity(params):
         res = collections.OrderedDict()
-        res['persistence_of_volatility'] = params[0]
-        res['mean_log_volatility'] = params[1]
-        res['white_noise_shock_scale'] = params[2]
-        res['log_volatility'] = tf.stack(params[3], axis=-1)
+        res['persistence_of_volatility'] = params.persistence_of_volatility
+        res['mean_log_volatility'] = params.mean_log_volatility
+        res['white_noise_shock_scale'] = params.white_noise_shock_scale
+        res['log_volatility'] = tf.stack(params.log_volatility, axis=-1)
         return res
 
       sample_transformations = {
