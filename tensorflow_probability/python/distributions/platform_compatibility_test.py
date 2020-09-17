@@ -37,6 +37,7 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import experimental
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
@@ -332,6 +333,53 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
           getattr(dist, evaluative)(sample)
       except NotImplementedError:
         pass
+
+
+class DistributionCompositeTensorTest(test_util.TestCase):
+
+  def _test_sample_and_log_prob(self, dist_name, dist):
+    seed = test_util.test_seed(sampler_type='stateless')
+    num_samples = 3
+
+    # Sample from the distribution before composite tensoring
+    sample1 = self.evaluate(dist.sample(num_samples, seed=seed))
+    hp.note('Drew samples {}'.format(sample1))
+
+    # Sample from the distribution after composite tensoring
+    composite_dist = experimental.as_composite(dist)
+    flat = tf.nest.flatten(composite_dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        composite_dist, flat, expand_composites=True)
+    sample2 = self.evaluate(unflat.sample(num_samples, seed=seed))
+    hp.note('Drew samples {}'.format(sample2))
+
+    # Check that the samples are the same
+    self.assertAllClose(sample1, sample2)
+
+    # Check that all the log_probs agree for the samples from before ...
+    ct_lp1 = unflat.log_prob(sample1)
+    orig_lp1 = dist.log_prob(sample1)
+    ct_lp1_, orig_lp1_ = self.evaluate((ct_lp1, orig_lp1))
+    self.assertAllClose(ct_lp1_, orig_lp1_)
+
+    # ... and after.  (Even though they're supposed to be the same anyway.)
+    ct_lp2 = unflat.log_prob(sample2)
+    orig_lp2 = dist.log_prob(sample2)
+    ct_lp2_, orig_lp2_ = self.evaluate((ct_lp2, orig_lp2))
+    self.assertAllClose(ct_lp2_, orig_lp2_)
+
+  # TODO(alexeev): Add coverage for meta distributions, in addition to base
+  # distributions.
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in dhps.TF2_FRIENDLY_DISTS)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testCompositeTensor(self, dist_name, data):
+    dist = data.draw(
+        dhps.distributions(
+            dist_name=dist_name, enable_vars=False, validate_args=False))
+    self._test_sample_and_log_prob(dist_name, dist)
 
 
 @test_util.test_graph_mode_only
