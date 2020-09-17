@@ -933,20 +933,16 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
     index_points = self._get_index_points(index_points)
     batch_shapes = [
         self.kernel.batch_shape,
-        self.variational_inducing_observations_loc.shape[:-1]]
-    if self.index_points is not None:
-      batch_shapes.append(
-          self.index_points.shape[:-(self.kernel.feature_ndims + 1)])
+        self.variational_inducing_observations_loc.shape[:-1],
+        index_points.shape[:-(self.kernel.feature_ndims + 1)]]
     return functools.reduce(tf.broadcast_static_shape, batch_shapes)
 
   def _batch_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
     batch_shape_tensors = [
         self.kernel.batch_shape_tensor(),
-        tf.shape(self.variational_inducing_observations_loc)[:-1]]
-    if self.index_points is not None:
-      batch_shape_tensors.append(
-          tf.shape(self.index_points)[:-(self.kernel.feature_ndims + 1)])
+        tf.shape(self.variational_inducing_observations_loc)[:-1],
+        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)]]
     return functools.reduce(tf.broadcast_dynamic_shape, batch_shape_tensors)
 
   def surrogate_posterior_expected_log_likelihood(
