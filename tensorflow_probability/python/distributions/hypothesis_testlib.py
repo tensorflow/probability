@@ -122,10 +122,10 @@ TF2_FRIENDLY_DISTS = (
 # `_instantiable_base_dists`, below.
 SPECIAL_DISTS = (
     'Autoregressive',
-    'BatchReshape',
+    'BatchReshape',  # (has strategy)
     'Blockwise',
     'Distribution',  # Base class; not a distribution at all
-    'Empirical',  # Special base distribution with custom instantiation
+    'Empirical',  # Base distribution with custom instantiation; (has strategy)
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionCoroutineAutoBatched',
@@ -133,12 +133,12 @@ SPECIAL_DISTS = (
     'JointDistributionNamedAutoBatched',
     'JointDistributionSequential',
     'JointDistributionSequentialAutoBatched',
-    'Independent',
-    'Mixture',
-    'MixtureSameFamily',
-    'Sample',
-    'TransformedDistribution',
-    'QuantizedDistribution',
+    'Independent',  # (has strategy)
+    'Mixture',  # (has strategy)
+    'MixtureSameFamily',  # (has strategy)
+    'Sample',  # (has strategy)
+    'TransformedDistribution',  # (has strategy)
+    'QuantizedDistribution',  # (has strategy)
 )
 
 
@@ -445,6 +445,7 @@ INSTANTIABLE_META_DISTS = (
     'Independent',
     'Mixture',
     'MixtureSameFamily',
+    'Sample',
     'TransformedDistribution',
     'QuantizedDistribution',
 )
@@ -949,6 +950,67 @@ def independents(
 
 
 @hps.composite
+def samples(
+    draw, batch_shape=None, event_dim=None,
+    enable_vars=False, depth=None, eligibility_filter=lambda name: True,
+    validate_args=True):
+  """Strategy for drawing `Sample` distributions.
+
+  The underlying distribution is drawn from the `distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `Sample` distribution.  Hypothesis will pick one if omitted.
+    event_dim: Optional Python int giving the size of each of the underlying
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `Sample` distributions with the specified
+      `batch_shape` (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=2, max_value=6))
+  sample_shape = draw(hps.lists(hps.just(event_dim), min_size=0, max_size=2))
+
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+
+  underlying = draw(
+      distributions(
+          batch_shape=batch_shape,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          depth=depth - 1,
+          eligibility_filter=eligibility_filter,
+          validate_args=validate_args))
+  hp.note('Forming Sample with underlying dist {}; '
+          'parameters {}; sample_shape {}'.format(
+              underlying, params_used(underlying), sample_shape))
+  result_dist = tfd.Sample(
+      underlying,
+      sample_shape=sample_shape,
+      validate_args=validate_args)
+  if batch_shape != result_dist.batch_shape:
+    msg = ('`Sample` strategy generated a bad batch shape '
+           'for {}, should have been {}.').format(result_dist, batch_shape)
+    raise AssertionError(msg)
+  return result_dist
+
+
+@hps.composite
 def transformed_distributions(draw,
                               batch_shape=None,
                               event_dim=None,
@@ -1350,6 +1412,10 @@ def distributions(draw,
         eligibility_filter, validate_args))
   if dist_name == 'Independent':
     return draw(independents(
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
+  if dist_name == 'Sample':
+    return draw(samples(
         batch_shape, event_dim, enable_vars, depth,
         eligibility_filter, validate_args))
   if dist_name == 'MixtureSameFamily':
