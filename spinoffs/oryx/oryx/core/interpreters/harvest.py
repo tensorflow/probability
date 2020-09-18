@@ -653,7 +653,7 @@ def nest(f, *, scope):
   return wrapped
 
 
-def _find_sows(typed_jaxpr: jax_core.TypedJaxpr,
+def _find_sows(typed_jaxpr: jax_core.ClosedJaxpr,
                tag: str) -> List[Dict[str, Any]]:
   sows = []
   for eqn in typed_jaxpr.jaxpr.eqns:

@@ -142,7 +142,7 @@ class FunctionModule(module.Module):
 
   def __init__(self,
                variables: Dict[str, Any],
-               jaxpr: jax_core.TypedJaxpr,
+               jaxpr: jax_core.ClosedJaxpr,
                in_tree: Any,
                out_tree: Any,
                *,
