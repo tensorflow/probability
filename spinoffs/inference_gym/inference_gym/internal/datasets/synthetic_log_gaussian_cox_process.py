@@ -23,7 +23,8 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.inference_gym.internal import array_to_source
+from inference_gym.internal import array_to_source
+from inference_gym import using_tensorflow as gym
 import numpy as np
 
 rng = np.random.RandomState(seed=1)
@@ -33,7 +34,7 @@ locations = np.stack(np.meshgrid(np.arange(10), np.arange(10)),
 extents = np.ones(100)
 dummy_counts = 100 * np.ones(100)
 
-model = tfp.experimental.inference_gym.targets.LogGaussianCoxProcess(
+model = gym.targets.LogGaussianCoxProcess(
     train_locations=locations, train_extents=extents, train_counts=dummy_counts)
 dataset = model._sample_dataset(seed=2)
 

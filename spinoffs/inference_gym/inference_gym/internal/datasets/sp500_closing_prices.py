@@ -22,7 +22,8 @@ To regenerate this data:
 
 ```python
 import pandas as pd
-from tensorflow_probability.python.experimental.inference_gym.internal import array_to_source
+from inference_gym.internal import array_to_source
+from inference_gym import using_tensorflow as gym
 
 url = 'https://query1.finance.yahoo.com/v7/finance/download/%5EGSPC?period1=1277424000&period2=1593043200&interval=1d&events=history'
 d = pd.read_csv(url)
