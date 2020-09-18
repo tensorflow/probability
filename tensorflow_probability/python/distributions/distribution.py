@@ -700,7 +700,7 @@ class Distribution(_BaseDistribution):
 
     x = tf.random.normal([5, 3, 2, 2])
     cov = tf.matmul(x, x, transpose_b=True)
-    chol = tf.cholesky(cov)
+    chol = tf.linalg.cholesky(cov)
     loc = tf.random.normal([4, 1, 3, 1])
     mvn = tfd.MultivariateNormalTriL(loc, chol)
     mvn.batch_shape  # => [4, 5, 3]
