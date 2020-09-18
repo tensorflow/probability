@@ -40,8 +40,11 @@
 # commands, telling pip to install the dependencies in the user install
 # directory.
 
+# Get the absolute path to the directory containing this script.
+DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
+
 virtualenv_is_active() {
-  python testing/virtualenv_is_active.py
+  python ${DIR}/virtualenv_is_active.py
 }
 
 SCRIPT_ARGS=$@
@@ -64,6 +67,8 @@ if ! virtualenv_is_active && ! user_flag_is_set; then
   exit 1
 elif ! virtualenv_is_active && user_flag_is_set; then
   PIP_FLAGS="--user"
+else
+  PIP_FLAGS=""
 fi
 
 if enable_gpu_flag_is_set; then
@@ -89,7 +94,7 @@ find_good_tf_nightly_version_str() {
 }
 
 has_tensorflow_packages() {
-  python -m pip list | grep tensorflow &> /dev/null
+  python -m pip list | grep -v tensorflow-metadata | grep tensorflow &> /dev/null
 }
 
 has_tf_nightly_cpu_package() {
@@ -140,17 +145,24 @@ check_for_common_package_conflicts() {
   fi
 }
 
+install_tensorflow() {
+  # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
+  TF_VERSION_STR=$(find_good_tf_nightly_version_str $TF_NIGHTLY_PACKAGE)
+  python -m pip install $PIP_FLAGS $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR
+}
+
+install_jax() {
+  # For the JAX backend.
+  python -m pip install jax jaxlib
+}
+
 install_python_packages() {
   # Ensure newer than 18.x pip version, which is necessary after tf-nightly
   # switched to manylinux2010.
   python -m pip install $PIP_FLAGS --upgrade 'pip>=19.2'
 
-  # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
-  TF_VERSION_STR=$(find_good_tf_nightly_version_str $TF_NIGHTLY_PACKAGE)
-  python -m pip install $PIP_FLAGS $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR
-
-  # For the JAX backend.
-  python -m pip install jax jaxlib
+  install_tensorflow
+  install_jax
 
   # The following unofficial dependencies are used only by tests.
   # TODO(b/148685448): Unpin Hypothesis and coverage versions.
