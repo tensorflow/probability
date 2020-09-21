@@ -69,7 +69,7 @@ class SkewGeneralizedNormal(Distribution):
             [self._loc, self._scale, self._peak]
         )
 
-    super(self).__init__(
+    super().__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
