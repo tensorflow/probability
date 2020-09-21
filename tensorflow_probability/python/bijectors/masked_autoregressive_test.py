@@ -729,6 +729,56 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     self.assertAllEqual(
         (3,), distribution.log_prob(np.ones((3, 2), dtype=np.float32)).shape)
 
+  def test_doc_string_2(self):
+    n = 2000
+    c = np.r_[np.zeros(n // 2), np.ones(n // 2)]
+    mean_0, mean_1 = 0, 5
+    x = np.r_[np.random.randn(n // 2).astype(dtype=np.float32) + mean_0,
+              np.random.randn(n // 2).astype(dtype=np.float32) + mean_1]
+
+    # Density estimation with MADE.
+    made = tfb.AutoregressiveNetwork(
+        params=2,
+        hidden_units=[1],
+        event_shape=(1,),
+        kernel_initializer=tfk.initializers.VarianceScaling(0.1),
+        conditional=True,
+        conditional_event_shape=(1,))
+
+    distribution = tfd.TransformedDistribution(
+        distribution=tfd.Sample(tfd.Normal(loc=0., scale=1.), sample_shape=[1]),
+        bijector=tfb.MaskedAutoregressiveFlow(made))
+
+    # Construct and fit model.
+    x_ = tfkl.Input(shape=(1,), dtype=tf.float32)
+    c_ = tfkl.Input(shape=(1,), dtype=tf.float32)
+    log_prob_ = distribution.log_prob(
+        x_, bijector_kwargs={"conditional_input": c_})
+    model = tfk.Model([x_, c_], log_prob_)
+
+    model.compile(
+        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        loss=lambda _, log_prob: -log_prob)
+
+    batch_size = 25
+    model.fit(
+        x=[x, c],
+        y=np.zeros((n, 0), dtype=np.float32),
+        batch_size=batch_size,
+        epochs=3,
+        steps_per_epoch=n // batch_size,
+        shuffle=True,
+        verbose=True)
+
+    # Use the fitted distribution to sample condition on c = 1
+    n_samples = 1000
+    cond = 1
+    samples = distribution.sample(
+        (n_samples,),
+        bijector_kwargs={"conditional_input": cond * np.ones((n_samples, 1))})
+    # Assert mean is close to conditional mean
+    self.assertAllClose(tf.reduce_mean(samples), mean_1, atol=1.)
+
   def test_doc_string_images_case_1(self):
     # Generate fake images.
     images = np.random.choice([0, 1], size=(100, 8, 8, 3))
