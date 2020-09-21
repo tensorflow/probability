@@ -31,6 +31,7 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.logistic_regression import LogisticRegression
   from inference_gym.targets.model import Model
   from inference_gym.targets.neals_funnel import NealsFunnel
+  from inference_gym.targets.non_identifiable_quartic import NonIdentifiableQuarticMeasurementModel
   from inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
   from inference_gym.targets.probit_regression import ProbitRegression
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffects
@@ -60,6 +61,7 @@ __all__ = [
     'LogisticRegression',
     'Model',
     'NealsFunnel',
+    'NonIdentifiableQuarticMeasurementModel',
     'ProbitRegression',
     'RadonContextualEffects',
     'RadonContextualEffectsMinnesota',

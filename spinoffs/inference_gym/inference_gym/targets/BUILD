@@ -45,6 +45,7 @@ py_library(
         ":logistic_regression",
         ":model",
         ":neals_funnel",
+        ":non_identifiable_quartic",
         ":probit_regression",
         ":radon_contextual_effects",
         ":sparse_logistic_regression",
@@ -312,6 +313,29 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":neals_funnel",
+        # tensorflow dep,
+        "//inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "non_identifiable_quartic",
+    srcs = ["non_identifiable_quartic.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":bayesian_model",
+        ":model",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "non_identifiable_quartic_test",
+    srcs = ["non_identifiable_quartic_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":non_identifiable_quartic",
         # tensorflow dep,
         "//inference_gym/internal:test_util",
     ],
