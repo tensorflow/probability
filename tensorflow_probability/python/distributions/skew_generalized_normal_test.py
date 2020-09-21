@@ -430,7 +430,7 @@ class SkewGeneralizedNormalTestStaticShapeFloat32(test_util.TestCase,
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
-    super(SkewGeneralizedNormalTestStaticShapeFloat32, self).setUp()
+    super(self).setUp()
 
 
 @test_util.test_all_tf_execution_regimes
@@ -441,7 +441,7 @@ class SkewGeneralizedNormalTestDynamicShapeFloat32(test_util.TestCase,
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
-    super(SkewGeneralizedNormalTestDynamicShapeFloat32, self).setUp()
+    super(self).setUp()
 
 
 @test_util.test_all_tf_execution_regimes
@@ -452,7 +452,7 @@ class SkewGeneralizedNormalTestStaticShapeFloat64(test_util.TestCase,
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
-    super(SkewGeneralizedNormalTestStaticShapeFloat64, self).setUp()
+    super(self).setUp()
 
 
 @test_util.test_all_tf_execution_regimes
@@ -463,7 +463,7 @@ class SkewGeneralizedNormalTestDynamicShapeFloat64(test_util.TestCase,
 
   def setUp(self):
     self._rng = np.random.RandomState(123)
-    super(SkewGeneralizedNormalTestDynamicShapeFloat64, self).setUp()
+    super(self).setUp()
 
 
 if __name__ == '__main__':

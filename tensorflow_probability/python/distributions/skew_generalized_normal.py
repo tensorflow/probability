@@ -47,7 +47,7 @@ class SkewGeneralizedNormal(Distribution):
                peak,
                validate_args=False,
                allow_nan_stats=True,
-               name="GeneralizedGaussian"):
+               name="SkewGeneralizedNormal"):
 
     parameters = dict(locals())
 
@@ -69,7 +69,7 @@ class SkewGeneralizedNormal(Distribution):
             [self._loc, self._scale, self._peak]
         )
 
-    super(SkewGeneralizedNormal, self).__init__(
+    super(self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=validate_args,
