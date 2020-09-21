@@ -298,6 +298,7 @@ class BatesTest(test_util.TestCase):
 
   def testBatesCDFHighTotalCount(self):
     # Compute with exact integer arithmetic.
+    # This only works when n*x is an integer.
     def exact(n, nx):
       fractional = sum(
           fractions.Fraction((-1)**k * (nx - k)**n * math.factorial(n),
