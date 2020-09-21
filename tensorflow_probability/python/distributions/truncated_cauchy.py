@@ -260,6 +260,7 @@ class TruncatedCauchy(distribution.Distribution):
             sample_and_batch_shape,
             minval=_cauchy_cdf(std_low),
             maxval=_cauchy_cdf(std_high),
+            dtype=self.dtype,
             seed=seed))
     return std_samples * scale + loc
 
