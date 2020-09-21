@@ -22,6 +22,12 @@ from __future__ import print_function
 # Dependency imports
 
 from absl import app
+from absl import flags
+
+flags.DEFINE_bool('rewrite_numpy_import', True,
+                  'If False, we skip swapping numpy for jax.numpy.')
+
+FLAGS = flags.FLAGS
 
 
 def main(argv):
@@ -41,8 +47,12 @@ def main(argv):
       'tf.test.main()',
       'from jax.config import config; config.update("jax_enable_x64", True); '
       'tf.test.main()')
-  contents = contents.replace('\nimport numpy as np',
-                              '\nimport numpy as onp\nimport jax.numpy as np')
+  if FLAGS.rewrite_numpy_import:
+    contents = contents.replace('\nimport numpy as np',
+                                '\nimport numpy as onp\nimport jax.numpy as np')
+  else:
+    contents = contents.replace('\nimport numpy as np',
+                                '\nimport numpy as np; onp = np')
   contents = contents.replace('np.bool', 'onp.bool')
   contents = contents.replace('np.dtype', 'onp.dtype')
   contents = contents.replace('np.generic', 'onp.generic')

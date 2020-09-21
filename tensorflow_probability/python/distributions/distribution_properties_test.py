@@ -60,6 +60,7 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 EVENT_SPACE_BIJECTOR_IS_BROKEN = [
     'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
                      # (Reciprocal(Softplus(x)) -> inf for small x)
+    'Sample',  # TODO(b/168139745): Needs transpose before calling underlying.
 ]
 
 SLICING_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-5)
@@ -90,6 +91,12 @@ class ReproducibilityTest(test_util.TestCase):
     if tf.executing_eagerly():
       tf.random.set_seed(seed)
     with tfp_hps.no_tf_rank_errors():
+      s2 = self.evaluate(dist.sample(50, seed=seed))
+    self.assertAllEqual(s1, s2)
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    with tfp_hps.no_tf_rank_errors():
+      s1 = self.evaluate(dist.sample(50, seed=seed))
       s2 = self.evaluate(dist.sample(50, seed=seed))
     self.assertAllEqual(s1, s2)
 
@@ -163,7 +170,8 @@ class EventSpaceBijectorsTest(test_util.TestCase):
   # fold these two tests into one.
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
-      for dname in sorted(list(dhps.INSTANTIABLE_META_DISTS)))
+      for dname in sorted(list(set(dhps.INSTANTIABLE_META_DISTS) -
+                               set(EVENT_SPACE_BIJECTOR_IS_BROKEN))))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistributionNoVars(self, dist_name, data):

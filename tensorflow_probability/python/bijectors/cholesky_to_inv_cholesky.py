@@ -38,7 +38,7 @@ class CholeskyToInvCholesky(bijector.Bijector):
 
   ```python
   def forward(x):
-    return tf.cholesky(tf.linalg.inv(tf.matmul(x, x, adjoint_b=True)))
+    return tf.linalg.cholesky(tf.linalg.inv(tf.matmul(x, x, adjoint_b=True)))
 
   inverse = forward
   ```

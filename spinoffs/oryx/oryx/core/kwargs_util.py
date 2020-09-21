@@ -14,7 +14,9 @@
 # ============================================================================
 # Lint as: python3
 """Module that provides kwargs utility functions."""
+import functools
 import inspect
+import jax
 
 __all__ = [
     'filter_kwargs',
@@ -22,10 +24,19 @@ __all__ = [
 ]
 
 
-def _argspec_and_keywords(func):
+@functools.singledispatch
+def argspec_and_keywords(func):
+  """Returns the argspec and keyword arguments for a callable."""
   argspec = inspect.getfullargspec(func)
   keywords = argspec.varkw
   return argspec, keywords
+
+
+@argspec_and_keywords.register(jax.custom_jvp)
+@argspec_and_keywords.register(jax.custom_vjp)
+def custom_vjp_jvp_argspec_and_keywords(func):
+  """Overrides default behavior to use signature of internal `fun` member."""
+  return argspec_and_keywords(func.fun)
 
 
 def filter_kwargs(func, kwargs):
@@ -43,7 +54,7 @@ def filter_kwargs(func, kwargs):
     A filtered `kwargs` dictionary that excludes keywords
     not in func.
   """
-  argspec, keywords = _argspec_and_keywords(func)
+  argspec, keywords = argspec_and_keywords(func)
   accepts_all_kwargs = keywords is not None
   if accepts_all_kwargs:
     return kwargs
@@ -60,7 +71,7 @@ def filter_kwargs(func, kwargs):
 
 def check_in_kwargs(func, key):
   """Checks whether a key is in a func kwargs."""
-  argspec, keywords = _argspec_and_keywords(func)
+  argspec, keywords = argspec_and_keywords(func)
   accepts_all_kwargs = keywords is not None
   if accepts_all_kwargs:
     return True

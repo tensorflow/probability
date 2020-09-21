@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal.backend.numpy import ops
 
 __all__ = [
     'cond',
+    'group',
     'no_op',
     'while_loop',
     # 'case',
@@ -242,6 +243,10 @@ def with_dependencies(deps, value):
 cond = utils.copy_docstring(
     'tf.cond',
     _cond_jax if JAX_MODE else _cond)
+
+group = utils.copy_docstring(
+    'tf.group',
+    lambda *inputs, **kwargs: None)
 
 no_op = utils.copy_docstring(
     'tf.no_op',

@@ -23,6 +23,7 @@ import numpy as np
 
 from oryx.core import state
 from oryx.experimental.nn import pooling
+from oryx.internal import test_util
 
 
 def shape4d_parameters():
@@ -65,7 +66,7 @@ def shape3d_parameters():
                    'pool_class': pool_class}
 
 
-class PoolingTest(parameterized.TestCase):
+class PoolingTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

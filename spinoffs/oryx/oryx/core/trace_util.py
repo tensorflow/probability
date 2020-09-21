@@ -54,25 +54,26 @@ def pv_like(x, abstract=True):
 
 
 def stage(f, dynamic=True):
-  """Returns a function that stages a function to a TypedJaxpr and its Pytrees."""
+  """Returns a function that stages a function to a ClosedJaxper."""
 
   def wrapped(*args, **kwargs):
     fun = lu.wrap_init(f, kwargs)
     flat_args, in_tree = tree_util.tree_flatten(args)
     flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
     flat_avals = safe_map(get_shaped_aval, flat_args)
-    if dynamic and jax.config.omnistaging_enabled:
-      jaxpr, out_avals, consts = pe.trace_to_jaxpr_dynamic(
+    if not jax.config.omnistaging_enabled:
+      raise ValueError('Oryx must be used with JAX omnistaging enabled.')
+    if dynamic:
+      jaxpr, _, consts = pe.trace_to_jaxpr_dynamic(
           flat_fun,
           flat_avals)
     else:
       pvals = [pe.PartialVal((aval, jax_core.unit)) for aval in flat_avals]
-      jaxpr, out_pvals, consts = pe.trace_to_jaxpr(
+      jaxpr, _, consts = pe.trace_to_jaxpr(
           flat_fun,
           pvals,
-          instantiate=True, stage_out=True)
-      out_avals = [pval.get_aval() for pval in out_pvals]
-    typed_jaxpr = jax_core.TypedJaxpr(jaxpr, consts, flat_avals, out_avals)
+          instantiate=True)
+    typed_jaxpr = jax_core.ClosedJaxpr(jaxpr, consts)
     return typed_jaxpr, (in_tree, out_tree())
 
   return wrapped

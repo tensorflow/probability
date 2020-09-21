@@ -31,7 +31,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "fun_mcmc",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":api",
         ":backend",
@@ -44,7 +44,7 @@ py_library(
 py_library(
     name = "api",
     srcs = ["api.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":fun_mcmc_lib",
         ":prefab",
@@ -78,7 +78,7 @@ py_library(
 py_library(
     name = "util_tf",
     srcs = ["util_tf.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

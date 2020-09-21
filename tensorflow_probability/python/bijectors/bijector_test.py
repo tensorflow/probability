@@ -435,7 +435,7 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, 'must be larger than'):
+    with self.assertRaisesRegexp(ValueError, 'must be at least'):
       bij.forward_log_det_jacobian(x, event_ndims=0)
 
   def testReduceEventNdimsInverse(self):
@@ -454,7 +454,7 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
   def testReduceEventNdimsInverseRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
-    with self.assertRaisesRegexp(ValueError, 'must be larger than'):
+    with self.assertRaisesRegexp(ValueError, 'must be at least'):
       bij.inverse_log_det_jacobian(x, event_ndims=0)
 
   def testReduceEventNdimsForwardConstJacobian(self):

@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "vi",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":surrogate_posteriors",
         "//tensorflow_probability/python/internal:all_util",
@@ -38,7 +38,7 @@ py_library(
 py_library(
     name = "parameter_constraints",
     srcs = ["parameter_constraints.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
@@ -48,7 +48,7 @@ py_library(
 py_library(
     name = "surrogate_posteriors",
     srcs = ["surrogate_posteriors.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":parameter_constraints",
         # numpy dep,

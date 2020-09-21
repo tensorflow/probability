@@ -25,6 +25,7 @@ import numpy as onp
 
 from oryx.core import trace_util
 from oryx.core.interpreters import harvest
+from oryx.internal import test_util
 
 
 sow = harvest.sow
@@ -154,7 +155,7 @@ class ReapTest(absltest.TestCase):
     self.assertTupleEqual(harvest_variables(foo)({}, 1.), (1., {'x': 1.}))
 
 
-class PlantTest(absltest.TestCase):
+class PlantTest(test_util.TestCase):
 
   def test_should_plant_variable(self):
 
@@ -231,7 +232,7 @@ class PlantTest(absltest.TestCase):
     self.assertTupleEqual(harvest_variables(foo)({'x': 2.}, 1.), (2., {}))
 
 
-class HarvestTest(absltest.TestCase):
+class HarvestTest(test_util.TestCase):
 
   def test_should_harvest_variable(self):
 
@@ -269,7 +270,7 @@ class HarvestTest(absltest.TestCase):
     self.assertDictEqual(trace_util.dynamic_contexts, {})
 
 
-class ControlFlowTest(absltest.TestCase):
+class ControlFlowTest(test_util.TestCase):
 
   def test_strict_mode_in_scan_should_error(self):
 

@@ -28,6 +28,7 @@ for further documentation.
 """
 from jax import tree_util
 from jax import util as jax_util
+from oryx.core import kwargs_util
 from oryx.core import primitive
 
 from oryx.core.interpreters.inverse import core
@@ -231,3 +232,8 @@ def custom_inverse(f):
 
 class NonInvertibleError(Exception):
   """Raised by a custom inverse definition when values are unknown."""
+
+
+@kwargs_util.argspec_and_keywords.register(CustomInverse)
+def custom_inverse_argspec_and_keywords(ci):
+  return kwargs_util.argspec_and_keywords(ci.func)

@@ -151,6 +151,16 @@ class Sample(distribution_lib.Distribution):
   def sample_shape(self):
     return self._sample_shape
 
+  def __getitem__(self, slices):
+    # Because slicing is parameterization-dependent, we only implement slicing
+    # for instances of MSF, not subclasses thereof.
+    if type(self).__init__ is not Sample.__init__:
+      return super(Sample, self).__getitem__(slices)
+
+    # Since this distribution only modifies the event shape, we can simply pass
+    # through slicing to the underlying.
+    return self.copy(distribution=self.distribution.__getitem__(slices))
+
   def _batch_shape_tensor(self):
     return self.distribution.batch_shape_tensor()
 
@@ -290,6 +300,10 @@ class Sample(distribution_lib.Distribution):
             sample_shape, -1, message=msg))
 
     return assertions
+
+  _composite_tensor_nonshape_params = ('distribution,')
+
+  _composite_tensor_shape_params = ('sample_shape,')
 
 
 @kullback_leibler.RegisterKL(Sample, Sample)

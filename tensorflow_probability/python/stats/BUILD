@@ -37,7 +37,7 @@ multi_substrate_py_library(
     jax_omit_deps = [
         ":ranking",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":calibration",
         ":leave_one_out",
@@ -52,7 +52,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "leave_one_out",
     srcs = ["leave_one_out.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -105,7 +105,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "ranking",
     srcs = ["ranking.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
@@ -131,7 +131,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "sample_stats",
     srcs = ["sample_stats.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -161,7 +161,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "quantiles",
     srcs = ["quantiles.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -189,7 +189,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "calibration",
     srcs = ["calibration.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":quantiles",
         # numpy dep,

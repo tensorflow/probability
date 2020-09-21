@@ -20,8 +20,10 @@ from jax import random
 from jax import tree_util
 import jax.numpy as np
 import numpy as onp
+
 from oryx.core import state
 from oryx.experimental import nn
+from oryx.internal import test_util
 
 
 class AddOne(nn.Layer):
@@ -102,7 +104,7 @@ class Sampler(nn.Layer):
     return random.normal(rng, x.shape)
 
 
-class FunctionTest(absltest.TestCase):
+class FunctionTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

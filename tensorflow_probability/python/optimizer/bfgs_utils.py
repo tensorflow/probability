@@ -79,15 +79,75 @@ def get_initial_state_args(value_and_gradients_function,
       f0, df0 = value_and_gradients_function(initial_position)
   else:
     f0, df0 = value_and_gradients_function(initial_position)
-  converged = norm(df0, dims=1) < grad_tolerance
+  # This is a gradient-based convergence check.  We only do it for finite
+  # objective values because we assume the gradient reported at a position with
+  # a non-finite objective value is untrustworthy.  The main loop handles
+  # non-finite objective values itself (see `terminate_if_not_finite`).
+  init_converged = tf.math.is_finite(f0) & (norm(df0, dims=1) < grad_tolerance)
   return dict(
-      converged=converged,
-      failed=tf.zeros_like(converged),  # i.e. False.
+      converged=init_converged,
+      failed=tf.zeros_like(init_converged),  # i.e. False.
       num_iterations=tf.convert_to_tensor(0),
       num_objective_evaluations=tf.convert_to_tensor(1),
       position=initial_position,
       objective_value=f0,
       objective_gradient=df0)
+
+
+def terminate_if_not_finite(state, value=None, gradient=None):
+  """Terminates optimization if the objective or gradient values are not finite.
+
+  Specifically,
+
+  - If the objective is -inf, stop with success, since this position is a global
+    minimum.
+
+  - Otherwise, if the objective or any component of the gradient is not finite,
+    stop with failure.
+
+  Why fail?
+
+  - If the objective is nan, it could be a global minimum, but we can't know.
+
+  - If the objective is +inf, we can't trust the gradient, so we can't know
+    where to go next.  This should only ever happen on the first iteration,
+    because the line search avoids returning points whose objective values are
+    +inf.
+
+  - If the gradient has any nonfinite values, we can't use it to move a finite
+    amount.
+
+  Args:
+    state: A BfgsOptimizerResults or LbfgsOptimizerResults representing the
+      current position and information about it.
+    value: A Tensor giving the value of the objective function.
+      `state.objective_value` if not supplied.
+    gradient: A Tensor giving the gradient of the objective function.
+      `state.objective_gradient` if not supplied.
+
+  Returns:
+    state: A namedputple of the same type with possibly updated `converged` and
+      `failed` fields.
+  """
+  if value is None:
+    value = state.objective_value
+  if gradient is None:
+    gradient = state.objective_gradient
+
+  minus_inf_mask = _is_negative_inf(value)
+  state = state._replace(converged=state.converged | minus_inf_mask)
+
+  non_finite_mask = (
+      ~tf.math.is_finite(value) |
+      tf.reduce_any(~tf.math.is_finite(gradient), axis=-1))
+  state = state._replace(failed=state.failed |
+                         (~state.converged & non_finite_mask))
+
+  return state
+
+
+def _is_negative_inf(x):
+  return x <= tf.constant(float('-inf'), dtype=x.dtype)
 
 
 def line_search_step(state, value_and_gradients_function, search_direction,
@@ -156,7 +216,7 @@ def line_search_step(state, value_and_gradients_function, search_direction,
 
   state_after_ls = update_fields(
       state,
-      failed=state.failed | ~ls_result.converged,
+      failed=state.failed | (~state.converged & ~ls_result.converged),
       num_iterations=state.num_iterations + 1,
       num_objective_evaluations=(
           state.num_objective_evaluations + ls_result.func_evals))
@@ -265,22 +325,20 @@ def _update_position(state,
                      f_relative_tolerance,
                      x_tolerance):
   """Updates the state advancing its position by a given position_delta."""
-  failed = state.failed | ~tf.math.is_finite(next_objective) | ~tf.reduce_all(
-      tf.math.is_finite(next_gradient), axis=-1)
+  state = terminate_if_not_finite(state, next_objective, next_gradient)
 
   next_position = state.position + position_delta
-  converged = ~failed & _check_convergence(state.position,
-                                           next_position,
-                                           state.objective_value,
-                                           next_objective,
-                                           next_gradient,
-                                           grad_tolerance,
-                                           f_relative_tolerance,
-                                           x_tolerance)
+  converged = ~state.failed & _check_convergence(state.position,
+                                                 next_position,
+                                                 state.objective_value,
+                                                 next_objective,
+                                                 next_gradient,
+                                                 grad_tolerance,
+                                                 f_relative_tolerance,
+                                                 x_tolerance)
   return update_fields(
       state,
       converged=state.converged | converged,
-      failed=failed,
       position=next_position,
       objective_value=next_objective,
       objective_gradient=next_gradient)

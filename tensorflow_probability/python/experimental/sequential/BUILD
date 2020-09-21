@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "sequential",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":ensemble_adjustment_kalman_filter",
         ":ensemble_kalman_filter",
@@ -42,7 +42,7 @@ py_library(
 py_library(
     name = "extended_kalman_filter",
     srcs = ["extended_kalman_filter.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
@@ -55,7 +55,7 @@ py_library(
 py_library(
     name = "ensemble_kalman_filter",
     srcs = ["ensemble_kalman_filter.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -66,7 +66,7 @@ py_library(
 py_library(
     name = "ensemble_adjustment_kalman_filter",
     srcs = ["ensemble_adjustment_kalman_filter.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -127,7 +127,7 @@ py_test(
 py_library(
     name = "iterated_filter",
     srcs = ["iterated_filter.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",

@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "sts_gibbs",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":gibbs_sampler",
     ],
@@ -55,7 +55,7 @@ py_test(
 py_library(
     name = "gibbs_sampler",
     srcs = ["gibbs_sampler.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

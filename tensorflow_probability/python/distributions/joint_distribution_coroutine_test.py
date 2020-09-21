@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import warnings
 
 # Dependency imports
 from absl.testing import parameterized
@@ -28,6 +29,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
@@ -952,12 +954,12 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         'These names were invalid:\n'
         'z')
     with self.assertRaisesRegex(ValueError, expected_error):
-      joint.sample(z=2.)
+      joint.sample(seed=seed, z=2.)
 
     # Raise if value and keywords are passed.
     with self.assertRaisesRegex(
         ValueError, r'Supplied both `value` and keyword arguments .*'):
-      joint.sample(a=1., value={'a': 1})
+      joint.sample(seed=seed, a=1., value={'a': 1})
 
   def test_named_dtype(self):
     """Test using names for component distributions."""
@@ -1069,6 +1071,63 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     lp_tlp = nest_util.call_fn(target_log_prob_fn, test_point)
 
     self.assertAllClose(self.evaluate(lp_manual), self.evaluate(lp_tlp))
+
+  @test_util.jax_disable_test_missing_functionality('stateful samplers')
+  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
+  def test_legacy_dists(self):
+
+    class StatefulNormal(tfd.Normal):
+
+      def _sample_n(self, n, seed=None):
+        return self.loc + self.scale * tf.random.normal(
+            tf.concat([[n], self.batch_shape_tensor()], axis=0),
+            seed=seed)
+
+    def dist():
+      e = yield Root(
+          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1, name='e'))
+      loc = yield Root(StatefulNormal(loc=0, scale=2., name='loc'))
+      scale = yield tfd.Gamma(
+          concentration=e[..., 0], rate=e[..., 1], name='scale')
+      m = yield tfd.Normal(loc, scale, name='m')
+      yield tfd.Sample(tfd.Bernoulli(logits=m), 12, name='x')
+
+    d = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    warnings.simplefilter('always')
+    with warnings.catch_warnings(record=True) as w:
+      d.sample(seed=test_util.test_seed())
+    self.assertRegexpMatches(
+        str(w[0].message),
+        r'Falling back to stateful sampling for distribution #1.*'
+        r'of type.*StatefulNormal.*component name "loc" and `dist.name` '
+        r'".*loc"',
+        msg=w)
+
+  @test_util.jax_disable_test_missing_functionality('stateful samplers')
+  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
+  def test_legacy_dists_stateless_seed_raises(self):
+
+    class StatefulNormal(tfd.Normal):
+
+      def _sample_n(self, n, seed=None):
+        return self.loc + self.scale * tf.random.normal(
+            tf.concat([[n], self.batch_shape_tensor()], axis=0),
+            seed=seed)
+
+    def dist():
+      e = yield Root(
+          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1, name='e'))
+      loc = yield Root(StatefulNormal(loc=0, scale=2., name='loc'))
+      scale = yield tfd.Gamma(
+          concentration=e[..., 0], rate=e[..., 1], name='scale')
+      m = yield tfd.Normal(loc, scale, name='m')
+      yield tfd.Sample(tfd.Bernoulli(logits=m), 12, name='x')
+
+    d = tfd.JointDistributionCoroutine(dist, validate_args=True)
+
+    with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
+      d.sample(seed=samplers.zeros_seed())
 
 
 if __name__ == '__main__':

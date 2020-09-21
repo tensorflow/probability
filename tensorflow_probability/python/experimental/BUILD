@@ -33,11 +33,10 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "experimental",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     substrates_omit_deps = [
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/edward2",
         "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
@@ -52,7 +51,6 @@ multi_substrate_py_library(
     deps = [
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/edward2",
         "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
@@ -62,6 +60,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
+        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/experimental/vi",
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
@@ -71,7 +70,7 @@ multi_substrate_py_library(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",

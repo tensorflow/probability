@@ -100,6 +100,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core:primitive",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -114,5 +115,6 @@ py_test(
         ":registrations",
         # absl/testing:absltest dep,
         # jax dep,
+        "//oryx/internal:test_util",
     ],
 )

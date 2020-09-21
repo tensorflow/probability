@@ -145,10 +145,10 @@ class InverseAndILDJ(Cell):
 
   @classmethod
   def new(cls, val):
+    if val is jax_core.unit:
+      return InverseAndILDJ.unknown(jax_core.abstract_unit)
     val = np.array(val)
     aval = jax_core.get_aval(val)
-    if aval is jax_core.abstract_unit:
-      return InverseAndILDJ.unknown(aval)
     aval = abstract_arrays.raise_to_shaped(aval)
     ndslice = NDSlice.new(val, np.zeros_like(val))
     return InverseAndILDJ(aval, frozenset([ndslice]))
@@ -329,12 +329,13 @@ def hop_inverse_rule(prim):
 primitive.register_hop_transformation_rule('inverse', hop_inverse_rule)
 
 
-def initial_ildj(incells, outcells, *, jaxpr, **_):
-  env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr, [], incells,
-                            outcells)
+def initial_ildj(incells, outcells, *, jaxpr, num_consts, **_):
+  const_cells, incells = jax_util.split_list(incells, [num_consts])
+  env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr, const_cells,
+                            incells, outcells)
   new_incells = [env.read(invar) for invar in jaxpr.invars]
   new_outcells = [env.read(outvar) for outvar in jaxpr.outvars]
-  return new_incells, new_outcells, None
+  return const_cells + new_incells, new_outcells, None
 
 
 def initial_inverse_rule(prim):

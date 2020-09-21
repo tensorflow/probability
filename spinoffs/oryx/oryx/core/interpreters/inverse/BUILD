@@ -83,6 +83,7 @@ py_library(
         ":core",
         ":slice",
         # jax dep,
+        "//oryx/core:kwargs_util",
         "//oryx/core:primitive",
     ],
 )
@@ -99,6 +100,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core/interpreters:harvest",
+        "//oryx/internal:test_util",
         # tensorflow_probability/substrates:jax dep,
     ],
 )
@@ -113,6 +115,7 @@ py_test(
         ":slice",
         # absl/testing:absltest dep,
         # jax dep,
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -128,5 +131,6 @@ py_test(
         ":rules",
         # absl/testing:absltest dep,
         # jax dep,
+        "//oryx/internal:test_util",
     ],
 )

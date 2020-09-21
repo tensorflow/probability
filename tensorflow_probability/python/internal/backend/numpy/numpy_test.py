@@ -22,6 +22,7 @@ import functools
 
 # Dependency imports
 
+from absl import flags
 from absl import logging
 from absl.testing import parameterized
 
@@ -42,6 +43,14 @@ from tensorflow_probability.python.internal.backend.numpy import functional_ops 
 import tensorflow_probability.substrates.numpy as tfp
 from tensorflow.python.ops import parallel_for as tf_pfor  # pylint: disable=g-direct-tensorflow-import
 
+
+# Allows us to test low-level TF:XLA match.
+flags.DEFINE_enum('test_mode', 'numpy', ['numpy', 'xla'],
+                  'Set to `"xla"` to compare TF with TF-XLA. '
+                  'Default compares tf to nptf.')
+flags.DEFINE_bool('only_disabled', False, 'Only test disabled XLA tests')
+
+FLAGS = flags.FLAGS
 
 ALLOW_NAN = False
 ALLOW_INFINITY = False
@@ -329,7 +338,7 @@ def uniform_params(draw):
   minval = (
       draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype,
                          elements=elements[0]))
-      if include_arg[0] else 0)
+      if include_arg[0] else dtype(0))
   maxval = minval + (
       draw(single_arrays(shape=hps.just(arg_shapes[2]), dtype=dtype,
                          elements=elements[1]))
@@ -557,7 +566,10 @@ def histogram_fixed_width_bins_params(draw):
 def histogram_fixed_width_params(draw):
   values, [value_min, value_max], nbins = draw(
       histogram_fixed_width_bins_params())
-  return values, [value_min, max(value_max, value_min+.1)], nbins
+  return (values,
+          [value_min, max(value_max,
+                          value_min + np.asarray(.1, value_min.dtype))],
+          nbins)
 
 
 @hps.composite
@@ -699,7 +711,8 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
-    TestCase('linalg.det', [nonsingular_matrices()]),
+    TestCase('linalg.det', [nonsingular_matrices()],
+             xla_disabled=True),  # TODO(b/162937268): missing kernel.
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
     TestCase('linalg.matrix_transpose',
@@ -712,16 +725,20 @@ NUMPY_TEST_CASES = [
         'math.polygamma', [
             hps.tuples(hps.integers(0, 10).map(float), positive_floats()),
         ],
-        disabled=JAX_MODE),
+        disabled=JAX_MODE,
+        xla_disabled=True),  # TODO(b/163880625): [Log]MatrixDeterminant kernel
 
     # ArgSpec(args=['arr', 'weights', 'minlength',
     #               'maxlength', 'dtype', 'name'],
     #         varargs=None,
     #         keywords=None,
     #         defaults=(None, None, None, tf.int32, None))
-    TestCase('math.bincount', [bincount_params()]),
-    TestCase('math.confusion_matrix', [confusion_matrix_params()]),
-    TestCase('math.top_k', [top_k_params()]),
+    TestCase('math.bincount', [bincount_params()],
+             xla_disabled=True),  # missing kernel.
+    TestCase('math.confusion_matrix', [confusion_matrix_params()],
+             xla_disabled=True),  # broken string-using assert.
+    TestCase('math.top_k', [top_k_params()],
+             xla_disabled=True),  # No TopKV2 (at least, for doubles).
 
     # ArgSpec(args=['chol', 'rhs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -746,7 +763,8 @@ NUMPY_TEST_CASES = [
                   hps.booleans()),
               ],
              post_processor=_qr_post_process,
-             atol=1e-3),
+             atol=1e-3,
+             xla_disabled=True),  # No Qr kernel (complex128).
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -824,9 +842,11 @@ NUMPY_TEST_CASES = [
                 elements=hps.booleans()))
     ]),
     TestCase('math.reduce_logsumexp', [array_axis_tuples()]),
-    TestCase('math.reduce_max', [array_axis_tuples(allow_nan=True)]),
+    TestCase('math.reduce_max', [array_axis_tuples(allow_nan=True)],
+             xla_disabled=True),  # TODO(b/168718272): [nan, nan], axis=0 (GPU)
     TestCase('math.reduce_mean', [array_axis_tuples()]),
-    TestCase('math.reduce_min', [array_axis_tuples(allow_nan=True)]),
+    TestCase('math.reduce_min', [array_axis_tuples(allow_nan=True)],
+             xla_disabled=True),  # TODO(b/168718272): [nan, nan], axis=0 (GPU)
     TestCase('math.reduce_prod', [array_axis_tuples(),
                                   array_axis_tuples(dtype=np.int32)]),
     TestCase('math.reduce_std',
@@ -836,14 +856,19 @@ NUMPY_TEST_CASES = [
     TestCase('math.reduce_variance',
              [array_axis_tuples(elements=floats(-1e6, 1e6))]),
 
-    TestCase('math.segment_max', [segment_params()]),
+    TestCase('math.segment_max', [segment_params()],
+             xla_disabled=True),  # No SegmentMax kernel.
     TestCase('math.segment_mean',
              [segment_params()],
              # need jax.numpy.bincount
-             disabled=JAX_MODE),
-    TestCase('math.segment_min', [segment_params()]),
-    TestCase('math.segment_prod', [segment_params()]),
-    TestCase('math.segment_sum', [segment_params()]),
+             disabled=JAX_MODE,
+             xla_disabled=True),  # No SegmentMean kernel.
+    TestCase('math.segment_min', [segment_params()],
+             xla_disabled=True),  # No SegmentMin kernel.
+    TestCase('math.segment_prod', [segment_params()],
+             xla_disabled=True),  # No SegmentProd kernel.
+    TestCase('math.segment_sum', [segment_params()],
+             xla_disabled=True),  # TODO(b/165608758): No SegmentSum kernel.
 
     # ArgSpec(args=['inputs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -911,7 +936,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('linalg.adjoint',
              [single_arrays(shape=shapes(min_dims=2),
                             dtype=np.complex64, elements=complex_numbers())]),
-    TestCase('linalg.slogdet', [nonsingular_matrices()]),
+    TestCase('linalg.slogdet', [nonsingular_matrices()],
+             xla_disabled=True),  # TODO(b/163880625): No kernel.
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
     TestCase('complex', [n_same_shape(n=2, dtype=np.float32),
                          n_same_shape(n=2, dtype=np.float64)]),
@@ -924,12 +950,14 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.atanh', [single_arrays(elements=floats(-1., 1.))]),
     TestCase(
         'math.bessel_i0', [single_arrays(elements=floats(-50., 50.))],
-        disabled=JAX_MODE),
+        disabled=JAX_MODE,
+        xla_disabled=True),  # Missing BesselI0 kernel.
     TestCase(
         'math.bessel_i0e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase(
         'math.bessel_i1', [single_arrays(elements=floats(-50., 50.))],
-        disabled=JAX_MODE),
+        disabled=JAX_MODE,
+        xla_disabled=True),  # Missing BesselI1 kernel.
     TestCase(
         'math.bessel_i1e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase('math.ceil', [single_arrays()]),
@@ -1036,7 +1064,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase(
         'random.gamma', [gamma_params()],
         jax_kwargs=_add_jax_prng_key_as_seed,
-        assert_shape_only=True),
+        assert_shape_only=True,
+        xla_disabled=True),  # No XLA kernel (we use a py rejection sampler).
     TestCase(
         'random.normal', [normal_params()],
         jax_kwargs=_add_jax_prng_key_as_seed,
@@ -1051,7 +1080,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('gather_nd', [gather_nd_params()]),
     # TODO(leben): Fix bug in jax.numpy.repeat(array(0), 1, 0).
     TestCase('repeat', [repeat_params()],
-             disabled=JAX_MODE),
+             disabled=JAX_MODE,
+             xla_disabled=True),  # TF op is XLA-incompatible (boolean mask)
     TestCase('searchsorted', [searchsorted_params()]),
     TestCase('linspace', [linspace_params()]),
     TestCase('one_hot', [one_hot_params()]),
@@ -1061,15 +1091,17 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
 
     # Misc
     TestCase('histogram_fixed_width',
-             [histogram_fixed_width_params()]),
+             [histogram_fixed_width_params()],
+             xla_disabled=True),
     TestCase('histogram_fixed_width_bins',
-             [histogram_fixed_width_bins_params()]),
+             [histogram_fixed_width_bins_params()],
+             xla_disabled=True),   # GPU fails with f32([0.]), [0.0, 0.0], 2
 ]
 
 
 def _maybe_convert_to_tensors(args):
   # Ensures we go from JAX np -> original np -> tf.Tensor. (no-op for non-JAX.)
-  convert = lambda a: tf.convert_to_tensor(onp.array(a))
+  convert = lambda a: tf.convert_to_tensor(onp.array(a), onp.array(a).dtype)
   return tf.nest.map_structure(
       lambda arg: convert(arg) if isinstance(arg, np.ndarray) else arg,
       args)
@@ -1508,12 +1540,12 @@ class NumpyTest(test_util.TestCase):
                             tensorflow_function,
                             numpy_function,
                             strategy_list,
-                            jax_disabled=False,
+                            xla_disabled=False,
                             **_):
-    if jax_disabled and JAX_MODE:
-      logging.warning('The test for %s is disabled for JAX.',
-                      numpy_function.__name__)
-    elif not strategy_list:
+    if xla_disabled and FLAGS.test_mode == 'xla':
+      logging.warning(
+          'The test for %s is disabled on XLA.', numpy_function.__name__)
+    if not strategy_list:
       logging.warning(
           'The test for %s contains no strategies.', numpy_function.__name__)
     else:
@@ -1527,11 +1559,19 @@ class NumpyTest(test_util.TestCase):
                       atol=1e-5,
                       rtol=1e-5,
                       disabled=False,
+                      xla_disabled=False,
+                      xla_atol=None,
+                      xla_rtol=None,
                       assert_shape_only=False,
                       post_processor=None,
                       jax_kwargs=lambda: {}):
     if disabled:
       self.skipTest('Test is disabled.')
+    if (xla_disabled ^ FLAGS.only_disabled) and FLAGS.test_mode == 'xla':
+      self.skipTest('Test is disabled.')
+    if FLAGS.test_mode == 'xla':
+      rtol = rtol if xla_rtol is None else xla_rtol
+      atol = atol if xla_atol is None else xla_atol
     for strategy in strategy_list:
       @hp.settings(deadline=None,
                    max_examples=10,
@@ -1551,16 +1591,23 @@ class NumpyTest(test_util.TestCase):
             tf_fn(*_maybe_convert_to_tensors(args),
                   **_maybe_convert_to_tensors(kwargs)))
 
-        kwargs.update(jax_kwargs() if JAX_MODE else {})
-        numpy_value = np_fn(*args, **kwargs)
+        if FLAGS.test_mode == 'xla':
+          alt_value = self.evaluate(
+              tf.function(
+                  lambda args, kwargs: tf_fn(*args, **kwargs),
+                  experimental_compile=True)(_maybe_convert_to_tensors(args),
+                                             _maybe_convert_to_tensors(kwargs)))
+        else:
+          kwargs.update(jax_kwargs() if JAX_MODE else {})
+          alt_value = np_fn(*args, **kwargs)
 
         def assert_same_dtype(x, y):
           self.assertEqual(dtype_util.as_numpy_dtype(x.dtype),
                            dtype_util.as_numpy_dtype(y.dtype))
-        tf.nest.map_structure(assert_same_dtype, tensorflow_value, numpy_value)
+        tf.nest.map_structure(assert_same_dtype, tensorflow_value, alt_value)
 
         if post_processor is not None:
-          numpy_value = post_processor(numpy_value)
+          alt_value = post_processor(alt_value)
           tensorflow_value = post_processor(tensorflow_value)
 
         if assert_shape_only:
@@ -1568,13 +1615,12 @@ class NumpyTest(test_util.TestCase):
           def assert_same_shape(x, y):
             self.assertAllEqual(x.shape, y.shape)
 
-          tf.nest.map_structure(assert_same_shape, tensorflow_value,
-                                numpy_value)
+          tf.nest.map_structure(assert_same_shape, tensorflow_value, alt_value)
         else:
-          for i, (tf_val, np_val) in enumerate(six.moves.zip_longest(
-              tf.nest.flatten(tensorflow_value), tf.nest.flatten(numpy_value))):
+          for i, (tf_val, alt_val) in enumerate(six.moves.zip_longest(
+              tf.nest.flatten(tensorflow_value), tf.nest.flatten(alt_value))):
             self.assertAllCloseAccordingToType(
-                tf_val, np_val, atol=atol, rtol=rtol,
+                tf_val, alt_val, atol=atol, rtol=rtol,
                 msg='output {}'.format(i))
 
       check_consistency(tensorflow_function, numpy_function)

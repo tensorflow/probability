@@ -201,11 +201,11 @@ def sample_lkj(
     result = tf.linalg.set_diag(
         result, tf.ones(shape=ps.shape(result)[:-1], dtype=result.dtype))
     # This sampling algorithm can produce near-PSD matrices on which standard
-    # algorithms such as `tf.cholesky` or `tf.linalg.self_adjoint_eigvals`
-    # fail. Specifically, as documented in b/116828694, around 2% of trials
-    # of 900,000 5x5 matrices (distributed according to 9 different
-    # concentration parameter values) contained at least one matrix on which
-    # the Cholesky decomposition failed.
+    # algorithms such as `tf.linalg.cholesky` or
+    # `tf.linalg.self_adjoint_eigvals` fail. Specifically, as documented in
+    # b/116828694, around 2% of trials of 900,000 5x5 matrices (distributed
+    # according to 9 different concentration parameter values) contained at
+    # least one matrix on which the Cholesky decomposition failed.
     return result
 
 

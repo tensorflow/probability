@@ -20,13 +20,14 @@ from jax import random
 from oryx.core.state import api
 from oryx.core.state import function
 from oryx.core.state import registrations
+from oryx.internal import test_util
 
 # Only needed for registration
 del function
 del registrations
 
 
-class RegistrationsTest(absltest.TestCase):
+class RegistrationsTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

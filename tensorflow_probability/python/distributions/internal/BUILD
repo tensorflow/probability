@@ -34,13 +34,13 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "init",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
 )
 
 multi_substrate_py_library(
     name = "statistical_testing",
     srcs = ["statistical_testing.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":init",
         # tensorflow dep,
@@ -72,7 +72,7 @@ py_library(
     srcs = [
         "correlation_matrix_volumes_lib.py",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":init",
         # numpy dep,

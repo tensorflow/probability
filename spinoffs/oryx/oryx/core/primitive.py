@@ -78,7 +78,6 @@ class HigherOrderPrimitive(jax_core.Primitive):
     super(HigherOrderPrimitive, self).__init__(name)
     self.call_primitive = True
     self.multiple_results = True
-    pe.staged_out_calls.add(self)
     for register_func in hop_transformation_rules.values():
       register_func(self)
 
@@ -217,6 +216,9 @@ class InitialStylePrimitive(FlatPrimitive):
     self.def_impl(fun_impl)
     for register_func in initial_transformation_rules.values():
       register_func(self)
+
+  def subcall(self, name):
+    return InitialStylePrimitive(f'{self.name}/{name}')
 
 
 tie_all_p = jax_core.Primitive('tie_all')

@@ -30,7 +30,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "lazybones",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":deferred",
         ":deferred_scope",
@@ -41,7 +41,7 @@ py_library(
 py_library(
     name = "deferred",
     srcs = ["deferred.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":deferred_scope",
         # tensorflow dep,
@@ -53,7 +53,7 @@ py_library(
 py_library(
     name = "deferred_scope",
     srcs = ["deferred_scope.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # six dep,
         "//tensorflow_probability/python/experimental/lazybones/utils:weak_container",

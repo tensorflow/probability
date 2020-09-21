@@ -20,4 +20,6 @@ from oryx import bijectors  # pylint: disable=g-import-not-at-top
 from oryx import core
 from oryx import distributions
 from oryx import experimental
+from oryx import internal
+from oryx import util
 from oryx.version import __version__

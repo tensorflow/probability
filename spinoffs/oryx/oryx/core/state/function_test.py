@@ -26,6 +26,7 @@ from oryx.core import primitive
 from oryx.core.state import api
 from oryx.core.state import function
 from oryx.core.state import module
+from oryx.internal import test_util
 
 training_add_p = jax_core.Primitive('training_add')
 
@@ -49,7 +50,7 @@ training_add_p.def_abstract_eval(_training_abstract_eval)
 function.kwargs_rules[training_add_p] = _training_add_kwargs_rule
 
 
-class FunctionModuleTest(absltest.TestCase):
+class FunctionModuleTest(test_util.TestCase):
 
   def test_init_nonstateful_function(self):
 
@@ -172,7 +173,7 @@ class FunctionModuleTest(absltest.TestCase):
     self.assertEqual(m(1., training=False), 1.)
 
 
-class FunctionSpecTest(absltest.TestCase):
+class FunctionSpecTest(test_util.TestCase):
 
   def test_spec_works_for_identity_function(self):
     def f(x):

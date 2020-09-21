@@ -163,7 +163,7 @@ class Convolution(layers_lib.KernelBiasLayer):
       name: ...
         Default value: `None` (i.e., `'Convolution'`).
     """
-    filter_shape = prepare_tuple_argument(
+    filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
     batch_shape = (np.array([], dtype=np.int32) if batch_shape is None
                    else prefer_static.reshape(batch_shape, shape=[-1]))
@@ -181,7 +181,7 @@ class Convolution(layers_lib.KernelBiasLayer):
           batch_shape, filter_shape, [input_size, output_size]], axis=0)
       bias_shape = prefer_static.concat(
           [batch_shape, [output_size]], axis=0)
-      apply_kernel_fn = lambda x, k: convolution_batch(  # pylint: disable=g-long-lambda
+      apply_kernel_fn = lambda x, k: nn_util_lib.convolution_batch(  # pylint: disable=g-long-lambda
           x, k,
           rank=rank,
           strides=strides,
@@ -437,7 +437,7 @@ class ConvolutionVariationalReparameterization(
         Default value: `None` (i.e.,
         `'ConvolutionVariationalReparameterization'`).
     """
-    filter_shape = prepare_tuple_argument(
+    filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
     kernel_shape = filter_shape + (input_size, output_size)
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
@@ -630,7 +630,7 @@ class ConvolutionVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
         Default value: `None` (i.e.,
         `'ConvolutionVariationalFlipout'`).
     """
-    filter_shape = prepare_tuple_argument(
+    filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape')
     kernel_shape = filter_shape + (input_size, output_size)
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
@@ -667,7 +667,7 @@ def _make_convolution_fn(rank, strides, padding, dilations):
       padding,
       dilations,
       data_format,
-  ] = prepare_conv_args(rank, strides, padding, dilations)
+  ] = nn_util_lib.prepare_conv_args(rank, strides, padding, dilations)
   def op(x, kernel):
     dtype = dtype_util.common_dtype([x, kernel], dtype_hint=tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype, name='x')
@@ -678,194 +678,4 @@ def _make_convolution_fn(rank, strides, padding, dilations):
         padding=padding,
         data_format=data_format,
         dilations=dilations)
-  return lambda x, kernel: batchify_op(op, rank + 1, x, kernel)
-
-
-def batchify_op(op, op_min_input_ndims, x, *other_op_args):
-  """Reshape `op` input `x` to be a vec of `op_min_input_ndims`-rank tensors."""
-  if x.shape.rank == op_min_input_ndims + 1:
-    # Input is already a vector of `op_min_input_ndims`-rank tensors.
-    return op(x, *other_op_args)
-  batch_shape, op_shape = prefer_static.split(
-      prefer_static.shape(x),
-      num_or_size_splits=[-1, op_min_input_ndims])
-  flat_shape = prefer_static.pad(
-      op_shape,
-      paddings=[[1, 0]],
-      constant_values=-1)
-  y = tf.reshape(x, flat_shape)
-  y = op(y, *other_op_args)
-  unflat_shape = prefer_static.concat([
-      batch_shape,
-      prefer_static.shape(y)[1:],
-  ], axis=0)
-  y = tf.reshape(y, unflat_shape)
-  return y
-
-
-def prepare_conv_args(rank, strides, padding, dilations):
-  """Sanitizes use provided input."""
-  try:
-    rank = int(tf.get_static_value(rank))
-  except TypeError:
-    raise TypeError('Argument `rank` must be statically known `int`.')
-  valid_rank = {1, 2, 3}
-  if rank not in valid_rank:
-    raise ValueError('Argument `rank` must be in {}.'.format(valid_rank))
-  strides = prepare_tuple_argument(strides, rank, arg_name='strides')
-  padding = _prepare_padding_argument(padding)
-  dilations = prepare_tuple_argument(dilations, rank, arg_name='dilations')
-  data_format = {1: 'NWC', 2: 'NHWC', 3: 'NDHWC'}.get(rank)
-  return rank, strides, padding, dilations, data_format
-
-
-def prepare_tuple_argument(x, n, arg_name):
-  """Helper which puts tuples in standard form."""
-  if isinstance(x, int):
-    return (x,) * n
-  try:
-    x = tuple(x)
-  except TypeError:
-    raise ValueError('Argument {} must be convertible to tuple.'.format(
-        arg_name))
-  if n != len(x):
-    raise ValueError('Argument {} has invalid length; expected:{}, '
-                     'saw:{}.'.format(arg_name, n, len(x)))
-  for x_ in x:
-    try:
-      int(x_)
-    except (ValueError, TypeError):
-      raise ValueError('Argument {} contains non-integer input; '
-                       'saw: {}.'.format(arg_name, x_))
-  return x
-
-
-def prepare_strides(x, n, arg_name):
-  """Mimics prepare_tuple_argument, but puts a 1 for the 0th and 3rd element."""
-  if isinstance(x, int):
-    return (1,) + (x,) * (n-2) + (1,)
-  try:
-    x = tuple(x)
-  except TypeError:
-    raise ValueError('Argument {} must be convertible to tuple.'.format(
-        arg_name))
-  if n != len(x):
-    raise ValueError('Argument {} has invalid length; expected:{}, '
-                     'saw:{}.'.format(arg_name, n, len(x)))
-  for x_ in x:
-    try:
-      int(x_)
-    except (ValueError, TypeError):
-      raise ValueError('Argument {} contains non-integer input; '
-                       'saw: {}.'.format(arg_name, x_))
-  return x
-
-
-def _prepare_padding_argument(x):
-  """Helper which processes the padding argument."""
-  if not hasattr(x, 'upper'):
-    return tuple(x)
-  padding = x.upper()
-  if padding in {'CAUSAL', 'FULL'}:
-    raise NotImplementedError(
-        'Argument `padding` value "{}" currently not supported. If you '
-        'require this feature, please create an issue on '
-        '`https://github.com/tensorflow/probability` or email '
-        '`tfprobability@tensorflow.org`.'.format(padding))
-  valid_values = {'VALID', 'SAME'}
-  if padding not in valid_values:
-    raise ValueError('Argument `padding` must be convertible to a tuple '
-                     'or one of {}; saw: "{}".'.format(valid_values, padding))
-  return padding
-
-
-def convolution_batch(x, kernel, rank, strides, padding, data_format=None,
-                      dilations=None, name=None):
-  """Like `tf.nn.conv2d` except applies batch of kernels to batch of `x`."""
-  if rank != 2:
-    raise NotImplementedError('Argument `rank` currently only supports `2`; '
-                              'saw "{}".'.format(rank))
-  if data_format is not None and data_format.upper() != 'NHWBC':
-    raise ValueError('Argument `data_format` currently only supports "NHWBC"; '
-                     'saw "{}".'.format(data_format))
-  with tf.name_scope(name or 'conv2d_nhwbc'):
-    # Prepare arguments.
-    [
-        rank,
-        _,  # strides
-        padding,
-        dilations,
-        data_format,
-    ] = prepare_conv_args(rank, strides, padding, dilations)
-    strides = prepare_strides(strides, rank + 2, arg_name='strides')
-
-    dtype = dtype_util.common_dtype([x, kernel], dtype_hint=tf.float32)
-    x = tf.convert_to_tensor(x, dtype=dtype, name='x')
-    kernel = tf.convert_to_tensor(kernel, dtype=dtype, name='kernel')
-
-    # Step 1: Transpose and double flatten kernel.
-    # kernel.shape = B + F + [c, c']. Eg: [b, fh, fw, c, c']
-    kernel_shape = prefer_static.shape(kernel)
-    kernel_batch_shape, kernel_event_shape = prefer_static.split(
-        kernel_shape,
-        num_or_size_splits=[-1, rank + 2])
-    kernel_batch_size = prefer_static.reduce_prod(kernel_batch_shape)
-    kernel_ndims = prefer_static.rank(kernel)
-    kernel_batch_ndims = kernel_ndims - rank - 2
-    perm = prefer_static.concat([
-        prefer_static.range(kernel_batch_ndims, kernel_batch_ndims + rank),
-        prefer_static.range(0, kernel_batch_ndims),
-        prefer_static.range(kernel_batch_ndims + rank, kernel_ndims),
-    ], axis=0)  # Eg, [1, 2, 0, 3, 4]
-    kernel = tf.transpose(kernel, perm=perm)  # F + B + [c, c']
-    kernel = tf.reshape(
-        kernel,
-        shape=prefer_static.concat([
-            kernel_event_shape[:rank],
-            [kernel_batch_size * kernel_event_shape[-2],
-             kernel_event_shape[-1]],
-        ], axis=0))  # F + [bc, c']
-
-    # Step 2: Double flatten x.
-    # x.shape = N + D + B + [c]
-    x_shape = prefer_static.shape(x)
-    [
-        x_sample_shape,
-        x_rank_shape,
-        x_batch_shape,
-        x_channel_shape,
-    ] = prefer_static.split(
-        x_shape,
-        num_or_size_splits=[-1, rank, kernel_batch_ndims, 1])
-    x = tf.reshape(
-        x,  # N + D + B + [c]
-        shape=prefer_static.concat([
-            [prefer_static.reduce_prod(x_sample_shape)],
-            x_rank_shape,
-            [prefer_static.reduce_prod(x_batch_shape) *
-             prefer_static.reduce_prod(x_channel_shape)],
-        ], axis=0))  # [n] + D + [bc]
-
-    # Step 3: Apply convolution.
-    y = tf.nn.depthwise_conv2d(
-        x, kernel,
-        strides=strides,
-        padding=padding,
-        data_format='NHWC',
-        dilations=dilations)
-    #  SAME: y.shape = [n, h,      w,      bcc']
-    # VALID: y.shape = [n, h-fh+1, w-fw+1, bcc']
-
-    # Step 4: Reshape/reduce for output.
-    y_shape = prefer_static.shape(y)
-    y = tf.reshape(
-        y,
-        shape=prefer_static.concat([
-            x_sample_shape,
-            y_shape[1:-1],
-            kernel_batch_shape,
-            kernel_event_shape[-2:],
-        ], axis=0))  # N + D' + B + [c, c']
-    y = tf.reduce_sum(y, axis=-2)  # N + D' + B + [c']
-
-    return y
+  return lambda x, kernel: nn_util_lib.batchify_op(op, rank + 1, x, kernel)

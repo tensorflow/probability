@@ -26,6 +26,7 @@ from oryx.experimental.nn import convolution
 from oryx.experimental.nn import core
 from oryx.experimental.nn import normalization
 from oryx.experimental.nn import reshape
+from oryx.internal import test_util
 
 
 def define_dnn():
@@ -45,7 +46,7 @@ def define_cnn():
                             core.Softmax()])
 
 
-class CombinatorTest(parameterized.TestCase):
+class CombinatorTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

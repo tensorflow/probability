@@ -24,7 +24,6 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
@@ -65,18 +64,6 @@ class DtypeUtilTest(test_util.TestCase):
     x = tf.linalg.LinearOperatorDiag(tf.ones(3, tf.float16))
     self.assertEqual(
         tf.float16, dtype_util.common_dtype([x], dtype_hint=tf.float32))
-
-  def testCommonDtypeFromEdRV(self):
-    # Only test Edward2 if it's able to be imported (not possible in jax/numpy
-    # modes).
-    try:
-      ed = tfp.experimental.edward2
-    except AttributeError:
-      self.skipTest('No edward2 module present in jax/numpy modes.')
-    # As in tensorflow_probability github issue #221
-    x = ed.Dirichlet(np.ones(3, dtype='float64'))
-    self.assertEqual(
-        tf.float64, dtype_util.common_dtype([x], dtype_hint=tf.float32))
 
   @parameterized.named_parameters(
       dict(testcase_name='Float32', dtype=tf.float32,

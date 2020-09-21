@@ -207,6 +207,8 @@ from oryx.core.interpreters import log_prob as lp
 
 __all__ = [
     'random_variable',
+    'rv',
+    'nest',
     'log_prob',
     'joint_sample',
     'joint_log_prob',
@@ -222,6 +224,8 @@ LogProbFunction = Callable[..., Scalar]
 RANDOM_VARIABLE = 'random_variable'
 
 safe_zip = jax_util.safe_zip
+
+nest = harvest.nest
 
 
 @functools.singledispatch
@@ -243,6 +247,10 @@ def random_variable(obj, *, name: Optional[str] = None) -> Program:
     raise ValueError(f'Cannot call `random_variable` on {type(obj)} '
                      'without passing in a name.')
   return harvest.sow(obj, tag=RANDOM_VARIABLE, name=name, mode='strict')
+
+
+# Alias for random_variable
+rv = random_variable
 
 
 @random_variable.register(types.FunctionType)

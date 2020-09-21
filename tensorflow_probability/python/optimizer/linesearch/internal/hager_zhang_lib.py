@@ -142,9 +142,12 @@ def secant2(value_and_gradients_function,
     # This will always be s.t. left <= c <= right
     val_c = value_and_gradients_function(
         _secant(search_interval.left, search_interval.right))
-    failed = search_interval.failed | ~is_finite(val_c)
-    converged = search_interval.converged | (~failed & _satisfies_wolfe(
-        val_0, val_c, f_lim, sufficient_decrease_param, curvature_param))
+    finished = _is_negative_inf(val_c.f)
+    failed = ~search_interval.converged & (
+        search_interval.failed | (~finished & ~is_finite(val_c)))
+    converged = search_interval.converged | finished | (
+        ~failed & _satisfies_wolfe(
+            val_0, val_c, f_lim, sufficient_decrease_param, curvature_param))
     new_converged = converged & ~search_interval.converged
     val_left = val_where(new_converged, val_c, search_interval.left)
     val_right = val_where(new_converged, val_c, search_interval.right)
@@ -491,7 +494,7 @@ def bracket(value_and_gradients_function,
   # If the right end is -inf, we have already found a minimum.  Passing along to
   # `_bisect` in this state will do the right thing, so just mark those as
   # stopped.
-  finished = search_interval.right.f <= float('-inf')
+  finished = _is_negative_inf(search_interval.right.f)
 
   # If the value at the right end is finite and the slope at right end point is
   # positive, step B1 in [2], then the given initial points already bracket a
@@ -534,7 +537,7 @@ def bracket(value_and_gradients_function,
 
     # Updated the failed, bracketed, and needs_bisect conditions.
     failed = curr.failed | _bad_nan(right)
-    finished = right.f <= float('-inf')
+    finished = _is_negative_inf(right.f)
     bracketed = _is_rising(right)
     needs_bisect = _needs_bisect(right, f_lim)
     return [_IntermediateResult(
@@ -553,7 +556,7 @@ def bracket(value_and_gradients_function,
   # - `left` is adjusted
   #   - to equal `right` if we already found a minimum (i.e., -inf)
   #   - to the starting point if we're actually bisecting, per step B2
-  finished = bracket_result.right.f <= float('-inf')
+  finished = _is_negative_inf(bracket_result.right.f)
   bracketed = _is_rising(bracket_result.right)
   needs_bisect = _needs_bisect(bracket_result.right, f_lim)
   stopped = already_stopped | bracket_result.failed | finished | bracketed
@@ -615,7 +618,7 @@ def bisect(value_and_gradients_function,
         point of the bracketing interval found.
   """
   failed = ~is_finite(initial_left) | tf.math.is_nan(initial_right.f)
-  finished = initial_right.f <= float('-inf')
+  finished = _is_negative_inf(initial_right.f)
   bisect_args = _IntermediateResult(
       iteration=tf.convert_to_tensor(0),
       stopped=failed | finished | ~_needs_bisect(initial_right, f_lim),
@@ -638,7 +641,7 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
 
     # If the mid point has a value of -inf, we have found a minimum; jump
     # both ends of the interval there and exit.
-    finished = mid.f <= float('-inf')
+    finished = _is_negative_inf(mid.f)
 
     # Otherwise, fail if the midpoint has a `nan` value or derivative, or if the
     # left/right points are so close to it that we can't distinguish them any
@@ -704,6 +707,10 @@ def _needs_bisect(val, f_lim):
       calls for bisection.
   """
   return (val.f >= float('inf')) | ((val.df < 0) & (val.f > f_lim))
+
+
+def _is_negative_inf(x):
+  return x <= tf.constant(float('-inf'), dtype=x.dtype)
 
 
 def _is_rising(val):

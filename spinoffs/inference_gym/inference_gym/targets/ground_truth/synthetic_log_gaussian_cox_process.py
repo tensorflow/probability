@@ -18,7 +18,8 @@ r"""Ground truth values for `synthetic_log_gaussian_cox_process`.
 Automatically generated using the command:
 
 ```
-bazel run //tools/inference_gym_ground_truth:get_ground_truth --   --target \
+python -m inference_gym.tools.get_ground_truth \
+  --target \
   synthetic_log_gaussian_cox_process \
   --stan_samples \
   50000 \

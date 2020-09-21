@@ -16,6 +16,7 @@
 """Implementation of the VectorModel."""
 
 import collections
+import functools
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -39,9 +40,9 @@ class VectorModel(model_lib.Model):
   vector.
 
   The resultant vector-valued model has updated properties and sample
-  transformations which reflect the transformation above. Note that the sample
-  transformations will still return structured values, as those generally cannot
-  be as readily flattened.
+  transformations which reflect the transformation above. By default, the sample
+  transformations will still return structured values. This behavior can be
+  altered via the `flatten_sample_transformations` argument.
 
   There are only two restrictions on the models that can be handled by this
   class:
@@ -80,100 +81,150 @@ class VectorModel(model_lib.Model):
 
   """
 
-  def __init__(self, model):
+  def __init__(self, model, flatten_sample_transformations=False):
     """Constructs the adapter.
 
     Args:
       model: An Inference Gym model.
+      flatten_sample_transformations: Python bool. Whether to flatten and
+        concatenate the outputs of sample transformations.
 
     Raises:
       TypeError: If `model` has more than one unique Tensor dtype.
+      TypeError: If `flatten_sample_transformations` is `True` and there is a
+        sample transformation that has more than one unique Tensor dtype.
     """
     self._model = model
-    dtypes = set(
-        tf.nest.flatten(tf.nest.map_structure(tf.as_dtype, self._model.dtype)))
-    if len(dtypes) > 1:
-      raise TypeError('Model must have only one Tensor dtype, saw: {}'.format(
-          self._model.dtype))
-    dtype = dtypes.pop()
-
-    # TODO(siege): Make this work with multi-part default_event_bijector.
-    def _make_reshaped_bijector(b, s):
-      return tfb.Chain([
-          tfb.Reshape(event_shape_in=s, event_shape_out=[ps.reduce_prod(s)]),
-          b,
-          tfb.Reshape(event_shape_out=b.inverse_event_shape(s)),
-      ])
-
-    reshaped_bijector = tf.nest.map_structure(
-        _make_reshaped_bijector, self._model.default_event_space_bijector,
-        self._model.event_shape)
-
-    bijector = tfb.Blockwise(
-        bijectors=tf.nest.flatten(reshaped_bijector),
-        block_sizes=tf.nest.flatten(
-            tf.nest.map_structure(
-                lambda b, s: ps.reduce_prod(b.inverse_event_shape(s)),  # pylint: disable=g-long-lambda
-                self._model.default_event_space_bijector,
-                self._model.event_shape)))
-
-    event_sizes = tf.nest.map_structure(
-        lambda b, s: ps.reduce_prod(b.inverse_event_shape(s)),
-        self._model.default_event_space_bijector, self._model.event_shape)
-    event_shape = tf.TensorShape([sum(tf.nest.flatten(event_sizes))])
-
-    sample_transformations = collections.OrderedDict()
-
-    def make_flattened_transform(transform):
-      # We yank this out to avoid capturing the loop variable.
-      return transform._replace(
-          fn=lambda x: transform(self._split_and_reshape_event(x)))
-
-    for key, transform in self._model.sample_transformations.items():
-      sample_transformations[key] = make_flattened_transform(transform)
 
     super(VectorModel, self).__init__(
-        default_event_space_bijector=bijector,
-        event_shape=event_shape,
-        dtype=dtype,
+        default_event_space_bijector=_make_vector_event_space_bijector(
+            self._model),
+        event_shape=_get_vector_event_shape(self._model),
+        dtype=_get_unique_dtype(
+            self._model.dtype,
+            'Model must have only one Tensor dtype, saw: {}'.format),
         name='vector_' + self._model.name,
         pretty_name=str(self._model),
-        sample_transformations=sample_transformations,
+        sample_transformations=_make_vector_sample_transformations(
+            self._model, flatten_sample_transformations),
     )
 
   def _unnormalized_log_prob(self, value):
     return self._model.unnormalized_log_prob(
-        self._split_and_reshape_event(value))
+        _split_and_reshape_event(value, self._model))
 
-  def _flatten_and_concat_event(self, x):
 
-    def _reshape_part(part, event_shape):
-      part = tf.cast(part, self.dtype)
-      new_shape = ps.concat(
-          [
-              ps.shape(part)[:ps.size(ps.shape(part)) - ps.size(event_shape)],
-              [-1]
-          ],
-          axis=-1,
-      )
-      return tf.reshape(part, ps.cast(new_shape, tf.int32))
-
-    x = tf.nest.map_structure(_reshape_part, x, self._model.event_shape)
-    return tf.concat(tf.nest.flatten(x), axis=-1)
-
-  def _split_and_reshape_event(self, x):
-    splits = [
-        ps.maximum(1, ps.reduce_prod(s))
-        for s in tf.nest.flatten(self._model.event_shape)
-    ]
-    x = tf.nest.pack_sequence_as(self._model.event_shape,
-                                 tf.split(x, splits, axis=-1))
-
-    def _reshape_part(part, dtype, event_shape):
-      part = tf.cast(part, dtype)
-      new_shape = ps.concat([ps.shape(part)[:-1], event_shape], axis=-1)
-      return tf.reshape(part, ps.cast(new_shape, tf.int32))
-
-    x = tf.nest.map_structure(_reshape_part, x, self._model.dtype,
-                              self._model.event_shape)
+def _flatten_and_concat(x, batch_shape, dtype):
+  """Flattens and concatenates a structured `x`."""
+  # For convenience.
+  if x is None:
     return x
+
+  def _reshape_part(part):
+    part = tf.cast(part, dtype)
+    new_shape = ps.concat(
+        [batch_shape, [-1]],
+        axis=-1,
+    )
+    return tf.reshape(part, ps.cast(new_shape, tf.int32))
+
+  x = tf.nest.map_structure(_reshape_part, x)
+  return tf.concat(tf.nest.flatten(x), axis=-1)
+
+
+def _get_unique_dtype(dtype, error_message_fn):
+  """Gets unique singleton dtype from a structure."""
+  dtypes = set(tf.nest.flatten(tf.nest.map_structure(tf.as_dtype, dtype)))
+  if len(dtypes) > 1:
+    raise TypeError(error_message_fn(dtype))
+  return dtypes.pop()
+
+
+def _make_vector_event_space_bijector(model):
+  """Creates a vector bijector that constrains like the structured model."""
+
+  # TODO(siege): Make this work with multi-part default_event_bijector.
+  def _make_reshaped_bijector(b, s):
+    return tfb.Chain([
+        tfb.Reshape(event_shape_in=s, event_shape_out=[ps.reduce_prod(s)]),
+        b,
+        tfb.Reshape(
+            event_shape_in=[ps.reduce_prod(b.inverse_event_shape(s))],
+            event_shape_out=b.inverse_event_shape(s)),
+    ])
+
+  reshaped_bijector = tf.nest.map_structure(_make_reshaped_bijector,
+                                            model.default_event_space_bijector,
+                                            model.event_shape)
+
+  return tfb.Blockwise(
+      bijectors=tf.nest.flatten(reshaped_bijector),
+      block_sizes=tf.nest.flatten(
+          tf.nest.map_structure(
+              lambda b, s: ps.reduce_prod(b.inverse_event_shape(s)),  # pylint: disable=g-long-lambda
+              model.default_event_space_bijector,
+              model.event_shape)))
+
+
+def _get_vector_event_shape(model):
+  """Returns the size of the vector corresponding to the flattened event."""
+  event_sizes = tf.nest.map_structure(ps.reduce_prod, model.event_shape)
+  return tf.TensorShape([sum(tf.nest.flatten(event_sizes))])
+
+
+def _split_and_reshape_event(x, model):
+  """Splits and reshapes a flat event `x` to match the structure of `model`."""
+  splits = [
+      ps.maximum(1, ps.reduce_prod(s))
+      for s in tf.nest.flatten(model.event_shape)
+  ]
+  x = tf.nest.pack_sequence_as(model.event_shape, tf.split(x, splits, axis=-1))
+
+  def _reshape_part(part, dtype, event_shape):
+    part = tf.cast(part, dtype)
+    new_shape = ps.concat([ps.shape(part)[:-1], event_shape], axis=-1)
+    return tf.reshape(part, ps.cast(new_shape, tf.int32))
+
+  x = tf.nest.map_structure(_reshape_part, x, model.dtype, model.event_shape)
+  return x
+
+
+def _make_vector_sample_transformations(model, flatten_sample_transformations):
+  """Makes `model`'s sample transformations compatible with vector events."""
+  sample_transformations = collections.OrderedDict()
+
+  def flattened_transform(x, dtype, transform):
+    res = transform(_split_and_reshape_event(x, model))
+    if not flatten_sample_transformations:
+      return res
+    batch_shape = ps.shape(x)[:-1]
+    return _flatten_and_concat(res, batch_shape, dtype)
+
+  # We yank this out to avoid capturing the loop variable.
+  def make_flattened_transform(transform_name, transform):
+    if flatten_sample_transformations:
+      dtype = _get_unique_dtype(
+          transform.dtype,
+          lambda d:  # pylint: disable=g-long-lambda
+          'Sample transformation \'{}\' must have only one Tensor dtype, '
+          'saw: {}'.format(transform_name, d))
+      transform = transform._replace(
+          ground_truth_mean=_flatten_and_concat(
+              transform.ground_truth_mean, (), dtype),
+          ground_truth_standard_deviation=_flatten_and_concat(
+              transform.ground_truth_standard_deviation, (), dtype),
+          ground_truth_mean_standard_error=_flatten_and_concat(
+              transform.ground_truth_mean_standard_error, (), dtype),
+          ground_truth_standard_deviation_standard_error=_flatten_and_concat(
+              transform.ground_truth_standard_deviation_standard_error, (),
+              dtype),
+      )
+    else:
+      dtype = None
+    return transform._replace(
+        fn=functools.partial(
+            flattened_transform, dtype=dtype, transform=transform))
+
+  for key, transform in model.sample_transformations.items():
+    sample_transformations[key] = make_flattened_transform(key, transform)
+  return sample_transformations

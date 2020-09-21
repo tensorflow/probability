@@ -248,7 +248,7 @@ def find_bins(x,
                     tensorshape_util.rank(x.shape) > 1)
 
     if flattening_x:
-      x_orig_shape = tf.shape(x)
+      x_orig_shape = ps.shape(x)
       x = tf.reshape(x, [-1])
 
     if dtype is None:

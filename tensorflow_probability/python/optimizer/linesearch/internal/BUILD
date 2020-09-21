@@ -37,7 +37,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "hager_zhang_lib",
     srcs = ["hager_zhang_lib.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",

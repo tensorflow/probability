@@ -19,8 +19,10 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 import numpy as onp
+
 from oryx import bijectors as bb
 from oryx import core
+from oryx.internal import test_util
 
 
 BIJECTORS = [
@@ -32,7 +34,7 @@ BIJECTORS = [
 ]
 
 
-class BijectorsExtensionsTest(parameterized.TestCase):
+class BijectorsExtensionsTest(test_util.TestCase):
 
   @parameterized.named_parameters(BIJECTORS)
   def test_forward(self, bij, args, kwargs, inp, flat):

@@ -19,9 +19,10 @@ from jax import random
 
 from oryx.core import state
 from oryx.experimental.nn import base
+from oryx.internal import test_util
 
 
-class LayerParamsTest(absltest.TestCase):
+class LayerParamsTest(test_util.TestCase):
 
   def test_defaults(self):
     layer_params = base.LayerParams()
@@ -44,7 +45,7 @@ class DummyLayer(base.Layer):
     return self.replace(state=self.state+100)
 
 
-class LayerTest(absltest.TestCase):
+class LayerTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

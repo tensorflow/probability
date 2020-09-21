@@ -20,10 +20,12 @@ import jax
 from jax import random
 import jax.numpy as np
 import numpy as onp
+
 from oryx.core import state
 from oryx.core.serialize import deserialize
 from oryx.core.serialize import serialize
 from oryx.experimental import nn
+from oryx.internal import test_util
 
 
 templates = {
@@ -38,7 +40,7 @@ templates = {
 }
 
 
-class SerializeTest(parameterized.TestCase):
+class SerializeTest(test_util.TestCase):
 
   @parameterized.named_parameters(templates.items())
   def test_serialize(self, template):

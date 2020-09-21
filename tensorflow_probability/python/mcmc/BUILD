@@ -40,7 +40,7 @@ multi_substrate_py_library(
         ":langevin",
         ":nuts",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":diagnostic",
         ":dual_averaging_step_size_adaptation",
@@ -63,7 +63,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "diagnostic",
     srcs = ["diagnostic.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -89,7 +89,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "dual_averaging_step_size_adaptation",
     srcs = ["dual_averaging_step_size_adaptation.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         ":simple_step_size_adaptation",
@@ -133,7 +133,7 @@ py_test(
 multi_substrate_py_library(
     name = "hmc",
     srcs = ["hmc.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         ":metropolis_hastings",
@@ -185,7 +185,7 @@ py_test(
 multi_substrate_py_library(
     name = "nuts",
     srcs = ["nuts.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         # numpy dep,
@@ -202,7 +202,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "nuts_testlib",
     testonly = 1,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -221,7 +221,7 @@ multi_substrate_py_test(
     srcs = ["nuts_test.py"],
     disabled_substrates = ["numpy"],
     shard_count = 7,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_testlib",
@@ -265,7 +265,7 @@ py_test(
 multi_substrate_py_library(
     name = "langevin",
     srcs = ["langevin.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         ":metropolis_hastings",
@@ -310,7 +310,7 @@ py_test(
 multi_substrate_py_library(
     name = "kernel",
     srcs = ["kernel.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # six dep,
     ],
@@ -319,7 +319,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "metropolis_hastings",
     srcs = ["metropolis_hastings.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         # tensorflow dep,
@@ -357,7 +357,7 @@ py_test(
 multi_substrate_py_library(
     name = "random_walk_metropolis",
     srcs = ["random_walk_metropolis.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         ":metropolis_hastings",
@@ -397,7 +397,7 @@ py_test(
 multi_substrate_py_library(
     name = "replica_exchange_mc",
     srcs = ["replica_exchange_mc.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         # tensorflow dep,
@@ -447,7 +447,7 @@ py_test(
 multi_substrate_py_library(
     name = "sample",
     srcs = ["sample.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -488,7 +488,7 @@ py_test(
 multi_substrate_py_library(
     name = "sample_annealed_importance",
     srcs = ["sample_annealed_importance.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -527,7 +527,7 @@ py_test(
 multi_substrate_py_library(
     name = "sample_halton_sequence",
     srcs = ["sample_halton_sequence.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -557,7 +557,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "slice_sampler_kernel",
     srcs = ["slice_sampler_kernel.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         # tensorflow dep,
@@ -606,7 +606,7 @@ py_test(
 multi_substrate_py_library(
     name = "transformed_kernel",
     srcs = ["transformed_kernel.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         # numpy dep,
@@ -687,7 +687,7 @@ py_test(
 multi_substrate_py_library(
     name = "simple_step_size_adaptation",
     srcs = ["simple_step_size_adaptation.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":kernel",
         # numpy dep,

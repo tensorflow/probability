@@ -52,7 +52,7 @@ py_test(
         ":transformations",
         # absl/testing:absltest dep,
         # jax dep,
-        "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:log_prob",
+        "//oryx/internal:test_util",
     ],
 )

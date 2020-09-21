@@ -117,3 +117,13 @@ py_library(
         # numpy dep,
     ],
 )
+
+# pytype_strict
+py_library(
+    name = "eight_schools",
+    srcs = ["eight_schools.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)

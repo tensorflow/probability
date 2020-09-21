@@ -26,7 +26,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "util",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":im2row",
         ":random_variable",
@@ -38,7 +38,7 @@ py_library(
 py_library(
     name = "im2row",
     srcs = ["im2row.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
@@ -61,7 +61,7 @@ py_test(
 py_library(
     name = "random_variable",
     srcs = ["random_variable.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
@@ -87,7 +87,7 @@ py_test(
 py_library(
     name = "utils",
     srcs = ["utils.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # matplotlib dep,
         # numpy dep,

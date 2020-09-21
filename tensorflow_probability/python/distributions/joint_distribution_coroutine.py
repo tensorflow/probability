@@ -16,22 +16,37 @@
 
 from __future__ import absolute_import
 from __future__ import division
+from __future__ import print_function
 
 import collections
+import warnings
 
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
+
 from tensorflow_probability.python.internal import structural_tuple
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'JointDistributionCoroutine',
 ]
+
+
+JAX_MODE = False
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.filterwarnings(
+    'always',
+    module='tensorflow_probability.*joint_distribution_coroutine',
+    append=True)  # Don't override user-set filters.
 
 
 class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
@@ -215,6 +230,10 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
           parameters=parameters,
           name=name)
 
+  # TODO(b/166658748): Once the bug is resolved, we should be able to eliminate
+  #   this workaround that disables sanitize_seed for JD*AB.
+  _stateful_to_stateless = True
+
   @property
   def _require_root(self):
     return True
@@ -278,7 +297,16 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """Executes `model`, creating both samples and distributions."""
     ds = []
     values_out = []
-    seed = SeedStream(seed, salt='JointDistributionCoroutine')
+    if samplers.is_stateful_seed(seed):
+      seed_stream = SeedStream(seed, salt='JointDistributionCoroutine')
+      if not self._stateful_to_stateless:
+        seed = None
+    else:
+      seed_stream = None  # We got a stateless seed for seed=.
+
+    # TODO(b/166658748): Make _stateful_to_stateless always True (eliminate it).
+    if self._stateful_to_stateless and (seed is not None or not JAX_MODE):
+      seed = samplers.sanitize_seed(seed, salt='JointDistributionCoroutine')
     gen = self._model_coroutine()
     index = 0
     d = next(gen)
@@ -289,9 +317,15 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
       while True:
         actual_distribution = d.distribution if isinstance(d, self.Root) else d
         ds.append(actual_distribution)
+        # Ensure reproducibility even when xs are (partially) set. Always split.
+        stateful_sample_seed = None if seed_stream is None else seed_stream()
+        if seed is None:
+          stateless_sample_seed = None
+        else:
+          stateless_sample_seed, seed = samplers.split_seed(seed)
+
         if (value is not None and len(value) > index and
             value[index] is not None):
-          seed()  # Ensure reproducibility even when xs are (partially) set.
 
           def convert_tree_to_tensor(x, dtype_hint):
             return tf.convert_to_tensor(x, dtype_hint=dtype_hint)
@@ -304,9 +338,37 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
               value[index],  # x
               ds[-1].dtype)  # dtype_hint
         else:
-          next_value = actual_distribution.sample(
-              sample_shape=sample_shape if isinstance(d, self.Root) else (),
-              seed=seed())
+          try:
+            next_value = actual_distribution.sample(
+                sample_shape=sample_shape if isinstance(d, self.Root) else (),
+                seed=(stateful_sample_seed if stateless_sample_seed is None
+                      else stateless_sample_seed))
+          except TypeError as e:
+            if ('Expected int for argument' not in str(e) and
+                TENSOR_SEED_MSG_PREFIX not in str(e)) or (
+                    stateful_sample_seed is None):
+              raise
+            msg = (
+                'Falling back to stateful sampling for distribution #{index} '
+                '(0-based) of type `{dist_cls}` with component name '
+                '{component_name} and `dist.name` "{dist_name}". Please '
+                'update to use `tf.random.stateless_*` RNGs. This fallback may '
+                'be removed after 20-Dec-2020. ({exc})')
+            component_name = (
+                joint_distribution_lib.get_explicit_name_for_component(ds[-1]))
+            if component_name is None:
+              component_name = '[None specified]'
+            else:
+              component_name = '"{}"'.format(component_name)
+            warnings.warn(msg.format(
+                index=index,
+                component_name=component_name,
+                dist_name=ds[-1].name,
+                dist_cls=type(ds[-1]),
+                exc=str(e)))
+            next_value = actual_distribution.sample(
+                sample_shape=sample_shape if isinstance(d, self.Root) else (),
+                seed=stateful_sample_seed)
 
         if self._validate_args:
           with tf.control_dependencies(

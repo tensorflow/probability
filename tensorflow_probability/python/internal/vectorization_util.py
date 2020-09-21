@@ -25,10 +25,9 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.util import SeedStream
-from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -36,6 +35,8 @@ __all__ = [
     'iid_sample',
     'make_rank_polymorphic'
 ]
+
+JAX_MODE = False
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
@@ -60,44 +61,45 @@ def iid_sample(sample_fn, sample_shape):
       `concat([sample_shape, shape_of_original_returned_tensor])`.
   """
   sample_shape = distribution_util.expand_to_vector(
-      prefer_static.cast(sample_shape, np.int32), tensor_name='sample_shape')
-  n = prefer_static.cast(
-      prefer_static.reduce_prod(sample_shape), dtype=np.int32)
+      ps.cast(sample_shape, np.int32), tensor_name='sample_shape')
+  n = ps.cast(ps.reduce_prod(sample_shape), dtype=np.int32)
 
   def unflatten(x):
-    unflattened_shape = prefer_static.cast(
-        prefer_static.concat([
-            sample_shape, prefer_static.shape(x)[1:]], axis=0),
+    unflattened_shape = ps.cast(
+        ps.concat([sample_shape, ps.shape(x)[1:]], axis=0),
         dtype=np.int32)
     return tf.reshape(x, unflattened_shape)
 
   def iid_sample_fn(*args, **kwargs):
     """Draws iid samples from `fn`."""
 
-    pfor_loop_body = lambda _: sample_fn(*args, **kwargs)
+    with tf.name_scope('iid_sample_fn'):
 
-    seed = kwargs.pop('seed', None)
-    try:  # Assume that `seed` is a valid stateful seed (Python `int`).
-      kwargs = dict(kwargs, seed=SeedStream(seed, salt='iid_sample')())
-      pfor_loop_body = lambda _: sample_fn(*args, **kwargs)
-    except TypeError as e:
-      # If a stateless seed arg is passed, split it into `n` different stateless
-      # seeds, so that we don't just get a bunch of copies of the same sample.
-      if TENSOR_SEED_MSG_PREFIX not in str(e):
-        raise
-      warnings.warn('Saw non-`int` seed {}, implying stateless sampling. '
-                    'Autovectorized functions that use stateless sampling '
-                    'may be quite slow because the current implementation '
-                    'falls back to an explicit loop. This will be fixed in the '
-                    'future. For now, you will likely see better performance '
-                    'from stateful sampling, which you can invoke by passing a'
-                    'traditional Python `int` seed.'.format(seed))
-      seed = samplers.split_seed(seed, n=n, salt='iid_sample_stateless')
-      pfor_loop_body = (
-          lambda i: sample_fn(*args, seed=tf.gather(seed, i), **kwargs))
+      seed = kwargs.pop('seed', None)
+      if samplers.is_stateful_seed(seed):
+        kwargs = dict(kwargs, seed=SeedStream(seed, salt='iid_sample')())
+        def pfor_loop_body(_):
+          with tf.name_scope('iid_sample_fn_stateful_body'):
+            return sample_fn(*args, **kwargs)
+      else:
+        # If a stateless seed arg is passed, split it into `n` different
+        # stateless seeds, so that we don't just get a bunch of copies of the
+        # same sample.
+        if not JAX_MODE:
+          warnings.warn(
+              'Saw Tensor seed {}, implying stateless sampling. Autovectorized '
+              'functions that use stateless sampling may be quite slow because '
+              'the current implementation falls back to an explicit loop. This '
+              'will be fixed in the future. For now, you will likely see '
+              'better performance from stateful sampling, which you can invoke '
+              'by passing a Python `int` seed.'.format(seed))
+        seed = samplers.split_seed(seed, n=n, salt='iid_sample_stateless')
+        def pfor_loop_body(i):
+          with tf.name_scope('iid_sample_fn_stateless_body'):
+            return sample_fn(*args, seed=tf.gather(seed, i), **kwargs)
 
-    draws = parallel_for.pfor(pfor_loop_body, n)
-    return tf.nest.map_structure(unflatten, draws, expand_composites=True)
+      draws = parallel_for.pfor(pfor_loop_body, n)
+      return tf.nest.map_structure(unflatten, draws, expand_composites=True)
 
   return iid_sample_fn
 
@@ -118,15 +120,16 @@ def _lock_in_non_vectorized_args(fn, arg_structure, flat_core_ndims, flat_args):
   vectorized_arg_index_set = set(vectorized_arg_indices)
 
   def fn_of_vectorized_args(vectorized_args):
-    vectorized_args_by_index = dict(
-        zip(vectorized_arg_indices, vectorized_args))
-    # Substitute the vectorized args into the original argument
-    # structure.
-    new_args_with_original_structure = nest.pack_sequence_as(
-        arg_structure, [vectorized_args_by_index[i]
-                        if i in vectorized_arg_index_set
-                        else v for (i, v) in enumerate(flat_args)])
-    return fn(*new_args_with_original_structure)
+    with tf.name_scope('fn_of_vectorized_args'):
+      vectorized_args_by_index = dict(
+          zip(vectorized_arg_indices, vectorized_args))
+      # Substitute the vectorized args into the original argument
+      # structure.
+      new_args_with_original_structure = tf.nest.pack_sequence_as(
+          arg_structure, [vectorized_args_by_index[i]
+                          if i in vectorized_arg_index_set
+                          else v for (i, v) in enumerate(flat_args)])
+      return fn(*new_args_with_original_structure)
 
   return (vectorized_arg_core_ndims,
           vectorized_args,
@@ -236,12 +239,12 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
       # If we got a single value for core_ndims, tile it across all args.
       core_ndims_structure = (
           core_ndims
-          if nest.is_nested(core_ndims)
-          else nest.map_structure(lambda _: core_ndims, args))
+          if tf.nest.is_nested(core_ndims)
+          else tf.nest.map_structure(lambda _: core_ndims, args))
 
       # Build flat lists of all argument parts and their corresponding core
       # ndims.
-      flat_core_ndims = nest.flatten(core_ndims_structure)
+      flat_core_ndims = tf.nest.flatten(core_ndims_structure)
       flat_args = nest.flatten_up_to(
           core_ndims_structure, args, check_types=False)
 
@@ -264,7 +267,7 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
       # be nonnegative.
       vectorized_arg_shapes = [tf.shape(arg) for arg in vectorized_args]
       batch_ndims = [
-          prefer_static.rank_from_shape(arg_shape) - nd
+          ps.rank_from_shape(arg_shape) - nd
           for (arg_shape, nd) in zip(
               vectorized_arg_shapes, vectorized_arg_core_ndims)]
       static_ndims = [tf.get_static_value(nd) for nd in batch_ndims]
@@ -273,7 +276,7 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
                          'specified `core_ndims`! (saw input ranks {}, '
                          '`core_ndims` {}).'.format(
                              tf.nest.map_structure(
-                                 prefer_static.rank_from_shape,
+                                 ps.rank_from_shape,
                                  vectorized_arg_shapes),
                              vectorized_arg_core_ndims))
       if validate_args:
@@ -294,10 +297,10 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
               (arg_shape[:nd], arg_shape[nd:])
               for (arg_shape, nd) in zip(vectorized_arg_shapes, batch_ndims)])
         broadcast_batch_shape = (
-            functools.reduce(prefer_static.broadcast_shape, batch_shapes, []))
+            functools.reduce(ps.broadcast_shape, batch_shapes, []))
 
       # Flatten all of the batch dimensions into one.
-      n = tf.cast(prefer_static.reduce_prod(broadcast_batch_shape), tf.int32)
+      n = tf.cast(ps.reduce_prod(broadcast_batch_shape), tf.int32)
       static_n = tf.get_static_value(n)
       if static_n == 1:
         result = fn(*args)
@@ -307,20 +310,20 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
         # TODO(b/145227909): If/when vmap supports broadcasting, use nested vmap
         # when batch rank is static so that we can exploit broadcasting.
         broadcast_vectorized_args = [
-            tf.broadcast_to(part, prefer_static.concat(
+            tf.broadcast_to(part, ps.concat(
                 [broadcast_batch_shape, core_shape], axis=0))
             for (part, core_shape) in zip(vectorized_args, core_shapes)]
         vectorized_args_with_flattened_batch_dim = [
-            tf.reshape(part, prefer_static.concat([[n], core_shape], axis=0))
+            tf.reshape(part, ps.concat([[n], core_shape], axis=0))
             for (part, core_shape) in zip(
                 broadcast_vectorized_args, core_shapes)]
         batched_result = tf.vectorized_map(
             fn_of_vectorized_args, vectorized_args_with_flattened_batch_dim)
 
         # Unflatten any `Tensor`s in the result.
-        unflatten = lambda x: tf.reshape(x, prefer_static.concat([  # pylint: disable=g-long-lambda
-            broadcast_batch_shape, prefer_static.shape(x)[1:]], axis=0))
-        result = nest.map_structure(
+        unflatten = lambda x: tf.reshape(x, ps.concat([  # pylint: disable=g-long-lambda
+            broadcast_batch_shape, ps.shape(x)[1:]], axis=0))
+        result = tf.nest.map_structure(
             lambda x: unflatten(x) if tf.is_tensor(x) else x, batched_result,
             expand_composites=True)
     return result

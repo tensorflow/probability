@@ -37,7 +37,7 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     substrates_omit_deps = [
         ":covariance_reducer",
         ":elliptical_slice_sampler",
@@ -79,7 +79,7 @@ multi_substrate_py_library(
 py_library(
     name = "elliptical_slice_sampler",
     srcs = ["elliptical_slice_sampler.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -109,7 +109,7 @@ py_test(
 py_library(
     name = "nuts_autobatching",
     srcs = ["nuts_autobatching.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -125,7 +125,7 @@ py_library(
     name = "nuts_autobatching_testlib",
     testonly = 1,
     srcs = ["nuts_autobatching_test.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -142,7 +142,7 @@ py_test(
     srcs = ["nuts_autobatching_test.py"],
     python_version = "PY3",
     shard_count = 7,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_autobatching_testlib",
@@ -156,7 +156,7 @@ py_test(
     main = "nuts_autobatching_test.py",
     python_version = "PY3",
     shard_count = 7,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     tags = [
         "notap",
         "nozapfhahn",
@@ -216,7 +216,7 @@ py_test(
 py_library(
     name = "particle_filter",
     srcs = ["particle_filter.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
@@ -248,7 +248,7 @@ py_test(
 py_library(
     name = "particle_filter_augmentation",
     srcs = ["particle_filter_augmentation.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -273,7 +273,7 @@ py_test(
 multi_substrate_py_library(
     name = "sample_sequential_monte_carlo",
     srcs = ["sample_sequential_monte_carlo.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":weighted_resampling",
         # numpy dep,
@@ -305,7 +305,7 @@ multi_substrate_py_test(
 py_library(
     name = "sequential_monte_carlo_kernel",
     srcs = ["sequential_monte_carlo_kernel.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":weighted_resampling",
         # numpy dep,
@@ -336,7 +336,7 @@ py_test(
 multi_substrate_py_library(
     name = "weighted_resampling",
     srcs = ["weighted_resampling.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -365,7 +365,7 @@ multi_substrate_py_test(
 py_library(
     name = "sample",
     srcs = ["sample.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -392,7 +392,7 @@ py_test(
 py_library(
     name = "reducer",
     srcs = ["reducer.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # six dep,
     ],
@@ -401,7 +401,7 @@ py_library(
 py_library(
     name = "covariance_reducer",
     srcs = ["covariance_reducer.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -428,7 +428,7 @@ py_test(
 py_library(
     name = "with_reductions",
     srcs = ["with_reductions.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc:kernel",
@@ -452,7 +452,7 @@ py_test(
 py_library(
     name = "sample_fold",
     srcs = ["sample_fold.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":sample",
         ":sample_discarding_kernel",
@@ -483,7 +483,7 @@ py_test(
 py_library(
     name = "sample_discarding_kernel",
     srcs = ["sample_discarding_kernel.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":sample",
         # tensorflow dep,
@@ -510,7 +510,7 @@ py_test(
 py_library(
     name = "tracing_reducer",
     srcs = ["tracing_reducer.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -536,7 +536,7 @@ py_test(
 py_library(
     name = "expectations_reducer",
     srcs = ["expectations_reducer.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -562,7 +562,7 @@ py_test(
 py_library(
     name = "potential_scale_reduction_reducer",
     srcs = ["potential_scale_reduction_reducer.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,

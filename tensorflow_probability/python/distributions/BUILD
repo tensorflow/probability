@@ -844,6 +844,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -2259,7 +2260,7 @@ multi_substrate_py_test(
 
 py_test(
     name = "gamma_test_gpu",
-    size = "medium",
+    size = "large",
     srcs = ["gamma_test.py"],
     main = "gamma_test.py",
     python_version = "PY3",
@@ -2494,7 +2495,6 @@ multi_substrate_py_test(
     name = "joint_distribution_auto_batched_test",
     size = "large",
     srcs = ["joint_distribution_auto_batched_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     shard_count = 2,
     deps = [
@@ -3041,7 +3041,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "power_spherical_test",
-    size = "medium",
+    size = "large",
     srcs = ["power_spherical_test.py"],
     jax_tags = ["no-oss-ci"],  # TODO(b/160734689)
     shard_count = 4,
@@ -3399,7 +3399,7 @@ py_test(
 py_library(
     name = "jax_transformation_testlib",
     testonly = 1,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":hypothesis_testlib.jax",
         # absl/testing:parameterized dep,

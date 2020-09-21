@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "neutra",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":neutra_kernel",
     ],
@@ -37,7 +37,7 @@ py_library(
 py_library(
     name = "neutra_kernel",
     srcs = ["neutra_kernel.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

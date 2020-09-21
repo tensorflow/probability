@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "stats",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":sample_stats",
         "//tensorflow_probability/python/internal:all_util",
@@ -38,7 +38,7 @@ py_library(
 py_library(
     name = "sample_stats",
     srcs = ["sample_stats.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

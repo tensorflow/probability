@@ -32,12 +32,17 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
+    'dummy_seed',
     'JointDistribution',
 ]
 
+
+JAX_MODE = False
 
 CALLING_CONVENTION_DESCRIPTION = """
     The measure methods of `JointDistribution` (`log_prob`, `prob`, etc.)
@@ -117,6 +122,12 @@ CALLING_CONVENTION_DESCRIPTION = """
 FORBIDDEN_COMPONENT_NAMES = ('value', 'name')
 
 
+def dummy_seed():
+  """Returns a fixed constant seed, for cases needing samples without a seed."""
+  # TODO(b/147874898): After 20 Dec 2020, drop the 42 and inline the zeros_seed.
+  return samplers.zeros_seed() if JAX_MODE else 42
+
+
 @six.add_metaclass(abc.ABCMeta)
 class JointDistribution(distribution_lib.Distribution):
   """Joint distribution over one or more component distributions.
@@ -169,8 +180,11 @@ class JointDistribution(distribution_lib.Distribution):
     graph_id = -1 if tf.executing_eagerly() else id(tf.constant(True).graph)
     ds = self._single_sample_distributions.get(graph_id, None)
     if ds is None or any([d is None for d in ds]):
-      ds = (candidate_dists if candidate_dists is not None else
-            self._flat_sample_distributions(seed=42)[0])  # Seed for CSE.
+      if candidate_dists is not None:
+        ds = candidate_dists
+      else:
+        ds = self._flat_sample_distributions(  # Constant seed for CSE.
+            seed=dummy_seed())[0]
       self._single_sample_distributions[graph_id] = ds
     return ds
 
@@ -417,7 +431,8 @@ class JointDistribution(distribution_lib.Distribution):
   def _map_measure_over_dists(self, attr, value):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
-    ds, xs = self._call_flat_sample_distributions(value=value, seed=42)
+    ds, xs = self._call_flat_sample_distributions(
+        value=value, seed=dummy_seed())
     return (getattr(d, attr)(x) for d, x in zip(ds, xs))
 
   def _map_attr_over_dists(self, attr, dists=None):
@@ -541,6 +556,15 @@ def get_explicit_name_for_component(d):
   name = d.parameters.get('name', None)
   if name and d.__class__.__name__ in name:
     name = None
+
+  if name and hasattr(d, '__init__'):
+    spec = tf_inspect.getfullargspec(d.__init__)
+    default_name = dict(
+        zip(spec.args[len(spec.args) - len(spec.defaults or ()):],
+            spec.defaults or ())
+        ).get('name', None)
+    if name == default_name:
+      name = None
 
   if name in FORBIDDEN_COMPONENT_NAMES:
     raise ValueError('Distribution name "{}" is not allowed as a '

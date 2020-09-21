@@ -74,7 +74,6 @@ py_library(
     srcs = ["trace_util.py"],
     srcs_version = "PY3",
     deps = [
-        # dataclasses dep,
         # jax dep,
     ],
 )
@@ -85,6 +84,7 @@ py_library(
     srcs = ["kwargs_util.py"],
     srcs_version = "PY3",
     deps = [
+        # jax dep,
     ],
 )
 
@@ -101,6 +101,7 @@ py_test(
         # numpy dep,
         "//oryx/core/state",
         "//oryx/experimental/nn",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -113,5 +114,7 @@ py_test(
     deps = [
         ":kwargs_util",
         # absl/testing:absltest dep,
+        # jax dep,
+        "//oryx/core/interpreters/inverse:custom_inverse",
     ],
 )

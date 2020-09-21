@@ -15,7 +15,10 @@
 # Lint as: python3
 """Tests for tensorflow_probability.spinoffs.oryx.core.kwargs_util."""
 from absl.testing import absltest
+
+import jax
 from oryx.core import kwargs_util
+from oryx.core.interpreters.inverse import custom_inverse
 
 
 class KwargsUtilTest(absltest.TestCase):
@@ -111,6 +114,16 @@ class KwargsUtilTest(absltest.TestCase):
         kwargs_util.check_in_kwargs(foo4, 'rng'))
     self.assertTrue(
         kwargs_util.check_in_kwargs(foo4, 'training'))
+
+  def test_check_custom_jvp(self):
+    self.assertFalse(kwargs_util.check_in_kwargs(jax.nn.relu, 'foo'))
+
+  def test_check_custom_inverse(self):
+    @custom_inverse.custom_inverse
+    def f(x, bar=2):
+      return x + bar
+    self.assertFalse(kwargs_util.check_in_kwargs(f, 'foo'))
+    self.assertTrue(kwargs_util.check_in_kwargs(f, 'bar'))
 
 if __name__ == '__main__':
   absltest.main()

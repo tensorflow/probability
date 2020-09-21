@@ -196,7 +196,9 @@ def auto_composite_tensor(cls):
   """
   clsid = (cls.__module__, cls.__name__)
 
-  if clsid in _registry:
+  # Also check for subclass if retrieving from the _registry, in case the user
+  # has redefined the class (e.g. in a REPL/notebook).
+  if clsid in _registry and issubclass(_registry[clsid], cls):
     return _registry[clsid]
 
   class _AutoCompositeTensor(cls, CompositeTensor):

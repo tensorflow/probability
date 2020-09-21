@@ -101,7 +101,7 @@ class MultivariateNormalLinearOperator(
   cov = [[ 0.36,  0.12,  0.06],
          [ 0.12,  0.29, -0.13],
          [ 0.06, -0.13,  0.26]]
-  scale = tf.cholesky(cov)
+  scale = tf.linalg.cholesky(cov)
   # ==> [[ 0.6,  0. ,  0. ],
   #      [ 0.2,  0.5,  0. ],
   #      [ 0.1, -0.3,  0.4]])
@@ -111,13 +111,13 @@ class MultivariateNormalLinearOperator(
       scale=tf.linalg.LinearOperatorLowerTriangular(scale))
 
   # Covariance agrees with cholesky(cov) parameterization.
-  mvn.covariance().eval()
+  mvn.covariance()
   # ==> [[ 0.36,  0.12,  0.06],
   #      [ 0.12,  0.29, -0.13],
   #      [ 0.06, -0.13,  0.26]]
 
   # Compute the pdf of an`R^3` observation; return a scalar.
-  mvn.prob([-1., 0, 1]).eval()  # shape: []
+  mvn.prob([-1., 0, 1])  # shape: []
 
   # Initialize a 2-batch of 3-variate Gaussians.
   mu = [[1., 2, 3],
@@ -132,7 +132,7 @@ class MultivariateNormalLinearOperator(
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[-0.9, 0, 0.1],
        [-10, 0, 9]]     # shape: [2, 3]
-  mvn.prob(x).eval()    # shape: [2]
+  mvn.prob(x)    # shape: [2]
   ```
 
   """

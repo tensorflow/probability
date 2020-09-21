@@ -36,7 +36,7 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":test_util",  # EnableOnExport
     ],
@@ -45,14 +45,14 @@ multi_substrate_py_library(
 py_library(
     name = "all_util",
     srcs = ["all_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [],
 )
 
 multi_substrate_py_library(
     name = "auto_composite_tensor",
     srcs = ["auto_composite_tensor.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -62,7 +62,7 @@ py_test(
     name = "auto_composite_tensor_test",
     srcs = ["auto_composite_tensor_test.py"],
     python_version = "PY3",
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:auto_composite_tensor",
@@ -73,7 +73,7 @@ py_test(
 multi_substrate_py_library(
     name = "assert_util",
     srcs = ["assert_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -143,7 +143,7 @@ py_library(
     srcs = [
         "docstring_util.py",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
     ],
 )
@@ -165,7 +165,7 @@ py_test(
 multi_substrate_py_library(
     name = "dtype_util",
     srcs = ["dtype_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -188,7 +188,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "distribution_util",
     srcs = ["distribution_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":assert_util",
         ":dtype_util",
@@ -255,13 +255,13 @@ py_test(
 py_library(
     name = "lazy_loader",
     srcs = ["lazy_loader.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
 )
 
 multi_substrate_py_library(
     name = "monte_carlo",
     srcs = ["monte_carlo.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -270,7 +270,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "name_util",
     srcs = ["name_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -279,7 +279,7 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "nest_util",
     srcs = ["nest_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -381,7 +381,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "tensor_util",
     srcs = ["tensor_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -407,7 +407,7 @@ py_test(
 multi_substrate_py_library(
     name = "tensorshape_util",
     srcs = ["tensorshape_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -429,7 +429,7 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "vectorization_util",
     srcs = ["vectorization_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":samplers",
         # tensorflow dep,
@@ -440,7 +440,7 @@ multi_substrate_py_library(
     name = "hypothesis_testlib",
 #     testonly = 1,  # DisableOnExport
     srcs = ["hypothesis_testlib.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":tensorshape_util",
         # hypothesis dep,
@@ -471,7 +471,7 @@ py_test(
 multi_substrate_py_library(
     name = "structural_tuple",
     srcs = ["structural_tuple.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
 )
 
 multi_substrate_py_test(
@@ -489,7 +489,7 @@ multi_substrate_py_library(
     name = "test_util",
 #     testonly = 1,  # DisableOnExport
     srcs = ["test_util.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":dtype_util",
         ":test_combinations",
@@ -521,7 +521,7 @@ multi_substrate_py_library(
     name = "test_combinations",
 #     testonly = 1,  # DisableOnExport
     srcs = ["test_combinations.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # six dep,

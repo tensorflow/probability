@@ -23,7 +23,8 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.inference_gym.internal import array_to_source
+from inference_gym.internal import array_to_source
+from inference_gym import using_tensorflow as gym
 import numpy as np
 
 rng = np.random.RandomState(seed=1)
@@ -38,7 +39,7 @@ student_ids = student_ids[mask]
 question_ids = question_ids[mask]
 dummy_correct = np.ones_like(student_ids)
 
-model = tfp.experimental.inference_gym.targets.ItemResponseTheory(
+model = gym.targets.ItemResponseTheory(
     train_student_ids=student_ids,
     train_question_ids=question_ids,
     train_correct=dummy_correct)

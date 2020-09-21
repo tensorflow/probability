@@ -1200,10 +1200,10 @@ class Bijector(tf.Module):
       raise NotImplementedError(
           'Subclasses without static min_event_ndims must override '
           '`forward_event_ndims`')
-    batch_ndims = aligned_batch_ndims(
+    ldj_reduce_ndims = aligned_event_ndims(
         event_ndims, self._forward_min_event_ndims)
     return nest.map_structure(
-        lambda ndims: batch_ndims + ndims,
+        lambda ndims: ldj_reduce_ndims + ndims,
         self._inverse_min_event_ndims)
 
   def inverse_event_ndims(self, event_ndims, **kwargs):
@@ -1212,10 +1212,10 @@ class Bijector(tf.Module):
       raise NotImplementedError(
           'Subclasses without static min_event_ndims must override '
           '`inverse_event_ndims`')
-    batch_ndims = aligned_batch_ndims(
+    ldj_reduce_ndims = aligned_event_ndims(
         event_ndims, self._inverse_min_event_ndims)
     return nest.map_structure(
-        lambda ndims: batch_ndims + ndims,
+        lambda ndims: ldj_reduce_ndims + ndims,
         self._forward_min_event_ndims)
 
   @contextlib.contextmanager
@@ -1348,46 +1348,49 @@ def check_valid_ndims(ndims, validate=True):
   return ndims
 
 
-def aligned_batch_ndims(rank_structure,
-                        event_ndims,
+def aligned_event_ndims(event_ndims,
+                        min_event_ndims,
                         validate=True,
-                        name='aligned_batch_ndims'):
-  """Get the scalar batch-ndims given structured input-ranks and event-ndims.
+                        name='aligned_event_ndims'):
+  """Get the unique difference between `event_ndims` and `min_event_ndims`.
 
   This method takes two parallel structures of integer values: namely, the
-  structured ranks of a bijector input, and user-specified event-ndims. It
-  checks that the elementwise difference between the structures is equal for all
-  elements and returns the unique scalar difference.
+  structured user-specified `event_ndims` and the bijector's `min_event_ndims`.
+  It checks that the elementwise difference between the structures is equal for
+  all elements and returns the unique scalar difference.
 
   Args:
-    rank_structure: A structure of integers representing the ranks of bijector
-      inputs. Assumed to be positive integer values.
-    event_ndims: A corresponding structure of integers. We check that every
-      element of `rank_structure[i] - event_ndims[i]` is equal, and that the
-      difference is non-negative.
-    validate: Whether to use runtime assertions when either `rank_structure` or
-      `event_ndims` are not known statically. If true, the value returned
+    event_ndims: A structure of integers representing user-specified
+      `event_ndims` of a bijector input. Assumed to be positive integer values.
+    min_event_ndims: A corresponding structure of integers representing the
+      minimum rank of bijector inputs. We check that every element of
+      `event_ndims[i] - min_event_ndims[i]` is equal, and that the difference is
+      non-negative.
+    validate: Whether to use runtime assertions when either `event_ndims` or
+      `min_event_ndims` are not known statically. If true, the value returned
       by this method is conditioned on `tf.debugging` ops where required.
       Otherwise, only run statically-decidable assertions.
     name: Python `str` name given to ops created by this function.
   Returns:
-    batch_ndims: An unstructured integer representing "batch" dimensions.
+    ldj_reduction_ndims: An unstructured non-negative integer representing
+      the `event_ndims` additional to `min_event_ndims`, along which the log-
+      det-Jacobian is later reduced.
   Raises:
-    ValueError: When the structured difference between `rank_structure` and
-      `event_ndims` is not the same for all elements.
-    ValueError: If the resulting `batch_ndims` is negative.
+    ValueError: When the structured difference between `event_ndims` and
+      `min_event_ndims` is not the same for all elements.
+    ValueError: If the resulting `ldj_reduction_ndims` is negative.
   """
   with tf.name_scope(name):
     assertions = []
 
-    flat_ranks = nest.flatten(rank_structure)
-    flat_event_ndims = nest.flatten_up_to(rank_structure, event_ndims)
+    flat_event_ndims = nest.flatten(event_ndims)
+    flat_min_event_ndims = nest.flatten_up_to(event_ndims, min_event_ndims)
 
     flat_differences = []
     differences_all_static = True
 
-    for rank, ndims in zip(flat_ranks, flat_event_ndims):
-      difference = rank - ndims
+    for dim, min_dim in zip(flat_event_ndims, flat_min_event_ndims):
+      difference = dim - min_dim
       difference_ = tf.get_static_value(difference)
       if difference_ is not None:
         flat_differences.append(np.int32(difference_))
@@ -1399,32 +1402,33 @@ def aligned_batch_ndims(rank_structure,
     if len(flat_differences) > 1:
       if differences_all_static:
         if len(set(flat_differences)) > 1:
-          raise ValueError(('Differences between rank and event_ndims must '
-                            'be equal for all elements of the structured '
-                            'input. Saw input_rank={}, event_ndims={}.').format(
-                                rank_structure, event_ndims))
+          raise ValueError(
+              ('Differences between `event_ndims` and `min_event_ndims must be '
+               'equal for all elements of the structured input. Saw '
+               'event_ndims={}, min_event_ndims={}.'
+               ).format(event_ndims, min_event_ndims))
       elif validate:
         with tf.control_dependencies(assertions):
           assertions.append(assert_util.assert_equal(
               flat_differences[0], flat_differences[1:],
-              message=('Differences between rank and event_ndims must '
-                       'be equal for all elements of the structured input. '
-                       'Saw input_rank={}, event_ndims={}.').format(
-                           rank_structure, event_ndims)))
+              message=('Differences between `event_ndims` and `min_event_ndims`'
+                       ' must be equal for all elements of the structured '
+                       'input. Saw event_ndims={}, min_event_ndims={}.'
+                       ).format(event_ndims, min_event_ndims)))
 
     # Finally, make sure the difference is positive.
     result = flat_differences[0]
     if differences_all_static:
       if result < 0:
-        raise ValueError('Input must have rank at least {}. Saw: {}'
-                         .format(event_ndims, rank_structure))
+        raise ValueError('`event_ndims` must be at least {}. Saw: {}'
+                         .format(min_event_ndims, event_ndims))
     elif validate:
       with tf.control_dependencies(assertions):
         assertions.append(
             assert_util.assert_greater_equal(
                 result, 0,
-                message='Input must have rank at least {}. Saw: {}'.format(
-                    event_ndims, rank_structure)))
+                message='`event_ndims` must be at least {}. Saw: {}'.format(
+                    min_event_ndims, event_ndims)))
 
     if assertions:
       with tf.control_dependencies(assertions):
@@ -1519,63 +1523,66 @@ def ldj_reduction_shape(shape_structure,
     # Container for dynamic assertions
     assertions = []
 
-    # Make sure event_ndims and min_event_ndims are valid.
+    # Make sure event_ndims and min_event_ndims are valid and get reduce_ndims.
     min_event_ndims = nest.map_structure(
         lambda nd: check_valid_ndims(nd, validate), min_event_ndims)
     event_ndims = nest.map_structure_up_to(
         min_event_ndims,
         lambda nd: check_valid_ndims(nd, validate), event_ndims)
+    reduce_ndims = aligned_event_ndims(
+        event_ndims, min_event_ndims, validate=validate, name='reduce_ndims')
 
-    # Get slice start/endpoint for the ldj_reduction_shape.
-    rank_structure = nest.map_structure(ps.size, shape_structure)
-    max_batch_ndims = aligned_batch_ndims(
-        rank_structure, min_event_ndims, validate=validate,
-        name='max_batch_ndims')
-    batch_ndims = aligned_batch_ndims(
-        rank_structure, event_ndims, validate=validate,
-        name='batch_ndims')
+    # Get the non-minimal portion of the event shape over which to reduce LDJ.
+    ldj_reduce_shapes = nest.flatten(
+        nest.map_structure(
+            lambda s, dim: ps.slice(  # pylint: disable=g-long-lambda
+                s, begin=[ps.size(s) - dim], size=[reduce_ndims]),
+            shape_structure, event_ndims))
 
-    # Make sure the batch_ndims are not larger than max_batch_ndims.
-    max_batch_ndims_ = tf.get_static_value(max_batch_ndims)
-    batch_ndims_ = tf.get_static_value(batch_ndims)
-
-    if max_batch_ndims_ is not None and batch_ndims_ is not None:
-      if max_batch_ndims_ < batch_ndims_:
-        raise ValueError('event_ndims must be larger than min_event_ndims.')
-    elif validate:
-      assertions.append(
-          assert_util.assert_greater_equal(
-              max_batch_ndims, batch_ndims,
-              message='event_ndims must be larger than min_event_ndims.'))
-
-    # Get the maximal batch shape from each component of the structured input
-    flat_max_batch_shapes = [
-        s[:max_batch_ndims] for s in nest.flatten(shape_structure)]
-
-    # The dimensions following batch-dims and preceeding maximum possible batch
-    # dims are the LDJ reduce dims. This must be the same for all structured
-    # elements, so we'll just pick the first.
-    reduce_shape = ps.slice(
-        flat_max_batch_shapes[0],
-        begin=[batch_ndims],
-        size=[max_batch_ndims-batch_ndims])
-
-    # Make sure that the max_batch_shape is equal for all structured elements.
-    # We can skip this step if the input is unstructured.
-    if len(flat_max_batch_shapes) > 1:
+    # Make sure that the `event_shape` dimensions to the left of
+    # `min_event_ndims` are equal for all structured elements, and that batch
+    # shapes broadcast for all structured elements.
+    # We can skip these steps if the input is unstructured.
+    if len(ldj_reduce_shapes) > 1:
       # Try to check shapes statically.
-      max_batch_shapes_ = [tf.get_static_value(s)
-                           for s in flat_max_batch_shapes]
-      if not any(s is None for s in max_batch_shapes_):
-        if len(set(map(tuple, max_batch_shapes_))) > 1:
-          raise ValueError('Batch shapes must be equal. Saw: {}.'
-                           .format(nest.pack_sequence_as(
-                               shape_structure, max_batch_shapes_)))
+      ldj_reduce_shapes_ = [tf.get_static_value(s) for s in ldj_reduce_shapes]
+      if not any(s is None for s in ldj_reduce_shapes_):
+        if len(set(map(tuple, ldj_reduce_shapes_))) > 1:
+          raise ValueError(
+              '`event_shape` components to the left of `min_event_ndims` must '
+              ' be equal. Saw: {}.'.format(
+                  nest.pack_sequence_as(shape_structure, ldj_reduce_shapes_)))
+
+      batch_shapes = nest.flatten(
+          nest.map_structure(lambda s, dim: s[:ps.size(s) - dim],
+                             shape_structure, event_ndims))
+      batch_shapes_ = [tf.TensorShape(tf.get_static_value(s))
+                       for s in batch_shapes]
+      if not any(s is None for s in batch_shapes_):
+        shape_ = batch_shapes_[0]
+        for s in batch_shapes_[1:]:
+          try:
+            shape_ = tf.broadcast_static_shape(shape_, s)
+          except ValueError:
+            raise ValueError(
+                '`batch_shape` components must broadcast. Saw shapes {} and {}.'
+                ''.format(shape_, s))
+
       elif validate:
         with tf.control_dependencies(assertions):
           assertions.append(
               assert_util.assert_equal(
-                  flat_max_batch_shapes[0], flat_max_batch_shapes[1:],
-                  message='Batch shapes must be equal.'))
+                  ldj_reduce_shapes[0], ldj_reduce_shapes[1:],
+                  message=('`event_shape` components to the left of '
+                           '`min_event_ndims` must be equal.')))
 
-    return reduce_shape, assertions
+        shape = batch_shapes[0]
+        for s in batch_shapes[1:]:
+          try:
+            shape = ps.broadcast_shape(shape, s)
+          except ValueError:
+            raise ValueError(
+                ('`batch_shape` components must broadcast. Saw shapes {} and '
+                 '{}.'.format(shape, s)))
+
+    return ldj_reduce_shapes[0], assertions

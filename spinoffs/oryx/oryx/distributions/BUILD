@@ -60,5 +60,6 @@ py_test(
         # numpy dep,
         "//oryx/core",
         "//oryx/core/ppl",
+        "//oryx/internal:test_util",
     ],
 )

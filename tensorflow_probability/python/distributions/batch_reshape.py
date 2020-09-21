@@ -110,7 +110,7 @@ class BatchReshape(distribution_lib.Distribution):
       dtype = dtype_util.common_dtype([batch_shape], dtype_hint=tf.int32)
       # The unexpanded batch shape may contain up to one dimension of -1.
       self._batch_shape_unexpanded = tensor_util.convert_nonref_to_tensor(
-          batch_shape, dtype=dtype, name='batch_shape')
+          batch_shape, dtype=dtype, name='batch_shape', as_shape_tensor=True)
       validate_init_args_statically(distribution, self._batch_shape_unexpanded)
       self._distribution = distribution
       self._batch_shape_static = tensorshape_util.constant_value_as_shape(
@@ -455,6 +455,10 @@ class BatchReshape(distribution_lib.Distribution):
       assertions.append(shape_assertion)
 
     return assertions
+
+  _composite_tensor_nonshape_params = ('distribution',)
+
+  _composite_tensor_shape_params = ('batch_shape',)
 
 
 def validate_init_args_statically(distribution, batch_shape):

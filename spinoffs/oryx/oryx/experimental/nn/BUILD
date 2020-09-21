@@ -139,6 +139,7 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -149,13 +150,13 @@ py_test(
     python_version = "PY3",
     deps = [
         ":core",
-        ":nn",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
         # jax:stax dep,
         # numpy dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -176,6 +177,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -187,8 +189,10 @@ py_test(
     deps = [
         ":convolution",
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # jax dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -204,6 +208,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -219,6 +224,7 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -232,6 +238,7 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )
 
@@ -259,5 +266,6 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core/state",
+        "//oryx/internal:test_util",
     ],
 )

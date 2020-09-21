@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "utils",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":probability",
         ":special_methods",
@@ -40,7 +40,7 @@ py_library(
 py_library(
     name = "special_methods",
     srcs = ["special_methods.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -49,7 +49,7 @@ py_library(
 py_library(
     name = "utils_impl",
     srcs = ["utils.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         "//tensorflow_probability/python/experimental/lazybones:deferred",
     ],
@@ -70,7 +70,7 @@ py_test(
 py_library(
     name = "probability",
     srcs = ["probability.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/lazybones:deferred",
@@ -94,5 +94,5 @@ py_test(
 py_library(
     name = "weak_container",
     srcs = ["weak_container.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
 )

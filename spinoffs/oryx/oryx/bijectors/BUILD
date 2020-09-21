@@ -57,5 +57,6 @@ py_test(
         # jax dep,
         # numpy dep,
         "//oryx/core",
+        "//oryx/internal:test_util",
     ],
 )

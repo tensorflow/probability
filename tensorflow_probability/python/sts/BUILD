@@ -28,7 +28,7 @@ exports_files(["LICENSE"])
 py_library(
     name = "sts",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":autoregressive",
         ":decomposition",
@@ -50,7 +50,7 @@ py_library(
 py_library(
     name = "autoregressive",
     srcs = ["autoregressive.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -75,7 +75,7 @@ py_test(
 py_library(
     name = "decomposition",
     srcs = ["decomposition.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -102,7 +102,7 @@ py_test(
 py_library(
     name = "dynamic_regression",
     srcs = ["dynamic_regression.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -127,7 +127,7 @@ py_test(
 py_library(
     name = "fitting",
     srcs = ["fitting.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -160,7 +160,7 @@ py_test(
 py_library(
     name = "forecast",
     srcs = ["forecast.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -186,7 +186,7 @@ py_test(
 py_library(
     name = "local_level",
     srcs = ["local_level.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -211,7 +211,7 @@ py_test(
 py_library(
     name = "local_linear_trend",
     srcs = ["local_linear_trend.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -236,7 +236,7 @@ py_test(
 py_library(
     name = "regression",
     srcs = ["regression.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -261,7 +261,7 @@ py_test(
 py_library(
     name = "seasonal",
     srcs = ["seasonal.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -288,7 +288,7 @@ py_test(
 py_library(
     name = "semilocal_linear_trend",
     srcs = ["semilocal_linear_trend.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -313,7 +313,7 @@ py_test(
 py_library(
     name = "smooth_seasonal",
     srcs = ["smooth_seasonal.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -338,7 +338,7 @@ py_test(
 py_library(
     name = "structural_time_series",
     srcs = ["structural_time_series.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -364,7 +364,7 @@ py_test(
 py_library(
     name = "sum",
     srcs = ["sum.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

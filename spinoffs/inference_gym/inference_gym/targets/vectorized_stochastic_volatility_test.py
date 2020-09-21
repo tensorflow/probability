@@ -77,6 +77,7 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
   @test_util.numpy_disable_gradient_test
   def testParameterizationsConsistent(self):
     """Run HMC for both parameterizations, and compare posterior means."""
+    self.skipTest('Broken by omnistaging b/168705919')
     centered_returns = _test_dataset()
     centered_model = (
         vectorized_stochastic_volatility.VectorizedStochasticVolatility(
@@ -232,6 +233,7 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
   @test_util.numpy_disable_gradient_test
   def testSP500SmallHMC(self):
     """Checks approximate samples from the model against the ground truth."""
+    self.skipTest('Broken by omnistaging b/168705919')
     model = (
         vectorized_stochastic_volatility
         .VectorizedStochasticVolatilitySP500Small())

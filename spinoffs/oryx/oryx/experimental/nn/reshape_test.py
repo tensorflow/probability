@@ -20,9 +20,10 @@ from jax import random
 
 from oryx.core import state
 from oryx.experimental.nn import reshape
+from oryx.internal import test_util
 
 
-class ReshapeTest(absltest.TestCase):
+class ReshapeTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

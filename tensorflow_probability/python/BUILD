@@ -30,14 +30,13 @@ exports_files(["LICENSE"])
 py_library(
     name = "python",
     srcs = ["__init__.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
         ":version",
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/debugging",
         "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/edward2",
         "//tensorflow_probability/python/experimental",
         "//tensorflow_probability/python/glm",
         "//tensorflow_probability/python/internal",
@@ -58,5 +57,5 @@ py_library(
 py_library(
     name = "version",
     srcs = ["version.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
 )

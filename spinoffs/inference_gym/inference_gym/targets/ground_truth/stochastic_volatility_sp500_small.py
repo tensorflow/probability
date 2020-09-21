@@ -18,7 +18,7 @@ r"""Ground truth values for `stochastic_volatility_sp500_small`.
 Automatically generated using the command:
 
 ```
-bazel run //tools/inference_gym_ground_truth:get_ground_truth -- \
+python -m inference_gym.tools.get_ground_truth \
   --target=stochastic_volatility_sp500_small \
   --stan_samples=50000
 ```

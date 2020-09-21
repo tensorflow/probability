@@ -24,6 +24,9 @@ toc:
   path: /probability/examples/Learnable_Distributions_Zoo
 - title: Optimizers
   path: /probability/examples/Optimizers_in_TensorFlow_Probability
+- title: TensorFlow Probability on JAX
+  path: /probability/examples/TensorFlow_Probability_on_JAX
+  status: new
 - heading: "Tutorials"
 - title:  Probabilistic regression
   path: /probability/examples/Probabilistic_Layers_Regression

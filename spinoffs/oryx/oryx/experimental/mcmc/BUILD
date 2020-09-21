@@ -73,6 +73,7 @@ py_test(
         # numpy dep,
         # inference_gym:using_jax dep,
         "//oryx/core/interpreters:harvest",
+        "//oryx/internal:test_util",
         # tensorflow_probability/substrates:jax dep,
     ],
 )

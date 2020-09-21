@@ -20,9 +20,10 @@ from jax import random
 
 from oryx.core import state
 from oryx.experimental.nn import convolution
+from oryx.internal import test_util
 
 
-class ConvolutionTest(absltest.TestCase):
+class ConvolutionTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()

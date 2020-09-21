@@ -23,6 +23,7 @@ import numpy as onp
 from oryx.core import trace_util
 from oryx.core.interpreters.propagate import Cell
 from oryx.core.interpreters.propagate import propagate
+from oryx.internal import test_util
 
 
 inverse_rules = {}
@@ -171,7 +172,7 @@ def add_ildj(invals, outvals):
 ildj_rules[lax.add_p] = add_ildj
 
 
-class PropagateTest(absltest.TestCase):
+class PropagateTest(test_util.TestCase):
 
   def test_correct_inverse_for_identity_function(self):
     def f(x):

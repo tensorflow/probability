@@ -19,6 +19,7 @@ from absl.testing import absltest
 import jax.numpy as jnp
 
 from oryx.core.interpreters.inverse import slice as slc
+from oryx.internal import test_util
 
 Slice = slc.Slice
 NDSlice = slc.NDSlice
@@ -26,7 +27,7 @@ NDSlice = slc.NDSlice
 # pylint: disable=g-generic-assert
 
 
-class SliceTest(absltest.TestCase):
+class SliceTest(test_util.TestCase):
 
   def assertNotLess(self, left, right):
     self.assertFalse(left < right, msg=f'{left} is less than {right}.')

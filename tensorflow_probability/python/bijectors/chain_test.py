@@ -190,7 +190,7 @@ class ChainBijectorTest(test_util.TestCase):
     samples = tf1.placeholder_with_default(
         np.zeros([2, 10], np.float32), shape=None)
     ildj = chain.inverse_log_det_jacobian(samples, event_ndims=0)
-    self.assertTrue(ildj is not None)
+    self.assertIsNotNone(ildj)
     self.evaluate(ildj)
 
   def testChainDynamicToStatic(self):
@@ -205,38 +205,40 @@ class ChainBijectorTest(test_util.TestCase):
       return x
 
     def ldj(_):
-      return tf.constant(0.)
+      return tf.constant(1.)
 
     # The issue was that the sample's shape was going in-and-out of being fully
     # specified, causing internal consistency issues inside the bijector.
     chain = tfb.Chain([
         tfb.Inline(
-            inverse_log_det_jacobian_fn=ldj,
             inverse_fn=xform_dynamic,
             forward_min_event_ndims=0,
             forward_log_det_jacobian_fn=ldj,
             forward_fn=xform_dynamic),
         tfb.Inline(
-            inverse_log_det_jacobian_fn=ldj,
             inverse_fn=xform_static,
             forward_min_event_ndims=0,
             forward_log_det_jacobian_fn=ldj,
             forward_fn=xform_static),
         tfb.Inline(
-            inverse_log_det_jacobian_fn=ldj,
             inverse_fn=xform_dynamic,
             forward_min_event_ndims=0,
             forward_log_det_jacobian_fn=ldj,
             forward_fn=xform_dynamic)
     ])
 
-    ildj = chain.inverse_log_det_jacobian([0.], event_ndims=0)
-    # The static shape information is lost on the account of the final bijector
-    # being dynamic.
-    self.assertFalse(tensorshape_util.is_fully_defined(ildj.shape))
-    fldj = chain.forward_log_det_jacobian([0.], event_ndims=0)
+    ildj = chain.inverse_log_det_jacobian(
+        tf.zeros((2, 3), dtype=tf.float32), event_ndims=1)
+
+    # The shape of `ildj` is known statically to be scalar; its value is
+    # not statically known.
+    self.assertTrue(tensorshape_util.is_fully_defined(ildj.shape))
+    self.assertEqual(self.evaluate(ildj), -9.)
+
     # Ditto.
-    self.assertFalse(tensorshape_util.is_fully_defined(fldj.shape))
+    fldj = chain.forward_log_det_jacobian([0.], event_ndims=0)
+    self.assertTrue(tensorshape_util.is_fully_defined(fldj.shape))
+    self.assertEqual(self.evaluate(fldj), 3.)
 
 
 if __name__ == "__main__":

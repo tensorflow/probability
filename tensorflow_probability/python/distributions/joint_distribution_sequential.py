@@ -20,13 +20,16 @@ from __future__ import print_function
 
 import collections
 import functools
+import warnings
 
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -34,6 +37,17 @@ from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensor
 __all__ = [
     'JointDistributionSequential',
 ]
+
+
+JAX_MODE = False
+
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls wont trigger the warning.
+warnings.filterwarnings(
+    'always',
+    module='tensorflow_probability.*joint_distribution_sequential',
+    append=True)  # Don't override user-set filters.
 
 
 def _make_summary_statistic(attr):
@@ -248,22 +262,61 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     #   self._dist_fn_wrapped
     #   self._dist_fn_args
     #   self._always_use_specified_sample_shape
-    seed = SeedStream(seed, salt='JointDistributionSequential')
+    num_dists = len(self._dist_fn_wrapped)
+    if seed is not None and samplers.is_stateful_seed(seed):
+      seed_stream = SeedStream(seed, salt='JointDistributionSequential')
+    else:
+      seed_stream = None
+    if seed is not None:
+      seeds = samplers.split_seed(seed, n=num_dists,
+                                  salt='JointDistributionSequential')
+    else:
+      seeds = [None] * num_dists
     ds = []
-    xs = [None]*len(self._dist_fn_wrapped) if value is None else list(value)
-    if len(xs) != len(self._dist_fn_wrapped):
+    xs = [None] * num_dists if value is None else list(value)
+    if len(xs) != num_dists:
       raise ValueError('Number of `xs`s must match number of '
                        'distributions.')
     for i, (dist_fn, args) in enumerate(zip(self._dist_fn_wrapped,
                                             self._dist_fn_args)):
       ds.append(dist_fn(*xs[:i]))  # Chain rule of probability.
+
+      # Ensure reproducibility even when xs are (partially) set.
+      stateful_seed = None if seed_stream is None else seed_stream()
+
       if xs[i] is None:
         # TODO(b/129364796): We should ignore args prefixed with `_`; this
         # would mean we more often identify when to use `sample_shape=()`
         # rather than `sample_shape=sample_shape`.
-        xs[i] = ds[-1].sample(
-            () if args and not self._always_use_specified_sample_shape
-            else sample_shape, seed=seed())
+        try:  # TODO(b/147874898): Eliminate the stateful fallback 20 Dec 2020.
+          xs[i] = ds[-1].sample(
+              () if args and not self._always_use_specified_sample_shape
+              else sample_shape, seed=seeds[i])
+        except TypeError as e:
+          if ('Expected int for argument' not in str(e) and
+              TENSOR_SEED_MSG_PREFIX not in str(e)) or stateful_seed is None:
+            raise
+
+          if not getattr(self, '_resolving_names', False):  # avoid recursion
+            self._resolving_names = True
+            resolved_names = self._flat_resolve_names()
+            self._resolving_names = False
+            msg = (
+                'Falling back to stateful sampling for distribution #{i} '
+                '(0-based) of type `{dist_cls}` with component name '
+                '"{component_name}" and `dist.name` "{dist_name}". Please '
+                'update to use `tf.random.stateless_*` RNGs. This fallback may '
+                'be removed after 20-Dec-2020. ({exc})')
+            warnings.warn(msg.format(
+                i=i,
+                dist_name=ds[-1].name,
+                component_name=resolved_names[i],
+                dist_cls=type(ds[-1]),
+                exc=str(e)))
+          xs[i] = ds[-1].sample(
+              () if args and not self._always_use_specified_sample_shape
+              else sample_shape, seed=stateful_seed)
+
       else:
         # This signature does not allow kwarg names. Applies
         # `convert_to_tensor` on the next value.
@@ -272,7 +325,6 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
             lambda x, dtype: tf.convert_to_tensor(x, dtype_hint=dtype),  # func
             xs[i],  # x
             ds[-1].dtype)  # dtype
-        seed()  # Ensure reproducibility even when xs are (partially) set.
     # Note: we could also resolve distributions up to the first non-`None` in
     # `self._model_flatten(value)`, however we omit this feature for simplicity,
     # speed, and because it has not yet been requested.
@@ -300,7 +352,8 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
   def _call_attr(self, attr):
     if any(self._dist_fn_args):
       # Const seed for maybe CSE.
-      ds, _ = self._flat_sample_distributions(seed=42)
+      ds, _ = self._flat_sample_distributions(
+          seed=joint_distribution_lib.dummy_seed())
     else:
       ds = tuple(d() for d in self._dist_fn_wrapped)
     return (getattr(d, attr)() for d in ds)

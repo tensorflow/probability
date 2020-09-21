@@ -31,6 +31,8 @@ py_library(
         "//oryx/core",
         "//oryx/distributions",
         "//oryx/experimental",
+        "//oryx/internal",
+        "//oryx/util",
     ],
 )
 

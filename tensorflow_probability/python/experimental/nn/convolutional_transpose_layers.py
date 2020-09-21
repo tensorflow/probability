@@ -20,7 +20,6 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
-from tensorflow_probability.python.experimental.nn import convolutional_layers as convolution_lib
 from tensorflow_probability.python.experimental.nn import layers as layers_lib
 from tensorflow_probability.python.experimental.nn import util as nn_util_lib
 from tensorflow_probability.python.experimental.nn import variational_base as vi_lib
@@ -167,7 +166,7 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
       name: ...
         Default value: `None` (i.e., `'ConvolutionTranspose'`).
     """
-    filter_shape = convolution_lib.prepare_tuple_argument(
+    filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, 'filter_shape')
     kernel_shape = filter_shape + (output_size, input_size)  # Note transpose.
     batch_ndims = 0
@@ -440,7 +439,7 @@ class ConvolutionTransposeVariationalReparameterization(
         Default value: `None` (i.e.,
         `'ConvolutionTransposeVariationalReparameterization'`).
     """
-    filter_shape = convolution_lib.prepare_tuple_argument(
+    filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, 'filter_shape')
     kernel_shape = filter_shape + (output_size, input_size)  # Note transpose.
     batch_ndims = 0
@@ -654,7 +653,7 @@ class ConvolutionTransposeVariationalFlipout(
         Default value: `None` (i.e.,
         `'ConvolutionTransposeVariationalFlipout'`).
     """
-    filter_shape = convolution_lib.prepare_tuple_argument(
+    filter_shape = nn_util_lib.prepare_tuple_argument(
         filter_shape, rank, 'filter_shape')
     kernel_shape = filter_shape + (output_size, input_size)  # Note transpose.
     batch_ndims = 0
@@ -691,7 +690,7 @@ def _make_convolution_transpose_fn(rank, strides, padding, dilations,
       padding,
       dilations,
       data_format,
-  ] = convolution_lib.prepare_conv_args(rank, strides, padding, dilations)
+  ] = nn_util_lib.prepare_conv_args(rank, strides, padding, dilations)
   def op(x, kernel):
     output_shape, strides_ = _get_output_shape(
         rank, strides, padding, dilations,
@@ -703,7 +702,7 @@ def _make_convolution_transpose_fn(rank, strides, padding, dilations,
         padding=padding,
         data_format=data_format,
         dilations=dilations)
-  return lambda x, kernel: convolution_lib.batchify_op(op, rank + 1, x, kernel)
+  return lambda x, kernel: nn_util_lib.batchify_op(op, rank + 1, x, kernel)
 
 
 def _get_output_shape(rank, strides, padding, dilations,
@@ -712,7 +711,7 @@ def _get_output_shape(rank, strides, padding, dilations,
   if output_padding is None:
     output_padding = (None,) * rank
   else:
-    output_padding = convolution_lib.prepare_tuple_argument(
+    output_padding = nn_util_lib.prepare_tuple_argument(
         output_padding, rank, 'output_padding')
     for stride, out_pad in zip(strides, output_padding):
       if out_pad >= stride:
