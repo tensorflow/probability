@@ -59,9 +59,9 @@ class TruncatedCauchyTest(test_util.TestCase):
                         rtol=1e-2, atol=1e-2)
 
   def testSampleShape(self):
-    loc = tf.zeros((1, 1, 3))
-    scale = tf.ones((2, 3))
-    low = -tf.ones((4, 1, 1))
+    loc = tf.zeros((1, 1, 3), dtype=tf.float64)
+    scale = tf.ones((2, 3), dtype=tf.float64)
+    low = -tf.ones((4, 1, 1), dtype=tf.float64)
     high = 1.0
     d = tfd.TruncatedCauchy(loc, scale, low, high)
     self.assertAllEqual([7, 2, 4, 2, 3],
