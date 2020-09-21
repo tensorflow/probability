@@ -38,19 +38,19 @@ class _ParticleFilterTest(test_util.TestCase):
 
     # Biased random walk.
     def particle_dynamics(_, previous_state):
-      state_shape = tf.shape(previous_state['position'])
+      state_shape = ps.shape(previous_state['position'])
       return tfd.JointDistributionNamed({
           'position': tfd.TransformedDistribution(
-              tfd.Bernoulli(probs=tf.broadcast_to(0.75, state_shape),
+              tfd.Bernoulli(probs=tf.fill(state_shape, 0.75),
                             dtype=self.dtype),
               tfb.Shift(previous_state['position']))})
 
     # Completely uninformative observations allowing a test
     # of the pure dynamics.
     def particle_observations(_, state):
-      state_shape = tf.shape(state['position'])
-      return tfd.Uniform(low=tf.broadcast_to(-100.0, state_shape),
-                         high=tf.broadcast_to(100.0, state_shape))
+      state_shape = ps.shape(state['position'])
+      return tfd.Uniform(low=tf.fill(state_shape, -100.),
+                         high=tf.fill(state_shape, 100.))
 
     observations = tf.zeros((9,), dtype=self.dtype)
     trajectories, _ = self.evaluate(
@@ -448,6 +448,7 @@ class _ParticleFilterTest(test_util.TestCase):
              trace_criterion_fn=lambda s, r: ps.logical_or(  # pylint: disable=g-long-lambda
                  ps.equal(r.steps, 2),
                  ps.equal(r.steps, 4)),
+             static_trace_allocation_size=2,
              seed=test_util.test_seed()))
     self.assertLen(particles_1_3, 2)
     self.assertLen(log_weights_1_3, 2)

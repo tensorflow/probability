@@ -1096,6 +1096,12 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('histogram_fixed_width_bins',
              [histogram_fixed_width_bins_params()],
              xla_disabled=True),   # GPU fails with f32([0.]), [0.0, 0.0], 2
+    TestCase('argsort',
+             [hps.tuples(array_axis_tuples(),
+                         hps.sampled_from(['ASCENDING', 'DESCENDING'])
+                         ).map(lambda t: t[0] + (t[1], True))  # stable sort
+              ],
+             xla_disabled=True),  # No TopKV2 kernel (for doubles).
 ]
 
 

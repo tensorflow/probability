@@ -14,7 +14,9 @@
 # ============================================================================
 """Weighted resampling methods, e.g., for use in SMC methods."""
 
+import numpy as np
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as dist_util
@@ -125,7 +127,8 @@ def _resample_using_log_points(log_probs, sample_shape, log_points, name=None):
             ps.rank_from_shape(batch_shape)))
     markers_and_samples = ps.cast(
         tf.cumsum(sorted_markers, axis=-1), dtype=tf.int32)
-    markers_and_samples = tf.math.minimum(markers_and_samples, num_markers - 1)
+    markers_and_samples = tf.math.minimum(markers_and_samples,
+                                          num_markers - np.int32(1))
 
     # Collect up samples, omitting markers.
     samples_mask = tf.equal(sorted_markers, 0)

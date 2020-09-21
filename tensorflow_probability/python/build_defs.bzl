@@ -272,6 +272,7 @@ def multi_substrate_py_test(
         jax_tags = [],
         disabled_substrates = [],
         srcs_version = "PY3",
+        python_version = "PY3",
         timeout = None,
         shard_count = None):
     """A TFP `py_test` for each of TF, NumPy, and JAX.
@@ -295,6 +296,7 @@ def multi_substrate_py_test(
         disabled_substrates: Iterable of substrates to disable, items from
             ["numpy", "jax"].
         srcs_version: As with `py_test`.
+        python_version: As with `py_test`.
         timeout: As with `py_test`.
         shard_count: As with `py_test`.
     """
@@ -311,7 +313,7 @@ def multi_substrate_py_test(
         deps = deps,
         tags = tags,
         srcs_version = srcs_version,
-        python_version = "PY3",
+        python_version = python_version,
         timeout = timeout,
         shard_count = shard_count,
     )

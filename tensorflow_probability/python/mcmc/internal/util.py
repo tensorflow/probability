@@ -61,6 +61,8 @@ __all__ = [
 ]
 
 
+JAX_MODE = False
+
 SEED_CTOR_ARG_DEPRECATION_MSG = (
     'Seeding `tfp.mcmc.TransitionKernel` instances by constructor argument is '
     'deprecated. Use the `seed` argument to `tfp.mcmc.sample_chain` or '
@@ -426,11 +428,16 @@ def trace_scan(loop_fn,
     elems_array = elems_array.unstack(elems)
 
     # Initialize trace arrays.
-    dynamic_size, initial_size = True, 0
     if trace_criterion_fn is None:
       dynamic_size, initial_size = tf.is_tensor(length), length
-    elif static_trace_allocation_size:
+    elif static_trace_allocation_size is not None:
       dynamic_size, initial_size = False, static_trace_allocation_size
+    elif JAX_MODE or (not tf.executing_eagerly() and
+                      control_flow_util.GraphOrParentsInXlaContext(
+                          tf1.get_default_graph())):
+      dynamic_size, initial_size = False, length
+    else:
+      dynamic_size, initial_size = True, 0
     trace_arrays = tf.nest.map_structure(
         lambda x: tf.TensorArray(x.dtype,  # pylint: disable=g-long-lambda
                                  size=initial_size,

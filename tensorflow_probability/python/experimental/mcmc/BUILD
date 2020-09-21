@@ -43,14 +43,12 @@ multi_substrate_py_library(
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":nuts_autobatching",
-        ":particle_filter",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
         ":reducer",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
-        ":sequential_monte_carlo_kernel",
         ":tracing_reducer",
         ":with_reductions",
     ],
@@ -213,7 +211,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "particle_filter",
     srcs = ["particle_filter.py"],
     srcs_version = "PY3",
@@ -229,10 +227,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "particle_filter_test",
     size = "large",
     srcs = ["particle_filter_test.py"],
+    numpy_tags = ["notap"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
@@ -302,7 +301,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sequential_monte_carlo_kernel",
     srcs = ["sequential_monte_carlo_kernel.py"],
     srcs_version = "PY3",
@@ -317,7 +316,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sequential_monte_carlo_kernel_test",
     size = "medium",
     srcs = ["sequential_monte_carlo_kernel_test.py"],
