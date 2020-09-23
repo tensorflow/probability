@@ -415,7 +415,12 @@ py_test(
     name = "xla_test_gpu",
     size = "small",
     srcs = ["numpy_test.py"],
-    args = ["--test_mode=xla"],
+    args = [
+        "--test_mode=xla",
+        # TODO(b/168718272): reduce_*([nan, nan], axis=0) (GPU)
+        # histogram_fixed_width_bins fails with f32([0.]), [0.0, 0.0], 2
+        "--xla_disabled=math.reduce_min,math.reduce_max,histogram_fixed_width_bins",
+    ],
     main = "numpy_test.py",
     python_version = "PY3",
     shard_count = 11,

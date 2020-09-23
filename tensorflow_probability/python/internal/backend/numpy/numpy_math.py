@@ -168,6 +168,11 @@ __all__ = [
 def _astuple(x):
   """Attempt to convert the given argument to be a Python tuple."""
   try:
+    return (int(x),)
+  except TypeError:
+    pass
+
+  try:
     return tuple(x)
   except TypeError:
     pass
@@ -229,7 +234,7 @@ def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
            initial_value=None):
   """Shared impl of cumsum/cumprod."""
   del name
-  axis = _astuple(axis)
+  axis = int(axis)
   result = op(_reverse(x, axis) if reverse else x, axis)
   if reverse:
     result = _reverse(result, axis)
@@ -442,14 +447,14 @@ angle = utils.copy_docstring(
 argmax = utils.copy_docstring(
     'tf.math.argmax',
     lambda input, axis=None, output_type=np.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmax(input, axis=0 if axis is None else _astuple(axis))
+        np.argmax(input, axis=0 if axis is None else int(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 argmin = utils.copy_docstring(
     'tf.math.argmin',
     lambda input, axis=None, output_type=np.int64, name=None: (  # pylint: disable=g-long-lambda
         np.argmin(_convert_to_tensor(
-            input), axis=0 if axis is None else _astuple(axis))
+            input), axis=0 if axis is None else int(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 asin = utils.copy_docstring(
@@ -809,10 +814,17 @@ def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # 
   """Implements reduce_* for nptf."""
   input_tensor = _convert_to_tensor(input_tensor)
   axis = _astuple(axis)
-  if replace_nan is not None and np.issubdtype(input_tensor.dtype, np.floating):
+  # reduce_min([nan, nan], 0) in TF => +inf, but reduce_min([nan], 0) => nan.
+  if axis is None:
+    will_reduce = any(dim > 1 for dim in input_tensor.shape)
+  else:
+    will_reduce = any(input_tensor.shape[ax] > 1 for ax in axis)
+  if (will_reduce and
+      replace_nan is not None and
+      np.issubdtype(input_tensor.dtype, np.floating)):
     loc_is_nan = np.isnan(input_tensor)
-    input_tensor = np.where(  # reduce_*([nan, nan], 0) in TF returns nan.
-        loc_is_nan & ~np.all(loc_is_nan, axis=axis, keepdims=True),
+    input_tensor = np.where(
+        loc_is_nan,
         np.asarray(replace_nan, dtype=input_tensor.dtype),
         input_tensor)
   kwargs = dict(dtype=input_tensor.dtype) if include_dtype_kwarg else {}

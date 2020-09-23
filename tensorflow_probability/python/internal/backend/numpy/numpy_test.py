@@ -49,6 +49,9 @@ flags.DEFINE_enum('test_mode', 'numpy', ['numpy', 'xla'],
                   'Set to `"xla"` to compare TF with TF-XLA. '
                   'Default compares tf to nptf.')
 flags.DEFINE_bool('only_disabled', False, 'Only test disabled XLA tests')
+flags.DEFINE_bool('use_tpu', False, 'Verifies numerics on TPU.')
+flags.DEFINE_list('xla_disabled', [],
+                  'List of endpoints to skip. Allows us per-device blocklists.')
 
 FLAGS = flags.FLAGS
 
@@ -94,6 +97,7 @@ class TestCase(dict):
             name.replace('random.', 'random.stateless_'
                         ).replace('random.stateless_gamma', 'random.gamma')),
         strategy_list=strategy_list,
+        name=name,
         **kwargs)
 
   def __repr__(self):
@@ -151,7 +155,7 @@ def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
                  as_tuple=True, batch_shape=(), unique=False,
                  allow_nan=ALLOW_NAN):
   if dtype is None:
-    dtype = np.float64
+    dtype = np.float32 if FLAGS.use_tpu else np.float64
   if elements is None:
     if dtype in (np.float32, np.float64):
       if allow_nan:
@@ -187,13 +191,24 @@ single_arrays = functools.partial(n_same_shape, n=1, as_tuple=False)
 
 @hps.composite
 def array_axis_tuples(draw, strategy=None, elements=None, dtype=None,
-                      allow_nan=ALLOW_NAN):
+                      allow_nan=ALLOW_NAN, allow_multi_axis=False):
   x = draw(strategy or single_arrays(shape=shapes(min_dims=1),
                                      elements=elements,
                                      dtype=dtype,
                                      allow_nan=allow_nan))
   rank = len(x.shape)
-  axis = draw(hps.integers(-rank, rank - 1))
+  if allow_multi_axis:
+    if draw(hps.booleans()):  # Use None axis.
+      axis = None
+    else:
+      # Pick a set of distinct axes, then decide whether to index each one from
+      # the front or from the back.
+      axis = draw(hps.sets(hps.integers(-rank, -1)))
+      indexed_from_front = draw(hps.tuples(*[hps.booleans() for _ in axis]))
+      axis = tuple((ax + rank) if from_front else ax
+                   for (ax, from_front) in zip(axis, indexed_from_front))
+  else:
+    axis = draw(hps.integers(-rank, rank - 1))
   return x, axis
 
 
@@ -492,9 +507,10 @@ def linspace_params(draw):
   shape = draw(shapes())
   arg_shapes = draw(
       tfp_hps.broadcasting_shapes(shape, 2).map(tensorshapes_to_tuples))
-  dtype = draw(hps.sampled_from([np.int32, np.int64,
-                                 np.float32, np.float64,
-                                 np.complex64, np.complex128]))
+  valid_dtypes = [np.int32, np.int64, np.float32, np.float64, np.complex64]
+  if not FLAGS.use_tpu:
+    valid_dtypes.append(np.complex128)
+  dtype = draw(hps.sampled_from(valid_dtypes))
   start = draw(single_arrays(shape=hps.just(arg_shapes[0]), dtype=dtype))
   stop = draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype))
   num = draw(hps.integers(0, 13))
@@ -539,7 +555,7 @@ def top_k_params(draw):
   array_shape = shapes(min_dims=1)
   # TODO(srvasude): The unique check can be removed once
   # https://github.com/google/jax/issues/2124 is resolved.
-  array = draw(single_arrays(unique=True, shape=array_shape))
+  array = draw(single_arrays(dtype=np.float32, unique=True, shape=array_shape))
   k = draw(hps.integers(1, int(array.shape[-1])))
   return array, k
 
@@ -570,6 +586,17 @@ def histogram_fixed_width_params(draw):
           [value_min, max(value_max,
                           value_min + np.asarray(.1, value_min.dtype))],
           nbins)
+
+
+@hps.composite
+def argsort_params(draw):
+  dtype = None
+  if FLAGS.test_mode == 'xla':  # Double not supported by XLA TopKV2.
+    dtype = np.float32
+  return (
+      draw(array_axis_tuples(dtype=dtype)) +
+      (draw(hps.sampled_from(['ASCENDING', 'DESCENDING'])),
+       True))  # stable sort
 
 
 @hps.composite
@@ -620,6 +647,17 @@ def _svd_post_process(vals):
       np.swapaxes(v, -2, -1))
 
 
+@hps.composite
+def qr_params(draw):
+  full_matrices = draw(hps.booleans())
+  valid_dtypes = [np.float64]
+  if FLAGS.test_mode != 'xla':  # XLA does not support complex QR.
+    valid_dtypes.append(np.complex128)
+  dtype = draw(hps.sampled_from(valid_dtypes))
+  arr = draw(single_arrays(dtype=dtype, shape=shapes(min_dims=2)))
+  return arr, full_matrices
+
+
 def _qr_post_process(qr):
   """Values of q corresponding to zero values of r may have arbitrary values."""
   return np.matmul(qr.q, qr.r), np.float32(qr.q.shape), np.float32(qr.r.shape)
@@ -643,67 +681,116 @@ def _qr_post_process(qr):
 # TODO(jamieas): add tests for these functions.
 
 NUMPY_TEST_CASES = [
-
-    TestCase('signal.fft',
-             [single_arrays(shape=fft_shapes(fft_dim=1),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-4, rtol=1e-4),
-    TestCase('signal.fft2d',
-             [single_arrays(shape=fft_shapes(fft_dim=2),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-4, rtol=1e-4),
-    TestCase('signal.fft3d',
-             [single_arrays(shape=fft_shapes(fft_dim=3),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-3, rtol=1e-3),
-    TestCase('signal.rfft',
-             [single_arrays(shape=fft_shapes(fft_dim=1),
-                            dtype=np.float32,
-                            elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-4, rtol=1e-4),
-    TestCase('signal.rfft2d',
-             [single_arrays(shape=fft_shapes(fft_dim=2),
-                            dtype=np.float32,
-                            elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-3, rtol=1e-3),
-    TestCase('signal.rfft3d',
-             [single_arrays(shape=fft_shapes(fft_dim=3),
-                            dtype=np.float32,
-                            elements=floats(min_value=-1e3, max_value=1e3))],
-             atol=1e-2, rtol=2e-3),
-    TestCase('signal.ifft',
-             [single_arrays(shape=fft_shapes(fft_dim=1),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-4, rtol=1e-4),
-    TestCase('signal.ifft2d',
-             [single_arrays(shape=fft_shapes(fft_dim=2),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-4, rtol=1e-4),
-    TestCase('signal.ifft3d',
-             [single_arrays(shape=fft_shapes(fft_dim=3),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=1e-4, rtol=1e-4),
-    TestCase('signal.irfft',
-             [single_arrays(shape=fft_shapes(fft_dim=1),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=3e-4, rtol=3e-4),
-    TestCase('signal.irfft2d',
-             [single_arrays(shape=fft_shapes(fft_dim=2),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=5e2))],
-             atol=2e-4, rtol=2e-4),
-    TestCase('signal.irfft3d',
-             [single_arrays(shape=fft_shapes(fft_dim=3),
-                            dtype=np.complex64,
-                            elements=complex_numbers(max_magnitude=1e3))],
-             atol=4e-4, rtol=4e-4),
+    TestCase(
+        'signal.fft', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=1),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=1e-4,
+        rtol=1e-4,
+        xla_atol=5e-4),
+    TestCase(
+        'signal.fft2d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=2),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=1e-4,
+        rtol=1e-4),
+    TestCase(
+        'signal.fft3d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=3),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=1e-3,
+        rtol=1e-3),
+    TestCase(
+        'signal.rfft', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=1),
+                dtype=np.float32,
+                elements=floats(min_value=-1e3, max_value=1e3))
+        ],
+        atol=1e-4,
+        rtol=1e-4,
+        xla_atol=3e-4),
+    TestCase(
+        'signal.rfft2d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=2),
+                dtype=np.float32,
+                elements=floats(min_value=-1e3, max_value=1e3))
+        ],
+        atol=1e-3,
+        rtol=1e-3),
+    TestCase(
+        'signal.rfft3d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=3),
+                dtype=np.float32,
+                elements=floats(min_value=-1e3, max_value=1e3))
+        ],
+        atol=1e-2,
+        rtol=2e-3),
+    TestCase(
+        'signal.ifft', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=1),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=1e-4,
+        rtol=1e-4),
+    TestCase(
+        'signal.ifft2d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=2),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=1e-4,
+        rtol=1e-4),
+    TestCase(
+        'signal.ifft3d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=3),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=1e-4,
+        rtol=1e-4),
+    TestCase(
+        'signal.irfft', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=1),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=3e-4,
+        rtol=3e-4),
+    TestCase(
+        'signal.irfft2d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=2),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=5e2))
+        ],
+        atol=2e-4,
+        rtol=2e-4),
+    TestCase(
+        'signal.irfft3d', [
+            single_arrays(
+                shape=fft_shapes(fft_dim=3),
+                dtype=np.complex64,
+                elements=complex_numbers(max_magnitude=1e3))
+        ],
+        atol=4e-4,
+        rtol=4e-4),
 
     # ArgSpec(args=['a', 'b', 'transpose_a', 'transpose_b', 'adjoint_a',
     #               'adjoint_b', 'a_is_sparse', 'b_is_sparse', 'name'],
@@ -726,7 +813,7 @@ NUMPY_TEST_CASES = [
             hps.tuples(hps.integers(0, 10).map(float), positive_floats()),
         ],
         disabled=JAX_MODE,
-        xla_disabled=True),  # TODO(b/163880625): [Log]MatrixDeterminant kernel
+        xla_disabled=True),  # TODO(b/163880625): Polygamma kernel
 
     # ArgSpec(args=['arr', 'weights', 'minlength',
     #               'maxlength', 'dtype', 'name'],
@@ -735,10 +822,10 @@ NUMPY_TEST_CASES = [
     #         defaults=(None, None, None, tf.int32, None))
     TestCase('math.bincount', [bincount_params()],
              xla_disabled=True),  # missing kernel.
-    TestCase('math.confusion_matrix', [confusion_matrix_params()],
-             xla_disabled=True),  # broken string-using assert.
-    TestCase('math.top_k', [top_k_params()],
-             xla_disabled=True),  # No TopKV2 (at least, for doubles).
+    TestCase(
+        'math.confusion_matrix', [confusion_matrix_params()],
+        xla_disabled=True),  # broken string-using assert.
+    TestCase('math.top_k', [top_k_params()], xla_const_args=(1,)),
 
     # ArgSpec(args=['chol', 'rhs', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -751,20 +838,16 @@ NUMPY_TEST_CASES = [
     #         varargs=None,
     #         keywords=None,
     #         defaults=(False, True, None))
-    TestCase('linalg.svd',
-             [single_arrays(shape=shapes(min_dims=2))],
-             post_processor=_svd_post_process),
-    TestCase('linalg.qr',
-             [hps.tuples(
-                 single_arrays(dtype=np.float64, shape=shapes(min_dims=2)),
-                 hps.booleans()),
-              hps.tuples(
-                  single_arrays(dtype=np.complex128, shape=shapes(min_dims=2)),
-                  hps.booleans()),
-              ],
-             post_processor=_qr_post_process,
-             atol=1e-3,
-             xla_disabled=True),  # No Qr kernel (complex128).
+    TestCase(
+        'linalg.svd', [single_arrays(shape=shapes(min_dims=2))],
+        post_processor=_svd_post_process),
+    TestCase(
+        'linalg.qr', [
+            qr_params(),
+        ],
+        post_processor=_qr_post_process,
+        atol=1e-3,
+        xla_const_args=(1,)),  # full_matrices
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -784,8 +867,8 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['input', 'axis', 'output_type', 'name'], varargs=None,
     #         keywords=None, defaults=(None, tf.int64, None))
-    TestCase('math.argmax', [array_axis_tuples()]),
-    TestCase('math.argmin', [array_axis_tuples()]),
+    TestCase('math.argmax', [array_axis_tuples()], xla_const_args=(1,)),
+    TestCase('math.argmin', [array_axis_tuples()], xla_const_args=(1,)),
 
     # ArgSpec(args=['input', 'diagonal', 'name'], varargs=None, keywords=None,
     #         defaults=(None,))
@@ -800,16 +883,23 @@ NUMPY_TEST_CASES = [
     TestCase('math.real',
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
     TestCase('linalg.cholesky', [pd_matrices()]),
-    TestCase('linalg.lu', [nonsingular_matrices()], rtol=1e-4,
-             # TODO(b/161242015) do not disable unconditionally.  Was
-             # disabled=NUMPY_MODE and six.PY2
-             disabled=True),
+    TestCase(
+        'linalg.lu',
+        [nonsingular_matrices()],
+        rtol=1e-4,
+        # TODO(b/161242015) do not disable unconditionally.  Was
+        # disabled=NUMPY_MODE and six.PY2
+        disabled=True),
     TestCase('linalg.diag_part', [single_arrays(shape=shapes(min_dims=2))]),
-    TestCase('raw_ops.MatrixDiagPartV2', [
-        hps.fixed_dictionaries(dict(
-            input=single_arrays(shape=shapes(min_dims=2, min_side=2)),
-            k=hps.sampled_from([-1, 0, 1]),
-            padding_value=hps.just(0.))).map(Kwargs)]),
+    TestCase(
+        'raw_ops.MatrixDiagPartV2', [
+            hps.fixed_dictionaries(
+                dict(
+                    input=single_arrays(shape=shapes(min_dims=2, min_side=2)),
+                    k=hps.sampled_from([-1, 0, 1]),
+                    padding_value=hps.just(0.))).map(Kwargs)
+        ],
+        xla_const_args=('k',)),
     TestCase('identity', [single_arrays()]),
 
     # ArgSpec(args=['input', 'num_lower', 'num_upper', 'name'], varargs=None,
@@ -827,42 +917,67 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['input_tensor', 'axis', 'keepdims', 'name'], varargs=None,
     #         keywords=None, defaults=(None, False, None))
-    TestCase('math.reduce_all', [
-        array_axis_tuples(
-            single_arrays(
-                shape=shapes(min_dims=1),
-                dtype=np.bool,
-                elements=hps.booleans()))
-    ]),
-    TestCase('math.reduce_any', [
-        array_axis_tuples(
-            single_arrays(
-                shape=shapes(min_dims=1),
-                dtype=np.bool,
-                elements=hps.booleans()))
-    ]),
-    TestCase('math.reduce_logsumexp', [array_axis_tuples()]),
-    TestCase('math.reduce_max', [array_axis_tuples(allow_nan=True)],
-             xla_disabled=True),  # TODO(b/168718272): [nan, nan], axis=0 (GPU)
-    TestCase('math.reduce_mean', [array_axis_tuples()]),
-    TestCase('math.reduce_min', [array_axis_tuples(allow_nan=True)],
-             xla_disabled=True),  # TODO(b/168718272): [nan, nan], axis=0 (GPU)
-    TestCase('math.reduce_prod', [array_axis_tuples(),
-                                  array_axis_tuples(dtype=np.int32)]),
-    TestCase('math.reduce_std',
-             [array_axis_tuples(elements=floats(-1e6, 1e6))]),
-    TestCase('math.reduce_sum', [array_axis_tuples(),
-                                 array_axis_tuples(dtype=np.int32)]),
-    TestCase('math.reduce_variance',
-             [array_axis_tuples(elements=floats(-1e6, 1e6))]),
-
+    TestCase(
+        'math.reduce_all', [
+            array_axis_tuples(
+                single_arrays(
+                    shape=shapes(min_dims=1),
+                    dtype=np.bool,
+                    elements=hps.booleans()),
+                allow_multi_axis=True)
+        ],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_any', [
+            array_axis_tuples(
+                single_arrays(
+                    shape=shapes(min_dims=1),
+                    dtype=np.bool,
+                    elements=hps.booleans()))
+        ],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_logsumexp', [array_axis_tuples(allow_multi_axis=True)],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_max',
+        [array_axis_tuples(allow_nan=True, allow_multi_axis=True)],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_mean', [array_axis_tuples(allow_multi_axis=True)],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_min',
+        [array_axis_tuples(allow_nan=True, allow_multi_axis=True)],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_prod', [
+            array_axis_tuples(allow_multi_axis=True),
+            array_axis_tuples(dtype=np.int32, allow_multi_axis=True)
+        ],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_std',
+        [array_axis_tuples(elements=floats(-1e6, 1e6), allow_multi_axis=True)],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_sum', [
+            array_axis_tuples(allow_multi_axis=True),
+            array_axis_tuples(dtype=np.int32, allow_multi_axis=True)
+        ],
+        xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_variance',
+        [array_axis_tuples(elements=floats(-1e6, 1e6), allow_multi_axis=True)],
+        xla_const_args=(1,)),
     TestCase('math.segment_max', [segment_params()],
              xla_disabled=True),  # No SegmentMax kernel.
-    TestCase('math.segment_mean',
-             [segment_params()],
-             # need jax.numpy.bincount
-             disabled=JAX_MODE,
-             xla_disabled=True),  # No SegmentMean kernel.
+    TestCase(
+        'math.segment_mean',
+        [segment_params()],
+        # need jax.numpy.bincount
+        disabled=JAX_MODE,
+        xla_disabled=True),  # No SegmentMean kernel.
     TestCase('math.segment_min', [segment_params()],
              xla_disabled=True),  # No SegmentMin kernel.
     TestCase('math.segment_prod', [segment_params()],
@@ -882,15 +997,17 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['logits', 'axis', 'name'], varargs=None, keywords=None,
     #         defaults=(None, None))
-    TestCase('math.log_softmax', [
-        single_arrays(
-            shape=shapes(min_dims=1),
-            elements=floats(
-                min_value=-1e6,
-                max_value=1e6,
-                allow_nan=False,
-                allow_infinity=False))
-    ]),
+    TestCase(
+        'math.log_softmax', [
+            single_arrays(
+                shape=shapes(min_dims=1),
+                elements=floats(
+                    min_value=-1e6,
+                    max_value=1e6,
+                    allow_nan=False,
+                    allow_infinity=False))
+        ],
+        xla_rtol=1e-4),
     TestCase('math.softmax', [
         single_arrays(
             shape=shapes(min_dims=1),
@@ -919,28 +1036,36 @@ NUMPY_TEST_CASES = [
 
     # ArgSpec(args=['x', 'axis', 'exclusive', 'reverse', 'name'], varargs=None,
     #         keywords=None, defaults=(0, False, False, None))
-    TestCase('math.cumprod', [
-        hps.tuples(array_axis_tuples(), hps.booleans(),
-                   hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
-    ]),
-    TestCase('math.cumsum', [
-        hps.tuples(array_axis_tuples(), hps.booleans(),
-                   hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
-    ]),
-
+    TestCase(
+        'math.cumprod', [
+            hps.tuples(array_axis_tuples(), hps.booleans(),
+                       hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+        ],
+        xla_const_args=(1, 2, 3)),
+    TestCase(
+        'math.cumsum', [
+            hps.tuples(array_axis_tuples(), hps.booleans(),
+                       hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+        ],
+        xla_const_args=(1, 2, 3)),
 ]
 
 NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
 
     # args=['input', 'name']
-    TestCase('linalg.adjoint',
-             [single_arrays(shape=shapes(min_dims=2),
-                            dtype=np.complex64, elements=complex_numbers())]),
+    TestCase('linalg.adjoint', [
+        single_arrays(
+            shape=shapes(min_dims=2),
+            dtype=np.complex64,
+            elements=complex_numbers())
+    ]),
     TestCase('linalg.slogdet', [nonsingular_matrices()],
-             xla_disabled=True),  # TODO(b/163880625): No kernel.
+             xla_disabled=True),  # TODO(b/162937268): No kernel.
     # ArgSpec(args=['x', 'name'], varargs=None, keywords=None, defaults=(None,))
-    TestCase('complex', [n_same_shape(n=2, dtype=np.float32),
-                         n_same_shape(n=2, dtype=np.float64)]),
+    TestCase('complex', [
+        n_same_shape(n=2, dtype=np.float32),
+        n_same_shape(n=2, dtype=np.float64)
+    ]),
     TestCase('math.abs', [single_arrays()]),
     TestCase('math.acos', [single_arrays(elements=floats(-1., 1.))]),
     TestCase('math.acosh', [single_arrays(elements=positive_floats())]),
@@ -952,14 +1077,12 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
         'math.bessel_i0', [single_arrays(elements=floats(-50., 50.))],
         disabled=JAX_MODE,
         xla_disabled=True),  # Missing BesselI0 kernel.
-    TestCase(
-        'math.bessel_i0e', [single_arrays(elements=floats(-50., 50.))]),
+    TestCase('math.bessel_i0e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase(
         'math.bessel_i1', [single_arrays(elements=floats(-50., 50.))],
         disabled=JAX_MODE,
         xla_disabled=True),  # Missing BesselI1 kernel.
-    TestCase(
-        'math.bessel_i1e', [single_arrays(elements=floats(-50., 50.))]),
+    TestCase('math.bessel_i1e', [single_arrays(elements=floats(-50., 50.))]),
     TestCase('math.ceil', [single_arrays()]),
     TestCase('math.conj',
              [single_arrays(dtype=np.complex64, elements=complex_numbers())]),
@@ -970,8 +1093,9 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.erf', [single_arrays()]),
     TestCase('math.erfc', [single_arrays()]),
     TestCase('math.erfinv', [single_arrays(elements=floats(-1., 1.))]),
-    TestCase('math.exp',  # TODO(b/147394924): max_value=1e3
-             [single_arrays(elements=floats(min_value=-1e3, max_value=85))]),
+    TestCase(
+        'math.exp',  # TODO(b/147394924): max_value=1e3
+        [single_arrays(elements=floats(min_value=-1e3, max_value=85))]),
     TestCase('math.expm1',
              [single_arrays(elements=floats(min_value=-1e3, max_value=1e3))]),
     TestCase('math.floor', [single_arrays()]),
@@ -1047,10 +1171,14 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
     TestCase('math.xlog1py',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
-    TestCase('nn.sparse_softmax_cross_entropy_with_logits',
-             [sparse_xent_params()], rtol=1e-4, atol=1e-4),
-    TestCase('nn.softmax_cross_entropy_with_logits',
-             [xent_params()], rtol=1e-4, atol=1e-4),
+    TestCase(
+        'nn.sparse_softmax_cross_entropy_with_logits', [sparse_xent_params()],
+        rtol=1e-4,
+        atol=1e-4),
+    TestCase(
+        'nn.softmax_cross_entropy_with_logits', [xent_params()],
+        rtol=1e-4,
+        atol=1e-4),
     TestCase(
         'random.categorical', [
             hps.tuples(
@@ -1076,32 +1204,29 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
         assert_shape_only=True),
 
     # Array ops.
-    TestCase('gather', [gather_params()]),
-    TestCase('gather_nd', [gather_nd_params()]),
-    # TODO(leben): Fix bug in jax.numpy.repeat(array(0), 1, 0).
-    TestCase('repeat', [repeat_params()],
-             disabled=JAX_MODE,
-             xla_disabled=True),  # TF op is XLA-incompatible (boolean mask)
-    TestCase('searchsorted', [searchsorted_params()]),
-    TestCase('linspace', [linspace_params()]),
+    TestCase('gather', [gather_params()],
+             xla_const_args=(2, 3, 4)),  # validate_indices, axis, batch_dims
+    TestCase('gather_nd', [gather_nd_params()],
+             xla_const_args=(2,)),  # batch_dims
+    TestCase(
+        'repeat', [repeat_params()], xla_const_args=(1, 2),
+        xla_disabled=True),  # TF op is XLA-incompatible (boolean mask)
+    TestCase('searchsorted', [searchsorted_params()], xla_const_args=(2,)),
+    TestCase('linspace', [linspace_params()], xla_const_args=('num', 'axis')),
     TestCase('one_hot', [one_hot_params()]),
-    TestCase('slice', [sliceable_and_slices()]),
+    TestCase('slice', [sliceable_and_slices()], xla_const_args=(1, 2)),
     TestCase('compat.v1.where', [where_params(version=1)]),
     TestCase('where', [where_params(version=2)]),
 
     # Misc
-    TestCase('histogram_fixed_width',
-             [histogram_fixed_width_params()],
-             xla_disabled=True),
+    TestCase(
+        'histogram_fixed_width', [histogram_fixed_width_params()],
+        xla_disabled=True),
     TestCase('histogram_fixed_width_bins',
-             [histogram_fixed_width_bins_params()],
-             xla_disabled=True),   # GPU fails with f32([0.]), [0.0, 0.0], 2
-    TestCase('argsort',
-             [hps.tuples(array_axis_tuples(),
-                         hps.sampled_from(['ASCENDING', 'DESCENDING'])
-                         ).map(lambda t: t[0] + (t[1], True))  # stable sort
-              ],
-             xla_disabled=True),  # No TopKV2 kernel (for doubles).
+             [histogram_fixed_width_bins_params()]),
+    TestCase(
+        'argsort', [argsort_params()],
+        xla_const_args=(1, 2, 3)),  # axis, direction, stable-sort
 ]
 
 
@@ -1339,6 +1464,8 @@ else:
 
 class NumpyTest(test_util.TestCase):
 
+  _cached_strategy = None
+
   @parameterized.named_parameters(CONVERT_TO_TENSOR_TESTS)
   def test_convert_to_tensor(self, value=None, out_value=None, out_dtype=None,
                              in_dtype=None, dtype=None, dtype_hint=None,
@@ -1557,6 +1684,16 @@ class NumpyTest(test_util.TestCase):
     else:
       self.skipTest('Has coverage.')
 
+  def tpu_strategy(self):  # For TPU testing.
+    if not FLAGS.use_tpu:
+      return None
+    if self._cached_strategy is None:
+      tpu = tf.distribute.cluster_resolver.TPUClusterResolver('local')
+      tf.config.experimental_connect_to_cluster(tpu)
+      tf.tpu.experimental.initialize_tpu_system(tpu)
+      self._cached_strategy = tf.distribute.TPUStrategy(tpu)
+    return self._cached_strategy
+
   @parameterized.named_parameters(NUMPY_TEST_CASES)
   def testConsistency(self,
                       tensorflow_function,
@@ -1568,11 +1705,15 @@ class NumpyTest(test_util.TestCase):
                       xla_disabled=False,
                       xla_atol=None,
                       xla_rtol=None,
+                      xla_const_args=(),
                       assert_shape_only=False,
                       post_processor=None,
-                      jax_kwargs=lambda: {}):
+                      jax_kwargs=lambda: {},
+                      name=None):
     if disabled:
       self.skipTest('Test is disabled.')
+    if name in FLAGS.xla_disabled:
+      xla_disabled = True
     if (xla_disabled ^ FLAGS.only_disabled) and FLAGS.test_mode == 'xla':
       self.skipTest('Test is disabled.')
     if FLAGS.test_mode == 'xla':
@@ -1598,11 +1739,34 @@ class NumpyTest(test_util.TestCase):
                   **_maybe_convert_to_tensors(kwargs)))
 
         if FLAGS.test_mode == 'xla':
-          alt_value = self.evaluate(
-              tf.function(
-                  lambda args, kwargs: tf_fn(*args, **kwargs),
-                  experimental_compile=True)(_maybe_convert_to_tensors(args),
-                                             _maybe_convert_to_tensors(kwargs)))
+          zero = tf.zeros([])
+          const_args = tuple(
+              [a if i in xla_const_args else None for i, a in enumerate(args)])
+          nonconst_args = tuple(
+              [zero if i in xla_const_args else a for i, a in enumerate(args)])
+          const_kwargs = {
+              k: v for k, v in kwargs.items() if k in xla_const_args}
+          nonconst_kwargs = {
+              k: zero if k in xla_const_args else v for k, v in kwargs.items()}
+          args = _maybe_convert_to_tensors(nonconst_args)
+          kwargs = _maybe_convert_to_tensors(nonconst_kwargs)
+          def const_closure(*args, **kwargs):
+            args = [const_args[i] if i in xla_const_args else arg
+                    for i, arg in enumerate(args)]
+            kwargs = dict(kwargs, **const_kwargs)
+            return tf_fn(*args, **kwargs)
+
+          tpu_strategy = self.tpu_strategy()
+          if tpu_strategy is None:
+            alt_value = self.evaluate(
+                tf.function(
+                    lambda args, kwargs: const_closure(*args, **kwargs),
+                    experimental_compile=True)(nonconst_args, nonconst_kwargs))
+          else:
+            alt_value = self.evaluate(
+                tpu_strategy.run(tf.function(const_closure),
+                                 args=nonconst_args, kwargs=nonconst_kwargs))
+            alt_value = tf.nest.map_structure(lambda t: t.values[0], alt_value)
         else:
           kwargs.update(jax_kwargs() if JAX_MODE else {})
           alt_value = np_fn(*args, **kwargs)
