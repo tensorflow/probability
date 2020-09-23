@@ -393,6 +393,8 @@ class DistributionXLATest(test_util.TestCase):
     sample = self.evaluate(
         tf.function(experimental_compile=True)(dist.sample)(
             num_samples, seed=seed))
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
     hp.note('Drew samples {}'.format(sample))
 
     xla_lp = tf.function(experimental_compile=True)(dist.log_prob)(
