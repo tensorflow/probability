@@ -48,8 +48,9 @@ class LeapfrogIntegrator(object):
   """
 
   @abc.abstractmethod
-  def __call__(self, momentum_parts, state_parts, target=None,
-               target_grad_parts=None, kinetic_energy_fn=None, name=None):
+  def __call__(self, momentum_parts, state_parts,
+               target=None, target_grad_parts=None,
+               name=None):
     """Computes the integration.
 
     Args:
@@ -61,8 +62,6 @@ class LeapfrogIntegrator(object):
         unnormalized log prob) evaluated at `state_parts`.
       target_grad_parts: Python `list` of `Tensor`s representing the gradient of
         `target` with respect to each of `state_parts`.
-      kinetic_energy_fn: Python callable that can evaluate the kinetic energy
-        of the given momentum.
       name: Python `str` used to group ops created by this function.
 
     Returns:
@@ -230,12 +229,11 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
                state_parts,
                target=None,
                target_grad_parts=None,
-               kinetic_energy_fn=None,
                name=None):
     """Applies `num_steps` of the leapfrog integrator.
 
     Args:
-      momentum_parts: Python `list` of `Tensor`s representing momentum for each
+      momentum_parts: Python `list` of `Tensor`s representing momentume for each
         state part.
       state_parts: Python `list` of `Tensor`s which collectively representing
         the state.
@@ -243,9 +241,6 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
         unnormalized log prob) evaluated at `state_parts`.
       target_grad_parts: Python `list` of `Tensor`s representing the gradient of
         `target` with respect to each of `state_parts`.
-      kinetic_energy_fn: Python callable that can evaluate the kinetic energy
-        of the given momentum. This is typically the log probability of the
-        distribution over the momentum.
       name: Python `str` used to group ops created by this function.
 
     Returns:
@@ -270,17 +265,6 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
           target,
           target_grad_parts)
 
-      if kinetic_energy_fn is None:
-        # Avoid adding ops and taking grads, when the implied kinetic energy
-        # is just -0.5 * ||x||^2
-        def get_velocity_parts(half_next_momentum_parts):
-          return [-x for x in half_next_momentum_parts]
-      else:
-        def get_velocity_parts(half_next_momentum_parts):
-          _, velocity_parts = mcmc_util.maybe_call_fn_and_grads(
-              kinetic_energy_fn, half_next_momentum_parts)
-          return velocity_parts
-
       # See Algorithm 1 of "Faster Hamiltonian Monte Carlo by Learning Leapfrog
       # Scale", https://arxiv.org/abs/1810.04449.
 
@@ -298,7 +282,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
       ] = tf.while_loop(
           cond=lambda i, *_: i < self.num_steps,
           body=lambda i, *args: [i + 1] + list(_one_step(  # pylint: disable=no-value-for-parameter,g-long-lambda
-              self.target_fn, self.step_sizes, get_velocity_parts, *args)),
+              self.target_fn, self.step_sizes, *args)),
           loop_vars=[
               tf.zeros_like(self.num_steps, name='iter'),
               half_next_momentum_parts,
@@ -326,21 +310,18 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
 def _one_step(
     target_fn,
     step_sizes,
-    get_velocity_parts,
     half_next_momentum_parts,
     state_parts,
     target,
     target_grad_parts):
   """Body of integrator while loop."""
   with tf.name_scope('leapfrog_integrate_one_step'):
+    next_state_parts = [
+        x + tf.cast(eps, x.dtype) * tf.cast(v, x.dtype)  # pylint: disable=g-complex-comprehension
+        for x, eps, v
+        in zip(state_parts, step_sizes, half_next_momentum_parts)
+    ]
 
-    velocity_parts = get_velocity_parts(half_next_momentum_parts)
-    next_state_parts = []
-    for state_part, eps, velocity_part in zip(
-        state_parts, step_sizes, velocity_parts):
-      next_state_parts.append(
-          state_part - tf.cast(eps, state_part.dtype) *
-          tf.cast(velocity_part, state_part.dtype))
     [next_target, next_target_grad_parts] = mcmc_util.maybe_call_fn_and_grads(
         target_fn, next_state_parts)
     if any(g is None for g in next_target_grad_parts):

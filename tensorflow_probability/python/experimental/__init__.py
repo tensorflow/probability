@@ -32,7 +32,6 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental import auto_batching
-from tensorflow_probability.python.experimental import distributions
 from tensorflow_probability.python.experimental import lazybones
 from tensorflow_probability.python.experimental import linalg
 from tensorflow_probability.python.experimental import marginalize
@@ -53,7 +52,6 @@ _allowed_symbols = [
     'auto_batching',
     'as_composite',
     'auto_composite_tensor',
-    'distributions',
     'lazybones',
     'linalg',
     'marginalize',
