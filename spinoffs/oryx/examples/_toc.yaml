@@ -16,3 +16,5 @@ toc:
 - heading: "Guide"
 - title: A Tour of Oryx
   path: /probability/oryx/notebooks/a_tour_of_oryx
+- title: Probabilistic Programming
+  path: /probability/oryx/notebooks/probabilistic_programming
