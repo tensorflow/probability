@@ -45,6 +45,7 @@ multi_substrate_py_library(
         ":nuts_autobatching",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
+        ":preconditioned_hmc",
         ":reducer",
         ":sample",
         ":sample_discarding_kernel",
@@ -60,6 +61,7 @@ multi_substrate_py_library(
         ":particle_filter",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
+        ":preconditioned_hmc",
         ":reducer",
         ":sample",
         ":sample_discarding_kernel",
@@ -71,6 +73,39 @@ multi_substrate_py_library(
         ":with_reductions",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+py_library(
+    name = "preconditioned_hmc",
+    srcs = ["preconditioned_hmc.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "preconditioned_hmc_test",
+    size = "medium",
+    timeout = "long",
+    srcs = ["preconditioned_hmc_test.py"],
+    python_version = "PY3",
+    shard_count = 2,
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
