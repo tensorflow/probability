@@ -131,10 +131,11 @@ VECTORIZED_LOGPROB_RTOL.update({
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.
 XLA_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_ATOL.update({
+    'Beta': 1e-4,
     'Binomial': 5e-6,
     'DirichletMultinomial': 1e-4,
-    'ExpGamma': 1e-3,  # TODO(b/166257329)
-    'ExpInverseGamma': 1e-3,  # TODO(b/166257329)
+    'ExpGamma': 2e-3,  # TODO(b/166257329)
+    'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
     'InverseGamma': 5e-5,
     'Kumaraswamy': 3e-6,
@@ -163,7 +164,7 @@ XLA_LOGPROB_RTOL.update({
     'Geometric': 5e-5,
     'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
-    'LKJ': 5e-3,
+    'LKJ': .07,
     'LogLogistic': 1.5e-2,  # TODO(b/163118820)
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)

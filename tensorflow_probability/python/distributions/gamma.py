@@ -653,7 +653,7 @@ def random_gamma(
 
 def _random_gamma_rejection(
     shape, concentration, rate=None, log_rate=None, seed=None, log_space=False,
-    internal_dtype=tf.float64):
+    internal_dtype=None):
   """Samples from the gamma distribution.
 
   The sampling algorithm is rejection sampling [1], and pathwise gradients with
@@ -674,7 +674,9 @@ def _random_gamma_rejection(
       as if 0 (but possibly more efficiently). Mutually exclusive with `rate`.
     seed: (optional) The random seed.
     log_space: Optionally sample log(gamma) variates.
-    internal_dtype: dtype to use for internal computations.
+    internal_dtype: dtype to use for internal computations. If unspecified, we
+      use the same dtype as the output (i.e. the dtype of `concentration`,
+      `rate`, or `log_rate`) when `log_space==True`, and `tf.float64` otherwise.
 
   Returns:
     Differentiable samples from the gamma distribution.
@@ -691,6 +693,8 @@ def _random_gamma_rejection(
       seed, salt='random_gamma')
   output_dtype = dtype_util.common_dtype([concentration, rate, log_rate],
                                          dtype_hint=tf.float32)
+  if internal_dtype is None:
+    internal_dtype = output_dtype if log_space else tf.float64
 
   def rejection_sample(concentration):
     """Gamma rejection sampler."""

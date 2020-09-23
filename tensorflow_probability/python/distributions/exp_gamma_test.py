@@ -174,7 +174,7 @@ class ExpGammaTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(d.stddev()), expected_stddev)
     self.assertAllClose(self.evaluate(d_lr.stddev()), expected_stddev)
 
-  def testSampleSmallconcentration(self):
+  def testSampleSmallConcentration(self):
     concentration_v = 0.05
     rate_v = 1.0
     concentration = tf.constant(concentration_v)
@@ -190,12 +190,11 @@ class ExpGammaTest(test_util.TestCase):
     self.assertAllClose(
         sample_values.mean(),
         d.mean(),
-        rtol=.006,
-        atol=.01)
+        rtol=.01)
     self.assertAllClose(
         sample_values.var(),
         d.variance(),
-        rtol=.015)
+        rtol=.025)
 
   def testSample(self):
     concentration_v = 4.0
@@ -338,11 +337,11 @@ class ExpGammaTest(test_util.TestCase):
     self.assertAllClose(
         sample_values.mean(axis=0),
         d.mean(),
-        rtol=.15)
+        rtol=.2)
     self.assertAllClose(
         sample_values.var(axis=0),
         d.variance(),
-        rtol=0.07)
+        rtol=0.09)
     fails = 0
     trials = 0
     for ai, a in enumerate(np.reshape(concentration_v, [-1])):
