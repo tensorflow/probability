@@ -20,10 +20,11 @@ from setuptools import setup
 
 REQUIRED_PACKAGES = [
     'dataclasses;python_version<"3.7"',
-    'jax==0.1.76',
+    'jax==0.2.0',
     'jaxlib==0.1.55',
     # Pin a TF version while TFP-on-JAX still depends on TF
-    'tfp-nightly==0.12.0.dev20200910',
+    'tfp-nightly==0.12.0.dev20200923',
+    'inference_gym',
 ]
 
 
