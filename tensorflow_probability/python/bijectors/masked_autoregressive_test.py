@@ -735,13 +735,20 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     mean_0, mean_1 = 0, 5
     x = np.r_[np.random.randn(n // 2).astype(dtype=np.float32) + mean_0,
               np.random.randn(n // 2).astype(dtype=np.float32) + mean_1]
+    shuffle_idxs = np.arange(n)
+    np.random.shuffle(shuffle_idxs)
+    x = x[shuffle_idxs]
+    c = c[shuffle_idxs]
+
+    seed = test_util.test_seed_stream()
 
     # Density estimation with MADE.
     made = tfb.AutoregressiveNetwork(
         params=2,
         hidden_units=[1],
         event_shape=(1,),
-        kernel_initializer=tfk.initializers.VarianceScaling(0.1),
+        kernel_initializer=tfk.initializers.VarianceScaling(
+            0.1, seed=seed() % 2**31),
         conditional=True,
         conditional_event_shape=(1,))
 
@@ -767,7 +774,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
         batch_size=batch_size,
         epochs=3,
         steps_per_epoch=n // batch_size,
-        shuffle=True,
+        shuffle=False,
         verbose=True)
 
     # Use the fitted distribution to sample condition on c = 1
@@ -775,7 +782,8 @@ class AutoregressiveNetworkTest(test_util.TestCase):
     cond = 1
     samples = distribution.sample(
         (n_samples,),
-        bijector_kwargs={"conditional_input": cond * np.ones((n_samples, 1))})
+        bijector_kwargs={"conditional_input": cond * np.ones((n_samples, 1))},
+        seed=seed())
     # Assert mean is close to conditional mean
     self.assertAllClose(tf.reduce_mean(samples), mean_1, atol=1.)
 
