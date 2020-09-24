@@ -116,7 +116,8 @@ class WithReductions(kernel_base.TransitionKernel):
           new_reducer_state, inner_kernel_results)
       return new_state, kernel_results
 
-  def bootstrap_results(self, init_state):
+  def bootstrap_results(self, init_state, inner_results=None,
+                        previous_reducer_state=None):
     """Instantiates reducer states with identical structure to the `init_state`.
 
     Args:
@@ -125,6 +126,10 @@ class WithReductions(kernel_base.TransitionKernel):
         procedures (i.e. `tfp.mcmc.sample_chain` follows similar semantics),
         the initial state does not count as a "sample". Hence, all reducer
         states will reflect empty streams.
+      inner_results: Optional results tuple for the inner kernel.  Will be
+        re-bootstrapped if omitted.
+      previous_reducer_state: Optional results structure for the reducers.  Will
+        be re-initialized if omitted.
 
     Returns:
       kernel_results: `WithReductionsKernelResults` representing updated
@@ -134,12 +139,13 @@ class WithReductions(kernel_base.TransitionKernel):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'with_reductions', 'bootstrap_results')):
-      inner_kernel_results = self.inner_kernel.bootstrap_results(init_state)
-      return WithReductionsKernelResults(
-          tf.nest.map_structure(
-              lambda r: r.initialize(init_state, inner_kernel_results),
-              self.reducer),
-          inner_kernel_results)
+      if inner_results is None:
+        inner_results = self.inner_kernel.bootstrap_results(init_state)
+      if previous_reducer_state is None:
+        previous_reducer_state = tf.nest.map_structure(
+            lambda r: r.initialize(init_state, inner_results),
+            self.reducer)
+      return WithReductionsKernelResults(previous_reducer_state, inner_results)
 
   @property
   def is_calibrated(self):

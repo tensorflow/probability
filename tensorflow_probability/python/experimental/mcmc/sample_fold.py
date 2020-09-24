@@ -42,6 +42,8 @@ def sample_fold(
     previous_kernel_results=None,
     kernel=None,
     reducer=None,
+    previous_reducer_state=None,
+    return_final_reducer_states=False,
     num_burnin_steps=0,
     num_steps_between_results=0,
     parallel_iterations=10,
@@ -85,6 +87,11 @@ def sample_fold(
     reducer: A (possibly nested) structure of `Reducer`s to be evaluated
       on the `kernel`'s samples. If no reducers are given (`reducer=None`),
       then `None` will be returned in place of streaming calculations.
+    previous_reducer_state: A (possibly nested) structure of running states
+      corresponding to the structure in `reducer`.  For resuming streaming
+      reduction computations begun in a previous run.
+    return_final_reducer_states: A Python `bool` giving whether to return
+      resumable final reducer states.
     num_burnin_steps: Integer or scalar `Tensor` representing the number
         of chain steps to take before starting to collect results.
         Defaults to 0 (i.e., no burn-in).
@@ -105,6 +112,9 @@ def sample_fold(
     final_kernel_results: `collections.namedtuple` of internal calculations
       used to advance the supplied `kernel`. These results do not include
       the kernel results of `WithReductions` or `SampleDiscardingKernel`.
+    final_reducer_states: A (possibly nested) structure of final running reducer
+      states, if `return_final_reducer_states` was `True`.  Can be used to
+      resume streaming reductions when continuing sampling.
   """
   with tf.name_scope(name or 'mcmc_sample_fold'):
     num_steps = tf.convert_to_tensor(
@@ -116,17 +126,25 @@ def sample_fold(
     if reducer is None:
       reducer = []
       reducer_was_none = True
+    thinning_kernel = sample_discarding_kernel.SampleDiscardingKernel(
+        inner_kernel=kernel,
+        num_burnin_steps=num_burnin_steps,
+        num_steps_between_results=num_steps_between_results)
     reduction_kernel = with_reductions.WithReductions(
-        inner_kernel=sample_discarding_kernel.SampleDiscardingKernel(
-            inner_kernel=kernel,
-            num_burnin_steps=num_burnin_steps,
-            num_steps_between_results=num_steps_between_results),
+        inner_kernel=thinning_kernel,
         reducer=reducer,
     )
+    if previous_kernel_results is None:
+      previous_kernel_results = kernel.bootstrap_results(current_state)
+    thinning_pkr = thinning_kernel.bootstrap_results(
+        current_state, previous_kernel_results)
+    reduction_pkr = reduction_kernel.bootstrap_results(
+        current_state, thinning_pkr, previous_reducer_state)
+
     end_state, final_kernel_results = exp_sample_lib.step_kernel(
         num_steps=num_steps,
         current_state=current_state,
-        previous_kernel_results=previous_kernel_results,
+        previous_kernel_results=reduction_pkr,
         kernel=reduction_kernel,
         return_final_kernel_results=True,
         parallel_iterations=parallel_iterations,
@@ -141,9 +159,19 @@ def sample_fold(
         check_types=False)
     if reducer_was_none:
       reduction_results = None
-    return (reduction_results,
-            end_state,
-            final_kernel_results.inner_results.inner_results)
+    # TODO(axch): Choose a friendly return value convention that
+    # - Doesn't burden the user with needless stuff when they don't want it
+    # - Supports warm restart when the user does want it
+    # - Doesn't trigger Pylint's unbalanced-tuple-unpacking warning.
+    if return_final_reducer_states:
+      return (reduction_results,
+              end_state,
+              final_kernel_results.inner_results.inner_results,
+              final_kernel_results.streaming_calculations)
+    else:
+      return (reduction_results,
+              end_state,
+              final_kernel_results.inner_results.inner_results)
 
 
 def _trace_kernel_results(current_state, kernel_results):
@@ -264,6 +292,7 @@ def sample_chain(
         trace_fn=real_trace_fn,
         size=num_results
     )
+    # pylint: disable=unbalanced-tuple-unpacking
     trace_results, _, final_kernel_results = sample_fold(
         num_steps=num_results,
         current_state=current_state,

@@ -54,6 +54,57 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(5, kernel_results.counter_1)
     self.assertEqual(10, kernel_results.counter_2)
 
+    # Warm-restart the underlying kernel but not the reduction
+    reduction_rslt_2, last_sample_2, kr_2 = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=last_sample,
+        kernel=fake_kernel,
+        reducer=fake_reducer,
+        previous_kernel_results=kernel_results,
+    )
+    reduction_rslt_2, last_sample_2, kernel_results_2 = self.evaluate([
+        reduction_rslt_2, last_sample_2, kr_2
+    ])
+    self.assertEqual(8, reduction_rslt_2)
+    self.assertEqual(10, last_sample_2)
+    self.assertEqual(10, kernel_results_2.counter_1)
+    self.assertEqual(20, kernel_results_2.counter_2)
+
+  def test_reducer_warm_restart(self):
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.NaiveMeanReducer()
+    red_res, last_sample, kr, red_states = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=fake_kernel,
+        reducer=fake_reducer,
+        return_final_reducer_states=True,
+    )
+    red_res, last_sample, kernel_results, red_states = self.evaluate([
+        red_res, last_sample, kr, red_states
+    ])
+    self.assertEqual(3, red_res)
+    self.assertEqual(5, last_sample)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
+
+    # Warm-restart the underlying kernel and the reduction
+    reduction_rslt_2, last_sample_2, kr_2 = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=last_sample,
+        previous_kernel_results=kernel_results,
+        kernel=fake_kernel,
+        reducer=fake_reducer,
+        previous_reducer_state=red_states
+    )
+    reduction_rslt_2, last_sample_2, kernel_results_2 = self.evaluate([
+        reduction_rslt_2, last_sample_2, kr_2
+    ])
+    self.assertEqual(5.5, reduction_rslt_2)
+    self.assertEqual(10, last_sample_2)
+    self.assertEqual(10, kernel_results_2.counter_1)
+    self.assertEqual(20, kernel_results_2.counter_2)
+
   @parameterized.parameters(1., 2.)
   def test_current_state(self, curr_state):
     fake_kernel = test_fixtures.TestTransitionKernel()
