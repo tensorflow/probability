@@ -1532,12 +1532,30 @@ def ldj_reduction_shape(shape_structure,
     reduce_ndims = aligned_event_ndims(
         event_ndims, min_event_ndims, validate=validate, name='reduce_ndims')
 
+    # Make sure inputs have rank greater than event_ndims.
+    rank_structure = nest.map_structure_up_to(
+        event_ndims, ps.size, shape_structure)
+    for rank, ndims in zip(
+        nest.flatten(rank_structure), nest.flatten(event_ndims)):
+      rank_ = tf.get_static_value(rank)
+      ndims_ = tf.get_static_value(ndims)
+      if rank_ is not None and ndims_ is not None:
+        if rank_ < ndims_:
+          raise ValueError('Input must have rank at least {}. Saw: {}'.format(
+              ndims_, rank_))
+      elif validate:
+        with tf.control_dependencies(assertions):
+          assertions.append(
+              assert_util.assert_greater_equal(
+                  rank, ndims, message=('Input must have rank at least {}.'
+                                        'Saw: {}'.format(ndims, rank))))
+
     # Get the non-minimal portion of the event shape over which to reduce LDJ.
     ldj_reduce_shapes = nest.flatten(
         nest.map_structure(
-            lambda s, dim: ps.slice(  # pylint: disable=g-long-lambda
-                s, begin=[ps.size(s) - dim], size=[reduce_ndims]),
-            shape_structure, event_ndims))
+            lambda s, r, dim: ps.slice(  # pylint: disable=g-long-lambda
+                s, begin=[r - dim], size=[reduce_ndims]),
+            shape_structure, rank_structure, event_ndims))
 
     # Make sure that the `event_shape` dimensions to the left of
     # `min_event_ndims` are equal for all structured elements, and that batch
@@ -1554,8 +1572,8 @@ def ldj_reduction_shape(shape_structure,
                   nest.pack_sequence_as(shape_structure, ldj_reduce_shapes_)))
 
       batch_shapes = nest.flatten(
-          nest.map_structure(lambda s, dim: s[:ps.size(s) - dim],
-                             shape_structure, event_ndims))
+          nest.map_structure(lambda s, r, dim: s[:r - dim],
+                             shape_structure, rank_structure, event_ndims))
       batch_shapes_ = [tf.TensorShape(tf.get_static_value(s))
                        for s in batch_shapes]
       if not any(s is None for s in batch_shapes_):
