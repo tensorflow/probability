@@ -18,6 +18,7 @@
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -50,6 +51,7 @@ multi_substrate_py_library(
     ],
     deps = [
         ":composite_tensor",
+        ":unnest",
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
@@ -85,6 +87,25 @@ py_test(
     srcs_version = "PY3",
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "unnest",
+    srcs = ["unnest.py"],
+    srcs_version = "PY3",
+    deps = [],
+)
+
+multi_substrate_py_test(
+    name = "unnest_test",
+    size = "small",
+    srcs = ["unnest_test.py"],
+    deps = [
+        ":unnest",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
