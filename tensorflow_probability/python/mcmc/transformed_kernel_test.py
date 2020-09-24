@@ -460,5 +460,40 @@ class TransformedTransitionKernelTest(test_util.TestCase):
                     outer_results_two[0],
                     err=1e-6)
 
+  @test_util.numpy_disable_gradient_test('HMC')
+  def test_multipart_bijector(self):
+    seed_stream = test_util.test_seed_stream()
+
+    prior = tfd.JointDistributionSequential([
+        tfd.Gamma(1., 1.),
+        lambda scale: tfd.Uniform(0., scale),
+        lambda concentration: tfd.CholeskyLKJ(4, concentration),
+    ], validate_args=True)
+    likelihood = lambda corr: tfd.MultivariateNormalTriL(scale_tril=corr)
+    obs = self.evaluate(
+        likelihood(
+            prior.sample(seed=seed_stream())[-1]).sample(seed=seed_stream()))
+
+    bij = prior._experimental_default_event_space_bijector()
+
+    def target_log_prob(scale, conc, corr):
+      return prior.log_prob(scale, conc, corr) + likelihood(corr).log_prob(obs)
+    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
+                                            num_leapfrog_steps=3, step_size=.5)
+    kernel = tfp.mcmc.TransformedTransitionKernel(kernel, bij)
+
+    init = self.evaluate(
+        tuple(tf.random.uniform(s, -2., 2., seed=seed_stream())
+              for s in bij.inverse_event_shape(prior.event_shape)))
+    state = bij.forward(init)
+    kr = kernel.bootstrap_results(state)
+    next_state, next_kr = kernel.one_step(state, kr, seed=seed_stream())
+    self.evaluate((state, kr, next_state, next_kr))
+    expected = (target_log_prob(*state) -
+                bij.inverse_log_det_jacobian(state, [0, 0, 2]))
+    actual = kernel._inner_kernel.target_log_prob_fn(*init)  # pylint: disable=protected-access
+    self.assertAllClose(expected, actual)
+
+
 if __name__ == '__main__':
   tf.test.main()

@@ -46,22 +46,41 @@ class TransformedTransitionKernelResults(
 
 def make_log_det_jacobian_fn(bijector, direction):
   """Makes a function which applies a list of Bijectors' `log_det_jacobian`s."""
-  if not mcmc_util.is_list_like(bijector):
-    bijector = [bijector]
   attr = '{}_log_det_jacobian'.format(direction)
+  if not mcmc_util.is_list_like(bijector):
+    dtype = getattr(bijector, '{}_dtype'.format(direction))()
+    if mcmc_util.is_list_like(dtype):
+      def multipart_fn(state_parts, event_ndims):
+        return getattr(bijector, attr)(state_parts, event_ndims)
+      return multipart_fn
+    elif tf.nest.is_nested(dtype):
+      raise ValueError(
+          'Only list-like multi-part bijectors are currently supported, but '
+          'got {}.'.format(tf.nest.map_structure(lambda _: '.', dtype)))
+    bijector = [bijector]
   def fn(state_parts, event_ndims):
-    return [
+    return sum([
         getattr(b, attr)(sp, event_ndims=e)
         for b, e, sp in zip(bijector, event_ndims, state_parts)
-    ]
+    ])
   return fn
 
 
 def make_transform_fn(bijector, direction):
   """Makes a function which applies a list of Bijectors' `forward`s."""
   if not mcmc_util.is_list_like(bijector):
+    dtype = getattr(bijector, '{}_dtype'.format(direction))()
+    if mcmc_util.is_list_like(dtype):
+      return getattr(bijector, direction)
+    elif tf.nest.is_nested(dtype):
+      raise ValueError(
+          'Only list-like multi-part bijectors are currently supported, but '
+          'got {}.'.format(tf.nest.map_structure(lambda _: '.', dtype)))
     bijector = [bijector]
   def fn(state_parts):
+    if len(bijector) != len(state_parts):
+      raise ValueError('State has {} parts, but bijector has {}.'.format(
+          len(state_parts), len(bijector)))
     return [getattr(b, direction)(sp) for b, sp in zip(bijector, state_parts)]
   return fn
 
@@ -106,7 +125,7 @@ def make_transformed_log_prob(
     tlp = log_prob_fn(*fn(state_parts))
     tlp_rank = prefer_static.rank(tlp)
     event_ndims = [(prefer_static.rank(sp) - tlp_rank) for sp in state_parts]
-    return tlp + sum(ldj_fn(state_parts, event_ndims))
+    return tlp + ldj_fn(state_parts, event_ndims)
   return transformed_log_prob_fn
 
 
