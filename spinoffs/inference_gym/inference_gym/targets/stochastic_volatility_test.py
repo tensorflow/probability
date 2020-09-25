@@ -63,7 +63,6 @@ class StochasticVolatilityTest(test_util.InferenceGymTestCase):
 
   def testSP500(self):
     """Checks that unconstrained parameters yield finite joint densities."""
-    self.skipTest('b/166833715')
     model = (
         stochastic_volatility.StochasticVolatilitySP500())
     self.validate_log_prob_and_transforms(
