@@ -516,6 +516,28 @@ class CategoricalTest(test_util.TestCase):
         self.assertAllClose(kl_val, kl_expected)
         self.assertAllClose(kl_same, np.zeros_like(kl_expected))
 
+  @parameterized.parameters(
+      # Test categorical distributions from probs.
+      (dict(probs=[0.0, 0.5, 0.5]), dict(probs=[0.2, 0.2, 0.6])),
+      # Test categorical distributions from logits.
+      (dict(logits=[-np.inf, np.log(0.5), np.log(0.5)]),
+       dict(logits=[np.log(0.2), np.log(0.2), np.log(0.6)])),
+  )
+  def testCategoricalCategoricalKLExtreme(self, kwargs1, kwargs2):
+    a = tfd.Categorical(**kwargs1)
+    kl = tfd.kl_divergence(a, a)
+    kl_val = self.evaluate(kl)
+    self.assertEqual(kl_val, 0.0)
+
+    b = tfd.Categorical(**kwargs2)
+    kl = tfd.kl_divergence(a, b)
+    kl_val = self.evaluate(kl)
+    self.assertAllClose(kl_val, np.log(0.5) - 0.5 * (np.log(0.2) + np.log(0.6)))
+
+    kl = tfd.kl_divergence(b, a)
+    kl_val = self.evaluate(kl)
+    self.assertEqual(kl_val, np.inf)
+
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
     d = tfd.Categorical(logits=x, validate_args=True)

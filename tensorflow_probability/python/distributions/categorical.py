@@ -449,6 +449,7 @@ def _kl_categorical_categorical(a, b, name=None):
     a_logits = a._logits_parameter_no_checks()  # pylint:disable=protected-access
     b_logits = b._logits_parameter_no_checks()  # pylint:disable=protected-access
     return tf.reduce_sum(
-        (tf.math.softmax(a_logits) *
-         (tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits))),
+        tf.math.multiply_no_nan(
+            tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits),
+            tf.math.softmax(a_logits)),
         axis=-1)
