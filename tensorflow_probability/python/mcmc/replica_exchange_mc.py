@@ -793,7 +793,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       # then the new shape is [(T, Sx), (T, Sy)] where (a, b) means
       # concatenation and T=shape(inverse_temperature).
       num_replica = ps.size0(inverse_temperatures)
-      replica_shape = tf.convert_to_tensor([num_replica])
+      replica_shape = ps.convert_to_shape_tensor([num_replica])
 
       if self._state_includes_replicas:
         replica_states = init_state
