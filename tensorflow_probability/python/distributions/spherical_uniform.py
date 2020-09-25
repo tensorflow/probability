@@ -158,7 +158,7 @@ class SphericalUniform(distribution.Distribution):
   def _log_prob(self, x):
     log_nsphere_surface_area = (
         np.log(2.) + (self.dimension / 2) * np.log(np.pi) -
-        tf.math.lgamma(tf.cast(self.dimension / 2., self.dtype)))
+        tf.math.lgamma(tf.cast(self.dimension / 2., x.dtype)))
     batch_shape = ps.broadcast_shape(
         ps.shape(x)[:-1], self.batch_shape)
     return tf.fill(batch_shape, -log_nsphere_surface_area)

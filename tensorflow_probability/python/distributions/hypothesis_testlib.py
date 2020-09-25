@@ -1054,7 +1054,8 @@ def transformed_distributions(draw,
   if depth is None:
     depth = draw(depths())
 
-  bijector = draw(bijector_hps.unconstrained_bijectors())
+  bijector = draw(bijector_hps.unconstrained_bijectors(
+      validate_args=validate_args))
   hp.note('Drawing TransformedDistribution with bijector {}'.format(bijector))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
@@ -1138,6 +1139,7 @@ def quantized_distributions(draw,
       event_dim=event_dim,
       enable_vars=enable_vars,
       eligibility_filter=ok,
+      validate_args=validate_args,
   )
   underlying = draw(underlyings)
 
@@ -1238,13 +1240,21 @@ def mixtures_same_family(draw,
         batch_shape,
         draw(tfp_hps.shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
+  # Cannot put a BatchReshape into a MixtureSameFamily, because the former
+  # doesn't support broadcasting, and the latter relies on it.  b/161984806.
+  def nested_eligibility_filter(dist_name):
+    if dist_name == 'BatchReshape':
+      return False
+    return eligibility_filter(dist_name)
+
   component = draw(
       distributions(
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
-          eligibility_filter=eligibility_filter,
-          depth=depth - 1))
+          eligibility_filter=nested_eligibility_filter,
+          depth=depth - 1,
+          validate_args=validate_args))
   hp.note('Drawing MixtureSameFamily with component {}; parameters {}'.format(
       component, params_used(component)))
   # scalar or same-shaped categorical?
@@ -1318,7 +1328,8 @@ def mixtures(draw,
       event_dim=event_dim,
       enable_vars=enable_vars,
       eligibility_filter=eligibility_filter,
-      depth=depth - 1)
+      depth=depth - 1,
+      validate_args=validate_args)
   # Must ensure matching event shapes and dtypes.
   c0 = draw(component_strategy)
   components = [c0] + draw(hps.lists(

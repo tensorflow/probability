@@ -38,10 +38,18 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import experimental as tfe
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+
+
+WORKING_PRECISION_TEST_BLOCK_LIST = (
+    # The difficulty concerns Mixtures of component distributions whose samples
+    # have different dtypes.
+    'Mixture',
+)
 
 
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
@@ -71,6 +79,46 @@ SLICING_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-5)
 SLICING_LOGPROB_RTOL.update({
     'Weibull': 3e-5,
 })
+
+
+def tensor_to_f64(x):
+  if tf.is_tensor(x) and x.dtype.is_floating:
+    return tf.cast(x, dtype=tf.float64)
+  else:
+    return x
+
+
+@test_util.test_all_tf_execution_regimes
+class LogProbConsistentPrecisionTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())
+                          + list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    if dist_name in WORKING_PRECISION_TEST_BLOCK_LIST:
+      self.skipTest('{} is blocked'.format(dist_name))
+    def eligibility_filter(name):
+      return name not in WORKING_PRECISION_TEST_BLOCK_LIST
+    dist = data.draw(dhps.distributions(
+        dist_name=dist_name, eligibility_filter=eligibility_filter,
+        enable_vars=False, validate_args=False))
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
+    seed = test_util.test_seed()
+    samples = dist.sample(5, seed=seed)
+    self.assertIn(samples.dtype, [tf.float32, tf.int32])
+    self.assertEqual(dist.log_prob(samples).dtype, tf.float32)
+
+    def log_prob_function(dist, x):
+      return dist.log_prob(x)
+
+    dist64 = tf.nest.map_structure(
+        tensor_to_f64, tfe.as_composite(dist), expand_composites=True)
+    result64 = log_prob_function(dist64, tensor_to_f64(samples))
+    self.assertEqual(result64.dtype, tf.float64)
 
 
 @test_util.test_all_tf_execution_regimes
