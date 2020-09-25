@@ -66,7 +66,7 @@ def as_numpy_dtype(dtype):
 
 def base_dtype(dtype):
   """Returns a non-reference `dtype` based on this `dtype`."""
-  dtype = tf.as_dtype(dtype)
+  dtype = None if dtype is None else tf.as_dtype(dtype)
   if hasattr(dtype, 'base_dtype'):
     return dtype.base_dtype
   return dtype
@@ -97,7 +97,7 @@ def common_dtype(args_list, dtype_hint=None):
         raise TypeError(
             'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
                 dtype, dt, seen))
-  return dtype_hint if dtype is None else base_dtype(dtype)
+  return base_dtype(dtype_hint) if dtype is None else base_dtype(dtype)
 
 
 def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):

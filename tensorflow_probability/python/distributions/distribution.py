@@ -1428,13 +1428,17 @@ class Distribution(_BaseDistribution):
     # must ensure that assertions are applied for both `self` and `other`.
     return self._kl_divergence(other)
 
-  def _default_event_space_bijector(self):
+  def _default_event_space_bijector(self, *args, **kwargs):
     raise NotImplementedError(
         '_default_event_space_bijector` is not implemented: {}'.format(
             type(self).__name__))
 
-  def _experimental_default_event_space_bijector(self):
+  def _experimental_default_event_space_bijector(self, *args, **kwargs):
     """Bijector mapping the reals (R**n) to the event space of the distribution.
+
+    Args:
+      *args: Passed to implementation subclass.
+      **kwargs: Passed to implementation subclass.
 
     Returns:
       event_space_bijector: `Bijector` instance or `None`.
@@ -1451,7 +1455,7 @@ class Distribution(_BaseDistribution):
     unconstrained space are between Gaussian and Exponential. For distributions
     with discrete event space, `_default_event_space_bijector` returns `None`.
     """
-    return self._default_event_space_bijector()
+    return self._default_event_space_bijector(*args, **kwargs)
 
   def __str__(self):
     if self.batch_shape:

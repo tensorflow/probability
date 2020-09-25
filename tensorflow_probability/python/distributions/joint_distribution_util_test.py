@@ -37,10 +37,10 @@ class JointDistributionUtilTest(test_util.TestCase):
     distribution = tfd.independent_joint_distribution_from_structure(structure)
     self.assertIsInstance(distribution, expect_isinstance)
 
-    self.assertAllEqualNested(
+    self.assertEqual(
         distribution.dtype,
         tf.nest.map_structure(lambda d: d.dtype, structure))
-    self.assertAllEqualNested(
+    self.assertEqual(
         distribution.event_shape,
         tf.nest.map_structure(lambda d: d.event_shape, structure))
 

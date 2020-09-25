@@ -1129,6 +1129,28 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
       d.sample(seed=samplers.zeros_seed())
 
+  def test_pinning(self):
+    """Test pinning a component distribution."""
+
+    def model_fn():
+      c = yield Root(tfd.LogNormal(0., 1., name='c'))
+      b = yield tfd.Normal(c, 1., name='b')
+      yield tfd.Normal(c + b, 1e-3, name='a')
+
+    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+    samp = self.evaluate(d.experimental_pin(b=1.5).sample_unpinned(
+        seed=test_util.test_seed()))
+    self.assertEqual(('c', 'a'), samp._fields)
+    self.assertAllClose(samp.c + 1.5, samp.a, atol=3e-3)
+
+    samp = self.evaluate(d.experimental_pin(None, .75).sample_unpinned(
+        seed=test_util.test_seed()))
+    self.assertAllClose(samp.c + .75, samp.a, atol=3e-3)
+
+    samp = self.evaluate(d.experimental_pin([None, 7.5]).sample_unpinned(
+        seed=test_util.test_seed()))
+    self.assertAllClose(samp.c + 7.5, samp.a, atol=3e-3)
+
 
 if __name__ == '__main__':
   tf.test.main()
