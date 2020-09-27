@@ -896,7 +896,7 @@ class IndependentLogistic(DistributionLambda):
     with tf.name_scope(name or 'IndependentLogistic_params_size'):
       event_shape = tf.convert_to_tensor(
           event_shape, name='event_shape', dtype_hint=tf.int32)
-      return 2 * _event_size(
+      return np.int32(2) * _event_size(
           event_shape, name=name or 'IndependentLogistic_params_size')
 
   def get_config(self):
@@ -1011,7 +1011,7 @@ class IndependentNormal(DistributionLambda):
     with tf.name_scope(name or 'IndependentNormal_params_size'):
       event_shape = tf.convert_to_tensor(
           event_shape, name='event_shape', dtype_hint=tf.int32)
-      return 2 * _event_size(
+      return np.int32(2) * _event_size(
           event_shape, name=name or 'IndependentNormal_params_size')
 
   def get_config(self):
