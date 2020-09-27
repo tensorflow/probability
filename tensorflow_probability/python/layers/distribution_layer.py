@@ -92,7 +92,7 @@ def _event_size(event_shape, name=None):
 
     event_shape_const = tf.get_static_value(event_shape)
     if event_shape_const is not None:
-      return np.prod(event_shape_const)
+      return np.prod(event_shape_const, dtype=np.int32)
     else:
       return tf.reduce_prod(event_shape)
 
