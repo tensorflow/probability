@@ -174,7 +174,7 @@ class InferenceGymTestCaseTest(test_util.InferenceGymTestCase):
   @test_util.numpy_disable_gradient_test
   def testBadGroundTruthWithHMC(self):
     """Tests that an error is raised if the ground truth is wrong."""
-    model = TestModel(ground_truth_mean=-10.)
+    model = TestModel(ground_truth_mean=-1000.)
     with self.assertRaisesRegexp(AssertionError, 'Not equal to tolerance'):
       self.validate_ground_truth_using_hmc(
           model,

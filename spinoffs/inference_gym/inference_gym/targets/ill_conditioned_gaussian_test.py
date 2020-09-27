@@ -51,8 +51,8 @@ class IllConditionedGaussianTest(test_util.InferenceGymTestCase):
     self.validate_ground_truth_using_hmc(
         model,
         num_chains=4,
-        num_steps=4000,
-        num_leapfrog_steps=2,
+        num_steps=2000,
+        num_leapfrog_steps=3,
         step_size=0.5,
         seed=seed(),
     )

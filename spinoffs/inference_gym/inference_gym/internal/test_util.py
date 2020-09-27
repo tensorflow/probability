@@ -220,7 +220,7 @@ def run_hmc_on_model(
     return model.unnormalized_log_prob(x)
 
   if seed is None:
-    seed = test_util.test_seed()
+    seed = test_util.test_seed(sampler_type='stateless')
   current_state = tf.nest.map_structure(
       lambda b, e: b(  # pylint: disable=g-long-lambda
           tf.zeros([num_chains] + list(e), dtype=dtype)),

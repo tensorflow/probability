@@ -170,7 +170,7 @@ class LogGaussianCoxProcess(bayesian_model.BayesianModel):
     observation_noise_dist = self._observation_noise_fn(
         prior_samples['log_intensity'])
     counts = observation_noise_dist.sample(seed=seed)
-    dataset['train_counts'] = tf.cast(counts, tf.int32)
+    dataset['train_counts'] = tf.maximum(1, tf.cast(counts, tf.int32))
     return dataset
 
   def _log_likelihood(self, value):

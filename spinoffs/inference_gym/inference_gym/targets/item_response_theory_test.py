@@ -134,7 +134,7 @@ class ItemResponseTheoryTest(test_util.InferenceGymTestCase,
     self.validate_ground_truth_using_hmc(
         model,
         num_chains=4,
-        num_steps=5000,
+        num_steps=4000,
         num_leapfrog_steps=10,
         step_size=0.025,
     )
