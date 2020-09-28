@@ -324,14 +324,13 @@ class MixtureSameFamily(distribution.Distribution):
     mask_batch_ndims = ps.rank(mask) - 1
     pad_ndims = batch_ndims - mask_batch_ndims
     mask_shape = ps.shape(mask)
-    mask = tf.reshape(
-        mask,
-        shape=ps.concat([
-            mask_shape[:-1],
-            ps.ones([pad_ndims], dtype=tf.int32),
-            mask_shape[-1:],
-            ps.ones([event_ndims], dtype=tf.int32),
-        ], axis=0))
+    target_shape = ps.concat([
+        mask_shape[:-1],
+        ps.ones([pad_ndims], dtype=tf.int32),
+        mask_shape[-1:],
+        ps.ones([event_ndims], dtype=tf.int32),
+    ], axis=0)
+    mask = tf.reshape(mask, shape=target_shape)
 
     if x.dtype in [tf.bfloat16, tf.float16, tf.float32, tf.float64,
                    tf.complex64, tf.complex128]:

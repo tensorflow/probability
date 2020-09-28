@@ -1323,11 +1323,18 @@ def mixtures(draw,
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
 
+  # TODO(b/169441746): Re-enable nesting MixtureSameFamily inside Mixture when
+  # the weird edge case gets fixed.
+  def nested_eligibility_filter(dist_name):
+    if dist_name in ['MixtureSameFamily']:
+      return False
+    return eligibility_filter(dist_name)
+
   component_strategy = distributions(
       batch_shape=batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars,
-      eligibility_filter=eligibility_filter,
+      eligibility_filter=nested_eligibility_filter,
       depth=depth - 1,
       validate_args=validate_args)
   # Must ensure matching event shapes and dtypes.
