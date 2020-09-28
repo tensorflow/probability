@@ -48,9 +48,9 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.experimental import auto_batching as ab
+from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
@@ -74,7 +74,7 @@ Point = collections.namedtuple(
     "Point", ["state", "target_log_prob", "grads_target_log_prob", "momentum"])
 
 
-class NoUTurnSampler(mcmc.TransitionKernel):
+class NoUTurnSampler(kernel_base.TransitionKernel):
   """Runs one step of the No U-Turn Sampler.
 
   The No U-Turn Sampler (NUTS) is an adaptive variant of the Hamiltonian Monte

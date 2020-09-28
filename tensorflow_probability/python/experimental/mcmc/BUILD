@@ -149,7 +149,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math",
-        "//tensorflow_probability/python/mcmc",
+        "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util:seed_stream",
     ],

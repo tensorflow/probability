@@ -22,7 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.mcmc import TransitionKernel
+from tensorflow_probability.python.mcmc import kernel as kernel_base
 
 __all__ = [
     'SequentialMonteCarlo',
@@ -126,7 +126,7 @@ def ess_below_threshold(weighted_particles, threshold=0.5):
                       ps.log(threshold))
 
 
-class SequentialMonteCarlo(TransitionKernel):
+class SequentialMonteCarlo(kernel_base.TransitionKernel):
   """Sequential Monte Carlo transition kernel.
 
   Sequential Monte Carlo maintains a population of weighted particles

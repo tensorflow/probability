@@ -24,6 +24,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.experimental import unnest
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -971,10 +972,8 @@ def _make_post_swap_replica_results(pre_swap_replica_results,
         kr, 'grads_target_log_prob', new_grads_target_log_prob)
   # For transition kernels not involving the gradient of the log-probability,
   # grads_target_log_prob will not exist in the (possibly multiply wrapped)
-  # kernel results and that's perfectly fine. But _get_field() /
-  # _update_field() (which wrap tfp.mcmc.internal.util.get_field /
-  # update_field) will throw a NotImplementedError, which we thus catch
-  # silently.
+  # kernel results and that's perfectly fine. But _get_field() / _update_field()
+  # will throw a REMCFieldNotFoundError, which we thus catch silently.
   except REMCFieldNotFoundError:
     pass
 
@@ -1060,8 +1059,8 @@ class REMCFieldNotFoundError(AttributeError):
 
 def _get_field(kernel_results, field_name):
   try:
-    return mcmc_util.get_field(kernel_results, field_name)
-  except TypeError:
+    return unnest.get_innermost(kernel_results, field_name)
+  except AttributeError:
     msg = _kernel_result_not_implemented_message_template.format(
         kernel_results, field_name)
     raise REMCFieldNotFoundError(msg)
@@ -1069,8 +1068,8 @@ def _get_field(kernel_results, field_name):
 
 def _update_field(kernel_results, field_name, value):
   try:
-    return mcmc_util.update_field(kernel_results, field_name, value)
-  except TypeError:
+    return unnest.replace_innermost(kernel_results, **{field_name: value})
+  except ValueError:
     msg = _kernel_result_not_implemented_message_template.format(
         kernel_results, field_name)
     raise REMCFieldNotFoundError(msg)

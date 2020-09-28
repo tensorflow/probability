@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import warnings
 
 # Dependency imports
@@ -45,8 +44,6 @@ __all__ = [
     'index_remapping_gather',
     'is_list_like',
     'is_namedtuple_like',
-    'make_innermost_getter',
-    'make_innermost_setter',
     'make_name',
     'maybe_call_fn_and_grads',
     'prepare_state_parts',
@@ -482,64 +479,6 @@ def trace_scan(loop_fn,
     return final_state, stacked_trace
 
 
-def make_innermost_setter(setter):
-  """Wraps a setter so it applies to the inner-most results in `kernel_results`.
-
-  The wrapped setter unwraps `kernel_results` and applies `setter` to the first
-  results without an `inner_results` attribute.
-
-  Args:
-    setter: A callable that takes the kernel results as well as some `*args` and
-      `**kwargs` and returns a modified copy of those kernel results.
-
-  Returns:
-    new_setter: A wrapped `setter`.
-  """
-
-  @functools.wraps(setter)
-  def _new_setter(kernel_results, *args, **kwargs):
-    """Wrapped setter."""
-    results_stack = []
-    while hasattr(kernel_results, 'inner_results'):
-      results_stack.append(kernel_results)
-      kernel_results = kernel_results.inner_results
-
-    new_kernel_results = setter(kernel_results, *args, **kwargs)
-    for outer_results in reversed(results_stack):
-      new_kernel_results = outer_results._replace(
-          inner_results=new_kernel_results)
-
-    return new_kernel_results
-
-  return _new_setter
-
-
-def make_innermost_getter(getter):
-  """Wraps a getter so it applies to the inner-most results in `kernel_results`.
-
-  The wrapped getter unwraps `kernel_results` and returns the return value of
-  `getter` called with the first results without an `inner_results` attribute.
-
-  Args:
-    getter: A callable that takes Kernel results and returns some value.
-
-  Returns:
-    new_getter: A wrapped `getter`.
-  """
-
-  @functools.wraps(getter)
-  def _new_getter(kernel_results, *args, **kwargs):
-    """Wrapped getter."""
-    results_stack = []
-    while hasattr(kernel_results, 'inner_results'):
-      results_stack.append(kernel_results)
-      kernel_results = kernel_results.inner_results
-
-    return getter(kernel_results, *args, **kwargs)
-
-  return _new_getter
-
-
 def enable_store_parameters_in_results(kernel):
   """Enables the `store_parameters_in_results` parameter in a chain of kernels.
 
@@ -735,30 +674,3 @@ def index_remapping_gather(params,
     return dist_util.move_dimension(result_t,
                                     source_idx=broadcast_indices_ndims - 1,
                                     dest_idx=axis)
-
-
-# TODO(b/111801087): Use a standardized API, when available.
-@make_innermost_getter
-def get_field(kernel_results, field_name):
-  """Get field value from kernel_results or kernel_results.accepted_results."""
-  attr = getattr(kernel_results, field_name, None)
-  if attr is not None:
-    return attr
-  accepted_results = getattr(kernel_results, 'accepted_results', None)
-  if accepted_results is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  return get_field(accepted_results, field_name)
-
-
-@make_innermost_setter
-def update_field(kernel_results, field_name, value):
-  """Set field value in kernel_results or kernel_results.accepted_results."""
-  if hasattr(kernel_results, field_name):
-    return kernel_results._replace(**{field_name: value})
-  accepted_results = getattr(kernel_results, 'accepted_results', None)
-  if accepted_results is None:
-    raise TypeError('Cannot set {} in {}'.format(
-        field_name, kernel_results))
-  return kernel_results._replace(
-      accepted_results=update_field(accepted_results, field_name, value))

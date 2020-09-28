@@ -366,15 +366,10 @@ class NeuTra(tfp.mcmc.TransitionKernel):
         advance the chain.
     """
 
-    @tfp.mcmc.internal.util.make_innermost_setter
-    def set_num_leapfrog_steps(kernel_results, num_leapfrog_steps):
-      return kernel_results._replace(
-          accepted_results=kernel_results.accepted_results._replace(
-              num_leapfrog_steps=num_leapfrog_steps))
-
     step_size = previous_kernel_results.new_step_size
-    previous_kernel_results = set_num_leapfrog_steps(
-        previous_kernel_results, self._num_leapfrog_steps(step_size))
+    previous_kernel_results = tfp.experimental.unnest.replace_innermost(
+        previous_kernel_results,
+        num_leapfrog_steps=self._num_leapfrog_steps(step_size))
 
     new_state, kernel_results = self._kernel.one_step(
         self._flatten_state(current_state), previous_kernel_results)

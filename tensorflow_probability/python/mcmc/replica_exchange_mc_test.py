@@ -28,9 +28,9 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 tfd = tfp.distributions
+unnest = tfp.experimental.unnest
 
 JAX_MODE = False
 
@@ -374,7 +374,7 @@ class REMCTest(test_util.TestCase):
             states_.mean(), states_.std()))
 
     # Some shortened names.
-    replica_log_accept_ratio = mcmc_util.get_field(
+    replica_log_accept_ratio = unnest.get_innermost(
         kr_.post_swap_replica_results, 'log_accept_ratio')
     replica_states_ = kr_.post_swap_replica_states[0]  # Get rid of "parts"
 
@@ -455,11 +455,11 @@ class REMCTest(test_util.TestCase):
           tfp.mcmc.simple_step_size_adaptation.SimpleStepSizeAdaptationResults):
         self.assertAllEqual(
             np.repeat([step_size], axis=0, repeats=num_results),
-            mcmc_util.get_field(kr_.post_swap_replica_results, 'step_size'))
+            unnest.get_innermost(kr_.post_swap_replica_results, 'step_size'))
 
       self.assertAllEqual(
           np.repeat([num_leapfrog_steps], axis=0, repeats=num_results),
-          mcmc_util.get_field(
+          unnest.get_innermost(
               kr_.post_swap_replica_results, 'num_leapfrog_steps'))
 
   @test_util.numpy_disable_gradient_test('HMC')
@@ -595,7 +595,7 @@ class REMCTest(test_util.TestCase):
     remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
-      return mcmc_util.get_field(
+      return unnest.get_innermost(
           results.post_swap_replica_results, 'log_accept_ratio')
 
     if state_includes_replicas:
@@ -810,7 +810,7 @@ class REMCTest(test_util.TestCase):
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return [
-          mcmc_util.get_field(
+          unnest.get_innermost(
               results.post_swap_replica_results, 'log_accept_ratio'),
           results.post_swap_replica_states
       ]

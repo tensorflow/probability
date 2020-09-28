@@ -26,9 +26,8 @@ from tensorflow_probability.python.distributions import joint_distribution_seque
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.mcmc import HamiltonianMonteCarlo
+from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import metropolis_hastings
-from tensorflow_probability.python.mcmc import UncalibratedHamiltonianMonteCarlo
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
@@ -38,7 +37,7 @@ __all__ = [
 ]
 
 
-class PreconditionedHamiltonianMonteCarlo(HamiltonianMonteCarlo):
+class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
   """Runs Hamiltonian Monte Carlo with a non-identity mass matrix.
 
   See tfp.mcmc.HamiltonianMonteCarlo for details.
@@ -205,7 +204,7 @@ class PreconditionedHamiltonianMonteCarlo(HamiltonianMonteCarlo):
 
 
 class UncalibratedPreconditionedHamiltonianMonteCarlo(
-    UncalibratedHamiltonianMonteCarlo):
+    hmc.UncalibratedHamiltonianMonteCarlo):
   """Runs one step of Uncalibrated Hamiltonian Monte Carlo.
 
   Warning: this kernel will not result in a chain which converges to the
@@ -217,7 +216,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
   `PreconditionedHamiltonianMonteCarlo`.
   """
 
-  @mcmc_util.set_doc(UncalibratedHamiltonianMonteCarlo.__init__)
+  @mcmc_util.set_doc(hmc.UncalibratedHamiltonianMonteCarlo.__init__)
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -240,7 +239,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
   def momentum_distribution(self):
     return self._parameters['momentum_distribution']
 
-  @mcmc_util.set_doc(HamiltonianMonteCarlo.one_step.__doc__)
+  @mcmc_util.set_doc(hmc.HamiltonianMonteCarlo.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results, seed=None):
     with tf.name_scope(mcmc_util.make_name(self.name, 'hmc', 'one_step')):
       if self._store_parameters_in_results:
