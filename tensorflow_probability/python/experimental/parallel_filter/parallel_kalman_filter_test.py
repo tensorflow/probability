@@ -115,10 +115,6 @@ class _KalmanFilterTest(test_util.TestCase):
                     'mask'])
 
     def batch_generator():
-      for skip in range(9):
-        batch_list = skip * [batch_shape] + [()
-                                            ] + (9 - skip - 1) * [batch_shape]
-        yield Batches(*batch_list)
       # Skipping 'mask' case because it isn't used in sample generation.
       for skip in range(8):
         batch_list = skip * [()] + [batch_shape] + (9 - skip - 1) * [()]
