@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental.distributions.joint_distribution_pinned import JointDistributionPinned
+from tensorflow_probability.python.experimental.distributions.mvn_inverse_scale_linop import MultivariateNormalInverseScaleLinearOperator
 
 
 __all__ = [
     'JointDistributionPinned',
+    'MultivariateNormalInverseScaleLinearOperator',
 ]
