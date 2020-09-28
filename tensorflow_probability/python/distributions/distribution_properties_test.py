@@ -108,16 +108,18 @@ class LogProbConsistentPrecisionTest(test_util.TestCase):
     hp.note('Trying distribution {}'.format(
         self.evaluate_dict(dist.parameters)))
     seed = test_util.test_seed()
-    samples = dist.sample(5, seed=seed)
-    self.assertIn(samples.dtype, [tf.float32, tf.int32])
-    self.assertEqual(dist.log_prob(samples).dtype, tf.float32)
+    with tfp_hps.no_tf_rank_errors():
+      samples = dist.sample(5, seed=seed)
+      self.assertIn(samples.dtype, [tf.float32, tf.int32])
+      self.assertEqual(dist.log_prob(samples).dtype, tf.float32)
 
     def log_prob_function(dist, x):
       return dist.log_prob(x)
 
     dist64 = tf.nest.map_structure(
         tensor_to_f64, tfe.as_composite(dist), expand_composites=True)
-    result64 = log_prob_function(dist64, tensor_to_f64(samples))
+    with tfp_hps.no_tf_rank_errors():
+      result64 = log_prob_function(dist64, tensor_to_f64(samples))
     self.assertEqual(result64.dtype, tf.float64)
 
 
