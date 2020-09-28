@@ -21,6 +21,7 @@ import functools
 # Dependency imports
 
 import numpy as np
+import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -396,8 +397,7 @@ class DistributionLambdaSerializationTest(test_util.TestCase):
             lambda t: DistributionLambdaSerializationTest._make_distribution(t))
     ])
     model.compile(optimizer='adam', loss='mse')
-    # TODO(b/138375951): Re-enable this test.
-    # self.assertSerializable(model, batch_size=3)
+    self.assertSerializable(model, batch_size=3)
 
     model = tfk.Sequential([
         tfkl.Dense(15, input_shape=(5,)),
@@ -410,6 +410,10 @@ class DistributionLambdaSerializationTest(test_util.TestCase):
     self.assertExportable(model)
 
   def test_serialization_closure_over_lambdas_tensors_and_numpy_array(self):
+    if six.PY2 and not tf.executing_eagerly():
+      self.skipTest('Serialization of constant graph-mode Tensors is not '
+                    'supported under Python 2.')
+
     num_components = np.array(3)
     one = tf.convert_to_tensor(1)
     mk_ind_norm = lambda event_shape: tfpl.IndependentNormal(event_shape + one)

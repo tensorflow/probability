@@ -31,7 +31,7 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
     'numpy >= 1.13.3',
     'decorator',
-    'cloudpickle == 1.3',  # TODO(b/155109696): Unpin cloudpickle version.
+    'cloudpickle >= 1.3',
     'gast >= 0.3.2',  # For autobatching
     'dm-tree'  # For NumPy/JAX backends (hence, also for prefer_static)
 ]
@@ -105,7 +105,7 @@ setup(
     ],
     keywords='tensorflow probability statistics bayesian machine learning',
     extras_require={  # e.g. `pip install tfp-nightly[jax]`
-        'jax': ['jax', 'jaxlib'],
+        'jax': ['jax==0.1.74', 'jaxlib==0.1.52'],
         'tfds': [TFDS_PACKAGE],
     }
 )

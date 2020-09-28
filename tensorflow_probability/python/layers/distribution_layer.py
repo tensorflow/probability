@@ -25,7 +25,7 @@ import io
 import pickle
 
 # Dependency imports
-from cloudpickle.cloudpickle import CloudPickler
+from cloudpickle import CloudPickler
 import numpy as np
 import six
 import tensorflow.compat.v2 as tf
@@ -2020,37 +2020,32 @@ def _get_convert_to_tensor_fn(identifier):
                    'convert-to-tensor function identifier:', identifier)
 
 
-class _TensorCloudPickler(CloudPickler):
-  """Subclass of `CloudPickler` that includes pickling of `Tensor` objects."""
-
-  def __init__(self, out_file, protocol=None):
-    CloudPickler.__init__(self, out_file, protocol)
-
-  @staticmethod
-  def save_tensor(cloud_pickler, tensor, name=None):
-    val = tf.get_static_value(tensor)
-    if val is None:
-      raise ValueError('Cannot pickle Tensor -- '
-                       'its value is not known statically: {}.'.format(tensor))
-    CloudPickler.save_reduce(cloud_pickler, np.array, (val,))
-
-  def inject_addons(self):
-    tensor_class = tf.convert_to_tensor(1.).__class__
-    CloudPickler.dispatch[tensor_class] = _TensorCloudPickler.save_tensor
-
-  @staticmethod
-  def dumps(obj, protocol=None):
-    out_file = io.BytesIO()
-    try:
-      _TensorCloudPickler(out_file, protocol).dump(obj)
-      return out_file.getvalue()
-    finally:
-      out_file.close()
+def _reduce_tensor(tensor):
+  val = tf.get_static_value(tensor)
+  if val is None:
+    raise ValueError('Cannot pickle Tensor -- '
+                     'its value is not known statically: {}.'.format(tensor))
+  return (tf.convert_to_tensor, (val,))
 
 
 def _serialize_function(func):
-  raw_code = _TensorCloudPickler.dumps(func)
-  return codecs.encode(raw_code, 'base64').decode('ascii')
+  """Serializes a function (using CloudPickle)."""
+  buffer = io.BytesIO()
+  pickler = CloudPickler(buffer)
+
+  # Serializing a DistributionLambda or other distribution layer may require
+  # serializaing a lambda or function that closes over a constant, graph-mode
+  # Tensor, but graph-mode Tensors do not support pickling.  We modify
+  # `pickler.dispatch_table` so that a special reduction function will be used
+  # for graph-mode Tensors, which will:
+  #  - Correctly serialize constant graph-mode Tensors.
+  #  - Raise an explanatory error message for non-constant graph-mode Tensors.
+  if not hasattr(pickler, 'dispatch_table'):
+    pickler.dispatch_table = {}
+  pickler.dispatch_table[tf.Tensor] = _reduce_tensor
+
+  pickler.dump(func)
+  return codecs.encode(buffer.getvalue(), 'base64').decode('ascii')
 
 
 def _deserialize_function(code):

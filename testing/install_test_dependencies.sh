@@ -150,14 +150,14 @@ install_python_packages() {
   python -m pip install $PIP_FLAGS $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR
 
   # For the JAX backend.
-  python -m pip install jax jaxlib
+  python -m pip install jax==0.1.74 jaxlib==0.1.52
 
   # The following unofficial dependencies are used only by tests.
   # TODO(b/148685448): Unpin Hypothesis and coverage versions.
   python -m pip install $PIP_FLAGS hypothesis==3.56.5 coverage==4.4.2 matplotlib mock scipy
 
   # Install additional TFP dependencies.
-  python -m pip install $PIP_FLAGS decorator cloudpickle==1.3 dm-tree  # TODO(b/155109696): Unpin cloudpickle version.
+  python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
 
   # Upgrade numpy to the latest to address issues that happen when testing with
   # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
