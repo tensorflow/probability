@@ -26,8 +26,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 # pytype_strict
 py_library(
     name = "datasets",
