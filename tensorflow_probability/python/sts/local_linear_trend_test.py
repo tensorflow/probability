@@ -92,6 +92,56 @@ class _LocalLinearTrendStateSpaceModelTest(object):
     y = ssm.sample()
     self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
 
+  def test_joint_sample(self):
+    strm = test_util.test_seed_stream()
+    batch_shape = [4, 3]
+
+    level_scale = self._build_placeholder(2 * np.ones(batch_shape))
+    slope_scale = self._build_placeholder(0.2 * np.ones(batch_shape))
+    observation_noise_scale = self._build_placeholder(1.)
+    initial_state_prior = tfd.MultivariateNormalDiag(
+        loc=self._build_placeholder([-3, 0.5]),
+        scale_diag=self._build_placeholder([0.1, 0.2]))
+
+    ssm = LocalLinearTrendStateSpaceModel(
+        num_timesteps=10,
+        level_scale=level_scale,
+        slope_scale=slope_scale,
+        observation_noise_scale=observation_noise_scale,
+        initial_state_prior=initial_state_prior)
+
+    num_samples = 10000
+    sampled_latents, sampled_obs = ssm._joint_sample_n(n=num_samples,
+                                                       seed=strm())
+    latent_mean, obs_mean = ssm._joint_mean()
+    latent_cov, obs_cov = ssm._joint_covariances()
+    (sampled_latents_, sampled_obs_,
+     latent_mean_, obs_mean_,
+     latent_level_std_,
+     level_slope_std_,
+     obs_std_) = self.evaluate(
+         (sampled_latents, sampled_obs,
+          latent_mean, obs_mean,
+          tf.sqrt(latent_cov[..., 0, 0]),
+          tf.sqrt(latent_cov[..., 1, 1]),
+          tf.sqrt(obs_cov[..., 0])))
+    latent_std_ = np.stack([latent_level_std_, level_slope_std_], axis=-1)
+
+    # Instead of directly comparing means and stddevs, we normalize by stddev
+    # to make the stderr constant.
+    self.assertAllClose(np.mean(sampled_latents_, axis=0) / latent_std_,
+                        latent_mean_ / latent_std_,
+                        atol=4. / np.sqrt(num_samples))
+    self.assertAllClose(np.mean(sampled_obs_, axis=0) / obs_std_,
+                        obs_mean_ / obs_std_,
+                        atol=4. / np.sqrt(num_samples))
+    self.assertAllClose(np.std(sampled_latents_, axis=0) / latent_std_,
+                        np.ones(latent_std_.shape, dtype=latent_std_.dtype),
+                        atol=4. / np.sqrt(num_samples))
+    self.assertAllClose(np.std(sampled_obs_, axis=0) / obs_std_,
+                        np.ones(obs_std_.shape, dtype=obs_std_.dtype),
+                        atol=4. / np.sqrt(num_samples))
+
   def _build_placeholder(self, ndarray):
     """Convert a numpy array to a TF placeholder.
 
