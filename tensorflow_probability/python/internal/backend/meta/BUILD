@@ -23,8 +23,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_binary(
     name = "gen_linear_operators",
     srcs = ["gen_linear_operators.py"],

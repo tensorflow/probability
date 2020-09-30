@@ -28,8 +28,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 # This target is here for convenience. Link to one of the `using_*` targets to
 # minimize the number of dependencies.
 # pytype_strict

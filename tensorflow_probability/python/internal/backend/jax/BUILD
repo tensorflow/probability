@@ -22,8 +22,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 FILENAMES = [
     "__init__",
     "bitwise",
