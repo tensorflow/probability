@@ -514,7 +514,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
         #         E.matmul(x_2, adjoint=adjoint)`,
         # where `x_1` and `x_2` are splits of `x`.
         for j in range(index + 1, len(self.operators)):
-          result += self.operators[j][index].matmul(
+          result = result + self.operators[j][index].matmul(
               split_x[j], adjoint=adjoint, adjoint_arg=adjoint_arg)
         result_list.append(result)
     else:
@@ -527,7 +527,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
         # partition, apply the operator to the respective `rhs` block, and
         # accumulate the sum.
         for j, operator in enumerate(row[1:]):
-          result += operator.matmul(
+          result = result + operator.matmul(
               split_x[j + 1], adjoint=adjoint, adjoint_arg=adjoint_arg)
         result_list.append(result)
 
@@ -594,13 +594,13 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
       return math_ops.exp(self._log_abs_determinant())
     result = self._diagonal_operators[0].determinant()
     for op in self._diagonal_operators[1:]:
-      result *= op.determinant()
+      result = result * op.determinant()
     return result
 
   def _log_abs_determinant(self):
     result = self._diagonal_operators[0].log_abs_determinant()
     for op in self._diagonal_operators[1:]:
-      result += op.log_abs_determinant()
+      result = result + op.log_abs_determinant()
     return result
 
   def solve(self, rhs, adjoint=False, adjoint_arg=False, name="solve"):
@@ -853,7 +853,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
   def _trace(self):
     result = self._diagonal_operators[0].trace()
     for op in self._diagonal_operators[1:]:
-      result += op.trace()
+      result = result + op.trace()
     return result
 
   def _to_dense(self):
@@ -866,7 +866,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
         for i in range(len(self.operators))]
     for row_blocks in broadcast_operators:
       batch_row_shape = array_ops.shape(row_blocks[0])[:-1]
-      num_cols += array_ops.shape(row_blocks[-1])[-1]
+      num_cols = num_cols + array_ops.shape(row_blocks[-1])[-1]
       zeros_to_pad_after_shape = array_ops.concat(
           [batch_row_shape,
            [self.domain_dimension_tensor() - num_cols]], axis=-1)

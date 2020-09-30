@@ -245,7 +245,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     if name is None:
       name = operators[0].name
       for operator in operators[1:]:
-        name += "_x_" + operator.name
+        name = name + "_x_" + operator.name
     with ops.name_scope(name, values=graph_parents):
       super(LinearOperatorKronecker, self).__init__(
           dtype=dtype,
@@ -267,11 +267,11 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     # Get final matrix shape.
     domain_dimension = self.operators[0].domain_dimension
     for operator in self.operators[1:]:
-      domain_dimension *= operator.domain_dimension
+      domain_dimension = domain_dimension * operator.domain_dimension
 
     range_dimension = self.operators[0].range_dimension
     for operator in self.operators[1:]:
-      range_dimension *= operator.range_dimension
+      range_dimension = range_dimension * operator.range_dimension
 
     matrix_shape = tensor_shape.TensorShape([
         range_dimension, domain_dimension])
@@ -288,11 +288,11 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
   def _shape_tensor(self):
     domain_dimension = self.operators[0].domain_dimension_tensor()
     for operator in self.operators[1:]:
-      domain_dimension *= operator.domain_dimension_tensor()
+      domain_dimension = domain_dimension * operator.domain_dimension_tensor()
 
     range_dimension = self.operators[0].range_dimension_tensor()
     for operator in self.operators[1:]:
-      range_dimension *= operator.range_dimension_tensor()
+      range_dimension = range_dimension * operator.range_dimension_tensor()
 
     matrix_shape = [range_dimension, domain_dimension]
 
@@ -349,7 +349,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     # Always add a batch dimension to enable broadcasting to work.
     batch_shape = array_ops.concat(
         [array_ops.ones_like(self.batch_shape_tensor()), [1, 1]], 0)
-    x += array_ops.zeros(batch_shape, dtype=x.dtype)
+    x = x + array_ops.zeros(batch_shape, dtype=x.dtype)
 
     # x has shape [B, R, C], where B represent some number of batch dimensions,
     # R represents the number of rows, and C represents the number of columns.
@@ -428,7 +428,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     total = self.domain_dimension_tensor()
     determinant = 1.
     for operator in self.operators:
-      determinant *= operator.determinant() ** _ops.cast(
+      determinant = determinant * operator.determinant() ** _ops.cast(
           total / operator.domain_dimension_tensor(),
           dtype=operator.dtype)
     return determinant
@@ -438,7 +438,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     total = self.domain_dimension_tensor()
     log_abs_det = 0.
     for operator in self.operators:
-      log_abs_det += operator.log_abs_determinant() * _ops.cast(
+      log_abs_det = log_abs_det + operator.log_abs_determinant() * _ops.cast(
           total / operator.domain_dimension_tensor(),
           dtype=operator.dtype)
     return log_abs_det
@@ -447,7 +447,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     # tr(A x B) = tr(A) * tr(B)
     trace = 1.
     for operator in self.operators:
-      trace *= operator.trace()
+      trace = trace * operator.trace()
     return trace
 
   def _solve(self, rhs, adjoint=False, adjoint_arg=False):
@@ -465,7 +465,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     # Always add a batch dimension to enable broadcasting to work.
     batch_shape = array_ops.concat(
         [array_ops.ones_like(self.batch_shape_tensor()), [1, 1]], 0)
-    rhs += array_ops.zeros(batch_shape, dtype=rhs.dtype)
+    rhs = rhs + array_ops.zeros(batch_shape, dtype=rhs.dtype)
 
     # rhs has shape [B, R, C], where B represent some number of batch
     # dimensions,
@@ -537,7 +537,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     for operator in self.operators[1:]:
       diag_part = diag_part[..., :, _ops.newaxis]
       op_diag_part = operator.diag_part()[..., _ops.newaxis, :]
-      diag_part *= op_diag_part
+      diag_part = diag_part * op_diag_part
       diag_part = array_ops.reshape(
           diag_part,
           shape=array_ops.concat(
@@ -560,7 +560,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       op_to_mul = operator.to_dense()[
           ..., _ops.newaxis, :, _ops.newaxis, :]
       # This is now [B, R1, R2, C1, C2].
-      product *= op_to_mul
+      product = product * op_to_mul
       # Now merge together dimensions to get [B, R1 * R2, C1 * C2].
       product = array_ops.reshape(
           product,
@@ -583,7 +583,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       # Product has shape [B, R1, 1].
       product = product[..., _ops.newaxis]
       # Eigval has shape [B, 1, R2]. Produces shape [B, R1, R2].
-      product *= eigval[..., _ops.newaxis, :]
+      product = product * eigval[..., _ops.newaxis, :]
       # Reshape to [B, R1 * R2]
       product = array_ops.reshape(
           product,

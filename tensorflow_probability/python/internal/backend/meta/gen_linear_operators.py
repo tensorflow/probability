@@ -172,6 +172,10 @@ def gen_module(module_name):
   code = re.sub(r' (\w*)\.set_shape\(',
                 ' tensorshape_util.set_shape(\\1, ', code)
 
+  # Replace in-place Python operators (e.g. `+=`) with implicit copying.
+  code = re.sub(r'([_a-zA-Z0-9.\[\]]+)[ ]{0,1}(\+|\-|\*|\/)[\=][ ]{0,1}',
+                '\\1 = \\1 \\2 ', code)
+
   for lint in DISABLED_LINTS:
     code = code.replace('pylint: enable={}'.format(lint),
                         'pylint: disable={}'.format(lint))

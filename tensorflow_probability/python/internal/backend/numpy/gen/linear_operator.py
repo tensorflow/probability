@@ -262,7 +262,7 @@ class LinearOperator(module.Module):
     """Helper function to standardize op scope."""
     full_name = self.name
     if name is not None:
-      full_name += "/" + name
+      full_name = full_name + "/" + name
     with ops.name_scope(full_name) as scope:
       yield scope
 
