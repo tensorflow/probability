@@ -25,17 +25,20 @@ import functools
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import softplus as softplus_lib
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched
+from tensorflow_probability.python.distributions import joint_distribution_coroutine
 from tensorflow_probability.python.distributions import joint_distribution_util
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.experimental.vi import parameter_constraints
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
-Root = tfd.JointDistributionCoroutine.Root
+Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
 
 _NON_STATISTICAL_PARAMS = ['name', 'validate_args', 'allow_nan_stats']
 
@@ -46,7 +49,7 @@ ASVIParameters = collections.namedtuple(
 def build_trainable_location_scale_distribution(initial_loc,
                                                 initial_scale,
                                                 event_ndims,
-                                                distribution_fn=tfd.Normal,
+                                                distribution_fn=normal.Normal,
                                                 validate_args=False,
                                                 name=None):
   """Builds a variational distribution from a location-scale family.
@@ -84,7 +87,7 @@ def build_trainable_location_scale_distribution(initial_loc,
     # Ensure the distribution has the desired number of event dimensions.
     static_event_ndims = tf.get_static_value(event_ndims)
     if static_event_ndims is None or static_event_ndims > 0:
-      posterior_dist = tfd.Independent(
+      posterior_dist = independent.Independent(
           posterior_dist,
           reinterpreted_batch_ndims=event_ndims,
           validate_args=validate_args)
@@ -106,7 +109,7 @@ def _get_event_shape_shallow_structure(event_shape):
 _sample_uniform_initial_loc = functools.partial(
     tf.random.uniform, minval=-2., maxval=2., dtype=tf.float32)
 _build_trainable_normal_dist = functools.partial(
-    build_trainable_location_scale_distribution, distribution_fn=tfd.Normal)
+    build_trainable_location_scale_distribution, distribution_fn=normal.Normal)
 
 
 def build_factored_surrogate_posterior(
@@ -451,7 +454,8 @@ def build_asvi_surrogate_posterior(prior, name=None):
       except StopIteration:
         pass
 
-    surrogate_posterior = tfd.JointDistributionCoroutineAutoBatched(
-        posterior_generator)
+    surrogate_posterior = (
+        joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched(
+            posterior_generator))
     surrogate_posterior.also_track = param_dicts
     return surrogate_posterior

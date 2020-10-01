@@ -197,7 +197,8 @@ class _KalmanFilterTest(test_util.TestCase):
               loc=tf.gather(observation_mean, t, axis=0),
               covariance_matrix=tf.gather(observation_cov, t, axis=0)),
           initial_state_prior=mvn(loc=initial_mean,
-                                  covariance_matrix=initial_cov))
+                                  covariance_matrix=initial_cov),
+          experimental_parallelize=False)  # Compare against sequential filter.
       # pylint: enable=g-long-lambda,cell-var-from-loop
 
       (log_likelihoods,

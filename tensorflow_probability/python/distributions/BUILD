@@ -1020,6 +1020,7 @@ multi_substrate_py_library(
         ":normal",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/experimental/parallel_filter:parallel_kalman_filter_lib",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -2594,11 +2595,12 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "linear_gaussian_ssm_test",
-    size = "medium",
+    size = "large",
     srcs = ["linear_gaussian_ssm_test.py"],
     jax_size = "large",
     numpy_tags = ["notap"],
     shard_count = 5,
+    tags = ["tf1-broken"],  # Test with `--define=tf-api-version=1` runs out of memory.
     deps = [
         ":linear_gaussian_ssm",
         # numpy dep,

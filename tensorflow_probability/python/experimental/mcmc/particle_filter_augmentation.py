@@ -21,8 +21,8 @@ import collections
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import deterministic
 from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import independent_joint_distribution_from_structure
 from tensorflow_probability.python.distributions import joint_distribution_named
+from tensorflow_probability.python.distributions import joint_distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
@@ -116,8 +116,10 @@ def augment_with_state_history(fn):
                                       s[:, tf.newaxis]], axis=1),
               state_with_history.state_history,
               state)
-          return independent_joint_distribution_from_structure(
-              _wrap_as_distributions(new_state_histories))
+          return (
+              joint_distribution_util
+              .independent_joint_distribution_from_structure(
+                  _wrap_as_distributions(new_state_histories)))
 
     return joint_distribution_named.JointDistributionNamed(
         StateWithHistory(
@@ -215,8 +217,9 @@ def augment_prior_with_state_history(prior, history_size):
                          [history_size],
                          ps.shape(x)[1:]], axis=0)),
           state)
-      return independent_joint_distribution_from_structure(
-          _wrap_as_distributions(initial_state_histories))
+      return (joint_distribution_util
+              .independent_joint_distribution_from_structure(
+                  _wrap_as_distributions(initial_state_histories)))
 
   return joint_distribution_named.JointDistributionNamed(
       StateWithHistory(

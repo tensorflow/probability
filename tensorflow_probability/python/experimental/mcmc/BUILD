@@ -287,6 +287,10 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:deterministic",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:joint_distribution_util",
     ],
 )
 

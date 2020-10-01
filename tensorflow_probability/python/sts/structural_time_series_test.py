@@ -144,11 +144,15 @@ class _StsTestHarness(object):
 
     # Verify that the child class passes the initial step and prior arguments
     # through to the SSM.
-    self.assertEqual(ssm.initial_step, 1)
+    self.assertEqual(self.evaluate(ssm.initial_step), 1)
     self.assertEqual(ssm.initial_state_prior, initial_state_prior)
 
     # Verify the model has the correct latent size.
-    self.assertEqual(ssm.latent_size, model.latent_size)
+    self.assertEqual(
+        self.evaluate(
+            tf.convert_to_tensor(
+                ssm.latent_size_tensor())),
+        model.latent_size)
 
   def test_log_joint(self):
     seed = test_util.test_seed_stream()
