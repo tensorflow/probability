@@ -26,6 +26,7 @@ from hypothesis import strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import experimental
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static
@@ -178,6 +179,14 @@ AUTOVECTORIZATION_ATOL = collections.defaultdict(lambda: 1e-5)
 AUTOVECTORIZATION_ATOL.update({
     'ScaleMatvecLU': 1e-2,  # TODO(b/151041130) tighten this.
     'ScaleMatvecTriL': 1e-1})  # TODO(b/150250388) tighten this.
+
+COMPOSITE_TENSOR_IS_BROKEN = [
+    'BatchNormalization',
+    'Inline',  # callable
+    'ScaleMatvecDiag',  # linear operator
+    'ScaleMatvecTriL',  # linear operator
+    'TransformDiagonal',  # callable
+]
 
 
 def is_invert(bijector):
@@ -731,6 +740,37 @@ class BijectorPropertiesTest(test_util.TestCase):
     self.assertEqual(hash(bijector_1), hash(bijector_2))
     self.assertEqual(bijector_1, bijector_2)
     self.assertFalse(bijector_1 != bijector_2)  # pylint: disable=g-generic-assert
+
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in (set(TF2_FRIENDLY_BIJECTORS) -
+                    set(COMPOSITE_TENSOR_IS_BROKEN)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testCompositeTensor(self, bijector_name, data):
+    # Test that making a composite tensor of this bijector doesn't throw any
+    # errors.
+    bijector, event_dim = self._draw_bijector(
+        bijector_name, data, batch_shape=[],
+        allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
+                           set(COMPOSITE_TENSOR_IS_BROKEN)))
+    composite_bij = experimental.as_composite(bijector)
+    flat = tf.nest.flatten(composite_bij, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(composite_bij, flat,
+                                      expand_composites=True)
+
+    # Compare forward maps before and after compositing.
+    n = 3
+    xs = self._draw_domain_tensor(bijector, data, event_dim, sample_shape=[n])
+    before_ys = bijector.forward(xs)
+    after_ys = unflat.forward(xs)
+    self.assertAllClose(*self.evaluate((before_ys, after_ys)))
+
+    # Compare inverse maps before and after compositing.
+    ys = self._draw_codomain_tensor(bijector, data, event_dim, sample_shape=[n])
+    before_xs = bijector.inverse(ys)
+    after_xs = unflat.inverse(ys)
+    self.assertAllClose(*self.evaluate((before_xs, after_xs)))
 
 
 def ensure_nonzero(x):
