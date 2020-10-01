@@ -400,6 +400,8 @@ class InferenceGymTestCase(test_util.TestCase):
       target_accept_prob=0.9,
       seed=None,
       dtype=tf.float32,
+      mean_fudge_atol=0,
+      standard_deviation_fudge_atol=0,
       use_xla=True,
   ):
     """Validates the ground truth of a model using HMC.
@@ -414,6 +416,10 @@ class InferenceGymTestCase(test_util.TestCase):
       target_accept_prob: Target acceptance probability.
       seed: Optional seed to use. By default, `test_util.test_seed()` is used.
       dtype: DType to use for the algorithm.
+      mean_fudge_atol: Scalar `Tensor`. Additional atol to use when doing the
+        Z-test for the sample mean.
+      standard_deviation_fudge_atol: Scalar `Tensor`. Additional atol to use
+        when doing the Z-test for the sample standard deviation,
       use_xla: Whether to use XLA.
     """
     mcmc_results = self.evaluate(
@@ -450,6 +456,8 @@ class InferenceGymTestCase(test_util.TestCase):
           sample_transformation=sample_transformation,
           transformed_samples=transformed_chain,
           num_samples=tf.nest.pack_sequence_as(transformed_chain, flat_ess),
+          mean_fudge_atol=mean_fudge_atol,
+          standard_deviation_fudge_atol=standard_deviation_fudge_atol,
           sample_dims=(0, 1),
       )
 
@@ -494,9 +502,11 @@ class InferenceGymTestCase(test_util.TestCase):
       sample_transformation,
       transformed_samples,
       num_samples,
+      mean_fudge_atol=0,
+      standard_deviation_fudge_atol=0,
       sample_dims=0,
   ):
-    """Does a two-sided Z-test between some samples and the ground truth."""
+    """Does a two-sample, two-sided Z-test between samples and ground truth."""
     sample_mean = tf.nest.map_structure(
         lambda transformed_samples: np.mean(  # pylint: disable=g-long-lambda
             transformed_samples,
@@ -520,18 +530,32 @@ class InferenceGymTestCase(test_util.TestCase):
     # choices on formal grounds.
     if sample_transformation.ground_truth_mean is not None:
 
-      def _mean_assertions_part(ground_truth_mean, sample_mean, sample_variance,
-                                num_samples):
+      def _mean_assertions_part(ground_truth_mean,
+                                ground_truth_mean_standard_error, sample_mean,
+                                sample_variance, num_samples):
+        sample_standard_error_sq = sample_variance / num_samples
         self.assertAllClose(
             ground_truth_mean,
             sample_mean,
             # TODO(b/144290399): Use the full atol vector.
-            atol=np.array(5. * np.sqrt(sample_variance / num_samples)).max(),
+            atol=(np.array(
+                5. * np.sqrt(sample_standard_error_sq +
+                             ground_truth_mean_standard_error**2)).max() +
+                  mean_fudge_atol),
         )
+
+      ground_truth_mean_standard_error = (
+          sample_transformation.ground_truth_mean_standard_error)
+      if ground_truth_mean_standard_error is None:
+        # Note that this is NOT the intended general interpretaton of SEM being
+        # None, but only the interpetation we choose for these tests.
+        ground_truth_mean_standard_error = tf.nest.map_structure(
+            np.zeros_like, sample_transformation.ground_truth_mean)
 
       self.assertAllAssertsNested(
           _mean_assertions_part,
           sample_transformation.ground_truth_mean,
+          ground_truth_mean_standard_error,
           sample_mean,
           sample_variance,
           num_samples,
@@ -545,21 +569,36 @@ class InferenceGymTestCase(test_util.TestCase):
           transformed_samples,
           sample_mean)
 
-      def _var_assertions_part(ground_truth_standard_deviation, sample_variance,
-                               fourth_moment, num_samples):
+      ground_truth_standard_deviation_standard_error = (
+          sample_transformation.ground_truth_standard_deviation_standard_error)
+      if ground_truth_standard_deviation_standard_error is None:
+        # Note that this is NOT the intended general interpretaton of SESD being
+        # None, but only the interpetation we choose for these tests.
+        ground_truth_standard_deviation_standard_error = tf.nest.map_structure(
+            np.zeros_like,
+            sample_transformation.ground_truth_standard_deviation)
+
+      def _var_assertions_part(ground_truth_standard_deviation,
+                               ground_truth_standard_deviation_standard_error,
+                               sample_variance, fourth_moment, num_samples):
+        sample_standard_error_sq = (
+            fourth_moment / num_samples - sample_variance**2 *
+            (num_samples - 3) / num_samples / (num_samples - 1))
         self.assertAllClose(
             np.square(ground_truth_standard_deviation),
             sample_variance,
             # TODO(b/144290399): Use the full atol vector.
             atol=np.array(
-                5. * np.sqrt(fourth_moment / num_samples - sample_variance**2 *
-                             (num_samples - 3) / num_samples /
-                             (num_samples - 1))).max(),
+                5. *
+                np.sqrt(sample_standard_error_sq +
+                        ground_truth_standard_deviation_standard_error)).max() +
+            standard_deviation_fudge_atol,
         )
 
       self.assertAllAssertsNested(
           _var_assertions_part,
           sample_transformation.ground_truth_standard_deviation,
+          ground_truth_standard_deviation_standard_error,
           sample_variance,
           fourth_moment,
           num_samples,
