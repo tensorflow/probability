@@ -30,6 +30,8 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
+# ** See PRNGS.md for more detailed discussion about this packge. **
+
 __all__ = [
     'categorical',
     'gamma',
@@ -42,7 +44,6 @@ __all__ = [
     'uniform',
     'zeros_seed',
 ]
-
 
 JAX_MODE = False
 
