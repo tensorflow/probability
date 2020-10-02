@@ -39,6 +39,7 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 __all__ = [
     'ReplicaExchangeMC',
     'default_swap_proposal_fn',
+    'even_odd_swap_proposal_fn',
 ]
 
 
