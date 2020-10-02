@@ -450,6 +450,21 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "discrete_rejection_sampling",
+    srcs = ["discrete_rejection_sampling.py"],
+    deps = [
+        ":distribution",
+        ":exponential",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:batched_rejection_sampler",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/random",
+    ],
+)
+
+multi_substrate_py_library(
     name = "distribution",
     srcs = ["distribution.py"],
     deps = [
@@ -1974,6 +1989,7 @@ multi_substrate_py_test(
     name = "binomial_test",
     size = "medium",
     srcs = ["binomial_test.py"],
+    shard_count = 5,
     deps = [
         # numpy dep,
         # scipy dep,
@@ -1990,6 +2006,7 @@ py_test(
     srcs = ["binomial_test.py"],
     main = "binomial_test.py",
     python_version = "PY3",
+    shard_count = 3,
     srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
@@ -2132,6 +2149,20 @@ multi_substrate_py_test(
     srcs = ["dirichlet_test.py"],
     jax_size = "medium",
     deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "discrete_rejection_sampling_test",
+    size = "medium",
+    srcs = ["discrete_rejection_sampling_test.py"],
+    deps = [
+        ":discrete_rejection_sampling",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,

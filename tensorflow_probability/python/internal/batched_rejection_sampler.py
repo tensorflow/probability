@@ -23,7 +23,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
 __all__ = [
@@ -52,9 +52,9 @@ def batched_las_vegas_algorithm(
   deliberately left unspecified.
 
   Args:
-    batched_las_vegas_trial_fn: A callable that takes a Python integer PRNG seed
-      and returns two values. (1) A structure of Tensors containing the results
-      of the computation, all with a shape broadcastable with (2) a boolean mask
+    batched_las_vegas_trial_fn: A callable that takes a PRNG seed and returns
+      two values. (1) A structure of Tensors containing the results of the
+      computation, all with a shape broadcastable with (2) a boolean mask
       representing whether each batch point succeeded.
     seed: Python integer or `Tensor`, for seeding PRNG.
     name: A name to prepend to created ops.
@@ -71,13 +71,12 @@ def batched_las_vegas_algorithm(
        testing. Universite de Montreal, D.M.S. No. 79-10.
   """
   with tf.name_scope(name or 'batched_las_vegas_algorithm'):
-    init_seed, loop_seed = samplers.split_seed(
-        seed, salt='batched_las_vegas_algorithm')
+    init_seed, loop_seed = samplers.split_seed(seed)
     values, good_values_mask = batched_las_vegas_trial_fn(init_seed)
     num_iters = tf.constant(1)
 
     def cond(unused_values, good_values_mask, unused_num_iters, unused_seed):
-      return tf.math.logical_not(tf.reduce_all(good_values_mask))
+      return ~tf.reduce_all(good_values_mask)
 
     def body(values, good_values_mask, num_iters, seed):
       """Batched Las Vegas Algorithm body."""
@@ -89,7 +88,7 @@ def batched_las_vegas_algorithm(
           lambda new, old: tf.where(new_good_values_mask, new, old),
           new_values, values)
 
-      good_values_mask = tf.logical_or(good_values_mask, new_good_values_mask)
+      good_values_mask = good_values_mask | new_good_values_mask
 
       return values, good_values_mask, num_iters + 1, new_seed
 
@@ -133,8 +132,7 @@ def batched_rejection_sampler(
   with tf.name_scope(name or 'batched_rejection_sampler'):
     def randomized_computation(seed):
       """Internal randomized computation."""
-      proposal_seed, mask_seed = samplers.split_seed(
-          seed, salt='batched_rejection_sampler')
+      proposal_seed, mask_seed = samplers.split_seed(seed)
 
       proposed_samples, proposed_values = proposal_fn(proposal_seed)
 
@@ -144,7 +142,7 @@ def batched_rejection_sampler(
       target_values = target_fn(proposed_samples)
       good_samples_mask = tf.less(
           proposed_values * samplers.uniform(
-              prefer_static.shape(proposed_samples),
+              ps.shape(proposed_samples),
               seed=mask_seed,
               dtype=dtype),
           target_values)
