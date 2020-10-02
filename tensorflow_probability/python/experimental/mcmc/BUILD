@@ -96,7 +96,7 @@ py_library(
 
 py_test(
     name = "preconditioned_hmc_test",
-    size = "medium",
+    size = "large",
     timeout = "long",
     srcs = ["preconditioned_hmc_test.py"],
     python_version = "PY3",

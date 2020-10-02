@@ -369,7 +369,7 @@ def _compute_log_acceptance_correction(kinetic_energy_fn,
 
   ```none
                        target_prob(x')
-  accept_prob(x'|x) = -----------------  [m(z) / m(z')]
+  accept_prob(x'|x) = -----------------  [m(z') / m(z)]
                        target_prob(x)
   ```
   (Note: we actually need to handle the kinetic energy change at each leapfrog
@@ -380,8 +380,8 @@ def _compute_log_acceptance_correction(kinetic_energy_fn,
   distribution. So the log acceptance probability is
 
   ```none
-  log(correction) = log(m(z)) - log(m(z'))
-                  = K(z') - K(z)
+  log(correction) = log(m(z')) - log(m(z))
+                  = K(z) - K(z')
   ```
 
   Note that this is equality, since the normalization constants on `m` cancel
@@ -406,9 +406,7 @@ def _compute_log_acceptance_correction(kinetic_energy_fn,
   with tf.name_scope(name or 'compute_log_acceptance_correction'):
     current_kinetic = kinetic_energy_fn(current_momentums)
     proposed_kinetic = kinetic_energy_fn(proposed_momentums)
-    return 0.5 * mcmc_util.safe_sum([
-        ps.reshape(proposed_kinetic, ps.shape(current_kinetic)),
-        -current_kinetic])
+    return mcmc_util.safe_sum([current_kinetic, -proposed_kinetic])
 
 
 def _prepare_args(target_log_prob_fn,

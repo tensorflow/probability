@@ -32,7 +32,7 @@ tfd = tfp.distributions
 tfd_e = tfp.experimental.distributions
 
 
-@test_util.test_graph_mode_only
+@test_util.test_graph_and_eager_modes
 class PreconditionedHMCPropertyTest(test_util.TestCase):
   """More careful tests that preconditioning is actually working."""
 
@@ -63,40 +63,42 @@ class PreconditionedHMCPropertyTest(test_util.TestCase):
                  tf.sqrt(tfd.Normal(0., 1.).quantile(1 - target_accept / 2.)))
     return step_size
 
-  def _run_hmc(self, scale_diag, target_accept, precondition):
+  def _run_hmc_with_step_size(self, scale_diag, target_accept, precondition,
+                              num_results, num_adaptation_steps):
     dims = ps.shape(scale_diag)[0]
-    loc = tf.range(0., dims)
-    mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
+    mvn = tfd.MultivariateNormalDiag(loc=tf.zeros(dims),
+                                     scale_diag=scale_diag)
 
     if precondition:
       momentum_distribution = tfd.MultivariateNormalDiag(
           loc=tf.zeros(dims),
-          scale_diag=1. / scale_diag)
+          scale_diag=1./scale_diag)
     else:
       momentum_distribution = None
 
-    ndraws = 1000
-    hmc_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    hmc_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
             target_log_prob_fn=mvn.log_prob,
             momentum_distribution=momentum_distribution,
             step_size=0.6,
-            num_leapfrog_steps=10),
-        num_adaptation_steps=ndraws - 1,
+            num_leapfrog_steps=3),
+        num_adaptation_steps=num_adaptation_steps,
         target_accept_prob=target_accept)
 
     @tf.function
     def do_sample():
-      _, step = tfp.mcmc.sample_chain(
-          ndraws,
+      draws, step = tfp.mcmc.sample_chain(
+          num_results,
           tf.zeros(dims),
           kernel=hmc_kernel,
+          num_burnin_steps=num_adaptation_steps,
+          seed=test_util.test_seed(),
           trace_fn=lambda _, pkr: pkr.inner_results.accepted_results.step_size)
-      return step[-1]
+      return draws, step
 
     return do_sample()
 
-  def test_adapt_step_size(self):
+  def test_adapt_step_size_default(self):
     """Test that step size adaptation finds the theoretical optimal step size.
 
     See _caclulate_expected_step_size for formula details, but roughly, for a
@@ -106,26 +108,70 @@ class PreconditionedHMCPropertyTest(test_util.TestCase):
     standard normal distribution, and so should adapt to the step size where
     the scales are all ones.
 
-    In the examples below, `preconditioned_expected_step` is around 0.6, and
-    `unpreconditioned_expected_step` is around 0.00002, so there is
+    In the example below, `expected_step` is around 0.00002, so there is
     significantly different behavior when conditioning.
     """
     dims = 100
     target_accept = 0.75
     scale_diag = tf.linspace(1e-5, 1., dims)
-    preconditioned_step_size = self._run_hmc(scale_diag, target_accept,
-                                             precondition=True)
-    unpreconditioned_step_size = self._run_hmc(scale_diag, target_accept,
-                                               precondition=False)
-    preconditioned_expected_step = self._calculate_expected_step_size(
-        tf.ones(dims), target_accept)
-    unpreconditioned_expected_step = self._calculate_expected_step_size(
+    _, step_size = self._run_hmc_with_step_size(scale_diag, target_accept,
+                                                precondition=False,
+                                                num_adaptation_steps=500,
+                                                num_results=1)
+
+    expected_step = self._calculate_expected_step_size(
         scale_diag, target_accept)
 
+    self.assertAllClose(step_size[-1], expected_step, atol=0.001)
+
+  def test_adapt_step_size_explicit(self):
+    """Test that step size adaptation finds the theoretical optimal step size.
+
+    In the example below, `expected_step` is around 0.6, so there is
+    significantly different behavior when conditioning.
+    """
+    dims = 100
+    target_accept = 0.75
+    scale_diag = tf.linspace(1e-5, 1., dims)
+    _, step_size = self._run_hmc_with_step_size(scale_diag, target_accept,
+                                                precondition=True,
+                                                num_adaptation_steps=2000,
+                                                num_results=1)
+
+    expected_step = self._calculate_expected_step_size(
+        tf.ones(dims), target_accept)
+
+    self.assertAllClose(step_size[-1], expected_step, atol=0.1)
+
+  def test_std_close_default(self):
+    """Test that sampling gets close to the right posterior.
+    """
+    target_accept = 0.75
+    scale_diag = tf.constant([1.])
+    draws, _ = self._run_hmc_with_step_size(scale_diag, target_accept,
+                                            precondition=False,
+                                            num_adaptation_steps=500,
+                                            num_results=2000)
+
     self.assertAllClose(
-        preconditioned_step_size, preconditioned_expected_step, atol=0.1)
+        tf.math.reduce_std(draws, axis=0),
+        scale_diag,
+        rtol=0.05)
+
+  def test_std_close_explicit(self):
+    """Test that sampling gets close to the right posterior.
+    """
+    target_accept = 0.75
+    scale_diag = tf.constant([10.])
+    draws, _ = self._run_hmc_with_step_size(scale_diag, target_accept,
+                                            precondition=True,
+                                            num_adaptation_steps=500,
+                                            num_results=2000)
+
     self.assertAllClose(
-        unpreconditioned_step_size, unpreconditioned_expected_step, atol=0.001)
+        tf.math.reduce_std(draws, axis=0),
+        scale_diag,
+        rtol=0.05)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -178,6 +224,8 @@ class PreconditionedHMCTest(test_util.TestCase):
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 50.)
 
   def test_tril(self, use_default):
+    if tf.executing_eagerly():
+      self.skipTest('b/169882656 Too many warnings are issued in eager logs')
     cov = 0.9 * tf.ones([3, 3]) + 0.1 * tf.eye(3)
     scale = tf.linalg.cholesky(cov)
     mv_tril = tfd.MultivariateNormalTriL(loc=[1., 2., 3.],
@@ -206,11 +254,11 @@ class PreconditionedHMCTest(test_util.TestCase):
     if not use_default:
       self.assertAllClose(ess, tf.fill([3], 100.))
     else:
-      self.assertLess(self.evaluate(tf.reduce_min(ess)), 50.)
+      self.assertLess(self.evaluate(tf.reduce_min(ess)), 60.)
 
   def test_transform(self, use_default):
     mvn = tfd.MultivariateNormalDiag(loc=[1., 2., 3.], scale_diag=[1., 1., 1.])
-    diag_covariance = tf.constant([0.1, 1., 10.])
+    diag_variance = tf.constant([0.1, 1., 10.])
 
     if use_default:
       momentum_distribution = None
@@ -218,7 +266,7 @@ class PreconditionedHMCTest(test_util.TestCase):
       momentum_distribution = tfd_e.MultivariateNormalInverseScaleLinearOperator(
           tf.zeros(3),
           inverse_scale=tf.linalg.LinearOperatorDiag(
-              tf.math.sqrt(diag_covariance)))
+              tf.math.sqrt(diag_variance)))
     hmc_kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
         target_log_prob_fn=mvn.log_prob,
         momentum_distribution=momentum_distribution,
@@ -226,7 +274,7 @@ class PreconditionedHMCTest(test_util.TestCase):
         num_leapfrog_steps=10)
 
     transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
-        hmc_kernel, bijector=tfb.Scale(tf.math.rsqrt(diag_covariance)))
+        hmc_kernel, bijector=tfb.Scale(tf.math.rsqrt(diag_variance)))
 
     draws = tfp.mcmc.sample_chain(
         110,
