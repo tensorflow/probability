@@ -291,23 +291,34 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   See also the review paper [1].
 
   The `K` replicas are parameterized in terms of `inverse_temperature`'s,
-  `(beta[0], beta[1], ..., beta[K-1])`.  If the target distribution has
-  probability density `p(x)`, the `kth` replica has density `p(x)**beta_k`.
+  `(beta[0], beta[1], ..., beta[K-1])`.  If `target_log_prob(x) = log[f(x)]`,
+  the `kth` replica samples from a "tempered" distribution with density
 
-  Typically `beta[0] = 1.0`, and `1.0 > beta[1] > beta[2] > ... > 0.0`.
-  Trying geometrically decaying `beta` is good starting point.
+  * `f(x)**beta_k`, if `untempered_log_prob_fn is None` (the default).
+  * `f(x)**beta_k * g(x)`, if `untempered_log_prob_fn(x) = log[g(x)]`.
 
-  * `beta[0] == 1` ==> First replicas samples from the target density, `p`.
+  In the case `untempered_log_prob_fn = None`, geometrically decaying `beta`
+  often works well.  That is, with `R < 1`, we recommend trying (see [2])
+  `beta[k] = R^k` so that `1.0 = beta[0] > beta[1] > ... > 0`.
+
+  The case `untempered_log_prob_fn(x) = log[g(x)]` allows for `beta[-1] = 0`, in
+  which case the highest temperature replica is sampling from `g(x)`.
+  In a Bayesian setup, `g(x)` will often be the prior.
+
+  In all cases,
+
+  * `beta[0] == 1` ==> First replicas samples from the target density.
   * `beta[k] < 1`, for `k = 1, ..., K-1` ==> Other replicas sample from
-    "flattened" versions of `p` (peak is less high, valley less low).  These
-    distributions are somewhat closer to a uniform on the support of `p`.
+    "tempered" versions of target (peak is less high, valley less low).  These
+    distributions should allow easier exploration of separated modes.
 
   By default, samples from adjacent replicas `i`, `i + 1` are used as proposals
   for each other in a Metropolis step.  This allows the lower `beta` samples,
   which explore less dense areas of `p`, to eventually swap state with the
   `beta == 1` chain, allowing it to explore these new regions.
 
-  Samples from replica 0 are returned, and the others are discarded.
+  Samples from replica 0 are returned, and the others are discarded, unless
+  `state_includes_replicas is True`.
 
   #### Examples
 
@@ -414,6 +425,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   [1]: David J. Earl, Michael W. Deem
        Parallel Tempering: Theory, Applications, and New Perspectives
        https://arxiv.org/abs/physics/0508111
+  [2]: David A. Kofke
+       On the acceptance probability of replica-exchange Monte Carlo trials.
+       J. of Chem. Phys. Vol. 117 No. 5.
   """
 
   @deprecation.deprecated_args(
@@ -425,6 +439,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                make_kernel_fn,
                swap_proposal_fn=default_swap_proposal_fn(1.),
                state_includes_replicas=False,
+               untempered_log_prob_fn=None,
                seed=None,
                validate_args=False,
                name=None):
@@ -450,6 +465,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         of each state sample should index replicas. If `True`, the leftmost
         dimension of the `current_state` kwarg to `tfp.mcmc.sample_chain` will
         be interpreted as indexing replicas.
+      untempered_log_prob_fn: Optional Python callable with same signature as
+        `target_log_prob_fn`. If provided, the log prob function used with
+        inverse temperature beta is:
+        `beta * target_log_prob_fn(x) + untempered_log_prob_fn(x)`.
       seed: Python integer to seed the random number generator. Deprecated, pass
         seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       validate_args: Python `bool`, default `False`. When `True` distribution
@@ -469,6 +488,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   @property
   def target_log_prob_fn(self):
     return self._parameters['target_log_prob_fn']
+
+  @property
+  def untempered_log_prob_fn(self):
+    return self._parameters['untempered_log_prob_fn']
 
   @property
   def inverse_temperatures(self):
@@ -553,7 +576,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
           self.target_log_prob_fn,
-          inverse_temperatures)
+          inverse_temperatures,
+          self.untempered_log_prob_fn,
+      )
       # Seed handling complexity is due to users possibly expecting an old-style
       # stateful seed to be passed to `self.make_kernel_fn`, and no seed
       # expected by `kernel.one_step`.
@@ -652,9 +677,28 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                                             self.validate_args)
 
       # Un-temper the log probs.  E.g., for replica k, at point x_k, this is
-      # Log[p(x_k)], and *not* Log[p_x(x_k)] = Log[p(x_k)] * beta_k.
-      untempered_pre_swap_replica_target_log_prob = (
-          pre_swap_replica_target_log_prob / inverse_temperatures)
+      # log[p(x_k)], and *not* log[p_x(x_k)] = log[p(x_k)] * beta_k.
+      if self.untempered_log_prob_fn is None:
+        untempered_energy_ignoring_ulp = (
+            pre_swap_replica_target_log_prob / inverse_temperatures)
+      else:
+        # Let T = target_log_prob_fn(x), U = untempered_log_prob_fn(x),
+        # then pre_swap_replica_target_log_prob(x) = beta * T + U
+        # To untemper this, we do:
+        #   (beta * T + U - U) / beta = T. Note this removes U, but...
+        # The untempered_log_prob_fn does not factor into the acceptance ratio.
+        # Proof: Suppose the tempered target is
+        #   p_k(x) = f(x)^{beta_k} g(x),
+        # So f(x) is tempered, and g(x) is not.  Then, the acceptance ratio for
+        # a 1 <--> 2 swap is...
+        #   (p_1(x_2) p_2(x_1)) / (p_1(x_1) p_2(x_2))
+        # which depends only on f(x), since terms involving g(x) cancel.
+        pre_swap_ulp = self.untempered_log_prob_fn(*pre_swap_replica_states)
+        untempered_energy_ignoring_ulp = (
+            # divide_no_nan(X, 0) = 0, and does not propagate NaN's in grads.
+            tf.math.divide_no_nan(
+                pre_swap_replica_target_log_prob - pre_swap_ulp,
+                inverse_temperatures))
 
       # Since `swaps` is its own inverse permutation we automatically know the
       # swap counterpart: range(num_replica). We use this idea to compute the
@@ -666,10 +710,13 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       # Note: diffs would normally be "proposed - current" however energy is
       # flipped since `energy == -log_prob`.
+      # Note: The untempered_log_prob_fn (if provided) is not included in
+      # untempered_pre_swap_replica_target_log_prob, and hence does not factor
+      # into energy_diff. Why? Because, it cancels out in the acceptance ratio.
       energy_diff = (
-          untempered_pre_swap_replica_target_log_prob -
+          untempered_energy_ignoring_ulp -
           mcmc_util.index_remapping_gather(
-              untempered_pre_swap_replica_target_log_prob,
+              untempered_energy_ignoring_ulp,
               swaps, name='gather_swap_tlp'))
       swapped_inverse_temperatures = mcmc_util.index_remapping_gather(
           inverse_temperatures, swaps, name='gather_swap_temps')
@@ -684,7 +731,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           tf.math.is_finite(log_accept_ratio),
           log_accept_ratio, tf.constant(-np.inf, dtype=dtype))
 
-      # Produce Log[Uniform] draws that are identical at swapped indices.
+      # Produce log[Uniform] draws that are identical at swapped indices.
       log_uniform = tf.math.log(
           samplers.uniform(shape=replica_and_batch_shape,
                            dtype=dtype,
@@ -727,12 +774,22 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       else:
         post_swap_states = [s[0] for s in post_swap_replica_states]
 
-      post_swap_replica_results = _make_post_swap_replica_results(
-          pre_swap_replica_results,
-          inverse_temperatures,
-          swapped_inverse_temperatures,
-          is_swap_accepted_mask,
-          _swap_tensor)
+      if self.untempered_log_prob_fn is None:
+        # Swap around the log prob/grads to avoid re-computation.
+        # This amounts to dividing by beta in the right places.
+        post_swap_replica_results = _make_post_swap_replica_results(
+            pre_swap_replica_results,
+            inverse_temperatures,
+            swapped_inverse_temperatures,
+            is_swap_accepted_mask,
+            _swap_tensor,
+        )
+      else:
+        # If self.untempered_log_prob_fn, then we're allowed to use beta=0. In
+        # this case, we cannot efficiently divide by beta...in fact there is a
+        # loss of information because the target log prob was multiplied by 0.
+        post_swap_replica_results = inner_kernel.bootstrap_results(
+            post_swap_replica_states)
 
       if mcmc_util.is_list_like(current_state):
         # We *always* canonicalize the states in the kernel results.
@@ -851,13 +908,19 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           tf.eye(num_replica, batch_shape=batch_shape, dtype=tf.bool),
           shift=2)
 
-      post_swap_replica_results = _make_post_swap_replica_results(
-          replica_results,
-          inverse_temperatures,
-          inverse_temperatures,
-          is_swap_accepted[0],
-          lambda x: x,
-      )
+      if self.untempered_log_prob_fn is None:
+        # This call imputes NaN in places where we cannot "make post swap".
+        post_swap_replica_results = _make_post_swap_replica_results(
+            replica_results,
+            inverse_temperatures,
+            inverse_temperatures,
+            is_swap_accepted[0],
+            lambda x: x,
+        )
+      else:
+        # _make_post_swap_replica_results doesn't work in this case.
+        # See usage of _make_post_swap_replica_results in one_step for more.
+        post_swap_replica_results = replica_results
 
       return ReplicaExchangeMCKernelResults(
           post_swap_replica_states=replica_states,
@@ -874,12 +937,19 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       )
 
 
-def _make_replica_target_log_prob_fn(target_log_prob_fn, inverse_temperatures):
+def _make_replica_target_log_prob_fn(
+    target_log_prob_fn,
+    inverse_temperatures,
+    untempered_log_prob_fn=None,
+):
   """Helper which creates inner kernel target_log_prob_fn."""
   def _replica_target_log_prob(*x):
     tlp = target_log_prob_fn(*x)
-    return tf.cast(mcmc_util.left_justified_expand_dims_like(
+    log_prob = tf.cast(mcmc_util.left_justified_expand_dims_like(
         inverse_temperatures, tlp), dtype=tlp.dtype) * tlp
+    if untempered_log_prob_fn is not None:
+      log_prob += untempered_log_prob_fn(*x)
+    return log_prob
   return _replica_target_log_prob
 
 
