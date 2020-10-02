@@ -179,8 +179,7 @@ class UnzipTrace(jax_core.Trace):
     if isinstance(pv, jax_core.AbstractValue):
       return tracer
     elif not pv:
-      if (isinstance(const, tuple(jax_core.literalable_types)) and
-          not onp.shape(const)):
+      if type(const) in jax_core.literalable_types and not onp.shape(const):  # pylint: disable=unidiomatic-typecheck
         return self.new_instantiated_literal(const)
       else:
         return self.new_instantiated_const(const)
