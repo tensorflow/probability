@@ -49,8 +49,12 @@ def _random_poisson_cpu(
     if rates is None:
       rates = tf.math.exp(log_rates)
     shape = tf.concat([shape, tf.shape(rates)], axis=0)
-    return tf.random.stateless_poisson(
+    samples = tf.random.stateless_poisson(
         shape=shape, seed=seed, lam=rates, dtype=output_dtype)
+    # b/169426647: The underlying sampler returns `nan` for Poissons with
+    # infinite rates, but the right answer is `+inf`.
+    return tf.where(
+        rates >= np.inf, tf.constant(np.inf, dtype=output_dtype), samples)
 
 
 def _random_poisson_noncpu(

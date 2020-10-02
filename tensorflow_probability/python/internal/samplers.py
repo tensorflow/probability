@@ -198,8 +198,13 @@ def poisson(
     seed = sanitize_seed(seed)
     lam_shape = ps.shape(lam)
     sample_shape = ps.concat([shape, lam_shape], axis=0)
-    return tf.random.stateless_poisson(
+    samples = tf.random.stateless_poisson(
         shape=sample_shape, seed=seed, lam=lam, dtype=dtype)
+    # b/169426647: The underlying sampler returns `nan` for Poissons with
+    # infinite rates, but the right answer is `+inf`.
+    return tf.where(
+        tf.convert_to_tensor(lam) >= np.inf,
+        tf.constant(np.inf, dtype=dtype), samples)
 
 
 def shuffle(

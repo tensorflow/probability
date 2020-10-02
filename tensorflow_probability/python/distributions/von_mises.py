@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 
 __all__ = ['VonMises']
@@ -543,13 +544,14 @@ def _von_mises_sample_no_gradient(shape, concentration, seed):
 
   s = tf.where(concentration > s_concentration_cutoff, s_exact, s_approximate)
 
-  def loop_body(done, u, w, seed):
+  def loop_body(done, u_in, w, seed):
     """Resample the non-accepted points."""
     # We resample u each time completely. Only its sign is used outside the
     # loop, which is random.
     u_seed, v_seed, next_seed = samplers.split_seed(seed, n=3)
     u = samplers.uniform(
         shape, minval=-1., maxval=1., dtype=concentration.dtype, seed=u_seed)
+    tensorshape_util.set_shape(u, u_in.shape)
     z = tf.cos(np.pi * u)
     # Update the non-accepted points.
     w = tf.where(done, w, (1. + s * z) / (s + z))

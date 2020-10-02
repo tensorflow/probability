@@ -323,7 +323,7 @@ class GammaTest(test_util.TestCase):
     gamma = tfd.Gamma([1., 2.], 0., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
-    self.assertAllNan(samples)
+    self.assertAllPositiveInf(samples)
 
     gamma = tfd.Gamma([1., 2.], -1., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))

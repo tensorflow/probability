@@ -433,9 +433,14 @@ def _random_gamma_cpu(
         tf.zeros((), dtype=samples.dtype))
     samples += (conc_lt_one_fix - log_rate)
 
+  # 0 rate is infinite scale, which implies a +inf sample.
+  # `if log_space` clobbered the `rate` variable with 1 a score lines ago.
   return tf.where(
-      bad_rate | bad_concentration,
-      dtype_util.as_numpy_dtype(concentration.dtype)(np.nan), samples)
+      (log_rate <= -np.inf if log_space else tf.equal(rate, 0.)),
+      tf.constant(np.inf, dtype=concentration.dtype),
+      tf.where(
+          bad_rate | bad_concentration,
+          dtype_util.as_numpy_dtype(concentration.dtype)(np.nan), samples))
 
 
 def _random_gamma_noncpu(
@@ -797,10 +802,10 @@ def _random_gamma_rejection(
 
   if log_space:
     if log_rate is None:
-      log_rate = tf.math.log(tf.where(rate > 0., rate, np.nan))
+      log_rate = tf.math.log(tf.where(rate >= 0., rate, np.nan))
     return concentration_samples - log_rate
   else:
     if rate is None:
       rate = tf.math.exp(log_rate)
-    corrected_rate = tf.where(rate > 0., rate, np.nan)  # log_rate=-inf case
+    corrected_rate = tf.where(rate >= 0., rate, np.nan)
     return _fix_zero_samples(concentration_samples / corrected_rate)

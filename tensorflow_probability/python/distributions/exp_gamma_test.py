@@ -237,7 +237,7 @@ class ExpGammaTest(test_util.TestCase):
     d = tfd.ExpGamma([1., 2.], 0., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
-    self.assertAllNan(samples)
+    self.assertAllPositiveInf(samples)
 
     d = tfd.ExpGamma([1., 2.], -1., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))

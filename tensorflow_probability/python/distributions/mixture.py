@@ -338,7 +338,11 @@ class Mixture(distribution.Distribution):
       mask = distribution_util.pad_mixture_dimensions(
           mask, self, self._cat,
           tensorshape_util.rank(self._static_event_shape))  # [n, B, k, [1]*e]
-      return tf.reduce_sum(x * mask, axis=stack_axis)  # [n, B, E]
+      if x.dtype.is_floating:
+        masked = tf.math.multiply_no_nan(x, mask)
+      else:
+        masked = x * mask
+      return tf.reduce_sum(masked, axis=stack_axis)  # [n, B, E]
 
     n = tf.convert_to_tensor(n, name='n')
     static_n = tf.get_static_value(n)

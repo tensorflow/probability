@@ -52,6 +52,11 @@ WORKING_PRECISION_TEST_BLOCK_LIST = (
 )
 
 
+NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST = (
+    'ContinuousBernoulli',  # b/169321398
+    'TransformedDistribution',  # Bijectors may introduce nans
+)
+
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
 # instantiation (per `instantiable_base_dists`, below) also requires
 # `_params_event_ndims`, but some special distributions can be instantiated
@@ -148,6 +153,30 @@ class ReproducibilityTest(test_util.TestCase):
       s1 = self.evaluate(dist.sample(50, seed=seed))
       s2 = self.evaluate(dist.sample(50, seed=seed))
     self.assertAllEqual(s1, s2)
+
+
+@test_util.test_all_tf_execution_regimes
+class NoNansInSampleTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    if dist_name in NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST:
+      self.skipTest('{} is blocked'.format(dist_name))
+    def eligibility_filter(name):
+      return name not in NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        eligibility_filter=eligibility_filter))
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
+    seed = test_util.test_seed(sampler_type='stateless')
+    with tfp_hps.no_tf_rank_errors():
+      s1 = self.evaluate(dist.sample(20, seed=seed))
+    self.assertAllEqual(np.zeros_like(s1), np.isnan(s1))
 
 
 @test_util.test_all_tf_execution_regimes

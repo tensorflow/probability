@@ -55,6 +55,20 @@ class _VonMisesTest(object):
       self.assertEqual(tf.TensorShape([5]), von_mises.batch_shape)
     self.assertEqual(tf.TensorShape([]), von_mises.event_shape)
 
+    # Let's also make sure that shape information propagates through sampling as
+    # expected.
+    samples = von_mises.sample(self.make_tensor(7), seed=test_util.test_seed())
+    if tf.executing_eagerly():
+      self.assertEqual(tf.TensorShape([7, 5]), samples.shape)
+    elif self.use_static_shape:
+      # n is a placeholder, therefore its value is statically unknown, even
+      # though its shape is
+      self.assertIsNone(samples.shape.as_list()[0])
+      self.assertEqual(5, samples.shape[1])
+    else:
+      self.assertEqual(tf.TensorShape(None), samples.shape)
+    self.assertEqual(tf.TensorShape([7, 5]), self.evaluate(samples).shape)
+
   def testInvalidConcentration(self):
     with self.assertRaisesOpError(
         'Argument `concentration` must be non-negative'):
