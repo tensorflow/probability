@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for inference_gym.targets.stochastic_volatility."""
+"""Tests for inference_gym.targets.brownian_motion."""
 
 import functools
 import numpy as np

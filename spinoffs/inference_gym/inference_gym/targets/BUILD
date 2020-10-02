@@ -41,6 +41,7 @@ py_library(
         ":item_response_theory",
         ":log_gaussian_cox_process",
         ":logistic_regression",
+        ":lorenz_system",
         ":model",
         ":neals_funnel",
         ":non_identifiable_quartic",
@@ -264,6 +265,35 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        "//inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "lorenz_system",
+    srcs = ["lorenz_system.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # numpy dep,
+        "//inference_gym/internal:data",
+        "//inference_gym/targets/ground_truth:convection_lorenz_bridge",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "lorenz_system_test",
+    size = "large",
+    srcs = ["lorenz_system_test.py"],
+    python_version = "PY3",
+    shard_count = 3,
+    srcs_version = "PY3",
+    deps = [
+        ":lorenz_system",
+        # numpy dep,
+        # tensorflow dep,
         "//inference_gym/internal:test_util",
     ],
 )

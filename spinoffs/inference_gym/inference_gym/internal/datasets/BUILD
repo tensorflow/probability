@@ -33,6 +33,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":brownian_motion_missing_middle_observations",
+        ":convection_lorenz_bridge",
         ":sp500_closing_prices",
         ":synthetic_item_response_theory",
         ":synthetic_log_gaussian_cox_process",
@@ -73,6 +74,16 @@ py_library(
 py_library(
     name = "synthetic_log_gaussian_cox_process",
     srcs = ["synthetic_log_gaussian_cox_process.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "convection_lorenz_bridge",
+    srcs = ["convection_lorenz_bridge.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,

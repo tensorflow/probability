@@ -38,6 +38,26 @@ py_library(
 
 # pytype_strict
 py_library(
+    name = "convection_lorenz_bridge",
+    srcs = ["convection_lorenz_bridge.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "eight_schools",
+    srcs = ["eight_schools.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
     name = "german_credit_numeric_logistic_regression",
     srcs = ["german_credit_numeric_logistic_regression.py"],
     srcs_version = "PY3",
@@ -110,16 +130,6 @@ py_library(
 py_library(
     name = "stochastic_volatility_sp500_small",
     srcs = ["stochastic_volatility_sp500_small.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-    ],
-)
-
-# pytype_strict
-py_library(
-    name = "eight_schools",
-    srcs = ["eight_schools.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,

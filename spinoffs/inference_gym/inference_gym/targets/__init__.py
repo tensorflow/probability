@@ -29,6 +29,8 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.log_gaussian_cox_process import SyntheticLogGaussianCoxProcess
   from inference_gym.targets.logistic_regression import GermanCreditNumericLogisticRegression
   from inference_gym.targets.logistic_regression import LogisticRegression
+  from inference_gym.targets.lorenz_system import ConvectionLorenzBridge
+  from inference_gym.targets.lorenz_system import LorenzSystem
   from inference_gym.targets.model import Model
   from inference_gym.targets.neals_funnel import NealsFunnel
   from inference_gym.targets.non_identifiable_quartic import NonIdentifiableQuarticMeasurementModel
@@ -51,6 +53,7 @@ __all__ = [
     'BayesianModel',
     'BrownianMotion',
     'BrownianMotionMissingMiddleObservations',
+    'ConvectionLorenzBridge',
     'EightSchools',
     'GermanCreditNumericLogisticRegression',
     'GermanCreditNumericProbitRegression',
@@ -59,6 +62,7 @@ __all__ = [
     'ItemResponseTheory',
     'LogGaussianCoxProcess',
     'LogisticRegression',
+    'LorenzSystem',
     'Model',
     'NealsFunnel',
     'NonIdentifiableQuarticMeasurementModel',

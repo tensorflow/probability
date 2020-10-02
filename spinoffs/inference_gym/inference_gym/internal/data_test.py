@@ -69,6 +69,10 @@ class DataTest(test_util.InferenceGymTestCase):
     dataset = data.brownian_motion_missing_middle_observations()
     self.assertEqual((30,), dataset['locs'].shape)
 
+  def testLorenzModel(self):
+    dataset = data.convection_lorenz_bridge()
+    self.assertEqual((30,), dataset['observed_values'].shape)
+
   @test_util.uses_tfds
   def testRadon(self):
     dataset = data.radon(train_fraction=0.75)

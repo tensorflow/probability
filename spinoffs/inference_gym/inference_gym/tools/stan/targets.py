@@ -21,6 +21,7 @@ from inference_gym.tools.stan import eight_schools as eight_schools_lib
 from inference_gym.tools.stan import item_response_theory
 from inference_gym.tools.stan import log_gaussian_cox_process
 from inference_gym.tools.stan import logistic_regression
+from inference_gym.tools.stan import lorenz_system
 from inference_gym.tools.stan import probit_regression
 from inference_gym.tools.stan import radon_contextual_effects
 from inference_gym.tools.stan import sparse_logistic_regression
@@ -28,6 +29,7 @@ from inference_gym.tools.stan import stochastic_volatility
 
 __all__ = [
     'brownian_motion_missing_middle_observations',
+    'convection_lorenz_bridge',
     'eight_schools',
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
@@ -48,6 +50,16 @@ def brownian_motion_missing_middle_observations():
   """
   dataset = data.brownian_motion_missing_middle_observations()
   return brownian_motion.brownian_motion(**dataset)
+
+
+def convection_lorenz_bridge():
+  """Lorenz System with observed convection and missing observations.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.convection_lorenz_bridge()
+  return lorenz_system.partially_observed_lorenz_system(**dataset)
 
 
 def eight_schools():

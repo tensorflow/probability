@@ -77,6 +77,17 @@ py_library(
 )
 
 py_library(
+    name = "lorenz_system",
+    srcs = ["lorenz_system.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+        # numpy dep,
+    ],
+)
+
+py_library(
     name = "radon_contextual_effects",
     srcs = ["radon_contextual_effects.py"],
     srcs_version = "PY3",
