@@ -54,6 +54,7 @@ WORKING_PRECISION_TEST_BLOCK_LIST = (
 
 NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST = (
     'ContinuousBernoulli',  # b/169321398
+    'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
     'TransformedDistribution',  # Bijectors may introduce nans
 )
 

@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -239,6 +240,8 @@ class Zipf(distribution.Distribution):
           maxval=maxval_u,
           dtype=power.dtype,
           seed=u_seed)
+      # set_shape needed here because of b/139013403
+      tensorshape_util.set_shape(u, should_continue.shape)
 
       # Sample the point X from the continuous density h(x) \propto x^(-power).
       x = self._hat_integral_inverse(u, power=power)
