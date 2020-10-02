@@ -15,7 +15,8 @@
 """Gibbs sampling inference for (a special case of) STS models.
 
 These methods implement Gibbs sampling steps for STS models that combine a
-single LocalLevel component with a linear regression component, with conjugate
+single LocalLevel or LocalLinearTrend component with a linear regression
+component, with conjugate
 InverseGamma priors on the scale and a Gaussian prior on the weights. This model
 class is somewhat general, in that we assume that any seasonal/holiday variation
 can be encoded in the design matrix of the linear regression. The intent is to
@@ -84,8 +85,18 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 # behaves properly -- i.e., that the state contains all model
 # parameters *in the same order* as they are listed in `model.parameters`. This
 # is currently enforced by construction in `build_gibbs_fittable_model`.
-GibbsSamplerState = collections.namedtuple('GibbsSamplerState', [
-    'observation_noise_scale', 'level_scale', 'weights', 'level', 'seed'])
+GibbsSamplerState = collections.namedtuple(  # pylint: disable=unexpected-keyword-arg
+    'GibbsSamplerState',
+    ['observation_noise_scale',
+     'level_scale',
+     'weights',
+     'level',
+     'seed',
+     'slope_scale',
+     'slope',])
+# Make the two slope-related quantities optional, for backwards compatibility.
+GibbsSamplerState.__new__.__defaults__ = (0.,  # slope_scale
+                                          0.)  # slope
 
 
 # TODO(b/151571025): revert to `tfd.InverseGamma` once its sampler is XLA-able.
@@ -101,14 +112,16 @@ def build_model_for_gibbs_fitting(observed_time_series,
                                   design_matrix,
                                   weights_prior,
                                   level_variance_prior,
-                                  observation_noise_variance_prior):
+                                  observation_noise_variance_prior,
+                                  slope_variance_prior=None):
   """Builds a StructuralTimeSeries model instance that supports Gibbs sampling.
 
   To support Gibbs sampling, a model must have have conjugate priors on all
   scale and weight parameters, and must be constructed so that
   `model.parameters` matches the parameters and ordering specified by the
   the `GibbsSamplerState` namedtuple. Currently, this includes (only) models
-  consisting of the sum of a LocalLevel and a LinearRegression component.
+  consisting of the sum of a LocalLevel or LocalLinearTrend component with
+  a LinearRegression component.
 
   Args:
     observed_time_series: optional `float` `Tensor` of shape [..., T, 1]`
@@ -129,6 +142,12 @@ def build_model_for_gibbs_fitting(observed_time_series,
       representing a prior on the observation noise variance (
       `observation_noise_scale**2`). May have batch shape broadcastable to the
       batch shape of `observed_time_series`.
+    slope_variance_prior: Optional instance of `tfd.InverseGamma` representing
+      a prior on slope variance (`slope_scale**2`) of a local linear trend
+      model. May have batch shape broadcastable to the batch shape of
+      `observed_time_series`. If specified, a local linear trend model is used
+      rather than a local level model.
+      Default value: `None`.
   Returns:
     model: A `tfp.sts.StructuralTimeSeries` model instance.
   """
@@ -137,18 +156,32 @@ def build_model_for_gibbs_fitting(observed_time_series,
   if not isinstance(level_variance_prior, tfd.InverseGamma):
     raise ValueError(
         'Level variance prior must be an inverse gamma distribution.')
+  if (slope_variance_prior is not None and
+      not isinstance(slope_variance_prior, tfd.InverseGamma)):
+    raise ValueError(
+        'Slope variance prior must be an inverse gamma distribution; got: {}.'
+        .format(slope_variance_prior))
   if not isinstance(observation_noise_variance_prior, tfd.InverseGamma):
     raise ValueError('Observation noise variance prior must be an inverse '
                      'gamma distribution.')
 
   sqrt = tfb.Invert(tfb.Square())  # Converts variance priors to scale priors.
-  local_level = sts.LocalLevel(observed_time_series=observed_time_series,
-                               level_scale_prior=sqrt(level_variance_prior),
-                               name='local_level')
+
+  if slope_variance_prior:
+    local_variation = sts.LocalLinearTrend(
+        observed_time_series=observed_time_series,
+        level_scale_prior=sqrt(level_variance_prior),
+        slope_scale_prior=sqrt(slope_variance_prior),
+        name='local_linear_trend')
+  else:
+    local_variation = sts.LocalLevel(
+        observed_time_series=observed_time_series,
+        level_scale_prior=sqrt(level_variance_prior),
+        name='local_level')
   regression = sts.LinearRegression(design_matrix=design_matrix,
                                     weights_prior=weights_prior,
                                     name='regression')
-  model = sts.Sum([local_level, regression],
+  model = sts.Sum([local_variation, regression],
                   observed_time_series=observed_time_series,
                   observation_noise_scale_prior=sqrt(
                       observation_noise_variance_prior),
@@ -196,16 +229,26 @@ def fit_with_gibbs_sampling(model,
   # describe scalar time series only. For our purposes it'll be cleaner to
   # remove this dimension.
   observed_time_series = observed_time_series[..., 0]
-
   batch_shape = prefer_static.shape(observed_time_series)[:-1]
+
+  # Treat a LocalLevel model as the special case of LocalLinearTrend where
+  # the slope_scale is always zero.
+  initial_slope_scale = 0.
+  initial_slope = 0.
+  if isinstance(model.components[0], sts.LocalLinearTrend):
+    initial_slope_scale = 1. * tf.ones(batch_shape, dtype=dtype)
+    initial_slope = tf.zeros_like(observed_time_series)
+
   if initial_state is None:
     initial_state = GibbsSamplerState(
         observation_noise_scale=tf.ones(batch_shape, dtype=dtype),
         level_scale=tf.ones(batch_shape, dtype=dtype),
+        slope_scale=initial_slope_scale,
         weights=tf.zeros(prefer_static.concat([
             batch_shape,
             _get_design_matrix(model).shape[-1:]], axis=0), dtype=dtype),
         level=tf.zeros_like(observed_time_series),
+        slope=initial_slope,
         seed=None)  # Set below.
 
   if isinstance(seed, six.integer_types):
@@ -283,20 +326,38 @@ def one_step_predictive(model,
   thinned_samples = tf.nest.map_structure(lambda x: x[::thin_every],
                                           posterior_samples)
 
-  # The local level model expects that the level at step t+1 is equal
-  # to the level at step t (plus transition noise of scale 'level_scale', which
-  # we account for below).
+  if prefer_static.rank_from_shape(  # If no slope was inferred, treat as zero.
+      prefer_static.shape(thinned_samples.slope)) <= 1:
+    thinned_samples = thinned_samples._replace(
+        slope=tf.zeros_like(thinned_samples.level),
+        slope_scale=tf.zeros_like(thinned_samples.level_scale))
+
+  num_steps_from_last_observation = tf.concat([
+      tf.ones([num_observed_steps], dtype=dtype),
+      tf.range(1, num_forecast_steps + 1, dtype=dtype)], axis=0)
+
+  # The local linear trend model expects that the level at step t + 1 is equal
+  # to the level at step t, plus the slope at time t - 1,
+  # plus transition noise of scale 'level_scale' (which we account for below).
   if num_forecast_steps > 0:
     num_batch_dims = prefer_static.rank_from_shape(
         prefer_static.shape(thinned_samples.level)) - 2
+    # All else equal, the current level will remain stationary.
     forecast_level = tf.tile(thinned_samples.level[..., -1:],
                              tf.concat([tf.ones([num_batch_dims + 1],
                                                 dtype=tf.int32),
                                         [num_forecast_steps]], axis=0))
+    # If the model includes slope, the level will steadily increase.
+    forecast_level += (thinned_samples.slope[..., -1:] *
+                       tf.range(1., num_forecast_steps + 1.,
+                                dtype=forecast_level.dtype))
+
   level_pred = tf.concat([thinned_samples.level[..., :1],  # t == 0
-                          thinned_samples.level[..., :-1]  # 1 <= t < T
-                         ] + ([forecast_level] if num_forecast_steps > 0
-                              else []),
+                          (thinned_samples.level[..., :-1] +
+                           thinned_samples.slope[..., :-1])  # 1 <= t < T
+                         ] + (
+                             [forecast_level]
+                             if num_forecast_steps > 0 else []),
                          axis=-1)
 
   design_matrix = _get_design_matrix(
@@ -306,13 +367,36 @@ def one_step_predictive(model,
   y_mean = ((level_pred + regression_effect) *
             original_scale[..., tf.newaxis] + original_mean[..., tf.newaxis])
 
-  num_steps_from_last_observation = tf.concat([
-      tf.ones([num_observed_steps], dtype=dtype),
-      tf.range(1, num_forecast_steps + 1, dtype=dtype)], axis=0)
+  # To derive a forecast variance, including slope uncertainty, let
+  #  `r[:k]` be iid Gaussian RVs with variance `level_scale**2` and `s[:k]` be
+  # iid Gaussian RVs with variance `slope_scale**2`. Then the forecast level at
+  # step `T + k` can be written as
+  #   (level[T] +           # Last known level.
+  #    r[0] + ... + r[k] +  # Sum of random walk terms on level.
+  #    slope[T] * k         # Contribution from last known slope.
+  #    (k - 1) * s[0] +     # Contributions from random walk terms on slope.
+  #    (k - 2) * s[1] +
+  #    ... +
+  #    1 * s[k - 1])
+  # which has variance of
+  #  (level_scale**2 * k +
+  #   slope_scale**2 * ( (k - 1)**2 +
+  #                      (k - 2)**2 +
+  #                      ... + 1 ))
+  # Here the `slope_scale` coefficient is the `k - 1`th square pyramidal
+  # number [1], which is given by
+  #  (k - 1) * k * (2 * k - 1) / 6.
+  #
+  # [1] https://en.wikipedia.org/wiki/Square_pyramidal_number
+  variance_from_level = (thinned_samples.level_scale[..., tf.newaxis]**2 *
+                         num_steps_from_last_observation)
+  variance_from_slope = thinned_samples.slope_scale[..., tf.newaxis]**2 * (
+      (num_steps_from_last_observation - 1) *
+      num_steps_from_last_observation *
+      (2 * num_steps_from_last_observation - 1)) / 6.
   y_scale = (original_scale * tf.sqrt(
       thinned_samples.observation_noise_scale[..., tf.newaxis]**2 +
-      thinned_samples.level_scale[..., tf.newaxis]**2 *
-      num_steps_from_last_observation))
+      variance_from_level + variance_from_slope))
 
   num_posterior_draws = prefer_static.shape(y_mean)[0]
   return tfd.MixtureSameFamily(
@@ -382,19 +466,19 @@ def _resample_weights(design_matrix, target_residuals, observation_noise_scale,
   return weights_mean + sampled_weights
 
 
-def _resample_level(observed_residuals,
-                    level_scale,
-                    observation_noise_scale,
-                    initial_state_prior,
-                    is_missing=None,
-                    sample_shape=(),
-                    seed=None):
-  """Uses Durbin-Koopman sampling to resample the latent level.
+def _resample_latents(observed_residuals,
+                      level_scale,
+                      observation_noise_scale,
+                      initial_state_prior,
+                      slope_scale=None,
+                      is_missing=None,
+                      sample_shape=(),
+                      seed=None):
+  """Uses Durbin-Koopman sampling to resample the latent level and slope.
 
   Durbin-Koopman sampling [1] is an efficient algorithm to sample from the
   posterior latents of a linear Gaussian state space model. This method
-  implements the algorithm, specialized to the case of a one-dimensional
-  latent local level model.
+  implements the algorithm.
 
   [1] Durbin, J. and Koopman, S.J. (2002) A simple and efficient simulation
       smoother for state space time series analysis.
@@ -407,28 +491,43 @@ def _resample_level(observed_residuals,
     observation_noise_scale: Float scalar `Tensor` (may contain batch
       dimensions) specifying the standard deviation of the observation noise.
     initial_state_prior: instance of `tfd.MultivariateNormalLinearOperator`.
+    slope_scale: Optional float scalar `Tensor` (may contain batch dimensions)
+      specifying the standard deviation of slope random walk steps. If
+      provided, a `LocalLinearTrend` model is used, otherwise, a `LocalLevel`
+      model is used.
     is_missing: Optional `bool` `Tensor` missingness mask.
     sample_shape: Optional `int` `Tensor` shape of samples to draw.
     seed: `int` `Tensor` of shape `[2]` controlling stateless sampling.
   Returns:
-    level: Float `Tensor` resampled latent level, of shape
-      `[..., num_timesteps]`, where `...` concatenates the sample shape
-      with any batch shape from `observed_time_series`.
+    latents: Float `Tensor` resampled latent level, of shape
+      `[..., num_timesteps, latent_size]`, where `...` concatenates the
+      sample shape with any batch shape from `observed_time_series`.
   """
 
   num_timesteps = prefer_static.shape(observed_residuals)[-1]
-  ssm = sts.LocalLevelStateSpaceModel(
-      num_timesteps=num_timesteps,
-      initial_state_prior=initial_state_prior,
-      observation_noise_scale=observation_noise_scale,
-      level_scale=level_scale)
+  if slope_scale is None:
+    ssm = sts.LocalLevelStateSpaceModel(
+        num_timesteps=num_timesteps,
+        initial_state_prior=initial_state_prior,
+        observation_noise_scale=observation_noise_scale,
+        level_scale=level_scale)
+  else:
+    ssm = sts.LocalLinearTrendStateSpaceModel(
+        num_timesteps=num_timesteps,
+        initial_state_prior=initial_state_prior,
+        observation_noise_scale=observation_noise_scale,
+        level_scale=level_scale,
+        slope_scale=slope_scale)
+
   return ssm.posterior_sample(observed_residuals[..., tf.newaxis],
                               sample_shape=sample_shape,
                               mask=is_missing,
-                              seed=seed)[..., 0]
+                              seed=seed)
 
 
-def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
+def _resample_scale(prior, observed_residuals,
+                    is_missing=None,
+                    seed=None):
   """Samples a scale parameter from its conditional posterior.
 
   We assume the conjugate InverseGamma->Normal model:
@@ -465,7 +564,13 @@ def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
       concentration=prior.concentration + num_observations / 2.,
       scale=prior.scale + tf.reduce_sum(
           tf.square(observed_residuals), axis=-1) / 2.)
-  return tf.sqrt(variance_posterior.sample(seed=seed))
+  new_scale = tf.sqrt(variance_posterior.sample(seed=seed))
+
+  # Support truncated priors.
+  if hasattr(prior, 'upper_bound') and prior.upper_bound is not None:
+    new_scale = tf.minimum(new_scale, prior.upper_bound)
+
+  return new_scale
 
 
 def _build_sampler_loop_body(model,
@@ -486,21 +591,32 @@ def _build_sampler_loop_body(model,
       new `GibbsSamplerState`. The second argument (passed by `tf.scan`) is
       ignored.
   """
+  level_component = model.components[0]
+  if not (isinstance(level_component, sts.LocalLevel) or
+          isinstance(level_component, sts.LocalLinearTrend)):
+    raise ValueError('Expected the first model component to be an instance of '
+                     '`tfp.sts.LocalLevel` or `tfp.sts.LocalLinearTrend`; '
+                     'instead saw {}'.format(level_component))
+  model_has_slope = isinstance(level_component, sts.LocalLinearTrend)
 
   # Require that the model has exactly the parameters expected by
   # `GibbsSamplerState`.
-  observation_noise_param, level_scale_param, weights_param = model.parameters
+  if model_has_slope:
+    (observation_noise_param,
+     level_scale_param,
+     slope_scale_param,
+     weights_param) = model.parameters
+  else:
+    (observation_noise_param,
+     level_scale_param,
+     weights_param) = model.parameters
+  # If all non-`slope_scale` parameters are as expected, by process of
+  # elimination `slope_scale` must be correct as well.
   if (('observation_noise' not in observation_noise_param.name) or
       ('level_scale' not in level_scale_param.name) or
       ('weights' not in weights_param.name)):
     raise ValueError('Model parameters {} do not match the expected sampler '
                      'state.'.format(model.parameters))
-
-  level_component = model.components[0]
-  if not isinstance(level_component, sts.LocalLevel):
-    raise ValueError('Expected the first model component to be an instance of '
-                     '`tfp.sts.LocalLevel`; instead saw {}'.format(
-                         level_component))
 
   if is_missing is not None:  # Ensure series does not contain NaNs.
     observed_time_series = tf.where(is_missing,
@@ -512,6 +628,8 @@ def _build_sampler_loop_body(model,
 
   # Untransform scale priors -> variance priors by reaching thru Sqrt bijector.
   level_scale_variance_prior = level_scale_param.prior.distribution
+  if model_has_slope:
+    slope_scale_variance_prior = slope_scale_param.prior.distribution
   observation_noise_variance_prior = observation_noise_param.prior.distribution
 
   def sampler_loop_body(previous_sample, _):
@@ -523,6 +641,9 @@ def _build_sampler_loop_body(model,
      level_scale_seed,
      loop_seed) = samplers.split_seed(
          previous_sample.seed, n=5, salt='sampler_loop_body')
+    # Preserve backward-compatible seed behavior by splitting slope separately.
+    slope_scale_seed, = samplers.split_seed(
+        previous_sample.seed, n=1, salt='sampler_loop_body_slope')
 
     # We encourage a reasonable initialization by sampling the weights first,
     # so at the first step they are regressed directly against the observed
@@ -541,29 +662,48 @@ def _build_sampler_loop_body(model,
 
     regression_residuals = observed_time_series - tf.linalg.matvec(
         design_matrix, weights)
-    level = _resample_level(
+    latents = _resample_latents(
         observed_residuals=regression_residuals,
         level_scale=previous_sample.level_scale,
+        slope_scale=previous_sample.slope_scale if model_has_slope else None,
         observation_noise_scale=previous_sample.observation_noise_scale,
         initial_state_prior=level_component.initial_state_prior,
         is_missing=is_missing,
         seed=level_seed)
+    level = latents[..., 0]
+    level_residuals = level[..., 1:] - level[..., :-1]
+    if model_has_slope:
+      slope = latents[..., 1]
+      level_residuals -= slope[..., :-1]
+      slope_residuals = slope[..., 1:] - slope[..., :-1]
 
     # Estimate level scale from the empirical changes in level.
     level_scale = _resample_scale(
         prior=level_scale_variance_prior,
-        observed_residuals=level[..., 1:] - level[..., :-1],
-        is_missing=None, seed=level_scale_seed)
+        observed_residuals=level_residuals,
+        is_missing=None,
+        seed=level_scale_seed)
+    if model_has_slope:
+      slope_scale = _resample_scale(
+          prior=slope_scale_variance_prior,
+          observed_residuals=slope_residuals,
+          is_missing=None,
+          seed=slope_scale_seed)
     # Estimate noise scale from the residuals.
     observation_noise_scale = _resample_scale(
         prior=observation_noise_variance_prior,
         observed_residuals=regression_residuals - level,
-        is_missing=is_missing, seed=observation_noise_scale_seed)
+        is_missing=is_missing,
+        seed=observation_noise_scale_seed)
 
     return GibbsSamplerState(
         observation_noise_scale=observation_noise_scale,
         level_scale=level_scale,
+        slope_scale=(slope_scale if model_has_slope
+                     else previous_sample.slope_scale),
         weights=weights,
         level=level,
+        slope=(slope if model_has_slope
+               else previous_sample.slope),
         seed=loop_seed)
   return sampler_loop_body
