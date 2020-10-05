@@ -14,16 +14,14 @@
 # ============================================================================
 """Tests for quantiles.py."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
 
@@ -277,6 +275,52 @@ class HistogramTest(test_util.TestCase):
         # which is approximately Sqrt[1 / (p * N)].  Bound by 4 times this,
         # which means an unseeded test fails with probability 3e-5.
         rtol=4 / np.sqrt(0.25 * n_samples))
+
+  def test_2d_uniform_reduce_axis_0_yes_weights(self):
+    n_samples = 1000
+
+    # Shape [n_samples, 2]
+    x = np.stack([np.random.rand(n_samples), 1 + np.random.rand(n_samples)],
+                 axis=-1)
+    weights = np.stack([np.random.rand(n_samples), np.random.rand(n_samples)],
+                       axis=-1)
+
+    # Intervals are:
+    edges = np.float64([-1., 0., 0.5, 1.0, 1.5, 2.0, 2.5])
+
+    counts = tfp.stats.histogram(x, edges=edges, axis=0)
+
+    self.assertAllEqual((6, 2), counts.shape)
+    self.assertDTypeEqual(counts, np.float64)
+
+    # x[:, 0] ~ Uniform(0, 1)
+    event_0_expected_counts = [
+        #     [-1, 0)          [0, 0.5)         [0.5, 1)
+        0.0 * n_samples, 0.5 * n_samples, 0.5 * n_samples,
+        #     [1, 1.5)         [1.5, 2)         [2, 2.5]
+        0.0 * n_samples, 0.0 * n_samples, 0.0 * n_samples,
+    ]
+
+    # x[:, 1] ~ Uniform(1, 2)
+    event_1_expected_counts = [
+        #     [-1, 0)          [0, 0.5)         [0.5, 1)
+        0.0 * n_samples, 0.0 * n_samples, 0.0 * n_samples,
+        #     [1, 1.5)         [1.5, 2)         [2, 2.5]
+        0.5 * n_samples, 0.5 * n_samples, 0.0 * n_samples,
+    ]
+
+    expected_counts = np.stack([event_0_expected_counts,
+                                event_1_expected_counts], axis=-1)
+
+    self.assertAllClose(
+        expected_counts,
+        self.evaluate(counts),
+        # Standard error for each count is Sqrt[p * (1 - p) / (p * N)],
+        # which is approximately Sqrt[1 / (p * N)].  Bound by 4 times this,
+        # which means an unseeded test fails with probability 3e-5.
+        rtol=4 / np.sqrt(0.25 * n_samples))
+
+
 
   def test_2d_uniform_reduce_axis_1_and_change_dtype(self):
     n_samples = 1000

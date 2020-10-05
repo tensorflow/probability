@@ -14,21 +14,15 @@
 # ============================================================================
 """Functions for computing statistics of samples."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-
-from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
+from tensorflow_probability.python.internal import assert_util, distribution_util, dtype_util, prefer_static as ps, \
+  tensorshape_util
 
 __all__ = [
     'count_integers',
@@ -326,7 +320,9 @@ def histogram(x,
     axis:  Optional `0-D` or `1-D` integer `Tensor` with constant
       values. The axis in `x` that index iid samples.
       `Default value:` `None` (treat every dimension as sample dimension).
-    weights:  Optional `Tensor` of same `dtype` and `shape` as `x`.
+    weights:  Optional `Tensor` of same `dtype` as `x`. Will be flattened
+      and corresponds in shape to the histogram axes. Product of
+      `x.shape[axis]` has to be equal to the size of the flattened weights.
       For each value in `x`, the bin will be incremented by
       the corresponding weight instead of 1.
     extend_lower_interval:  Python `bool`.  If `True`, extend the lowest
@@ -378,12 +374,14 @@ def histogram(x,
     if weights is not None:
       weights = tf.convert_to_tensor(weights, name='weights', dtype=in_dtype)
 
+      # flatten weights as they correspond to n_samples
+      weights = tf.reshape(weights, shape=[-1])
+
     # Move dims in axis to the left end as one flattened dim.
     # After this, x.shape = [n_samples] + E.
     if axis is None:
       x = tf.reshape(x, shape=[-1])
-      if weights is not None:
-        weights = tf.reshape(x, shape=[-1])
+      # TODO: check if weights shape does match x shape (dynamic)?
     else:
       x_ndims = _get_static_ndims(
           x, expect_static=True, expect_ndims_at_least=1)
@@ -391,16 +389,13 @@ def histogram(x,
       if not axis:
         raise ValueError('`axis` cannot be empty.  Found: {}'.format(axis))
       x = _move_dims_to_flat_end(x, axis, x_ndims, right_end=False)
-      if weights is not None:
 
-        weights_ndims = _get_static_ndims(
-          x, expect_static=True, expect_ndims_at_least=1)
-        if x_ndims != weights_ndims:
-          raise ValueError('Shape of `x` and `weights` have to coincide.  '
-                           'Found: x.shape={} weights.shape={}'
-                           ''.format(x.shape, weights.shape))
-        weights = _move_dims_to_flat_end(weights, axis, x_ndims,
-                                         right_end=False)
+      if weights is not None and (tf.compat.dimension_value(x.shape[0]) !=
+                                  tf.compat.dimension_value(weights.shape[0])):
+        raise ValueError('Size of  `x` dimensions specified with `axis` '
+                         'and `weights` have to coincide.  '
+                         'Found: x.shape={} weights.shape={}'
+                         ''.format(x.shape, weights.shape))
 
     # bins.shape = x.shape = [n_samples] + E,
     # and bins[i] is a shape E Tensor of the bins that sample `i` fell into.
