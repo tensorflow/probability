@@ -326,9 +326,9 @@ def histogram(x,
     axis:  Optional `0-D` or `1-D` integer `Tensor` with constant
       values. The axis in `x` that index iid samples.
       `Default value:` `None` (treat every dimension as sample dimension).
-    weights:  Optional `Tensor` of same `dtype` and `shape` as `x`. The weights
-      that specify the count of each value in `x`. If not given, it is
-      assumed to be one.
+    weights:  Optional `Tensor` of same `dtype` and `shape` as `x`.
+      For each value in `x`, the bin will be incremented by
+      the corresponding weight instead of 1.
     extend_lower_interval:  Python `bool`.  If `True`, extend the lowest
       interval `I0` to `(-inf, c1]`.
     extend_upper_interval:  Python `bool`.  If `True`, extend the upper
