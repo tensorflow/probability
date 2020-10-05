@@ -342,8 +342,11 @@ def histogram(x,
       `~axis = [i for i in range(arr.ndim) if i not in axis]`,
       `counts.shape = [edges.shape[0]] + x.shape[~axis]`.
       With `I` a multi-index into `~axis`, `counts[k][I]` is the number of times
-      event(s) fell into the `kth` interval of `edges` or, if weights are given,
-      the sum of the weight(s) corresponding to event(s) in a bin.
+      event(s) fell into the `kth` interval of `edges` or with `weights` non-None
+      the sum of the weight(s) corresponding to the event(s) in a bin.
+
+  Raises:
+    ValueError: if the shape of `x` and `weights` are not the same.
 
   #### Examples
 
@@ -393,7 +396,7 @@ def histogram(x,
         weights_ndims = _get_static_ndims(
           x, expect_static=True, expect_ndims_at_least=1)
         if x_ndims != weights_ndims:
-          raise ValueError('Dimensions of `x` and `weights` have to coincide.  '
+          raise ValueError('Shape of `x` and `weights` have to coincide.  '
                            'Found: x.shape={} weights.shape={}'
                            ''.format(x.shape, weights.shape))
         weights = _move_dims_to_flat_end(weights, axis, x_ndims,
