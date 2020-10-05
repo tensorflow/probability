@@ -28,22 +28,22 @@ class MultivariateNormalInverseScaleLinearOperator(
     mvn_linear_operator.MultivariateNormalLinearOperator):
   """A multivariate normal distribution on `R^k`, parametrized by inverse scale.
 
-  The multivariate normal distribution is defined over `R^k` and parameterized
-  by a (batch of) length-`k` `loc` vector (aka "mu") and a (batch of) `k x k`
-  `inverse_scale` matrix; `covariance = inv(inverse_scale.T @ inverse_scale)`,
-  where `@` denotes matrix-multiplication. You can see this through the identity
+  The multivariate normal distribution is defined over `R^k` and may be
+  parameterized by a (batch of) length-`k` `loc` vector (aka "mu") and a
+  (batch of) `k x k` `inverse_scale` matrix.
 
-  ```none
-  covariance = scale @ scale.T
-             = inv(inverse_scale) @ inv(inverse_scale).T
-             = inv(inverse_scale.T @ inverse_scale)
-  ```
+  If the covariance of this distribution is `C`, and the "scale" is a matrix
+  `S` such that `C = S @ S.T`, then `inverse_scale = inverse(S)`. In other
+  words, `inverse_scale` is the inverse of the scale matrix.
 
-  Optionally allows specifying a `precision` linear operator as well, if known.
-  This may lead to savings in computing the log probability in case the
-  `precision` matrix `P` has an efficient structure. For example, if
-  `P = D + X@X.T`, where `X` is low rank, then matrix multiplication with `P`
-  may be more efficient than with the inverse_scale. These optimizations will
+  This `Distribution` optionally allows specifying the `precision` as a
+  `tf.linalg.LinearOperator`. If the covariance of this distribution is `C`,
+  then `precision = inv(C) = inverse_scale.T @ inverse_scale`.
+
+  Supplying `precision` may lead to savings in computing the log probability
+  when the `precision` operator `P` has a particular structure. For example, if
+  `P = D + X @ X.T`, where `X` is low rank, then matrix multiplication with `P`
+  may be more efficient than with `inverse_scale`. These optimizations will
   rely on `P` implementing that efficient matrix multiplication.
 
   #### Mathematical Details
@@ -120,14 +120,6 @@ class MultivariateNormalInverseScaleLinearOperator(
                name='MultivariateNormalInverseScaleLinearOperator'):
     """Initialize distribution.
 
-    Recall that `covariance = scale @ scale.T`, so `inverse_scale` satisfies
-    `inv(covariance) = inverse_scale.T @ inverse_scale`. If the
-    covariance is known, the user may initialize this distribution with
-    ```python
-    inverse_scale = tf.linalg.LinearOperatorLowerTriangular(
-      tf.linalg.cholesky(covariance)).inverse()
-    ```
-
     The `batch_shape` is the broadcast shape between `loc` and `scale`
     arguments.
 
@@ -139,11 +131,11 @@ class MultivariateNormalInverseScaleLinearOperator(
       loc: Floating-point `Tensor`. May have shape `[B1, ..., Bb, k]` where
         `b >= 0` and `k` is the event size.
       inverse_scale: `tf.linalg.LinearOperator` instance, indicating the inverse
-        of the scale of the posterior. More specifically, this is a matrix `G`
-        so that the `precision = G^T G`, or equivalently, `G = S^{-1}`, where
-        `covariance = S S^T`.
+        of the scale of the distribution. Specifically, if the covariance is
+        `S S.T`, then `inverse_scale = inv(S)`.
       precision: `tf.linalg.LinearOperator` instance, which should represent a
-        matrix A so that `inv(A) = covariance`. If this is provided, it will be
+        matrix `P` such that `inv(P) = covariance`. Equivalently,
+        `P = inverse_scale.T @ inverse_scale`.  If this is provided, it will be
         used to calculate the log probability.
       validate_args: Python `bool`, default `False`. Whether to validate input
         with asserts. If `validate_args` is `False`, and the inputs are
