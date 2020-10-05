@@ -399,7 +399,7 @@ def histogram(x,
           raise ValueError('Shape of `x` and `weights` have to coincide.  '
                            'Found: x.shape={} weights.shape={}'
                            ''.format(x.shape, weights.shape))
-        weights = _move_dims_to_flat_end(weights, axis, x_ndims,
+        weights = _move_dims_to_flat_end(weights, axis, weights_ndims,
                                          right_end=False)
 
     # bins.shape = x.shape = [n_samples] + E,
