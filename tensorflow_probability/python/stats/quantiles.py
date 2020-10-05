@@ -396,9 +396,10 @@ def histogram(x,
         weights_ndims = _get_static_ndims(
           x, expect_static=True, expect_ndims_at_least=1)
         if x_ndims != weights_ndims:
-          raise ValueError('Shape of `x` and `weights` have to coincide.  '
-                           'Found: x.shape={} weights.shape={}'
-                           ''.format(x.shape, weights.shape))
+          raise ValueError('Number of dimensions of `x` and `weights` '
+                           'have to coincide.  '
+                           'Found: x has {}, weights has {}'
+                           ''.format(x_ndims, weights_ndims))
         weights = _move_dims_to_flat_end(weights, axis, weights_ndims,
                                          right_end=False)
 
