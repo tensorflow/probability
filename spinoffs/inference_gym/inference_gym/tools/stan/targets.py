@@ -29,6 +29,7 @@ from inference_gym.tools.stan import stochastic_volatility
 
 __all__ = [
     'brownian_motion_missing_middle_observations',
+    'brownian_motion_unknown_scales_missing_middle_observations',
     'convection_lorenz_bridge',
     'eight_schools',
     'german_credit_numeric_logistic_regression',
@@ -50,6 +51,16 @@ def brownian_motion_missing_middle_observations():
   """
   dataset = data.brownian_motion_missing_middle_observations()
   return brownian_motion.brownian_motion(**dataset)
+
+
+def brownian_motion_unknown_scales_missing_middle_observations():
+  """Brownian Motion with missing observations and unknown scale parameters.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.brownian_motion_missing_middle_observations()
+  return brownian_motion.brownian_motion_unknown_scales(locs=dataset['locs'])
 
 
 def convection_lorenz_bridge():

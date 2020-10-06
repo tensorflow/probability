@@ -135,3 +135,13 @@ py_library(
         # numpy dep,
     ],
 )
+
+# pytype_strict
+py_library(
+    name = "brownian_motion_unknown_scales_missing_middle_observations",
+    srcs = ["brownian_motion_unknown_scales_missing_middle_observations.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)

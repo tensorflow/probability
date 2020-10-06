@@ -95,8 +95,8 @@ def brownian_motion_missing_middle_observations():
   """
   return dict(
       locs=brownian_motion_lib.OBSERVED_LOC,
-      observation_noise=brownian_motion_lib.OBSERVATION_NOISE,
-      innovation_noise=brownian_motion_lib.INNOVATION_NOISE)
+      observation_noise_scale=brownian_motion_lib.OBSERVATION_NOISE,
+      innovation_noise_scale=brownian_motion_lib.INNOVATION_NOISE)
 
 
 def convection_lorenz_bridge():

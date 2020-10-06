@@ -113,6 +113,7 @@ py_library(
         ":model",
         "//inference_gym/internal:data",
         "//inference_gym/targets/ground_truth:brownian_motion_missing_middle_observations",
+        "//inference_gym/targets/ground_truth:brownian_motion_unknown_scales_missing_middle_observations",
     ],
 )
 
