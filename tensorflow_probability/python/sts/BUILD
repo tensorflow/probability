@@ -134,6 +134,7 @@ py_library(
         "//tensorflow_probability/python/distributions:joint_distribution_named",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/sts/internal",
         "//tensorflow_probability/python/util",
     ],
