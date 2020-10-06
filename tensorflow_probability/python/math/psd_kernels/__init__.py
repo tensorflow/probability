@@ -27,6 +27,7 @@ from tensorflow_probability.python.math.psd_kernels.kumaraswamy_transformed impo
 from tensorflow_probability.python.math.psd_kernels.matern import MaternFiveHalves
 from tensorflow_probability.python.math.psd_kernels.matern import MaternOneHalf
 from tensorflow_probability.python.math.psd_kernels.matern import MaternThreeHalves
+from tensorflow_probability.python.math.psd_kernels.parabolic import Parabolic
 from tensorflow_probability.python.math.psd_kernels.polynomial import Linear
 from tensorflow_probability.python.math.psd_kernels.polynomial import Polynomial
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
@@ -44,6 +45,7 @@ _allowed_symbols = [
     'MaternFiveHalves',
     'MaternOneHalf',
     'MaternThreeHalves',
+    'Parabolic',
     'Polynomial',
     'PositiveSemidefiniteKernel',
     'RationalQuadratic',

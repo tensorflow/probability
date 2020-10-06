@@ -38,6 +38,7 @@ INSTANTIABLE_BASE_KERNELS = {
     'MaternOneHalf': dict(amplitude=0, length_scale=0),
     'MaternThreeHalves': dict(amplitude=0, length_scale=0),
     'MaternFiveHalves': dict(amplitude=0, length_scale=0),
+    'Parabolic': dict(amplitude=0, length_scale=0),
     # TODO(b/146073659): Polynomial as currently configured often produces
     # numerically ill-conditioned matrices. Disabled until we can make it more
     # reliable in the context of hypothesis tests.
