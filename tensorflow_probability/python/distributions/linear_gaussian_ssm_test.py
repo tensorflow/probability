@@ -954,7 +954,7 @@ del _MissingObservationsTests  # Don't run base class tests.
 
 class _KalmanSmootherTest(test_util.TestCase):
 
-  def build_kf(self):
+  def build_kf(self, validate_args=True):
     # Define a simple model with 3D latents and 2D observations.
 
     self.transition_matrix = np.array(
@@ -983,7 +983,7 @@ class _KalmanSmootherTest(test_util.TestCase):
         initial_state_prior=self.initial_state_prior,
         initial_step=0,
         experimental_parallelize=self.parallelize,
-        validate_args=True)
+        validate_args=validate_args)
 
   def testKalmanSmoother(self):
     obs = np.array(
@@ -994,9 +994,21 @@ class _KalmanSmootherTest(test_util.TestCase):
           [-0.46593086, 0.23341251]]],
         dtype=np.float32)
 
-    kf = self.build_kf()
-    _, filtered_means, filtered_covs, _, _, _, _ = kf.forward_filter(obs)
-    smoothed_means, smoothed_covs = kf.posterior_marginals(obs)
+    kf = self.build_kf(validate_args=not self.compile)
+    def filter_and_smooth():  # Wrap code to optionally test XLA compilation.
+      _, filtered_means, filtered_covs, _, _, _, _ = kf.forward_filter(obs)
+      smoothed_means, smoothed_covs = kf.posterior_marginals(obs)
+      return filtered_means, filtered_covs, smoothed_means, smoothed_covs
+    if self.compile:
+      self.skip_if_no_xla()
+      filter_and_smooth = tf.function(filter_and_smooth, autograph=False,
+                                      experimental_compile=True)
+    [
+        filtered_means,
+        filtered_covs,
+        smoothed_means,
+        smoothed_covs
+    ] = filter_and_smooth()
 
     # Numbers are checked against results from well-tested open source package.
     # In order to replicate the numbers below, one could run the following
@@ -1092,7 +1104,7 @@ class _KalmanSmootherTest(test_util.TestCase):
       dict(testcase_name='_{}'.format(sampler_type), sampler_type=sampler_type)
       for sampler_type in ('stateless', 'stateful')))
   def testPosteriorSample(self, sampler_type):
-    kf = self.build_kf()
+    kf = self.build_kf(validate_args=not self.compile)
     obs = np.array(
         [[[1.36560337, 0.28252135],
           [-0.44638565, -0.76692033],
@@ -1108,12 +1120,22 @@ class _KalmanSmootherTest(test_util.TestCase):
     self.assertAllEqual(single_posterior_sample.shape, [5, 3])
 
     sample_shape = [8000, 2]
-    posterior_samples = kf.posterior_sample(
-        obs, sample_shape, seed=test_util.test_seed(sampler_type=sampler_type),
-        mask=mask)
+    def sample_and_marginals():  # Wrap code to optionally test XLA compilation.
+      posterior_samples = kf.posterior_sample(
+          obs, sample_shape,
+          seed=test_util.test_seed(sampler_type=sampler_type),
+          mask=mask)
+      posterior_mean, posterior_covs = kf.posterior_marginals(obs, mask=mask)
+      return posterior_samples, posterior_mean, posterior_covs
+    if self.compile:
+      self.skip_if_no_xla()
+      sample_and_marginals = tf.function(sample_and_marginals,
+                                         autograph=False,
+                                         experimental_compile=True)
+    posterior_samples, posterior_mean, posterior_covs = sample_and_marginals()
     self.assertAllEqual(posterior_samples.shape,
                         sample_shape + [1, 1, 5, 3])
-    posterior_mean, posterior_covs = kf.posterior_marginals(obs, mask=mask)
+
     empirical_mean = tf.reduce_mean(posterior_samples, axis=[0, 1])
     centered_samples = posterior_samples - posterior_mean
     empirical_covs = tf.einsum(
@@ -1130,10 +1152,17 @@ class _KalmanSmootherTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class KalmanSmootherTestSequential(_KalmanSmootherTest):
   parallelize = False
+  compile = False
+
+
+class KalmanSmootherTestSequentialCompiled(_KalmanSmootherTest):
+  parallelize = False
+  compile = True
 
 
 class KalmanSmootherTestParallel(_KalmanSmootherTest):
   parallelize = True
+  compile = False
 
 del _KalmanSmootherTest  # Don't run base class tests.
 

@@ -49,7 +49,14 @@ def _safe_concat(values):
   """Concat along axis=0 that works even when some arguments have size 0."""
   initial_value_shape = ps.shape(values[0])
   reference_shape = ps.concat([[-1], initial_value_shape[1:]], axis=0)
-  return tf.concat([tf.reshape(x, reference_shape) for x in values], axis=0)
+  trivial_shape = ps.concat([[1], initial_value_shape[1:]], axis=0)
+  full_values = []
+  for x in values:
+    try:
+      full_values.append(ps.reshape(x, reference_shape))
+    except ValueError:  # JAX/numpy don't like `-1`'s in size-zero shapes.
+      full_values.append(ps.reshape(x, trivial_shape))
+  return ps.concat(full_values, axis=0)
 
 
 def _check_equal_shape(name,
@@ -354,10 +361,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
     with tf.name_scope(name) as name:
 
-      self._num_timesteps = tensor_util.convert_nonref_to_tensor(
+      self._num_timesteps = ps.convert_to_shape_tensor(
           num_timesteps, name='num_timesteps')
       self._initial_state_prior = initial_state_prior
-      self._initial_step = tensor_util.convert_nonref_to_tensor(
+      self._initial_step = ps.convert_to_shape_tensor(
           initial_step, name='initial_step')
       # We canonicalize these to LinearOperators below, so no need to do tensor
       # conversions here. Either way, we set them as properties to track
@@ -587,7 +594,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     # We assume the batch shapes of parameters don't change over time,
     # so use the initial step as a prototype.
     return functools.reduce(
-        tf.broadcast_dynamic_shape,
+        ps.broadcast_shape,
         [
             self.initial_state_prior.batch_shape_tensor(),
             self.get_transition_matrix_for_timestep(
@@ -692,9 +699,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       initial_state_seed, initial_obs_seed, loop_seed = samplers.split_seed(
           seed, n=3, salt='LinearGaussianStateSpaceModel_sample_n_joint')
 
-      sample_and_batch_shape = distribution_util.prefer_static_value(
-          tf.concat([[n], self.batch_shape_tensor()],
-                    axis=0))
+      batch_shape = self.batch_shape
+      if not tensorshape_util.is_fully_defined(batch_shape):
+        batch_shape = self.batch_shape_tensor()
+      sample_and_batch_shape = ps.concat([[n], batch_shape], axis=0)
 
       # Sample the initial timestep from the prior.  Since we want
       # this sample to have full batch shape (not just the batch shape
@@ -738,7 +746,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # Scan over all timesteps to sample latents and observations.
       (latents, observations, _) = tf.scan(
           sample_step,
-          elems=tf.range(self.initial_step+1, self._final_step()),
+          elems=ps.range(self.initial_step + 1, self._final_step()),
           initializer=(initial_latent, initial_observation, loop_seed))
 
       # Combine the initial sampled timestep with the remaining timesteps.
@@ -918,11 +926,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       latent_size = self.latent_size_tensor()
       prior_mean = tf.broadcast_to(
           self.initial_state_prior.mean()[..., tf.newaxis],
-          tf.concat([sample_and_batch_shape,
+          ps.concat([sample_and_batch_shape,
                      [latent_size, 1]], axis=0))
       prior_cov = tf.broadcast_to(
           self.initial_state_prior.covariance(),
-          tf.concat([mask_sample_and_batch_shape,
+          ps.concat([mask_sample_and_batch_shape,
                      [latent_size, latent_size]], axis=0))
 
       initial_observation_matrix = (
@@ -1097,7 +1105,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         the posterior over latent states given the observed value `x`.
     """
     x = tf.convert_to_tensor(x, name='x')
-    sample_shape = tf.convert_to_tensor(sample_shape, dtype_hint=tf.int32)
+    sample_shape = ps.convert_to_shape_tensor(
+        sample_shape, dtype_hint=tf.int32)
     if mask is not None:
       mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
 
@@ -1113,7 +1122,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # than the distribution, we'll need to draw extra samples to match.
       result_sample_and_batch_shape = ps.concat([
           distribution_util.expand_to_vector(sample_shape),
-          tf.convert_to_tensor(
+          ps.convert_to_shape_tensor(
               functools.reduce(ps.broadcast_shape, [
                   ps.shape(x)[:-2],
                   ps.shape(mask)[:-1] if mask is not None else [],
@@ -1169,7 +1178,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # Broadcast to ensure we represent the full batch shape.
       initial_latent_mean = tf.broadcast_to(
           self.initial_state_prior.mean()[..., tf.newaxis],
-          tf.concat([self.batch_shape_tensor(),
+          ps.concat([self.batch_shape_tensor(),
                      [self.latent_size_tensor(), 1]], axis=0))
 
       initial_observation_mean = _propagate_mean(
@@ -1227,7 +1236,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       latent_size = self.latent_size_tensor()
       initial_latent_cov = tf.broadcast_to(
           self.initial_state_prior.covariance(),
-          tf.concat([self.batch_shape_tensor(),
+          ps.concat([self.batch_shape_tensor(),
                      [latent_size, latent_size]], axis=0))
 
       initial_observation_cov = _propagate_cov(
