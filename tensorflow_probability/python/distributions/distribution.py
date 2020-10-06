@@ -40,6 +40,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 # Symbol import needed to avoid BUILD-dependency cycle
 from tensorflow_probability.python.math.generic import log1mexp
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -1433,27 +1434,40 @@ class Distribution(_BaseDistribution):
         '_default_event_space_bijector` is not implemented: {}'.format(
             type(self).__name__))
 
+  @deprecation.deprecated(
+      '2020-10-20',
+      'Use `experimental_default_event_space_bijector` instead.')
   def _experimental_default_event_space_bijector(self, *args, **kwargs):
+    return self.experimental_default_event_space_bijector(*args, **kwargs)
+
+  def experimental_default_event_space_bijector(self, *args, **kwargs):
     """Bijector mapping the reals (R**n) to the event space of the distribution.
 
+    Distributions with continuous support may implement
+    `_default_event_space_bijector` which returns a subclass of
+    `tfp.bijectors.Bijector` that maps R**n to the distribution's event space.
+    For example, the default bijector for the `Beta` distribution
+    is `tfp.bijectors.Sigmoid()`, which maps the real line to `[0, 1]`, the
+    support of the `Beta` distribution. The default bijector for the
+    `CholeskyLKJ` distribution is `tfp.bijectors.CorrelationCholesky`, which
+    maps R^(k * (k-1) // 2) to the submanifold of k x k lower triangular
+    matrices with ones along the diagonal.
+
+    The purpose of `experimental_default_event_space_bijector` is
+    to enable gradient descent in an unconstrained space for Variational
+    Inference and Hamiltonian Monte Carlo methods. Some effort has been made to
+    choose bijectors such that the tails of the distribution in the
+    unconstrained space are between Gaussian and Exponential.
+
+    For distributions with discrete event space, or for which TFP currently
+    lacks a suitable bijector, this function returns `None`.
+
     Args:
-      *args: Passed to implementation subclass.
-      **kwargs: Passed to implementation subclass.
+      *args: Passed to implementation `_default_event_space_bijector`.
+      **kwargs: Passed to implementation `_default_event_space_bijector`.
 
     Returns:
       event_space_bijector: `Bijector` instance or `None`.
-
-    Distributions with continuous support have a
-    `_default_event_space_bijector`, a subclass of `tfp.bijectors.Bijector`
-    that maps R**n to the distribution's event space. For example, the
-    `_default_event_space_bijector` of the `Beta` distribution is
-    `tfb.Sigmoid()`, which maps the real line to `[0, 1]`, the support of the
-    `Beta` distribution. The purpose of `_default_event_space_bijector` is
-    to enable gradient descent in an unconstrained space for Variational
-    Inference and Hamiltonian Monte Carlo methods. An effort has been made to
-    choose bijectors such that the tails of the distribution in the
-    unconstrained space are between Gaussian and Exponential. For distributions
-    with discrete event space, `_default_event_space_bijector` returns `None`.
     """
     return self._default_event_space_bijector(*args, **kwargs)
 
