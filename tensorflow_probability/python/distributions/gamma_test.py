@@ -670,7 +670,7 @@ class GammaSamplingTest(test_util.TestCase):
     self.assertAllClose(
         self.evaluate(tf.math.reduce_mean(samples, axis=0)),
         sp_stats.gamma.mean(concentration, scale=1 / rate),
-        rtol=0.03)
+        rtol=0.04)
     self.assertAllClose(
         self.evaluate(tf.math.reduce_variance(samples, axis=0)),
         sp_stats.gamma.var(concentration, scale=1 / rate),

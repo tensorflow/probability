@@ -722,23 +722,16 @@ def _random_gamma_rejection(
       """Generate and test samples."""
       v_seed, u_seed = samplers.split_seed(seed)
 
-      def generate_positive_v():
-        """Generate positive v."""
-        def _inner(seed):
-          x = samplers.normal(shape, dtype=internal_dtype, seed=seed)
-          # This implicitly broadcasts concentration up to sample shape.
-          v = 1 + c * x
-          return (x, v), v > 0.
-
-        # Note: It should be possible to remove this 'inner' call to
-        # `batched_las_vegas_algorithm` and merge the v > 0 check into the
-        # overall check for a good sample. This would lead to a slightly simpler
-        # implementation; it is unclear whether it would be faster. We include
-        # the inner loop so this implementation is more easily comparable to
-        # Ref. [1] and other implementations.
-        return brs.batched_las_vegas_algorithm(_inner, v_seed)[0]
-
-      (x, v) = generate_positive_v()
+      x = samplers.normal(shape, dtype=internal_dtype, seed=v_seed)
+      # This implicitly broadcasts concentration up to sample shape.
+      v = 1 + c * x
+      # In [1], there is an 'inner' rejection sampling loop which checks that
+      # v > 0 and generates a new normal sample if it's not, saving the rest of
+      # the computations below. We found that merging the check for  v > 0 with
+      # the `good_sample_mask` not only simplifies the code, but leads to a
+      # ~2x speedup for small concentrations on GPU, at the cost of deviating
+      # slightly from the implementation given in Ref. [1].
+      accept_v = v > 0.
       logv = tf.math.log1p(c * x)
       x2 = x * x
       v3 = v * v * v
@@ -753,7 +746,8 @@ def _random_gamma_rejection(
       # have to compute or not compute the logarithms for the entire batch, and
       # as the batch gets larger, the odds we compute it grow. Therefore we
       # don't bother with the "cheap" check.
-      good_sample_mask = tf.math.log(u) < (x2 / 2. + d * (1 - v3 + logv3))
+      good_sample_mask = tf.logical_and(
+          tf.math.log(u) < (x2 / 2. + d * (1 - v3 + logv3)), accept_v)
 
       return logv3 if log_space else v3, good_sample_mask
 
