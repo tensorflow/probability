@@ -322,8 +322,10 @@ class Multinomial(distribution.Distribution):
     if not self.validate_args:
       return assertions
     if is_init != tensor_util.is_ref(self.total_count):
-      assertions.extend(distribution_util.assert_nonnegative_integer_form(
-          self.total_count))
+      total_count = tf.convert_to_tensor(self.total_count)
+      assertions.append(distribution_util.assert_casting_closed(
+          total_count, target_dtype=tf.int32))
+      assertions.append(assert_util.assert_non_negative(total_count))
     return assertions
 
 

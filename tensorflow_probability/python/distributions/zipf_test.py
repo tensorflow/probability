@@ -96,15 +96,25 @@ class ZipfTest(test_util.TestCase):
     power = tf.constant([4.0])
     # Non-integer samples are rejected if validate_args is True and
     # interpolate_nondiscrete is False.
-    non_integer_samples = [0.99, 4.5, 5.001, 1e-6, -3, -2, -1]
+    zipf = tfd.Zipf(
+        power=power, interpolate_nondiscrete=False, validate_args=True)
+    non_integer_samples = [0.99, 4.5, 5.001, 1e-5]
     for x in non_integer_samples:
-      zipf = tfd.Zipf(
-          power=power, interpolate_nondiscrete=False, validate_args=True)
 
-      with self.assertRaisesOpError("Condition (x == y|x >= 0)"):
+      with self.assertRaisesOpError("cannot contain fractional components"):
         self.evaluate(zipf.log_prob(x))
 
-      with self.assertRaisesOpError("Condition (x == y|x >= 0)"):
+      with self.assertRaisesOpError("cannot contain fractional components"):
+        self.evaluate(zipf.prob(x))
+
+    # Negative samples are rejected if validate_args is True.
+    zipf = tfd.Zipf(power=power, validate_args=True)
+    negative_samples = [-3, -2, -1]
+    for x in negative_samples:
+      with self.assertRaisesOpError("must be non-negative"):
+        self.evaluate(zipf.log_prob(x))
+
+      with self.assertRaisesOpError("must be non-negative"):
         self.evaluate(zipf.prob(x))
 
   def testZipfLogPmf_IntegerArgs(self):

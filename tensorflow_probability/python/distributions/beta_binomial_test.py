@@ -184,7 +184,7 @@ class BetaBinomialTest(test_util.TestCase):
     with self.assertRaisesOpError('must be non-negative.'):
       d.log_prob([-1., 3.])
     with self.assertRaisesOpError('cannot contain fractional components.'):
-      d.log_prob([3., 3.5])
+      self.evaluate(d.log_prob([3., 3.5]))
     with self.assertRaisesOpError(
         'must be itemwise less than or equal to `total_count` parameter.'):
       d.log_prob(5.)

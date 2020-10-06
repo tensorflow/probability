@@ -76,7 +76,8 @@ class BatesTest(test_util.TestCase):
         self.evaluate(d.prob(1.))
 
   def testBatesIntegralTotalCount(self):
-    with self.assertRaisesOpError('`total_count` must be integer-valued.'):
+    msg = '`total_count` must be representable as a 32-bit integer.'
+    with self.assertRaisesOpError(msg):
       d = tfd.Bates(total_count=1.5, validate_args=True)
       self.evaluate(d.prob(1.))
 
@@ -130,7 +131,8 @@ class BatesTest(test_util.TestCase):
     self.evaluate(d.prob([.5, 1.]))
 
     self.evaluate(n.assign(n0 / 2.))
-    with self.assertRaisesOpError('`total_count` must be integer-valued.'):
+    with self.assertRaisesOpError(
+        '`total_count` must be representable as a 32-bit integer.'):
       self.evaluate(d.prob([.5, 1.]))
     self.evaluate(n.assign(n0))
     self.evaluate(d.prob([.5, 1.]))

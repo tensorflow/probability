@@ -420,38 +420,64 @@ def move_dimension(x, source_idx, dest_idx):
 def assert_integer_form(x,
                         summarize=None,
                         message=None,
-                        int_dtype=None,
+                        atol=None,
+                        rtol=None,
                         name='assert_integer_form'):
-  """Assert that x has integer components (or floats equal to integers).
+  """Assert that x has integer components (or floats near integers).
 
   Args:
-    x: Floating-point `Tensor`
+    x: Floating-point or integer `Tensor`.
     summarize: Print this many entries of each tensor.
     message: A string to prefix to the default message.
-    int_dtype: A `tf.dtype` used to cast the float to. The default (`None`)
-      implies the smallest possible signed int will be used for casting.
+    atol: Tensor. Same dtype as, and broadcastable to, x. The absolute
+      tolerance. Default is 10 * eps.
+    rtol: Tensor. Same dtype as, and broadcastable to, x. The relative
+      tolerance. Default is 10 * eps.
     name: A name for this operation (optional).
 
   Returns:
-    Op raising `InvalidArgumentError` if `cast(x, int_dtype) != x`.
+    Op raising `InvalidArgumentError` if `round(x) != x` within tolerance.
   """
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
     if dtype_util.is_integer(x.dtype):
       return tf.no_op()
     message = message or '{} has non-integer components'.format(x)
-    if int_dtype is None:
-      try:
-        int_dtype = {
-            tf.float16: tf.int16,
-            tf.float32: tf.int32,
-            tf.float64: tf.int64,
-        }[dtype_util.base_dtype(x.dtype)]
-      except KeyError:
-        raise TypeError('Unrecognized type {}'.format(dtype_util.name(x.dtype)))
+    return assert_util.assert_near(
+        x, tf.round(x), atol=atol, rtol=rtol,
+        summarize=summarize, message=message, name=name)
+
+
+def assert_casting_closed(x,
+                          target_dtype,
+                          summarize=None,
+                          message=None,
+                          name='assert_casting_closed'):
+  """Assert that x is fixed under round-trip casting to `target_dtype`.
+
+  Note that even when `target_dtype` is the integer dtype of the same width as
+  the dtype of `x`, this is stronger than `assert_integer_form`.  This is
+  because any given floating-point format can represent integers outside the
+  range of the equally wide integer format.
+
+  Args:
+    x: Floating-point `Tensor`
+    target_dtype: A `tf.dtype` used to cast `x` to.
+    summarize: Print this many entries of each tensor.
+    message: A string to prefix to the default message.
+    name: A name for this operation (optional).
+
+  Returns:
+    Op raising `InvalidArgumentError` if `cast(x, target_dtype) != x`.
+  """
+  with tf.name_scope(name):
+    x = tf.convert_to_tensor(x, name='x')
+    if message is None:
+      message = 'Tensor values must be representable as {}.'.format(
+          target_dtype)
     return assert_util.assert_equal(
         x,
-        tf.cast(tf.cast(x, int_dtype), x.dtype),
+        tf.cast(tf.cast(x, target_dtype), x.dtype),
         summarize=summarize,
         message=message,
         name=name)
@@ -483,7 +509,7 @@ def assert_nondecreasing(x, summarize=None, message=None, name=None):
 
 
 def assert_nonnegative_integer_form(
-    x, name='assert_nonnegative_integer_form'):
+    x, atol=None, rtol=None, name='assert_nonnegative_integer_form'):
   """Assert x is a non-negative tensor, and optionally of integers."""
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
@@ -494,18 +520,19 @@ def assert_nonnegative_integer_form(
     if not dtype_util.is_integer(x.dtype):
       assertions += [
           assert_integer_form(
-              x,
+              x, atol=atol, rtol=rtol,
               message='`{}` cannot contain fractional components.'.format(x)),
       ]
     return assertions
 
 
 def embed_check_nonnegative_integer_form(
-    x, name='embed_check_nonnegative_integer_form'):
+    x, atol=None, rtol=None, name='embed_check_nonnegative_integer_form'):
   """Assert x is a non-negative tensor, and optionally of integers."""
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
-    return with_dependencies(assert_nonnegative_integer_form(x), x)
+    return with_dependencies(assert_nonnegative_integer_form(
+        x, atol=atol, rtol=rtol), x)
 
 
 def same_dynamic_shape(a, b):
@@ -833,9 +860,9 @@ def embed_check_integer_casting_closed(x,
       # Being here means _is_integer_like_by_dtype(target_dtype) = True.
       # Since this check implies the magnitude check below, we need only it.
       assertions += [
-          assert_integer_form(
+          assert_casting_closed(
               x,
-              int_dtype=target_dtype,
+              target_dtype,
               message='Elements must be {}-equivalent.'.format(
                   dtype_util.name(target_dtype))),
       ]

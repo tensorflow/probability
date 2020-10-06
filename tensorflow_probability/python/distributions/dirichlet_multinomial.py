@@ -389,9 +389,13 @@ class DirichletMultinomial(distribution.Distribution):
 
     if is_init != tensor_util.is_ref(self._total_count):
       if self.validate_args:
-        assertions.extend(
-            distribution_util.assert_nonnegative_integer_form(
-                self._total_count))
+        total_count = tf.convert_to_tensor(self._total_count)
+        assertions.append(
+            distribution_util.assert_casting_closed(
+                total_count, target_dtype=tf.int32,
+                message='total_count cannot contain fractional components.'))
+        assertions.append(assert_util.assert_non_negative(
+            total_count, message='total_count must be non-negative'))
 
     if is_init != tensor_util.is_ref(self._concentration):
       if self.validate_args:

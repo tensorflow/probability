@@ -271,13 +271,15 @@ class Bates(distribution.Distribution):
     if is_init != tensor_util.is_ref(self.total_count):
       total_count = tf.convert_to_tensor(self.total_count)
       limit = BATES_TOTAL_COUNT_STABILITY_LIMITS[self.dtype]
+      msg = '`total_count` must be representable as a 32-bit integer.'
       assertions.extend([
           assert_util.assert_positive(
               total_count,
               message='`total_count` must be positive.'),
-          distribution_util.assert_integer_form(
+          distribution_util.assert_casting_closed(
               total_count,
-              message='`total_count` must be integer-valued.'),
+              target_dtype=tf.int32,
+              message=msg),
           assert_util.assert_less_equal(
               tf.cast(total_count, self.dtype),
               tf.cast(limit, self.dtype),

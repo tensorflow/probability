@@ -402,7 +402,9 @@ class OrderedLogistic(distribution.Distribution):
     assertions = []
     if not self.validate_args:
       return assertions
-    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(distribution_util.assert_casting_closed(
+        x, target_dtype=tf.int32))
+    assertions.append(assert_util.assert_non_negative(x))
     assertions.append(
         assert_util.assert_less_equal(
             x, tf.cast(self._num_categories(), x.dtype),

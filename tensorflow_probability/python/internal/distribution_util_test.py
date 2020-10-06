@@ -517,7 +517,7 @@ class AssertCloseTest(test_util.TestCase):
 
     with self.assertRaisesOpError('has non-integer components'):
       with tf.control_dependencies(
-          [distribution_util.assert_integer_form(w)]):
+          [distribution_util.assert_integer_form(w, atol=0, rtol=0)]):
         self.evaluate(tf.identity(w))
 
 

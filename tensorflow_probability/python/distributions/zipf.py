@@ -333,7 +333,11 @@ class Zipf(distribution.Distribution):
 
   def _sample_control_dependencies(self, x):
     assertions = []
-    if not self.validate_args or self.interpolate_nondiscrete:
+    if not self.validate_args:
       return assertions
-    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(assert_util.assert_non_negative(
+        x, message='samples must be non-negative'))
+    if not self.interpolate_nondiscrete:
+      assertions.append(distribution_util.assert_integer_form(
+          x, message='samples cannot contain fractional components.'))
     return assertions

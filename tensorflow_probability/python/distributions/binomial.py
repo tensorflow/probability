@@ -539,7 +539,11 @@ class Binomial(distribution.Distribution):
     assertions = []
     if not self.validate_args:
       return assertions
-    assertions.extend(distribution_util.assert_nonnegative_integer_form(counts))
+    assertions.append(distribution_util.assert_casting_closed(
+        counts, target_dtype=tf.int32,
+        message='counts cannot contain fractional components.'))
+    assertions.append(assert_util.assert_non_negative(
+        counts, message='counts must be non-negative.'))
     assertions.append(
         assert_util.assert_less_equal(
             counts, self.total_count,
