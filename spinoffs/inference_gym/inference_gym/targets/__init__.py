@@ -33,6 +33,8 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.logistic_regression import LogisticRegression
   from inference_gym.targets.lorenz_system import ConvectionLorenzBridge
   from inference_gym.targets.lorenz_system import LorenzSystem
+  from inference_gym.targets.lorenz_system import ConvectionLorenzBridgeUnknownScales
+  from inference_gym.targets.lorenz_system import LorenzSystemUnknownScales
   from inference_gym.targets.model import Model
   from inference_gym.targets.neals_funnel import NealsFunnel
   from inference_gym.targets.non_identifiable_quartic import NonIdentifiableQuarticMeasurementModel
@@ -58,6 +60,7 @@ __all__ = [
     'BrownianMotionUnknownScales',
     'BrownianMotionUnknownScalesMissingMiddleObservations',
     'ConvectionLorenzBridge',
+    'ConvectionLorenzBridgeUnknownScales',
     'EightSchools',
     'GermanCreditNumericLogisticRegression',
     'GermanCreditNumericProbitRegression',
@@ -67,6 +70,7 @@ __all__ = [
     'LogGaussianCoxProcess',
     'LogisticRegression',
     'LorenzSystem',
+    'LorenzSystemUnknownScales',
     'Model',
     'NealsFunnel',
     'NonIdentifiableQuarticMeasurementModel',

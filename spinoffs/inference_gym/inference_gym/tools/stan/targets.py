@@ -31,6 +31,7 @@ __all__ = [
     'brownian_motion_missing_middle_observations',
     'brownian_motion_unknown_scales_missing_middle_observations',
     'convection_lorenz_bridge',
+    'convection_lorenz_bridge_unknown_scales',
     'eight_schools',
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
@@ -71,6 +72,19 @@ def convection_lorenz_bridge():
   """
   dataset = data.convection_lorenz_bridge()
   return lorenz_system.partially_observed_lorenz_system(**dataset)
+
+
+def convection_lorenz_bridge_unknown_scales():
+  """Lorenz System with observed convection and missing observations.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.convection_lorenz_bridge()
+  del dataset['innovation_scale']
+  del dataset['observation_scale']
+  return lorenz_system.partially_observed_lorenz_system_unknown_scales(
+      **dataset)
 
 
 def eight_schools():

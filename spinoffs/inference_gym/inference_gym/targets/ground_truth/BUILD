@@ -48,6 +48,16 @@ py_library(
 
 # pytype_strict
 py_library(
+    name = "convection_lorenz_bridge_unknown_scales",
+    srcs = ["convection_lorenz_bridge_unknown_scales.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
     name = "eight_schools",
     srcs = ["eight_schools.py"],
     srcs_version = "PY3",

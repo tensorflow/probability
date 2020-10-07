@@ -61,6 +61,16 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
     self.validate_log_prob_and_transforms(
         model, sample_transformation_shapes=dict(identity=[30, 3]))
 
+  def testDeferred(self):
+    """Checks that the dataset is not prematurely materialized."""
+    dataset = _test_dataset()
+    func = functools.partial(lorenz_system.LorenzSystem,
+                             step_size=dataset.pop('step_size'),
+                             innovation_scale=dataset.pop('innovation_scale'),
+                             observation_scale=dataset.pop('observation_scale'),
+                             observation_index=dataset.pop('observation_index'))
+    self.validate_deferred_materialization(func, **dataset)
+
   def testConvectionLorenzBridge(self):
     """Checks that unconstrained parameters yield finite joint densities."""
     model = lorenz_system.ConvectionLorenzBridge()
@@ -76,6 +86,63 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
     """Checks approximate samples from the model against the ground truth."""
     model = lorenz_system.LorenzSystem(
         **_make_dataset(_partially_observed_data))
+
+    self.validate_ground_truth_using_hmc(
+        model,
+        num_chains=2,
+        num_steps=2000,
+        num_leapfrog_steps=15,
+        step_size=0.03,
+    )
+
+
+@test_util.multi_backend_test(globals(), 'targets.lorenz_system_test')
+class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
+
+  def testLorenzSystemUnknownScales(self):
+    """Checks that unconstrained parameters yield finite joint densities."""
+    dataset = _test_dataset()
+    del dataset['innovation_scale']
+    del dataset['observation_scale']
+    model = lorenz_system.LorenzSystemUnknownScales(**dataset)
+    self.validate_log_prob_and_transforms(
+        model, sample_transformation_shapes=dict(
+            identity={'innovation_scale': [],
+                      'observation_scale': [],
+                      'latents': [30, 3]}))
+
+  def testDeferred(self):
+    """Checks that the dataset is not prematurely materialized."""
+    dataset = _test_dataset()
+    del dataset['innovation_scale']
+    del dataset['observation_scale']
+    func = functools.partial(
+        lorenz_system.LorenzSystemUnknownScales,
+        step_size=dataset.pop('step_size'),
+        observation_index=dataset.pop('observation_index'))
+    self.validate_deferred_materialization(func, **dataset)
+
+  def testConvectionLorenzBridge(self):
+    """Checks that unconstrained parameters yield finite joint densities."""
+    model = lorenz_system.ConvectionLorenzBridgeUnknownScales()
+    self.validate_log_prob_and_transforms(
+        model,
+        sample_transformation_shapes=dict(
+            identity={'innovation_scale': [],
+                      'observation_scale': [],
+                      'latents': [30, 3]}),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True)
+
+  @test_util.numpy_disable_gradient_test
+  def testLorenzSystemHMC(self):
+    """Checks approximate samples from the model against the ground truth."""
+    dataset = _make_dataset(_partially_observed_data)
+    del dataset['innovation_scale']
+    del dataset['observation_scale']
+    model = lorenz_system.LorenzSystemUnknownScales(
+        **dataset)
 
     self.validate_ground_truth_using_hmc(
         model,

@@ -280,6 +280,7 @@ py_library(
         # numpy dep,
         "//inference_gym/internal:data",
         "//inference_gym/targets/ground_truth:convection_lorenz_bridge",
+        "//inference_gym/targets/ground_truth:convection_lorenz_bridge_unknown_scales",
     ],
 )
 

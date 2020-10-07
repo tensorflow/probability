@@ -143,6 +143,7 @@ py_library(
         ":item_response_theory",
         ":log_gaussian_cox_process",
         ":logistic_regression",
+        ":lorenz_system",
         ":probit_regression",
         ":radon_contextual_effects",
         ":sparse_logistic_regression",
