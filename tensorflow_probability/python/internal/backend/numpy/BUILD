@@ -558,6 +558,8 @@ py_test(
     srcs_version = "PY3",
     tags = [
         "no-oss-ci",
+        "notap",
+        "tfp-guitar",
     ],
     deps = [
         ":linear_operator_gen",
