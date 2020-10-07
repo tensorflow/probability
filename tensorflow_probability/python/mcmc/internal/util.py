@@ -92,7 +92,7 @@ def left_justified_expand_dims_to(x, rank, name=None):
         [ps.shape(x),
          ps.ones(shape=[expand_ndims], dtype=tf.int32)],
         axis=0)
-    return ps.reshape(x, expand_shape)
+    return tf.reshape(x, expand_shape)
 
 
 def left_justified_broadcast_like(x, reference, name=None):

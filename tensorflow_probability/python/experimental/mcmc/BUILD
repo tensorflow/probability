@@ -57,6 +57,7 @@ multi_substrate_py_library(
         ":covariance_reducer",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
+        ":gradient_based_trajectory_length_adaptation",
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
@@ -616,6 +617,41 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gradient_based_trajectory_length_adaptation",
+    srcs = ["gradient_based_trajectory_length_adaptation.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental:unnest",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "gradient_based_trajectory_length_adaptation_test",
+    size = "large",
+    srcs = ["gradient_based_trajectory_length_adaptation_test.py"],
+    numpy_tags = ["notap"],  # Mostly gradient-based tests.
+    python_version = "PY3",
+    shard_count = 3,
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
