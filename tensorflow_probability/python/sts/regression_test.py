@@ -142,7 +142,7 @@ class _LinearRegressionTest(test_util.TestCase):
         self.evaluate(
             weights.prior.log_prob(
                 weights.bijector(
-                    tf.random.normal([64],
+                    tf.random.normal(tf.shape(weights.prior.sample(64)),
                                      seed=test_util.test_seed(),
                                      dtype=self.dtype)))))
 

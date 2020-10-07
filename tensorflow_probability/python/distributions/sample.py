@@ -27,7 +27,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -36,16 +36,15 @@ def _make_summary_statistic(attr):
   """Factory for implementing summary statistics, eg, mean, stddev, mode."""
   def _fn(self, **kwargs):
     """Implements summary statistic, eg, mean, stddev, mode."""
-    sample_shape = prefer_static.reshape(self.sample_shape, shape=[-1])
+    sample_shape = ps.reshape(self.sample_shape, shape=[-1])
     x = getattr(self.distribution, attr)(**kwargs)
-    shape = prefer_static.concat([
+    shape = ps.concat([
         self.distribution.batch_shape_tensor(),
-        prefer_static.ones(prefer_static.rank_from_shape(sample_shape),
-                           dtype=sample_shape.dtype),
+        ps.ones(ps.rank_from_shape(sample_shape), dtype=sample_shape.dtype),
         self.distribution.event_shape_tensor(),
     ], axis=0)
     x = tf.reshape(x, shape=shape)
-    shape = prefer_static.concat([
+    shape = ps.concat([
         self.distribution.batch_shape_tensor(),
         sample_shape,
         self.distribution.event_shape_tensor(),
@@ -168,8 +167,8 @@ class Sample(distribution_lib.Distribution):
     return self.distribution.batch_shape
 
   def _event_shape_tensor(self):
-    return prefer_static.concat([
-        prefer_static.reshape(self.sample_shape, shape=[-1]),
+    return ps.concat([
+        ps.reshape(self.sample_shape, shape=[-1]),
         self.distribution.event_shape_tensor(),
     ], axis=0)
 
@@ -186,68 +185,76 @@ class Sample(distribution_lib.Distribution):
                                         self.distribution.event_shape)
 
   def _sample_n(self, n, seed, **kwargs):
-    sample_shape = prefer_static.reshape(self.sample_shape, shape=[-1])
-    fake_sample_ndims = prefer_static.rank_from_shape(sample_shape)
-    event_ndims = prefer_static.rank_from_shape(
+    sample_shape = ps.reshape(self.sample_shape, shape=[-1])
+    fake_sample_ndims = ps.rank_from_shape(sample_shape)
+    event_ndims = ps.rank_from_shape(
         self.distribution.event_shape_tensor, self.distribution.event_shape)
-    batch_ndims = prefer_static.rank_from_shape(
+    batch_ndims = ps.rank_from_shape(
         self.distribution.batch_shape_tensor, self.distribution.batch_shape)
-    perm = prefer_static.concat([
+    perm = ps.concat([
         [0],
-        prefer_static.range(1 + fake_sample_ndims,
-                            1 + fake_sample_ndims + batch_ndims,
-                            dtype=tf.int32),
-        prefer_static.range(1, 1 + fake_sample_ndims, dtype=tf.int32),
-        prefer_static.range(1 + fake_sample_ndims + batch_ndims,
-                            1 + fake_sample_ndims + batch_ndims + event_ndims,
-                            dtype=tf.int32),
+        ps.range(1 + fake_sample_ndims,
+                 1 + fake_sample_ndims + batch_ndims,
+                 dtype=tf.int32),
+        ps.range(1, 1 + fake_sample_ndims, dtype=tf.int32),
+        ps.range(1 + fake_sample_ndims + batch_ndims,
+                 1 + fake_sample_ndims + batch_ndims + event_ndims,
+                 dtype=tf.int32),
     ], axis=0)
     x = self.distribution.sample(
-        prefer_static.concat([[n], sample_shape], axis=0),
+        ps.concat([[n], sample_shape], axis=0),
         seed=seed,
         **kwargs)
     return tf.transpose(a=x, perm=perm)
 
   def _log_prob(self, x, **kwargs):
-    batch_ndims = prefer_static.rank_from_shape(
+    batch_ndims = ps.rank_from_shape(
         self.distribution.batch_shape_tensor,
         self.distribution.batch_shape)
-    extra_sample_ndims = prefer_static.rank_from_shape(self.sample_shape)
-    event_ndims = prefer_static.rank_from_shape(
+    extra_sample_ndims = ps.rank_from_shape(self.sample_shape)
+    event_ndims = ps.rank_from_shape(
         self.distribution.event_shape_tensor,
         self.distribution.event_shape)
-    ndims = prefer_static.rank(x)
+    ndims = ps.rank(x)
     # (1) Expand x's dims.
     d = ndims - batch_ndims - extra_sample_ndims - event_ndims
     x = tf.reshape(
         x,
-        shape=prefer_static.pad(
-            prefer_static.shape(x),
-            paddings=[[prefer_static.maximum(0, -d), 0]],
+        shape=ps.pad(
+            ps.shape(x),
+            paddings=[[ps.maximum(0, -d), 0]],
             constant_values=1))
-    ndims = prefer_static.rank(x)
-    sample_ndims = prefer_static.maximum(0, d)
+    ndims = ps.rank(x)
+    sample_ndims = ps.maximum(0, d)
     # (2) Transpose x's dims.
-    sample_dims = prefer_static.range(0, sample_ndims)
-    batch_dims = prefer_static.range(sample_ndims, sample_ndims + batch_ndims)
-    extra_sample_dims = prefer_static.range(
+    sample_dims = ps.range(0, sample_ndims)
+    batch_dims = ps.range(sample_ndims, sample_ndims + batch_ndims)
+    extra_sample_dims = ps.range(
         sample_ndims + batch_ndims,
         sample_ndims + batch_ndims + extra_sample_ndims)
-    event_dims = prefer_static.range(
+    event_dims = ps.range(
         sample_ndims + batch_ndims + extra_sample_ndims,
         ndims)
-    perm = prefer_static.concat(
+    perm = ps.concat(
         [sample_dims, extra_sample_dims, batch_dims, event_dims], axis=0)
     x = tf.transpose(a=x, perm=perm)
     # (3) Compute x's log_prob.
     lp = self.distribution.log_prob(x, **kwargs)
-    # (4) Make the final reduction in x.
-    axis = prefer_static.range(sample_ndims, sample_ndims + extra_sample_ndims)
+    # (4) Ensure lp is fully broadcast in the sample dims, i.e. ensure lp has
+    #     full sample shape in the sample axes, before we reduce.
+    bcast_lp_shape = ps.broadcast_shape(
+        ps.shape(lp),
+        ps.concat([ps.ones([sample_ndims], tf.int32),
+                   ps.reshape(self.sample_shape, shape=[-1]),
+                   ps.ones([batch_ndims], tf.int32)], axis=0))
+    lp = tf.broadcast_to(lp, bcast_lp_shape)
+    # (5) Make the final reduction in x.
+    axis = ps.range(sample_ndims, sample_ndims + extra_sample_ndims)
     return tf.reduce_sum(lp, axis=axis)
 
   def _entropy(self, **kwargs):
     h = self.distribution.entropy(**kwargs)
-    n = prefer_static.reduce_prod(self.sample_shape)
+    n = ps.reduce_prod(self.sample_shape)
     return tf.cast(x=n, dtype=h.dtype) * h
 
   _mean = _make_summary_statistic('mean')
@@ -343,5 +350,5 @@ def _kl_sample(a, b, name='kl_sample'):
   with tf.control_dependencies(assertions):
     kl = kullback_leibler.kl_divergence(
         a.distribution, b.distribution, name=name)
-    n = prefer_static.reduce_prod(a.sample_shape)
+    n = ps.reduce_prod(a.sample_shape)
     return tf.cast(x=n, dtype=kl.dtype) * kl

@@ -266,6 +266,19 @@ class SampleDistributionTest(test_util.TestCase):
       self.evaluate([v.initializer for v in dist.trainable_variables])
       self.evaluate(dist.mean())
 
+  def test_broadcast_event(self):
+    d = tfd.Sample(tfd.Normal(0, 1, validate_args=True), 4, validate_args=True)
+    # Batch of 2 events: works.
+    two_batch = d.log_prob(tf.zeros([2, 4]))
+    self.assertEqual((2,), self.evaluate(two_batch).shape)
+    # Broadcast of event: works.
+    self.assertAllEqual(two_batch, d.log_prob(tf.zeros([2, 1])))
+
+  def test_misshapen_event(self):
+    d = tfd.Sample(tfd.Normal(0, 1, validate_args=True), 4, validate_args=True)
+    with self.assertRaisesRegexp(ValueError,
+                                 r'Incompatible shapes for broadcasting'):
+      self.evaluate(d.log_prob(tf.zeros([3])))
 
 if __name__ == '__main__':
   tf.test.main()
