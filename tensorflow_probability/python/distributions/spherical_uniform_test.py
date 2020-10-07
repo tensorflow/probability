@@ -230,7 +230,7 @@ class _SphericalUniformTest(object):
     x = np.array([1., 0.2, 0.3], dtype=self.dtype)
     with self.assertRaisesOpError('must sum to `1`'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x))
+          dist.experimental_default_event_space_bijector().inverse(x))
 
 
 @test_util.test_all_tf_execution_regimes

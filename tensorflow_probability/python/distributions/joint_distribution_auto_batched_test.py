@@ -614,7 +614,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
 
     joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
-    joint_bijector = joint._experimental_default_event_space_bijector()
+    joint_bijector = joint.experimental_default_event_space_bijector()
     x = self.evaluate(joint.sample(seed=test_util.test_seed()))
     self.assertAllClose(
         x,

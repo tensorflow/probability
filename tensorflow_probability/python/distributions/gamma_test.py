@@ -590,7 +590,7 @@ class GammaTest(test_util.TestCase):
     dist = tfd.Gamma(
         concentration=[3.], rate=[3., 2., 5.4], validate_args=True)
     x = np.array([-4.2, -0.3, -1e-6])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

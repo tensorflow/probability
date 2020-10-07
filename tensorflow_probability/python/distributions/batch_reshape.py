@@ -256,7 +256,7 @@ class BatchReshape(distribution_lib.Distribution):
 
   def _default_event_space_bijector(self):
     base_bijector = (
-        self.distribution._experimental_default_event_space_bijector())  # pylint: disable=protected-access
+        self.distribution.experimental_default_event_space_bijector())
     if base_bijector is None:
       return None
     inverse_event_shape = base_bijector.inverse_event_shape(self.event_shape)

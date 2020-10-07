@@ -766,7 +766,7 @@ class _DefaultJointBijector(bijector_lib.Bijector):
     try:
       while True:
         dist = d.distribution if type(d).__name__ == 'Root' else d
-        bijector = dist._experimental_default_event_space_bijector()
+        bijector = dist.experimental_default_event_space_bijector()
 
         # For discrete distributions, the default event space bijector is None.
         # For a joint distribution's discrete components, we want the behavior
@@ -786,7 +786,7 @@ class _DefaultJointBijector(bijector_lib.Bijector):
     """For forward/inverse static event shapes."""
     input_shapes = self._jd._model_flatten(input_shapes)
     support_bijectors = [
-        d._experimental_default_event_space_bijector()
+        d.experimental_default_event_space_bijector()
         for d in self._jd._get_single_sample_distributions()]
     output_shapes = [
         getattr(bijector, event_shape_attr)(input_shape)

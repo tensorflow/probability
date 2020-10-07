@@ -613,10 +613,10 @@ class _BatchReshapeTest(object):
     reshape_dist = tfd.BatchReshape(
         dist, batch_shape=batch_shape, validate_args=True)
     x = self.evaluate(
-        dist._experimental_default_event_space_bijector()(
+        dist.experimental_default_event_space_bijector()(
             10. * tf.ones(dist.batch_shape)))
     x_reshape = self.evaluate(
-        reshape_dist._experimental_default_event_space_bijector()(
+        reshape_dist.experimental_default_event_space_bijector()(
             10. * tf.ones(reshape_dist.batch_shape)))
     self.assertAllEqual(tf.reshape(x, batch_shape), x_reshape)
 
@@ -625,7 +625,7 @@ class _BatchReshapeTest(object):
     reshape_dist = tfd.BatchReshape(dist, batch_shape=(), validate_args=True)
     eps = 1e-6
     bijector_test_util.assert_scalar_congruency(
-        reshape_dist._experimental_default_event_space_bijector(),
+        reshape_dist.experimental_default_event_space_bijector(),
         lower_x=2+eps, upper_x=10-eps, eval_func=self.evaluate, rtol=.15)
 
   def test_default_event_space_bijector_bijective_and_finite(self):
@@ -647,7 +647,7 @@ class _BatchReshapeTest(object):
 
     self.evaluate(low.initializer)
     bijector_test_util.assert_bijective_and_finite(
-        reshape_dist._experimental_default_event_space_bijector(),
+        reshape_dist.experimental_default_event_space_bijector(),
         x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-4)
 
 

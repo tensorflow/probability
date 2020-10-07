@@ -361,7 +361,7 @@ class HalfNormalTest(test_util.TestCase):
   def testSupportBijectorOutsideRange(self):
     dist = tfd.HalfNormal(scale=[3.1, 2., 5.4], validate_args=True)
     x = np.array([-4.2, -1e-6, -1.3])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

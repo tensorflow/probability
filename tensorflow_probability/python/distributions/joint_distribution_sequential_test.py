@@ -588,7 +588,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
     ]
 
     jd = tfd.JointDistributionSequential(dist_fns, validate_args=True)
-    joint_bijector = jd._experimental_default_event_space_bijector()
+    joint_bijector = jd.experimental_default_event_space_bijector()
 
     # define a sample in the unconstrained space and construct the component
     # distributions
@@ -596,11 +596,11 @@ class JointDistributionSequentialTest(test_util.TestCase):
     bijectors = []
     y = []
 
-    b = dist_fns[0]._experimental_default_event_space_bijector()
+    b = dist_fns[0].experimental_default_event_space_bijector()
     bijectors.append(b)
     y.append(b(x[0]))
     for i in range(1, 3):
-      b = dist_fns[i](y[i - 1])._experimental_default_event_space_bijector()
+      b = dist_fns[i](y[i - 1]).experimental_default_event_space_bijector()
       y.append(b(x[i]))
       bijectors.append(b)
 
@@ -626,10 +626,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
     ildj = joint_bijector.inverse_log_det_jacobian(y, event_ndims)
 
     bijectors = []
-    bijectors.append(dist_fns[0]._experimental_default_event_space_bijector())
+    bijectors.append(dist_fns[0].experimental_default_event_space_bijector())
     for i in range(1, 3):
       bijectors.append(
-          dist_fns[i](y[i - 1])._experimental_default_event_space_bijector())
+          dist_fns[i](y[i - 1]).experimental_default_event_space_bijector())
 
     inverse_plus = [b.inverse(y[i] + delta) for i, b in enumerate(bijectors)]
     inverse_minus = [b.inverse(y[i] - delta) for i, b in enumerate(bijectors)]
@@ -667,7 +667,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
               bijectors[i].inverse_event_shape_tensor(event_shapes[i])))
 
     # test shared cache
-    joint_bijector_2 = jd._experimental_default_event_space_bijector()
+    joint_bijector_2 = jd.experimental_default_event_space_bijector()
     y_1 = joint_bijector.forward(x)
     y_2 = joint_bijector_2.forward(x)
     for a, b in zip(y_1, y_2):

@@ -206,7 +206,7 @@ class JointDistributionPinned(object):
   `tfp.distributions.Uniform(-3., 2.)` to the real line, we might use
   `tfp.bijectors.Sigmoid(low=-3., high=2.)`. In support of such use cases,
   most distributions (including the `JointDistribution*` classes) provide a
-  `_experimental_default_event_space_bijector()` method.
+  `experimental_default_event_space_bijector()` method.
 
   When these transformations may be dependent on ancestral parts of a joint
   distribution, and some of those parameters may be pinned, it is helpful to
@@ -235,7 +235,7 @@ class JointDistributionPinned(object):
   data = joint.sample(upper=fixed_upper)['obs']
 
   pinned = tfde.JointDistributionPinned(joint, upper=fixed_upper, obs=data)
-  bij = pinned._experimental_default_event_space_bijector()
+  bij = pinned.experimental_default_event_space_bijector()
   pulled_back_shape = bij.inverse_event_shape(pinned.event_shape)
 
   # Fit an ensemble using SGD.
@@ -417,7 +417,7 @@ class JointDistributionPinned(object):
     return self._prune(self.distribution.event_shape_tensor(),
                        retain='unpinned')
 
-  def _experimental_default_event_space_bijector(self, *args, **kwargs):
+  def experimental_default_event_space_bijector(self, *args, **kwargs):
     """A bijector to pull back unpinned values to unconstrained reals."""
     if args or kwargs:
       return joint_distribution._DefaultJointBijector(

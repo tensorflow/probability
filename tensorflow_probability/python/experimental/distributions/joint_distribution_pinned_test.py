@@ -152,7 +152,7 @@ class JointDistributionPinnedParameterizedTest(test_util.TestCase):
             pinned.unnormalized_log_prob_parts(s1).unpinned)),
         pinned.unnormalized_log_prob(s1))
 
-    bij = pinned._experimental_default_event_space_bijector()
+    bij = pinned.experimental_default_event_space_bijector()
     pullback_event_shp = bij.inverse_event_shape(pinned.event_shape)
     self.assertAllEqualNested(
         pinned.event_shape, bij.forward_event_shape(pullback_event_shp))
@@ -323,7 +323,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
         tfd.Uniform(-1., 1.),
         lambda a: tfd.Uniform(a + tf.ones_like(a), a + tf.constant(2, a.dtype)),
         lambda b, a: tfd.Uniform(a, b, name='c')])
-    bij = jd._experimental_default_event_space_bijector(a=-.5, b=1.)
+    bij = jd.experimental_default_event_space_bijector(a=-.5, b=1.)
     self.assertAllClose((2/3,), tf.math.sigmoid(bij.inverse((0.5,))))
 
     @tfd.JointDistributionCoroutine
@@ -332,7 +332,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
       x = yield root(tfd.Normal(0., 1., name='x'))
       y = yield root(tfd.Gamma(1., 1., name='y'))
       yield tfd.Normal(x, y, name='z')
-    bij = model._experimental_default_event_space_bijector(
+    bij = model.experimental_default_event_space_bijector(
         model.sample(seed=test_util.test_seed())[-1:])
     self.assertAllCloseNested(
         structural_tuple.structtuple(['x', 'y'])(1., 2.),
@@ -340,7 +340,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
 
   def test_bijector_unconstrained_shapes(self):
     pinned = tfde.JointDistributionPinned(jd_coroutine(), x=1., y=[1., 1])
-    bij = pinned._experimental_default_event_space_bijector()
+    bij = pinned.experimental_default_event_space_bijector()
     self.assertEqual(
         structural_tuple.structtuple(['w', 'z'])([], [2, 6]),
         bij.inverse_event_shape(pinned.event_shape))
@@ -355,8 +355,8 @@ class JointDistributionPinnedTest(test_util.TestCase):
     pinned0 = tfde.JointDistributionPinned(
         jd_coroutine(), x=1., z=tf.eye(4, batch_shape=[2]))
     pinned1 = tfde.JointDistributionPinned(jd_coroutine(), x=1.)
-    bij0 = pinned0._experimental_default_event_space_bijector()
-    bij1 = pinned1._experimental_default_event_space_bijector(
+    bij0 = pinned0.experimental_default_event_space_bijector()
+    bij1 = pinned1.experimental_default_event_space_bijector(
         z=tf.eye(4, batch_shape=[2]))
     self.assertEqual(bij0.inverse_event_shape(pinned0.event_shape),
                      bij1.inverse_event_shape(pinned0.event_shape))

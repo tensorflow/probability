@@ -672,7 +672,7 @@ class ScalarToMultiTest(test_util.TestCase):
         validate_args=True)
     x = np.array([-4.2, -1e-6, -1.3])
     bijector_inverse_x = (
-        log_normal._experimental_default_event_space_bijector().inverse(x))
+        log_normal.experimental_default_event_space_bijector().inverse(x))
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 

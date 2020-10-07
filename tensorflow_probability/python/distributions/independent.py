@@ -265,7 +265,7 @@ class Independent(distribution_lib.Distribution):
     return self.distribution.mode(**kwargs)
 
   def _default_event_space_bijector(self):
-    return self.distribution._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+    return self.distribution.experimental_default_event_space_bijector()
 
   def _parameter_control_dependencies(self, is_init):
     # self, distribution, reinterpreted_batch_ndims, validate_args):

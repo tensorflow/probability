@@ -263,7 +263,7 @@ class Sample(distribution_lib.Distribution):
   _mode = _make_summary_statistic('mode')
 
   def _default_event_space_bijector(self):
-    return self.distribution._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+    return self.distribution.experimental_default_event_space_bijector()
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

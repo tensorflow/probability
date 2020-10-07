@@ -426,11 +426,11 @@ class _PowerSphericalTest(object):
     x[0][0] += 0.01
     with self.assertRaisesOpError('must sum to `1`'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[0]))
+          dist.experimental_default_event_space_bijector().inverse(x[0]))
 
     with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[1]))
+          dist.experimental_default_event_space_bijector().inverse(x[1]))
 
   def VerifyPowerSphericaUniformZeroKL(self, dim):
     seed_stream = test_util.test_seed_stream()

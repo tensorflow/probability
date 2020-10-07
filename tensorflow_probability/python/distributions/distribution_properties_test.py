@@ -207,7 +207,7 @@ class EventSpaceBijectorsTest(test_util.TestCase):
       hp.assume(np.all(np.abs(loc / scale) < 1e7))
 
   def check_event_space_bijector_constrains(self, dist, data):
-    event_space_bijector = dist._experimental_default_event_space_bijector()
+    event_space_bijector = dist.experimental_default_event_space_bijector()
     if event_space_bijector is None:
       return
 

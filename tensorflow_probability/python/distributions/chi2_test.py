@@ -167,7 +167,7 @@ class Chi2Test(test_util.TestCase):
     df = np.array([2., 4., 7.])
     dist = tfd.Chi2(df, validate_args=True)
     x = np.array([-8.3, -0.4, -1e-6])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

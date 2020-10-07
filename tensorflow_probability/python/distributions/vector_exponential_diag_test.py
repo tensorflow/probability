@@ -186,7 +186,7 @@ class VectorExponentialDiagTest(test_util.TestCase):
         scale_diag=[[3., 2., 1.], [4., 5., 6.]],
         validate_args=True)
     x = np.array([[-8.3, -0.4, -1e-6]])
-    bijector_inverse_x = vex._experimental_default_event_space_bijector(
+    bijector_inverse_x = vex.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

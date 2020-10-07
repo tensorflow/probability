@@ -421,7 +421,7 @@ class BetaTest(test_util.TestCase):
     dist = tfd.Beta(a, b, validate_args=True)
     eps = 1e-6
     x = np.array([-2.3, -eps, 1. + eps, 1.4])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

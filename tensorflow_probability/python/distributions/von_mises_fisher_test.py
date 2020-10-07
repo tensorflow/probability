@@ -507,11 +507,11 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     x[0][0] += 0.01
     with self.assertRaisesOpError('must sum to `1`'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[0]))
+          dist.experimental_default_event_space_bijector().inverse(x[0]))
 
     with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[1]))
+          dist.experimental_default_event_space_bijector().inverse(x[1]))
 
 if __name__ == '__main__':
   tf.test.main()

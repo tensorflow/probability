@@ -356,7 +356,7 @@ class InverseGammaTest(test_util.TestCase):
         scale=2.,
         validate_args=True)
     x = np.array([-7.2, -1e-6, -1.3])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

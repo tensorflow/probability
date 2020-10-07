@@ -366,7 +366,7 @@ class UniformTest(test_util.TestCase):
     dist = tfd.Uniform(low=low, high=high, validate_args=False)
     eps = 1e-6
     x = np.array([1. - eps, 1.5, 6. + eps, -5. - eps])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

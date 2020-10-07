@@ -474,7 +474,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
         likelihood(
             prior.sample(seed=seed_stream())[-1]).sample(seed=seed_stream()))
 
-    bij = prior._experimental_default_event_space_bijector()
+    bij = prior.experimental_default_event_space_bijector()
 
     def target_log_prob(scale, conc, corr):
       return prior.log_prob(scale, conc, corr) + likelihood(corr).log_prob(obs)

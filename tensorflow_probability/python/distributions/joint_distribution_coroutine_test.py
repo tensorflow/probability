@@ -842,7 +842,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       yield tfd.Logistic(b, a, validate_args=True)
 
     jd = tfd.JointDistributionCoroutine(dists, validate_args=True)
-    joint_bijector = jd._experimental_default_event_space_bijector()
+    joint_bijector = jd.experimental_default_event_space_bijector()
 
     def _finite_difference_ldj(bijectors, transform_direction, xs, delta):
       transform_plus = [getattr(b, transform_direction)(x + delta)
@@ -862,7 +862,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       bijectors = []
       try:
         while True:
-          b = d._experimental_default_event_space_bijector()
+          b = d.experimental_default_event_space_bijector()
           y = ys[index] if xs is None else b(xs[index])
           if ys is None:
             y = b(xs[index])
@@ -1014,7 +1014,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     assert_equal(sample_type(a=[], b=[], c=[]), model.batch_shape_tensor())
 
     # Check the default bijector.
-    b = model._experimental_default_event_space_bijector()
+    b = model.experimental_default_event_space_bijector()
     sample2 = self.evaluate(b.forward(b.inverse(sample)))
     self.assertAllClose(sample2, sample)
 

@@ -491,12 +491,12 @@ class TransformedDistribution(distribution_lib.Distribution):
     tensorshape_util.set_shape(entropy, self.batch_shape)
     return entropy
 
-  # pylint: disable=protected-access, not-callable
+  # pylint: disable=not-callable
   def _default_event_space_bijector(self):
-    if self.distribution._experimental_default_event_space_bijector() is None:
+    if self.distribution.experimental_default_event_space_bijector() is None:
       return None
     return self.bijector(
-        self.distribution._experimental_default_event_space_bijector())
-  # pylint: enable=protected-access, not-callable
+        self.distribution.experimental_default_event_space_bijector())
+  # pylint: enable=not-callable
 
   _composite_tensor_shape_params = ()

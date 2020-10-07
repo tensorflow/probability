@@ -394,7 +394,7 @@ class _InverseGaussianTest(object):
         validate_args=True)
     eps = 1e-6
     x = np.array([[-7.2, -eps, -1.3], [-5., -12., -eps]])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

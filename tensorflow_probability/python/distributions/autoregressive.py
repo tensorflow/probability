@@ -324,7 +324,5 @@ class Autoregressive(distribution.Distribution):
 
     return assertions
 
-  # pylint: disable=protected-access
   def _default_event_space_bijector(self):
-    return self._get_distribution0(
-        )._experimental_default_event_space_bijector()
+    return self._get_distribution0().experimental_default_event_space_bijector()

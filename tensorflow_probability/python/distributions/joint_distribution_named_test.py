@@ -567,7 +567,7 @@ class JointDistributionNamedTest(test_util.TestCase):
 
     # The event space bijector is inherited from `JointDistributionSequential`
     # and is tested more thoroughly in the tests for that class.
-    b = d._experimental_default_event_space_bijector()
+    b = d.experimental_default_event_space_bijector()
     y = self.evaluate(d.sample(seed=test_util.test_seed()))
     y_ = self.evaluate(b.forward(b.inverse(y)))
     self.assertAllClose(y, y_)

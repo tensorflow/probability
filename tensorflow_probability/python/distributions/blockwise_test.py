@@ -246,10 +246,10 @@ class BlockwiseTest(test_util.TestCase):
     dist = tfd.Exponential(rate=[1., 2., 6.], validate_args=True)
     blockwise_dist = tfd.Blockwise(dist, validate_args=True)
     x = self.evaluate(
-        dist._experimental_default_event_space_bijector()(
+        dist.experimental_default_event_space_bijector()(
             tf.ones(dist.batch_shape)))
     x_blockwise = self.evaluate(
-        blockwise_dist._experimental_default_event_space_bijector()(
+        blockwise_dist.experimental_default_event_space_bijector()(
             tf.ones(blockwise_dist.batch_shape)))
     self.assertAllEqual(x, x_blockwise)
 
