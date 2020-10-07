@@ -347,7 +347,7 @@ def _bates_pdf(total_count, low, high, dtype, value):
     value_centered = (value - low) / range_
     value_adj = tf.clip_by_value(value_centered, 0., 1.)
     value_adj = tf.where(value_adj < .5, value_adj, 1. - value_adj)
-    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, low)
+    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, 0.)
     # Flatten to make segments; need to broadcast before flattening.
     shape = ps.broadcast_shape(ps.shape(value_adj), ps.shape(total_count))
     total_count_b = ps.broadcast_to(total_count, shape)
@@ -429,7 +429,7 @@ def _bates_cdf(total_count, low, high, dtype, value):
     value_centered = (value - low) / (high - low)
     value_adj = tf.clip_by_value(value_centered, 0., 1.)
     value_adj = tf.where(value_adj < .5, value_adj, 1. - value_adj)
-    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, low)
+    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, 0.)
     # Flatten to make segments; need to broadcast before flattening.
     shape = ps.broadcast_shape(ps.shape(value_adj), ps.shape(total_count))
     total_count_b = ps.broadcast_to(total_count, shape)
