@@ -183,8 +183,6 @@ AUTOVECTORIZATION_ATOL.update({
 COMPOSITE_TENSOR_IS_BROKEN = [
     'BatchNormalization',
     'Inline',  # callable
-    'ScaleMatvecDiag',  # linear operator
-    'ScaleMatvecTriL',  # linear operator
     'TransformDiagonal',  # callable
 ]
 
