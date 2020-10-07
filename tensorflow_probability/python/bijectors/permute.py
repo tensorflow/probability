@@ -95,7 +95,8 @@ class Permute(bijector.Bijector):
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'permute') as name:
-      axis = tensor_util.convert_nonref_to_tensor(axis, name='axis')
+      axis = tensor_util.convert_nonref_to_tensor(
+          axis, name='axis', as_shape_tensor=True)
       if not dtype_util.is_integer(axis.dtype):
         raise TypeError('axis.dtype ({}) should be `int`-like.'.format(
             dtype_util.name(axis.dtype)))
