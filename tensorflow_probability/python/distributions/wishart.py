@@ -80,7 +80,7 @@ class WishartLinearOperator(distribution.Distribution):
                input_output_cholesky=False,
                validate_args=False,
                allow_nan_stats=True,
-               name=None):
+               name='WishartLinearOperator'):
     """Construct Wishart distributions.
 
     Args:
