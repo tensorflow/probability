@@ -312,7 +312,8 @@ class HistogramTest(test_util.TestCase):
     # scale the expected counts by the average weight
     expected_counts = np.stack([event_0_expected_counts,
                                 event_1_expected_counts],
-                               axis=-1) * np.mean(weights, axis=0, keepdims=True)
+                               axis=-1) * np.mean(weights, axis=0,
+                                                  keepdims=True)
 
     self.assertAllClose(
         expected_counts,
