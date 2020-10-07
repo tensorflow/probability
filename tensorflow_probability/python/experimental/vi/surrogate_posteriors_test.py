@@ -18,21 +18,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import functools
-# Dependency imports
-from absl.testing import parameterized
 
+# Dependency imports
+
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
+from tensorflow_probability.python.experimental.vi import surrogate_posteriors
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-_NON_STATISTICAL_PARAMS = ['name', 'validate_args', 'allow_nan_stats']
 
 
 @test_util.test_all_tf_execution_regimes
@@ -253,7 +252,6 @@ def _build_tensor(ndarray, dtype, use_static_shape):
       input=ndarray, shape=ndarray.shape if use_static_shape else None)
 
 
-# TODO(kateslin): Add a test for make_param_dicts.
 @test_util.test_all_tf_execution_regimes
 class _TrainableASVISurrogate(object):
 
@@ -270,7 +268,7 @@ class _TrainableASVISurrogate(object):
     for dist in prior_dists:
       dist_params = dist.parameters
       for param, value in dist_params.items():
-        if param not in _NON_STATISTICAL_PARAMS and value is not None:
+        if param not in surrogate_posteriors._NON_STATISTICAL_PARAMS and value is not None:
           expected_num_trainable_vars += 2  # prior_weight, mean_field_parameter
 
     self.assertLen(surrogate_posterior.trainable_variables,
@@ -317,6 +315,23 @@ class _TrainableASVISurrogate(object):
     _ = self.evaluate(losses)
     _ = self.evaluate(posterior_mean)
     _ = self.evaluate(posterior_stddev)
+
+  def test_make_asvi_trainable_variables(self):
+    prior_dist = self.make_prior_dist()
+    trained_vars = surrogate_posteriors._make_asvi_trainable_variables(
+        prior=prior_dist)
+
+    # Confirm that there is one dictionary per distribution.
+    prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
+    self.assertEqual(len(trained_vars), len(prior_dists))
+
+    # Confirm that there exists correct number of trainable variables.
+    for (prior_distribution, trained_vars_dict) in zip(prior_dists,
+                                                       trained_vars):
+      for param_name, prior_value in prior_distribution.parameters.items():
+        if param_name not in surrogate_posteriors._NON_STATISTICAL_PARAMS and prior_value is not None:
+          self.assertIsInstance(trained_vars_dict[param_name],
+                                surrogate_posteriors.ASVIParameters)
 
 
 @test_util.test_all_tf_execution_regimes

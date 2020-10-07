@@ -307,12 +307,11 @@ def build_factored_surrogate_posterior(
             component_distributions, validate_args=validate_args))
 
 
-def make_asvi_trainable_variables(prior):
+def _make_asvi_trainable_variables(prior):
   """Generates parameter dictionaries given a prior distribution and list."""
   with tf.name_scope('make_asvi_trainable_variables'):
     param_dicts = []
     prior_dists = prior._get_single_sample_distributions()  # pylint: disable=protected-access
-
     for dist in prior_dists:
       actual_dist = dist.distribution if isinstance(dist, Root) else dist
       dist_params = actual_dist.parameters
@@ -333,7 +332,7 @@ def make_asvi_trainable_variables(prior):
                 name='mean_field_parameter/{}/{}'.format(dist.name, param)))
 
       param_dicts.append(new_params_dict)
-    return param_dicts
+  return param_dicts
 
 
 # TODO(kateslin): Add support for models with prior+likelihood written as
@@ -419,7 +418,7 @@ def build_asvi_surrogate_posterior(prior, name=None):
 
   with tf.name_scope(name or 'build_asvi_surrogate_posterior'):
 
-    param_dicts = make_asvi_trainable_variables(prior)
+    param_dicts = _make_asvi_trainable_variables(prior)
 
     def posterior_generator():
 
