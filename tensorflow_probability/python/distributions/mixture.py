@@ -51,6 +51,10 @@ class Mixture(distribution.Distribution):
   The mixture model is defined by a `Categorical` distribution (the mixture)
   and a python list of `Distribution` objects.
 
+  In the common case that the component distributions are all the same
+  `Distribution` class (potentially with different parameters), it's probably
+  better to use `tfp.distributions.MixtureSameFamily` instead.
+
   Methods supported include `log_prob`, `prob`, `mean`, `sample`, and
   `entropy_lower_bound`.
 
@@ -92,6 +96,10 @@ class Mixture(distribution.Distribution):
 
     The `num_classes` of `cat` must be possible to infer at graph construction
     time and match `len(components)`.
+
+    In the common case that the component distributions are all the same
+    `Distribution` class (potentially with different parameters), it's probably
+    better to use `tfp.distributions.MixtureSameFamily` instead.
 
     Args:
       cat: A `Categorical` distribution instance, representing the probabilities
