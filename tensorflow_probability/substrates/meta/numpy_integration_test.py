@@ -46,6 +46,10 @@ class NumpyIntegrationTest(absltest.TestCase):
     f(1.)
     f(np.array([1, 2, 3.]))
 
+  def testVersion(self):
+    """Make sure tfp.__version__ is available to substrates."""
+    self.assertIsInstance(tfp.__version__, str)
+
 
 if __name__ == '__main__':
   absltest.main()
