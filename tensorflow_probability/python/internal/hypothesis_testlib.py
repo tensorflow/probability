@@ -682,6 +682,10 @@ def no_tf_rank_errors():
   # have larger "event" shapes than the distribution itself.
   input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
   input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
+  is_not_implemented_pat = (r'is not implemented for tensors of '
+                            r'rank > (8|9|[1-9][0-9]+).')
+  does_not_work_pat = (r'does not work on tensors with '
+                       r'more than (8|9|[1-9][0-9]+) dimensions')
   pat_1 = _rank_broadcasting_error_pattern(1, 6)
   pat_2 = _rank_broadcasting_error_pattern(6, 1)
   try:
@@ -699,6 +703,18 @@ def no_tf_rank_errors():
       hp.assume(False)
     elif re.search(input_rank_pat, msg):
       # We asked some TF op (PadV2?) to operate on a Tensor of rank >= 7.
+      hp.assume(False)
+    elif re.search(is_not_implemented_pat, msg):
+      # We asked some different TF op (ReverseV2?) to operate on a Tensor of
+      # rank >= 8.
+      hp.assume(False)
+    else:
+      raise
+  except ValueError as e:
+    msg = str(e)
+    if re.search(does_not_work_pat, msg):
+      # We asked some yet different TF op (ReverseV2 in graph mode?) to operate
+      # on a Tensor of rank >= 8.
       hp.assume(False)
     else:
       raise
