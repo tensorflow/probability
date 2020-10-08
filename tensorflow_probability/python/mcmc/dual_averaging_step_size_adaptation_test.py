@@ -90,7 +90,7 @@ class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
         step_size=step_size,
         store_parameters_in_results=store_parameters_in_results)
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     return current_state, previous_kernel_results
 
   def bootstrap_results(self, current_state):
@@ -116,7 +116,7 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
   def inner_kernel(self):
     return self.parameters['inner_kernel']
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     new_state, new_inner_results = self.inner_kernel.one_step(
         current_state, previous_kernel_results.inner_results)
     return new_state, previous_kernel_results._replace(

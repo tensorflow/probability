@@ -337,6 +337,31 @@ class MetropolisHastingsTest(test_util.TestCase):
                         next_state_)
 
   @test_util.jax_disable_test_missing_functionality('stateful sampler/legacy')
+  def testInnerOneStepMissingSeedArg(self):
+    current_state_ = [self.dtype([1, 2]), self.dtype([3, 4])]
+    current_state = [tf.convert_to_tensor(s) for s in current_state_]
+
+    init_inner_kernel_results = InnerKernelResultsWithCorrection(
+        log_acceptance_correction=self.dtype([+300., -300.]),
+        target_log_prob=self.dtype([100., -100.]),
+        grads_target_log_prob=[self.dtype([1.25, 1.5]),
+                               self.dtype([2.25, 2.5])],
+        extraneous=self.dtype([1.75, 2.]))
+
+    one_step_fn = make_one_step_fn(dtype=self.dtype)
+    bootstrap_fn = make_bootstrap_results_fn(init_inner_kernel_results)
+
+    mh = tfp.mcmc.MetropolisHastings(
+        FakeTransitionKernel(
+            one_step_fn=one_step_fn,
+            bootstrap_fn=bootstrap_fn,
+            is_calibrated=True,
+            accepts_seed_arg=False))
+    init_kernel_results = mh.bootstrap_results(current_state)
+    # Verify we can execute a step without an exception, as long as no seed arg
+    # is provided to MH.
+    self.evaluate(mh.one_step(current_state, init_kernel_results))
+
   def testWarnings(self):
     current_state_ = [self.dtype([1, 2]),
                       self.dtype([3, 4])]
@@ -359,21 +384,16 @@ class MetropolisHastingsTest(test_util.TestCase):
           FakeTransitionKernel(
               is_calibrated=True,  # Verify the already-calibrated warning.
               one_step_fn=one_step_fn,
-              bootstrap_fn=bootstrap_fn,
-              # Verify M-H supports legacy kernels lacking seed arg, warns.
-              accepts_seed_arg=False),
-          seed=test_util.test_seed())
+              bootstrap_fn=bootstrap_fn))
       init_kernel_results = mh.bootstrap_results(current_state)
-      _, _ = mh.one_step(current_state, init_kernel_results)
+      _, _ = mh.one_step(current_state, init_kernel_results,
+                         seed=test_util.test_seed())
     w = sorted(w, key=lambda w: str(w.message))
     self.assertRegexpMatches(
         str(w[0].message),
-        r'Seeding.*TransitionKernel.*by constructor argument is deprecated.')
-    self.assertRegexpMatches(
-        str(w[1].message),
         r'`TransitionKernel` is already calibrated')
     self.assertRegexpMatches(
-        str(w[2].message),
+        str(w[1].message),
         r'`TransitionKernel` does not have a `log_acceptance_correction`')
 
 

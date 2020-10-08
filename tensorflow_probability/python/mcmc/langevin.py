@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import warnings
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -31,8 +30,6 @@ from tensorflow_probability.python.math import diag_jacobian
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -57,13 +54,6 @@ class UncalibratedLangevinKernelResults(
         ])):
   """Internal state and diagnostics for Uncalibrated Langevin."""
   __slots__ = ()
-
-
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings('always',
-                        module='tensorflow_probability.*langevin',
-                        append=True)  # Don't override user-set filters.
 
 
 class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
@@ -204,14 +194,10 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
        https://arxiv.org/abs/1309.2983
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
                volatility_fn=None,
-               seed=None,
                parallel_iterations=10,
                name=None):
     """Initializes MALA transition kernel.
@@ -231,11 +217,9 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
         volatility value at `current_state`. Should return a `Tensor` or Python
         `list` of `Tensor`s that must broadcast with the shape of
         `current_state` Defaults to the identity function.
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`.
       parallel_iterations: the number of coordinates for which the gradients of
         the volatility matrix `volatility_fn` can be computed in parallel.
-        Default value: `None` (i.e., no seed).
+        Default value: `None` (i.e., use system default).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'mala_kernel').
 
@@ -251,18 +235,13 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
-    seed_stream = SeedStream(seed, salt='langevin')
-    mh_kwargs = {} if seed is None else dict(seed=seed_stream())
-    uncal_kwargs = {} if seed is None else dict(seed=seed_stream())
     impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedLangevin(
             target_log_prob_fn=target_log_prob_fn,
             step_size=step_size,
             volatility_fn=volatility_fn,
             parallel_iterations=parallel_iterations,
-            name=name,
-            **uncal_kwargs),
-        **mh_kwargs)
+            name=name))
 
     self._impl = impl
     parameters = impl.inner_kernel.parameters.copy()
@@ -282,10 +261,6 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   @property
   def step_size(self):
     return self._impl.inner_kernel.step_size
-
-  @property
-  def seed(self):
-    return self._impl.inner_kernel.seed
 
   @property
   def parallel_iterations(self):
@@ -351,16 +326,12 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
   `MetropolisAdjustedLangevinAlgorithm`.
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
                volatility_fn=None,
                parallel_iterations=10,
                compute_acceptance=True,
-               seed=None,
                name=None):
     """Initializes Langevin diffusion transition kernel.
 
@@ -384,8 +355,6 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
       compute_acceptance: Python 'bool' indicating whether to compute the
         Metropolis log-acceptance ratio used to construct
         `MetropolisAdjustedLangevinAlgorithm` kernel.
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'mala_kernel').
 
@@ -401,7 +370,6 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `volatility_fn` is not callable.
     """
-    self._seed_stream = SeedStream(seed, salt='UncalibratedLangevin')
     # Default value of `volatility_fn` is the identity function.
     if volatility_fn is None:
       volatility_fn = lambda *args: 1.
@@ -413,7 +381,6 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         step_size=step_size,
         volatility_fn=volatility_fn,
         compute_acceptance=tf.convert_to_tensor(compute_acceptance),
-        seed=seed,
         parallel_iterations=parallel_iterations,
         name=name)
 
@@ -432,10 +399,6 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
   @property
   def compute_acceptance(self):
     return self._parameters['compute_acceptance']
-
-  @property
-  def seed(self):
-    return self._parameters['seed']
 
   @property
   def parallel_iterations(self):
@@ -479,13 +442,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
             previous_kernel_results.diffusion_drift,
             self.parallel_iterations)
 
-        # TODO(b/159636942): Clean up after 2020-09-20.
-        if seed is not None:
-          seed = samplers.sanitize_seed(seed)
-        else:
-          if self._seed_stream.original_seed is not None:
-            warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
-          seed = samplers.sanitize_seed(self._seed_stream())
+        seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
         seeds = samplers.split_seed(
             seed, n=len(current_state_parts), salt='langevin.one_step')
 

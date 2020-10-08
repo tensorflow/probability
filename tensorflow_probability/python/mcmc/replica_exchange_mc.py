@@ -32,8 +32,6 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -163,8 +161,7 @@ def default_swap_proposal_fn(prob_swap, name=None):
     """Make random shuffle using only one time swaps."""
     del step_count  # Unused for this function.
     with tf.name_scope(name or 'adjacent_swaps'):
-      parity_seed, proposal_seed = samplers.split_seed(
-          seed, salt='random_adjacent_shuffle')
+      parity_seed, proposal_seed = samplers.split_seed(seed)
       # u selects parity.  E.g.,
       #  u==False ==> [1, 0, 3, 2, 4] even parity swaps
       #  u==True ==>  [0, 2, 1, 4, 3] odd parity swaps
@@ -330,10 +327,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   # If everything was Normal, step_size should be ~ sqrt(temperature).
   step_size = 0.5 / tf.sqrt(inverse_temperatures)
 
-  def make_kernel_fn(target_log_prob_fn, seed):
+  def make_kernel_fn(target_log_prob_fn):
     return tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
-        seed=seed, step_size=step_size, num_leapfrog_steps=3)
+        step_size=step_size, num_leapfrog_steps=3)
 
   remc = tfp.mcmc.ReplicaExchangeMC(
       target_log_prob_fn=target.log_prob,
@@ -417,16 +414,12 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
        https://arxiv.org/abs/physics/0508111
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                inverse_temperatures,
                make_kernel_fn,
                swap_proposal_fn=default_swap_proposal_fn(1.),
                state_includes_replicas=False,
-               seed=None,
                validate_args=False,
                name=None):
     """Instantiates this object.
@@ -440,9 +433,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         second dimension through the rightmost can provide different temperature
         to different batch members, doing a left-justified broadcast.
       make_kernel_fn: Python callable which takes a `target_log_prob_fn`
-        arg and returns a `tfp.mcmc.TransitionKernel` instance. Passing a
-        function taking `(target_log_prob_fn, seed)` deprecated but supported
-        until 2020-09-20.
+        arg and returns a `tfp.mcmc.TransitionKernel` instance.
       swap_proposal_fn: Python callable which take a number of replicas, and
         returns `swaps`, a shape `[num_replica] + batch_shape` `Tensor`, where
         axis 0 indexes a permutation of `{0,..., num_replica-1}`, designating
@@ -451,8 +442,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         of each state sample should index replicas. If `True`, the leftmost
         dimension of the `current_state` kwarg to `tfp.mcmc.sample_chain` will
         be interpreted as indexing replicas.
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`. Default value: `None` (i.e., no seed).
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -465,7 +454,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
     """
     self._parameters = {k: v for k, v in locals().items() if v is not self}
     self._state_includes_replicas = state_includes_replicas
-    self._seed_stream = SeedStream(seed, salt='replica_mc')
 
   @property
   def target_log_prob_fn(self):
@@ -486,10 +474,6 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   @property
   def swap_proposal_fn(self):
     return self._parameters['swap_proposal_fn']
-
-  @property
-  def seed(self):
-    return self._parameters['seed']
 
   @property
   def validate_args(self):
@@ -555,52 +539,28 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
           self.target_log_prob_fn,
           inverse_temperatures)
-      # Seed handling complexity is due to users possibly expecting an old-style
-      # stateful seed to be passed to `self.make_kernel_fn`, and no seed
-      # expected by `kernel.one_step`.
-      # In other words:
-      # - We try `make_kernel_fn` without a seed first; this is the future. The
-      #   kernel will receive a seed later, as part of `one_step`.
-      # - If the user code doesn't like that (Python complains about a missing
-      #   required argument), we warn and fall back to the previous behavior.
+      # TODO(b/159636942): Clean up the helpful error msg after 2020-11-10.
       try:
         inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
             target_log_prob_for_inner_kernel)
       except TypeError as e:
         if 'argument' not in str(e):
           raise
-        warnings.warn(
-            'The `seed` argument to `ReplicaExchangeMC`s `make_kernel_fn` is '
-            'deprecated. `TransitionKernel` instances now receive seeds via '
+        raise TypeError(
+            '`ReplicaExchangeMC`s `make_kernel_fn` no longer receives a `seed` '
+            'argument. `TransitionKernel` instances now receive seeds via '
             '`one_step`.')
-        inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
-            target_log_prob_for_inner_kernel, self._seed_stream())
 
-      # Now that we've constructed the TransitionKernel instance:
-      # - If we were given a seed, we sanitize it to stateless and pass along
-      #   to `kernel.one_step`. If it doesn't like that, we crash and propagate
-      #   the error.  Rationale: The contract is stateless sampling given
-      #   seed, and doing otherwise would not meet it.
-      # - If not given a seed, we don't pass one along. This avoids breaking
-      #   underlying kernels lacking a `seed` arg on `one_step`.
-      # TODO(b/159636942): Clean up after 2020-09-20.
-      if seed is not None:
-        seed = samplers.sanitize_seed(seed)
-        inner_seed, swap_seed, logu_seed = samplers.split_seed(
-            seed, n=3, salt='remc_one_step')
-        inner_kwargs = dict(seed=inner_seed)
-      else:
-        if self._seed_stream.original_seed is not None:
-          warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
-        inner_kwargs = {}
-        swap_seed, logu_seed = samplers.split_seed(self._seed_stream())
+      seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
+      inner_seed, swap_seed, logu_seed = samplers.split_seed(seed, n=3)
+      # Step the inner TransitionKernel.
       [
           pre_swap_replica_states,
           pre_swap_replica_results,
       ] = inner_kernel.one_step(
           previous_kernel_results.post_swap_replica_states,
           previous_kernel_results.post_swap_replica_results,
-          **inner_kwargs)
+          seed=inner_seed)
 
       pre_swap_replica_target_log_prob = _get_field(
           # These are tempered log probs (have been divided by temperature).
@@ -754,7 +714,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           inverse_temperatures=previous_kernel_results.inverse_temperatures,
           swaps=swaps,
           step_count=previous_kernel_results.step_count + 1,
-          seed=samplers.zeros_seed() if seed is None else seed,
+          seed=seed,
       )
 
       return states, post_swap_kernel_results
@@ -811,26 +771,17 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
           self.target_log_prob_fn,
           inverse_temperatures)
-      # Seed handling complexity is due to users possibly expecting an old-style
-      # stateful seed to be passed to `self.make_kernel_fn`.
-      # In other words:
-      # - We try `make_kernel_fn` without a seed first; this is the future. The
-      #   kernel will receive a seed later, as part of `one_step`.
-      # - If the user code doesn't like that (Python complains about a missing
-      #   required argument), we fall back to the previous behavior and warn.
+      # TODO(b/159636942): Clean up the helpful error msg after 2020-11-10.
       try:
         inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
             target_log_prob_for_inner_kernel)
       except TypeError as e:
         if 'argument' not in str(e):
           raise
-        warnings.warn(
-            'The second (`seed`) argument to `ReplicaExchangeMC`s '
-            '`make_kernel_fn` is deprecated. `TransitionKernel` instances now '
-            'receive seeds via `bootstrap_results` and `one_step`. This '
-            'fallback may become an error 2020-09-20.')
-        inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
-            target_log_prob_for_inner_kernel, self._seed_stream())
+        raise TypeError(
+            '`ReplicaExchangeMC`s `make_kernel_fn` no longer receives a second '
+            '(`seed`) argument. `TransitionKernel` instances now receive seeds '
+            'via `one_step`.')
 
       replica_results = inner_kernel.bootstrap_results(replica_states)
 

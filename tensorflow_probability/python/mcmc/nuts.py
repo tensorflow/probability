@@ -38,7 +38,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import warnings
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -50,8 +49,6 @@ from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 JAX_MODE = False
 
@@ -74,13 +71,6 @@ GENERALIZED_UTURN = True              # Default: True
 __all__ = [
     'NoUTurnSampler',
 ]
-
-
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings('always',
-                        module='tensorflow_probability.*nuts',
-                        append=True)  # Don't override user-set filters.
 
 
 class NUTSKernelResults(
@@ -207,9 +197,6 @@ class NoUTurnSampler(TransitionKernel):
   _arXiv preprint arXiv:1701.02434_, 2018. https://arxiv.org/abs/1701.02434
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -217,7 +204,6 @@ class NoUTurnSampler(TransitionKernel):
                max_energy_diff=1000.,
                unrolled_leapfrog_steps=1,
                parallel_iterations=10,
-               seed=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -243,8 +229,6 @@ class NoUTurnSampler(TransitionKernel):
         trajectory length implied by max_tree_depth. Defaults to 1.
       parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'nuts_kernel').
     """
@@ -287,11 +271,9 @@ class NoUTurnSampler(TransitionKernel):
           max_energy_diff=max_energy_diff,
           unrolled_leapfrog_steps=unrolled_leapfrog_steps,
           parallel_iterations=parallel_iterations,
-          seed=seed,
           name=name,
       )
       self._parallel_iterations = parallel_iterations
-      self._seed_stream = SeedStream(seed, salt='nuts_one_step')
       self._unrolled_leapfrog_steps = unrolled_leapfrog_steps
       self._name = name
       self._max_energy_diff = max_energy_diff
@@ -341,15 +323,8 @@ class NoUTurnSampler(TransitionKernel):
     return True
 
   def one_step(self, current_state, previous_kernel_results, seed=None):
-    # TODO(b/159636942): Clean up after 2020-09-20.
-    if seed is not None:
-      start_trajectory_seed, loop_seed = samplers.split_seed(
-          seed, salt='nuts.one_step')
-    else:
-      if self._seed_stream.original_seed is not None:
-        warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
-      start_trajectory_seed, loop_seed = samplers.split_seed(
-          self._seed_stream(), salt='nuts.one_step')
+    seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
+    start_trajectory_seed, loop_seed = samplers.split_seed(seed)
 
     with tf.name_scope(self.name + '.one_step'):
       unwrap_state_list = not tf.nest.is_nested(current_state)
@@ -453,7 +428,7 @@ class NoUTurnSampler(TransitionKernel):
           reach_max_depth=new_step_metastate.continue_tree,
           has_divergence=~new_step_metastate.not_divergence,
           energy=new_step_metastate.candidate_state.energy,
-          seed=samplers.zeros_seed() if seed is None else seed,
+          seed=seed,
       )
 
       result_state = new_step_metastate.candidate_state.state

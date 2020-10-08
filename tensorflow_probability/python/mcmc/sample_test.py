@@ -148,24 +148,6 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([1, 2], kernel_results.counter_1)
     self.assertAllClose([2, 4], kernel_results.counter_2)
 
-  @test_util.jax_disable_test_missing_functionality('implicit seeds')
-  def testBasicOperationLegacy(self):
-    kernel = TestTransitionKernel(accepts_seed=False)
-    samples, kernel_results = tfp.mcmc.sample_chain(
-        num_results=2, current_state=0, kernel=kernel)
-
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(samples.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
-
-    samples, kernel_results = self.evaluate([samples, kernel_results])
-    self.assertAllClose([1, 2], samples)
-    self.assertAllClose([1, 2], kernel_results.counter_1)
-    self.assertAllClose([2, 4], kernel_results.counter_2)
-
   def testBurnin(self):
     kernel = TestTransitionKernel()
     samples, kernel_results = tfp.mcmc.sample_chain(
