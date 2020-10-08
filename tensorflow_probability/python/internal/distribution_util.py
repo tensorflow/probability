@@ -42,20 +42,19 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
   each component's mean and standard deviation can be provided.
 
   Args:
-    mixture_weight_vector: A 2D tensor with shape [batch_size, num_components]
-    mean_vector: A 2D tensor of mixture component means. Has shape `[batch_size,
-      num_components]`.
-    stddev_vector: A 2D tensor of mixture component standard deviations. Has
-      shape `[batch_size, num_components]`.
+    mixture_weight_vector: A Tensor with shape `batch_shape + [num_components]`
+    mean_vector: A Tensor of mixture component means. Has shape `batch_shape +
+      [num_components]`.
+    stddev_vector: A Tensor of mixture component standard deviations. Has
+      shape `batch_shape + [num_components]`.
 
   Returns:
-    A 1D tensor of shape `[batch_size]` representing the standard deviation of
+    A 1D tensor of shape `batch_shape` representing the standard deviation of
     the mixture distribution with given weights and component means and standard
     deviations.
   Raises:
     ValueError: If the shapes of the input tensors are not as expected.
   """
-  tensorshape_util.assert_has_rank(mixture_weight_vector.shape, 2)
   if not tensorshape_util.is_compatible_with(mean_vector.shape,
                                              mixture_weight_vector.shape):
     raise ValueError('Expecting means to have same shape as mixture weights.')
@@ -63,22 +62,31 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
                                              mixture_weight_vector.shape):
     raise ValueError('Expecting stddevs to have same shape as mixture weights.')
 
-  # Reshape the distribution parameters for batched vectorized dot products.
-  pi_for_dot_prod = tf.expand_dims(mixture_weight_vector, axis=1)
-  mu_for_dot_prod = tf.expand_dims(mean_vector, axis=2)
-  sigma_for_dot_prod = tf.expand_dims(stddev_vector, axis=2)
+  weighted_average_means = tf.reduce_sum(
+      mixture_weight_vector * mean_vector, axis=-1, keepdims=True)
+  deviations = mean_vector - weighted_average_means
+  return _hypot(_weighted_norm(mixture_weight_vector, deviations),
+                _weighted_norm(mixture_weight_vector, stddev_vector))
 
-  # weighted average of component means under mixture distribution.
-  mean_wa = tf.matmul(pi_for_dot_prod, mu_for_dot_prod)
-  mean_wa = tf.reshape(mean_wa, (-1,))
-  # weighted average of component variances under mixture distribution.
-  var_wa = tf.matmul(pi_for_dot_prod, tf.square(sigma_for_dot_prod))
-  var_wa = tf.reshape(var_wa, (-1,))
-  # weighted average of component squared means under mixture distribution.
-  sq_mean_wa = tf.matmul(pi_for_dot_prod, tf.square(mu_for_dot_prod))
-  sq_mean_wa = tf.reshape(sq_mean_wa, (-1,))
-  mixture_variance = var_wa + sq_mean_wa - tf.square(mean_wa)
-  return tf.sqrt(mixture_variance)
+
+def _hypot(x, y):
+  """Returns sqrt(x**2 + y**2) elementwise without overflow."""
+  # Notably, this implementation avoids overflow better than
+  # tf.experimental.numpy.hypot
+  mag = tf.maximum(tf.math.abs(x), tf.math.abs(y))
+  normalized_result = tf.sqrt(tf.square(x / mag) + tf.square(y / mag))
+  return tf.math.multiply_no_nan(normalized_result, mag)
+
+
+def _weighted_norm(weights, xs):
+  """Returns sqrt(sum_{axis=-1}(w_i * x_i**2)) without overflow in x_i**2."""
+  # Notably, this implementation differs from tf.norm in supporting weights and
+  # avoiding overflow.  The weights are assumed < 1, i.e., incapable of causing
+  # overflow themselves.
+  magnitude = tf.reduce_max(tf.math.abs(xs), axis=-1)
+  xs = xs / magnitude[..., tf.newaxis]
+  normalized_result = tf.sqrt(tf.reduce_sum(weights * tf.square(xs), axis=-1))
+  return tf.math.multiply_no_nan(normalized_result, magnitude)
 
 
 def shapes_from_loc_and_scale(loc, scale, name='shapes_from_loc_and_scale'):
