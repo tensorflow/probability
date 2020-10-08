@@ -124,7 +124,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
       during the computation of the variational bound, i.e., those defining
       `surrogate_posterior` and the model `target_log_prob_fn`.
       Default value: `None`
-    seed: Python integer to seed the random number generator.
+    seed: Optional seed for reproducible sampling.
     name: Python `str` name prefixed to ops created by this function.
       Default value: 'fit_surrogate_posterior'.
 

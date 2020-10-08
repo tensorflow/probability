@@ -30,7 +30,6 @@ from tensorflow_probability.python.mcmc import hmc
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
 
 __all__ = [
     'PreconditionedHamiltonianMonteCarlo',
@@ -141,7 +140,6 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
                momentum_distribution=None,
                state_gradients_are_stopped=False,
                step_size_update_fn=None,
-               seed=None,
                store_parameters_in_results=False,
                name=None):
     """Initializes this transition kernel.
@@ -169,8 +167,6 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
         (typically a `tf.Variable`) and `kernel_results` (typically
         `collections.namedtuple`) and returns updated step_size (`Tensor`s).
         Default value: `None` (i.e., do not update `step_size` automatically).
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`.
       store_parameters_in_results: If `True`, then `step_size` and
         `num_leapfrog_steps` are written to and read from eponymous fields in
         the kernel results objects returned from `one_step` and
@@ -184,9 +180,6 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
       raise ValueError('It is invalid to simultaneously specify '
                        '`step_size_update_fn` and set '
                        '`store_parameters_in_results` to `True`.')
-    self._seed_stream = SeedStream(seed, salt='hmc')
-    uhmc_kwargs = {} if seed is None else dict(seed=self._seed_stream())
-    mh_kwargs = {} if seed is None else dict(seed=self._seed_stream())
     self._impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedPreconditionedHamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob_fn,
@@ -195,12 +188,10 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
             state_gradients_are_stopped=state_gradients_are_stopped,
             momentum_distribution=momentum_distribution,
             name=name or 'hmc_kernel',
-            store_parameters_in_results=store_parameters_in_results,
-            **uhmc_kwargs),
-        **mh_kwargs)
+            store_parameters_in_results=store_parameters_in_results))
     self._parameters = self._impl.inner_kernel.parameters.copy()
+    self._parameters.pop('seed', None)  # TODO(b/159636942): Remove this line.
     self._parameters['step_size_update_fn'] = step_size_update_fn
-    self._parameters['seed'] = seed
 
 
 class UncalibratedPreconditionedHamiltonianMonteCarlo(
@@ -230,10 +221,10 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
         step_size,
         num_leapfrog_steps,
         state_gradients_are_stopped=state_gradients_are_stopped,
-        seed=None,
         store_parameters_in_results=store_parameters_in_results,
         name=name)
     self._parameters['momentum_distribution'] = momentum_distribution
+    self._parameters.pop('seed', None)  # TODO(b/159636942): Remove this line.
 
   @property
   def momentum_distribution(self):

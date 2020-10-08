@@ -442,11 +442,10 @@ def fit_with_hmc(model,
                       target_log_prob_fn=target_log_prob_fn,
                       step_size=initial_step_size,
                       num_leapfrog_steps=num_leapfrog_steps,
-                      state_gradients_are_stopped=True,
-                      seed=seed()),
+                      state_gradients_are_stopped=True),
                   bijector=[param.bijector for param in model.parameters]),
               num_adaptation_steps=int(num_warmup_steps * 0.8)),
-          parallel_iterations=1 if seed is not None else 10)
+          seed=seed())
     samples, kernel_results = run_hmc()
 
     return samples, kernel_results

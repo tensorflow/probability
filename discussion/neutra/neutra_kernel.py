@@ -259,8 +259,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
     kernel = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=flattened_target_log_prob,
         step_size=1.,
-        num_leapfrog_steps=self._num_leapfrog_steps(1.),
-        seed=seed if not tf.executing_eagerly() else None)
+        num_leapfrog_steps=self._num_leapfrog_steps(1.))
     kernel = tfp.mcmc.TransformedTransitionKernel(kernel, self._bijector)
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(
         kernel,
@@ -347,7 +346,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
     return self._flattened_target_log_prob_val
 
   @tf.function(autograph=False)
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     """Runs one iteration of NeuTra.
 
     Args:
@@ -357,6 +356,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
+      seed: Optional seed for reproducible sampling.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)
@@ -372,7 +372,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
         num_leapfrog_steps=self._num_leapfrog_steps(step_size))
 
     new_state, kernel_results = self._kernel.one_step(
-        self._flatten_state(current_state), previous_kernel_results)
+        self._flatten_state(current_state), previous_kernel_results, seed=seed)
     return self._unflatten_state(new_state), kernel_results
 
   def bootstrap_results(self, state):

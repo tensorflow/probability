@@ -103,7 +103,6 @@ class NutsXLATest(test_util.TestCase):
       kernel = tfp.mcmc.NoUTurnSampler(
           target_log_prob_fn,
           step_size=[tf.cast(step_size, dtype=tf.float32)],
-          seed=9,
           unrolled_leapfrog_steps=unrolled_leapfrog_steps)
       [x], (is_accepted, leapfrogs_taken) = tfp.mcmc.sample_chain(
           num_results=num_steps,
@@ -111,7 +110,7 @@ class NutsXLATest(test_util.TestCase):
           current_state=[initial_state],
           kernel=kernel,
           trace_fn=lambda _, pkr: (pkr.is_accepted, pkr.leapfrogs_taken),
-          parallel_iterations=1)
+          seed=9)
       return (
           tf.reduce_mean(x, axis=[0, 1]),
           tf.math.reduce_std(x, axis=[0, 1]),
