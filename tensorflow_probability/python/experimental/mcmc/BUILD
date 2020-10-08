@@ -46,6 +46,7 @@ multi_substrate_py_library(
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
         ":preconditioned_hmc",
+        ":progress_bar_reducer",
         ":reducer",
         ":sample",
         ":sample_discarding_kernel",
@@ -63,6 +64,7 @@ multi_substrate_py_library(
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
         ":preconditioned_hmc",
+        ":progress_bar_reducer",
         ":reducer",
         ":sample",
         ":sample_discarding_kernel",
@@ -107,6 +109,32 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "progress_bar_reducer",
+    srcs = ["progress_bar_reducer.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        # tqdm dep,
+    ],
+)
+
+py_test(
+    name = "progress_bar_reducer_test",
+    size = "small",
+    srcs = ["progress_bar_reducer_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

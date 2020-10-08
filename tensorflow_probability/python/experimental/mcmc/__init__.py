@@ -35,6 +35,8 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
 from tensorflow_probability.python.experimental.mcmc.potential_scale_reduction_reducer import PotentialScaleReductionReducer
 from tensorflow_probability.python.experimental.mcmc.preconditioned_hmc import PreconditionedHamiltonianMonteCarlo
+from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import make_tqdm_progress_bar_fn
+from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import ProgressBarReducer
 from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
 from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
@@ -60,6 +62,16 @@ from tensorflow_probability.python.experimental.mcmc.with_reductions import With
 
 
 __all__ = [
+    'CovarianceReducer',
+    'EllipticalSliceSampler',
+    'ExpectationsReducer',
+    'NoUTurnSampler',
+    'PreconditionedHamiltonianMonteCarlo',
+    'ProgressBarReducer',
+    'SequentialMonteCarlo',
+    'SequentialMonteCarloResults',
+    'StateWithHistory',
+    'WeightedParticles',
     'augment_prior_with_state_history',
     'augment_with_observation_history',
     'augment_with_state_history',
@@ -75,6 +87,7 @@ __all__ = [
     'GradientBasedTrajectoryLengthAdaptationResults',
     'infer_trajectories',
     'make_rwmh_kernel_fn',
+    'make_tqdm_progress_bar_fn',
     'NoUTurnSampler',
     'particle_filter',
     'PotentialScaleReductionReducer',
