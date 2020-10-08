@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Ordered bijector."""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+"""Ascending bijector."""
 
 import tensorflow.compat.v2 as tf
 
@@ -25,73 +21,71 @@ from tensorflow_probability.python.internal import assert_util
 
 
 __all__ = [
-    "Ordered",
+    "Ascending",
 ]
 
 
-class Ordered(bijector.Bijector):
-  """Deprecated. Use bijectors.Invert(bijectors.Ascending()) instead.
-
-  Maps a vector of increasing elements to an unconstrained vector.
+class Ascending(bijector.Bijector):
+  """Maps an unconstrained vector to a vector of (different) elements in
+  ascending order.
 
   Both the domain and the codomain of the mapping is [-inf, inf], however,
-  the input of the forward mapping must be strictly increasing.
+  the input of the inverse mapping must be strictly increasing.
 
-  On the last dimension of the tensor, Ordered bijector performs:
-  `y[0] = x[0]`
-  `y[1:] = tf.log(x[1:] - x[:-1])`
+  On the last dimension of the tensor, the Ascending bijector performs:
+  `y = tf.cumsum([x[0], tf.exp(x[1]), tf.exp(x[2]), ..., tf.exp(x[-1])])`
 
   #### Example Use:
 
   ```python
-  bijectors.Ordered().forward([2, 3, 4])
+  bijectors.Ascending().inverse([2, 3, 4])
   # Result: [2., 0., 0.]
 
-  bijectors.Ordered().inverse([0.06428002, -1.07774478, -0.71530371])
+  bijectors.Ascending().forward([0.06428002, -1.07774478, -0.71530371])
   # Result: [0.06428002, 0.40464228, 0.8936858]
   ```
   """
 
-  def __init__(self, validate_args=False, name="ordered"):
+  def __init__(self, validate_args=False, name="ascending"):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      super(Ordered, self).__init__(
+      super().__init__(
           forward_min_event_ndims=1,
           validate_args=validate_args,
           parameters=parameters,
           name=name)
 
   def _forward(self, x):
-    with tf.control_dependencies(self._assertions(x)):
-      y0 = x[..., :1]
-      yk = tf.math.log(x[..., 1:] - x[..., :-1])
-      y = tf.concat([y0, yk], axis=-1)
-      return y
+    y0 = x[..., :1]
+    yk = tf.exp(x[..., 1:])
+    y = tf.concat([y0, yk], axis=-1)
+    return tf.cumsum(y, axis=-1)
 
   def _inverse(self, y):
-    x0 = y[..., :1]
-    xk = tf.exp(y[..., 1:])
-    x = tf.concat([x0, xk], axis=-1)
-    return tf.cumsum(x, axis=-1)
-
-  def _inverse_log_det_jacobian(self, y):
-    # The Jacobian of the inverse mapping is lower
-    # triangular, with the diagonal elements being:
-    # J[i,i] = 1 if i=1, and
-    #          exp(y_i) if 1<i<=K
-    # which gives the absolute Jacobian determinant:
-    # |det(Jac)| = prod_{i=1}^{K} exp(y[i]).
-    # (1) - Stan Modeling Language User's Guide and Reference Manual
-    #       Version 2.17.0 session 35.2
-    return tf.reduce_sum(y[..., 1:], axis=-1)
+    with tf.control_dependencies(self._assertions(y)):
+      x0 = y[..., :1]
+      xk = tf.math.log(y[..., 1:] - y[..., :-1])
+      x = tf.concat([x0, xk], axis=-1)
+      return x
 
   def _forward_log_det_jacobian(self, x):
-    with tf.control_dependencies(self._assertions(x)):
-      return -tf.reduce_sum(tf.math.log(x[..., 1:] - x[..., :-1]), axis=-1)
+    # The Jacobian of the forward mapping is lower
+    # triangular, with the diagonal elements being:
+    # J[i,i] = 1 if i=1, and
+    #          exp(x_i) if 1<i<=K
+    # which gives the absolute Jacobian determinant:
+    # |det(Jac)| = prod_{i=1}^{K} exp(x[i]).
+    # (1) - Stan Modeling Language User's Guide and Reference Manual
+    #       Version 2.17.0 session 35.2
+    return tf.reduce_sum(x[..., 1:], axis=-1)
+
+  def _inverse_log_det_jacobian(self, y):
+    with tf.control_dependencies(self._assertions(y)):
+      return -tf.reduce_sum(tf.math.log(y[..., 1:] - y[..., :-1]), axis=-1)
 
   def _assertions(self, t):
     if not self.validate_args:
       return []
     return [assert_util.assert_positive(
         t[..., 1:] - t[..., :-1],
-        message="Forward transformation input must be strictly increasing.")]
+        message="Inverse transformation input must be strictly increasing.")]
