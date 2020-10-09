@@ -59,7 +59,7 @@ class Ordered(bijector.Bijector):
   def __init__(self, validate_args=False, name="ordered"):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      super(Ordered, self).__init__(
+      super().__init__(
           forward_min_event_ndims=1,
           validate_args=validate_args,
           parameters=parameters,
