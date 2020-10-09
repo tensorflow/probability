@@ -30,11 +30,6 @@ __all__ = [
 ]
 
 
-@deprecation.deprecated(
-      '2021-01-09',
-      '`Ordered` bijector is deprecated; please use '
-      '`tfb.Invert(tfb.Ascending())` instead.',
-      warn_once=True)
 class Ordered(bijector.Bijector):
   """Maps a vector of increasing elements to an unconstrained vector.
 
@@ -56,10 +51,15 @@ class Ordered(bijector.Bijector):
   ```
   """
 
+  @deprecation.deprecated(
+        '2021-01-09',
+        '`Ordered` bijector is deprecated; please use '
+        '`tfb.Invert(tfb.Ascending())` instead.',
+        warn_once=True)
   def __init__(self, validate_args=False, name="ordered"):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      super().__init__(
+      super(Ordered, self).__init__(
           forward_min_event_ndims=1,
           validate_args=validate_args,
           parameters=parameters,
