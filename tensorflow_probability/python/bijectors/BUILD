@@ -45,6 +45,7 @@ multi_substrate_py_library(
         ":affine",
         ":affine_linear_operator",
         ":affine_scalar",
+        ":ascending",
         ":batch_normalization",
         ":bijector",
         ":blockwise",
@@ -601,6 +602,17 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:special_math",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "ascending",
+    srcs = ["ascending.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
@@ -1506,6 +1518,20 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "ascending_test",
+    size = "small",
+    srcs = ["ascending_test.py"],
+    deps = [
+        ":bijector_test_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "ordered_test",
     size = "small",
     srcs = ["ordered_test.py"],
@@ -1871,6 +1897,8 @@ exports_files(
         "affine_linear_operator_test.py",
         "affine_scalar.py",
         "affine_scalar_test.py",
+        "ascending.py",
+        "ascending_test.py",
         "batch_normalization.py",
         "bijector.py",
         "bijector_test_util.py",
