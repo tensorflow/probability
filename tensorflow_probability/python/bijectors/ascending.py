@@ -86,6 +86,6 @@ class Ascending(bijector.Bijector):
   def _assertions(self, t):
     if not self.validate_args:
       return []
-    return [assert_util.assert_positive(
-        t[..., 1:] - t[..., :-1],
+    return [assert_util.assert_greater(
+        t[..., 1:], t[..., :-1],
         message="Inverse transformation input must be strictly increasing.")]
