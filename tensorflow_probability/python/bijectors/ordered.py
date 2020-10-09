@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -29,10 +30,13 @@ __all__ = [
 ]
 
 
+@deprecation.deprecated(
+      '2020-10-09',
+      '`Ordered` bijector is deprecated; please use '
+      '`tfb.Invert(tfb.Ascending())` instead.',
+      warn_once=True)
 class Ordered(bijector.Bijector):
-  """Deprecated. Use bijectors.Invert(bijectors.Ascending()) instead.
-
-  Maps a vector of increasing elements to an unconstrained vector.
+  """Maps a vector of increasing elements to an unconstrained vector.
 
   Both the domain and the codomain of the mapping is [-inf, inf], however,
   the input of the forward mapping must be strictly increasing.
