@@ -31,7 +31,7 @@ __all__ = [
 
 
 @deprecation.deprecated(
-      '2020-10-09',
+      '2021-01-09',
       '`Ordered` bijector is deprecated; please use '
       '`tfb.Invert(tfb.Ascending())` instead.',
       warn_once=True)
