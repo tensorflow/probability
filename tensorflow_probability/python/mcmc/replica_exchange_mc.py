@@ -289,23 +289,36 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   See also the review paper [1].
 
   The `K` replicas are parameterized in terms of `inverse_temperature`'s,
-  `(beta[0], beta[1], ..., beta[K-1])`.  If the target distribution has
-  probability density `p(x)`, the `kth` replica has density `p(x)**beta_k`.
+  `(beta[0], beta[1], ..., beta[K-1])`. If the user provides
+  `target_log_prob_fn`, then the `kth` replica samples from density `p_k(x)`,
+  with `log(p_k(x)) = beta_k * target_log_prob(x)`.
+  In this case, geometrically decaying `beta` often works well.  That is, with
+  `R < 1`, we recommend trying `beta[k] = R^k` so that
+  `1.0 = beta[0] > beta[1] > ... > 0`.  See [2].
 
-  Typically `beta[0] = 1.0`, and `1.0 > beta[1] > beta[2] > ... > 0.0`.
-  Trying geometrically decaying `beta` is good starting point.
+  The user can also provide two functions, `tempered_log_prob_fn` and
+  `untempered_log_prob_fn`. In this case, the `kth` replica samples from
+  density `p_k(x)` with
+  `log(p_k(x)) = beta_k * tempered_log_prob_fn(x) + untempered_log_prob_fn(x)`.
+  The this case, `beta` may be zero, and one often sets `beta[-1]` to zero.
+  This means the last replica samples using `untempered_log_prob_fn`.
+  In the Bayesian setup, `untempered_log_prob_fn` will often be the log prior,
+  and `tempered_log_prob_fn` the likelihood.
 
-  * `beta[0] == 1` ==> First replicas samples from the target density, `p`.
+  In all cases,
+
+  * `beta[0] == 1` ==> First replica samples from the target density.
   * `beta[k] < 1`, for `k = 1, ..., K-1` ==> Other replicas sample from
-    "flattened" versions of `p` (peak is less high, valley less low).  These
-    distributions are somewhat closer to a uniform on the support of `p`.
+    "tempered" versions of target (peak is less high, valley less low).  These
+    distributions should allow easier exploration of separated modes.
 
   By default, samples from adjacent replicas `i`, `i + 1` are used as proposals
   for each other in a Metropolis step.  This allows the lower `beta` samples,
   which explore less dense areas of `p`, to eventually swap state with the
   `beta == 1` chain, allowing it to explore these new regions.
 
-  Samples from replica 0 are returned, and the others are discarded.
+  Samples from replica 0 are returned, and the others are discarded, unless
+  `state_includes_replicas`.
 
   #### Examples
 
@@ -412,6 +425,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   [1]: David J. Earl, Michael W. Deem
        Parallel Tempering: Theory, Applications, and New Perspectives
        https://arxiv.org/abs/physics/0508111
+  [2]: David A. Kofke
+       On the acceptance probability of replica-exchange Monte Carlo trials.
+       J. of Chem. Phys. Vol. 117 No. 5.
   """
 
   def __init__(self,
@@ -420,6 +436,8 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
                make_kernel_fn,
                swap_proposal_fn=default_swap_proposal_fn(1.),
                state_includes_replicas=False,
+               untempered_log_prob_fn=None,
+               tempered_log_prob_fn=None,
                validate_args=False,
                name=None):
     """Instantiates this object.
@@ -428,6 +446,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       target_log_prob_fn: Python callable which takes an argument like
         `current_state` (or `*current_state` if it's a list) and returns its
         (possibly unnormalized) log-density under the target distribution.
+        Must be `None` if the pair `tempered/untempered_log_prob_fn` is provided
       inverse_temperatures: `Tensor` of inverse temperatures to temper each
         replica. The leftmost dimension is the `num_replica` and the
         second dimension through the rightmost can provide different temperature
@@ -442,6 +461,13 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         of each state sample should index replicas. If `True`, the leftmost
         dimension of the `current_state` kwarg to `tfp.mcmc.sample_chain` will
         be interpreted as indexing replicas.
+      untempered_log_prob_fn: Python callable which takes an argument like
+        `current_state` (or `*current_state` if it's a list) and returns its
+        (possibly unnormalized) log-density under the target distribution.
+        Must be `None` if `target_log_prob_fn` is provided.
+      tempered_log_prob_fn: Optional Python callable with same signature as
+        `untempered_log_prob_fn`. Provide this arg if and only if
+        `untempered_log_prob_fn` is provided.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -451,13 +477,43 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
     Raises:
       ValueError: `inverse_temperatures` doesn't have statically known 1D shape.
+      ValueError: If wrong combination of log prob functions are provided.
     """
     self._parameters = {k: v for k, v in locals().items() if v is not self}
     self._state_includes_replicas = state_includes_replicas
 
+    if (tempered_log_prob_fn is None) != (untempered_log_prob_fn is None):
+      raise ValueError(
+          'Must provide either neither or both of tempered/untempered log prob '
+          'funs. Found `tempered_log_prob_fn is None = ({})`, '
+          'and `untempered_log_prob_fn is None = ({})`'.format(
+              tempered_log_prob_fn is None,
+              untempered_log_prob_fn is None))
+
+    if target_log_prob_fn is not None and tempered_log_prob_fn is not None:
+      raise ValueError(
+          'Exactly one of `target_log_prob_fn` and `tempered_log_prob_fn` '
+          'should be provided. Instead, both were.')
+
+    # Static checks only.
+    if tempered_log_prob_fn is not None:
+      check = tf.debugging.assert_non_negative(inverse_temperatures)
+    else:
+      check = tf.debugging.assert_positive(inverse_temperatures)
+    if not tf.executing_eagerly():
+      check.mark_used()
+
   @property
   def target_log_prob_fn(self):
     return self._parameters['target_log_prob_fn']
+
+  @property
+  def tempered_log_prob_fn(self):
+    return self._parameters['tempered_log_prob_fn']
+
+  @property
+  def untempered_log_prob_fn(self):
+    return self._parameters['untempered_log_prob_fn']
 
   @property
   def inverse_temperatures(self):
@@ -537,8 +593,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           name='inverse_temperatures')
 
       target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
-          self.target_log_prob_fn,
-          inverse_temperatures)
+          target_log_prob_fn=self.target_log_prob_fn,
+          inverse_temperatures=inverse_temperatures,
+          untempered_log_prob_fn=self.untempered_log_prob_fn,
+          tempered_log_prob_fn=self.tempered_log_prob_fn,
+      )
       # TODO(b/159636942): Clean up the helpful error msg after 2020-11-10.
       try:
         inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
@@ -612,10 +671,24 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       swaps = _maybe_embed_swaps_validation(swaps, null_swaps,
                                             self.validate_args)
 
-      # Un-temper the log probs.  E.g., for replica k, at point x_k, this is
-      # Log[p(x_k)], and *not* Log[p_x(x_k)] = Log[p(x_k)] * beta_k.
-      untempered_pre_swap_replica_target_log_prob = (
-          pre_swap_replica_target_log_prob / inverse_temperatures)
+      # Un-temper the log probs for use in the swap acceptance ratio.
+      if self.tempered_log_prob_fn is None:
+        # Efficient way of re-evaluating target_log_prob_fn on the
+        # pre_swap_replica_states.
+        untempered_energy_ignoring_ulp = (
+            # Since untempered_log_prob_fn is None, we may assume
+            # inverse_temperatures > 0 (else the target is improper).
+            pre_swap_replica_target_log_prob / inverse_temperatures)
+      else:
+        # The untempered_log_prob_fn does not factor into the acceptance ratio.
+        # Proof: Suppose the tempered target is
+        #   p_k(x) = f(x)^{beta_k} g(x),
+        # So f(x) is tempered, and g(x) is not.  Then, the acceptance ratio for
+        # a 1 <--> 2 swap is...
+        #   (p_1(x_2) p_2(x_1)) / (p_1(x_1) p_2(x_2))
+        # which depends only on f(x), since terms involving g(x) cancel.
+        untempered_energy_ignoring_ulp = self.tempered_log_prob_fn(
+            *pre_swap_replica_states)
 
       # Since `swaps` is its own inverse permutation we automatically know the
       # swap counterpart: range(num_replica). We use this idea to compute the
@@ -627,10 +700,13 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
 
       # Note: diffs would normally be "proposed - current" however energy is
       # flipped since `energy == -log_prob`.
+      # Note: The untempered_log_prob_fn (if provided) is not included in
+      # untempered_pre_swap_replica_target_log_prob, and hence does not factor
+      # into energy_diff. Why? Because, it cancels out in the acceptance ratio.
       energy_diff = (
-          untempered_pre_swap_replica_target_log_prob -
+          untempered_energy_ignoring_ulp -
           mcmc_util.index_remapping_gather(
-              untempered_pre_swap_replica_target_log_prob,
+              untempered_energy_ignoring_ulp,
               swaps, name='gather_swap_tlp'))
       swapped_inverse_temperatures = mcmc_util.index_remapping_gather(
           inverse_temperatures, swaps, name='gather_swap_temps')
@@ -645,7 +721,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           tf.math.is_finite(log_accept_ratio),
           log_accept_ratio, tf.constant(-np.inf, dtype=dtype))
 
-      # Produce Log[Uniform] draws that are identical at swapped indices.
+      # Produce log[Uniform] draws that are identical at swapped indices.
       log_uniform = tf.math.log(
           samplers.uniform(shape=replica_and_batch_shape,
                            dtype=dtype,
@@ -688,12 +764,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       else:
         post_swap_states = [s[0] for s in post_swap_replica_states]
 
-      post_swap_replica_results = _make_post_swap_replica_results(
-          pre_swap_replica_results,
-          inverse_temperatures,
-          swapped_inverse_temperatures,
-          is_swap_accepted_mask,
-          _swap_tensor)
+      post_swap_replica_results = _set_swapped_fields_to_nan(
+          _swap_log_prob_and_maybe_grads(
+              pre_swap_replica_results,
+              post_swap_replica_states,
+              inner_kernel))
 
       if mcmc_util.is_list_like(current_state):
         # We *always* canonicalize the states in the kernel results.
@@ -769,8 +844,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         ]
 
       target_log_prob_for_inner_kernel = _make_replica_target_log_prob_fn(
-          self.target_log_prob_fn,
-          inverse_temperatures)
+          target_log_prob_fn=self.target_log_prob_fn,
+          inverse_temperatures=inverse_temperatures,
+          untempered_log_prob_fn=self.untempered_log_prob_fn,
+          tempered_log_prob_fn=self.tempered_log_prob_fn,
+      )
       # TODO(b/159636942): Clean up the helpful error msg after 2020-11-10.
       try:
         inner_kernel = self.make_kernel_fn(  # pylint: disable=not-callable
@@ -803,18 +881,10 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           tf.eye(num_replica, batch_shape=batch_shape, dtype=tf.bool),
           shift=2)
 
-      post_swap_replica_results = _make_post_swap_replica_results(
-          replica_results,
-          inverse_temperatures,
-          inverse_temperatures,
-          is_swap_accepted[0],
-          lambda x: x,
-      )
-
       return ReplicaExchangeMCKernelResults(
           post_swap_replica_states=replica_states,
           pre_swap_replica_results=replica_results,
-          post_swap_replica_results=post_swap_replica_results,
+          post_swap_replica_results=_set_swapped_fields_to_nan(replica_results),
           is_swap_proposed=is_swap_accepted,
           is_swap_accepted=is_swap_accepted,
           is_swap_proposed_adjacent=_sub_diag(is_swap_accepted),
@@ -826,12 +896,27 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       )
 
 
-def _make_replica_target_log_prob_fn(target_log_prob_fn, inverse_temperatures):
+def _make_replica_target_log_prob_fn(
+    target_log_prob_fn,
+    inverse_temperatures,
+    untempered_log_prob_fn=None,
+    tempered_log_prob_fn=None,
+):
   """Helper which creates inner kernel target_log_prob_fn."""
   def _replica_target_log_prob(*x):
-    tlp = target_log_prob_fn(*x)
-    return tf.cast(mcmc_util.left_justified_expand_dims_like(
+    if tempered_log_prob_fn is not None:
+      tlp = tempered_log_prob_fn(*x)
+    else:
+      tlp = target_log_prob_fn(*x)
+
+    log_prob = tf.cast(mcmc_util.left_justified_expand_dims_like(
         inverse_temperatures, tlp), dtype=tlp.dtype) * tlp
+
+    if untempered_log_prob_fn is not None:
+      log_prob = log_prob + untempered_log_prob_fn(*x)
+
+    return log_prob
+
   return _replica_target_log_prob
 
 
@@ -853,83 +938,66 @@ def _maybe_embed_swaps_validation(swaps, null_swaps, validate_args):
     return tf.identity(swaps)
 
 
-def _make_post_swap_replica_results(pre_swap_replica_results,
-                                    inverse_temperatures,
-                                    swapped_inverse_temperatures,
-                                    is_swap_accepted_mask, swap_tensor_fn):
-  """Return Kernel results, valid for post-swap states.
+def _set_swapped_fields_to_nan(replica_results):
+  """Get new replica results, with some fields set to NaN.
 
-  Fields will be removed if they cannot be updated in an unambiguous manner.
+  It is unclear what values some fields should take after swapping. For these
+  values, we set them to NaN.
 
   Args:
-    pre_swap_replica_results: Kernel results obtained by running
-      inner_kernel.one_step before swapping.
-    inverse_temperatures: Tensor of inverse temperatures.
-    swapped_inverse_temperatures: Tensor of inverse temperatures, permuted by
-      swaps.
-    is_swap_accepted_mask: Shape [num_replica] + batch_shape boolean Tensor
-      telling which swaps were accepted.  Returns Kernel results of same type as
-      pre_swap_replica_results.
-    swap_tensor_fn: Callable. For `x.shape = [num_replica] + batch_shape`,
-      swap_tensor_fn(x) performs swaps where they are accepted, and does not
-      swap otherwise.
+    replica_results: Replica results, before swapping.
 
   Returns:
-    new_replica_results:  Same type as pre_swap_replica_results.
-
-  Raises:
-    NotImplementedError: If type of [nested] results is not handled.
+    Copy of replica_results, with some fields set to NaN.
   """
+  dtype = _get_field(replica_results, 'target_log_prob').dtype
+  nan = tf.convert_to_tensor(np.nan, name='intentional_nan', dtype=dtype)
 
-  kr = pre_swap_replica_results
-  dtype = swapped_inverse_temperatures.dtype
+  for field in ['proposed_results', 'proposed_state']:
+    replica_results = _update_field(replica_results, field, nan)
 
-  # Hard to modify proposed_results in an um-ambiguous manner.
-  # ...we also don't need to.
-  kr = _update_field(
-      kr,
-      'proposed_results',
-      tf.convert_to_tensor(np.nan, dtype=dtype))
-  kr = _update_field(
-      kr,
-      'proposed_state',
-      tf.convert_to_tensor(np.nan, dtype=dtype))
+  return replica_results
 
-  replica_and_batch_rank = ps.rank(_get_field(kr, 'log_accept_ratio'))
 
-  # After using swap_tensor_fn on "values", values will be multiplied by the
-  # swapped_inverse_temperatures.  We need it to be multiplied instead by the
-  # inverse temperature corresponding to its index.
-  it_ratio_raw = inverse_temperatures / swapped_inverse_temperatures
-  it_ratio = tf.where(
-      is_swap_accepted_mask,
-      mcmc_util.left_justified_expand_dims_to(it_ratio_raw,
-                                              replica_and_batch_rank),
-      tf.convert_to_tensor(1.0, dtype=dtype))
+def _swap_log_prob_and_maybe_grads(
+    pre_swap_replica_results,
+    post_swap_replica_states,
+    inner_kernel,
+):
+  """Swap 'target_log_prob' and maybe 'grads_target_log_prob'.
 
-  def _swap_then_retemper(x):
-    x, is_multipart = mcmc_util.prepare_state_parts(x)
-    it_ratio_ = mcmc_util.left_justified_expand_dims_like(it_ratio, x[0])
-    x = [swap_tensor_fn(x_part) * it_ratio_ for x_part in x]
-    if not is_multipart:
-      x = x[0]
-    return x
+  After swapping states, the log probs for replicas need to be evaluated at
+  the new points, then tempered. The easiest way to do this is to call
+  `inner_kernel.bootstrap_results`.
 
-  kr = _update_field(kr, 'target_log_prob', _swap_then_retemper(
-      _get_field(kr, 'target_log_prob')))
-  try:
-    new_grads_target_log_prob = _swap_then_retemper(
-        _get_field(kr, 'grads_target_log_prob'))
-    kr = _update_field(
-        kr, 'grads_target_log_prob', new_grads_target_log_prob)
-  # For transition kernels not involving the gradient of the log-probability,
-  # grads_target_log_prob will not exist in the (possibly multiply wrapped)
-  # kernel results and that's perfectly fine. But _get_field() / _update_field()
-  # will throw a REMCFieldNotFoundError, which we thus catch silently.
-  except REMCFieldNotFoundError:
-    pass
+  Args:
+    pre_swap_replica_results: Replica results, before swapping.
+    post_swap_replica_states: The states, after swapping.
+    inner_kernel: The tempered inner kernel used by ReplicaExchangeMC.
 
-  return kr
+  Returns:
+    Copy of pre_swap_replica_results, with some fields set to NaN.
+  """
+  # This call means we re-evaluate gradients. More efficient surgery could be
+  # done, but this is much simpler.
+  temp_kr = inner_kernel.bootstrap_results(post_swap_replica_states)
+
+  post_swap_replica_results = pre_swap_replica_results
+
+  # Fields we expect to find, else raise.
+  for field in ['target_log_prob']:
+    post_swap_replica_results = _update_field(
+        post_swap_replica_results, field, _get_field(temp_kr, field))
+
+  # Fields we don't always find.
+  for field in ['grads_target_log_prob']:
+    try:
+      post_swap_replica_results = _update_field(
+          post_swap_replica_results, field, _get_field(temp_kr, field))
+    except REMCFieldNotFoundError:
+      pass
+
+  return post_swap_replica_results
 
 
 def _compute_swap_notmatrix(before_positions, after_positions):
