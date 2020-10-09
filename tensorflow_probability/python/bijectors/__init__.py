@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors.absolute_value import AbsoluteValue
 from tensorflow_probability.python.bijectors.affine import Affine
 from tensorflow_probability.python.bijectors.affine_linear_operator import AffineLinearOperator
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
+from tensorflow_probability.python.bijectors.ascending import Ascending
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import Bijector
 from tensorflow_probability.python.bijectors.blockwise import Blockwise
@@ -99,6 +100,7 @@ __all__ = [
     "Affine",
     "AffineLinearOperator",
     "AffineScalar",
+    "Ascending",
     "AutoregressiveNetwork",
     "BatchNormalization",
     "Bijector",

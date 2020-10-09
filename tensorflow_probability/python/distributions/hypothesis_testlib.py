@@ -304,7 +304,7 @@ CONSTRAINTS = {
         tf.sigmoid,
     'cutpoints':
         # Permit values that aren't too large
-        lambda x: tfb.Ordered().inverse(10 * tf.math.tanh(x)),
+        lambda x: tfb.Ascending().forward(10 * tf.math.tanh(x)),
     'log_rate':
         lambda x: tf.maximum(x, -16.),
     'log_scale':
