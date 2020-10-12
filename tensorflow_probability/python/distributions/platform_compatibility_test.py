@@ -132,6 +132,7 @@ VECTORIZED_LOGPROB_RTOL.update({
 XLA_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_ATOL.update({
     'Beta': 1e-4,
+    'BetaBinomial': 5e-6,
     'Binomial': 5e-6,
     'DirichletMultinomial': 1e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
