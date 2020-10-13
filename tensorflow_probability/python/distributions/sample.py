@@ -18,11 +18,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -263,7 +266,10 @@ class Sample(distribution_lib.Distribution):
   _mode = _make_summary_statistic('mode')
 
   def _default_event_space_bijector(self):
-    return self.distribution.experimental_default_event_space_bijector()
+    # TODO(b/170405182): In scenarios where we can statically prove that it has
+    #   no batch part, avoid the transposes by directly using
+    #   `self.distribution.experimental_default_event_space_bijector()`.
+    return _DefaultSampleBijector(self.distribution, self.sample_shape)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
@@ -311,6 +317,164 @@ class Sample(distribution_lib.Distribution):
   _composite_tensor_nonshape_params = ('distribution,')
 
   _composite_tensor_shape_params = ('sample_shape,')
+
+
+class _DefaultSampleBijector(bijector_lib.Bijector):
+  """Since tfd.Sample uses transposes, it requires a custom event bijector."""
+
+  def __init__(self, distribution, sample_shape):
+    parameters = dict(locals())
+    self.distribution = distribution
+    self.bijector = distribution.experimental_default_event_space_bijector()
+    self.sample_shape = sample_shape
+    sample_ndims = ps.rank_from_shape(self.sample_shape)
+    super(_DefaultSampleBijector, self).__init__(
+        forward_min_event_ndims=(
+            self.bijector.forward_min_event_ndims + sample_ndims),
+        inverse_min_event_ndims=(
+            self.bijector.inverse_min_event_ndims + sample_ndims),
+        parameters=parameters)
+
+  def _forward_event_shape(self, shape):
+    return self.bijector.forward_event_shape(shape)
+
+  def _forward_event_shape_tensor(self, shape):
+    return self.bijector.forward_event_shape_tensor(shape)
+
+  def _inverse_event_shape(self, shape):
+    return self.bijector.inverse_event_shape(shape)
+
+  def _inverse_event_shape_tensor(self, shape):
+    return self.bijector.inverse_event_shape_tensor(shape)
+
+  def _transpose_around_bijector_fn(self,
+                                    bijector_fn,
+                                    arg,
+                                    src_event_ndims,
+                                    dest_event_ndims=None,
+                                    fn_reduces_event=False,
+                                    **kwargs):
+    # This function moves the axes corresponding to `self.sample_shape` to the
+    # left of the batch shape, then applies `bijector_fn`, then moves the axes
+    # corresponding to `self.sample_shape` back to the event part of the shape.
+    #
+    # `src_event_ndims` and `dest_event_ndims` indicate the expected event rank
+    # (omitting `self.sample_shape`) before and after applying `bijector_fn`.
+    #
+    # This function arose because forward and inverse ended up being quite
+    # similar. It was then only a small generalization to also support {F/I}LDJ.
+    batch_ndims = ps.rank_from_shape(self.distribution.batch_shape_tensor,
+                                     self.distribution.batch_shape)
+    extra_sample_ndims = ps.rank_from_shape(self.sample_shape)
+    arg_ndims = ps.rank(arg)
+    # (1) Expand arg's dims.
+    d = arg_ndims - batch_ndims - extra_sample_ndims - src_event_ndims
+    arg = tf.reshape(
+        arg,
+        shape=ps.pad(
+            ps.shape(arg),
+            paddings=[[ps.maximum(0, -d), 0]],
+            constant_values=1))
+    arg_ndims = ps.rank(arg)
+    sample_ndims = ps.maximum(0, d)
+    # (2) Transpose arg's dims.
+    sample_dims = ps.range(0, sample_ndims)
+    batch_dims = ps.range(sample_ndims, sample_ndims + batch_ndims)
+    extra_sample_dims = ps.range(
+        sample_ndims + batch_ndims,
+        sample_ndims + batch_ndims + extra_sample_ndims)
+    event_dims = ps.range(
+        sample_ndims + batch_ndims + extra_sample_ndims,
+        arg_ndims)
+    perm = ps.concat(
+        [sample_dims, extra_sample_dims, batch_dims, event_dims], axis=0)
+    arg = tf.transpose(arg, perm=perm)
+    # (3) Apply underlying bijector.
+    result = bijector_fn(arg, **kwargs)
+    # (4) Transpose sample_shape from the sample to the event shape.
+    result_ndims = ps.rank(result)
+    if fn_reduces_event:
+      dest_event_ndims = 0
+    d = result_ndims - batch_ndims - extra_sample_ndims - dest_event_ndims
+    if fn_reduces_event:
+      # In some cases, fn may reduce event too far, i.e. ildj may return a
+      # scalar `0.`, which won't work with the transpose we do below.
+      result = tf.reshape(
+          result,
+          shape=ps.pad(
+              ps.shape(result),
+              paddings=[[ps.maximum(0, -d), 0]],
+              constant_values=1))
+      result_ndims = ps.rank(result)
+    sample_ndims = ps.maximum(0, d)
+    sample_dims = ps.range(0, sample_ndims)
+    extra_sample_dims = ps.range(sample_ndims,
+                                 sample_ndims + extra_sample_ndims)
+    batch_dims = ps.range(sample_ndims + extra_sample_ndims,
+                          sample_ndims + extra_sample_ndims + batch_ndims)
+    event_dims = ps.range(sample_ndims + extra_sample_ndims + batch_ndims,
+                          result_ndims)
+    perm = ps.concat(
+        [sample_dims, batch_dims, extra_sample_dims, event_dims], axis=0)
+    return tf.transpose(result, perm=perm)
+
+  def _forward(self, x, **kwargs):
+    dist = self.distribution
+    event_ndims = ps.rank_from_shape(dist.event_shape_tensor, dist.event_shape)
+    bij = self.bijector
+    pullback_event_ndims = ps.rank_from_shape(
+        lambda: bij.inverse_event_shape_tensor(dist.event_shape_tensor()),
+        bij.inverse_event_shape(dist.event_shape))
+    return self._transpose_around_bijector_fn(
+        bij.forward, arg=x,
+        src_event_ndims=pullback_event_ndims, dest_event_ndims=event_ndims)
+
+  def _inverse(self, y, **kwargs):
+    dist = self.distribution
+    event_ndims = ps.rank_from_shape(dist.event_shape_tensor, dist.event_shape)
+    bij = self.bijector
+    pullback_event_ndims = ps.rank_from_shape(
+        lambda: bij.inverse_event_shape_tensor(dist.event_shape_tensor()),
+        bij.inverse_event_shape(dist.event_shape))
+    return self._transpose_around_bijector_fn(
+        bij.inverse, arg=y,
+        src_event_ndims=event_ndims, dest_event_ndims=pullback_event_ndims)
+
+  def _bcast_and_reduce_logdet(self, underlying_ldj):
+    # Ensure ldj is fully broadcast in the sample dims, i.e. ensure ldj has
+    # full sample shape in the sample axes, before we reduce.
+    batch_ndims = ps.rank_from_shape(self.distribution.batch_shape_tensor,
+                                     self.distribution.batch_shape)
+    extra_sample_ndims = ps.rank_from_shape(self.sample_shape)
+    sample_ndims = ps.rank(underlying_ldj) - extra_sample_ndims - batch_ndims
+    bcast_ldj_shape = ps.broadcast_shape(
+        ps.shape(underlying_ldj),
+        ps.concat([ps.ones([sample_ndims], tf.int32),
+                   ps.ones([batch_ndims], tf.int32),
+                   ps.reshape(self.sample_shape, shape=[-1])], axis=0))
+    ldj = tf.broadcast_to(underlying_ldj, bcast_ldj_shape)
+    return tf.reduce_sum(ldj, axis=-1 - ps.range(extra_sample_ndims))
+
+  def _forward_log_det_jacobian(self, x, **kwargs):
+    dist = self.distribution
+    bij = self.bijector
+    pullback_event_ndims = ps.rank_from_shape(
+        lambda: bij.inverse_event_shape_tensor(dist.event_shape_tensor()),
+        bij.inverse_event_shape(dist.event_shape))
+    fn = functools.partial(bij.forward_log_det_jacobian,
+                           event_ndims=pullback_event_ndims)
+    underlying_ldj = self._transpose_around_bijector_fn(
+        fn, arg=x, src_event_ndims=pullback_event_ndims, fn_reduces_event=True)
+    return self._bcast_and_reduce_logdet(underlying_ldj)
+
+  def _inverse_log_det_jacobian(self, y, **kwargs):
+    event_ndims = ps.rank_from_shape(
+        self.distribution.event_shape_tensor, self.distribution.event_shape)
+    fn = functools.partial(self.bijector.inverse_log_det_jacobian,
+                           event_ndims=event_ndims)
+    underlying_ldj = self._transpose_around_bijector_fn(
+        fn, arg=y, src_event_ndims=event_ndims, fn_reduces_event=True)
+    return self._bcast_and_reduce_logdet(underlying_ldj)
 
 
 @kullback_leibler.RegisterKL(Sample, Sample)

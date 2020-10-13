@@ -280,5 +280,147 @@ class SampleDistributionTest(test_util.TestCase):
                                  r'Incompatible shapes for broadcasting'):
       self.evaluate(d.log_prob(tf.zeros([3])))
 
+  def test_bijector_shapes(self):
+    d = tfd.Sample(tfd.Uniform(tf.zeros([5]), 1.), 2)
+    b = d.experimental_default_event_space_bijector()
+    self.assertEqual((2,), d.event_shape)
+    self.assertEqual((2,), b.inverse_event_shape((2,)))
+    self.assertEqual((2,), b.forward_event_shape((2,)))
+    self.assertEqual((5, 2), b.forward_event_shape((5, 2)))
+    self.assertEqual((5, 2), b.inverse_event_shape((5, 2)))
+    self.assertEqual((3, 5, 2), b.inverse_event_shape((3, 5, 2)))
+    self.assertEqual((3, 5, 2), b.forward_event_shape((3, 5, 2)))
+
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
+    b = d.experimental_default_event_space_bijector()
+    self.assertEqual((2, 4, 4), d.event_shape)
+    dim = (4 * 3) // 2
+    self.assertEqual((5, 2, dim), b.inverse_event_shape((5, 2, 4, 4)))
+    self.assertEqual((5, 2, 4, 4), b.forward_event_shape((5, 2, dim)))
+    self.assertEqual((3, 5, 2, dim), b.inverse_event_shape((3, 5, 2, 4, 4)))
+    self.assertEqual((3, 5, 2, 4, 4), b.forward_event_shape((3, 5, 2, dim)))
+
+  def test_bijector_uniform(self):
+    d = tfd.Sample(tfd.Uniform(tf.zeros([5]), 1.), 2)
+    b = d.experimental_default_event_space_bijector()
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [5] vs. [5,2] [Op:Mul]
+    self.evaluate(b.forward(0.5 * tf.ones([5, 2])))
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [5,2] vs. [5] [Op:Sub]
+    self.evaluate(b.inverse(d.sample(seed=test_util.test_seed())))
+    nchains = 3
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [3,5,2] vs. [5] [Op:Sub]
+    self.evaluate(b.inverse(d.sample(nchains, seed=test_util.test_seed())))
+
+    init = tf.random.uniform(
+        (nchains,) + d.batch_shape + b.inverse_event_shape(d.event_shape),
+        minval=-2.,
+        maxval=2.,
+        seed=test_util.test_seed())
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [5] vs. [3,5,2] [Op:Mul]
+    self.evaluate(b.forward(init))
+    self.assertEqual((nchains,) + d.batch_shape,
+                     self.evaluate(d.log_prob(b.forward(init))).shape)
+
+  def test_bijector_cholesky_lkj(self):
+    # Let's try with a shape-shifting underlying bijector vec=>mat.
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
+    b = d.experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    y = self.evaluate(d.sample(7, seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    d2 = tfd.Independent(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 2])),
+                         reinterpreted_batch_ndims=1)
+    b2 = d2.experimental_default_event_space_bijector()
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([2, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([2, 6])))
+    x_sliced = x[..., :1, :]
+    x_bcast = tf.concat([x_sliced, x_sliced], axis=-2)
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x_bcast, event_ndims=len([2, 6])),
+        b.forward_log_det_jacobian(x_sliced, event_ndims=len([1, 6])))
+    # Should this test pass? Right now, Independent's default bijector does not
+    # broadcast the LDJ to match underlying batch shape.
+    # self.assertAllClose(
+    #     b2.forward_log_det_jacobian(x_sliced, event_ndims=len([1, 6])),
+    #     b.forward_log_det_jacobian(x_bcast, event_ndims=len([2, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([2, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([2, 4, 4])))
+    y_sliced = y[..., :1, :, :]
+    y_bcast = tf.concat([y_sliced, y_sliced], axis=-3)
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])),
+        b.inverse_log_det_jacobian(y_sliced, event_ndims=len([1, 4, 4])))
+    # Should this test pass? Right now, Independent's default bijector does not
+    # broadcast the LDJ to match underlying batch shape.
+    # self.assertAllClose(
+    #     b2.inverse_log_det_jacobian(y_sliced, event_ndims=len([1, 4, 4])),
+    #     b.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])))
+    self.assertAllClose(
+        b.forward_log_det_jacobian(x_sliced, event_ndims=len([2, 6])),
+        -b.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])))
+
+    # Now, with another sample shape.
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), [2, 7])
+    b = d.experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(11, seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    d2 = tfd.Independent(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 2, 7])),
+                         reinterpreted_batch_ndims=2)
+    b2 = d2.experimental_default_event_space_bijector()
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])))
+
+    # Now, with another batch shape.
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 7])), 2)
+    b = d.experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(11, seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])))
+
+    # Also verify it properly handles an extra "event" dim.
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([5, 2, 7, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([5, 2, 7, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([5, 2, 7, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([5, 2, 7, 4, 4])))
+
+  def test_bijector_scalar_underlying_ildj(self):
+    d = tfd.Normal(0., 1.)  # Uses Identity bijector, ildj=0.
+    bij = tfd.Sample(d, [1]).experimental_default_event_space_bijector()
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([1, 1]), event_ndims=1)
+    self.assertAllEqual(0., ildj)
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([1, 1]), event_ndims=2)
+    self.assertAllEqual(0., ildj)
+
+  def test_bijector_constant_underlying_ildj(self):
+    d = tfb.Scale([2., 3.])(tfd.Normal([0., 0.], 1.))
+    bij = tfd.Sample(d, [3]).experimental_default_event_space_bijector()
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([2, 3]), event_ndims=1)
+    self.assertAllClose(-np.log([2., 3.]) * 3, ildj)
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([2, 3]), event_ndims=2)
+    self.assertAllClose(-np.log([2., 3.]).sum() * 3, ildj)
+
+
 if __name__ == '__main__':
   tf.test.main()
