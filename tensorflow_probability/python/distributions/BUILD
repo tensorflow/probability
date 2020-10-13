@@ -1132,7 +1132,6 @@ multi_substrate_py_library(
     deps = [
         ":categorical",
         ":distribution",
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",

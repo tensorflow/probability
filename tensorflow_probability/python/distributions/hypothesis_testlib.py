@@ -1355,7 +1355,7 @@ def mixtures(draw,
       cat, params_used(cat)))
   result_dist = tfd.Mixture(
       cat=cat, components=components,
-      validate_args=validate_args, use_static_graph=draw(hps.booleans()))
+      validate_args=validate_args)
   if batch_shape != result_dist.batch_shape:
     msg = ('Mixture strategy generated a bad batch shape for {}, should have'
            ' been {}.').format(result_dist, batch_shape)
