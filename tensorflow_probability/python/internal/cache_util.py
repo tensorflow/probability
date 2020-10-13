@@ -189,6 +189,9 @@ class WeakStructRef(object):
         clazz=self.__class__.__name__,
         referrent=self._struct)
 
+  def __bool__(self):
+    return self.alive
+
 
 # This only affects numpy/jax backends, where non-tensor values can be returned.
 def _containerize(value):
@@ -481,8 +484,9 @@ class BijectorCache(object):
       raise ValueError('Input must not be None.')
     input_ref, output_ref, attrs, _ = self._get_or_create_edge(
         input, forward_name, kwargs)
-    output = output_ref() if output_ref else None
-    if output is None:
+    if output_ref:
+      output = output_ref()
+    else:
       # Get the output structure, and declare a
       # weakref to clear it from the cache once it gets GCed
       output = nest.map_structure(

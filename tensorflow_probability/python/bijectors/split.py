@@ -291,10 +291,6 @@ class Split(bijector.Bijector):
       inverse_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `inverse`.
     """
-    output_shapes = [
-        tf.convert_to_tensor(t, dtype_hint=tf.int32, name='output_shape')
-        for t in output_shapes]
-
     # Validate `output_shapes` statically if possible and get assertions.
     is_validated = self._validate_output_shapes(
         [tensorshape_util.constant_value_as_shape(s) for s in output_shapes])

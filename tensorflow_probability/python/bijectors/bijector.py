@@ -537,6 +537,16 @@ class Bijector(tf.Module):
     self._forward_min_event_ndims = self._no_dependency(forward_min_event_ndims)
     self._inverse_min_event_ndims = self._no_dependency(inverse_min_event_ndims)
 
+    # By default, allow broadcasting within the `event_shape`, and do not check
+    # for differences in the total number of degrees of freedom between forward
+    # and inverse event shapes. This may cause incorrect LDJ values.
+    # Subclasses may set this value to `False`.
+    self._allow_event_shape_broadcasting = True
+
+    # Batch shape implied by the bijector's parameters, for use in validating
+    # LDJ shapes (currently only used in multipart bijectors.)
+    self._parameter_batch_shape = None
+
     for i, t in enumerate(self._graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError('Graph parent item %d is not a Tensor; %s.' % (i, t))
@@ -975,11 +985,14 @@ class Bijector(tf.Module):
           y, name='y', dtype_hint=dtype,
           dtype=None if SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
+
       reduce_shape, assertions = ldj_reduction_shape(
           nest.map_structure(ps.shape, y),
           event_ndims=event_ndims,
           min_event_ndims=self._inverse_min_event_ndims,
-          validate=self.validate_args)
+          parameter_batch_shape=self._parameter_batch_shape,
+          allow_event_shape_broadcasting=self._allow_event_shape_broadcasting,
+          validate_args=self.validate_args)
 
       # Make sure we have validated reduce_shape before continuing on.
       with tf.control_dependencies(assertions):
@@ -1082,11 +1095,14 @@ class Bijector(tf.Module):
           x, name='x', dtype_hint=dtype,
           dtype=None if SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
+
       reduce_shape, assertions = ldj_reduction_shape(
           nest.map_structure(ps.shape, x),
           event_ndims=event_ndims,
+          parameter_batch_shape=self._parameter_batch_shape,
           min_event_ndims=self._forward_min_event_ndims,
-          validate=self.validate_args)
+          allow_event_shape_broadcasting=self._allow_event_shape_broadcasting,
+          validate_args=self.validate_args)
 
       # Make sure we have validated reduce_shape before continuing on.
       with tf.control_dependencies(assertions):
@@ -1200,8 +1216,10 @@ class Bijector(tf.Module):
       raise NotImplementedError(
           'Subclasses without static min_event_ndims must override '
           '`forward_event_ndims`')
-    ldj_reduce_ndims = aligned_event_ndims(
-        event_ndims, self._forward_min_event_ndims)
+    ldj_reduce_ndims = ldj_reduction_ndims(
+        event_ndims,
+        self._forward_min_event_ndims,
+        self.validate_args)
     return nest.map_structure(
         lambda ndims: ldj_reduce_ndims + ndims,
         self._inverse_min_event_ndims)
@@ -1212,8 +1230,10 @@ class Bijector(tf.Module):
       raise NotImplementedError(
           'Subclasses without static min_event_ndims must override '
           '`inverse_event_ndims`')
-    ldj_reduce_ndims = aligned_event_ndims(
-        event_ndims, self._inverse_min_event_ndims)
+    ldj_reduce_ndims = ldj_reduction_ndims(
+        event_ndims,
+        self._inverse_min_event_ndims,
+        validate_args=self.validate_args)
     return nest.map_structure(
         lambda ndims: ldj_reduce_ndims + ndims,
         self._forward_min_event_ndims)
@@ -1348,10 +1368,10 @@ def check_valid_ndims(ndims, validate=True):
   return ndims
 
 
-def aligned_event_ndims(event_ndims,
+def ldj_reduction_ndims(event_ndims,
                         min_event_ndims,
-                        validate=True,
-                        name='aligned_event_ndims'):
+                        validate_args=True,
+                        name='ldj_reduction_ndims'):
   """Get the unique difference between `event_ndims` and `min_event_ndims`.
 
   This method takes two parallel structures of integer values: namely, the
@@ -1366,19 +1386,19 @@ def aligned_event_ndims(event_ndims,
       minimum rank of bijector inputs. We check that every element of
       `event_ndims[i] - min_event_ndims[i]` is equal, and that the difference is
       non-negative.
-    validate: Whether to use runtime assertions when either `event_ndims` or
-      `min_event_ndims` are not known statically. If true, the value returned
+    validate_args: Whether to use runtime assertions when either `event_ndims`
+      or `min_event_ndims` are not known statically. If true, the value returned
       by this method is conditioned on `tf.debugging` ops where required.
       Otherwise, only run statically-decidable assertions.
     name: Python `str` name given to ops created by this function.
   Returns:
-    ldj_reduction_ndims: An unstructured non-negative integer representing
+    reduction_ndims: An unstructured non-negative integer representing
       the `event_ndims` additional to `min_event_ndims`, along which the log-
       det-Jacobian is later reduced.
   Raises:
     ValueError: When the structured difference between `event_ndims` and
       `min_event_ndims` is not the same for all elements.
-    ValueError: If the resulting `ldj_reduction_ndims` is negative.
+    ValueError: If the resulting `reduction_ndims` is negative.
   """
   with tf.name_scope(name):
     assertions = []
@@ -1407,7 +1427,7 @@ def aligned_event_ndims(event_ndims,
                'equal for all elements of the structured input. Saw '
                'event_ndims={}, min_event_ndims={}.'
                ).format(event_ndims, min_event_ndims))
-      elif validate:
+      elif validate_args:
         with tf.control_dependencies(assertions):
           assertions.append(assert_util.assert_equal(
               flat_differences[0], flat_differences[1:],
@@ -1422,7 +1442,7 @@ def aligned_event_ndims(event_ndims,
       if result < 0:
         raise ValueError('`event_ndims` must be at least {}. Saw: {}'
                          .format(min_event_ndims, event_ndims))
-    elif validate:
+    elif validate_args:
       with tf.control_dependencies(assertions):
         assertions.append(
             assert_util.assert_greater_equal(
@@ -1439,7 +1459,9 @@ def aligned_event_ndims(event_ndims,
 def ldj_reduction_shape(shape_structure,
                         event_ndims,
                         min_event_ndims,
-                        validate=True,
+                        parameter_batch_shape,
+                        allow_event_shape_broadcasting=False,
+                        validate_args=True,
                         name='ldj_reduction_shape'):
   """Get the shape of the LDJ reduction for a structured input.
 
@@ -1447,22 +1469,23 @@ def ldj_reduction_shape(shape_structure,
   when computing  `a_bijector.fldj(x, event_ndims)` in terms of
   `a_bijector.fldj(x, min_event_ndims)`.
 
-  Concretely, this value is the *unique* value of
+  Concretely, this is the broadcasted value of
   `shape_structure[i][-event_ndims[i]:-min_event_ndims[i]]` for all elements
-  `i` of the structured arguments.
+  `i` of the structured arguments. If `allow_event_shape_broadcasting` is False,
+  then it is verified that the shape elements are identical (not only
+  broadcastable). If broadcasting occurs among the shape elements, LDJ may be
+  incorrect.
 
   For this to be valid, the following must all be true:
   1) `shape_structure`, `event_ndims`, and `min_event_ndims` have identical
      nested structure (representing valid shapes and ranks, respectively).
-  2) `batch_ndims := shape_structure[i].ndims - event_ndims[i]` takes the
-     same value for all `i` in the structured inputs.
-  3) `max_batch_ndims := shape_structure[i].ndims - min_event_ndims[i]` takes
-     the same value for all `i` in the structured inputs.
-  4) `max_batch_ndims >= batch_ndims >= 0`.
-  5) The first `max_batch_ndims` elements of each shape must be identical.
-     Mathematically, only the shapes between `batch_ndims` and `max_batch_ndims`
-     need to be the same. Practically, broadcasting over `batch_ndims` creates
-     issues for invertibility and is currently disallowed.
+  2) `event_ndims[i] >= min_event_ndims[i]` for all `i` in the structured
+      inputs.
+  3) `reduce_ndims := event_ndims[i] - min_event_ndims[i]` takes the same value
+     for all `i` in the structured inputs.
+  4) `reduce_shape := shape_structure[i][-event_ndims[i]:-min_event_ndims[i]]`
+     takes the same value for all `i` in the structured inputs, if
+     `allow_event_shape_broadcasting` is False.
 
   Example Usage:
   ```
@@ -1498,10 +1521,16 @@ def ldj_reduction_shape(shape_structure,
     min_event_ndims: A matching structure of scalar integers that are intrinsic
       properties of the bijector, used to determine the maximum possible
       batch-ndims.
-    validate: Whether to use runtime assertions when properties of the arguments
-      are not known statically. If true, the value returned by this method is
-      conditioned on `tf.debugging` ops where required. Otherwise, only run
-      statically-decidable assertions.
+    parameter_batch_shape: The broadcasted `batch_shape` of bijector parameters
+      or `None`.
+    allow_event_shape_broadcasting: Whether to validate that the total number of
+      degrees of freedom in the event shape is unchanged by the forward/inverse
+      transformations and the `ldj_reduction_shape` is the same for all elements
+      of the structure. If this is violated, then LDJ may be incorrect.
+    validate_args: Whether to use runtime assertions when properties of the
+      arguments are not known statically. If true, the value returned by this
+      method is conditioned on `tf.debugging` ops where required. Otherwise,
+      only run statically-decidable assertions.
     name: Python `str` name given to ops created by this function.
       Default value: "ldj_reduction_shape".
   Returns:
@@ -1517,7 +1546,8 @@ def ldj_reduction_shape(shape_structure,
       invalid slice of `shape_structure[i]` for any element of the structured
       inputs.
     ValueError: When `ldj_reduction_shape[i]` computed on any element `[i]` of
-      the structured inputs is not the same across the structure.
+      the structured inputs is not the same across the structure if
+      `allow_event_shape_broadcasting` is False.
   """
   with tf.name_scope(name):
     # Container for dynamic assertions
@@ -1525,12 +1555,13 @@ def ldj_reduction_shape(shape_structure,
 
     # Make sure event_ndims and min_event_ndims are valid and get reduce_ndims.
     min_event_ndims = nest.map_structure(
-        lambda nd: check_valid_ndims(nd, validate), min_event_ndims)
+        lambda nd: check_valid_ndims(nd, validate_args), min_event_ndims)
     event_ndims = nest.map_structure_up_to(
         min_event_ndims,
-        lambda nd: check_valid_ndims(nd, validate), event_ndims)
-    reduce_ndims = aligned_event_ndims(
-        event_ndims, min_event_ndims, validate=validate, name='reduce_ndims')
+        lambda nd: check_valid_ndims(nd, validate_args), event_ndims)
+    reduce_ndims = ldj_reduction_ndims(
+        event_ndims, min_event_ndims, validate_args=validate_args,
+        name='reduce_ndims')
 
     # Make sure inputs have rank greater than event_ndims.
     rank_structure = nest.map_structure_up_to(
@@ -1543,7 +1574,7 @@ def ldj_reduction_shape(shape_structure,
         if rank_ < ndims_:
           raise ValueError('Input must have rank at least {}. Saw: {}'.format(
               ndims_, rank_))
-      elif validate:
+      elif validate_args:
         with tf.control_dependencies(assertions):
           assertions.append(
               assert_util.assert_greater_equal(
@@ -1558,10 +1589,9 @@ def ldj_reduction_shape(shape_structure,
             shape_structure, rank_structure, event_ndims))
 
     # Make sure that the `event_shape` dimensions to the left of
-    # `min_event_ndims` are equal for all structured elements, and that batch
-    # shapes broadcast for all structured elements.
-    # We can skip these steps if the input is unstructured.
-    if len(ldj_reduce_shapes) > 1:
+    # `min_event_ndims` are equal for all structured elements.
+    # We can skip this step if the input is unstructured.
+    if len(ldj_reduce_shapes) > 1 and not allow_event_shape_broadcasting:
       # Try to check shapes statically.
       ldj_reduce_shapes_ = [tf.get_static_value(s) for s in ldj_reduce_shapes]
       if not any(s is None for s in ldj_reduce_shapes_):
@@ -1571,22 +1601,7 @@ def ldj_reduction_shape(shape_structure,
               ' be equal. Saw: {}.'.format(
                   nest.pack_sequence_as(shape_structure, ldj_reduce_shapes_)))
 
-      batch_shapes = nest.flatten(
-          nest.map_structure(lambda s, r, dim: s[:r - dim],
-                             shape_structure, rank_structure, event_ndims))
-      batch_shapes_ = [tf.TensorShape(tf.get_static_value(s))
-                       for s in batch_shapes]
-      if not any(s is None for s in batch_shapes_):
-        shape_ = batch_shapes_[0]
-        for s in batch_shapes_[1:]:
-          try:
-            shape_ = tf.broadcast_static_shape(shape_, s)
-          except ValueError:
-            raise ValueError(
-                '`batch_shape` components must broadcast. Saw shapes {} and {}.'
-                ''.format(shape_, s))
-
-      elif validate:
+      elif validate_args:
         with tf.control_dependencies(assertions):
           assertions.append(
               assert_util.assert_equal(
@@ -1594,13 +1609,43 @@ def ldj_reduction_shape(shape_structure,
                   message=('`event_shape` components to the left of '
                            '`min_event_ndims` must be equal.')))
 
-        shape = batch_shapes[0]
-        for s in batch_shapes[1:]:
-          try:
-            shape = ps.broadcast_shape(shape, s)
-          except ValueError:
-            raise ValueError(
-                ('`batch_shape` components must broadcast. Saw shapes {} and '
-                 '{}.'.format(shape, s)))
+    ldj_reduce_shape = ldj_reduce_shapes[0]
+    if allow_event_shape_broadcasting:
+      for s in ldj_reduce_shapes[1:]:
+        ldj_reduce_shape = ps.broadcast_shape(ldj_reduce_shape, s)
 
-    return ldj_reduce_shapes[0], assertions
+    # Check that the bijector's batch shape does not expand `ldj_reduce_shape`.
+    elif parameter_batch_shape is not None:
+      parameter_batch_shape_ = tf.get_static_value(parameter_batch_shape)
+      ldj_reduce_shape_ = tf.get_static_value(ldj_reduce_shape)
+      reduce_ndims_ = tf.get_static_value(reduce_ndims)
+      if all(x is not None for x in
+             (parameter_batch_shape_, ldj_reduce_shape_, reduce_ndims_)):
+        if np.size(parameter_batch_shape_) <= reduce_ndims_:
+          parameter_batch_in_ldj_shape_ = parameter_batch_shape_
+        else:
+          parameter_batch_in_ldj_shape_ = parameter_batch_shape_[
+              -reduce_ndims_:]
+        broadcasted_shape_ = tf.broadcast_static_shape(
+            tf.TensorShape(parameter_batch_in_ldj_shape_),
+            tf.TensorShape(ldj_reduce_shape_))
+        if not np.all(ldj_reduce_shape_ == broadcasted_shape_):
+          raise ValueError('Broadcasting with bijector parameters changes the '
+                           'LDJ reduction shape from {} to {}.'.format(
+                               ldj_reduce_shape_, broadcasted_shape_))
+      elif validate_args:
+        parameter_batch_rank = ps.size(parameter_batch_shape)
+        parameter_batch_in_ldj_shape = ps.slice(
+            parameter_batch_shape,
+            begin=[tf.maximum(parameter_batch_rank - reduce_ndims, 0)],
+            size=[tf.minimum(reduce_ndims, parameter_batch_rank)])
+        with tf.control_dependencies(assertions):
+          assertions.append(
+              assert_util.assert_equal(
+                  ldj_reduce_shape,
+                  ps.broadcast_shape(
+                      ldj_reduce_shape, parameter_batch_in_ldj_shape),
+                  message=('Broadcasting with bijector parameters changes the '
+                           'LDJ reduction shape.')))
+
+    return ldj_reduce_shape, assertions

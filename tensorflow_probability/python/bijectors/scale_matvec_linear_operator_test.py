@@ -124,5 +124,128 @@ class ScaleMatvecLinearOperatorTest(test_util.TestCase):
         self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=2)))
 
 
+class _ScaleMatvecLinearOperatorBlockTest(object):
+
+  def testBijector(self):
+    x = [np.array([4., 3., 3.]).astype(np.float32),
+         np.array([0., -5.]).astype(np.float32)]
+    op = self.build_operator()
+    y = self.evaluate(op.matvec(x))
+    ldj = self.evaluate(op.log_abs_determinant())
+
+    bijector = tfb.ScaleMatvecLinearOperatorBlock(scale=op, validate_args=True)
+    self.assertStartsWith(bijector.name, 'scale_matvec_linear_operator_block')
+
+    f_x = bijector.forward(x)
+    self.assertAllClose(y, self.evaluate(f_x))
+
+    inv_y = self.evaluate(bijector.inverse(y))
+    self.assertAllClose(x, inv_y)
+
+    # Calling `inverse` on an output of `bijector.forward` (that is equal to
+    # `y`) is a cache hit and returns the original, non-broadcasted input `x`.
+    for x_, z_ in zip(x, bijector.inverse(f_x)):
+      self.assertIs(x_, z_)
+
+    ldj_ = self.evaluate(
+        bijector.forward_log_det_jacobian(x, event_ndims=[1, 1]))
+    self.assertAllClose(ldj, ldj_)
+    self.assertEmpty(ldj_.shape)
+
+    self.assertAllClose(
+        ldj_,
+        self.evaluate(
+            -bijector.inverse_log_det_jacobian(y, event_ndims=[1, 1])))
+
+  def testOperatorBroadcast(self):
+    x = [tf.ones((1, 1, 1, 4), dtype=tf.float32),
+         tf.ones((1, 1, 1, 3), dtype=tf.float32)]
+    op = self.build_batched_operator()
+    bijector = tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
+
+    self.assertAllEqual(
+        self.evaluate(tf.shape(bijector.forward_log_det_jacobian(x, [1, 1]))),
+        self.evaluate(op.batch_shape_tensor()))
+
+    # Broadcasting of event shape components with batched LinearOperators
+    # raises.
+    with self.assertRaisesRegexp(ValueError, 'bijector parameters changes'):
+      self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[2, 2]))
+
+    # Broadcasting of event shape components with batched LinearOperators
+    # raises for `ldj_reduce_ndims > batch_ndims`.
+    with self.assertRaisesRegexp(ValueError, 'bijector parameters changes'):
+      self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[3, 3]))
+
+  def testEventShapeBroadcast(self):
+    op = self.build_operator()
+    bijector = tfb.ScaleMatvecLinearOperatorBlock(
+        op, validate_args=True)
+    x = [tf.broadcast_to(tf.constant(1., dtype=tf.float32), [2, 3, 3]),
+         tf.broadcast_to(tf.constant(2., dtype=tf.float32), [2, 1, 2])]
+
+    # Forward/inverse event shape methods return the correct value.
+    self.assertAllEqual(
+        self.evaluate(bijector.forward_event_shape_tensor(
+            [tf.shape(x_) for x_ in x])),
+        [self.evaluate(tf.shape(y_)) for y_ in bijector.forward(x)])
+    self.assertAllEqual(
+        bijector.inverse_event_shape([x_.shape for x_ in x]),
+        [y_.shape for y_ in bijector.inverse(x)])
+
+    # Broadcasting of inputs within `ldj_reduce_shape` raises.
+    with self.assertRaisesRegexp(ValueError, 'left of `min_event_ndims`'):
+      self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[2, 2]))
+
+  def testAlignedEventDims(self):
+    x = [tf.ones((3,), dtype=tf.float32), tf.ones((2, 2), tf.float32)]
+    op = self.build_operator()
+    bijector = tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
+    with self.assertRaisesRegexp(ValueError, 'equal for all elements'):
+      self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=[1, 2]))
+
+
+@test_util.test_all_tf_execution_regimes
+class ScaleMatvecLinearOperatorBlockDiagTest(
+    test_util.TestCase, _ScaleMatvecLinearOperatorBlockTest):
+
+  def build_operator(self):
+    return tf.linalg.LinearOperatorBlockDiag(
+        [tf.linalg.LinearOperatorDiag(diag=[2., 3., 6.]),
+         tf.linalg.LinearOperatorFullMatrix(matrix=[[12., 5.], [-1., 3.]])],
+        is_non_singular=True)
+
+  def build_batched_operator(self):
+    seed = test_util.test_seed()
+    return tf.linalg.LinearOperatorBlockDiag(
+        [tf.linalg.LinearOperatorDiag(
+            tf.random.normal((2, 4), dtype=tf.float32, seed=seed)),
+         tf.linalg.LinearOperatorIdentity(3)], is_non_singular=True)
+
+
+@test_util.test_all_tf_execution_regimes
+class ScaleMatvecLinearOperatorBlockTrilTest(
+    test_util.TestCase, _ScaleMatvecLinearOperatorBlockTest):
+
+  def build_operator(self):
+    return tf.linalg.LinearOperatorBlockLowerTriangular([
+        [tf.linalg.LinearOperatorDiag(diag=[2., 3., 6.], is_non_singular=True)],
+        [tf.linalg.LinearOperatorFullMatrix(
+            matrix=[[12., 5., -1.], [3., 0., 1.]]),
+         tf.linalg.LinearOperatorIdentity(2)]], is_non_singular=True)
+
+  def build_batched_operator(self):
+    seed = test_util.test_seed()
+    return tf.linalg.LinearOperatorBlockLowerTriangular([
+        [tf.linalg.LinearOperatorFullMatrix(
+            tf.random.normal((3, 4, 4), dtype=tf.float32, seed=seed),
+            is_non_singular=True)],
+        [tf.linalg.LinearOperatorZeros(
+            3, 4, is_square=False, is_self_adjoint=False),
+         tf.linalg.LinearOperatorFullMatrix(
+             tf.random.normal((3, 3), dtype=tf.float32, seed=seed),
+             is_non_singular=True)]
+    ], is_non_singular=True)
+
 if __name__ == '__main__':
   tf.test.main()

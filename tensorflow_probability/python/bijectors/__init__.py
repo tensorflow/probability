@@ -73,6 +73,7 @@ from tensorflow_probability.python.bijectors.reshape import Reshape
 from tensorflow_probability.python.bijectors.scale import Scale
 from tensorflow_probability.python.bijectors.scale_matvec_diag import ScaleMatvecDiag
 from tensorflow_probability.python.bijectors.scale_matvec_linear_operator import ScaleMatvecLinearOperator
+from tensorflow_probability.python.bijectors.scale_matvec_linear_operator import ScaleMatvecLinearOperatorBlock
 from tensorflow_probability.python.bijectors.scale_matvec_lu import MatvecLU
 from tensorflow_probability.python.bijectors.scale_matvec_lu import ScaleMatvecLU
 from tensorflow_probability.python.bijectors.scale_matvec_tril import ScaleMatvecTriL
@@ -147,6 +148,7 @@ __all__ = [
     "Scale",
     "ScaleMatvecDiag",
     "ScaleMatvecLinearOperator",
+    "ScaleMatvecLinearOperatorBlock",
     "ScaleMatvecLU",
     "ScaleMatvecTriL",
     "ScaleTriL",
