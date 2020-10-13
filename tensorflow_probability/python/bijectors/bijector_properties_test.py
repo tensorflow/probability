@@ -37,6 +37,7 @@ from tensorflow_probability.python.internal import test_util
 
 TF2_FRIENDLY_BIJECTORS = (
     'AffineScalar',
+    'Ascending',
     'BatchNormalization',
     # 'CategoricalToDiscrete', TODO(b/137956955): Add support
     # for hypothesis testing

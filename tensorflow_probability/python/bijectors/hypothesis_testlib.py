@@ -125,6 +125,9 @@ def bijector_supports():
       'AffineScalar':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
+      'Ascending':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_STRICTLY_INCREASING),
       'BatchNormalization':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
