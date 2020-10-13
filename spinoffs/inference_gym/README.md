@@ -144,3 +144,21 @@ See [`inference_gym/tools/get_ground_truth.py`][get_ground_truth].
 [irt]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/item_response_theory.py
 [gaussian]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/ill_conditioned_gaussian.py
 [vector_model]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/vector_model.py
+
+### Citing Inference Gym
+
+To cite the Inference Gym:
+
+```none
+@software{inferencegym2020,
+  author = {Pavel Sountsov and Alexey Radul and contributors},
+  title = {Inference Gym},
+  url = {https://pypi.org/project/inference_gym},
+  version = {0.0.2},
+  year = {2020},
+}
+```
+
+Make sure to update the `version` attribute to match the actual version you're
+using.
+
