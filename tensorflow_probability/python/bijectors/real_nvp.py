@@ -22,8 +22,10 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import affine_scalar
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import chain as chain_lib
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import shift as shift_lib
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -220,7 +222,12 @@ class RealNVP(bijector_lib.Bijector):
         def _bijector_fn(x0, input_depth, **condition_kwargs):
           shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
                                                     **condition_kwargs)
-          return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+          bijectors = []
+          if shift is not None:
+            bijectors.append(shift_lib.Shift(shift))
+          if log_scale is not None:
+            bijectors.append(scale_lib.Scale(log_scale=log_scale))
+          return chain_lib.Chain(bijectors)
 
         bijector_fn = _bijector_fn
 
