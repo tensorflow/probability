@@ -139,10 +139,12 @@ def _make_convertible(cls):
       for k in composite_tensor_params:
         if k in kwargs and kwargs[k] is not None:
           v = kwargs.pop(k)
-          if isinstance(v, CompositeTensor):
-            param_specs[k] = v._type_spec  # pylint: disable=protected-access
-          elif tf.is_tensor(v):
-            param_specs[k] = tf.TensorSpec.from_tensor(v)
+          def composite_helper(v):
+            if isinstance(v, CompositeTensor):
+              return v._type_spec  # pylint: disable=protected-access
+            elif tf.is_tensor(v):
+              return tf.TensorSpec.from_tensor(v)
+          param_specs[k] = tf.nest.map_structure(composite_helper, v)
       for k, v in list(kwargs.items()):
         if isinstance(v, CompositeTensor):
           param_specs[k] = v._type_spec  # pylint: disable=protected-access
@@ -264,10 +266,13 @@ def as_composite(obj):
       except (ValueError, TypeError) as e:
         kwargs[k] = v
   for k, v in kwargs.items():
-    if isinstance(v, distributions.Distribution):
-      kwargs[k] = as_composite(v)
-    if isinstance(v, bijectors.Bijector):
-      kwargs[k] = as_composite(v)
+    def composite_helper(v):
+      if isinstance(v, distributions.Distribution):
+        return as_composite(v)
+      if isinstance(v, bijectors.Bijector):
+        return as_composite(v)
+      return v
+    kwargs[k] = tf.nest.map_structure(composite_helper, v)
     if tensor_util.is_ref(v):
       try:
         kwargs[k] = tf.convert_to_tensor(v, name=k)

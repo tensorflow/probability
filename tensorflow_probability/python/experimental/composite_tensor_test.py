@@ -292,6 +292,32 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     log_prob_after = self.evaluate(unflat.log_prob(sample))
     self.assertEqual(log_prob_before, log_prob_after)
 
+  def test_shift_bijector(self):
+    d = tfd.Normal([0., 1.], [2., 3.])
+    bij = tfb.Shift(4.)
+    td = tfd.TransformedDistribution(distribution=d, bijector=bij)
+    sample = [-2.0, 3.0]
+    log_prob_before = self.evaluate(td.log_prob(sample))
+    dist = tfp.experimental.as_composite(td)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
+  def test_chain_bijector(self):
+    d = tfd.Normal([1., 2.], [3., 4.])
+    bij = tfb.Chain([tfb.Shift(5.), tfb.Scale(6.)])
+    td = tfd.TransformedDistribution(distribution=d, bijector=bij)
+    sample = [[7., 8.], [9., -1.]]
+    log_prob_before = self.evaluate(td.log_prob(sample))
+    dist = tfp.experimental.as_composite(td)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
   def test_transformed_distribution(self):
     fd = tfd.TransformedDistribution(
         distribution=tfd.Normal(loc=0., scale=1.),

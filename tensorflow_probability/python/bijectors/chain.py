@@ -334,3 +334,15 @@ class Chain(bijector.Bijector):
     for b in reversed(self.bijectors):
       dtype = b.forward_dtype(dtype, **kwargs.get(b.name, {}))
     return dtype
+
+  @property
+  def _composite_tensor_nonshape_params(self):
+    """A tuple describing which parameters are non-shape-related tensors.
+
+    Flattening in JAX involves many of the same considerations with regards to
+    identifying tensor arguments for the purposes of CompositeTensor, except
+    that shape-related items will be considered metadata.  This property
+    identifies the keys of parameters that are expected to be tensors, except
+    those that are shape-related.
+    """
+    return ("bijectors",)
