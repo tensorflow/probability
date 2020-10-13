@@ -391,7 +391,7 @@ def histogram(x,
       if not axis:
         raise ValueError('`axis` cannot be empty.  Found: {}'.format(axis))
       x = _move_dims_to_flat_end(x, axis, x_ndims, right_end=False)
-    
+
       if weights is not None:
         weights_ndims = _get_static_ndims(
           x, expect_static=True, expect_ndims_at_least=1)
