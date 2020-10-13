@@ -37,38 +37,47 @@ __all__ = [
 
 
 class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
-  """Runs Hamiltonian Monte Carlo with a non-identity mass matrix.
+  """Hamiltonian Monte Carlo, with given momentum distribution.
 
-  See tfp.mcmc.HamiltonianMonteCarlo for details.
+  See `tfp.mcmc.HamiltonianMonteCarlo` for details on HMC.
+
+  HMC produces samples much more efficiently if properly preconditioned. This
+  can be done by choosing a momentum distribution with covariance equal to
+  the inverse of the state's covariance.
 
   #### Examples:
 
   ##### Simple chain with warm-up.
 
-  In this example we sample from a non-isotropic Gaussian, and show that
-  we may still get all effective samples by pre-conditioning with the
-  covariance of the target log probability.
+  In this example we sample from a non-isotropic distribution, and show that
+  we may sample efficiently with HMC by pre-conditioning.
 
   ```python
   import tensorflow as tf
   import tensorflow_probability as tfp
+  tfed = tfp.experimental.distributions
 
-  # Synthetic target distribution is a non-isotropic Gaussian.
-  mvn = tfd.MultivariateNormalDiag(
-      loc=[1., 2., 3.], scale_diag=[0.1, 1., 10.])
+  # Suppose we have a target log prob fn, as well as an estimate of its
+  # covariance.
+  log_prob_fn = ...
+  cov_estimate = ...
 
-  # We can use the known scale of the target as an inverse scale
+  # We want the mass matrix to be the *inverse* of the covariance estimate,
+  # so we can use the symmetric square root:
   momentum_distribution = (
-      tfp.experimental.distributions.MultivariateNormalInverseScaleLinearOperator(
-        loc=tf.zeros(3),
-        inverse_scale=mvn.scale))
+      tfed.MultivariateNormalPrecisionFactorLinearOperator(
+          precision_factor=tf.linalg.LinearOperatorLowerTriangular(
+              tf.linalg.cholesky(cov_estimate),
+          ),
+          precision=tf.linalg.LinearOperatorFullMatrix(cov_estimate),
+  )
 
   # Run standard HMC below
   num_burnin_steps = 100
   num_results = 1000
   adaptive_hmc = tfp.mcmc.SimpleStepSizeAdaptation(
       tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
-        target_log_prob_fn=mvn.log_prob,
+        target_log_prob_fn=log_prob_fn,
         momentum_distribution=momentum_distribution,
         step_size=0.3,
         num_leapfrog_steps=10),
@@ -79,18 +88,18 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
     draws = tfp.mcmc.sample_chain(
         num_results,
         num_burnin_steps=num_burnin_steps,
-        current_state=tf.zeros(3),
+        current_state=tf.zeros(3),  # 3 chains.
         kernel=adaptive_hmc,
         trace_fn=None)
-    return tfp.mcmc.effective_sample_size(draws)
+    return tfp.mcmc.effective_sample_size(draws, cross_chain_dims=1)
 
-  run_chain_and_compute_ess()  # [1000, 1000, 1000]
+  run_chain_and_compute_ess()  # Something close to 3 x 1000.
   ```
 
-  ##### Estimate parameters of a more complicated posterior.
+  ##### Estimate parameters of a more complicated distribution.
 
   This demonstrates using multiple state parts, and reshaping a
-  `tfp.experimental.distributions.MultivariateNormalInverseScaleLinearOperator`
+  `tfde.MultivariateNormalPrecisionFactorLinearOperator`
   to use with a scalar or a non-square shape (in this case, `[2, 3, 4]`).
 
   ```python
@@ -106,7 +115,7 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
       tfd.Normal(0., 10.),
       tfd.Normal(0., 0.1),
       reshape_to_234(
-          tfp.experimental.distributions.MultivariateNormalInverseScaleLinearOperator(
+          tfde.MultivariateNormalPrecisionFactorLinearOperator(
               0., tf.linalg.LinearOperatorDiag(tf.fill([24], 10.))))
   ])
   num_burnin_steps = 100
@@ -126,8 +135,6 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
         kernel=adaptive_hmc,
         trace_fn=None)
     return tfp.mcmc.effective_sample_size(draws)
-
-
 
   run_chain_and_compute_ess()  # [1000, 1000, 1000 * tf.ones([2, 3, 4])]
   ```

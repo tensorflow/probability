@@ -36,7 +36,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         ":joint_distribution_pinned",
-        ":mvn_inverse_scale_linop",
+        ":mvn_precision_factor_linop",
     ],
 )
 
@@ -66,9 +66,9 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
-    name = "mvn_inverse_scale_linop",
-    srcs = ["mvn_inverse_scale_linop.py"],
-    srcs_version = "PY2AND3",
+    name = "mvn_precision_factor_linop",
+    srcs = ["mvn_precision_factor_linop.py"],
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -81,11 +81,12 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_test(
-    name = "mvn_inverse_scale_linop_test",
+    name = "mvn_precision_factor_linop_test",
     size = "medium",
     timeout = "long",
-    srcs = ["mvn_inverse_scale_linop_test.py"],
+    srcs = ["mvn_precision_factor_linop_test.py"],
     deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
