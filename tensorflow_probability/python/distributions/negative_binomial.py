@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -112,6 +113,36 @@ class NegativeBinomial(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def experimental_from_mean_dispersion(cls, mean, dispersion, **kwargs):
+    """Constructs a NegativeBinomial from its mean and dispersion.
+
+    **Experimental: Naming, location of this API may change.**
+
+    In this parameterization, the dispersion is defined as the reciprocal of the
+    total count of failures, i.e. `dispersion = 1 / total_count`.
+
+    Args:
+      mean: The mean of the constructed distribution.
+      dispersion: The reciprocal of the total_count of the constructed
+        distribution.
+      **kwargs: Other keyword arguments passed directly to `__init__`, e.g.
+        `validate_args`.
+
+    Returns:
+      neg_bin: A distribution with the given parameterization.
+    """
+    dtype = dtype_util.common_dtype([mean, dispersion], dtype_hint=tf.float32)
+    dispersion = tensor_util.convert_nonref_to_tensor(dispersion, dtype=dtype)
+    mean = tensor_util.convert_nonref_to_tensor(mean, dtype=dtype)
+
+    total_count = DeferredTensor(dispersion, tf.math.reciprocal, dtype=dtype)
+
+    return cls(
+        total_count=total_count,
+        probs=DeferredTensor(mean, lambda mean: mean / (mean + total_count)),
+        **kwargs)
 
   @classmethod
   def _params_event_ndims(cls):
