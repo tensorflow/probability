@@ -39,6 +39,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/math/ode",
     ],
     deps = [
+        ":bessel",
         ":custom_gradient",
         ":diag_jacobian",
         ":generic",
@@ -55,6 +56,34 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/math/ode",
         "//tensorflow_probability/python/math/psd_kernels",
         "//tensorflow_probability/python/random",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "bessel",
+    srcs = [
+        "bessel.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "bessel_test",
+    size = "medium",
+    srcs = ["bessel_test.py"],
+    shard_count = 2,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

@@ -21,6 +21,10 @@ from __future__ import print_function
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math import psd_kernels
+from tensorflow_probability.python.math.bessel import bessel_iv_ratio
+from tensorflow_probability.python.math.bessel import bessel_ive
+from tensorflow_probability.python.math.bessel import bessel_kve
+from tensorflow_probability.python.math.bessel import log_bessel_ive
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log1mexp
@@ -56,7 +60,6 @@ from tensorflow_probability.python.math.numeric import log1psquare
 from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
-from tensorflow_probability.python.math.special import bessel_iv_ratio
 from tensorflow_probability.python.math.special import erfcinv
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
@@ -79,6 +82,8 @@ _allowed_symbols = [
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
     'bessel_iv_ratio',
+    'bessel_ive',
+    'bessel_kve',
     'cholesky_concat',
     'cholesky_update',
     'clip_by_value_preserve_gradient',
@@ -92,6 +97,7 @@ _allowed_symbols = [
     'lambertw',
     'lambertw_winitzki_approx',
     'lbeta',
+    'log_bessel_ive',
     'log1mexp',
     'log1psquare',
     'log_add_exp',
