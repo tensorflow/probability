@@ -1174,6 +1174,40 @@ class _HiddenMarkovModelTest(
     mode = self.evaluate(model.posterior_mode(observations))
     self.assertAllEqual(mode, np.full((5,), 0))
 
+  def test_high_rank_dynamic_observation_posterior(self):
+    initial_prob_data = tf.constant(7 * [6 * [[0.6, 0.1, 0.3]]],
+                                    dtype=self.dtype)
+    transition_matrix_data = tf.constant(7 * [6 * [[[0.2, 0.6, 0.2],
+                                                    [0.5, 0.3, 0.2],
+                                                    [0.0, 1.0, 0.0]]]],
+                                         dtype=self.dtype)
+    observation_locs_data = tf.constant(7 * [6 * [[[0.0, 1.0, 2.0],
+                                                   [0.0, 2.0, 1.0],
+                                                   [2.0, 1.0, 0.0],
+                                                   [0.0, 1.0, 2.0],
+                                                   [2.0, 1.0, 0.0]]]],
+                                        dtype=self.dtype)
+    observation_scale_data = tf.constant(0.5, dtype=self.dtype)
+
+    (initial_prob, transition_matrix,
+     observation_locs, observation_scale) = self.make_placeholders([
+         initial_prob_data, transition_matrix_data,
+         observation_locs_data, observation_scale_data])
+
+    [num_steps] = self.make_placeholders([5])
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs, scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True,
+        time_varying_observation_distribution=True)
+
+    observations = tf.constant(np.random.normal(
+        size=[7, 6, 5]), dtype=self.dtype)
+    self.evaluate(model.posterior_marginals(observations).logits)
+    self.evaluate(model.posterior_mode(observations))
+
 
 class HiddenMarkovModelTestFloat32(_HiddenMarkovModelTest):
   dtype = tf.float32

@@ -650,7 +650,7 @@ class HiddenMarkovModel(distribution.Distribution):
     shape_condition = [assert_util.assert_equal(
         observation_tensor_shape[-1 - underlying_event_rank],
         self._num_steps,
-        message='The tensor `observations` must consist of sequences'
+        message='The tensor `observations` must consist of sequences '
                 'of observations from `HiddenMarkovModel` of length'
                 '`num_steps`.')]
     if mask_tensor_shape is not None:
@@ -662,7 +662,7 @@ class HiddenMarkovModel(distribution.Distribution):
     return tf.control_dependencies(shape_condition)
 
   def _observation_log_probs(self, observations, mask):
-    """Compute and shape tensor of log probs associated with observations.."""
+    """Compute and shape tensor of log probs associated with observations."""
 
     # Let E be the underlying event shape
     #     M the number of steps in the HMM
@@ -722,13 +722,22 @@ class HiddenMarkovModel(distribution.Distribution):
                                               observation_event_shape],
                                              axis=0))
     observation_rank = ps.rank(observations)
-    observations = distribution_util.move_dimension(
-        observations, observation_rank - underlying_event_rank - 1, 0)
-    observations = tf.expand_dims(
-        observations,
-        observation_rank - underlying_event_rank)
-    observation_log_probs = observation_distribution.log_prob(
-        observations)
+    if self._time_varying_observation_distribution:
+      observations = tf.expand_dims(
+          observations,
+          observation_rank - underlying_event_rank)
+      observation_log_probs = observation_distribution.log_prob(
+          observations)
+      observation_log_probs = distribution_util.move_dimension(
+          observation_log_probs, -2, 0)
+    else:
+      observations = distribution_util.move_dimension(
+          observations, observation_rank - underlying_event_rank - 1, 0)
+      observations = tf.expand_dims(
+          observations,
+          observation_rank - underlying_event_rank)
+      observation_log_probs = observation_distribution.log_prob(
+          observations)
 
     if mask is not None:
       mask = tf.broadcast_to(mask,
@@ -762,13 +771,15 @@ class HiddenMarkovModel(distribution.Distribution):
     from the model.
 
     Args:
-      observations: A tensor representing a batch of observations
-        made on the hidden Markov model.  The rightmost dimension of this tensor
-        gives the steps in a sequence of observations from a single sample from
-        the hidden Markov model. The size of this dimension should match the
-        `num_steps` parameter of the hidden Markov model object. The other
-        dimensions are the dimensions of the batch and these are broadcast with
-        the hidden Markov model's parameters.
+      observations: A tensor representing a batch of observations made on the
+        hidden Markov model.  The rightmost dimensions of this tensor correspond
+        to the dimensions of the observation distributions of the underlying
+        Markov chain, if the observations are non-scalar.  The next dimension
+        from the right indexes the steps in a sequence of observations from a
+        single sample from the hidden Markov model.  The size of this dimension
+        should match the `num_steps` parameter of the hidden Markov model
+        object.  The other dimensions are the dimensions of the batch and these
+        are broadcast with the hidden Markov model's parameters.
       mask: optional bool-type `tensor` with rightmost dimension matching
         `num_steps` indicating which observations the result of this
         function should be conditioned on. When the mask has value
@@ -878,12 +889,12 @@ class HiddenMarkovModel(distribution.Distribution):
       observations: A tensor representing a batch of observations made on the
         hidden Markov model.  The rightmost dimensions of this tensor correspond
         to the dimensions of the observation distributions of the underlying
-        Markov chain.  The next dimension from the right indexes the steps in a
-        sequence of observations from a single sample from the hidden Markov
-        model.  The size of this dimension should match the `num_steps`
-        parameter of the hidden Markov model object.  The other dimensions are
-        the dimensions of the batch and these are broadcast with the hidden
-        Markov model's parameters.
+        Markov chain, if the observations are non-scalar.  The next dimension
+        from the right indexes the steps in a sequence of observations from a
+        single sample from the hidden Markov model.  The size of this dimension
+        should match the `num_steps` parameter of the hidden Markov model
+        object.  The other dimensions are the dimensions of the batch and these
+        are broadcast with the hidden Markov model's parameters.
       mask: optional bool-type `tensor` with rightmost dimension matching
         `num_steps` indicating which observations the result of this
         function should be conditioned on. When the mask has value
