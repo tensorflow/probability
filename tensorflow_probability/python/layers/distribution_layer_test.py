@@ -826,6 +826,7 @@ class _IndependentLayerTest(object):
   def test_layer(self):
     batch_shape = self._build_tensor([5, 5], dtype=np.int32)
     p = self.layer_class.params_size()
+    self.assertDTypeEqual(p, np.int32)
 
     low = self._build_tensor(-3.)
     high = self._build_tensor(3.)
