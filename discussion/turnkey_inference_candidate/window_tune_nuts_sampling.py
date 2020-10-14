@@ -96,7 +96,6 @@ def _sample_posterior(target_log_prob_unconstrained,
           target_log_prob_fn=target_log_prob_unconstrained,
           step_size=init_step_size,
           max_tree_depth=max_tree_depth,
-          seed=seed_stream(),
           parallel_iterations=parallel_iterations,
       ), conditioning_bijector)
 
@@ -240,7 +239,8 @@ def _sample_posterior(target_log_prob_unconstrained,
         previous_kernel_results=previous_kernel_results,
         kernel=hmc_inner,
         trace_fn=trace_fn,
-        parallel_iterations=parallel_iterations)
+        parallel_iterations=parallel_iterations,
+        seed=seed_stream())
 
   # Main sampling with tuning routine.
   num_steps_tuning_window_schedule0 = tuning_window_schedule[0]
