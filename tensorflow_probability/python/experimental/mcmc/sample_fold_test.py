@@ -297,10 +297,11 @@ class SampleChainTest(test_util.TestCase):
 
   def test_basic_operation(self):
     kernel = test_fixtures.TestTransitionKernel()
-    samples, kernel_results = tfp.experimental.mcmc.sample_chain(
+    samples, kernel_results, final_results = tfp.experimental.mcmc.sample_chain(
         num_results=2,
         current_state=0.,
         kernel=kernel,
+        return_final_kernel_results=True,
         seed=test_util.test_seed())
     self.assertAllClose(
         [2], tensorshape_util.as_list(samples.shape))
@@ -313,6 +314,19 @@ class SampleChainTest(test_util.TestCase):
     self.assertAllClose([1, 2], samples)
     self.assertAllClose([1, 2], kernel_results.counter_1)
     self.assertAllClose([2, 4], kernel_results.counter_2)
+
+    # Warm-restart the underlying kernel.  The Trace does not support warm
+    # restart.
+    samples_2, kr_2 = tfp.experimental.mcmc.sample_chain(
+        num_results=2,
+        current_state=samples[-1],
+        previous_kernel_results=final_results,
+        kernel=kernel,
+    )
+    samples_2, kernel_results_2 = self.evaluate([samples_2, kr_2])
+    self.assertAllClose([3, 4], samples_2)
+    self.assertAllClose([3, 4], kernel_results_2.counter_1)
+    self.assertAllClose([6, 8], kernel_results_2.counter_2)
 
   def test_basic_operation_legacy(self):
     kernel = test_fixtures.TestTransitionKernel(accepts_seed=False)
