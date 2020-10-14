@@ -60,7 +60,8 @@ class WithReductions(kernel_base.TransitionKernel):
   `WithReductions`' kernel results.
   """
 
-  def __init__(self, inner_kernel, reducer, name=None):
+  def __init__(self, inner_kernel, reducer,
+               adjust_kr_fn=lambda x: x, name=None):
     """Instantiates this object.
 
     Args:
@@ -68,12 +69,17 @@ class WithReductions(kernel_base.TransitionKernel):
         MCMC sample(s).
       reducer: A (possibly nested) structure of `Reducer`s to be evaluated
         on the `inner_kernel`'s samples.
+      adjust_kr_fn: Optional function to adjust the kernel_results structure
+        of `inner_kernel` before presenting it to `reducer`.  Useful for
+        drivers (like `sample_fold`) that construct their own kernel onions,
+        but accept `Reducer`s as arguments.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., "reduced_kernel").
     """
     self._parameters = dict(
         inner_kernel=inner_kernel,
         reducer=reducer,
+        adjust_kr_fn=adjust_kr_fn,
         name=name or 'reduced_kernel'
     )
 
@@ -102,11 +108,12 @@ class WithReductions(kernel_base.TransitionKernel):
         mcmc_util.make_name(self.name, 'with_reductions', 'one_step')):
       new_state, inner_kernel_results = self.inner_kernel.one_step(
           current_state, previous_kernel_results.inner_results, seed=seed)
+      inner_kernel_results_adj = self.adjust_kr_fn(inner_kernel_results)
       def step_reducer(r, state):
         return r.one_step(
             new_state,
             state,
-            previous_kernel_results=inner_kernel_results)
+            previous_kernel_results=inner_kernel_results_adj)
       new_reducer_state = nest.map_structure_up_to(
           self.reducer,
           step_reducer,
@@ -141,9 +148,10 @@ class WithReductions(kernel_base.TransitionKernel):
         mcmc_util.make_name(self.name, 'with_reductions', 'bootstrap_results')):
       if inner_results is None:
         inner_results = self.inner_kernel.bootstrap_results(init_state)
+      inner_results_adj = self.adjust_kr_fn(inner_results)
       if previous_reducer_state is None:
         previous_reducer_state = tf.nest.map_structure(
-            lambda r: r.initialize(init_state, inner_results),
+            lambda r: r.initialize(init_state, inner_results_adj),
             self.reducer)
       return WithReductionsKernelResults(previous_reducer_state, inner_results)
 
@@ -162,6 +170,10 @@ class WithReductions(kernel_base.TransitionKernel):
   @property
   def reducer(self):
     return self._parameters['reducer']
+
+  @property
+  def adjust_kr_fn(self):
+    return self._parameters['adjust_kr_fn']
 
   @property
   def name(self):

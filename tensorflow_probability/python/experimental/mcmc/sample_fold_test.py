@@ -124,6 +124,28 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(5, kernel_results.counter_1)
     self.assertEqual(10, kernel_results.counter_2)
 
+  def test_reducing_kernel_results(self):
+    kernel = test_fixtures.TestTransitionKernel()
+    def reduction_target(current_state, kernel_results):
+      del current_state
+      assert isinstance(
+          kernel_results, test_fixtures.TestTransitionKernelResults)
+      return kernel_results.counter_2
+    reduction = tfp.experimental.mcmc.ExpectationsReducer(reduction_target)
+    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=kernel,
+        reducer=reduction,
+    )
+    reduction_rslt, last_sample, kernel_results = self.evaluate([
+        reduction_rslt, last_sample, kr
+    ])
+    self.assertEqual(np.mean(np.arange(2, 12, 2)), reduction_rslt)
+    self.assertEqual(5, last_sample)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
+
   def test_nested_reducers(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducers = [

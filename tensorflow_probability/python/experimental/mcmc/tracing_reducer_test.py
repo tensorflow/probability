@@ -113,8 +113,8 @@ class TracingReducerTest(test_util.TestCase):
         kernel_results
     ])
     self.assertAllEqual([1, 2, 3], trace[0])
-    self.assertAllEqual([1, 2, 3], trace[1].inner_results.counter_1)
-    self.assertAllEqual([2, 4, 6], trace[1].inner_results.counter_2)
+    self.assertAllEqual([1, 2, 3], trace[1].counter_1)
+    self.assertAllEqual([2, 4, 6], trace[1].counter_2)
     self.assertEqual(3, final_state)
     self.assertEqual(3, kernel_results.counter_1)
     self.assertEqual(6, kernel_results.counter_2)

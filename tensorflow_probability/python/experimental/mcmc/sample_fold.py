@@ -133,6 +133,8 @@ def sample_fold(
     reduction_kernel = with_reductions.WithReductions(
         inner_kernel=thinning_kernel,
         reducer=reducer,
+        # Strip thinning kernel results layer
+        adjust_kr_fn=lambda kr: kr.inner_results,
     )
     if previous_kernel_results is None:
       previous_kernel_results = kernel.bootstrap_results(current_state)
@@ -282,12 +284,8 @@ def sample_chain(
                     'value) or an explicit callback that traces the values '
                     'you are interested in.')
 
-    # `WithReductions` assumes all its reducers want to reduce over the
-    # immediate inner results of its kernel results. However,
-    # We don't care about the kernel results of `SampleDiscardingKernel`; hence,
-    # we evaluate the `trace_fn` on a deeper level of inner results.
     def real_trace_fn(curr_state, kr):
-      return curr_state, trace_fn(curr_state, kr.inner_results)
+      return curr_state, trace_fn(curr_state, kr)
     trace_reducer = tracing_reducer.TracingReducer(
         trace_fn=real_trace_fn,
         size=num_results
