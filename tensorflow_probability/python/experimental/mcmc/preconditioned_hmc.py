@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
@@ -34,6 +35,16 @@ from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 __all__ = [
     'PreconditionedHamiltonianMonteCarlo',
 ]
+
+
+class UncalibratedPreconditionedHamiltonianMonteCarloKernelResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple(
+        'UncalibratedPreconditionedHamiltonianMonteCarloKernelResults',
+        hmc.UncalibratedHamiltonianMonteCarloKernelResults._fields +
+        ('momentum_distribution',))):
+  """Internal state and diagnostics for Uncalibrated HMC."""
+  __slots__ = ()
 
 
 class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
@@ -174,12 +185,15 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
         (typically a `tf.Variable`) and `kernel_results` (typically
         `collections.namedtuple`) and returns updated step_size (`Tensor`s).
         Default value: `None` (i.e., do not update `step_size` automatically).
-      store_parameters_in_results: If `True`, then `step_size` and
-        `num_leapfrog_steps` are written to and read from eponymous fields in
-        the kernel results objects returned from `one_step` and
-        `bootstrap_results`. This allows wrapper kernels to adjust those
-        parameters on the fly. This is incompatible with `step_size_update_fn`,
-        which must be set to `None`.
+      store_parameters_in_results: If `True`, then `step_size`,
+        `momentum_distribution`, and `num_leapfrog_steps` are written to and
+        read from eponymous fields in the kernel results objects returned from
+        `one_step` and `bootstrap_results`. This allows wrapper kernels to
+        adjust those parameters on the fly. In case this is `True`, the
+        `momentum_distribution` must be a `CompositeTensor`. See
+        `tfp.experimental.as_composite` and `tfp.experimental.auto_composite`.
+        This is incompatible with `step_size_update_fn`, which must be set to
+        `None`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'hmc_kernel').
     """
@@ -239,13 +253,15 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
 
   @mcmc_util.set_doc(hmc.HamiltonianMonteCarlo.one_step.__doc__)
   def one_step(self, current_state, previous_kernel_results, seed=None):
-    with tf.name_scope(mcmc_util.make_name(self.name, 'hmc', 'one_step')):
+    with tf.name_scope(mcmc_util.make_name(self.name, 'phmc', 'one_step')):
       if self._store_parameters_in_results:
         step_size = previous_kernel_results.step_size
         num_leapfrog_steps = previous_kernel_results.num_leapfrog_steps
+        momentum_distribution = previous_kernel_results.momentum_distribution
       else:
         step_size = self.step_size
         num_leapfrog_steps = self.num_leapfrog_steps
+        momentum_distribution = self.momentum_distribution
 
       [
           current_state_parts,
@@ -257,7 +273,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
           self.target_log_prob_fn,
           current_state,
           step_size,
-          self.momentum_distribution,
+          momentum_distribution,
           previous_kernel_results.target_log_prob,
           previous_kernel_results.grads_target_log_prob,
           maybe_expand=True,
@@ -308,6 +324,22 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
       )
 
       return maybe_flatten(next_state_parts), new_kernel_results
+
+  @mcmc_util.set_doc(hmc.HamiltonianMonteCarlo.bootstrap_results.__doc__)
+  def bootstrap_results(self, init_state):
+    with tf.name_scope(
+        mcmc_util.make_name(self.name, 'phmc', 'bootstrap_results')):
+      result = super(UncalibratedPreconditionedHamiltonianMonteCarlo,
+                     self).bootstrap_results(init_state)
+      result = UncalibratedPreconditionedHamiltonianMonteCarloKernelResults(
+          **result._asdict(),  # pylint: disable=protected-access
+          momentum_distribution=[])
+
+      if self._store_parameters_in_results:
+        result = result._replace(
+            momentum_distribution=[] if self.momentum_distribution is None else
+            self.momentum_distribution)
+    return result
 
 
 def _compute_log_acceptance_correction(kinetic_energy_fn,
@@ -424,7 +456,9 @@ def _prepare_args(target_log_prob_fn,
   step_sizes, _ = mcmc_util.prepare_state_parts(
       step_size, dtype=target_log_prob.dtype, name='step_size')
 
-  if momentum_distribution is None:
+  # Default momentum distribution is None, but if `store_parameters_in_results`
+  # is true, then `momentum_distribution` defaults to an empty list
+  if momentum_distribution is None or isinstance(momentum_distribution, list):
     batch_rank = ps.rank(target_log_prob)
     def _batched_isotropic_normal_like(state_part):
       event_ndims = ps.rank(state_part) - batch_rank

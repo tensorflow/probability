@@ -412,7 +412,7 @@ def trace_scan(loop_fn,
 
     initial_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='initial_state'),
-        initial_state)
+        initial_state, expand_composites=True)
     elems = tf.convert_to_tensor(elems, name='elems')
 
     length = ps.size0(elems)

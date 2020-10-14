@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for tensorflow_probability.python.experimental.mcmc.preconditioned_hmc."""
+"""Tests for preconditioned_hmc."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -58,6 +58,24 @@ RunHMCResults = collections.namedtuple('RunHMCResults', [
     'cov_atol',
     'var_rtol',
 ])
+
+
+def _make_composite_tensor(dist):
+  """Wrapper to make distributions of linear operators composite."""
+  if dist is None:
+    return dist
+  composite_dist = tfp.experimental.auto_composite_tensor(dist.__class__,
+                                                          omit_kwargs='name')
+  p = dist.parameters
+
+  for k in p:
+    if isinstance(p[k], tfp.distributions.Distribution):
+      p[k] = _make_composite_tensor(p[k])
+    elif isinstance(p[k], tf.linalg.LinearOperator):
+      composite_linop = tfp.experimental.auto_composite_tensor(p[k].__class__)
+      p[k] = composite_linop(**p[k].parameters)
+  ac_dist = composite_dist(**p)
+  return ac_dist
 
 
 @test_util.test_graph_and_eager_modes
@@ -150,6 +168,7 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
     else:
       raise RuntimeError(
           'Unhandled precondition_scheme: {}'.format(precondition_scheme))
+    momentum_distribution = _make_composite_tensor(momentum_distribution)
 
     # Asyptotic step size, assuming P[accept] = target_accept.
     expected_step = self._calculate_asymptotic_step_size(
@@ -423,7 +442,7 @@ class PreconditionedHMCTest(test_util.TestCase):
       momentum_distribution = None
     else:
       momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
-          # TODO(b/170015229): Don't use the covariance as inverse scale,
+          # TODO(b/170015229) Don't use the covariance as inverse scale,
           # it is the wrong preconditioner.
           precision_factor=tf.linalg.LinearOperatorFullMatrix(cov),
       )
