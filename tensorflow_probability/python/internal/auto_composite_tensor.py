@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import inspect
 import warnings
 
@@ -89,38 +90,10 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
 
   def _to_components(self, obj):
     params = _kwargs_from(self._clsid, obj, limit_to=list(self._param_specs))
-    for k, v in params.items():
-
-      def reduce(spec, v):
-        if isinstance(spec, (list, tuple)):
-          v = type(spec)([reduce(sp, v_) for sp, v_ in zip(spec, v)])
-        elif not tf.is_tensor(v):
-          v = spec._to_components(v)  # pylint: disable=protected-access
-        return v
-
-      if not tf.is_tensor(v):
-        try:
-          params[k] = reduce(self._param_specs[k], v)
-        except TypeError as e:
-          raise NotImplementedError(
-              _mk_err_msg(
-                  self._clsid, obj,
-                  '(Unable to convert dependent entry \'{}\': {})'.format(
-                      k, str(e))))
     return params
 
   def _from_components(self, components):
     kwargs = dict(self._kwargs, **components)
-    for k, v in components.items():
-
-      def reconstitute(spec, v):
-        if isinstance(spec, (list, tuple)):
-          v = type(v)([reconstitute(sp, v_) for (sp, v_) in zip(spec, v)])
-        elif not tf.is_tensor(v):
-          v = spec._from_components(v)  # pylint: disable=protected-access
-        return v
-
-      kwargs[k] = reconstitute(self._param_specs[k], v)
     return self.value_type(**kwargs)  # pylint: disable=not-callable
 
   @property
@@ -152,7 +125,7 @@ _TypeSpecCodec.TYPE_SPEC_CLASS_TO_PROTO[_AutoCompositeTensorTypeSpec] = (
 del _TypeSpecCodec
 
 
-def auto_composite_tensor(cls):
+def auto_composite_tensor(cls=None, omit_kwargs=()):
   """Automagically create a `CompositeTensor` class for `cls`.
 
   `CompositeTensor` objects are able to pass in and out of `tf.function`,
@@ -167,11 +140,13 @@ def auto_composite_tensor(cls):
   ## Example
 
   ```python
-  @tfp.experimental.auto_composite_tensor
+  @tfp.experimental.auto_composite_tensor(omit_kwargs=('name',))
   class Adder(object):
-    def __init__(self, x, y):
-      self._x = tf.convert_to_tensor(x)
-      self._y = tf.convert_to_tensor(y)
+    def __init__(self, x, y, name=None):
+      with tf.name_scope(name or 'Adder') as name:
+        self._x = tf.convert_to_tensor(x)
+        self._y = tf.convert_to_tensor(y)
+        self._name = name
 
     def xpy(self):
       return self._x + self._y
@@ -190,11 +165,14 @@ def auto_composite_tensor(cls):
 
   Args:
     cls: The class for which to create a CompositeTensor subclass.
+    omit_kwargs: Optional sequence of kwarg names to be omitted from the spec.
 
   Returns:
     ctcls: A subclass of `cls` and TF CompositeTensor.
   """
-  clsid = (cls.__module__, cls.__name__)
+  if cls is None:
+    return functools.partial(auto_composite_tensor, omit_kwargs=omit_kwargs)
+  clsid = (cls.__module__, cls.__name__, omit_kwargs)
 
   # Also check for subclass if retrieving from the _registry, in case the user
   # has redefined the class (e.g. in a REPL/notebook).
@@ -210,6 +188,10 @@ def auto_composite_tensor(cls):
       param_specs = {}
       # Heuristically identify the tensor parts, and separate them.
       for k, v in list(kwargs.items()):  # We might pop in the loop body.
+
+        if k in omit_kwargs:
+          kwargs.pop(k)
+          continue
 
         def reduce(v):
           has_tensors = False

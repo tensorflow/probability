@@ -63,7 +63,7 @@ py_test(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
