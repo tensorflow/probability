@@ -64,8 +64,8 @@ def lorenz_system_prior_fn(num_timesteps, innovation_scale, step_size,
 def lorenz_system_unknown_scales_prior_fn(num_timesteps,
                                           step_size,
                                           dtype=tf.float32):
-  innovation_scale = yield Root(tfd.LogNormal(0., 2., name='innovation_scale'))
-  _ = yield Root(tfd.LogNormal(0., 2., name='observation_scale'))
+  innovation_scale = yield Root(tfd.LogNormal(-1., 1., name='innovation_scale'))
+  _ = yield Root(tfd.LogNormal(-1., 1., name='observation_scale'))
   yield from lorenz_system_prior_fn(num_timesteps=num_timesteps,
                                     innovation_scale=innovation_scale,
                                     step_size=step_size,
@@ -231,8 +231,8 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
   additionally modeled as unknown random variables:
 
   ```
-  innovation_scale ~ LogNormal(0., 2.)
-  observation_scale ~ LogNormal(0., 2.)
+  innovation_scale ~ LogNormal(-1., 1.)
+  observation_scale ~ LogNormal(-1., 1.)
 
   # IID noise processes.
   w_x(t) ~ Normal(0., innovation_scale)

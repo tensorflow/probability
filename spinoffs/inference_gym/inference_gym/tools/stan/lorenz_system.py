@@ -150,8 +150,8 @@ def partially_observed_lorenz_system_unknown_scales(
     matrix[num_timesteps, 3] latents;
   }
   model {
-    innovation_scale ~ lognormal(0, 2);
-    observation_scale ~ lognormal(0, 2);
+    innovation_scale ~ lognormal(-1, 1);
+    observation_scale ~ lognormal(-1, 1);
     """ + LORENZ_SYSTEM_OBSERVATIONS_MODEL + '}'
 
   stan_data = {
