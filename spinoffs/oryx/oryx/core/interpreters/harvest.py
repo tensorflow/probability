@@ -366,6 +366,19 @@ class HarvestTrace(jax_core.Trace):
 
   post_process_map = post_process_call
 
+  def process_custom_jvp_call(self, primitive, fun, jvp, tracers):
+    # This implementation just drops the custom derivative rule.
+    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
+    del primitive, jvp  # Unused.
+    return fun.call_wrapped(*tracers)
+
+  def process_custom_vjp_call(self, primitive, fun, fwd, bwd, tracers,
+                              out_trees):
+    # This implementation just drops the custom derivative rule.
+    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
+    del primitive, fwd, bwd, out_trees  # Unused.
+    return fun.call_wrapped(*tracers)
+
 
 class HarvestTracer(jax_core.Tracer):
   """A HarvestTracer just encapsulates a single value."""
