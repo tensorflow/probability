@@ -43,46 +43,6 @@ from tensorflow_probability.python.internal import tensorshape_util
 __all__ = ['VonMisesFisher']
 
 
-def _bessel_ive(v, z, cache=None):
-  """Computes I_v(z)*exp(-abs(z)) using a recurrence relation, where z > 0."""
-  # TODO(b/67497980): Switch to a more numerically faithful implementation.
-  z = tf.convert_to_tensor(z)
-
-  wrap = lambda result: tf.debugging.check_numerics(result, 'besseli{}'.format(v
-                                                                              ))
-
-  if float(v) >= 2:
-    raise ValueError(
-        'Evaluating bessel_i by recurrence becomes imprecise for large v')
-
-  cache = cache or {}
-  safe_z = tf.where(z > 0, z, tf.ones_like(z))
-  if v in cache:
-    return wrap(cache[v])
-  if v == 0:
-    cache[v] = tf.math.bessel_i0e(z)
-  elif v == 1:
-    cache[v] = tf.math.bessel_i1e(z)
-  elif v == 0.5:
-    # sinh(x)*exp(-abs(x)), sinh(x) = (e^x - e^{-x}) / 2
-    sinhe = lambda x: (tf.exp(x - tf.abs(x)) - tf.exp(-x - tf.abs(x))) / 2
-    cache[v] = (
-        np.sqrt(2 / np.pi) * sinhe(z) *
-        tf.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
-  elif v == -0.5:
-    # cosh(x)*exp(-abs(x)), cosh(x) = (e^x + e^{-x}) / 2
-    coshe = lambda x: (tf.exp(x - tf.abs(x)) + tf.exp(-x - tf.abs(x))) / 2
-    cache[v] = (
-        np.sqrt(2 / np.pi) * coshe(z) *
-        tf.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
-  if v <= 1:
-    return wrap(cache[v])
-  # Recurrence relation:
-  cache[v] = (_bessel_ive(v - 2, z, cache) -
-              (2 * (v - 1)) * _bessel_ive(v - 1, z, cache) / z)
-  return wrap(cache[v])
-
-
 class VonMisesFisher(distribution.Distribution):
   r"""The von Mises-Fisher distribution over unit vectors on `S^{n-1}`.
 
@@ -174,9 +134,6 @@ class VonMisesFisher(distribution.Distribution):
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
-
-    Raises:
-      ValueError: For known-bad arguments, i.e. unsupported event dimension.
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
@@ -190,9 +147,6 @@ class VonMisesFisher(distribution.Distribution):
       static_event_dim = tf.compat.dimension_value(
           tensorshape_util.with_rank_at_least(
               self._mean_direction.shape, 1)[-1])
-      if static_event_dim is not None and static_event_dim > 5:
-        raise ValueError('von Mises-Fisher ndims > 5 is not currently '
-                         'supported')
 
       # mean_direction is always reparameterized.
       # concentration is only for event_dim==3, via an inversion sampler.
@@ -260,15 +214,12 @@ class VonMisesFisher(distribution.Distribution):
     if concentration is None:
       concentration = tf.convert_to_tensor(self.concentration)
 
-    event_dim = tf.compat.dimension_value(self.event_shape[0])
-    if event_dim is None:
-      raise ValueError('von Mises-Fisher _log_normalizer currently only '
-                       'supports statically known event shape')
+    event_dim = tf.cast(self._event_shape_tensor()[0], self.dtype)
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))
     safe_lognorm = ((event_dim / 2 - 1) * tf.math.log(safe_conc) -
                     (event_dim / 2) * np.log(2 * np.pi) -
-                    tf.math.log(_bessel_ive(event_dim / 2 - 1, safe_conc)) -
+                    tfp_math.log_bessel_ive(event_dim / 2 - 1, safe_conc) -
                     tf.abs(safe_conc))
     log_nsphere_surface_area = (
         np.log(2.) + (event_dim / 2) * np.log(np.pi) -
@@ -327,11 +278,6 @@ class VonMisesFisher(distribution.Distribution):
     # Derivation: https://sachinruk.github.io/blog/von-Mises-Fisher/
 
     event_dimension_static = tf.compat.dimension_value(self.event_shape[0])
-
-    # TODO(b/141142878): Enable this; numerically unstable.
-    if event_dimension_static is not None and event_dimension_static > 2:
-      raise NotImplementedError(
-          'vMF covariance is numerically unstable for dim>2')
 
     mean_direction = tf.convert_to_tensor(self.mean_direction)
     concentration = tf.convert_to_tensor(self.concentration)
@@ -563,11 +509,6 @@ class VonMisesFisher(distribution.Distribution):
               tf.shape(mean_direction)[-1],
               1,
               message='`mean_direction` may not have scalar event shape'))
-      assertions.append(
-          assert_util.assert_less_equal(
-              tf.shape(mean_direction)[-1],
-              5,
-              message='von Mises-Fisher ndims > 5 is not currently supported'))
       assertions.append(
           assert_util.assert_near(
               1.,

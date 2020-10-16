@@ -45,12 +45,14 @@ JIT_SAMPLE_BLOCKLIST = (
     'Bates',
     'Independent',  # http://b/164415821
     'Multinomial',
+    'VonMisesFisher',  # http://b/171079052
 )
 JIT_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
     'Independent',  # http://b/164415821
     'MixtureSameFamily',  # http://b/164415821
+    'VonMisesFisher',  # http://b/171079052
 )
 
 VMAP_SAMPLE_BLOCKLIST = (
@@ -76,11 +78,15 @@ PMAP_LOGPROB_BLOCKLIST = (
 
 JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = ()
-JVP_LOGPROB_PARAM_BLOCKLIST = ()
+JVP_LOGPROB_PARAM_BLOCKLIST = (
+    'VonMisesFisher',  # http://b/171079052
+)
 
 VJP_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_SAMPLE_BLOCKLIST = ()
-VJP_LOGPROB_PARAM_BLOCKLIST = ()
+VJP_LOGPROB_PARAM_BLOCKLIST = (
+    'VonMisesFisher',  # http://b/171079052
+)
 
 PYTREE_BLOCKLIST = (
     'Bates',
