@@ -375,6 +375,8 @@ def map_ildj(prim, incells, outcells, **params):
   # Assume all invars as mapped
   new_mapped_invars = (True,) * len(flat_vals)
   new_params = dict(params, mapped_invars=new_mapped_invars)
+  if 'donated_invars' in params:
+    new_params['donated_invars'] = (False,) * len(flat_vals)
   subenv_vals = prim.bind(f, *flat_vals, **new_params)
   subenv_tree = aux()
   subenv = tree_util.tree_unflatten(subenv_tree, subenv_vals)
