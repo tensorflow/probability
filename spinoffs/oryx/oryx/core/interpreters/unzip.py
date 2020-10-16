@@ -74,19 +74,20 @@ class UnzipCustomRules:
 
   def __getitem__(self, key):
     if key not in self.rules:
+
       def custom_rule(*tracers, **params):
-        out_jaxpr_tracers = pe.custom_partial_eval_rules[key](
-            *tracers, **params)
-        out_tracers = [
-            UnzipTracer(out_tracer._trace, out_tracer.pval, out_tracer.recipe,  # pylint: disable=protected-access
-                        False, None) for out_tracer in out_jaxpr_tracers
-        ]
+        out_jaxpr_tracers = pe.custom_partial_eval_rules[key](*tracers,
+                                                              **params)
+        out_tracers = [UnzipTracer(
+            out_tracer._trace, out_tracer.pval, out_tracer.recipe,  # pylint: disable=protected-access
+            False, None) for out_tracer in out_jaxpr_tracers]
         for out_tracer in out_tracers:
           recipe = out_tracer.recipe
-          out_tracer.recipe = pe.new_eqn_recipe(
-              recipe.invars, out_tracers,
-              recipe.primitive, recipe.params, recipe.source_info)  # pytype: disable=wrong-arg-types
+          out_tracer.recipe = pe.new_eqn_recipe(recipe.invars, out_tracers,
+                                                recipe.primitive, recipe.params,
+                                                recipe.source_info)  # pytype: disable=wrong-arg-types
         return out_tracers
+
       return custom_rule
     return self.rules[key]
 
@@ -163,12 +164,13 @@ class UnzipTrace(jax_core.Trace):
     return UnzipTracer(self, pe.PartialVal.known(val), jax_core.unit, True)
 
   def new_instantiated_literal(self, val):
-    return UnzipTracer(self, pe.PartialVal.unknown(
-        trace_util.get_shaped_aval(val)), jax_core.Literal(val), True)
+    return UnzipTracer(self,
+                       pe.PartialVal.unknown(trace_util.get_shaped_aval(val)),
+                       jax_core.Literal(val), True)
 
   def new_instantiated_const(self, val):
-    return UnzipTracer(self, pe.PartialVal.unknown(
-        trace_util.get_shaped_aval(val)),
+    return UnzipTracer(self,
+                       pe.PartialVal.unknown(trace_util.get_shaped_aval(val)),
                        pe.ConstVar(val), True)
 
   def new_arg(self, pval, key):
@@ -222,8 +224,8 @@ class UnzipTrace(jax_core.Trace):
         for aval in ans
     ]
     # Passing in UnzipTracer, which pytype does not recognize as JaxprTracer
-    eqn = pe.new_eqn_recipe(
-        tracers, out_tracers, primitive, params, source_info_util.current())  # pytype: disable=wrong-arg-types
+    eqn = pe.new_eqn_recipe(tracers, out_tracers, primitive, params,
+                            source_info_util.current())  # pytype: disable=wrong-arg-types
     for t in out_tracers:
       t.recipe = eqn
 
@@ -325,12 +327,16 @@ class UnzipTrace(jax_core.Trace):
     if call_primitive is harvest.nest_p:
       variable_dict = harvest.sow(
           dict(safe_zip(variable_names, unflat_variables)),
-          tag=settings.tag, name=params['scope'], mode='strict')
+          tag=settings.tag,
+          name=params['scope'],
+          mode='strict')
       unflat_variables = tuple(variable_dict[name] for name in variable_names)
     else:
       unflat_variables = [
           harvest.sow(  # pylint: disable=g-complex-comprehension
-              unflat_variable, tag=settings.tag, name=name,
+              unflat_variable,
+              tag=settings.tag,
+              name=name,
               mode='strict') for unflat_variable, name in safe_zip(
                   unflat_variables, variable_names)
       ]
@@ -687,7 +693,7 @@ unzip_registry[harvest.sow_p] = sow_unzip
 
 def _custom_jvp_call_unzip(trace, fun, *tracers, **params):
   del trace
-  return cd.custom_jvp_call_jaxpr(fun, params['jvp'], *tracers)
+  return custom_jvp_call_jaxpr(fun, params['jvp'], *tracers)
 
 
 custom_rules[cd.custom_jvp_call_p] = _custom_jvp_call_unzip
@@ -695,8 +701,46 @@ custom_rules[cd.custom_jvp_call_p] = _custom_jvp_call_unzip
 
 def _custom_vjp_call_unzip(trace, fun, *tracers, **params):
   del trace
-  return cd.custom_vjp_call_jaxpr(fun, params['fwd'], params['bwd'], *tracers,
-                                  **params)
+  return custom_vjp_call_jaxpr(fun, params['fwd'], params['bwd'], *tracers,
+                               **params)
 
 
 custom_rules[cd.custom_vjp_call_p] = _custom_vjp_call_unzip
+
+
+def custom_jvp_call_jaxpr(fun, jvp, *args):
+  """A convenience wrapper to apply the custom_jvp_call_jaxpr primitive."""
+  in_avals = [
+      abstract_arrays.raise_to_shaped(jax_core.get_aval(x)) for x in args
+  ]
+  fun_jaxpr, consts = cd._initial_style_jaxpr(  # pylint: disable=protected-access
+      fun, in_avals)  # consts can be tracers!
+  closed_fun_jaxpr = jax_core.ClosedJaxpr(
+      pe.convert_constvars_jaxpr(fun_jaxpr), ())
+  jvp_jaxpr_thunk = pe._memoize(  # pylint: disable=protected-access
+      lambda: cd._initial_style_jaxpr(jvp, in_avals * 2))  # pylint: disable=protected-access
+  return cd.custom_jvp_call_jaxpr_p.bind(
+      *consts,
+      *args,
+      fun_jaxpr=closed_fun_jaxpr,
+      jvp_jaxpr_thunk=jvp_jaxpr_thunk,
+      num_consts=len(consts))
+
+
+def custom_vjp_call_jaxpr(fun, fwd, bwd, *args, out_trees):
+  in_avals = [
+      abstract_arrays.raise_to_shaped(jax_core.get_aval(x)) for x in args
+  ]
+  fun_jaxpr, consts = cd._initial_style_jaxpr(  # pylint: disable=protected-access
+      fun, in_avals)  # consts can be tracers!
+  closed_fun_jaxpr = jax_core.ClosedJaxpr(
+      pe.convert_constvars_jaxpr(fun_jaxpr), ())
+  fwd_jaxpr_thunk = pe._memoize(lambda: cd._initial_style_jaxpr(fwd, in_avals))  # pylint: disable=protected-access
+  return cd.custom_vjp_call_jaxpr_p.bind(
+      *consts,
+      *args,
+      fun_jaxpr=closed_fun_jaxpr,
+      fwd_jaxpr_thunk=fwd_jaxpr_thunk,
+      bwd=bwd,
+      out_trees=out_trees,
+      num_consts=len(consts))
