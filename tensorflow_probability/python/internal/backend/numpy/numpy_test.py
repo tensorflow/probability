@@ -940,15 +940,15 @@ NUMPY_TEST_CASES = [
         'math.reduce_logsumexp', [array_axis_tuples(allow_multi_axis=True)],
         xla_const_args=(1,)),
     TestCase(
-        'math.reduce_max',
-        [array_axis_tuples(allow_nan=True, allow_multi_axis=True)],
+        'math.reduce_max',  # TODO(b/171070692): TF produces nonsense with NaN.
+        [array_axis_tuples(allow_nan=False, allow_multi_axis=True)],
         xla_const_args=(1,)),
     TestCase(
         'math.reduce_mean', [array_axis_tuples(allow_multi_axis=True)],
         xla_const_args=(1,)),
     TestCase(
-        'math.reduce_min',
-        [array_axis_tuples(allow_nan=True, allow_multi_axis=True)],
+        'math.reduce_min',  # TODO(b/171070692): TF produces nonsense with NaN.
+        [array_axis_tuples(allow_nan=False, allow_multi_axis=True)],
         xla_const_args=(1,)),
     TestCase(
         'math.reduce_prod', [
