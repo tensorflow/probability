@@ -122,6 +122,8 @@ multi_substrate_py_library(
         ":init",
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -132,8 +134,9 @@ multi_substrate_py_test(
     deps = [
         ":slicing",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
