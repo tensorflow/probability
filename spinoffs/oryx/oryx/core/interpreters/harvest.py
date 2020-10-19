@@ -123,7 +123,6 @@ reap(f, tag='intermediate')(5.)  # ==> {'y': 6.}
 from typing import Any, Callable, Dict, Iterable, List, FrozenSet, Tuple, Union
 
 import dataclasses
-import jax
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -131,6 +130,11 @@ from jax import lax
 from jax import linear_util as lu
 from jax import tree_util
 from jax import util as jax_util
+# pylint: disable=g-import-not-at-top
+try:
+  from jax._src.lax import control_flow as lax_control_flow
+except ImportError:
+  from jax.lax import lax_control_flow  # type: ignore
 from jax.interpreters import ad
 from jax.interpreters import batching
 from jax.interpreters import masking
@@ -737,7 +741,7 @@ def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       abstract_arrays.raise_to_shaped(jax_core.get_aval(a)) for a in init)
   in_flat, in_tree = tree_util.tree_flatten((init, (xs_plants, xs)))
   body_jaxpr, new_consts, out_tree = (
-      jax.lax.lax_control_flow._initial_style_jaxpr(  # pylint: disable=protected-access
+      lax_control_flow._initial_style_jaxpr(  # pylint: disable=protected-access
           body, in_tree, init_avals + x_avals))
   new_values = list(new_consts) + in_flat
   num_xs_plants = len(new_values) - len(init) - len(xs) - len(new_consts)
