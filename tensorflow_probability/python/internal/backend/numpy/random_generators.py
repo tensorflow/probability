@@ -186,8 +186,6 @@ if JAX_MODE:
     # transformed rejection sampling algorithm for
     # lam > 10. A reference implementation can be found here:
     # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/kernels/random_poisson_op.cc#L159-L239
-
-    shape = _ensure_shape_tuple(shape)
     max_iters = (max_iters
                  if max_iters is not None
                  else np.iinfo(np.int32).max)
@@ -214,7 +212,8 @@ def _poisson_jax(shape, lam, dtype=np.float32, seed=None,
   """Jax Poisson random sampler."""
   # TODO(b/146674643): use transformed rejection sampling with lam > 10.
   lam = np.array(lam)
-  return _poisson_jax_impl(lam, seed, shape, dtype, name, max_iters)
+  return _poisson_jax_impl(lam, seed, _ensure_shape_tuple(shape), dtype, name,
+                           max_iters)
 
 
 def _shuffle(value, seed=None, name=None):  # pylint: disable=unused-argument
