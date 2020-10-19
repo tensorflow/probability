@@ -161,10 +161,11 @@ def _btrs(counts, probs, full_shape, seed):
     us = 0.5 - tf.math.abs(u)
     k = tf.math.floor((2 * a / us + b) * u + c)
 
-    # The original algorithm accepts early if (us >= 0.07) & (v <= v_r), where
-    # `v_r = 0.92 - 4.2 / b`, the region for which the box is tight. Since we
-    # have rewritten from scalar evaluation to batch and we can't avoid the
-    # computation below, we omit the cheaper check.
+    # When the bounding box is tight, this criteria is more numerically stable
+    # and equally valid. Particularly on GPU/TPU, it may make the difference
+    # between terminating and non-terminating loops.
+    v_r = 0.92 - 4.2 / b
+    accept_boxed = (us >= 0.07) & (v <= v_r)
 
     # Reject non-sensical answers.
     reject = (k < 0) | (k > counts)
@@ -179,7 +180,8 @@ def _btrs(counts, probs, full_shape, seed):
         (k + 0.5) * tf.math.log(r * (counts - k + 1) / (k + 1)) +
         _stirling_approx_tail(m) + _stirling_approx_tail(counts - m) -
         _stirling_approx_tail(k) - _stirling_approx_tail(counts - k))
-    return k, (~reject) & (v <= upperbound)
+    accept_bounded = v <= upperbound
+    return k, (~reject) & (accept_boxed | accept_bounded)
 
   return batched_rejection_sampler.batched_las_vegas_algorithm(
       batched_las_vegas_trial_fn, seed)[0]  # Drop `num_trials`.
