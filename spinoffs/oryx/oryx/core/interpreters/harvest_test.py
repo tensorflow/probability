@@ -267,7 +267,7 @@ class HarvestTest(test_util.TestCase):
 
     with self.assertRaisesRegex(ValueError, 'Intentional error!'):
       harvest_variables(f)({}, 1.)
-    self.assertDictEqual(trace_util.dynamic_contexts, {})
+    self.assertDictEqual(trace_util._thread_local_state.dynamic_contexts, {})
 
 
 class ControlFlowTest(test_util.TestCase):
