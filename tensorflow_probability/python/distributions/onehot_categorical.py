@@ -197,8 +197,7 @@ class OneHotCategorical(distribution.Distribution):
     if (not tensorshape_util.is_fully_defined(x.shape) or
         not tensorshape_util.is_fully_defined(logits.shape) or
         x.shape != logits.shape):
-      broadcast_shape = tf.broadcast_dynamic_shape(
-          tf.shape(logits), tf.shape(x))
+      broadcast_shape = ps.broadcast_shape(ps.shape(logits), ps.shape(x))
       logits = tf.broadcast_to(logits, broadcast_shape)
       x = tf.broadcast_to(x, broadcast_shape)
 
