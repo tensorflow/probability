@@ -1192,14 +1192,21 @@ class HiddenMarkovModel(distribution.Distribution):
         raise ValueError(
             '`transition_distribution` and `observation_distribution` '
             'must agree on last dimension of batch size')
+      static_num_steps = tf.compat.dimension_value(self._static_event_shape[0])
       if (self._time_varying_observation_distribution and
-          tf.compat.dimension_value(odbs[-2]) != self.num_steps):
-        raise ValueError('A time-varying `observation_distribution` must have '
-                         'a first batch dimension that matches num_steps.')
+          static_num_steps is not None and
+          tf.compat.dimension_value(odbs[-2]) is not None and
+          tf.compat.dimension_value(odbs[-2]) != static_num_steps):
+        raise ValueError(
+            'A time-varying `observation_distribution` must have a first '
+            'batch dimension that matches num_steps.')
       if (self._time_varying_transition_distribution and
-          tf.compat.dimension_value(tdbs[-2]) != (self.num_steps - 1)):
-        raise ValueError('A time-varying `transition_distribution` must have a '
-                         'first batch dimension that matches num_steps - 1.')
+          static_num_steps is not None and
+          tf.compat.dimension_value(tdbs[-2]) is not None and
+          tf.compat.dimension_value(tdbs[-2]) != (static_num_steps - 1)):
+        raise ValueError(
+            'A time-varying `transition_distribution` must have a first '
+            'batch dimension that matches num_steps - 1.')
     elif self.validate_args:
       tdbs = self.transition_distribution.batch_shape_tensor()
       odbs = self.observation_distribution.batch_shape_tensor()
