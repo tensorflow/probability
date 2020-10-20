@@ -109,22 +109,23 @@ class VectorizedStochasticVolatility(bayesian_model.BayesianModel):
 
   ```none
 
-  persistence_of_volatility ~ 2. * Beta(concentration1=20.,
-                                        concentration0=1.5) - 1.
-  mean_log_volatility ~ Cauchy(loc=0., scale=5.)
-  white_noise_shock_scale ~ HalfCauchy(loc=0., scale=2.)
+  persistence_of_volatility ~ 2 * Beta(concentration1=20,
+                                       concentration0=1.5) - 1.
+  mean_log_volatility ~ Cauchy(loc=0, scale=5)
+  white_noise_shock_scale ~ HalfCauchy(loc=0, scale=2)
 
   # Order-1 autoregressive process on log volatility.
   log_volatility[0] ~ Normal(
-      loc=0.,
-      scale=white_noise_shock_scale / sqrt(1. - persistence_of_volatility**2))
+      loc=0,
+      scale=white_noise_shock_scale / sqrt(1 - persistence_of_volatility**2))
   for t in range(1, num_timesteps):
     log_volatility[t] ~ Normal(
         loc=persistence_of_volatility * log_volatility[t - 1],
         scale=white_noise_shock_scale)
 
-  centered_returns ~ Normal(
-    loc=0., scale=sqrt(exp(mean_log_volatility + log_volatility)))
+  for t in range(num_timesteps):
+    centered_returns[t] ~ Normal(
+      loc=0, scale=sqrt(exp(mean_log_volatility + log_volatility[t])))
   ```
 
   This class allows two different parameterizations of the `log_volatility`

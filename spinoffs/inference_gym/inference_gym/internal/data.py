@@ -88,13 +88,13 @@ def brownian_motion_missing_middle_observations():
 
   Returns:
     dataset: A Dict with the following keys:
-      locs: Float `Tensor` of observed loc parameters at each timestep.
+      observed_locs: Float `Tensor` of observed loc parameters at each timestep.
       observation_noise: Float `Tensor` of observation noise, must be positive.
       innovation_noise: Float `Tensor` of innovation noise, must be positive.
 
   """
   return dict(
-      locs=brownian_motion_lib.OBSERVED_LOC,
+      observed_locs=brownian_motion_lib.OBSERVED_LOC,
       observation_noise_scale=brownian_motion_lib.OBSERVATION_NOISE,
       innovation_noise_scale=brownian_motion_lib.INNOVATION_NOISE)
 

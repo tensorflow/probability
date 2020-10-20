@@ -26,12 +26,13 @@ __all__ = [
 ]
 
 
-def brownian_motion(locs, innovation_noise_scale, observation_noise_scale):
+def brownian_motion(observed_locs, innovation_noise_scale,
+                    observation_noise_scale):
   """Brownian Motion model.
 
   Args:
-    locs: Array of loc parameters with np.nan value if loc is unobserved in
-      shape (num_timesteps,)
+    observed_locs: Array of loc parameters with np.nan value if loc is
+      unobserved.
     innovation_noise_scale: Python `float`.
     observation_noise_scale: Python `float`.
 
@@ -61,11 +62,12 @@ def brownian_motion(locs, innovation_noise_scale, observation_noise_scale):
   """
 
   stan_data = {
-      'num_timesteps': len(locs),
-      'num_observations': len(locs[np.isfinite(locs)]),
-      'observation_indices': np.arange(1,
-                                       len(locs) + 1)[np.isfinite(locs)],
-      'observations': locs[np.isfinite(locs)],
+      'num_timesteps': len(observed_locs),
+      'num_observations': len(observed_locs[~np.isnan(observed_locs)]),
+      'observation_indices':
+          (np.arange(1,
+                     len(observed_locs) + 1)[~np.isnan(observed_locs)]),
+      'observations': observed_locs[~np.isnan(observed_locs)],
       'innovation_noise_scale': innovation_noise_scale,
       'observation_noise_scale': observation_noise_scale
   }
@@ -85,12 +87,12 @@ def brownian_motion(locs, innovation_noise_scale, observation_noise_scale):
   )
 
 
-def brownian_motion_unknown_scales(locs):
+def brownian_motion_unknown_scales(observed_locs):
   """Brownian Motion model with scale parameters treated as random variables.
 
   Args:
-    locs: Array of loc parameters with np.nan value if loc is unobserved in
-      shape (num_timesteps,).
+    observed_locs: Array of loc parameters with np.nan value if loc is
+      unobserved.
   Returns:
     model: `StanModel`.
   """
@@ -119,11 +121,12 @@ def brownian_motion_unknown_scales(locs):
   """
 
   stan_data = {
-      'num_timesteps': len(locs),
-      'num_observations': len(locs[np.isfinite(locs)]),
-      'observation_indices': np.arange(1,
-                                       len(locs) + 1)[np.isfinite(locs)],
-      'observations': locs[np.isfinite(locs)]
+      'num_timesteps': len(observed_locs),
+      'num_observations': len(observed_locs[~np.isnan(observed_locs)]),
+      'observation_indices':
+          (np.arange(1,
+                     len(observed_locs) + 1)[~np.isnan(observed_locs)]),
+      'observations': observed_locs[~np.isnan(observed_locs)],
   }
 
   model = util.cached_stan_model(code)

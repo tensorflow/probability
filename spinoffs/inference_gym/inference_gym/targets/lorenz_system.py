@@ -101,15 +101,15 @@ class LorenzSystem(bayesian_model.BayesianModel):
   system used to model atmospheric convection. This model defines a stochastic
   variant that follows the following differential equation:
   ```none
-  x(0) ~ Normal(0, 1)
-  y(0) ~ Normal(0, 1)
-  z(0) ~ Normal(0, 1)
+  x[0] ~ Normal(loc=0, scale=1)
+  y[0] ~ Normal(loc=0, scale=1)
+  z[0] ~ Normal(loc=0, scale=1)
 
-  x'(t) = 10 * (y(t) - x(t)) + w_x(t)
-  y'(t) = x(t) * (28 - z(t)) - y(t) + w_y(t)
-  z'(t) = x(t) * y(t) - 8 / 3 * z(t) + w_z(t)
+  dx_dt[t] = 10 * (y[t] - x[t]) + w_x[t]
+  dy_dt[t] = x[t] * (28 - z[t]) - y[t] + w_y[t]
+  dz_dt[t] = x[t] * y[t] - 8 / 3 * z[t] + w_z[t]
   ```
-  where `w_x(t)`, `w_y(t)` and `w_z(t)` are Gaussian innovation noise processes
+  where `w_x[t]`, `w_y[t]` and `w_z[t]` are Gaussian innovation noise processes
   with a provided scale `innovation_scale`.
 
   The differential equation is numerically integrated using the Euler-Mariyama

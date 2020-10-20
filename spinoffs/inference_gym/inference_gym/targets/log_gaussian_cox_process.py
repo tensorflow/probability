@@ -60,11 +60,12 @@ class LogGaussianCoxProcess(bayesian_model.BayesianModel):
     summary:
 
     ```none
-    amplitude ~ LogNormal(-1, 0.5)
-    length_scale ~ LogNormal(-1, 1)
+    amplitude ~ LogNormal(loc=-1, scale=0.5)
+    length_scale ~ LogNormal(loc=-1, scale=1)
     delta_log_intensities ~ GP(Matern32(amplitude, length_scale), locations)
-    counts[i] ~ Poisson(extents[i] *
-                        exp(delta_log_intensities[i] + mean_log_intensity))
+    for i in range(num_locations):
+      counts[i] ~ Poisson(extents[i] *
+                          exp(delta_log_intensities[i] + mean_log_intensity))
     ```
 
     The data are encoded into three parallel arrays. I.e.

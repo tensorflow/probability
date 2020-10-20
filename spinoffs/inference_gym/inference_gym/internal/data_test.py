@@ -67,7 +67,7 @@ class DataTest(test_util.InferenceGymTestCase):
 
   def testBrownianMotion(self):
     dataset = data.brownian_motion_missing_middle_observations()
-    self.assertEqual((30,), dataset['locs'].shape)
+    self.assertEqual((30,), dataset['observed_locs'].shape)
 
   def testLorenzModel(self):
     dataset = data.convection_lorenz_bridge()

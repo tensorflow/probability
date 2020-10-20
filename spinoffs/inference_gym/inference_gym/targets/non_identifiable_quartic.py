@@ -36,9 +36,10 @@ class NonIdentifiableQuarticMeasurementModel(bayesian_model.BayesianModel):
   model:
 
   ```none
-  theta_i ~ Normal(0., 1.)
-  y ~ Normal(F(theta), noise_scale)
-  F(theta) = theta_2**2 + 3 * theta_1**2 * (theta_1**2 - 1)
+  for i in range(ndims):
+    theta[i] ~ Normal(loc=0, scale=1)
+  F(theta) = theta[1]**2 + 3 * theta[0]**2 * (theta[0]**2 - 1)
+  y ~ Normal(loc=F(theta), scale=noise_scale)
   ```
 
   with an observed `y = 1`. Note that if `ndims` is > 2, the additional
@@ -106,9 +107,9 @@ class NonIdentifiableQuarticMeasurementModel(bayesian_model.BayesianModel):
     return self._prior_dist
 
   def _log_likelihood(self, value):
-    theta_1_sq = value[..., 0]**2
-    theta_2_sq = value[..., 1]**2
-    y_hat = theta_2_sq + 3 * theta_1_sq * (theta_1_sq - 1.)
+    theta_0_sq = value[..., 0]**2
+    theta_1_sq = value[..., 1]**2
+    y_hat = theta_1_sq + 3 * theta_0_sq * (theta_0_sq - 1.)
     y = 1.
     observation_dist = tfd.Normal(y_hat, self._noise_scale)
     return observation_dist.log_prob(y)

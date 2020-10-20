@@ -61,7 +61,8 @@ def brownian_motion_unknown_scales_missing_middle_observations():
     target: StanModel.
   """
   dataset = data.brownian_motion_missing_middle_observations()
-  return brownian_motion.brownian_motion_unknown_scales(locs=dataset['locs'])
+  return brownian_motion.brownian_motion_unknown_scales(
+      observed_locs=dataset['observed_locs'])
 
 
 def convection_lorenz_bridge():

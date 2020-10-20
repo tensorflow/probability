@@ -37,7 +37,7 @@ _small_observed_data = np.array(
 
 def _test_dataset():
   return dict(
-      locs=_fake_observed_data,
+      observed_locs=_fake_observed_data,
       innovation_noise_scale=.1,
       observation_noise_scale=.15)
 
@@ -77,7 +77,7 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
 
   def testDeferred(self):
     """Checks that the dataset is not prematurely materialized."""
-    kwargs = dict(locs=_small_observed_data)
+    kwargs = dict(observed_locs=_small_observed_data)
     func = functools.partial(
         brownian_motion.BrownianMotion,
         observation_noise_scale=0.15,
@@ -88,7 +88,7 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
   def testBrownianMotionHMC(self):
     """Checks approximate samples from the model against the ground truth."""
     model = brownian_motion.BrownianMotion(
-        locs=_small_observed_data,
+        observed_locs=_small_observed_data,
         innovation_noise_scale=0.1,
         observation_noise_scale=0.15)
 
@@ -104,7 +104,7 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
   def testBrownianMotionUnknownScalesHMC(self):
     """Checks approximate samples from the model against the ground truth."""
     model = brownian_motion.BrownianMotionUnknownScales(
-        locs=_small_observed_data)
+        observed_locs=_small_observed_data)
 
     self.validate_ground_truth_using_hmc(
         model,

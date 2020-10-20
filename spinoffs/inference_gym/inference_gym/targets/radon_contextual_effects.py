@@ -101,21 +101,22 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
 
   ```none
 
-  county_effect_mean ~ Normal(loc=0., scale=1.)
-  county_effect_scale ~ Uniform(low=0., high=100.)
-  county_effect ~ Sample(
-      Normal(loc=county_effect_mean, scale=county_effect_scale),
-      sample_shape=[num_counties])
+  county_effect_mean ~ Normal(loc=0, scale=1)
+  county_effect_scale ~ Uniform(low=0, high=100)
+  for i in range(num_counties):
+    county_effect[i] ~ Normal(loc=county_effect_mean,
+                              scale=county_effect_scale)
+  for j in range(3):
+    weight[j] ~ Normal(loc=0, scale=1)
+  log_radon_scale ~ Uniform(low=0, high=100)
 
-  weight ~ Sample(Normal(loc=0., scale=1.), sample_shape=[3])
-  log_radon_scale ~ Uniform(low=0., high=100.)
-
-  log_radon ~ Normal(
-      loc=log_uranium * weight[1]           # effect of soil uranium
-          + floor * weight[2]               # effect of floor
-          + floor_by_county * weight[3]     # effect of mean floor by county
-          + gather(county_effect, county),  # effect of county
-      scale=log_radon_scale)
+  for k in range(num_houses):
+    log_radon[k] ~ Normal(
+        loc=log_uranium * weight[1]           # effect of soil uranium
+            + floor * weight[2]               # effect of floor
+            + floor_by_county * weight[3]     # effect of mean floor by county
+            + county_effect[county[k]],       # effect of county
+        scale=log_radon_scale)
   ```
 
   This model is based on an example from [1] and is the same as the Stan model

@@ -53,10 +53,24 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
 
     This models a set of students answering a set of questions, and being scored
     whether they get the question correct or not. Each student is associated
-    with a scalar `student_ability`, and each question is associated with a
-    scalar `question_difficulty`. Additionally, a scalar `mean_student_ability`
-    is shared between all the students. This corresponds to the [1PL
-    item-response theory](1) model.
+    with a scalar `centered_student_ability`, and each question is associated
+    with a scalar `question_difficulty`. Additionally, a scalar
+    `mean_student_ability` is shared between all the students. This corresponds
+    to the [1PL item-response theory][1] model:
+
+    ```none
+    mean_student_ability ∼ N(loc=0.75, scale=1)
+
+    for i in range(num_students):
+      centered_student_ability[i] ∼ N(loc=0, scale=1)
+
+    for j in range(num_questions):
+      question_difficulty[j] = N(loc=0, scale=1)
+
+    for i, j in student_question_pairs:
+      correct[i, j] = Bernoulli(logit=centered_student_ability[i] -
+                                question_difficulty[j] + mean_student_ability)
+    ```
 
     The data are encoded into three parallel arrays per set. I.e.
     `*_correct[i]  == 1` means that student `*_student_ids[i]` answered question
@@ -132,7 +146,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
       self._prior_dist = tfd.JointDistributionNamed(
           dict(
               mean_student_ability=tfd.Normal(0.75, 1.),
-              student_ability=tfd.Sample(
+              centered_student_ability=tfd.Sample(
                   tfd.Normal(0., 1.),
                   self._num_students,
               ),
@@ -142,12 +156,12 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
               ),
           ))
 
-      def observation_noise_fn(mean_student_ability, student_ability,
+      def observation_noise_fn(mean_student_ability, centered_student_ability,
                                question_difficulty):
         """Creates the observation noise distribution."""
         logits = (
             mean_student_ability[..., tf.newaxis, tf.newaxis] +
-            student_ability[..., tf.newaxis] -
+            centered_student_ability[..., tf.newaxis] -
             question_difficulty[..., tf.newaxis, :])
         return tfd.Bernoulli(logits)
 

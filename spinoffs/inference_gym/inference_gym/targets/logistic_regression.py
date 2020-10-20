@@ -52,6 +52,15 @@ class LogisticRegression(bayesian_model.BayesianModel):
   ):
     """Construct the logistic regression model.
 
+    ```none
+    # The `+ 1` is for the bias term.
+    for i in range(num_features + 1):
+      weights[i] ~ Normal(loc=0, scale=1)
+
+    for j in range(num_datapoints):
+      label[j] ~ Bernoulli(logit=concat([features[j], [1]) @ weights)
+    ```
+
     Args:
       train_features: Floating-point `Tensor` with shape `[num_train_points,
         num_features]`. Training features.

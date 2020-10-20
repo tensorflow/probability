@@ -61,7 +61,7 @@ def brownian_motion_unknown_scales_prior_fn(num_timesteps):
 
 
 def brownian_motion_log_likelihood_fn(values,
-                                      locs,
+                                      observed_locs,
                                       observation_noise_scale=None):
   """Likelihood of observed data under the Brownian Motion model."""
   if observation_noise_scale is None:
@@ -69,31 +69,33 @@ def brownian_motion_log_likelihood_fn(values,
   observation_noise_scale = tf.convert_to_tensor(
       observation_noise_scale, name='observation_noise_scale')
   latents = tf.stack(values, axis=-1)
-  lps = tfd.Normal(loc=latents,
-                   scale=observation_noise_scale[..., tf.newaxis]
-                   ).log_prob(tf.where(tf.math.is_finite(locs), locs, 0.))
-  return tf.reduce_sum(tf.where(tf.math.is_finite(locs), lps, 0.), axis=-1)
+  is_observed = ~tf.math.is_nan(observed_locs)
+  lps = tfd.Normal(
+      loc=latents, scale=observation_noise_scale[..., tf.newaxis]).log_prob(
+          tf.where(is_observed, observed_locs, 0.))
+  return tf.reduce_sum(tf.where(is_observed, lps, 0.), axis=-1)
 
 
 class BrownianMotion(bayesian_model.BayesianModel):
   """Construct the Brownian Motion model.
 
-  This models a Brownian Motion process. Each timestep consists of a Normal
-  distribution with a `loc` parameter. If there are no observations from a given
-  timestep, the loc value is np.nan. The constants `innovation_noise` and
-  `observation noise` are shared across all timesteps.
+  This models a Brownian Motion process with a Gaussian observation model.
 
   ```none
-  # The actual value of the loc parameter at timestep t is:
-  loc_{t+1} | loc_{t} ~ Normal(loc_t, innovation_noise)
+  locs[0] ~ Normal(loc=0, scale=innovation_noise_scale)
+  for t in range(1, num_timesteps):
+    locs[t] ~ Normal(loc=locs[t - 1], scale=innovation_noise_scale)
 
-  # The observed loc at each timestep t (which make up the locs array) is:
-  observed_loc_{t} ~ Normal(loc_{t}, observation_noise)
+  for t in range(num_timesteps):
+    observed_locs[t] ~ Normal(loc=locs[t], scale=observation_noise_scale)
   ```
+
+  This model supports missing observations, indicated by NaNs in the
+  `observed_locs` parameter.
   """
 
   def __init__(self,
-               locs,
+               observed_locs,
                innovation_noise_scale,
                observation_noise_scale,
                name='brownian_motion',
@@ -101,14 +103,15 @@ class BrownianMotion(bayesian_model.BayesianModel):
     """Construct the Brownian Motion model.
 
     Args:
-      locs: Array of loc parameters with nan value if loc is unobserved.
+      observed_locs: Array of loc parameters with NaN value if loc is
+        unobserved.
       innovation_noise_scale: Python `float`.
       observation_noise_scale: Python `float`.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
     with tf.name_scope(name):
-      num_timesteps = locs.shape[0]
+      num_timesteps = observed_locs.shape[0]
       self._prior_dist = tfd.JointDistributionCoroutine(
           functools.partial(
               brownian_motion_prior_fn,
@@ -118,7 +121,7 @@ class BrownianMotion(bayesian_model.BayesianModel):
       self._log_likelihood_fn = functools.partial(
           brownian_motion_log_likelihood_fn,
           observation_noise_scale=observation_noise_scale,
-          locs=locs)
+          observed_locs=observed_locs)
 
       def _ext_identity(params):
         return tf.stack(params, axis=-1)
@@ -165,36 +168,38 @@ class BrownianMotionMissingMiddleObservations(BrownianMotion):
 class BrownianMotionUnknownScales(bayesian_model.BayesianModel):
   """Construct the Brownian Motion model with unknown scale parameters.
 
-  This models a Brownian Motion process. Each timestep consists of a Normal
-  distribution with a `loc` parameter. If there are no observations from a given
-  timestep, the loc value is np.nan. The unknown `innovation_noise_scale` and
-  `observation_noise_scale` are shared across all timesteps.
+  This models a Brownian Motion process with a Gaussian observation model.
 
   ```none
-  innovation_noise_scale ~ LogNormal(0., 2.)
-  observation_noise_scale ~ LogNormal(0., 2.)
+  innovation_noise_scale ~ LogNormal(loc=0, scale=2)
+  observation_noise_scale ~ LogNormal(loc=0, scale=2)
 
-  # The actual value of the loc parameter at timestep t is:
-  loc_{t+1} | loc_{t} ~ Normal(loc_t, innovation_noise_scale)
+  locs[0] ~ Normal(loc=0, scale=innovation_noise_scale)
+  for t in range(1, num_timesteps):
+    locs[t] ~ Normal(loc=locs[t - 1], scale=innovation_noise_scale)
 
-  # The observed loc at each timestep t (which make up the locs array) is:
-  observed_loc_{t} ~ Normal(loc_{t}, observation_noise_scale)
+  for t in range(num_timesteps):
+    observed_locs[t] ~ Normal(loc=locs[t], scale=observation_noise_scale)
   ```
+
+  This model supports missing observations, indicated by NaNs in the
+  `observed_locs` parameter.
   """
 
   def __init__(self,
-               locs,
+               observed_locs,
                name='brownian_motion_unknown_scales',
                pretty_name='Brownian Motion with Unknown Scales'):
     """Construct the Brownian Motion model with unknown scales.
 
     Args:
-      locs: Array of loc parameters with nan value if loc is unobserved.
+      observed_locs: Array of loc parameters with nan value if loc is
+        unobserved.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
     with tf.name_scope(name):
-      num_timesteps = locs.shape[0]
+      num_timesteps = observed_locs.shape[0]
       self._prior_dist = tfd.JointDistributionCoroutine(
           functools.partial(
               brownian_motion_unknown_scales_prior_fn,
@@ -202,7 +207,7 @@ class BrownianMotionUnknownScales(bayesian_model.BayesianModel):
 
       self._log_likelihood_fn = functools.partial(
           brownian_motion_log_likelihood_fn,
-          locs=locs)
+          observed_locs=observed_locs)
 
       def _ext_identity(params):
         return {'innovation_noise_scale': params[0],
