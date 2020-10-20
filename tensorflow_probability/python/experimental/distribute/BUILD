@@ -26,6 +26,7 @@ package(
 py_library(
     name = "distribute",
     srcs = ["__init__.py"],
+    srcs_version = "PY2AND3",
     deps = [
         ":distribute_lib",
         ":joint_distribution",
