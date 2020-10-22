@@ -810,23 +810,10 @@ reciprocal_no_nan = utils.copy_docstring(
 
 
 def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # pylint: disable=unused-argument
-                     include_dtype_kwarg=False, replace_nan=None):
+                     include_dtype_kwarg=False):
   """Implements reduce_* for nptf."""
   input_tensor = _convert_to_tensor(input_tensor)
   axis = _astuple(axis)
-  # reduce_min([nan, nan], 0) in TF => +inf, but reduce_min([nan], 0) => nan.
-  if axis is None:
-    will_reduce = any(dim > 1 for dim in input_tensor.shape)
-  else:
-    will_reduce = any(input_tensor.shape[ax] > 1 for ax in axis)
-  if (will_reduce and
-      replace_nan is not None and
-      np.issubdtype(input_tensor.dtype, np.floating)):
-    loc_is_nan = np.isnan(input_tensor)
-    input_tensor = np.where(
-        loc_is_nan,
-        np.asarray(replace_nan, dtype=input_tensor.dtype),
-        input_tensor)
   kwargs = dict(dtype=input_tensor.dtype) if include_dtype_kwarg else {}
   return op(input_tensor, axis=axis, keepdims=keepdims, **kwargs)
 
@@ -849,7 +836,7 @@ reduce_logsumexp = utils.copy_docstring(
 
 reduce_max = utils.copy_docstring(
     'tf.math.reduce_max',
-    utils.partial(_apply_reduction, np.max, replace_nan=-float('inf')))
+    utils.partial(_apply_reduction, np.max))
 
 reduce_mean = utils.copy_docstring(
     'tf.math.reduce_mean',
@@ -857,7 +844,7 @@ reduce_mean = utils.copy_docstring(
 
 reduce_min = utils.copy_docstring(
     'tf.math.reduce_min',
-    utils.partial(_apply_reduction, np.min, replace_nan=float('inf')))
+    utils.partial(_apply_reduction, np.min))
 
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',

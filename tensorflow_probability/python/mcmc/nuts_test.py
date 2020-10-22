@@ -208,19 +208,18 @@ class NutsTest(test_util.TestCase):
     self.evaluate(assert_univariate_target_conservation(
         self, normal_dist, step_size=0.2))
 
-  def testLogitBetaTargetConservation(self):
-    logit_beta_dist = tfb.Invert(tfb.Sigmoid())(
-        tfd.Beta(concentration0=1., concentration1=2.))
-    self.evaluate(assert_univariate_target_conservation(
-        self, logit_beta_dist, step_size=0.2))
-
   def testSigmoidBetaTargetConservation(self):
-    # Not inverting the sigmoid bijector makes a kooky distribution, but nuts
-    # should still conserve it (with a smaller step size).
-    sigmoid_beta_dist = tfb.Identity(tfb.Sigmoid())(
+    sigmoid_beta_dist = tfb.Invert(tfb.Sigmoid())(
         tfd.Beta(concentration0=1., concentration1=2.))
     self.evaluate(assert_univariate_target_conservation(
-        self, sigmoid_beta_dist, step_size=1e-3))
+        self, sigmoid_beta_dist, step_size=0.2))
+
+  def testBetaTargetConservation(self):
+    # Not that we expect NUTS to do a good job without an unconstraining
+    # bijector, but...
+    beta_dist = tfd.Beta(concentration0=1., concentration1=2.)
+    self.evaluate(assert_univariate_target_conservation(
+        self, beta_dist, step_size=1e-3))
 
   @parameterized.parameters(
       (3, 50000,),
