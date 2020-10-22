@@ -399,6 +399,10 @@ class BijectorCachingTest(test_util.TestCase):
         bijector=instance_cache_bijector)
     global_cache_bijector = tfb.Exp()
 
+    # Ensure the global cache does not persist between tests in different
+    # execution regimes.
+    tfb.Exp._cache.clear()
+
     x = tf.constant(0., dtype=tf.float32)
     y = global_cache_bijector.forward(x)
 

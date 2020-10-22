@@ -370,7 +370,9 @@ class BijectorCache(object):
       raise ValueError('`direction` must be `"forward"`, `"inverse"`, or '
                        '`None`. Saw: {}'.format(direction))
     out = []
-    for k in self.storage.keys():
+    # Make a copy of the keys, in case one of them gets deleted, so as to avoid
+    # the dict-size changing at runtime error.
+    for k in list(self.storage.keys()):
       bijector_key, bijector_class_key, fn_key, _ = k.subkey
       if (k.alive and (bijector is None or bijector_key == bijector)
           and (bijector_class is None or bijector_class == bijector_class_key)
