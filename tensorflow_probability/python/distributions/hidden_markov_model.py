@@ -32,7 +32,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -271,13 +270,6 @@ class HiddenMarkovModel(distribution.Distribution):
   @property
   def num_steps(self):
     return self._num_steps
-
-  @property
-  @deprecation.deprecated(
-      '2020-02-08',
-      'Use `num_states_static` or `num_states_tensor` instead.')
-  def num_states(self):
-    return self.num_states_tensor
 
   @property
   def num_states_static(self):
