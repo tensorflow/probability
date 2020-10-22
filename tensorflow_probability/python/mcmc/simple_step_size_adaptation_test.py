@@ -357,6 +357,34 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
     self.assertFalse(
         tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(False), 1).is_calibrated)
 
+  def testCustomReduceFn(self):
+    log_accept_ratio = tf.constant(
+        [np.log(0.1), np.log(1.)])
+    state = [
+        tf.zeros([2]),
+    ]
+
+    old_step_size = 1.
+    kernel = FakeMHKernel(
+        FakeSteppedKernel(step_size=old_step_size),
+        log_accept_ratio=log_accept_ratio)
+    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+        kernel,
+        num_adaptation_steps=1,
+        adaptation_rate=tf.constant(_RATE - 1., dtype=tf.float64),
+        reduce_fn=tf.reduce_max,
+        validate_args=True)
+
+    kernel_results = kernel.bootstrap_results(state)
+    for _ in range(2):
+      _, kernel_results = kernel.one_step(state, kernel_results)
+
+    step_size = self.evaluate(
+        kernel_results.inner_results.accepted_results.step_size,)
+
+    # If reduce_fn was left at default, this would have decreased.
+    self.assertAllClose(old_step_size * _RATE, step_size)
+
 
 # Reduce test weight by not running the (slow) `eager_no_tf_function` regime.
 @test_util.test_graph_and_eager_modes()

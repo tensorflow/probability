@@ -151,6 +151,16 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
     dimension indexes different distributions, while `C1` indexes replicas of a
     single distribution, all sampled in parallel.
 
+  By default, the averaging function used above is the arithmetic mean, which is
+  not robust to stuck chains (e.g. average of one chain with `p_accept = 0` and
+  three chains with `p_accept = 1` will result in an average `p_accept = 0.75`,
+  which will cause this kernel keep the step size roughly the same rather than
+  reducing it to unstick the stuck chain). A more robust choice would be to set
+  `reduce_fn` argument to `tfp.math.reduce_log_harmonic_mean_exp` [3]. Note,
+  however, that the harmonic mean of a set of numbers is usually smaller than
+  the arithmetic mean, so its use will typically produce smaller than optimal
+  step sizes even for well behaved target distributions.
+
   #### Examples
 
   ```python
@@ -197,6 +207,9 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
   [2]:
   http://andrewgelman.com/2017/12/15/burn-vs-warm-iterative-simulation-algorithms/#comment-627745
 
+  [3]: Hoffman, M., Radul, A., & Sountsov, P. An Adaptive MCMC Scheme
+       for Setting Trajectory Lengths in Hamiltonian Monte Carlo, 2020. In
+       preparation.
   """
 
   def __init__(self,
@@ -207,6 +220,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
                step_size_setter_fn=hmc_like_step_size_setter_fn,
                step_size_getter_fn=hmc_like_step_size_getter_fn,
                log_accept_prob_getter_fn=hmc_like_log_accept_prob_getter_fn,
+               reduce_fn=reduce_logmeanexp,
                validate_args=False,
                name=None):
     """Creates the step size adaptation kernel.
@@ -243,6 +257,9 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
         `Tensor`. `log_accept_prob` can either be a scalar, or have shape
         [num_chains]. If it's the latter, `step_size` should also have the same
         leading dimension.
+      reduce_fn: A callable with signature `(input_tensor, axis, keepdims) ->
+        tensor` that returns a log-reduction of `log_accept_prob`, typically
+        some sort of mean. By default, this performs an arithmetic mean.
       validate_args: Python `bool`. When `True` kernel parameters are checked
         for validity. When `False` invalid inputs may silently render incorrect
         outputs.
@@ -282,6 +299,7 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
         step_size_setter_fn=step_size_setter_fn,
         step_size_getter_fn=step_size_getter_fn,
         log_accept_prob_getter_fn=log_accept_prob_getter_fn,
+        reduce_fn=reduce_fn,
         name=name,
     )
 
@@ -306,6 +324,10 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
 
   def log_accept_prob_getter_fn(self, kernel_results):
     return self._parameters['log_accept_prob_getter_fn'](kernel_results)
+
+  def reduce_fn(self, input_tensor, axis, keepdims):
+    return self._parameters['reduce_fn'](
+        input_tensor, axis=axis, keepdims=keepdims)
 
   @property
   def parameters(self):
@@ -376,15 +398,16 @@ class SimpleStepSizeAdaptation(kernel_base.TransitionKernel):
         num_reduce_dims = prefer_static.minimum(
             log_accept_prob_rank,
             prefer_static.rank(state_part) - prefer_static.rank(step_size_part))
-        reduced_log_accept_prob = reduce_logmeanexp(
+        reduced_log_accept_prob = self.reduce_fn(
             log_accept_prob,
-            axis=prefer_static.range(num_reduce_dims))
+            axis=prefer_static.range(num_reduce_dims),
+            keepdims=False)
         # reduced_log_accept_prob must broadcast into step_size_part on the
         # left, so we do an additional reduction over dimensions where their
         # shapes differ.
         reduce_indices = get_differing_dims(reduced_log_accept_prob,
                                             step_size_part)
-        reduced_log_accept_prob = reduce_logmeanexp(
+        reduced_log_accept_prob = self.reduce_fn(
             reduced_log_accept_prob, axis=reduce_indices, keepdims=True)
 
         one_plus_adaptation_rate = 1. + tf.cast(
