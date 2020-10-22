@@ -34,6 +34,22 @@ tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
+class LogHarmonicMeanExpTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      ('Defaults', None, False),
+      ('Axis', (0,), False),
+      ('KeepDims', (0,), True),
+  )
+  def testBasic(self, axis, keepdims):
+    x = np.array([[0.1, 0.2], [0.3, 0.4]]).astype(np.float32)
+    true_val = np.log(1 / (1 / x).mean(axis=axis, keepdims=keepdims))
+    val = tfp.math.reduce_log_harmonic_mean_exp(
+        np.log(x), axis=axis, keepdims=keepdims)
+    self.assertAllClose(true_val, val)
+
+
+@test_util.test_all_tf_execution_regimes
 class LogCombinationsTest(test_util.TestCase):
 
   def testLogCombinationsBinomial(self):
