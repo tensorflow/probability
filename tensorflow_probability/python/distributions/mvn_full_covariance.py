@@ -19,11 +19,15 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
+from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-
+from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -196,5 +200,17 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
     self._parameters = parameters
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, covariance_matrix=2)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        covariance_matrix=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, sample_shape[-1:]], axis=0),
+            default_constraining_bijector_fn=(lambda: chain_bijector.Chain([
+                cholesky_outer_product_bijector.CholeskyOuterProduct(),
+                fill_scale_tril_bijector.FillScaleTriL(
+                    diag_shift=dtype_util.eps(dtype))
+            ]))))
+    # pylint: enable=g-long-lambda

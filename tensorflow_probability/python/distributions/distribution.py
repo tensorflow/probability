@@ -77,6 +77,7 @@ _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
 
 UNSET_VALUE = object()
 
+
 JAX_MODE = False  # Overwritten by rewrite script.
 
 
@@ -577,6 +578,47 @@ class Distribution(_BaseDistribution):
     return ()
 
   @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    raise NotImplementedError(
+        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+
+  @classmethod
+  def parameter_properties(cls, dtype=tf.float32, num_classes=None):
+    """Returns a dict mapping constructor arg names to property annotations.
+
+    This dict should include an entry for each of the distribution's
+    `Tensor`-valued constructor arguments.
+
+    Args:
+      dtype: Optional float `dtype` to assume for continuous-valued parameters.
+        Some constraining bijectors require advance knowledge of the dtype
+        because certain constants (e.g., `tfb.Softplus.low`) must be
+        instantiated with the same dtype as the values to be transformed.
+      num_classes: Optional `int` `Tensor` number of classes to assume when
+        inferring the shape of parameters for categorical-like distributions.
+        Otherwise ignored.
+
+    Returns:
+      parameter_properties: A
+        `str -> `tfp.python.internal.parameter_properties.ParameterProperties`
+        dict mapping constructor argument names to `ParameterProperties`
+        instances.
+    """
+    with tf.name_scope('parameter_properties'):
+      # Instead of a dtype, subclass implementations take an `eps` argument
+      # representing a small value in the requested dtype. This may be used to
+      # avoid constraint boundaries, e.g., Softplus(low=eps) will avoid
+      # infinitesimally small values for a scale param. The dtype
+      # may be recovered as `eps.dtype`.
+      # Numpy defines `eps` using the difference between 1.0 and the next
+      # smallest representable float larger than 1.0. This is approximately
+      # 1.19e-07 in float32, 2.22e-16 in float64, and 0.00098 in float16.
+      return cls._parameter_properties(dtype, num_classes=num_classes)
+
+  @classmethod
+  @deprecation.deprecated('2021-03-01',
+                          'The `param_shapes` method of `tfd.Distribution` is '
+                          'deprecated; use `parameter_properties` instead.')
   def param_shapes(cls, sample_shape, name='DistributionParamShapes'):
     """Shapes of parameters given the desired shape of a call to `sample()`.
 
@@ -595,9 +637,16 @@ class Distribution(_BaseDistribution):
       `dict` of parameter name to `Tensor` shapes.
     """
     with tf.name_scope(name):
-      return cls._param_shapes(sample_shape)
+      param_shapes = {}
+      for (param_name, param) in cls.parameter_properties().items():
+        param_shapes[param_name] = tf.convert_to_tensor(
+            param.shape_fn(sample_shape), dtype=tf.int32)
+      return param_shapes
 
   @classmethod
+  @deprecation.deprecated(
+      '2021-03-01', 'The `param_static_shapes` method of `tfd.Distribution` is '
+      'deprecated; use `parameter_properties` instead.')
   def param_static_shapes(cls, sample_shape):
     """param_shapes with static (i.e. `TensorShape`) shapes.
 
@@ -636,10 +685,6 @@ class Distribution(_BaseDistribution):
 
     return static_params
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    raise NotImplementedError('_param_shapes not implemented')
-
   @property
   def name(self):
     """Name prepended to all ops created by this `Distribution`."""
@@ -668,27 +713,21 @@ class Distribution(_BaseDistribution):
   def _params_event_ndims(cls):
     """Returns a dict mapping constructor argument names to per-event rank.
 
-    Distributions may implement this method to provide support for slicing
-    (`__getitem__`) on the batch axes.
-
-    Examples: Normal has scalar parameters, so would return
-    `{'loc': 0, 'scale': 0}`. On the other hand, MultivariateNormalTriL has
-    vector loc and matrix scale, so returns `{'loc': 1, 'scale_tril': 2}`. When
-    a distribution accepts multiple parameterizations, either all possible
-    parameters may be specified by the dict, e.g. Bernoulli returns
-    `{'logits': 0, 'probs': 0}`, or if convenient only the parameters relevant
-    to this instance may be specified.
-
-    Parameter dtypes are inferred from Tensor attributes on the distribution
-    where available, e.g. `bernoulli.probs`, 'mvn.scale_tril', falling back with
-    a warning to the dtype of the distribution.
+    The ranks are pulled from `cls.parameter_properties()`; this is a
+    convenience wrapper.
 
     Returns:
       params_event_ndims: Per-event parameter ranks, a `str->int dict`.
     """
-    raise NotImplementedError(
-        '{} does not support batch slicing; must implement '
-        '_params_event_ndims.'.format(cls))
+    try:
+      return {
+          k: param.event_ndims
+          for (k, param) in cls.parameter_properties().items()
+      }
+    except NotImplementedError:
+      raise NotImplementedError(
+          '{} does not support batch slicing; must implement '
+          '_parameter_properties.'.format(cls))
 
   def __getitem__(self, slices):
     """Slices the batch axes of this distribution, returning a new instance.

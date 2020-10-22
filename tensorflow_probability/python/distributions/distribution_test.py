@@ -288,7 +288,7 @@ class DistributionStrReprTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class DistributionTest(test_util.TestCase):
 
-  def testParamShapesAndFromParams(self):
+  def testParamPropertiesAndFromParams(self):
     classes = [
         tfd.Normal,
         tfd.Bernoulli,
@@ -306,9 +306,16 @@ class DistributionTest(test_util.TestCase):
     seed_stream = test_util.test_seed_stream('param_shapes')
     for cls in classes:
       for sample_shape in sample_shapes:
-        param_shapes = cls.param_shapes(sample_shape)
-        params = dict([(name, tf.random.normal(shape, seed=seed_stream()))
-                       for name, shape in param_shapes.items()])
+        parameter_properties = cls.parameter_properties()
+        param_shapes = {
+            name: param.shape_fn(sample_shape)  # pylint: disable=comprehension-too-complex
+            for name, param in parameter_properties.items()
+            if param.is_preferred
+        }
+        params = {
+            name: tf.random.normal(shape, seed=seed_stream())
+            for name, shape in param_shapes.items()
+        }
         dist = cls(**params)
         self.assertAllEqual(
             sample_shape,

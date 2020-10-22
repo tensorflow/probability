@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import custom_gradient as tfp_custom
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -177,15 +178,19 @@ class Gamma(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('concentration', 'log_rate'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0, rate=0, log_rate=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        rate=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            is_preferred=False),
+        log_rate=parameter_properties.ParameterProperties())
+    # pylint: enable=g-long-lambda
 
   @property
   def concentration(self):

@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -271,8 +272,17 @@ class Deterministic(_BaseDeterministic):
         name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, atol=0, rtol=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        atol=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False),
+        rtol=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False))
 
   def _batch_shape_tensor(self, loc=None):
     return ps.broadcast_shape(
@@ -395,8 +405,19 @@ class VectorDeterministic(_BaseDeterministic):
         name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, atol=1, rtol=1)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        atol=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False),
+        rtol=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False))
 
   def _batch_shape_tensor(self, loc=None):
     return ps.broadcast_shape(

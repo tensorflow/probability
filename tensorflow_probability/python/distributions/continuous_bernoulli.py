@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -128,13 +129,13 @@ class ContinuousBernoulli(distribution.Distribution):
         parameters=parameters,
         name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return {"logits": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(logits=0, probs=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        logits=parameter_properties.ParameterProperties(),
+        probs=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=sigmoid_bijector.Sigmoid,
+            is_preferred=False))
 
   @property
   def logits(self):

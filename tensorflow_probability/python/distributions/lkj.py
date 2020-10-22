@@ -31,10 +31,12 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -299,8 +301,16 @@ class LKJ(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            shape_fn=lambda sample_shape: sample_shape[:-2],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(
+                    low=tf.convert_to_tensor(
+                        1. + dtype_util.eps(dtype), dtype=dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def dimension(self):

@@ -41,6 +41,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import experimental as tfe
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -262,6 +263,86 @@ class EventSpaceBijectorsTest(test_util.TestCase):
     self.evaluate([var.initializer for var in dist.variables])
     self.check_bad_loc_scale(dist)
     self.check_event_space_bijector_constrains(dist, data)
+
+
+@test_util.test_all_tf_execution_regimes
+class ParameterBijectorsTest(test_util.TestCase):
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testCanConstructAndSampleDistribution(self, data):
+
+    # TODO(b/169874884): Implement `width` parameters to work around the need
+    # for a high > low` joint constraint.
+    high_gt_low_constraint_dists = ('Bates', 'PERT', 'Triangular',
+                                    'TruncatedCauchy', 'TruncatedNormal',
+                                    'Uniform')
+    not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
+                           'Empirical|event_ndims=2', 'FiniteDiscrete',
+                           'MultivariateStudentTLinearOperator',
+                           'PoissonLogNormalQuadratureCompound',
+                           'SphericalUniform', 'SinhArcsinh')
+    non_trainable_dists = (
+        high_gt_low_constraint_dists + not_annotated_dists +
+        dhps.INSTANTIABLE_META_DISTS)
+
+    non_trainable_tensor_params = (
+        'atol',
+        'rtol',
+        'total_count',
+        'num_samples',
+        'df',  # Can't represent constraint that Wishart df > dimension.
+        'mean_direction')  # TODO(b/118492439): Add `UnitVector` bijector.
+    non_trainable_non_tensor_params = ('dimension', 'dtype'
+                                      )  # Required by Zipf.
+
+    dist = data.draw(
+        dhps.distributions(
+            eligibility_filter=(lambda name: name not in non_trainable_dists)))
+    sample_shape = tuple(
+        self.evaluate(
+            tf.concat([dist.batch_shape_tensor(),
+                       dist.event_shape_tensor()],
+                      axis=0)))
+
+    params = type(dist).parameter_properties(num_classes=2)
+    params64 = type(dist).parameter_properties(dtype=tf.float64, num_classes=2)
+
+    new_parameters = {}
+    seeds = {k: s for (k, s) in zip(
+        params.keys(),
+        samplers.split_seed(test_util.test_seed(), n=len(params)))}
+    for param_name, param in params.items():
+      if param_name in non_trainable_tensor_params:
+        new_parameters[param_name] = dist.parameters[param_name]
+      elif param.is_preferred:
+        b = param.default_constraining_bijector_fn()
+        unconstrained_shape = (
+            b.inverse_event_shape_tensor(
+                param.shape_fn(sample_shape=sample_shape)))
+        unconstrained_param = samplers.normal(
+            unconstrained_shape, seed=seeds[param_name])
+        new_parameters[param_name] = b.forward(unconstrained_param)
+
+        # Check that passing a float64 `eps` works with float64 parameters.
+        b_float64 = params64[param_name].default_constraining_bijector_fn()
+        b_float64(tf.cast(unconstrained_param, tf.float64))
+
+    # Copy over any non-Tensor parameters.
+    new_parameters.update({
+        k: v
+        for (k, v) in dist.parameters.items()
+        if k in non_trainable_non_tensor_params
+    })
+
+    # Sanity check that we got valid parameters.
+    new_parameters['validate_args'] = True
+    new_dist = type(dist)(**new_parameters)
+    x = self.evaluate(new_dist.sample(seed=test_util.test_seed()))
+    self.assertEqual(sample_shape, x.shape)
+
+    # Valid parameters should give finite samples.
+    self.assertAllFinite(x)
 
 
 def _all_shapes(thing):

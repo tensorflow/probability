@@ -19,12 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -132,8 +133,14 @@ class OneHotCategorical(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(logits=1, probs=1)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        logits=parameter_properties.ParameterProperties(event_ndims=1),
+        probs=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=softmax_centered_bijector
+            .SoftmaxCentered,
+            is_preferred=False))
 
   def _event_size(self, param=None):
     if param is None:

@@ -20,11 +20,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
@@ -126,14 +128,18 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
           validate_args=validate_args,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(zip(("shift", "scale", "tailweight"),
-                    ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 3)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(shift=0, scale=0, tailweight=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        shift=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        tailweight=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def allow_nan_stats(self):
@@ -221,14 +227,18 @@ class LambertWNormal(LambertWDistribution):
     """Location parameter of the Lambert W x Normal distribution."""
     return self._loc
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(zip(("loc", "scale", "tailweight"),
-                    ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 3)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0, tailweight=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        tailweight=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @distribution_util.AppendDocstring(
       """The mean of Lambert W x Normal equals `loc` if `tailweight > 1`,
@@ -259,7 +269,7 @@ class LambertWNormal(LambertWDistribution):
   def _variance(self):
     tailweight = tf.convert_to_tensor(self.tailweight)
     scale = tf.convert_to_tensor(self.scale)
-       # For tail < 0.5, the variance is finite. See Eq (18) in
+    # For tail < 0.5, the variance is finite. See Eq (18) in
     # https://www.hindawi.com/journals/tswj/2015/909231/
     var = (tf.cast(tf.pow(1. - 2. * tailweight, - 3. / 2.), dtype=self.dtype) *
            tf.math.square(scale))

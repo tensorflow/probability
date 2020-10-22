@@ -298,6 +298,12 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "parameter_properties",
+    srcs = ["parameter_properties.py"],
+    deps = ["//tensorflow_probability/python/bijectors:identity"],
+)
+
+multi_substrate_py_library(
     name = "prefer_static",
     srcs = ["prefer_static.py"],
     deps = [

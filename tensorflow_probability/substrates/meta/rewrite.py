@@ -81,28 +81,13 @@ DISABLED_BY_PKG = {
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'random', 'stats', 'util')
-INTERNALS = (
-    'assert_util',
-    'batched_rejection_sampler',
-    'cache_util',
-    'custom_gradient',
-    'distribution_util',
-    'dtype_util',
-    'hypothesis_testlib',
-    'implementation_selection',
-    'monte_carlo',
-    'name_util',
-    'nest_util',
-    'prefer_static',
-    'samplers',
-    'special_math',
-    'structural_tuple',
-    'tensor_util',
-    'tensorshape_util',
-    'test_combinations',
-    'test_util',
-    'vectorization_util'
-)
+INTERNALS = ('assert_util', 'batched_rejection_sampler', 'cache_util',
+             'custom_gradient', 'distribution_util', 'dtype_util',
+             'hypothesis_testlib', 'implementation_selection', 'monte_carlo',
+             'name_util', 'nest_util', 'parameter_properties', 'prefer_static',
+             'samplers', 'special_math', 'structural_tuple', 'tensor_util',
+             'tensorshape_util', 'test_combinations', 'test_util',
+             'vectorization_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')

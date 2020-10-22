@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -106,13 +107,14 @@ class Exponential(gamma.Gamma):
           name=name)
       self._parameters = parameters
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return {"rate": tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(rate=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        rate=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def rate(self):

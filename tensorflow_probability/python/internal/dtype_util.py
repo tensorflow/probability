@@ -30,6 +30,7 @@ __all__ = [
     'base_dtype',
     'base_equal',
     'common_dtype',
+    'eps',
     'is_bool',
     'is_complex',
     'is_floating',
@@ -124,6 +125,11 @@ def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):
   if not SKIP_DTYPE_CHECKS and dtype and not base_equal(dtype, dt):
     raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
   return dt
+
+
+def eps(dtype):
+  """Returns the distance between 1 and the next largest representable value."""
+  return np.finfo(as_numpy_dtype(dtype)).eps
 
 
 def is_bool(dtype):

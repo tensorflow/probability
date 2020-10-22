@@ -32,6 +32,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -586,8 +587,18 @@ class WishartTriL(WishartLinearOperator):
       self._parameters = parameters
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(df=0, scale_tril=2)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        df=parameter_properties.ParameterProperties(
+            shape_fn=lambda sample_shape: sample_shape[:-2],
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        scale_tril=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            default_constraining_bijector_fn=lambda: fill_scale_tril_bijector.
+            FillScaleTriL(diag_shift=dtype_util.eps(dtype))))
+    # pylint: enable=g-long-lambda
 
   @property
   def scale_tril(self):

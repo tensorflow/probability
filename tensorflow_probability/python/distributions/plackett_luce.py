@@ -19,11 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gumbel
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -164,8 +165,14 @@ class PlackettLuce(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(scores=1)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        scores=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   def _event_size(self, scores=None):
     if scores is None:
@@ -315,4 +322,3 @@ class PlackettLuce(distribution.Distribution):
       ])
 
     return assertions
-
