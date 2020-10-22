@@ -271,7 +271,10 @@ class Beta(distribution.Distribution):
     shape = self._batch_shape_tensor(concentration1, concentration0)
     concentration1 = tf.broadcast_to(concentration1, shape)
     concentration0 = tf.broadcast_to(concentration0, shape)
-    return tf.math.betainc(concentration1, concentration0, x)
+    safe_x = tf.where(tf.logical_and(x >= 0, x < 1), x, 0.5)
+    answer = tf.math.betainc(concentration1, concentration0, safe_x)
+    return distribution_util.extend_cdf_outside_support(
+        x, answer, low=0., high=1.)
 
   def _log_unnormalized_prob(self, x, concentration1, concentration0):
     return (tf.math.xlogy(concentration1 - 1., x) +

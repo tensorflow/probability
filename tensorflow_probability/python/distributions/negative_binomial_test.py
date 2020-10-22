@@ -141,6 +141,12 @@ class NegativeBinomialTest(test_util.TestCase):
     self.assertEqual([6], pmf.shape)
     self.assertAllClose(np.exp(expected_log_pmf), self.evaluate(pmf))
 
+  def testCdfBeyondSupport(self):
+    negbinom = tfd.NegativeBinomial(
+        total_count=5., probs=.7, validate_args=False)
+    cdf = self.evaluate(negbinom.cdf(-1.))
+    self.assertEqual(0, cdf)
+
   def testNegativeBinomialFromMeanDispersion(self):
     total_count = 5.
     probs = np.repeat(0.2, 3).astype(np.float32)

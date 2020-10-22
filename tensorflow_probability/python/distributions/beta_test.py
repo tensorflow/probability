@@ -302,6 +302,10 @@ class BetaTest(test_util.TestCase):
     self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
     self.assertAllClose(sp_stats.beta.cdf(x, a, b), actual, rtol=rtol, atol=0)
 
+  def testBetaCdfBeyondSupport(self):
+    cdf = tfd.Beta(2., 3., validate_args=False).cdf([-3.7, 1.03])
+    self.assertAllEqual([0., 1.], self.evaluate(cdf))
+
   @parameterized.parameters((np.float32, 5e-3), (np.float64, 1e-4))
   def testBetaLogCdf(self, dt, rtol):
     shape = (30, 40, 50)

@@ -193,6 +193,13 @@ class BinomialTest(test_util.TestCase):
     self.assertEqual((2, 2), pmf.shape)
     self.assertEqual((2, 2), cdf.shape)
 
+  def testCdfBeyondSupport(self):
+    p = [[0.1, 0.9]]
+    counts = [[-1., 4.]]
+    binom = tfd.Binomial(total_count=3., probs=p, validate_args=False)
+    cdf = binom.cdf(counts)
+    self.assertAllEqual([[0., 1.]], self.evaluate(cdf))
+
   def testBinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]

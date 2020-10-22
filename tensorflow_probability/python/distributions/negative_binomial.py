@@ -203,10 +203,12 @@ class NegativeBinomial(distribution.Distribution):
     total_count = tf.convert_to_tensor(self.total_count)
     shape = self._batch_shape_tensor(
         logits_or_probs=logits, total_count=total_count)
-    return tf.math.betainc(
+    safe_x = tf.where(x >= 0, x, 0.)
+    answer = tf.math.betainc(
         tf.broadcast_to(total_count, shape),
-        tf.broadcast_to(1. + x, shape),
+        tf.broadcast_to(1. + safe_x, shape),
         tf.broadcast_to(tf.sigmoid(-logits), shape))
+    return distribution_util.extend_cdf_outside_support(x, answer, low=0)
 
   def _log_prob(self, x):
     total_count = tf.convert_to_tensor(self.total_count)

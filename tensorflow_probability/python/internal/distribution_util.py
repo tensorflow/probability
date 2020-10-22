@@ -1465,3 +1465,39 @@ def is_distribution_instance(d):
   return (not tf_inspect.isclass(d) and
           hasattr(d, 'log_prob') and
           hasattr(d, 'sample'))
+
+
+def extend_cdf_outside_support(x, computed_cdf, low=None, high=None):
+  """Returns a CDF correctly extended outside a distribution's support interval.
+
+  This helper is useful when the natural formula for computing a CDF computes
+  the wrong thing outside the distribution's support.  For instance, a `nan` due
+  to invoking some special function with parameters out of bounds.
+
+  Note that correct gradients may require the "double-where" trick.  For that,
+  the caller must compute the `computed_cdf` Tensor with a doctored input that
+  replaces all out-of-support values of `x` with a "safe" in-support value that
+  is guaranteed not to produce a `nan` in the `computed_cdf` Tensor.  After
+  calling `extend_cdf_outside_support` those doctored CDF values will be ignored
+  in the primal computation, and any `nan`s thus avoided will not pollute the
+  gradients.
+
+  Args:
+    x: Tensor of input values at which the CDF is desired.
+    computed_cdf: Tensor of values computed for the CDF.  Must broadcast with
+      `x`.  Entries corresponding to points `x` falling below or above the given
+      support are ignored and replaced with 0 or 1, respectively.
+    low: Tensor of lower bounds for the support.  Must broadcast with `x`.
+    high: Tensor of upper bounds for the support.  Must broadcast with `x`.
+
+  Returns:
+    cdf: Tensor of corrected CDF values.  Each entry is either 0 if the
+      corresponding entry of `x` is outside the support from below, or the
+      computed CDF value if `x` is in the support, or 1 if `x` is outside the
+      support from above.
+  """
+  if low is not None:
+    computed_cdf = tf.where(x >= low, computed_cdf, 0.)
+  if high is not None:
+    computed_cdf = tf.where(x < high, computed_cdf, 1.)
+  return computed_cdf
