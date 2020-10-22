@@ -57,14 +57,16 @@ def _make_summary_statistic(attr):
 
 
 class Sample(distribution_lib.Distribution):
-  """Sample distribution via independent draws.
+  """Distribution over IID samples of a given shape.
 
-  This distribution is useful for reducing over a collection of independent,
-  identical draws. It is otherwise identical to the input distribution.
+  Given random variable `X`, one may make a new random variable by concatenating
+  samples.  For example, if `X1` and `X2` are iid `Normal(0, 1)` samples then
+  `[X1, X2]` is a bi-variate normal random vector.
 
   #### Mathematical Details
 
-  The probability function is,
+  With `p` the probability density/mass of the function being sampled, and
+  `n` the samples taken, the density/mass of this distribution is
 
   ```none
   p(x) = prod{ p(x[i]) : i = 0, ..., (n - 1) }
@@ -78,34 +80,36 @@ class Sample(distribution_lib.Distribution):
   # Example 1: Five scalar draws.
 
   s = tfd.Sample(
-      tfd.Normal(loc=0, scale=1),
-      sample_shape=5)
+        tfd.Normal(loc=0, scale=1),
+        sample_shape=5)
   x = s.sample()
   # ==> x.shape: [5]
 
   lp = s.log_prob(x)
   # ==> lp.shape: []
-  #     Equivalently: tf.reduce_sum(s.distribution.log_prob(x), axis=[0, 1])
+  #     Equivalently: tf.reduce_sum(s.distribution.log_prob(x), axis=0)
   #
   # `Sample.log_prob` computes the per-{sample, batch} `log_prob`s then sums
   # over the `Sample.sample_shape` dimensions. In the above example `log_prob`
-  # dims `[0, 1]` are summed out. Conceptually, first dim `1` is summed (this
-  # being the intrinsic `event`) then we sum over `Sample.sample_shape` dims, in
-  # this case dim `0`.
+  # dims `0` is summed out, since it is the `sample_shape` dimension.
 
   # Example 2: `[5, 4]`-draws of a bivariate Normal.
 
-  s = tfd.Sample(
-      tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1),
-                      reinterpreted_batch_ndims=1),
-      sample_shape=[5, 4])
+  mvn = tfd.MultivariateNormalDiag(loc=tf.zeros([3, 2]))
+  mvn.batch_shape ==> [3]
+  mvn.event_shape ==> [2]
+
+  s = tfd.Sample(mvn, sample_shape=[5, 4])
+  s.batch_shape ==> [3]
+  s.event_shape ==> [5, 4, 2]
+
   x = s.sample([6, 1])
   # ==> x.shape: [6, 1, 3, 5, 4, 2]
 
   lp = s.log_prob(x)
   # ==> lp.shape: [6, 1, 3]
   #
-  # `s.log_prob` will reduce over (intrinsic) event dims, i.e., dim `5`, then
+  # `s.log_prob` will reduce over the event dims of `mvn`, i.e., dim `5`, then
   # sums over `s.sample_shape` dims `[3, 4]` corresponding to shape (slice)
   # `[5, 4]`.
   ```
@@ -119,6 +123,15 @@ class Sample(distribution_lib.Distribution):
       validate_args=False,
       name=None):
     """Construct the `Sample` distribution.
+
+    The `event_shape` and `batch_shape` of the `Sample` distribution are
+    determined by the args `distribution` and `sample_shape`:
+
+    ```
+    s = Sample(distribution, sample_shape)
+    ==> s.batch_shape: distribution.batch_shape
+    ==> s.event_shape: sample_shape + distribution.event_shape
+    ```
 
     Args:
       distribution: The base distribution instance to transform. Typically an
