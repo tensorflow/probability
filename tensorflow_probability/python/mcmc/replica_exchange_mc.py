@@ -495,13 +495,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           'Exactly one of `target_log_prob_fn` and `tempered_log_prob_fn` '
           'should be provided. Instead, both were.')
 
-    # Static checks only.
-    if tempered_log_prob_fn is not None:
-      check = tf.debugging.assert_non_negative(inverse_temperatures)
-    else:
-      check = tf.debugging.assert_positive(inverse_temperatures)
-    if not tf.executing_eagerly():
-      check.mark_used()
+    self._parameters['inverse_temperatures'] = (
+        _maybe_embed_inverse_temperature_validation(
+            self.inverse_temperatures,
+            validate_args,
+            using_untempered_log_prob=untempered_log_prob_fn is not None))
 
   @property
   def target_log_prob_fn(self):
@@ -936,6 +934,34 @@ def _maybe_embed_swaps_validation(swaps, null_swaps, validate_args):
   ]
   with tf.control_dependencies(assertions):
     return tf.identity(swaps)
+
+
+def _maybe_embed_inverse_temperature_validation(
+    inverse_temperatures,
+    validate_args,
+    using_untempered_log_prob,
+):
+  """Return `inverse_temperatures`, possibly with embedded asserts."""
+  if not validate_args:
+    return inverse_temperatures
+
+  if using_untempered_log_prob:
+    check = tf.debugging.assert_non_negative(
+        inverse_temperatures,
+        message=(
+            '`inverse_temperatures` must be non-negative when using '
+            'untempered_log_prob_fn.'
+        ))
+  else:
+    check = tf.debugging.assert_positive(
+        inverse_temperatures,
+        message=(
+            '`inverse_temperatures` must be positive when not using '
+            'untempered_log_prob_fn.'
+        ))
+
+  with tf.control_dependencies([check]):
+    return tf.identity(inverse_temperatures)
 
 
 def _set_swapped_fields_to_nan(replica_results):

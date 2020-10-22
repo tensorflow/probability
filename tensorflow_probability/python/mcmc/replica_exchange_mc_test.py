@@ -28,6 +28,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental import unnest
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
@@ -284,6 +285,11 @@ class REMCTest(test_util.TestCase):
     tf.random.set_seed(123)
     super(REMCTest, self).setUp()
 
+  def assertRaisesError(self, msg):
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesOpError(msg)
+
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
           testcase_name=(
@@ -462,102 +468,124 @@ class REMCTest(test_util.TestCase):
           unnest.get_innermost(
               kr_.post_swap_replica_results, 'num_leapfrog_steps'))
 
-  @parameterized.named_parameters([
-      dict(testcase_name='_use_untempered_lp=True', use_untempered_lp=True),
-      dict(testcase_name='_use_untempered_lp=False', use_untempered_lp=False),
-  ])
   @test_util.numpy_disable_gradient_test('HMC')
-  def testAdaptingPerReplicaStepSize(self, use_untempered_lp):
-    num_chains, num_events = 3, 2
+  @test_combinations.generate(
+      test_combinations.combine(
+          use_untempered_lp=[False, True],
+          use_xla=[False, True],
+      )
+  )
+  def testAdaptingPerReplicaStepSize(self, use_untempered_lp, use_xla):
+    num_chains, num_events = 4, 2
+    num_results = 2000
     target = tfd.MultivariateNormalDiag(loc=[0.] * num_events)
-    inverse_temperatures = 0.5**np.arange(4, dtype=np.float32)
-    num_replica = len(inverse_temperatures)
 
-    # Whether using the untempered_log_prob_fn setup or not, the target is
-    # target.log_prob.
-    if use_untempered_lp:
-      target_log_prob_fn = None
-      untempered_log_prob_fn = lambda x: target.log_prob(x) / 3.
-      tempered_log_prob_fn = lambda x: target.log_prob(x) * 2 / 3.
-    else:
-      target_log_prob_fn = target.log_prob
-      untempered_log_prob_fn = None
-      tempered_log_prob_fn = None
+    # The inverse_temperatures are decaying rapidly enough to force
+    # significantly different adapted step sizes.
+    # It's important not to make inverse_temperatures[-1] too small, or else
+    # the last few temperatures could be essentially the same when using an
+    # untempered_log_prob_fn.
+    inverse_temperatures = 0.25**np.arange(3, dtype=np.float32)
+    num_replica = len(inverse_temperatures)
 
     # step_size is...
     #   Too large == 3!
     #   A shape that will broadcast across the chains, and (after adaptation)
-    #   give a diffeent value for each replica.
-    initial_step_scale = 3
-    step_size = initial_step_scale * np.ones((num_replica, 1, 1))
+    #   give a different value for each replica.
+    initial_step_size = 3 * np.ones((num_replica, 1, 1), dtype=np.float32)
+    target_accept_prob = 0.9
 
-    def make_kernel_fn(target_log_prob_fn):
-      hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    def _get_states_and_trace():
+      # Whether using the untempered_log_prob_fn setup or not, the target is
+      # target.log_prob.
+      # However, the untempered_log_prob_fn is very dispersed...it is as though
+      # it has a temperature of 100.
+      if use_untempered_lp:
+        target_log_prob_fn = None
+        untempered_log_prob_fn = lambda x: target.log_prob(x) / 100.
+        tempered_log_prob_fn = lambda x: target.log_prob(x) * 99 / 100.
+      else:
+        target_log_prob_fn = target.log_prob
+        untempered_log_prob_fn = None
+        tempered_log_prob_fn = None
+
+      def make_kernel_fn(target_log_prob_fn):
+        hmc = tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            step_size=initial_step_size,
+            num_leapfrog_steps=3,
+        )
+        return tfp.mcmc.SimpleStepSizeAdaptation(
+            inner_kernel=hmc,
+            target_accept_prob=target_accept_prob,
+            adaptation_rate=0.01,
+            num_adaptation_steps=num_results,
+        )
+
+      adaptive_remc = tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target_log_prob_fn,
-          step_size=step_size,
-          num_leapfrog_steps=3,
-      )
-      return tfp.mcmc.SimpleStepSizeAdaptation(
-          inner_kernel=hmc,
-          target_accept_prob=0.75,
-          adaptation_rate=0.03,
-          num_adaptation_steps=num_results,
+          untempered_log_prob_fn=untempered_log_prob_fn,
+          tempered_log_prob_fn=tempered_log_prob_fn,
+          inverse_temperatures=inverse_temperatures,
+          make_kernel_fn=make_kernel_fn,
+          state_includes_replicas=True,
       )
 
-    adaptive_remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=target_log_prob_fn,
-        untempered_log_prob_fn=untempered_log_prob_fn,
-        tempered_log_prob_fn=tempered_log_prob_fn,
-        inverse_temperatures=inverse_temperatures,
-        make_kernel_fn=make_kernel_fn,
-        state_includes_replicas=True,
-    )
+      def trace_fn(_, results):
+        step_adapt_results = results.post_swap_replica_results
+        hmc_results = step_adapt_results.inner_results
+        return {
+            'step_size':
+                step_adapt_results.new_step_size,
+            'prob_accept':
+                tf.math.exp(tf.math.minimum(hmc_results.log_accept_ratio, 0.)),
+        }
 
-    num_results = 200
+      return tfp.mcmc.sample_chain(
+          num_results=num_results,
+          current_state=tf.zeros((num_replica, num_chains, num_events)),
+          kernel=adaptive_remc,
+          trace_fn=trace_fn,
+          num_burnin_steps=0,
+          seed=_set_seed(),
+      )
 
-    def trace_fn(_, results):
-      step_adapt_results = results.post_swap_replica_results
-      hmc_results = step_adapt_results.inner_results
-      return {
-          'step_size':
-              step_adapt_results.new_step_size,
-          'prob_accept':
-              tf.math.exp(tf.math.minimum(hmc_results.log_accept_ratio, 0.)),
-      }
+    if use_xla:
+      states, trace = tf.function(
+          _get_states_and_trace, experimental_compile=True)()
+    else:
+      states, trace = _get_states_and_trace()
 
-    states, trace = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        current_state=tf.zeros((num_replica, num_chains, num_events)),
-        kernel=adaptive_remc,
-        trace_fn=trace_fn,
-        num_burnin_steps=0,
-        seed=_set_seed(),
-    )
-
-    states_, final_step_size_, mean_accept_ = self.evaluate([
+    states_, final_step_size_, mean_accept_, ess_ = self.evaluate([
         states,
         trace['step_size'][-1],
         tf.reduce_mean(trace['prob_accept'][num_results // 2:], axis=0),
+        effective_sample_size(states, cross_chain_dims=-2),
     ])
 
     self.assertAllEqual((num_replica, 1, 1), final_step_size_.shape)
 
     self.assertAllClose(
-        0.75 * np.ones_like(mean_accept_), mean_accept_, atol=0.2)
+        target_accept_prob * np.ones_like(mean_accept_), mean_accept_, atol=0.2)
 
     # Step size should be increasing (with temperature).
     np.testing.assert_array_less(0.0, np.diff(final_step_size_.ravel()))
 
     # Step size for the Temperature = 1 replica should have decreased
     # significantly from the large initial value.
-    self.assertEqual(initial_step_scale, 3)
+    self.assertEqual(initial_step_size[0, 0, 0], 3)
     self.assertLess(final_step_size_[0, 0, 0], 2)
 
     # The mean shouldn't be ridiculous.
-    self.assertAllClose(np.zeros((num_replica, num_chains, num_events)),
-                        np.mean(states_, axis=0),
-                        # Passed at atol = 8 / Sqrt(num_results).
-                        atol=16 / np.sqrt(num_results))
+    for r in range(num_replica):
+      x = states_[:, r]
+      mean = np.mean(x)
+      stddev = np.std(x)
+      n = np.min(ess_[r])
+      self.assertAllClose(np.zeros_like(mean),
+                          mean,
+                          atol=4 * stddev / np.sqrt(n),
+                          msg='Failed at replica {}'.format(r))
 
   @parameterized.named_parameters([
       # pylint: disable=line-too-long
@@ -1187,6 +1215,45 @@ class REMCTest(test_util.TestCase):
             tempered_log_prob_fn=lambda x: 1.0,  # provided
             inverse_temperatures=[1.],
             make_kernel_fn=make_kernel_fn)
+
+  def testInvalidInverseTemperaturesRaises(self):
+
+    def make_kernel_fn(target_log_prob_fn):
+      return tfp.mcmc.RandomWalkMetropolis(
+          target_log_prob_fn=target_log_prob_fn,
+          new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=0.1))
+
+    with self.subTest('Nothing raised if valid (even with validate_args)'):
+      tfp.mcmc.ReplicaExchangeMC(
+          target_log_prob_fn=None,
+          untempered_log_prob_fn=lambda x: 1.0,  # provided
+          tempered_log_prob_fn=lambda x: 1.0,  # provided
+          inverse_temperatures=[1., 0.5],
+          make_kernel_fn=make_kernel_fn,
+          validate_args=True,
+      )
+
+    with self.subTest('Negative temperatures not allowed'):
+      with self.assertRaisesError('must be non-negative'):
+        tfp.mcmc.ReplicaExchangeMC(
+            target_log_prob_fn=None,
+            untempered_log_prob_fn=lambda x: 1.0,  # provided
+            tempered_log_prob_fn=lambda x: 1.0,  # provided
+            inverse_temperatures=[-1., -0.5],
+            make_kernel_fn=make_kernel_fn,
+            validate_args=True,
+        )
+
+    with self.subTest('Zero temperatures not allowed without split tempering'):
+      with self.assertRaisesError('must be positive'):
+        tfp.mcmc.ReplicaExchangeMC(
+            target_log_prob_fn=lambda x: 1.0,  # provided
+            untempered_log_prob_fn=None,
+            tempered_log_prob_fn=None,
+            inverse_temperatures=[1., 0.5, 0.0],
+            make_kernel_fn=make_kernel_fn,
+            validate_args=True,
+        )
 
   def testWithUntemperedLPemperatureGapNearOne(self):
     inverse_temperatures = tf.convert_to_tensor([1., 0.0005, 0.])
