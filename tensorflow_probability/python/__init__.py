@@ -62,6 +62,16 @@ def _ensure_tf_install():
             required=required_tensorflow_version,
             present=tf.__version__))
 
+  if tf.config.experimental.tensor_float_32_execution_enabled():
+    # Must import here, because symbols get pruned to __all__.
+    import warnings  # pylint: disable=g-import-not-at-top
+    warnings.warn(
+        'TensorFloat-32 matmul/conv are enabled for NVIDIA Ampere+ GPUs. The '
+        'resulting loss of precision may hinder MCMC convergence. To turn off, '
+        'run `tf.config.experimental.enable_tensor_float_32_execution(False)`. '
+        'For more detail, see https://github.com/tensorflow/community/pull/287.'
+        )
+
 
 _allowed_symbols = [
     'bijectors',
