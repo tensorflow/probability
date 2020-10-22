@@ -298,6 +298,7 @@ def find_bins(x,
 def histogram(x,
               edges,
               axis=None,
+              weights=None,
               extend_lower_interval=False,
               extend_upper_interval=False,
               dtype=None,
@@ -325,6 +326,9 @@ def histogram(x,
     axis:  Optional `0-D` or `1-D` integer `Tensor` with constant
       values. The axis in `x` that index iid samples.
       `Default value:` `None` (treat every dimension as sample dimension).
+    weights:  Optional `Tensor` of same `dtype` and `shape` as `x`.
+      For each value in `x`, the bin will be incremented by
+      the corresponding weight instead of 1.
     extend_lower_interval:  Python `bool`.  If `True`, extend the lowest
       interval `I0` to `(-inf, c1]`.
     extend_upper_interval:  Python `bool`.  If `True`, extend the upper
@@ -338,7 +342,11 @@ def histogram(x,
       `~axis = [i for i in range(arr.ndim) if i not in axis]`,
       `counts.shape = [edges.shape[0]] + x.shape[~axis]`.
       With `I` a multi-index into `~axis`, `counts[k][I]` is the number of times
-      event(s) fell into the `kth` interval of `edges`.
+      event(s) fell into the `kth` interval of `edges` or with `weights`
+      non-None the sum of the weight(s) corresponding to the event(s) in a bin.
+
+  Raises:
+    ValueError: if the shape of `x` and `weights` are not the same.
 
   #### Examples
 
@@ -362,15 +370,20 @@ def histogram(x,
   with tf.name_scope(name or 'histogram'):
 
     # Tensor conversions.
-    in_dtype = dtype_util.common_dtype([x, edges], dtype_hint=tf.float32)
+    in_dtype = dtype_util.common_dtype([x, edges, weights],
+                                       dtype_hint=tf.float32)
 
     x = tf.convert_to_tensor(x, name='x', dtype=in_dtype)
     edges = tf.convert_to_tensor(edges, name='edges', dtype=in_dtype)
+    if weights is not None:
+      weights = tf.convert_to_tensor(weights, name='weights', dtype=in_dtype)
 
     # Move dims in axis to the left end as one flattened dim.
     # After this, x.shape = [n_samples] + E.
     if axis is None:
       x = tf.reshape(x, shape=[-1])
+      if weights is not None:
+        weights = tf.reshape(weights, shape=[-1])
     else:
       x_ndims = _get_static_ndims(
           x, expect_static=True, expect_ndims_at_least=1)
@@ -378,6 +391,16 @@ def histogram(x,
       if not axis:
         raise ValueError('`axis` cannot be empty.  Found: {}'.format(axis))
       x = _move_dims_to_flat_end(x, axis, x_ndims, right_end=False)
+
+      if weights is not None:
+        weights_ndims = _get_static_ndims(
+            x, expect_static=True, expect_ndims_at_least=1)
+        if x_ndims != weights_ndims:
+          raise ValueError('Number of dimensions of `x` and `weights` must '
+                           'coincide. Found: x has {}, weights has {}'.format(
+                               x_ndims, weights_ndims))
+        weights = _move_dims_to_flat_end(weights, axis, weights_ndims,
+                                         right_end=False)
 
     # bins.shape = x.shape = [n_samples] + E,
     # and bins[i] is a shape E Tensor of the bins that sample `i` fell into.
@@ -394,6 +417,7 @@ def histogram(x,
     # TODO(b/124015136) Use standard tf.math.bincount once it supports `axis`.
     counts = count_integers(
         bins,
+        weights=weights,
         # Ensure we get correct output, even if x did not fall into every bin
         minlength=tf.shape(edges)[0] - 1,
         maxlength=tf.shape(edges)[0] - 1,
