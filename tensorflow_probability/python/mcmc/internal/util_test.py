@@ -28,6 +28,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal import util
@@ -294,6 +295,33 @@ class TraceScanTest(test_util.TestCase):
             static_trace_allocation_size=3 if static_length else None))
     self.assertAllClose(7 + 6 + 5 + 4 + 3 + 2 + 1, final_state)
     self.assertAllClose([3, 5, 14], trace)
+
+  @test_util.jax_disable_test_missing_functionality('b/171298381')
+  @test_util.numpy_disable_test_missing_functionality('No expanding composites')
+  def testComposite(self):
+    auto_normal = auto_composite_tensor.auto_composite_tensor(
+        tfd.Normal, omit_kwargs=('name',))
+
+    def _loop_fn(state, element):
+      return state + element
+
+    def _trace_fn(state):
+      return [state, 2 * state, auto_normal(state, 0.1)]
+
+    final_state, trace = util.trace_scan(
+        loop_fn=_loop_fn, initial_state=0., elems=[1., 2.], trace_fn=_trace_fn)
+
+    self.assertAllClose([], tensorshape_util.as_list(final_state.shape))
+    self.assertAllClose([2], tensorshape_util.as_list(trace[0].shape))
+    self.assertAllClose([2], tensorshape_util.as_list(trace[1].shape))
+
+    self.assertAllClose(3, final_state)
+    self.assertAllClose([1, 3], trace[0])
+    self.assertAllClose([2, 6], trace[1])
+
+    self.assertIsInstance(trace[2], tfd.Normal)
+    self.assertAllClose([1., 3.], trace[2].loc)
+    self.assertAllClose([0.1, 0.1], trace[2].scale)
 
 
 WrapperResults = collections.namedtuple('WrapperResults',

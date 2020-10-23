@@ -435,19 +435,22 @@ def trace_scan(loop_fn,
       dynamic_size, initial_size = False, length
     else:
       dynamic_size, initial_size = True, 0
-    trace_arrays = tf.nest.map_structure(
-        lambda x: tf.TensorArray(x.dtype,  # pylint: disable=g-long-lambda
-                                 size=initial_size,
-                                 dynamic_size=dynamic_size,
-                                 element_shape=x.shape),
-        trace_fn(initial_state))
+    initial_trace = trace_fn(initial_state)
+    flat_initial_trace = tf.nest.flatten(initial_trace, expand_composites=True)
+    trace_arrays = []
+    for trace_elt in flat_initial_trace:
+      trace_arrays.append(
+          tf.TensorArray(
+              trace_elt.dtype,
+              size=initial_size,
+              dynamic_size=dynamic_size,
+              element_shape=trace_elt.shape))
 
     # Helper for writing a (structured) state to (structured) arrays.
     def trace_one_step(num_steps_traced, trace_arrays, state):
-      return tf.nest.map_structure(
-          lambda ta, x: ta.write(num_steps_traced, x),
-          trace_arrays,
-          trace_fn(state))
+      return [ta.write(num_steps_traced, x) for ta, x in
+              zip(trace_arrays,
+                  tf.nest.flatten(trace_fn(state), expand_composites=True))]
 
     def _body(i, state, num_steps_traced, trace_arrays):
       elem = elems_array.read(i)
@@ -467,15 +470,20 @@ def trace_scan(loop_fn,
         loop_vars=(0, initial_state, 0, trace_arrays),
         parallel_iterations=parallel_iterations)
 
-    stacked_trace = tf.nest.map_structure(lambda x: x.stack(), trace_arrays)
+    # unflatten
+    stacked_trace = tf.nest.pack_sequence_as(
+        initial_trace, [ta.stack() for ta in trace_arrays],
+        expand_composites=True)
 
     # Restore the static length if we know it.
     static_length = tf.TensorShape(None if dynamic_size else initial_size)
+
     def _merge_static_length(x):
       tensorshape_util.set_shape(x, static_length.concatenate(x.shape[1:]))
       return x
 
-    stacked_trace = tf.nest.map_structure(_merge_static_length, stacked_trace)
+    stacked_trace = tf.nest.map_structure(
+        _merge_static_length, stacked_trace, expand_composites=True)
     return final_state, stacked_trace
 
 
