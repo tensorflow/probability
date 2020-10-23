@@ -80,11 +80,12 @@ py_library(
 
 py_test(
     name = "probability_test",
-    size = "small",
     srcs = ["probability_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
+        # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

@@ -23,12 +23,10 @@ from __future__ import print_function
 import functools
 import operator
 
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.lazybones import deferred
 from tensorflow_probability.python.experimental.lazybones import deferred_scope
-
 
 __all__ = [
     'distribution_measure',
@@ -39,16 +37,34 @@ __all__ = [
 
 def log_prob(vertexes, values):
   """Returns `log_prob` when `vertexes` take on `values`."""
-  return distribution_measure(vertexes, values, 'log_prob', sum)
+  return distribution_measure(vertexes, values, lambda dist: dist.log_prob, sum)
 
 
 def prob(vertexes, values):
   """Returns `prob` when `vertexes` take on `values`."""
-  return distribution_measure(vertexes, values, 'prob', _prod)
+  return distribution_measure(vertexes, values, lambda dist: dist.prob, _prod)
 
 
-def distribution_measure(vertexes, values, attr, combine):
-  """Returns `getattr(distribution)` when `vertexes` take on `values`."""
+def distribution_measure(vertexes,
+                         values,
+                         get_attr_fn,
+                         combine,
+                         reduce_op=lambda x: x):
+  """Returns `get_attr_fn(distribution)` when `vertexes` take on `values`.
+
+  Args:
+    vertexes: A nest structrue of `lazybones` deferred random variable. Usually
+      this is a value representation (e.g., a random sample, the mean) of a
+      `Deferred` wrapped distribution-like object.
+    values: A nest structrue of Array.
+    get_attr_fn: Callable to get a Class attribute from a distribution-like
+      object that used to evaluate on the vertexes itself (e.g., `logpdf` or
+      `pdf` from a `scipy.stats` distributions).
+    combine: Method to combine the distribution measure (e.g., `sum` to combine
+      `logpdf`, `prod` to combine `pdf`).
+    reduce_op: Optional computation to reduce the distribution measure for each
+      vertexes, default to identity.
+  """
   vertexes = tf.nest.flatten(vertexes)
   values = tf.nest.flatten(values)
   distributions = []
@@ -62,7 +78,9 @@ def distribution_measure(vertexes, values, attr, combine):
         x.value = v
       d = x.parents[0].parents[0]
       distributions.append(d)
-    r = combine(getattr(d, attr)(x) for d, x in zip(distributions, vertexes))
+    r = combine(
+        reduce_op(get_attr_fn(dist)(x))
+        for dist, x in zip(distributions, vertexes))
     return r.eval()
 
 
