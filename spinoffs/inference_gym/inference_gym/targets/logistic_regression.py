@@ -39,7 +39,17 @@ def _add_bias(features):
 
 
 class LogisticRegression(bayesian_model.BayesianModel):
-  """Bayesian logistic regression with a Gaussian prior."""
+  """Bayesian logistic regression with a Gaussian prior.
+
+  ```none
+  # The `+ 1` is for the bias term.
+  for i in range(num_features + 1):
+    weights[i] ~ Normal(loc=0, scale=1)
+
+  for j in range(num_datapoints):
+    label[j] ~ Bernoulli(logit=concat([features[j], [1]) @ weights)
+  ```
+  """
 
   def __init__(
       self,
@@ -51,15 +61,6 @@ class LogisticRegression(bayesian_model.BayesianModel):
       pretty_name='Logistic Regression',
   ):
     """Construct the logistic regression model.
-
-    ```none
-    # The `+ 1` is for the bias term.
-    for i in range(num_features + 1):
-      weights[i] ~ Normal(loc=0, scale=1)
-
-    for j in range(num_datapoints):
-      label[j] ~ Bernoulli(logit=concat([features[j], [1]) @ weights)
-    ```
 
     Args:
       train_features: Floating-point `Tensor` with shape `[num_train_points,

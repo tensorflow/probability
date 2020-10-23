@@ -95,7 +95,7 @@ def lorenz_system_log_likelihood_fn(params, observed_values, observation_scale,
 
 
 class LorenzSystem(bayesian_model.BayesianModel):
-  """Construct a Lorenz System model.
+  """Lorenz System model.
 
   This class models the Lorenz System, a three-dimensional nonlinear dynamical
   system used to model atmospheric convection. This model defines a stochastic

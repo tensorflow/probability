@@ -36,7 +36,37 @@ __all__ = [
 
 
 class ItemResponseTheory(bayesian_model.BayesianModel):
-  """One-parameter logistic item-response theory (IRT) model."""
+  """One-parameter logistic item-response theory (IRT) model.
+
+  This models a set of students answering a set of questions, and being scored
+  whether they get the question correct or not. Each student is associated
+  with a scalar `centered_student_ability`, and each question is associated
+  with a scalar `question_difficulty`. Additionally, a scalar
+  `mean_student_ability` is shared between all the students. This corresponds
+  to the [1PL item-response theory][1] model:
+
+  ```none
+  mean_student_ability ∼ N(loc=0.75, scale=1)
+
+  for i in range(num_students):
+    centered_student_ability[i] ∼ N(loc=0, scale=1)
+
+  for j in range(num_questions):
+    question_difficulty[j] = N(loc=0, scale=1)
+
+  for i, j in student_question_pairs:
+    correct[i, j] = Bernoulli(logit=centered_student_ability[i] -
+                              question_difficulty[j] + mean_student_ability)
+  ```
+
+  The data are encoded into three parallel arrays per set. I.e.
+  `*_correct[i]  == 1` means that student `*_student_ids[i]` answered question
+  `*_question_ids[i]` correctly; `*_correct[i] == 0` means they didn't.
+
+  #### References
+
+  1. https://en.wikipedia.org/wiki/Item_response_theory
+  """
 
   def __init__(
       self,
@@ -50,31 +80,6 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
       pretty_name='Item-Response Theory',
   ):
     """Construct the item-response theory model.
-
-    This models a set of students answering a set of questions, and being scored
-    whether they get the question correct or not. Each student is associated
-    with a scalar `centered_student_ability`, and each question is associated
-    with a scalar `question_difficulty`. Additionally, a scalar
-    `mean_student_ability` is shared between all the students. This corresponds
-    to the [1PL item-response theory][1] model:
-
-    ```none
-    mean_student_ability ∼ N(loc=0.75, scale=1)
-
-    for i in range(num_students):
-      centered_student_ability[i] ∼ N(loc=0, scale=1)
-
-    for j in range(num_questions):
-      question_difficulty[j] = N(loc=0, scale=1)
-
-    for i, j in student_question_pairs:
-      correct[i, j] = Bernoulli(logit=centered_student_ability[i] -
-                                question_difficulty[j] + mean_student_ability)
-    ```
-
-    The data are encoded into three parallel arrays per set. I.e.
-    `*_correct[i]  == 1` means that student `*_student_ids[i]` answered question
-    `*_question_ids[i]` correctly; `*_correct[i] == 0` means they didn't.
 
     Args:
       train_student_ids: Integer `Tensor` with shape `[num_train_points]`.
@@ -101,10 +106,6 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
       ValueError: If `test_student_ids`, `test_question_ids` or `test_correct`
         are not either all `None` or are all specified.
       ValueError: If the parallel arrays are not all of the same size.
-
-    #### References
-
-    1. https://en.wikipedia.org/wiki/Item_response_theory
     """
     with tf.name_scope(name):
       test_data_present = (

@@ -32,7 +32,41 @@ __all__ = [
 
 
 class LogGaussianCoxProcess(bayesian_model.BayesianModel):
-  """Log-Gaussian Cox Process model."""
+  """Log-Gaussian Cox Process[1] regression in a D dimensional space.
+
+  This models the observed event counts at a set of locations with associated
+  extents. An extent could correspond to an area (in which case location could
+  be the centroid of that area), or duration (in which case the location is
+  infinitesimal, but the measurements are taken over an extended period of
+  time). Counts divided by the extent at a location is termed the intensity at
+  that location.
+
+  A Gaussian Process with a Matern 3/2 kernel is used to model log-intensity
+  deviations from the mean log-intensity. The regressed intensity is then
+  multiplied by the extents to parameterize the rate a Poisson observation
+  model. The posterior of the model is over the amplitude and length scale of
+  the Matern kernel, as well as the log-intensity deviations themselves. In
+  summary:
+
+  ```none
+  amplitude ~ LogNormal(loc=-1, scale=0.5)
+  length_scale ~ LogNormal(loc=-1, scale=1)
+  delta_log_intensities ~ GP(Matern32(amplitude, length_scale), locations)
+  for i in range(num_locations):
+    counts[i] ~ Poisson(extents[i] *
+                        exp(delta_log_intensities[i] + mean_log_intensity))
+  ```
+
+  The data are encoded into three parallel arrays. I.e.
+  `train_counts[i]` and `train_extents[i]` correspond to `train_locations[i]`.
+
+  #### References
+
+  1. Diggle, P. J., Moraga, P., Rowlingson, B., & Taylor, B. M. (2013).
+    Spatial and spatio-temporal log-gaussian cox processes: Extending the
+    geostatistical paradigm. Statistical Science, 28(4), 542-563.
+
+  """
 
   def __init__(
       self,
@@ -43,33 +77,7 @@ class LogGaussianCoxProcess(bayesian_model.BayesianModel):
       name='log_gaussian_cox_process',
       pretty_name='Log-Gaussian Cox Process',
   ):
-    """Log-Gaussian Cox Process[1] regression in a D dimensional space.
-
-    This models the observed event counts at a set of locations with associated
-    extents. An extent could correspond to an area (in which case location could
-    be the centroid of that area), or duration (in which case the location is
-    infinitesimal, but the measurements are taken over an extended period of
-    time). Counts divided by the extent at a location is termed the intensity at
-    that location.
-
-    A Gaussian Process with a Matern 3/2 kernel is used to model log-intensity
-    deviations from the mean log-intensity. The regressed intensity is then
-    multiplied by the extents to parameterize the rate a Poisson observation
-    model. The posterior of the model is over the amplitude and length scale of
-    the Matern kernel, as well as the log-intensity deviations themselves. In
-    summary:
-
-    ```none
-    amplitude ~ LogNormal(loc=-1, scale=0.5)
-    length_scale ~ LogNormal(loc=-1, scale=1)
-    delta_log_intensities ~ GP(Matern32(amplitude, length_scale), locations)
-    for i in range(num_locations):
-      counts[i] ~ Poisson(extents[i] *
-                          exp(delta_log_intensities[i] + mean_log_intensity))
-    ```
-
-    The data are encoded into three parallel arrays. I.e.
-    `train_counts[i]` and `train_extents[i]` correspond to `train_locations[i]`.
+    """Construct the Log-Gaussian Cox Process model.
 
     Args:
       train_locations: Float `Tensor` with shape `[num_train_points, D]`.
@@ -85,13 +93,6 @@ class LogGaussianCoxProcess(bayesian_model.BayesianModel):
 
     Raises:
       ValueError: If the parallel arrays are not all of the same size.
-
-    #### References
-
-    1. Diggle, P. J., Moraga, P., Rowlingson, B., & Taylor, B. M. (2013).
-      Spatial and spatio-temporal log-gaussian cox processes: Extending the
-      geostatistical paradigm. Statistical Science, 28(4), 542-563.
-
     """
     with tf.name_scope(name):
       if not (train_locations.shape[0] == train_counts.shape[0] ==
