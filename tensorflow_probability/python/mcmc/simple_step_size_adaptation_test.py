@@ -33,15 +33,6 @@ from tensorflow_probability.python.internal import test_util
 
 _RATE = 1.01
 
-
-def _set_seed(seed):
-  """Helper which uses graph seed if using eager."""
-  # TODO(b/68017812): Deprecate once eager correctly supports seed.
-  if tf.executing_eagerly():
-    return None
-  return seed
-
-
 FakeMHKernelResults = collections.namedtuple(
     'FakeMHKernelResults', 'accepted_results, log_accept_ratio')
 
