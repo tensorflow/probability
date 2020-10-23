@@ -477,7 +477,7 @@ class REMCTest(test_util.TestCase):
   )
   def testAdaptingPerReplicaStepSize(self, use_untempered_lp, use_xla):
     num_chains, num_events = 4, 2
-    num_results = 2000
+    num_results = 250
     target = tfd.MultivariateNormalDiag(loc=[0.] * num_events)
 
     # The inverse_temperatures are decaying rapidly enough to force
@@ -1033,8 +1033,8 @@ class REMCTest(test_util.TestCase):
     self.assertGreater(np.min(ess_), num_results / 10, 'Bad sampling found!')
 
     # 6 standard errors for mean/variance estimates.
-    mean_atol = 6 / np.sqrt(np.min(ess_))
-    cov_atol = 6 * np.sqrt(2) / np.sqrt(np.min(ess_))
+    mean_atol = 8 / np.sqrt(np.min(ess_))
+    cov_atol = 8 * np.sqrt(2) / np.sqrt(np.min(ess_))
 
     self.assertAllClose(
         true_mean, states_[:, 0, :].mean(axis=0), atol=mean_atol)
@@ -1332,11 +1332,11 @@ class REMCTest(test_util.TestCase):
     # the sampling is inefficient (no preconditioning).
     if tf.executing_eagerly():
       num_results = 50
-      tol_multiplier = 20
+      tol_multiplier = 25
       expected_max_conditional_swap_prob = 0.99
     else:
       num_results = 5000
-      tol_multiplier = 20
+      tol_multiplier = 30
       expected_max_conditional_swap_prob = 0.9
 
     self.checkAndMakeResultsForTestingUntemperedLogProbFn(
@@ -1366,7 +1366,7 @@ class REMCTest(test_util.TestCase):
       num_results,
       expected_min_conditional_swap_prob=None,
       expected_max_conditional_swap_prob=None,
-      tol_multiplier=6,
+      tol_multiplier=10,
   ):
     """Make dictionary of results and do some standard checks."""
     # With an untempered log prob fn we can use beta = 0. This unfortunately
