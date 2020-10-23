@@ -26,6 +26,10 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
 
+__all__ = ['kalman_filter',
+           'sample_walk']
+
+
 # Kalman filter parameters that are time dependent.
 TimeDependentParameters = collections.namedtuple(
     'TimeDependentParameters',

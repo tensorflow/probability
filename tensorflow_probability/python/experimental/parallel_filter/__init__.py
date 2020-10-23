@@ -13,8 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """TensorFlow Probability experimental parallel filtering package."""
+from tensorflow_probability.python.experimental.parallel_filter.parallel_kalman_filter_lib import kalman_filter
+from tensorflow_probability.python.experimental.parallel_filter.parallel_kalman_filter_lib import sample_walk
 from tensorflow_probability.python.internal import all_util
 
-_allowed_symbols = []
+
+_allowed_symbols = ['kalman_filter',
+                    'sample_walk']
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
