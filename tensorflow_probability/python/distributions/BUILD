@@ -1790,6 +1790,7 @@ multi_substrate_py_library(
     srcs = ["transformed_distribution.py"],
     deps = [
         ":distribution",
+        ":kullback_leibler",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",

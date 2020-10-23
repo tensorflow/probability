@@ -22,6 +22,7 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -81,6 +82,23 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     * and similarly for: `cdf`, `prob`, `log_survival_function`,
      `survival_function`.
+
+  Kullback-Leibler divergence is also well defined for `TransformedDistribution`
+  instances that have matching bijectors.  Bijector matching is performed via
+  the `Bijector.__eq__` method, e.g., `td1.bijector == td2.bijector`, as part
+  of the KL calculation.  If the underlying bijectors do not match, a
+  `NotImplementedError` is raised when calling `kl_divergence`.  This is the
+  same behavior as calling `kl_divergence` when two distributions do not match
+  in general.
+
+  **Note** Due to the current constraints imposed on bijector equality testing,
+  `kl_divergence` may behave differently in eager mode computation vs. traced
+  computation.  For example, if a TD Bijector's parameters are `Tensor` objects,
+  and are themselves derived from e.g. a Variable, some stateful operation, or
+  from an argument to a `tf.function` then Bijector equality cannot be known
+  during the call to `kl_divergence` and the bijectors are assumed unequal.
+  In this case, calling `kl_divergence` may raise an exception in
+  graph / tf.function mode, but work just fine in eager / numpy mode.
 
   A simple example constructing a Log-Normal distribution from a Normal
   distribution:
@@ -500,3 +518,28 @@ class TransformedDistribution(distribution_lib.Distribution):
   # pylint: enable=not-callable
 
   _composite_tensor_shape_params = ()
+
+
+@kullback_leibler.RegisterKL(TransformedDistribution, TransformedDistribution)
+def _kl_transformed_transformed(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b Transformed.
+
+  Args:
+    a: instance of a TransformedDistribution object.
+    b: instance of a TransformedDistribution object.
+    name: Name to use for created operations.
+      Default value: `None` (i.e., `'kl_normal_normal'`).
+
+  Returns:
+    kl_div: Batchwise KL(a || b)
+
+  Raises:
+    NotImplementedError: If `a.bijector != b.bijector`.
+  """
+  with tf.name_scope(name or 'kl_transformed_transformed'):
+    if a.bijector == b.bijector:
+      return kullback_leibler.kl_divergence(a.distribution, b.distribution)
+  raise NotImplementedError(
+      'Unable to calculate KL divergence between {} and {} because '
+      'their bijectors are not equal: {} vs. {}'.format(
+          a, b, a.bijector, b.bijector))

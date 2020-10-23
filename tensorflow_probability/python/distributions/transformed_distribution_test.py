@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import copy
+
 # Dependency imports
 from absl.testing import parameterized  # pylint: disable=unused-import
 
@@ -390,6 +392,57 @@ class TransformedDistributionTest(test_util.TestCase):
     base_log_prob = -0.5 * 0.25 + np.log(0.25)
     ildj = np.log(2.)
     self.assertAllClose(base_log_prob - ildj, log_prob_, rtol=1e-6, atol=0.)
+
+  def testTransformedKLDifferentBijectorFails(self):
+    d1 = self._cls()(
+        tfd.Exponential(rate=0.25),
+        bijector=tfb.Scale(scale=2.),
+        validate_args=True)
+    d2 = self._cls()(
+        tfd.Exponential(rate=0.25),
+        bijector=tfb.Scale(scale=3.),
+        validate_args=True)
+    with self.assertRaisesRegex(
+        NotImplementedError, r'their bijectors are not equal'):
+      tfd.kl_divergence(d1, d2)
+
+  def testTransformedNormalNormalKL(self):
+    batch_size = 6
+    mu_a = np.array([3.0] * batch_size).astype(np.float32)
+    sigma_a = np.array([1.0, 2.0, 3.0, 1.5, 2.5, 3.5]).astype(np.float32)
+    mu_b = np.array([-3.0] * batch_size).astype(np.float32)
+    sigma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]).astype(np.float32)
+
+    n_a = tfd.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
+    n_b = tfd.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
+
+    kl_expected = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
+        (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
+
+    bij1 = tfb.Shift(shift=1.)(tfb.Scale(scale=2.))
+    bij2 = (tfb.Shift(shift=np.array(2., dtype=np.float32))
+            (tfb.Scale(scale=np.array(3., dtype=np.float32))))
+    bij3 = tfb.Tanh()
+    for chain in bij2(bij1), bij3(bij2(bij1)):
+      td_a = self._cls()(
+          distribution=n_a,
+          bijector=chain,
+          validate_args=True)
+      td_b = self._cls()(
+          distribution=n_b,
+          bijector=copy.copy(chain),
+          validate_args=True)
+
+      kl = tfd.kl_divergence(td_a, td_b)
+      kl_val = self.evaluate(kl)
+
+      x = td_a.sample(int(1e5), seed=test_util.test_seed())
+      kl_sample = tf.reduce_mean(td_a.log_prob(x) - td_b.log_prob(x), axis=0)
+      kl_sample_ = self.evaluate(kl_sample)
+
+      self.assertEqual(kl.shape, (batch_size,))
+      self.assertAllClose(kl_val, kl_expected)
+      self.assertAllClose(kl_expected, kl_sample_, atol=0.0, rtol=1e-2)
 
 
 @test_util.test_all_tf_execution_regimes

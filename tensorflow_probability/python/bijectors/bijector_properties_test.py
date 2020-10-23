@@ -737,6 +737,16 @@ class BijectorPropertiesTest(test_util.TestCase):
         bijectors(bijector_name=bijector_name,
                   enable_vars=True, return_duplicate=True))
     self.assertEqual(hash(bijector_1), hash(bijector_2))
+
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in TF2_FRIENDLY_BIJECTORS)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testEquality(self, bijector_name, data):
+    bijector_1, bijector_2 = data.draw(
+        bijectors(bijector_name=bijector_name,
+                  enable_vars=True, return_duplicate=True))
     self.assertEqual(bijector_1, bijector_2)
     self.assertFalse(bijector_1 != bijector_2)  # pylint: disable=g-generic-assert
 

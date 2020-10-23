@@ -180,6 +180,12 @@ XLA_LOGPROB_RTOL.update({
 })
 
 
+SKIP_KL_CHECK_DIST_VAR_GRADS = [
+    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
+    'JohnsonSU'  # TD's KL gradients do not rely on bijector variables.
+]
+
+
 def extra_tensor_conversions_allowed(dist):
   """Returns number of extra tensor conversions allowed for the input dist."""
   extra_conversions = EXTRA_TENSOR_CONVERSION_DISTS.get(type(dist).__name__)
@@ -283,6 +289,8 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
     # that is produces non-None gradients.
     try:
       for d1, d2 in (dist, dist2), (dist2, dist):
+        if dist_name in SKIP_KL_CHECK_DIST_VAR_GRADS:
+          continue
         with tf.GradientTape() as tape:
           with tfp_hps.assert_no_excessive_var_usage(
               '`kl_divergence` of (`{}` (vars {}), `{}` (vars {}))'.format(
@@ -298,6 +306,7 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
                                      d1, d2, var, d1, d1.variables, d2,
                                      d2.variables))
     except NotImplementedError:
+      # Raised by kl_divergence if no registered KL is found.
       pass
 
     # Test that log_prob produces non-None gradients, except for distributions

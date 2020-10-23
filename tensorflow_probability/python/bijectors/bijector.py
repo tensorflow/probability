@@ -632,16 +632,37 @@ class Bijector(tf.Module):
         type(self), self._get_parameterization())))
 
   def __eq__(self, other):
-    return (
-        type(self) is type(other)
-        and (cache_util.hashable_structure(self._get_parameterization())
-             == cache_util.hashable_structure(other._get_parameterization())))
+    if type(self) is not type(other):
+      return False
 
-  def __ne__(self, other):
-    return (
-        type(self) is not type(other)
-        or (cache_util.hashable_structure(self._get_parameterization())
-            != cache_util.hashable_structure(other._get_parameterization())))
+    try:
+      tf.nest.assert_same_structure(self._get_parameterization(),
+                                    other._get_parameterization())
+    except (ValueError, TypeError):
+      return False
+
+    self_params = tf.nest.flatten(self._get_parameterization())
+    other_params = tf.nest.flatten(other._get_parameterization())
+
+    for (p1, p2) in zip(self_params, other_params):
+      if p1 is p2:
+        continue
+      if tf.is_tensor(p1):
+        p1 = tf.get_static_value(p1)
+      if tf.is_tensor(p2):
+        p2 = tf.get_static_value(p2)
+      p1_isarray = getattr(p1, '__array__', None) is not None
+      p2_isarray = getattr(p2, '__array__', None) is not None
+      if p1_isarray != p2_isarray:
+        return False
+      if p1_isarray and p2_isarray:
+        if p1.shape != p2.shape:
+          return False
+        if not np.all(np.equal(p1, p2)):
+          return False
+      if p1 != p2:
+        return False
+    return True
 
   def _get_parameterization(self):
     return self.parameters
