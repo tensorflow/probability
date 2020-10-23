@@ -140,6 +140,7 @@ py_library(
     deps = [
         ":model",
         # numpy dep,
+        "//inference_gym/targets/ground_truth:eight_schools",
     ],
 )
 

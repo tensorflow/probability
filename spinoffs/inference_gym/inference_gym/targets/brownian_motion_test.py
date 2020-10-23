@@ -85,26 +85,24 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
     self.validate_deferred_materialization(func, **kwargs)
 
   @test_util.numpy_disable_gradient_test
-  def testBrownianMotionHMC(self):
+  def testBrownianMotionMissingMiddleObservationsHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    model = brownian_motion.BrownianMotion(
-        observed_locs=_small_observed_data,
-        innovation_noise_scale=0.1,
-        observation_noise_scale=0.15)
+    model = brownian_motion.BrownianMotionMissingMiddleObservations()
 
     self.validate_ground_truth_using_hmc(
         model,
         num_chains=4,
         num_steps=4000,
-        num_leapfrog_steps=15,
-        step_size=0.03,
+        num_leapfrog_steps=18,
+        step_size=0.02,
     )
 
   @test_util.numpy_disable_gradient_test
-  def testBrownianMotionUnknownScalesHMC(self):
+  def testBrownianMotionUnknownScalesMissingMiddleObservationsHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    model = brownian_motion.BrownianMotionUnknownScales(
-        observed_locs=_small_observed_data)
+    self.skipTest('b/171518508')
+    model = (
+        brownian_motion.BrownianMotionUnknownScalesMissingMiddleObservations())
 
     self.validate_ground_truth_using_hmc(
         model,

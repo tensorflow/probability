@@ -528,38 +528,37 @@ class InferenceGymTestCase(test_util.TestCase):
     #
     # We should re-examine the literature for Z-testing and justify these
     # choices on formal grounds.
-    if sample_transformation.ground_truth_mean is not None:
-
-      def _mean_assertions_part(ground_truth_mean,
-                                ground_truth_mean_standard_error, sample_mean,
-                                sample_variance, num_samples):
-        sample_standard_error_sq = sample_variance / num_samples
-        self.assertAllClose(
-            ground_truth_mean,
-            sample_mean,
-            # TODO(b/144290399): Use the full atol vector.
-            atol=(np.array(
-                5. * np.sqrt(sample_standard_error_sq +
-                             ground_truth_mean_standard_error**2)).max() +
-                  mean_fudge_atol),
-        )
-
-      ground_truth_mean_standard_error = (
-          sample_transformation.ground_truth_mean_standard_error)
-      if ground_truth_mean_standard_error is None:
-        # Note that this is NOT the intended general interpretaton of SEM being
-        # None, but only the interpetation we choose for these tests.
-        ground_truth_mean_standard_error = tf.nest.map_structure(
-            np.zeros_like, sample_transformation.ground_truth_mean)
-
-      self.assertAllAssertsNested(
-          _mean_assertions_part,
-          sample_transformation.ground_truth_mean,
-          ground_truth_mean_standard_error,
+    def _mean_assertions_part(ground_truth_mean,
+                              ground_truth_mean_standard_error, sample_mean,
+                              sample_variance, num_samples):
+      sample_standard_error_sq = sample_variance / num_samples
+      self.assertAllClose(
+          ground_truth_mean,
           sample_mean,
-          sample_variance,
-          num_samples,
-          msg='Comparing mean of "{}"'.format(name))
+          # TODO(b/144290399): Use the full atol vector.
+          atol=(np.array(
+              5. * np.sqrt(sample_standard_error_sq +
+                           ground_truth_mean_standard_error**2)).max() +
+                mean_fudge_atol),
+      )
+
+    ground_truth_mean_standard_error = (
+        sample_transformation.ground_truth_mean_standard_error)
+    if ground_truth_mean_standard_error is None:
+      # Note that this is NOT the intended general interpretaton of SEM being
+      # None, but only the interpetation we choose for these tests.
+      ground_truth_mean_standard_error = tf.nest.map_structure(
+          np.zeros_like, sample_transformation.ground_truth_mean)
+
+    self.assertAllAssertsNested(
+        _mean_assertions_part,
+        sample_transformation.ground_truth_mean,
+        ground_truth_mean_standard_error,
+        sample_mean,
+        sample_variance,
+        num_samples,
+        msg='Comparing mean of "{}"'.format(name))
+
     if sample_transformation.ground_truth_standard_deviation is not None:
       # From https://math.stackexchange.com/q/72975
       fourth_moment = tf.nest.map_structure(

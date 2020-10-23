@@ -82,16 +82,15 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
         check_ground_truth_standard_deviation=True)
 
   @test_util.numpy_disable_gradient_test
-  def testLorenzSystemHMC(self):
+  def testConvectionLorenzBridgeHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    model = lorenz_system.LorenzSystem(
-        **_make_dataset(_partially_observed_data))
+    model = lorenz_system.ConvectionLorenzBridge()
 
     self.validate_ground_truth_using_hmc(
         model,
-        num_chains=2,
+        num_chains=4,
         num_steps=2000,
-        num_leapfrog_steps=15,
+        num_leapfrog_steps=240,
         step_size=0.03,
     )
 
@@ -136,19 +135,16 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
         check_ground_truth_standard_deviation=True)
 
   @test_util.numpy_disable_gradient_test
-  def testLorenzSystemHMC(self):
+  def testConvectionLorenzBridgeHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    dataset = _make_dataset(_partially_observed_data)
-    del dataset['innovation_scale']
-    del dataset['observation_scale']
-    model = lorenz_system.LorenzSystemUnknownScales(
-        **dataset)
+    self.skipTest('b/171518508')
+    model = lorenz_system.ConvectionLorenzBridgeUnknownScales()
 
     self.validate_ground_truth_using_hmc(
         model,
         num_chains=2,
         num_steps=2000,
-        num_leapfrog_steps=15,
+        num_leapfrog_steps=240,
         step_size=0.03,
     )
 

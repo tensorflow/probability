@@ -21,9 +21,11 @@ from tensorflow_probability.python.internal import prefer_static as ps
 
 from inference_gym.targets import bayesian_model
 from inference_gym.targets import model
+from inference_gym.targets.ground_truth import eight_schools
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
 __all__ = [
     'EightSchools'
 ]
@@ -70,6 +72,8 @@ class EightSchools(bayesian_model.BayesianModel):
       Donald Rubin. Bayesian Data Analysis, Third Edition.
       Chapman and Hall/CRC, 2013.
   """
+
+  GROUND_TRUTH_MODULE = eight_schools
 
   def __init__(self, name='eight_schools', pretty_name='Eight Schools'):
     """Construct the Eight Schools model.
