@@ -162,7 +162,7 @@ To cite the Inference Gym:
   author = {Pavel Sountsov and Alexey Radul and contributors},
   title = {Inference Gym},
   url = {https://pypi.org/project/inference_gym},
-  version = {0.0.3},
+  version = {0.0.4},
   year = {2020},
 }
 ```
