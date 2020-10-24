@@ -28,6 +28,10 @@ Each model can additionally provide:
   Monte-Carlo methods, a standard error is also provided. This can be used to
   verify the algorithm's level of bias.
 
+## Getting started
+
+Check out the [`tutorial`][tutorial].
+
 ## Usage
 
 ```bash
@@ -121,6 +125,8 @@ Using this requires adding a model implementation inside the
 [`inference_gym/tools/stan`][ground_truth_dir]
 directory.
 
+New (and existing) models should follow the [Model Contract][contract].
+
 ### Adding a new real dataset
 
 We strongly encourage you to add your dataset to TensorFlow Datasets first.
@@ -144,6 +150,8 @@ See [`inference_gym/tools/get_ground_truth.py`][get_ground_truth].
 [irt]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/item_response_theory.py
 [gaussian]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/ill_conditioned_gaussian.py
 [vector_model]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/vector_model.py
+[tutorial]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/notebooks/inference_gym_tutorial.ipynb
+[contract]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/model_contract.md
 
 ### Citing Inference Gym
 
@@ -154,7 +162,7 @@ To cite the Inference Gym:
   author = {Pavel Sountsov and Alexey Radul and contributors},
   title = {Inference Gym},
   url = {https://pypi.org/project/inference_gym},
-  version = {0.0.2},
+  version = {0.0.3},
   year = {2020},
 }
 ```
