@@ -30,7 +30,7 @@ Each model can additionally provide:
 
 ## Getting started
 
-Check out the [`tutorial`][tutorial].
+Check out the [tutorial].
 
 ## Usage
 
