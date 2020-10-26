@@ -27,6 +27,9 @@ toc:
 - title: TensorFlow Probability on JAX
   path: /probability/examples/TensorFlow_Probability_on_JAX
   status: new
+- title: Automatically Batched Joint Distributions
+  path: /probability/examples/JointDistributionAutoBatched_A_Gentle_Tutorial
+  status: new
 - heading: "Tutorials"
 - title:  Probabilistic regression
   path: /probability/examples/Probabilistic_Layers_Regression
