@@ -182,7 +182,10 @@ class Geometric(distribution.Distribution):
     if not self.validate_args:
       # For consistency with cdf, we take the floor.
       x = tf.floor(x)
-    return tf.math.xlog1py(x, -probs) + tf.math.log(probs)
+    return tf.where(
+        x < 0.,
+        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+        tf.math.xlog1py(x, -probs) + tf.math.log(probs))
 
   def _entropy(self):
     logits, probs = self._logits_and_probs_no_checks()

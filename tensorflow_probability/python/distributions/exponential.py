@@ -121,11 +121,17 @@ class Exponential(gamma.Gamma):
     return self._rate
 
   def _cdf(self, value):
-    return -tf.math.expm1(-self.rate * value)
+    return tf.where(
+        value < 0.,
+        tf.zeros_like(value),
+        -tf.math.expm1(-self.rate * value))
 
   def _log_survival_function(self, value):
     rate = tf.convert_to_tensor(self._rate)
-    return self._log_prob(value, rate=rate) - tf.math.log(rate)
+    return tf.where(
+        value < 0.,
+        tf.zeros_like(value),
+        self._log_prob(value, rate=rate) - tf.math.log(rate))
 
   def _sample_n(self, n, seed=None):
     rate = tf.convert_to_tensor(self.rate)
