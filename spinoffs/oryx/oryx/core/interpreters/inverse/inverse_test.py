@@ -216,6 +216,12 @@ class InverseTest(test_util.TestCase):
     self.assertEqual(x, 1.)
     self.assertEqual(ildj_, 0.)
 
+  def test_sow_happens_in_forward_pass(self):
+    def f(x, y):
+      return x, harvest.sow(x, name='x', tag='foo') * y
+    vals = harvest.reap(core.inverse(f), tag='foo')(1., 1.)
+    self.assertDictEqual(vals, dict(x=1.))
+
   def test_inverse_of_nest(self):
     def f(x):
       x = harvest.nest(lambda x: x, scope='foo')(x)

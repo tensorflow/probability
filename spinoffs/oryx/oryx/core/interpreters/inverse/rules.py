@@ -78,8 +78,7 @@ register_binary(lax.mul_p)(mul_left, mul_right)
 
 
 def div_left(left_val, out_val, ildj_):
-  return left_val / out_val, (
-      (np.log(left_val) - 2 * np.log(out_val)) + ildj_)
+  return left_val / out_val, ((np.log(left_val) - 2 * np.log(out_val)) + ildj_)
 
 
 def div_right(right_val, out_val, ildj_):
@@ -132,13 +131,29 @@ def concatenate_ildj(incells, outcells, *, dimension):
 ildj_registry[lax.concatenate_p] = concatenate_ildj
 
 
-def sow_ildj(incells, outcells, **params):
+def tie_all_ildj(incells, outcells, **params):
   del params
-  new_cells = [incell.join(outcell) for incell, outcell
-               in safe_zip(incells, outcells)]
+  new_cells = [
+      incell.join(outcell) for incell, outcell in safe_zip(incells, outcells)
+  ]
   return new_cells, new_cells, None
+
+
+ildj_registry[primitive.tie_all_p] = tie_all_ildj
+
+
+def sow_ildj(incells, outcells, **params):
+  if all(incell.top() for incell in incells) and all(
+      not outcell.top() for outcell in outcells):
+    # In forward evaluation mode, we want to still sow the values.
+    invals = [incell.val for incell in incells]
+    outvals = harvest.sow_p.bind(*invals, **params)
+    new_outcells = [InverseAndILDJ.new(outval) for outval in outvals]
+    return incells, new_outcells, None
+  return tie_all_ildj(incells, outcells, **params)
+
+
 ildj_registry[harvest.sow_p] = sow_ildj
-ildj_registry[primitive.tie_all_p] = sow_ildj
 
 
 def reshape_ildj(incells, outcells, **params):
