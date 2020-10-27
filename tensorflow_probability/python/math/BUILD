@@ -44,6 +44,7 @@ multi_substrate_py_library(
         ":diag_jacobian",
         ":generic",
         ":gradient",
+        ":gram_schmidt",
         ":interpolation",
         ":linalg",
         ":minimize",
@@ -109,6 +110,30 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gram_schmidt",
+    srcs = [
+        "gram_schmidt.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "gram_schmidt_test",
+    size = "small",
+    srcs = ["gram_schmidt_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

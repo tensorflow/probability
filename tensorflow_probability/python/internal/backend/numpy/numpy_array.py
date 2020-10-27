@@ -328,6 +328,11 @@ builtin_slice = slice  # pylint: disable=invalid-name
 
 
 def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,redefined-outer-name
+  if JAX_MODE:
+    input_ = np.asarray(input_)
+    size = [dim_size - start if size == -1 else size
+            for (size, start, dim_size) in zip(size, begin, input_.shape)]
+    return jax.lax.dynamic_slice(input_, begin, size)
   slices = tuple(
       builtin_slice(b, b + s if s != -1 else None) for b, s in zip(begin, size))
   return input_[slices]

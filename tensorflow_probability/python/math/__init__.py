@@ -41,6 +41,7 @@ from tensorflow_probability.python.math.generic import soft_sorting_matrix
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.generic import softplus_inverse
 from tensorflow_probability.python.math.gradient import value_and_gradient
+from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
@@ -94,6 +95,7 @@ _allowed_symbols = [
     'erfcinv',
     'fill_triangular',
     'fill_triangular_inverse',
+    'gram_schmidt',
     'interp_regular_1d_grid',
     'lambertw',
     'lambertw_winitzki_approx',
