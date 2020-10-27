@@ -478,6 +478,7 @@ class HiddenMarkovModel(distribution.Distribution):
       # observation_probs :: num_steps batch_shape num_states
 
     if self._time_varying_transition_distribution:
+      log_transition = distribution_util.move_dimension(log_transition, -3, 0)
       def dynamic_forward_step(log_prev_step, log_transition_and_observation):
         log_transition, log_prob_observation = log_transition_and_observation
         return _log_vector_matrix(log_prev_step,
@@ -843,6 +844,9 @@ class HiddenMarkovModel(distribution.Distribution):
         log_prob = log_init + observation_log_probs[0]
         log_transition = _extract_log_probs(num_states,
                                             self.transition_distribution)
+        if self._time_varying_transition_distribution:
+          log_transition = distribution_util.move_dimension(
+              log_transition, -3, 0)
         log_adjoint_prob = tf.zeros_like(log_prob)
 
         def _scan_multiple_steps_forwards():
@@ -1028,6 +1032,8 @@ class HiddenMarkovModel(distribution.Distribution):
                                       self.initial_distribution)
         log_trans = _extract_log_probs(num_states,
                                        self.transition_distribution)
+        if self._time_varying_transition_distribution:
+          log_trans = distribution_util.move_dimension(log_trans, -3, 0)
         log_prob = log_init + observation_log_probs[0]
 
         def _reduce_multiple_steps():

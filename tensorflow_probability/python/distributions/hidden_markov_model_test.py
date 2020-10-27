@@ -1486,6 +1486,54 @@ class _HiddenMarkovModelTest(
     mode = self.evaluate(model.posterior_mode(observations_data_likely))
     self.assertAllClose(mode, [0., 0., 0., 1.], 1e-2)
 
+  def test_batch_dynamic_distributions_log_prob_and_posterior(self):
+    initial_prob_data = tf.constant([0.999, 0.001], dtype=self.dtype)
+    transition_matrix_data = tf.constant(6 * [[[[0.999, 0.001],
+                                                [0.001, 0.999]],
+                                               [[0.999, 0.001],
+                                                [0.001, 0.999]],
+                                               [[0.001, 0.999],
+                                                [0.999, 0.001]]]],
+                                         dtype=self.dtype)
+    observation_scale_data = tf.constant(0.1, dtype=self.dtype)
+    observation_loc_data = tf.constant(1 * [[[0.0, 1.0],
+                                             [0.0, 1.0],
+                                             [1.0, 0.0],
+                                             [1.0, 0.0]]], dtype=self.dtype)
+    observations_data_unlikely = tf.constant([0.0, 0.0, 0.0, 1.0],
+                                             dtype=self.dtype)
+    observations_data_likely = tf.constant(5 * [6 * [[0.0, 0.0, 1.0, 0.0]]],
+                                           dtype=self.dtype)
+
+    (initial_prob, transition_matrix, observation_scale, observations_unlikely,
+     observations_likely, observation_locs) = self.make_placeholders(
+         [initial_prob_data, transition_matrix_data, observation_scale_data,
+          observations_data_unlikely, observations_data_likely,
+          observation_loc_data])
+
+    [num_steps] = self.make_placeholders([4])
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs, scale=observation_scale),
+        num_steps=num_steps,
+        validate_args=True,
+        time_varying_transition_distribution=True,
+        time_varying_observation_distribution=True)
+
+    likely_log_prob = self.evaluate(model.log_prob(observations_likely))
+    unlikely_log_prob = self.evaluate(model.log_prob(observations_unlikely))
+    self.assertLess(likely_log_prob[0, 0], 1e1)
+    self.assertLess(unlikely_log_prob[0], 1e-6)
+    marginals = self.evaluate(model.posterior_marginals(
+        observations_data_likely).probs_parameter())
+    self.assertAllClose(marginals[0, 0], [[1., 0.],
+                                          [1., 0.],
+                                          [1., 0.],
+                                          [0., 1.]], 1e-2)
+    mode = self.evaluate(model.posterior_mode(observations_data_likely))
+    self.assertAllClose(mode[0, 0], [0., 0., 0., 1.], 1e-2)
+
 
 class HiddenMarkovModelTestFloat32(_HiddenMarkovModelTest):
   dtype = tf.float32
