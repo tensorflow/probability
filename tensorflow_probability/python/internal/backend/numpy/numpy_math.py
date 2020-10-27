@@ -227,7 +227,7 @@ def _confusion_matrix(
   if not JAX_MODE:
     np.add.at(cmatrix, [labels, predictions], weights)
     return cmatrix
-  return jax.ops.index_add(cmatrix, [labels, predictions], weights)
+  return jax.ops.index_add(cmatrix, (labels, predictions), weights)
 
 
 def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
