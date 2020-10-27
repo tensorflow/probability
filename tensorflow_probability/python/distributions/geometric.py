@@ -163,7 +163,7 @@ class Geometric(distribution.Distribution):
       x = tf.floor(x)
     return tf.where(
         x < 0.,
-        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+        dtype_util.as_numpy_dtype(x.dtype)(0.),
         (1. + x) * tf.math.log1p(-probs))
 
   def _log_cdf(self, x):
