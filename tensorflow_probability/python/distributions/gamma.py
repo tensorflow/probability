@@ -628,7 +628,7 @@ def _fix_zero_samples(s):
   # We use `tf.where` instead of `tf.maximum` because we need to allow for
   # `samples` to be `nan`, but `tf.maximum(nan, x) == x`.
   return tf.where(
-      s == 0, np.finfo(dtype_util.as_numpy_dtype(s.dtype)).tiny, s)
+      tf.equal(s, 0), np.finfo(dtype_util.as_numpy_dtype(s.dtype)).tiny, s)
 
 
 # TF custom_gradient doesn't support kwargs, so we wrap _random_gamma_gradient.
@@ -807,4 +807,8 @@ def _random_gamma_rejection(
     if rate is None:
       rate = tf.math.exp(log_rate)
     corrected_rate = tf.where(rate >= 0., rate, np.nan)
-    return _fix_zero_samples(concentration_samples / corrected_rate)
+    # 0 rate is infinite scale, which implies a +inf sample.
+    ret = tf.where(
+        tf.equal(corrected_rate, 0), tf.constant(np.inf, dtype=output_dtype),
+        _fix_zero_samples(concentration_samples / corrected_rate))
+    return ret

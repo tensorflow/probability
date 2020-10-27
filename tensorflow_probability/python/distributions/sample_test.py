@@ -366,7 +366,8 @@ class SampleDistributionTest(test_util.TestCase):
     #     b.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])))
     self.assertAllClose(
         b.forward_log_det_jacobian(x_sliced, event_ndims=len([2, 6])),
-        -b.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])))
+        -b.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])),
+        rtol=1e-5)
 
     # Now, with another sample shape.
     d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), [2, 7])

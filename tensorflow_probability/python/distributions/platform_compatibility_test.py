@@ -433,8 +433,12 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
   def _test_vectorization(self, dist_name, dist):
     seed = test_util.test_seed()
 
+    # TODO(b/171752261): New stateless samplers don't work with pfor.
+    enable_auto_vectorized_sampling = False
+
     num_samples = 3
-    if dist_name in SAMPLE_AUTOVECTORIZATION_IS_BROKEN:
+    if (not enable_auto_vectorized_sampling or
+        dist_name in SAMPLE_AUTOVECTORIZATION_IS_BROKEN):
       sample = self.evaluate(dist.sample(num_samples, seed=seed))
     else:
       sample = self.evaluate(tf.vectorized_map(

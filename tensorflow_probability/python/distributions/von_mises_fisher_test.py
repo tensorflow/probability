@@ -318,7 +318,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     kl_sample = tf.reduce_mean(vmf.log_prob(x) - su.log_prob(x), axis=0)
     true_kl = tfp.distributions.kl_divergence(vmf, su)
     true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=7e-2)
+    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=0.3)
 
   @parameterized.parameters(2, 3, 5, 10, 20)
   def testKLVonMisesFisherSphericalUniformDim(self, dim):
