@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -65,25 +66,29 @@ def gram_schmidt(vectors, num_vectors=None):
   Returns:
     A Tensor of shape `[..., d, n]` corresponding to the orthonormalization.
   """
-  n = ps.shape(vectors)[-1]
-  if num_vectors is None:
-    num_vectors = n
-  cond = lambda vecs, i: i < num_vectors - 1
+  with tf.name_scope('gram_schmidt'):
+    n = ps.shape(vectors)[-1]
+    if num_vectors is None:
+      num_vectors = n
+    cond = lambda vecs, i: i < num_vectors - 1
 
-  def body_fn(vecs, i):
-    # Slice out the vector w.r.t. which we're orthogonalizing the rest.
-    vecs_ndims = ps.rank(vecs)
-    select_axis = (ps.range(vecs_ndims) == vecs_ndims - 1)
-    start = ps.where(select_axis, i, ps.zeros([vecs_ndims], i.dtype))
-    size = ps.where(select_axis, 1, ps.shape(vecs))
-    u = tf.math.l2_normalize(tf.slice(vecs, start, size), axis=-2)
-    # TODO(b/171730305): XLA can't handle this line...
-    # u = tf.math.l2_normalize(vecs[..., i, tf.newaxis], axis=-2)
-    # Find weights by dotting the d x 1 against the d x n.
-    weights = tf.einsum('...dm,...dn->...n', u, vecs)
-    # Project out vector `u` from the trailing vectors.
-    masked_weights = tf.where(tf.range(n) > i, weights, 0.)[..., tf.newaxis, :]
-    return vecs - tf.math.multiply_no_nan(u, masked_weights), i + 1
+    def body_fn(vecs, i):
+      # Slice out the vector w.r.t. which we're orthogonalizing the rest.
+      vecs_ndims = ps.rank(vecs)
+      select_axis = (ps.range(vecs_ndims) == vecs_ndims - 1)
+      start = ps.where(select_axis, i, ps.zeros([vecs_ndims], i.dtype))
+      size = ps.where(select_axis, 1, ps.shape(vecs))
+      u = tf.math.l2_normalize(tf.slice(vecs, start, size), axis=-2)
+      # TODO(b/171730305): XLA can't handle this line...
+      # u = tf.math.l2_normalize(vecs[..., i, tf.newaxis], axis=-2)
+      # Find weights by dotting the d x 1 against the d x n.
+      weights = tf.einsum('...dm,...dn->...n', u, vecs)
+      # Project out vector `u` from the trailing vectors.
+      masked_weights = tf.where(
+          tf.range(n) > i, weights, 0.)[..., tf.newaxis, :]
+      vecs = vecs - tf.math.multiply_no_nan(u, masked_weights)
+      tensorshape_util.set_shape(vecs, vectors.shape)
+      return vecs, i + 1
 
-  vectors, _ = tf.while_loop(cond, body_fn, (vectors, tf.zeros([], tf.int32)))
-  return tf.math.l2_normalize(vectors, axis=-2)
+    vectors, _ = tf.while_loop(cond, body_fn, (vectors, tf.zeros([], tf.int32)))
+    return tf.math.l2_normalize(vectors, axis=-2)

@@ -92,6 +92,17 @@ class GramSchmidtTest(test_util.TestCase):
         np.vectorize(gs_numpy, signature='(d,n)->(d,n)')(mat_numpy),
         tfp.math.gram_schmidt(mat))
 
+  def testBatch1UnknownInnermost(self):
+    shp = (1, 13, 7)
+    mat_numpy = self.evaluate(tf.random.normal(shp, seed=test_util.test_seed()))
+    mat = tf.constant(mat_numpy)
+    @tf.function
+    def f(n):
+      return tfp.math.gram_schmidt(mat[..., :n])
+    self.assertAllClose(
+        np.vectorize(gs_numpy, signature='(d,n)->(d,n)')(mat_numpy[..., :4]),
+        f(tf.constant(4)))
+
   def testQrEquivalenceUpToN(self):
     shp = (5, 13, 7)
     mat = self.evaluate(tf.math.l2_normalize(
