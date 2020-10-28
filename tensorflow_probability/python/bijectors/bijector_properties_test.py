@@ -65,6 +65,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'NormalCDF',
     'Ordered',
     'Permute',
+    'Power',
     'PowerTransform',
     'RationalQuadraticSpline',
     'RayleighCDF',
@@ -100,6 +101,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
     'MatvecLU': dict(lower_upper=2, permutation=1),
     'MoyalCDF': dict(loc=0, scale=0),
+    'Power': dict(power=0),
     'RayleighCDF': dict(scale=0),
     'Scale': dict(scale=0),
     'ScaleMatvecDiag': dict(scale_diag=1),
@@ -148,6 +150,7 @@ TRANSFORM_DIAGONAL_ALLOWLIST = {
     'MoyalCDF',
     'NormalCDF',
     'PowerTransform',
+    'Power',
     'RayleighCDF',
     'Reciprocal',
     'Scale',
@@ -794,6 +797,9 @@ CONSTRAINTS = {
     'concentration1':
         tfp_hps.softplus_plus_eps(),
     'hinge_softness':
+        tfp_hps.softplus_plus_eps(),
+    'power':
+        # Restrict to positive since `Invert(Power(...))` tests the negation.
         tfp_hps.softplus_plus_eps(),
     'rate':
         tfp_hps.softplus_plus_eps(),

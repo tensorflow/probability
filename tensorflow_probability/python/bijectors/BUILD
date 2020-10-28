@@ -79,6 +79,7 @@ multi_substrate_py_library(
         ":ordered",
         ":pad",
         ":permute",
+        ":power",
         ":power_transform",
         ":rational_quadratic_spline",
         ":rayleigh_cdf",
@@ -654,6 +655,17 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "power",
+    srcs = ["power.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1564,6 +1576,19 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["permute_test.py"],
     numpy_tags = ["notap"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "power_test",
+    size = "small",
+    srcs = ["power_test.py"],
     deps = [
         ":bijector_test_util",
         ":bijectors",

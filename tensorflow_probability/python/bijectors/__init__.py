@@ -63,6 +63,7 @@ from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.pad import Pad
 from tensorflow_probability.python.bijectors.permute import Permute
+from tensorflow_probability.python.bijectors.power import Power
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
 from tensorflow_probability.python.bijectors.rational_quadratic_spline import RationalQuadraticSpline
 from tensorflow_probability.python.bijectors.rayleigh_cdf import RayleighCDF
@@ -139,6 +140,7 @@ __all__ = [
     "Ordered",
     "Pad",
     "Permute",
+    "Power",
     "PowerTransform",
     "RationalQuadraticSpline",
     "RayleighCDF",

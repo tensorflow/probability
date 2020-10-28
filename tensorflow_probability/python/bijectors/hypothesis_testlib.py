@@ -199,6 +199,9 @@ def bijector_supports():
       'Permute':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
+      'Power':
+          BijectorSupport(Support.SCALAR_POSITIVE,
+                          Support.SCALAR_POSITIVE),
       'PowerTransform':  # The domain is parameter dependent.
           BijectorSupport(Support.OTHER, Support.SCALAR_POSITIVE),
       'RationalQuadraticSpline':
