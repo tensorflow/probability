@@ -103,6 +103,15 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "kendalls_tau",
+    srcs = ["kendalls_tau.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
     name = "ranking",
     srcs = ["ranking.py"],
     srcs_version = "PY3",
