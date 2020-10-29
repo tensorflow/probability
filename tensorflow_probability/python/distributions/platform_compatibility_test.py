@@ -125,6 +125,7 @@ VECTORIZED_LOGPROB_ATOL.update({
 VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_RTOL.update({
     'NegativeBinomial': 1e-5,
+    'PERT': 1e-5,
     'PowerSpherical': 5e-5,
 })
 
