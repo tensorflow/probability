@@ -34,6 +34,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     jax_omit_deps = [
         ":ranking",
+        ":kendalls_tau",
     ],
     srcs_version = "PY3",
     deps = [
@@ -213,11 +214,23 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
+multi_substrate_py_test(
+    name = "kendalls_tau_test",
+    size = "large",
+    srcs = ["kendalls_tau_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
 
 exports_files(
     [
         "__init__.py",
         "calibration.py",
+        "kendalls_tau.py",
         "leave_one_out.py",
         "moving_stats.py",
         "quantiles.py",
