@@ -33,12 +33,13 @@ multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
     jax_omit_deps = [
-        ":ranking",
         ":kendalls_tau",
+        ":ranking",
     ],
     srcs_version = "PY3",
     deps = [
         ":calibration",
+        ":kendalls_tau",
         ":leave_one_out",
         ":moving_stats",
         ":quantiles",
