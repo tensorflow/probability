@@ -150,16 +150,17 @@ def _update_target_log_prob(kernel, new_target_log_prob):
   """Replaces `target_log_prob_fn` of outermost `inner_kernel` of `kernel`."""
   kernel_stack = _make_kernel_stack(kernel)
   # Update to target_log_prob to `new_target_log_prob`.
-  prev_kernel = kernel_stack.pop().copy(target_log_prob_fn=new_target_log_prob)
+  with deprecation.silence():
+    prev_kernel = kernel_stack.pop().copy(
+        target_log_prob_fn=new_target_log_prob)
 
-  # Propagate the change upwards by reconstructing wrapper kernels.
-  while kernel_stack:
-    curr_kernel = kernel_stack.pop()
-    with deprecation.silence():
+    # Propagate the change upwards by reconstructing wrapper kernels.
+    while kernel_stack:
+      curr_kernel = kernel_stack.pop()
       updated_kernel = type(prev_kernel)(**prev_kernel.parameters)
       curr_kernel = curr_kernel.copy(inner_kernel=updated_kernel)
-    prev_kernel = curr_kernel
-  return prev_kernel
+      prev_kernel = curr_kernel
+    return prev_kernel
 
 
 class TransformedTransitionKernel(kernel_base.TransitionKernel):
