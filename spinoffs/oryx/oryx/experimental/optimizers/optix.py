@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Lint as: python3
-"""Reimplementation of jax.experimental.optix.
+"""Reimplementation of a subset of the optax library using oryx.
 
 There are a few key differences:
 1. We use Oryx's state API to handle variables.
