@@ -117,9 +117,10 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.
 VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
+    'BetaBinomial': 1e-5,
     'CholeskyLKJ': 1e-4,
     'LKJ': 1e-3,
-    'BetaBinomial': 1e-5,
+    'PowerSpherical': 1e-5,
 })
 
 VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
