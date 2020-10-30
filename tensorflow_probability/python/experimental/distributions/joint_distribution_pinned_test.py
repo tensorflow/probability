@@ -324,7 +324,9 @@ class JointDistributionPinnedTest(test_util.TestCase):
         lambda a: tfd.Uniform(a + tf.ones_like(a), a + tf.constant(2, a.dtype)),
         lambda b, a: tfd.Uniform(a, b, name='c')])
     bij = jd.experimental_default_event_space_bijector(a=-.5, b=1.)
-    self.assertAllClose((2/3,), tf.math.sigmoid(bij.inverse((0.5,))))
+    test_input = (0.5,)
+    self.assertIs(type(jd.dtype), type(bij.inverse(test_input)))
+    self.assertAllClose((2/3,), tf.math.sigmoid(bij.inverse(test_input)))
 
     @tfd.JointDistributionCoroutine
     def model():

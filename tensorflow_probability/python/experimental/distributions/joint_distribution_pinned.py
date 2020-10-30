@@ -355,16 +355,17 @@ class JointDistributionPinned(object):
 
   def _model_unflatten(self, xs):
     """Unflattens `xs` to a structure like-typed to `self.distribution`."""
-    model = self.distribution.dtype
-    if isinstance(model, dict):
+    # Use the underlying JD dtype to infer model structure.
+    dtype = self.distribution.dtype
+    if isinstance(dtype, dict):
       ks = self._flat_resolve_names()
       if len(ks) != len(xs):
         raise ValueError('Invalid xs length {}, ks={}'.format(len(xs), ks))
-      return type(model)(zip(ks, xs))
-    if hasattr(model, '_fields') and hasattr(model, '_asdict'):
-      ks = [k for k in model._fields if k not in self.pins]
+      return type(dtype)(zip(ks, xs))
+    if hasattr(dtype, '_fields') and hasattr(dtype, '_asdict'):
+      ks = [k for k in dtype._fields if k not in self.pins]
       return structural_tuple.structtuple(ks)(*xs)
-    return tuple(xs)
+    return type(dtype)(xs)
 
   def _prune(self, xs, retain=None):
     """Drops fields from `xs`, retaining those specified by `retain`.
