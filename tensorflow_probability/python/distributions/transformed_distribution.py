@@ -88,8 +88,8 @@ class TransformedDistribution(distribution_lib.Distribution):
   the `Bijector.__eq__` method, e.g., `td1.bijector == td2.bijector`, as part
   of the KL calculation.  If the underlying bijectors do not match, a
   `NotImplementedError` is raised when calling `kl_divergence`.  This is the
-  same behavior as calling `kl_divergence` when two distributions do not match
-  in general.
+  same behavior as calling `kl_divergence` when two distributions do not have
+  a registered KL divergence.
 
   **Note** Due to the current constraints imposed on bijector equality testing,
   `kl_divergence` may behave differently in eager mode computation vs. traced
