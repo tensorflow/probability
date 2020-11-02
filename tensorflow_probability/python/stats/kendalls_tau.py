@@ -26,8 +26,7 @@ __all__ = [
 ]
 
 
-def iterative_mergesort(y: tf.Tensor, aperm: tf.Tensor) -> (tf.int32,
-                                                            tf.Tensor):
+def iterative_mergesort(y, aperm):
   """Non-recusive mergesort that counts exchanges.
 
   Args:
@@ -74,7 +73,7 @@ def iterative_mergesort(y: tf.Tensor, aperm: tf.Tensor) -> (tf.int32,
   return exchanges, aperm.stack()
 
 
-def kendalls_tau(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+def kendalls_tau(y_true, y_pred):
   """Computes Kendall's Tau for two ordered lists.
 
   Kendall's Tau measures the correlation between ordinal rankings. This
