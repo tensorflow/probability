@@ -61,10 +61,11 @@ class GramSchmidtTest(test_util.TestCase):
     ortho = self.evaluate(tfp.math.gram_schmidt(vectors))
 
     for i in range(n_vectors):
-      self.assertAlmostEqual(np.linalg.norm(ortho[..., i]), 1., places=6)
+      self.assertAllClose(
+          np.linalg.norm(ortho[..., i]), 1., rtol=1e-7)
       for j in range(i + 1, n_vectors):
-        self.assertAlmostEqual(
-            np.dot(ortho[..., i], ortho[..., j]), 0., places=6)
+        self.assertAllClose(
+            np.dot(ortho[..., i], ortho[..., j]), 0., atol=1e-6)
 
   def testIllConditioned(self):
     # Modified G-S handles ill-conditioned matrices much better (numerically)
@@ -105,14 +106,18 @@ class GramSchmidtTest(test_util.TestCase):
 
   def testQrEquivalenceUpToN(self):
     shp = (5, 13, 7)
-    mat = self.evaluate(tf.math.l2_normalize(
-        tf.random.normal(shp, seed=test_util.test_seed()), axis=-2))
+    # Ensure the matrix is well conditioned.
+    mat = tf.random.normal(shp, seed=test_util.test_seed())
+    mat = tf.linalg.matmul(mat, mat, transpose_b=True)
+    mat = tf.linalg.set_diag(mat, tf.linalg.diag_part(mat) + 1.)
+    mat = self.evaluate(tf.math.l2_normalize(mat, axis=-2))
     n_vecs = 4
-    self.assertAllClose(  # The two are identical up to sign.
-        tf.ones_like(mat[..., :n_vecs]),
-        tf.math.abs(tf.linalg.qr(mat).q / tfp.math.gram_schmidt(mat, n_vecs)
-                    )[..., :n_vecs],
-        rtol=5e-5)
+    # The two are identical up to sign.
+    self.assertAllClose(
+        tf.math.abs(tf.linalg.qr(mat).q)[..., :n_vecs],
+        tf.math.abs(
+            tfp.math.gram_schmidt(mat, n_vecs))[..., :n_vecs],
+        rtol=1e-5)
 
 
 if __name__ == '__main__':
