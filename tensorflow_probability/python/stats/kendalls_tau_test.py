@@ -30,18 +30,18 @@ class KendallsTauTest(test_util.TestCase):
     x1 = [12, 2, 1, 12, 2]
     x2 = [1, 4, 7, 1, 0]
     expected = stats.kendalltau(x1, x2)[0]
-    res = tfp.stats.kendalls_tau(tf.constant(x1, tf.float32),
-                                 tf.constant(x2, tf.float32))
-    self.assertAllClose(expected, res.numpy(), atol=1e-5)
+    res = self.evaluate(tfp.stats.kendalls_tau(tf.constant(x1, tf.float32),
+                                               tf.constant(x2, tf.float32)))
+    self.assertAllClose(expected, res, atol=1e-5)
 
 
   def test_kendall_tau_float(self):
     x1 = [0.12, 0.02, 0.01, 0.12, 0.02]
     x2 = [0.1, 0.4, 0.7, 0.1, 0.0]
     expected = stats.kendalltau(x1, x2)[0]
-    res = tfp.stats.kendalls_tau(tf.constant(x1, tf.float32),
-                                 tf.constant(x2, tf.float32))
-    self.assertAllClose(expected, res.numpy(), atol=1e-5)
+    res = self.evaluate(tfp.stats.kendalls_tau(tf.constant(x1, tf.float32),
+                                               tf.constant(x2, tf.float32)))
+    self.assertAllClose(expected, res, atol=1e-5)
 
 
   def test_kendall_random_lists(self):
@@ -49,7 +49,7 @@ class KendallsTauTest(test_util.TestCase):
     for _ in range(10):
       right = random.sample(left, len(left))
       expected = stats.kendalltau(left, right)[0]
-      res = tfp.stats.kendalls_tau(
+      res = self.evaluate(tfp.stats.kendalls_tau(
           tf.constant(left, tf.float32), tf.constant(right, tf.float32)
-      )
-      self.assertAllClose(expected, res.numpy(), atol=1e-5)
+      ))
+      self.assertAllClose(expected, res, atol=1e-5)
