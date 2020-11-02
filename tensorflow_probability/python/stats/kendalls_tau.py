@@ -20,8 +20,14 @@ import numpy as np
 import tensorflow as tf
 
 
-def _iterative_mergesort(y: tf.Tensor, aperm: tf.Tensor) -> (tf.int32,
-                                                             tf.Tensor):
+__all__ = [
+    'iterative_mergesort',
+    'kendalls_tau'
+]
+
+
+def iterative_mergesort(y: tf.Tensor, aperm: tf.Tensor) -> (tf.int32,
+                                                            tf.Tensor):
   """Non-recusive mergesort that counts exchanges.
 
   Args:
@@ -135,7 +141,7 @@ def kendalls_tau(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
   u += ((n - first) * (n - first - 1)) // 2
 
   # count exchanges
-  exchanges, newperm = _iterative_mergesort(y_pred, lexi)
+  exchanges, newperm = iterative_mergesort(y_pred, lexi)
   # compute ties in y_pred after mergesort with counting
   first = 0
   v = 0
