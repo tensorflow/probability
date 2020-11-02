@@ -41,7 +41,7 @@ def iterative_mergesort(y: tf.Tensor, aperm: tf.Tensor) -> (tf.int32,
   """
   exchanges = 0
   num = tf.size(y)
-  k = tf.constant(1, tf.int32)
+  k = 1
   while tf.less(k, num):
     for left in tf.range(0, num - k, 2 * k, dtype=tf.int32):
       rght = left + k
