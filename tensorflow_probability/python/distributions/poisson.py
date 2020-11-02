@@ -35,6 +35,7 @@ from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
+    'random_poisson',
     'Poisson',
 ]
 
@@ -105,7 +106,7 @@ def _random_poisson_noncpu(
 @implementation_selection.never_runs_functions_eagerly
 # TODO(b/163029794): Shape relaxation breaks XLA.
 @tf.function(autograph=False)
-def _random_poisson(
+def random_poisson(
     shape,
     rates=None,
     log_rates=None,
@@ -306,7 +307,7 @@ class Poisson(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     seed = samplers.sanitize_seed(seed)
-    return _random_poisson(
+    return random_poisson(
         shape=ps.convert_to_shape_tensor([n]),
         rates=(None if self._rate is None else
                tf.convert_to_tensor(self._rate)),

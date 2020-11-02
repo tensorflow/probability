@@ -45,6 +45,7 @@ JIT_SAMPLE_BLOCKLIST = (
     'Bates',
     'Independent',  # http://b/164415821
     'Multinomial',
+    'Skellam',  # http://b/171079052
     'VonMisesFisher',  # http://b/171079052
 )
 JIT_LOGPROB_BLOCKLIST = (
@@ -52,6 +53,7 @@ JIT_LOGPROB_BLOCKLIST = (
     'Bates',
     'Independent',  # http://b/164415821
     'MixtureSameFamily',  # http://b/164415821
+    'Skellam',  # http://b/171079052
     'VonMisesFisher',  # http://b/171079052
 )
 
@@ -77,14 +79,20 @@ PMAP_LOGPROB_BLOCKLIST = (
 )
 
 JVP_SAMPLE_BLOCKLIST = ()
-JVP_LOGPROB_SAMPLE_BLOCKLIST = ()
+JVP_LOGPROB_SAMPLE_BLOCKLIST = (
+    'Skellam',  # http://b/171079052
+)
 JVP_LOGPROB_PARAM_BLOCKLIST = (
+    'Skellam',  # http://b/171079052
     'VonMisesFisher',  # http://b/171079052
 )
 
 VJP_SAMPLE_BLOCKLIST = ()
-VJP_LOGPROB_SAMPLE_BLOCKLIST = ()
+VJP_LOGPROB_SAMPLE_BLOCKLIST = (
+    'Skellam',  # http://b/171079052
+)
 VJP_LOGPROB_PARAM_BLOCKLIST = (
+    'Skellam',  # http://b/171079052
     'VonMisesFisher',  # http://b/171079052
 )
 

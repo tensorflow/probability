@@ -127,6 +127,7 @@ multi_substrate_py_library(
         ":relaxed_onehot_categorical",
         ":sample",
         ":sinh_arcsinh",
+        ":skellam",
         ":spherical_uniform",
         ":student_t",
         ":student_t_process",
@@ -1707,6 +1708,23 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "skellam",
+    srcs = ["skellam.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:implementation_selection",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
+    ],
+)
+
+multi_substrate_py_library(
     name = "half_student_t",
     srcs = ["half_student_t.py"],
     deps = [
@@ -3267,6 +3285,23 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "skellam_test",
+    size = "medium",
+    srcs = ["skellam_test.py"],
+    shard_count = 2,
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

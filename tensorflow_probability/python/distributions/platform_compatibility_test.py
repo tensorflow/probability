@@ -98,12 +98,14 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'DirichletMultinomial',  # Times out. (b/164143676)
     'Multinomial',  # TensorListConcatV2 fallback broken: b/166658748
     'PlackettLuce',  # No converter for TopKV2
+    'Skellam',
     # 'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'HalfStudentT',  # Numerical problem: b/149785284
+    'Skellam',
     'StudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/150811273
     'VonMisesFisher',  # No converter for CheckNumerics

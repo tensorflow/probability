@@ -401,7 +401,7 @@ class PoissonSamplingTest(test_util.TestCase):
   def testSampleCPU(self):
     with tf.device('CPU'):
       _, runtime = self.evaluate(
-          poisson_lib._random_poisson(
+          poisson_lib.random_poisson(
               shape=tf.constant([], dtype=tf.int32),
               rates=tf.constant(10.),
               seed=test_util.test_seed()))
@@ -411,7 +411,7 @@ class PoissonSamplingTest(test_util.TestCase):
     if not tf.test.is_gpu_available():
       self.skipTest('no GPU')
     with tf.device('GPU'):
-      _, runtime = self.evaluate(poisson_lib._random_poisson(
+      _, runtime = self.evaluate(poisson_lib.random_poisson(
           shape=tf.constant([], dtype=tf.int32),
           rates=tf.constant(10.),
           seed=test_util.test_seed()))
@@ -428,7 +428,7 @@ class PoissonSamplingTest(test_util.TestCase):
                     experimental_compile=True)())
     # Also test the low-level sampler and verify the XLA-friendly variant.
     _, runtime = self.evaluate(
-        tf.function(poisson_lib._random_poisson, experimental_compile=True)(
+        tf.function(poisson_lib.random_poisson, experimental_compile=True)(
             shape=tf.constant([], dtype=tf.int32),
             rates=tf.constant(10.),
             seed=test_util.test_seed()))

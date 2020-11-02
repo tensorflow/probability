@@ -102,6 +102,7 @@ TF2_FRIENDLY_DISTS = (
     'RelaxedBernoulli',
     'ExpRelaxedOneHotCategorical',
     # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
+    'Skellam',
     'SphericalUniform',
     'StudentT',
     'Triangular',
@@ -148,6 +149,8 @@ MUTEX_PARAMS = (
     set(['logits', 'probs']),
     set(['probits', 'probs']),
     set(['rate', 'log_rate']),
+    set(['rate1', 'log_rate1']),
+    set(['rate2', 'log_rate2']),
     set(['scale', 'log_scale']),
     set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
 )
@@ -307,6 +310,10 @@ CONSTRAINTS = {
         lambda x: tfb.Ascending().forward(10 * tf.math.tanh(x)),
     'log_rate':
         lambda x: tf.maximum(x, -16.),
+    'log_rate1':
+        lambda x: tf.maximum(x, -16.),
+    'log_rate2':
+        lambda x: tf.maximum(x, -16.),
     'log_scale':
         lambda x: tf.maximum(x, -16.),
     'mixing_concentration':
@@ -314,6 +321,10 @@ CONSTRAINTS = {
     'mixing_rate':
         tfp_hps.softplus_plus_eps(),
     'rate':
+        tfp_hps.softplus_plus_eps(),
+    'rate1':
+        tfp_hps.softplus_plus_eps(),
+    'rate2':
         tfp_hps.softplus_plus_eps(),
     'scale':
         tfp_hps.softplus_plus_eps(),
