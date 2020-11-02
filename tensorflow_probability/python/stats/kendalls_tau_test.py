@@ -26,6 +26,16 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class KendallsTauTest(test_util.TestCase):
 
+  def test_iterative_mergesort(self):
+    values = [7, 3, 9, 0, -6, 12, 54, 3, -6, 88, 1412]
+    array = tf.constant(values, tf.int32)
+    iperm = tf.range(len(values), dtype=tf.int32)
+    exchanges, perm = tfp.stats.iterative_mergesort(array, iperm)
+    self.assertEquals(exchanges, 100)
+    self.assertEquals(array[perm], sorted(array))
+    ordered, _ = tfp.stats.iterative_mergesort(array, perm)
+    self.assertEquals(ordered, 0)
+
   def test_kendall_tau(self):
     x1 = [12, 2, 1, 12, 2]
     x2 = [1, 4, 7, 1, 0]
@@ -53,3 +63,8 @@ class KendallsTauTest(test_util.TestCase):
           tf.constant(left, tf.float32), tf.constant(right, tf.float32)
       ))
       self.assertAllClose(expected, res, atol=1e-5)
+
+
+if __name__ == '__main__':
+  tf.test.main()
+

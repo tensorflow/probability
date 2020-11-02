@@ -19,6 +19,9 @@ import warnings
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
+
 
 __all__ = [
     'iterative_mergesort',
@@ -39,6 +42,8 @@ def iterative_mergesort(y, aperm, name=None):
     Tensor that contains the ordering of y values that are sorted.
   """
   with tf.name_scope(name or 'iterative_mergesort'):
+    y = tf.convert_to_tensor(y, name='y', dtype=tf.int32)
+    aperm = tf.convert_to_tensor(aperm, name='aperm', dtype=tf.int32)
     exchanges = 0
     num = tf.size(y)
     k = 1
@@ -88,9 +93,12 @@ def kendalls_tau(y_true, y_pred, name=None):
     ties, as a scalar Tensor.
   """
   with tf.name_scope(name or 'kendalls_tau'):
+    in_type = dtype_util.common_dtype([y_true, y_pred], dtype_hint=tf.float32)
+    y_true = tf.convert_to_tensor(y_true, name='y_true', dtype=in_type)
+    y_pred = tf.convert_to_tensor(y_pred, name='y_pred', dtype=in_type)
     y_true = tf.reshape(y_true, [-1])
     y_pred = tf.reshape(y_pred, [-1])
-    y_pred.shape.assert_is_compatible_with(y_true.shape)
+    tensorshape_util.assert_is_compatible_with(y_true.shape, y_pred.shape)
     if tf.equal(tf.size(y_true), 0) or tf.equal(tf.size(y_pred), 0):
       warnings.warn("y_true and y_pred tensors are not the same size.")
       return np.nan
