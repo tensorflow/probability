@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -158,9 +159,16 @@ class Poisson(distribution.Distribution):
 
   """
 
+  @deprecation.deprecated_args(
+      '2021-02-01',
+      ('The `interpolate_nondiscrete` flag is deprecated; instead use '
+       '`force_probs_to_zero_outside_support` (with the opposite sense).'),
+      'interpolate_nondiscrete',
+      warn_once=True)
   def __init__(self,
                rate=None,
                log_rate=None,
+               force_probs_to_zero_outside_support=None,
                interpolate_nondiscrete=True,
                validate_args=False,
                allow_nan_stats=True,
@@ -172,12 +180,23 @@ class Poisson(distribution.Distribution):
         Must specify exactly one of `rate` and `log_rate`.
       log_rate: Floating point tensor, the log of the rate parameter.
         Must specify exactly one of `rate` and `log_rate`.
-      interpolate_nondiscrete: Python `bool`. When `False`,
-        `log_prob` returns `-inf` (and `prob` returns `0`) for non-integer
-        inputs. When `True`, `log_prob` evaluates the continuous function
-        `k * log_rate - lgamma(k+1) - rate`, which matches the Poisson pmf
-        at integer arguments `k` (note that this function is not itself
-        a normalized probability log-density).
+      force_probs_to_zero_outside_support: Python `bool`. When `True`, negative
+        and non-integer values are evaluated "strictly": `log_prob` returns
+        `-inf`, `prob` returns `0`, and `cdf` and `sf` correspond.  When
+        `False`, the implementation is free to save computation (and TF graph
+        size) by evaluating something that matches the Poisson pmf at integer
+        values `k` but produces an unrestricted result on other inputs.  In the
+        case of Poisson, the `log_prob` formula in this case happens to be the
+        continuous function `k * log_rate - lgamma(k+1) - rate`.  Note that this
+        function is not itself a normalized probability log-density.
+        Default value: `False`.
+      interpolate_nondiscrete: Deprecated.  Use
+        `force_probs_to_zero_outside_support` (with the opposite sense) instead.
+        Python `bool`. When `False`, `log_prob` returns `-inf` (and `prob`
+        returns `0`) for non-integer inputs. When `True`, `log_prob` evaluates
+        the continuous function `k * log_rate - lgamma(k+1) - rate`, which
+        matches the Poisson pmf at integer arguments `k` (note that this
+        function is not itself a normalized probability log-density).
         Default value: `True`.
       validate_args: Python `bool`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -210,6 +229,18 @@ class Poisson(distribution.Distribution):
           log_rate, name='log_rate', dtype=dtype)
 
       self._interpolate_nondiscrete = interpolate_nondiscrete
+      if force_probs_to_zero_outside_support is not None:
+        # `force_probs_to_zero_outside_support` was explicitly set, so it
+        # controls.
+        self._force_probs_to_zero_outside_support = (
+            force_probs_to_zero_outside_support)
+      elif not self._interpolate_nondiscrete:
+        # `interpolate_nondiscrete` was explicitly set by the caller, so it
+        # should control until it is removed.
+        self._force_probs_to_zero_outside_support = True
+      else:
+        # Default.
+        self._force_probs_to_zero_outside_support = False
       super(Poisson, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -240,9 +271,19 @@ class Poisson(distribution.Distribution):
     return self._log_rate
 
   @property
+  @deprecation.deprecated(
+      '2021-02-01',
+      ('The `interpolate_nondiscrete` property is deprecated; instead use '
+       '`force_probs_to_zero_outside_support` (with the opposite sense).'),
+      warn_once=True)
   def interpolate_nondiscrete(self):
     """Interpolate (log) probs on non-integer inputs."""
     return self._interpolate_nondiscrete
+
+  @property
+  def force_probs_to_zero_outside_support(self):
+    """Return 0 probabilities on non-integer inputs."""
+    return self._force_probs_to_zero_outside_support
 
   def _batch_shape_tensor(self):
     x = self._rate if self._log_rate is None else self._log_rate
@@ -262,7 +303,7 @@ class Poisson(distribution.Distribution):
     log_rate = self._log_rate_parameter_no_checks()
     log_probs = (self._log_unnormalized_prob(x, log_rate) -
                  self._log_normalization(log_rate))
-    if not self.interpolate_nondiscrete:
+    if self.force_probs_to_zero_outside_support:
       # Ensure the gradient wrt `rate` is zero at non-integer points.
       log_probs = tf.where(
           tf.math.is_inf(log_probs),
@@ -278,7 +319,8 @@ class Poisson(distribution.Distribution):
     # For fractional x, the CDF is equal to the CDF at n = floor(x).
     # For negative x, the CDF is zero, but tf.igammac gives NaNs, so we impute
     # the values and handle this case explicitly.
-    safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
+    safe_x = tf.maximum(
+        tf.floor(x) if self.force_probs_to_zero_outside_support else x, 0.)
     cdf = tf.math.igammac(1. + safe_x, self._rate_parameter_no_checks())
     return tf.where(x < 0., tf.zeros_like(cdf), cdf)
 
@@ -288,7 +330,8 @@ class Poisson(distribution.Distribution):
   def _log_unnormalized_prob(self, x, log_rate):
     # The log-probability at negative points is always -inf.
     # Catch such x's and set the output value accordingly.
-    safe_x = tf.maximum(x if self.interpolate_nondiscrete else tf.floor(x), 0.)
+    safe_x = tf.maximum(
+        tf.floor(x) if self.force_probs_to_zero_outside_support else x, 0.)
     y = tf.math.multiply_no_nan(log_rate, safe_x) - tf.math.lgamma(1. + safe_x)
     return tf.where(
         tf.equal(x, safe_x), y, dtype_util.as_numpy_dtype(y.dtype)(-np.inf))
