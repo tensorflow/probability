@@ -274,8 +274,7 @@ class DistributionTensorConversionTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class MemoryLeakTest(test_util.TestCase):
 
-  # TODO(b/171812768): Investigate failure caused by Keras tracking tf.Modules.
-  def DISABLED_testTypeObjectLeakage(self):
+  def testTypeObjectLeakage(self):
     if not tf.executing_eagerly():
       self.skipTest('only relevant to eager')
 
