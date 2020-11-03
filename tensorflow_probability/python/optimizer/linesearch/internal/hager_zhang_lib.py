@@ -814,7 +814,7 @@ def _satisfies_wolfe(val_0,
       Wolfe or approximate Wolfe conditions are satisfied.
   """
   exact_wolfe_suff_dec = (sufficient_decrease_param * val_0.df >=
-                          (val_c.f - val_0.f) / val_c.x)
+                          tf.math.divide_no_nan(val_c.f - val_0.f, val_c.x))
   wolfe_curvature = val_c.df >= curvature_param * val_0.df
   exact_wolfe = exact_wolfe_suff_dec & wolfe_curvature
   approx_wolfe_applies = val_c.f <= f_lim
@@ -848,4 +848,5 @@ def _secant(val_a, val_b):
     approx_minimum: A scalar real `Tensor`. An approximation to the point
       at which the derivative vanishes.
   """
-  return (val_a.x * val_b.df - val_b.x * val_a.df) / (val_b.df - val_a.df)
+  return tf.math.divide_no_nan(val_a.x * val_b.df - val_b.x * val_a.df,
+                               val_b.df - val_a.df)
