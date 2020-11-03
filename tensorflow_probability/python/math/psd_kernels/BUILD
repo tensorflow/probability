@@ -139,10 +139,11 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "matern_test",
-    size = "small",
+    size = "medium",
     srcs = ["matern_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
+    shard_count = 2,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
