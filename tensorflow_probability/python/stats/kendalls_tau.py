@@ -133,7 +133,6 @@ def kendalls_tau(y_true, y_pred, name=None):
     subperm = tf.argsort(tf.gather(y_pred, perm[left:n]))
     lexi.scatter(tf.range(left, n), tf.gather(sub, subperm))
 
-    # This code follows roughly along with scipy/stats/stats.py v. 0.15.1
     # compute joint ties
     first = 0
     t = 0
