@@ -30,11 +30,12 @@ class KendallsTauTest(test_util.TestCase):
     values = [7, 3, 9, 0, -6, 12, 54, 3, -6, 88, 1412]
     array = tf.constant(values, tf.int32)
     iperm = tf.range(len(values), dtype=tf.int32)
-    exchanges, perm = tfp.stats.iterative_mergesort(array, iperm)
-    self.assertEquals(exchanges, 100)
-    self.assertEquals(array[perm], sorted(array))
-    ordered, _ = tfp.stats.iterative_mergesort(array, perm)
-    self.assertEquals(ordered, 0)
+    exchanges, perm = tfp.stats.iterative_mergesort(
+        array, iperm, dtype=tf.int32)
+    self.assertEqual(exchanges, 19)
+    self.assertEqual([array[i] for i in perm], sorted(array))
+    ordered, _ = tfp.stats.iterative_mergesort(array, perm, dtype=tf.int32)
+    self.assertEqual(ordered, 0)
 
   def test_kendall_tau(self):
     x1 = [12, 2, 1, 12, 2]

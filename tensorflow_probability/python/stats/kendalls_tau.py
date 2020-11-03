@@ -29,12 +29,14 @@ __all__ = [
 ]
 
 
-def iterative_mergesort(y, aperm, name=None):
+def iterative_mergesort(y, iperm, dtype=None, name=None):
   """Non-recusive mergesort that counts exchanges.
 
   Args:
     y: values to be sorted.
-    aperm: original ordering.
+    iperm: original ordering.
+    name: The name scope if different from 'iterative_mergesort'.
+    dtype: The type of values in y.
 
   Returns:
     A tuple consisting of a int32 scalar that counts the number of
@@ -42,8 +44,12 @@ def iterative_mergesort(y, aperm, name=None):
     Tensor that contains the ordering of y values that are sorted.
   """
   with tf.name_scope(name or 'iterative_mergesort'):
-    y = tf.convert_to_tensor(y, name='y', dtype=tf.int32)
-    aperm = tf.convert_to_tensor(aperm, name='aperm', dtype=tf.int32)
+    y = tf.convert_to_tensor(y, name='y', dtype=dtype)
+    iperm = tf.convert_to_tensor(iperm, name='iperm', dtype=tf.int32)
+    n = tf.shape(iperm)[0]
+    aperm = tf.TensorArray(tf.int32, size=n)
+    for i in tf.range(n):
+      aperm = aperm.write(i, iperm[i])
     exchanges = 0
     num = tf.size(y)
     k = 1
@@ -87,6 +93,7 @@ def kendalls_tau(y_true, y_pred, name=None):
   Args:
     y_true: A tensor that provides a true ordinal ranking of N items.
     y_pred: A presumably model provided ordering of the same N items:
+    name: the name scope if different from 'kendalls_tau'.
 
   Returns:
     Kendell's Tau, the 1945 tau-b formulation that ignores ordering of
@@ -100,12 +107,12 @@ def kendalls_tau(y_true, y_pred, name=None):
     y_pred = tf.reshape(y_pred, [-1])
     tensorshape_util.assert_is_compatible_with(y_true.shape, y_pred.shape)
     if tf.equal(tf.size(y_true), 0) or tf.equal(tf.size(y_pred), 0):
-      warnings.warn("y_true and y_pred tensors are not the same size.")
+      warnings.warn('y_true and y_pred tensors are not the same size.')
       return np.nan
     perm = tf.argsort(y_true)
     n = tf.shape(perm)[0]
     if tf.less(n, 2):
-      warnings.warn("Scalar tensors have no defined ordering.")
+      warnings.warn('Scalar tensors have no defined ordering.')
       return np.nan
 
     left = 0
@@ -151,7 +158,8 @@ def kendalls_tau(y_true, y_pred, name=None):
     u += ((n - first) * (n - first - 1)) // 2
 
     # count exchanges
-    exchanges, newperm = iterative_mergesort(y_pred, lexi)
+    exchanges, newperm = iterative_mergesort(
+        y_pred, lexi.stack(), dtype=in_type)
     # compute ties in y_pred after mergesort with counting
     first = 0
     v = 0
@@ -168,15 +176,15 @@ def kendalls_tau(y_true, y_pred, name=None):
 
     # Prevent overflow; equal to np.sqrt((tot - u) * (tot - v))
     denom = tf.math.exp(
-      0.5
-      * (
-        tf.math.log(tf.cast(tot - u, tf.float32))
-        + tf.math.log(tf.cast(tot - v, tf.float32))
-      )
+        0.5
+        * (
+            tf.math.log(tf.cast(tot - u, tf.float32))
+            + tf.math.log(tf.cast(tot - v, tf.float32))
+        )
     )
     tau = (
-      tf.cast(tot - (v + u - t), tf.float32) - 2.0 * tf.cast(exchanges,
-                                                             tf.float32)
+        tf.cast(tot - (v + u - t), tf.float32) - 2.0 * tf.cast(exchanges,
+                                                               tf.float32)
     ) / denom
 
     return tau
