@@ -133,7 +133,12 @@ def kendalls_tau(y_true, y_pred, name=None):
     subperm = tf.argsort(tf.gather(y_pred, perm[left:n]))
     lexi.scatter(tf.range(left, n), tf.gather(sub, subperm))
 
-    # compute joint ties
+    # See A Computer Method for Calculating Kendall's Tau with Ungrouped Data
+    # by William Night, Journal of the American Statistical Association,
+    # Jun., 1966, Vol. 61, No. 314, Part 1 (Jun., 1966), pp. 436-439
+    # for notation https://www.jstor.org/stable/2282833
+
+    # Joinly tied pairs.
     first = 0
     t = 0
     for i in tf.range(1, n):
@@ -146,44 +151,37 @@ def kendalls_tau(y_true, y_pred, name=None):
         first = i
     t += ((n - first) * (n - first - 1)) // 2
 
-    # compute ties in y_true
-    first = 0
-    u = 0
-    for i in tf.range(1, n):
-      y_truefirsti = tf.gather(y_true, lexi.gather([first, i]))
-      if y_truefirsti[0] != y_truefirsti[1]:
-        u += ((i - first) * (i - first - 1)) // 2
-        first = i
-    u += ((n - first) * (n - first - 1)) // 2
-
-    # count exchanges
-    exchanges, newperm = iterative_mergesort(
-        y_pred, lexi.stack(), dtype=in_type)
-    # compute ties in y_pred after mergesort with counting
+    # Ties in y_true.
     first = 0
     v = 0
     for i in tf.range(1, n):
-      y_predfirsti = tf.gather(y_pred, tf.gather(newperm, [first, i]))
-      if y_predfirsti[0] != y_predfirsti[1]:
+      y_truefirsti = tf.gather(y_true, lexi.gather([first, i]))
+      if y_truefirsti[0] != y_truefirsti[1]:
         v += ((i - first) * (i - first - 1)) // 2
         first = i
     v += ((n - first) * (n - first - 1)) // 2
 
-    tot = (n * (n - 1)) // 2
-    if tf.equal(tot, u) or tf.equal(tot, v):
+    # count exchanges
+    exchanges, newperm = iterative_mergesort(
+        y_pred, lexi.stack(), dtype=in_type)
+
+    # Ties in in y_pred.
+    first = 0
+    u = 0
+    for i in tf.range(1, n):
+      y_predfirsti = tf.gather(y_pred, tf.gather(newperm, [first, i]))
+      if y_predfirsti[0] != y_predfirsti[1]:
+        u += ((i - first) * (i - first - 1)) // 2
+        first = i
+    u += ((n - first) * (n - first - 1)) // 2
+
+    n0 = (n * (n - 1)) // 2
+    if tf.equal(n0, v) or tf.equal(n0, u):
       return np.nan  # Special case for all ties in both ranks
 
-    # Prevent overflow; equal to np.sqrt((tot - u) * (tot - v))
-    denom = tf.math.exp(
-        0.5
-        * (
-            tf.math.log(tf.cast(tot - u, tf.float32))
-            + tf.math.log(tf.cast(tot - v, tf.float32))
-        )
-    )
-    tau = (
-        tf.cast(tot - (v + u - t), tf.float32) - 2.0 * tf.cast(exchanges,
-                                                               tf.float32)
-    ) / denom
+    tau_b = (tf.cast(n0 - (u + v - t), tf.float32) - 2.0 * tf.cast(
+        exchanges, tf.float32)) / tf.math.exp( 0.5 * (
+            tf.math.log(tf.cast(n0 - v, tf.float32))
+            + tf.math.log(tf.cast(n0 - u, tf.float32))))
 
-    return tau
+    return tau_b
