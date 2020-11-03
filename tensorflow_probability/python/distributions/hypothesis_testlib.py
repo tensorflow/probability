@@ -310,10 +310,12 @@ CONSTRAINTS = {
         lambda x: tfb.Ascending().forward(10 * tf.math.tanh(x)),
     'log_rate':
         lambda x: tf.maximum(x, -16.),
+    # Capping log_rate1 and log_rate2 to 15. This is because if both are large
+    # (meaning the rates are `inf`), then the Skellam distribution is undefined.
     'log_rate1':
-        lambda x: tf.maximum(x, -16.),
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
     'log_rate2':
-        lambda x: tf.maximum(x, -16.),
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
     'log_scale':
         lambda x: tf.maximum(x, -16.),
     'mixing_concentration':
