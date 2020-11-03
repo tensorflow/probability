@@ -14,6 +14,7 @@
 # ============================================================================
 # Lint as: python3
 """Module for probabilistic programming features."""
+from oryx.core.ppl.transformations import block
 from oryx.core.ppl.transformations import conditional
 from oryx.core.ppl.transformations import graph_replace
 from oryx.core.ppl.transformations import intervene

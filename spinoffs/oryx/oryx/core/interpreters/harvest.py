@@ -120,6 +120,7 @@ reap(f, tag='intermediate')(1.)  # ==> {'y': 2.}
 reap(f, tag='intermediate')(5.)  # ==> {'y': 6.}
 ```
 """
+import enum
 from typing import Any, Callable, Dict, Iterable, List, FrozenSet, Tuple, Union
 
 import dataclasses
@@ -159,12 +160,18 @@ safe_map = jax_util.safe_map
 safe_zip = jax_util.safe_zip
 
 
+class HarvestMode(enum.Enum):
+  REAP_PLANT = 'reap_plant'
+  PLANT_ONLY = 'plant_only'
+
+
 @dataclasses.dataclass(frozen=True)
 class HarvestSettings:
   """Contains the settings for a HarvestTrace."""
   tag: str
   blocklist: FrozenSet[str]
   allowlist: Union[FrozenSet[str], None]
+  mode: HarvestMode
 
 
 @dataclasses.dataclass
@@ -188,8 +195,9 @@ class HarvestContext:
       return values
     if name in self.plants:
       return self.handle_plant(values, name=name, mode=mode, tree=tree)
-    else:
+    elif self.settings.mode is not HarvestMode.PLANT_ONLY:
       return self.handle_reap(values, name=name, mode=mode, tree=tree)
+    return sow_p.bind(*values, name=name, tag=tag, mode=mode, tree=tree)
 
   def handle_reap(self, values, *, name, mode, tree):
     """Stores values in the context."""
@@ -529,7 +537,8 @@ def harvest(f,
             *,
             tag: str,
             allowlist: Union[Iterable[str], None] = None,
-            blocklist: Iterable[str] = frozenset()):
+            blocklist: Iterable[str] = frozenset(),
+            mode='reap_plant'):
   """Transforms a function into a "functionalized" version.
 
   Sown values are namespaced using string "tags", where a value is sown (using
@@ -556,6 +565,9 @@ def harvest(f,
       other names will be ignored.
     blocklist: an iterable of strings of names that will be ignored while
       planting/reaping.
+    mode: `str`, either `'reap_plant'` (the default) or `'plant_only'`. In
+      `'plant_only'` mode, `harvest` will keep `sow`s in the function that were
+      not `plant`-ed.
 
   Returns:
     A function that takes in an additional initial input (a dictionary mapping
@@ -565,7 +577,7 @@ def harvest(f,
   blocklist = frozenset(blocklist)
   if allowlist is not None:
     allowlist = frozenset(allowlist)
-  settings = HarvestSettings(tag, blocklist, allowlist)
+  settings = HarvestSettings(tag, blocklist, allowlist, HarvestMode(mode))
 
   def wrapped(plants, *args, **kwargs):
     fun = lu.wrap_init(f, kwargs)
@@ -717,7 +729,8 @@ def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       jaxpr_fun,
       tag=settings.tag,
       allowlist=settings.allowlist,
-      blocklist=settings.blocklist)
+      blocklist=settings.blocklist,
+      mode=settings.mode)
 
   def body(carry, x):
     x_plants, x_vals = x

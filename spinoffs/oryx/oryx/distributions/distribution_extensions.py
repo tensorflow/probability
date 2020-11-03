@@ -20,6 +20,7 @@ from jax import tree_util
 from jax import util as jax_util
 from oryx.core import ppl
 from oryx.core import primitive
+from oryx.core.interpreters import harvest
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters import log_prob
 from oryx.core.interpreters import unzip
@@ -64,13 +65,16 @@ def distribution_random_variable(dist: tfd.Distribution, *,
                                  name: Optional[str] = None):
   """Converts a distribution into a sampling function."""
   def wrapped(key):
-    result = primitive.initial_style_bind(
-        random_variable_p,
-        distribution_name=dist.__class__.__name__)(_sample_distribution)(
-            key, dist)
+    def sample(key):
+      result = primitive.initial_style_bind(
+          random_variable_p,
+          distribution_name=dist.__class__.__name__)(_sample_distribution)(
+              key, dist)
+      return result
     if name is not None:
-      result = ppl.random_variable(result, name=name)
-    return result
+      return ppl.random_variable(
+          harvest.nest(sample, scope=name)(key), name=name)
+    return sample(key)
   return wrapped
 
 
