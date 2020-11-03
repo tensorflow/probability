@@ -2558,7 +2558,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["hidden_markov_model_test.py"],
     jax_tags = ["flaky"],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
