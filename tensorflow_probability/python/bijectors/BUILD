@@ -39,6 +39,7 @@ multi_substrate_py_library(
         ":batch_normalization",
         ":discrete_cosine_transform",
         ":ffjord",
+        ":glow",
     ],
     deps = [
         ":absolute_value",
@@ -64,6 +65,7 @@ multi_substrate_py_library(
         ":frechet_cdf",
         ":generalized_pareto",
         ":gev_cdf",
+        ":glow",
         ":gompertz_cdf",
         ":gumbel_cdf",
         ":identity",
@@ -448,6 +450,27 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+py_library(
+    name = "glow",
+    srcs = ["glow.py"],
+    deps = [
+        ":bijector",
+        ":blockwise",
+        ":chain",
+        ":identity",
+        ":invert",
+        ":real_nvp",
+        ":reshape",
+        ":scale",
+        ":scale_matvec_lu",
+        ":shift",
+        ":tanh",
+        ":transpose",
+        # tensorflow dep,
+        "//tensorflow_probability/python/util",
     ],
 )
 
@@ -1088,6 +1111,21 @@ multi_substrate_py_test(
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "glow_test",
+    size = "medium",
+    srcs = ["glow_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":bijector_test_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
