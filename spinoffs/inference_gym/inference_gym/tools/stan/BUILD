@@ -98,6 +98,16 @@ py_library(
 )
 
 py_library(
+    name = "radon_contextual_effects_halfnormal",
+    srcs = ["radon_contextual_effects_halfnormal.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+    ],
+)
+
+py_library(
     name = "stan_model",
     srcs = ["stan_model.py"],
     srcs_version = "PY3",

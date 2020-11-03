@@ -24,6 +24,7 @@ from inference_gym.tools.stan import logistic_regression
 from inference_gym.tools.stan import lorenz_system
 from inference_gym.tools.stan import probit_regression
 from inference_gym.tools.stan import radon_contextual_effects
+from inference_gym.tools.stan import radon_contextual_effects_halfnormal
 from inference_gym.tools.stan import sparse_logistic_regression
 from inference_gym.tools.stan import stochastic_volatility
 
@@ -37,6 +38,7 @@ __all__ = [
     'german_credit_numeric_probit_regression',
     'german_credit_numeric_sparse_logistic_regression',
     'radon_contextual_effects_minnesota',
+    'radon_contextual_effects_minnesota_halfnormal',
     'stochastic_volatility_sp500',
     'stochastic_volatility_sp500_small',
     'synthetic_item_response_theory',
@@ -140,6 +142,19 @@ def radon_contextual_effects_minnesota():
     if key.startswith('test_'):
       del dataset[key]
   return radon_contextual_effects.radon_contextual_effects(**dataset)
+
+
+def radon_contextual_effects_minnesota_halfnormal():
+  """Hierarchical radon model with contextual effects, with data from Minnesota.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.radon(state='MN')
+  for key in list(dataset.keys()):
+    if key.startswith('test_'):
+      del dataset[key]
+  return radon_contextual_effects_halfnormal.radon_contextual_effects(**dataset)
 
 
 def stochastic_volatility_sp500():

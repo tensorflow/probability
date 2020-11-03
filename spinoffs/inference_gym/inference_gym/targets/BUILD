@@ -410,6 +410,7 @@ py_library(
         ":model",
         "//inference_gym/internal:data",
         "//inference_gym/targets/ground_truth:radon_contextual_effects_minnesota",
+        "//inference_gym/targets/ground_truth:radon_contextual_effects_minnesota_halfnormal",
     ],
 )
 

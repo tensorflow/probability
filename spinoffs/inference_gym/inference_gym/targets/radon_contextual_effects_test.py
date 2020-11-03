@@ -45,19 +45,18 @@ def _test_dataset(train_size, test_size=None, num_counties=3):
       )
 
 
-@test_util.multi_backend_test(globals(),
-                              'targets.radon_contextual_effects_test')
-class RadonContextualEffectsTest(test_util.InferenceGymTestCase):
+class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
 
   @parameterized.named_parameters(
       ('NoTest', None),
       ('WithTest', 5),
-      )
+  )
   def testBasic(self, test_size):
     """Checks that unconstrained parameters yield finite joint densities."""
     num_counties = 3
     train_size = 20
     model = radon_contextual_effects.RadonContextualEffects(
+        prior_scale=self.prior_scale,
         **_test_dataset(train_size, test_size, num_counties))
     self.validate_log_prob_and_transforms(
         model,
@@ -85,8 +84,8 @@ class RadonContextualEffectsTest(test_util.InferenceGymTestCase):
     self.validate_deferred_materialization(
         functools.partial(
             radon_contextual_effects.RadonContextualEffects,
-            num_counties=num_counties),
-        **kwargs)
+            prior_scale=self.prior_scale,
+            num_counties=num_counties), **kwargs)
 
   def testPartiallySpecifiedTestSet(self):
     """Check that partially specified test set raises an error."""
@@ -96,7 +95,8 @@ class RadonContextualEffectsTest(test_util.InferenceGymTestCase):
         train_size=20, test_size=test_size, num_counties=num_counties)
     del dataset['test_county']
     with self.assertRaisesRegex(ValueError, 'all be specified'):
-      radon_contextual_effects.RadonContextualEffects(**dataset)
+      radon_contextual_effects.RadonContextualEffects(
+          prior_scale=self.prior_scale, **dataset)
 
   @parameterized.named_parameters(
       ('NoTest', None),
@@ -107,8 +107,10 @@ class RadonContextualEffectsTest(test_util.InferenceGymTestCase):
     train_size = 30
     num_counties = 3
     model = radon_contextual_effects.RadonContextualEffects(
+        prior_scale=self.prior_scale,
         **_test_dataset(train_size, test_size, num_counties))
     model2 = radon_contextual_effects.RadonContextualEffects(
+        prior_scale=self.prior_scale,
         **model._sample_dataset(tfp_test_util.test_seed()))
     self.validate_log_prob_and_transforms(
         model2,
@@ -131,7 +133,7 @@ class RadonContextualEffectsTest(test_util.InferenceGymTestCase):
     transformations.
     """
     num_counties = 85
-    model = radon_contextual_effects.RadonContextualEffectsMinnesota()
+    model = self.build_model()
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -153,15 +155,38 @@ class RadonContextualEffectsTest(test_util.InferenceGymTestCase):
   @tfp_test_util.numpy_disable_gradient_test
   def testRadonHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    model = radon_contextual_effects.RadonContextualEffectsMinnesota()
+    model = self.build_model()
     self.validate_ground_truth_using_hmc(
         model,
         num_chains=4,
         num_steps=4000,
         num_leapfrog_steps=15,
         step_size=0.03,
-        dtype=tf.float64
-    )
+        dtype=tf.float64)
+
+
+@test_util.multi_backend_test(globals(),
+                              'targets.radon_contextual_effects_test')
+class RadonContextualEffectsTest(_RadonContextualEffectsTest):
+  prior_scale = 'uniform'
+  build_model = radon_contextual_effects.RadonContextualEffectsMinnesota
+
+  def testInvalidPriorScaleRaises(self):
+    with self.assertRaisesRegex(ValueError, 'not a valid value'):
+      radon_contextual_effects.RadonContextualEffects(
+          prior_scale='invalid_input',
+          **_test_dataset(train_size=20))
+
+
+@test_util.multi_backend_test(globals(),
+                              'targets.radon_contextual_effects_test')
+class RadonContextualEffectsHalfNormalTest(_RadonContextualEffectsTest):
+  prior_scale = 'halfnormal'
+  build_model = radon_contextual_effects.RadonContextualEffectsHalfNormalMinnesota
+
+
+del _RadonContextualEffectsTest
+
 
 if __name__ == '__main__':
   tf.test.main()

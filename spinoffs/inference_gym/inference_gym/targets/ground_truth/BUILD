@@ -155,3 +155,13 @@ py_library(
         # numpy dep,
     ],
 )
+
+# pytype_strict
+py_library(
+    name = "radon_contextual_effects_minnesota_halfnormal",
+    srcs = ["radon_contextual_effects_minnesota_halfnormal.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
