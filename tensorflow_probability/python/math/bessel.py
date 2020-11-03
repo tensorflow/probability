@@ -743,19 +743,19 @@ def _temme_expansion(v, x):
 def bessel_ive(v, z, name=None):
   """Computes exponentially scaled modified Bessel function of the first kind.
 
-  This function computes `Ive` which is an exponentially scaled version
+  This function computes `Ive`, which is an exponentially scaled version
   of the modified Bessel function of the first kind.
 
-  `Ive(v, z) = Ive(v, z) * exp(-abs(z))`
+  `Ive(v, z) = Iv(v, z) * exp(-abs(z))`
 
   Warning: Gradients with respect to the first parameter `v` are currently not
   defined.
 
   Args:
-    v: Floating-point `Tensor` broadcastable with `x` for which `Ive(v, x)`
+    v: Floating-point `Tensor` broadcastable with `z` for which `Ive(v, z)`
       should be computed. `v` is expected to be non-negative.
-    z: Floating-point `Tensor` broadcastable with `v` for which `Ive(v, x)`
-      should be computed. If `x` is negative, `v` is expected to be an integer.
+    z: Floating-point `Tensor` broadcastable with `v` for which `Ive(v, z)`
+      should be computed. If `z` is negative, `v` is expected to be an integer.
     name: A name for the operation (optional).
       Default value: `None` (i.e., 'bessel_ive').
 
@@ -840,7 +840,7 @@ def bessel_kve(v, z, name=None):
   This function computes `Kve` which is an exponentially scaled version
   of the modified Bessel function of the first kind.
 
-  `Kve(v, z) = Kve(v, z) * exp(abs(z))`
+  `Kve(v, z) = Kv(v, z) * exp(abs(z))`
 
   Warning: Gradients with respect to the first parameter `v` are currently not
   defined.
