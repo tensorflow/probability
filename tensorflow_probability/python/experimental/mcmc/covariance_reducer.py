@@ -38,7 +38,7 @@ __all__ = [
 
 
 CovarianceReducerState = collections.namedtuple(
-    'CovarianceReducerState', 'init_structure, cov_state')
+    'CovarianceReducerState', 'cov_state')
 
 
 def _get_sample(current_state, kernel_results):
@@ -180,13 +180,14 @@ class CovarianceReducer(reducer_base.Reducer):
           lambda fn: fn(initial_chain_state, initial_kernel_results),
           self.transform_fn,
       )
-      cov_streams = _prepare_args(
+      event_ndims = _canonicalize_event_ndims(
           initial_fn_result, self.event_ndims)
-      running_covariance_states = tf.nest.map_structure(
-          lambda strm: strm.initialize(),
-          cov_streams)
-      return CovarianceReducerState(
-          initial_fn_result, running_covariance_states)
+      def init(tensor, event_ndims):
+        return sample_stats.RunningCovariance.from_shape(
+            ps.shape(tensor), tensor.dtype, event_ndims)
+      running_covariances = tf.nest.map_structure(
+          init, initial_fn_result, event_ndims)
+      return CovarianceReducerState(running_covariances)
 
   def one_step(
       self,
@@ -225,8 +226,6 @@ class CovarianceReducer(reducer_base.Reducer):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'one_step')):
-      cov_streams = _prepare_args(
-          current_reducer_state.init_structure, self.event_ndims)
       new_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           new_chain_state)
@@ -239,17 +238,14 @@ class CovarianceReducer(reducer_base.Reducer):
       )
       if not nest.is_nested(axis):
         axis = nest_util.broadcast_structure(fn_results, axis)
-      running_cov_state = nest.map_structure_up_to(
-          current_reducer_state.init_structure,
-          lambda strm, *args: strm.update(*args),
-          cov_streams,
+      running_covariances = nest.map_structure(
+          lambda cov, *args: cov.update(*args),
           current_reducer_state.cov_state,
           fn_results,
           axis,
           check_types=False,
       )
-      return CovarianceReducerState(
-          current_reducer_state.init_structure, running_cov_state)
+      return CovarianceReducerState(running_covariances)
 
   def finalize(self, final_reducer_state):
     """Finalizes covariance calculation from the `final_reducer_state`.
@@ -264,13 +260,9 @@ class CovarianceReducer(reducer_base.Reducer):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'covariance_reducer', 'finalize')):
-      cov_streams = _prepare_args(
-          final_reducer_state.init_structure, self.event_ndims)
-      return nest.map_structure_up_to(
-          final_reducer_state.init_structure,
-          lambda strm, state: strm.finalize(state, ddof=self.ddof),
-          cov_streams, final_reducer_state.cov_state
-      )
+      def finalize(cov):
+        return cov.covariance(ddof=self.ddof)
+      return nest.map_structure(finalize, final_reducer_state.cov_state)
 
   @property
   def event_ndims(self):
@@ -313,41 +305,13 @@ class VarianceReducer(CovarianceReducer):
     )
 
 
-def _prepare_args(target, event_ndims):
-  """Creates a structure of `RunningCovariance`s based on inferred metadata.
-
-  Metadata required to create a `RunningCovariance` object (`shape`, `dtype`,
-  and `event_ndims` of incoming chain states) will be inferred from the
-  `target`. Using that information, an identical structure of
-  `RunningCovariance`s to `target` will be returned.
-
-  Args:
-    target: A (possibly nested) structure of `Tensor`s or Python
-      `list`s of `Tensor`s representing the current state(s) of the Markov
-      chain(s). It is used to infer the shape and dtype of future samples.
-    event_ndims: A (possibly nested) structure of integers. Defines
-        the number of inner-most dimensions that represent the event shape.
-        Must be either a singleton or of the same shape as `target`.
-
-  Returns:
-    cov_streams: Structure of `sample_stats.RunningCovariance` matching
-      the shape of `target`.
-  """
-
-  shape = tf.nest.map_structure(
-      lambda target: target.shape,
-      target)
-  dtype = tf.nest.map_structure(
-      lambda target: target.dtype,
-      target)
-  if event_ndims is None:
-    event_ndims = tf.nest.map_structure(
-        ps.rank, target)
-  elif not nest.is_nested(event_ndims):
-    event_ndims = nest_util.broadcast_structure(
-        target, event_ndims)
-  return nest.map_structure_up_to(
-      target,
-      sample_stats.RunningCovariance,
-      shape, event_ndims, dtype,
-      check_types=False,)
+def _canonicalize_event_ndims(target, event_ndims):
+  """Returns `event_ndims` shaped parallel to `target`, repeating as needed."""
+  # This is only here to support the possibility of different event_ndims across
+  # different Tensors in the target structure.  Otherwise, event_ndims could
+  # just be an integer (or None) and wouldn't need to be canonicalized to a
+  # structure.
+  if not nest.is_nested(event_ndims):
+    return nest_util.broadcast_structure(target, event_ndims)
+  else:
+    return event_ndims

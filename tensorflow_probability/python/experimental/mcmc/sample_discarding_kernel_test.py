@@ -146,18 +146,14 @@ class SampleDiscardingTest(test_util.TestCase):
     for _ in range(2):
       current_state, kernel_results = reducer_kernel.one_step(
           current_state, kernel_results)
-    current_state, kernel_results, cov = self.evaluate([
-        current_state,
-        kernel_results,
-        cov_reducer.finalize(kernel_results.streaming_calculations),
-    ])
-    self.assertEqual(16, current_state)
-    self.assertEqual(2, kernel_results.inner_results.call_counter)
-    self.assertEqual(
+    cov = cov_reducer.finalize(kernel_results.streaming_calculations)
+    self.assertAllEqual(16, current_state)
+    self.assertAllEqual(2, kernel_results.inner_results.call_counter)
+    self.assertAllEqual(
         16, kernel_results.inner_results.inner_results.counter_1)
-    self.assertEqual(
+    self.assertAllEqual(
         32, kernel_results.inner_results.inner_results.counter_2)
-    self.assertEqual(np.var([13, 16]), cov)
+    self.assertAllEqual(np.var([13, 16]), cov)
 
   def test_tf_while(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()

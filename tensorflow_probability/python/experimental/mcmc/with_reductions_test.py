@@ -185,17 +185,16 @@ class CovarianceWithReductionsTest(test_util.TestCase):
       chain_state, kernel_results = reducer_kernel.one_step(
           chain_state, kernel_results)
 
-    kernel_results, final_cov = self.evaluate([
-        kernel_results,
-        cov_reducer.finalize(
-            kernel_results.streaming_calculations)])
-    self.assertEqual(3.5, kernel_results.streaming_calculations.cov_state.mean)
+    final_cov = self.evaluate(
+        cov_reducer.finalize(kernel_results.streaming_calculations))
+    self.assertAllEqual(
+        3.5, kernel_results.streaming_calculations.cov_state.mean)
     self.assertNear(
         np.cov(np.arange(1, 7), ddof=ddof).tolist(),
         final_cov,
         err=1e-6)
-    self.assertEqual(6, kernel_results.inner_results.counter_1)
-    self.assertEqual(12, kernel_results.inner_results.counter_2)
+    self.assertAllEqual(6, kernel_results.inner_results.counter_1)
+    self.assertAllEqual(12, kernel_results.inner_results.counter_2)
 
   def test_covariance_with_batching(self):
     fake_kernel = test_fixtures.TestTransitionKernel((9, 3))
@@ -209,10 +208,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     for _ in range(6):
       state, kernel_results = reducer_kernel.one_step(
           state, kernel_results)
-    kernel_results, final_cov = self.evaluate([
-        kernel_results,
-        cov_reducer.finalize(kernel_results.streaming_calculations)
-    ])
+    final_cov = cov_reducer.finalize(kernel_results.streaming_calculations)
     self.assertEqual(
         (9, 3), kernel_results.streaming_calculations.cov_state.mean.shape)
     self.assertEqual((9, 3, 3), final_cov.shape)
@@ -231,17 +227,16 @@ class CovarianceWithReductionsTest(test_util.TestCase):
       chain_state, kernel_results = reducer_kernel.one_step(
           chain_state, kernel_results)
 
-    kernel_results, final_var = self.evaluate([
-        kernel_results,
-        reducer.finalize(
-            kernel_results.streaming_calculations)])
-    self.assertEqual(3.5, kernel_results.streaming_calculations.cov_state.mean)
+    final_var = self.evaluate(
+        reducer.finalize(kernel_results.streaming_calculations))
+    self.assertAllEqual(
+        3.5, kernel_results.streaming_calculations.cov_state.mean)
     self.assertNear(
         np.var(np.arange(1, 7), ddof=ddof).tolist(),
         final_var,
         err=1e-6)
-    self.assertEqual(6, kernel_results.inner_results.counter_1)
-    self.assertEqual(12, kernel_results.inner_results.counter_2)
+    self.assertAllEqual(6, kernel_results.inner_results.counter_1)
+    self.assertAllEqual(12, kernel_results.inner_results.counter_2)
 
   def test_multivariate_normal_covariance_with_sample_chain(self):
     mu = [1, 2, 3]
@@ -267,19 +262,15 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         kernel=reducer_kernel,
         trace_fn=None,
         return_final_kernel_results=True,
-        seed=test_util.test_seed()
+        seed=test_util.test_seed(sampler_type='stateless')
     )
-    samples, kernel_results, final_cov = self.evaluate([
+    samples, mean, final_cov = self.evaluate([
         samples,
-        kernel_results,
+        kernel_results.streaming_calculations.cov_state.mean,
         cov_reducer.finalize(kernel_results.streaming_calculations)
     ])
-    self.assertAllClose(
-        np.mean(samples, axis=0),
-        kernel_results.streaming_calculations.cov_state.mean,
-        rtol=1e-6)
-    self.assertAllClose(
-        np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
+    self.assertAllClose(np.mean(samples, axis=0), mean, rtol=1e-6)
+    self.assertAllClose(np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
 
   def test_covariance_with_step_kernel(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
@@ -294,19 +285,17 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         kernel=reducer_kernel,
         return_final_kernel_results=True,
     )
-    chain_state, kernel_results, final_cov = self.evaluate([
-        chain_state,
-        kernel_results,
-        cov_reducer.finalize(kernel_results.streaming_calculations)
-    ])
-    self.assertEqual(6, chain_state)
-    self.assertEqual(3.5, kernel_results.streaming_calculations.cov_state.mean)
+    final_cov = self.evaluate(
+        cov_reducer.finalize(kernel_results.streaming_calculations))
+    self.assertAllEqual(6, chain_state)
+    self.assertAllEqual(
+        3.5, kernel_results.streaming_calculations.cov_state.mean)
     self.assertNear(
         np.cov(np.arange(1, 7), ddof=0).tolist(),
         final_cov,
         err=1e-6)
-    self.assertEqual(6, kernel_results.inner_results.counter_1)
-    self.assertEqual(12, kernel_results.inner_results.counter_2)
+    self.assertAllEqual(6, kernel_results.inner_results.counter_1)
+    self.assertAllEqual(12, kernel_results.inner_results.counter_2)
 
   def test_covariance_before_transformation(self):
     fake_kernel = test_fixtures.TestTransitionKernel(
@@ -327,9 +316,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         trace_fn=None,
         return_final_kernel_results=True,
         seed=test_util.test_seed())
-    samples, kernel_results, final_cov = self.evaluate([
+    samples, final_cov = self.evaluate([
         samples,
-        kernel_results,
         cov_reducer.finalize(
             kernel_results.inner_results.streaming_calculations)
     ])
@@ -359,9 +347,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         trace_fn=None,
         return_final_kernel_results=True,
         seed=test_util.test_seed())
-    samples, kernel_results, final_cov = self.evaluate([
+    samples, final_cov = self.evaluate([
         samples,
-        kernel_results,
         cov_reducer.finalize(
             kernel_results.streaming_calculations)
     ])
@@ -395,14 +382,14 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         trace_fn=None,
         return_final_kernel_results=True,
         seed=test_util.test_seed())
-    samples, kernel_results, final_cov = self.evaluate([
+    mean = kernel_results.inner_results.streaming_calculations.cov_state.mean
+    samples, mean, final_cov = self.evaluate([
         samples,
-        kernel_results,
+        mean,
         cov_reducer.finalize(
             kernel_results.inner_results.streaming_calculations)
     ])
 
-    mean = kernel_results.inner_results.streaming_calculations.cov_state.mean
     self.assertEqual((2,), mean.shape)
     self.assertAllClose(np.mean(samples, axis=0), mean, rtol=1e-6)
     self.assertEqual((2, 2), final_cov.shape)
@@ -424,8 +411,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
       chain_state, kernel_results = reducer_kernel.one_step(
           chain_state, kernel_results)
 
-    kernel_results, final_cov, final_mean = self.evaluate([
-        kernel_results,
+    final_cov, final_mean = self.evaluate([
         cov_reducer.finalize(
             kernel_results.streaming_calculations[0][1]),
         mean_reducer.finalize(
@@ -436,15 +422,15 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertEqual(1, len(kernel_results.streaming_calculations[1]))
 
     self.assertEqual(3.5, final_mean)
-    self.assertEqual(
+    self.assertAllEqual(
         3.5, kernel_results.streaming_calculations[0][1].cov_state.mean)
-    self.assertEqual(6, kernel_results.streaming_calculations[1][0])
+    self.assertAllEqual(6, kernel_results.streaming_calculations[1][0])
     self.assertNear(
         np.cov(np.arange(1, 7), ddof=0).tolist(),
         final_cov,
         err=1e-6)
-    self.assertEqual(6, kernel_results.inner_results.counter_1)
-    self.assertEqual(12, kernel_results.inner_results.counter_2)
+    self.assertAllEqual(6, kernel_results.inner_results.counter_1)
+    self.assertAllEqual(12, kernel_results.inner_results.counter_2)
 
 
 if __name__ == '__main__':

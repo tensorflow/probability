@@ -116,6 +116,7 @@ class CovarianceReducersTest(test_util.TestCase):
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     fake_kr = FakeKernelResults(0, FakeInnerResults(0))
     state = cov_reducer.initialize(tf.ones((2, 3)), fake_kr)
+    print(state)
     _, state = tf.while_loop(
         lambda i, _: i < 100,
         lambda i, s: (i + 1, cov_reducer.one_step(tf.ones((2, 3)), s, fake_kr)),

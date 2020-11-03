@@ -713,6 +713,7 @@ py_library(
 py_test(
     name = "potential_scale_reduction_reducer_test",
     size = "small",
+    timeout = "moderate",
     srcs = ["potential_scale_reduction_reducer_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
