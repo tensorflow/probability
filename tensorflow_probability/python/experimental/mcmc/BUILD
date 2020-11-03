@@ -42,6 +42,8 @@ multi_substrate_py_library(
         ":covariance_reducer",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
+        ":kernel_builder",
+        ":kernel_outputs",
         ":nuts_autobatching",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
@@ -59,6 +61,8 @@ multi_substrate_py_library(
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":gradient_based_trajectory_length_adaptation",
+        ":kernel_builder",
+        ":kernel_outputs",
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
@@ -76,6 +80,74 @@ multi_substrate_py_library(
         ":with_reductions",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+py_library(
+    name = "kernel_builder",
+    srcs = ["kernel_builder.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":kernel_outputs",
+        ":preconditioned_hmc",
+        ":progress_bar_reducer",
+        ":sample",
+        ":sample_discarding_kernel",
+        ":tracing_reducer",
+        ":with_reductions",
+        "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc:langevin",
+        "//tensorflow_probability/python/mcmc:nuts",
+        "//tensorflow_probability/python/mcmc:random_walk_metropolis",
+        "//tensorflow_probability/python/mcmc:replica_exchange_mc",
+        "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "kernel_builder_test",
+    size = "small",
+    srcs = ["kernel_builder_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":kernel_builder",
+        ":sample_discarding_kernel",
+        ":with_reductions",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc:nuts",
+        "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
+    ],
+)
+
+py_library(
+    name = "kernel_outputs",
+    srcs = ["kernel_outputs.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":tracing_reducer",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "kernel_outputs_test",
+    size = "small",
+    srcs = ["kernel_outputs_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":kernel_builder",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -658,10 +730,10 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/experimental:unnest",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:unnest",
         "//tensorflow_probability/python/math:gradient",
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",

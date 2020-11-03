@@ -21,8 +21,8 @@ from __future__ import print_function
 import collections
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental import unnest
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import unnest
 
 
 JAX_MODE = False

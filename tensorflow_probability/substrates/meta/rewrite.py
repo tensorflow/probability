@@ -86,7 +86,7 @@ INTERNALS = ('assert_util', 'batched_rejection_sampler', 'cache_util',
              'hypothesis_testlib', 'implementation_selection', 'monte_carlo',
              'name_util', 'nest_util', 'parameter_properties', 'prefer_static',
              'samplers', 'special_math', 'structural_tuple', 'tensor_util',
-             'tensorshape_util', 'test_combinations', 'test_util',
+             'tensorshape_util', 'test_combinations', 'test_util', 'unnest',
              'vectorization_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)

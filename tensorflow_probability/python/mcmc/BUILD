@@ -311,10 +311,10 @@ multi_substrate_py_library(
     deps = [
         ":kernel",
         # tensorflow dep,
-        "//tensorflow_probability/python/experimental:unnest",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:unnest",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -334,6 +334,7 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:unnest",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -523,11 +524,11 @@ multi_substrate_py_library(
         ":kernel",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/experimental:unnest",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:unnest",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal",
     ],

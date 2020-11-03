@@ -23,6 +23,7 @@ import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import unnest
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -367,7 +368,7 @@ class NeuTra(tfp.mcmc.TransitionKernel):
     """
 
     step_size = previous_kernel_results.new_step_size
-    previous_kernel_results = tfp.experimental.unnest.replace_innermost(
+    previous_kernel_results = unnest.replace_innermost(
         previous_kernel_results,
         num_leapfrog_steps=self._num_leapfrog_steps(step_size))
 

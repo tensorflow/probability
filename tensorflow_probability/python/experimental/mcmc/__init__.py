@@ -25,6 +25,8 @@ from tensorflow_probability.python.experimental.mcmc.expectations_reducer import
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import chees_criterion
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptation
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptationResults
+from tensorflow_probability.python.experimental.mcmc.kernel_builder import KernelBuilder
+from tensorflow_probability.python.experimental.mcmc.kernel_outputs import KernelOutputs
 from tensorflow_probability.python.experimental.mcmc.nuts_autobatching import NoUTurnSampler
 from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 from tensorflow_probability.python.experimental.mcmc.particle_filter import particle_filter
@@ -62,16 +64,6 @@ from tensorflow_probability.python.experimental.mcmc.with_reductions import With
 
 
 __all__ = [
-    'CovarianceReducer',
-    'EllipticalSliceSampler',
-    'ExpectationsReducer',
-    'NoUTurnSampler',
-    'PreconditionedHamiltonianMonteCarlo',
-    'ProgressBarReducer',
-    'SequentialMonteCarlo',
-    'SequentialMonteCarloResults',
-    'StateWithHistory',
-    'WeightedParticles',
     'augment_prior_with_state_history',
     'augment_with_observation_history',
     'augment_with_state_history',
@@ -86,12 +78,15 @@ __all__ = [
     'GradientBasedTrajectoryLengthAdaptation',
     'GradientBasedTrajectoryLengthAdaptationResults',
     'infer_trajectories',
+    'KernelBuilder',
+    'KernelOutputs',
     'make_rwmh_kernel_fn',
     'make_tqdm_progress_bar_fn',
     'NoUTurnSampler',
     'particle_filter',
     'PotentialScaleReductionReducer',
     'PreconditionedHamiltonianMonteCarlo',
+    'ProgressBarReducer',
     'reconstruct_trajectories',
     'Reducer',
     'resample_deterministic_minimum_error',

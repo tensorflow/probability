@@ -37,6 +37,7 @@ def get_nested_objs(obj,
                     fallback_attrs=(
                         'inner_results',
                         'accepted_results',
+                        '_inner_kernel',  # used by TransformedTransitionKernel
                         'inner_kernel',
                     )):
   """Finds the list of nested objects inside an object's attributes.

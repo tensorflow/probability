@@ -42,7 +42,6 @@ from tensorflow_probability.python.experimental import parallel_filter
 from tensorflow_probability.python.experimental import sequential
 from tensorflow_probability.python.experimental import stats
 from tensorflow_probability.python.experimental import substrates
-from tensorflow_probability.python.experimental import unnest
 from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental import vi
 from tensorflow_probability.python.experimental.composite_tensor import as_composite

@@ -560,6 +560,25 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "unnest",
+    srcs = ["unnest.py"],
+    srcs_version = "PY3",
+    deps = [],
+)
+
+multi_substrate_py_test(
+    name = "unnest_test",
+    size = "small",
+    srcs = ["unnest_test.py"],
+    deps = [
+        ":unnest",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 exports_files(
     [
         "assert_util.py",
@@ -576,6 +595,8 @@ exports_files(
         "test_combinations.py",
         "test_util.py",
         "test_util_test.py",
+        "unnest.py",
+        "unnest_test.py",
         "vectorization_util.py",
     ],
     visibility = [

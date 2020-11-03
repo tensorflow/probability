@@ -25,14 +25,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.experimental import unnest
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import unnest
 
 tfd = tfp.distributions
-unnest = tfp.experimental.unnest
 
 JAX_MODE = False
 
