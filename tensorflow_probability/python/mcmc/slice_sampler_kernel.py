@@ -330,7 +330,7 @@ class SliceSampler(kernel_base.TransitionKernel):
       return SliceSamplerKernelResults(
           target_log_prob=init_target_log_prob,
           bounds_satisfied=tf.zeros(
-              shape=tf.shape(init_target_log_prob), dtype=tf.bool),
+              shape=ps.shape(init_target_log_prob), dtype=tf.bool),
           direction=direction,
           upper_bounds=tf.zeros_like(init_target_log_prob),
           lower_bounds=tf.zeros_like(init_target_log_prob),
