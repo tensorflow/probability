@@ -79,7 +79,7 @@ class Affine(layers_lib.KernelBiasLayer):
         Default value: `None` (i.e., `'Affine'`).
     """
     batch_shape = tf.constant(
-        [], dtype=tf.int32) if batch_shape is None else tf.cast(
+        [], dtype=tf.int32) if batch_shape is None else prefer_static.cast(
             prefer_static.reshape(batch_shape, shape=[-1]), tf.int32)
     batch_ndims = prefer_static.size(batch_shape)
     kernel_shape = prefer_static.concat([
