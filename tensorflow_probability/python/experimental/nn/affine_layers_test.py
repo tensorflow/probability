@@ -92,6 +92,59 @@ class BnnEndToEnd(object):
 
 @test_util.test_all_tf_execution_regimes
 class AffineTest(test_util.TestCase):
+  # Note that some of these kwargs are unused for the tests, but they are
+  # passed from the layer to make_kernel_bias_fn so we need to take them in.
+
+  def make_bayesian_kernel_bias(self,
+                                kernel_shape,
+                                bias_shape,
+                                kernel_initializer=None,
+                                bias_initializer=None,
+                                kernel_batch_ndims=0,
+                                bias_batch_ndims=0,
+                                dtype=tf.float32):
+
+    kernel_dist = tfd.Independent(
+        tfd.Normal(tf.zeros(kernel_shape, dtype=dtype),
+                   tf.ones(kernel_shape, dtype=dtype)),
+        reinterpreted_batch_ndims=tf.size(kernel_shape)-kernel_batch_ndims)
+
+    bias_dist = tfd.Independent(
+        tfd.Normal(tf.zeros(bias_shape, dtype=dtype),
+                   tf.ones(bias_shape, dtype=dtype)),
+        reinterpreted_batch_ndims=tf.size(bias_shape)-bias_batch_ndims)
+
+    wk = kernel_dist.sample(self.num_samples)
+    wb = bias_dist.sample(self.num_samples)
+
+    return wk, wb
+
+  def test_dnn_nobayes(self):
+    affine = tfn.Affine(5, 10, batch_shape=())
+    inputs = tf.zeros([4, 5])
+    output = affine(inputs)
+    self.assertShapeEqual(np.zeros([4, 10]), output)
+
+  def test_dnn_bayes(self):
+    self.num_samples = 3
+    self.num_components = None
+    inputs = tf.zeros([4, 5])
+    affine = tfn.Affine(5, 10,
+                        make_kernel_bias_fn=self.make_bayesian_kernel_bias)
+    output = affine(inputs[:, tf.newaxis, :])
+    self.assertShapeEqual(np.zeros([4, 3, 10]), output)
+
+  def test_dnn_bayes_mixture(self):
+    self.num_samples = 3
+    self.num_components = 6
+    inputs = tf.zeros([4, 5])
+    affine = tfn.Affine(5, 10,
+                        make_kernel_bias_fn=self.make_bayesian_kernel_bias,
+                        batch_shape=self.num_components)
+    output = affine(inputs[:, tf.newaxis, tf.newaxis, :])
+    print(tf.shape(output))
+    print(affine.kernel.shape, affine.bias.shape)
+    self.assertShapeEqual(np.zeros([4, 3, 6, 10]), output)
 
   def test_works_correctly(self):
     pass

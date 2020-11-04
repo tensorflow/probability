@@ -17,8 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
@@ -80,25 +78,15 @@ class Affine(layers_lib.KernelBiasLayer):
       name: ...
         Default value: `None` (i.e., `'Affine'`).
     """
-    batch_shape = (np.array([], dtype=np.int32) if batch_shape is None
-                   else prefer_static.reshape(batch_shape, shape=[-1]))
+    batch_shape = tf.constant(
+        [], dtype=tf.int32) if batch_shape is None else tf.cast(
+            prefer_static.reshape(batch_shape, shape=[-1]), tf.int32)
     batch_ndims = prefer_static.size(batch_shape)
-    if tf.get_static_value(batch_ndims) == 0:
-      # In this branch, we statically know there are no batch dims.
-      kernel_shape = [input_size, output_size]
-      bias_shape = [output_size]
-      apply_kernel_fn = tf.matmul
-    else:
-      # In this branch, there are either static/dynamic batch dims or
-      # dynamically no batch dims.
-      kernel_shape = prefer_static.concat([
-          batch_shape, [input_size, output_size]], axis=0)
-      bias_shape = prefer_static.concat(
-          [batch_shape, [output_size]], axis=0)
-      # apply_kernel_fn = lambda x, k: tf.matmul(
-      #     x[..., tf.newaxis, :], k)[..., 0, :]
-      apply_kernel_fn = lambda x, k: tf.linalg.matvec(k, x, adjoint_a=True)
-    batch_ndims = prefer_static.size(batch_shape)
+    kernel_shape = prefer_static.concat([
+        batch_shape, [input_size, output_size]], axis=0)
+    bias_shape = prefer_static.concat([batch_shape, [output_size]], axis=0)
+    apply_kernel_fn = lambda x, k: tf.matmul(
+        x[..., tf.newaxis, :], k)[..., 0, :]  # pylint-disable=long-lambda
     kernel, bias = make_kernel_bias_fn(
         kernel_shape, bias_shape,
         init_kernel_fn, init_bias_fn,
