@@ -32,7 +32,6 @@ from tensorflow_probability.python.distributions import joint_distribution_auto_
 from tensorflow_probability.python.distributions import joint_distribution_coroutine
 from tensorflow_probability.python.distributions import joint_distribution_util
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.experimental.vi import parameter_constraints
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -328,9 +327,10 @@ def _make_asvi_trainable_variables(prior):
                 name='prior_weight/{}/{}'.format(dist.name, param)),
             mean_field_parameter=tfp.util.TransformedVariable(
                 0.5,
-                bijector=parameter_constraints.constraint_for(param),
-                name='mean_field_parameter/{}/{}'.format(dist.name, param)))
-
+                bijector=dist.parameter_properties(
+                    dtype=dist.dtype)[param].default_constraining_bijector_fn(),
+                name='mean_field_parameter/{}/{}'.format(dist.name, param))
+            )
       param_dicts.append(new_params_dict)
   return param_dicts
 

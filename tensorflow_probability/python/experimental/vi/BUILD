@@ -36,21 +36,10 @@ py_library(
 )
 
 py_library(
-    name = "parameter_constraints",
-    srcs = ["parameter_constraints.py"],
-    srcs_version = "PY3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
-    ],
-)
-
-py_library(
     name = "surrogate_posteriors",
     srcs = ["surrogate_posteriors.py"],
     srcs_version = "PY3",
     deps = [
-        ":parameter_constraints",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
