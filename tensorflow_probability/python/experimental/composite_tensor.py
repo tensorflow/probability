@@ -22,7 +22,6 @@ import inspect
 import six
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors
 from tensorflow_probability.python import distributions
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.framework.composite_tensor import CompositeTensor  # pylint: disable=g-direct-tensorflow-import
@@ -134,7 +133,7 @@ def _make_convertible(cls):
       param_specs = {}
       try:
         composite_tensor_params = self._composite_tensor_params  # pylint: disable=protected-access
-      except NotImplementedError:
+      except (AttributeError, NotImplementedError):
         composite_tensor_params = ()
       for k in composite_tensor_params:
         if k in kwargs and kwargs[k] is not None:
@@ -255,7 +254,7 @@ def as_composite(obj):
 
   try:
     composite_tensor_params = obj._composite_tensor_params  # pylint: disable=protected-access
-  except NotImplementedError:
+  except (AttributeError, NotImplementedError):
     composite_tensor_params = ()
   for k in composite_tensor_params:
     # Use dtype inference from ctor.
@@ -267,13 +266,16 @@ def as_composite(obj):
         kwargs[k] = v
   for k, v in kwargs.items():
     def composite_helper(v):
-      if isinstance(v, distributions.Distribution):
-        return as_composite(v)
-      if isinstance(v, bijectors.Bijector):
+      # If we have a parameters attribute, then we may be able to convert to
+      # a composite tensor by guessing which of the parameters are tensors.  In
+      # essence, we duck-type based on this attribute.
+      if hasattr(v, 'parameters'):
         return as_composite(v)
       return v
     kwargs[k] = tf.nest.map_structure(composite_helper, v)
-    if tensor_util.is_ref(v):
+    # Unfortunately, tensor_util.is_ref(v) returns true for a
+    # tf.linalg.LinearOperator even though that is not ideal behavior.
+    if tensor_util.is_ref(v) and not isinstance(v, tf.linalg.LinearOperator):
       try:
         kwargs[k] = tf.convert_to_tensor(v, name=k)
       except TypeError as e:
