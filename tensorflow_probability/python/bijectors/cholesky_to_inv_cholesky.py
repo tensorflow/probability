@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
@@ -70,7 +71,7 @@ class CholeskyToInvCholesky(bijector.Bijector):
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
-      x_shape = tf.shape(x)
+      x_shape = ps.shape(x)
       identity_matrix = tf.eye(
           x_shape[-1],
           batch_shape=x_shape[:-2],
@@ -97,7 +98,7 @@ class CholeskyToInvCholesky(bijector.Bijector):
     # For step 3,
     #   |Jac(Cholesky(N))| = -|Jac(outerprod(Y)|
     #                      = 2^p prod_{j=0}^{p-1} Y[j,j]^{p-j}
-    n = tf.cast(tf.shape(x)[-1], x.dtype)
+    n = ps.cast(ps.shape(x)[-1], x.dtype)
     y = self._forward(x)
     return (
         (self._cholesky.forward_log_det_jacobian(x, event_ndims=2) -
