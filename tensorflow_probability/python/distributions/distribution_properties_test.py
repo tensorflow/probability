@@ -341,8 +341,8 @@ class ParameterBijectorsTest(test_util.TestCase):
     x = self.evaluate(new_dist.sample(seed=test_util.test_seed()))
     self.assertEqual(sample_shape, x.shape)
 
-    # Valid parameters should give finite samples.
-    self.assertAllFinite(x)
+    # Valid parameters should give non-nan samples.
+    self.assertAllFalse(np.isnan(x))
 
 
 def _all_shapes(thing):
