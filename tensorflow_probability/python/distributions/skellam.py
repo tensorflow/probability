@@ -71,7 +71,7 @@ class Skellam(distribution.Distribution):
                rate2=None,
                log_rate1=None,
                log_rate2=None,
-               interpolate_nondiscrete=True,
+               force_probs_to_zero_outside_support=False,
                validate_args=False,
                allow_nan_stats=True,
                name='Skellam'):
@@ -86,12 +86,12 @@ class Skellam(distribution.Distribution):
         Must specify exactly one of `rate1` and `log_rate1`.
       log_rate2: Floating point tensor, the log of the second rate parameter.
         Must specify exactly one of `rate2` and `log_rate2`.
-      interpolate_nondiscrete: Python `bool`. When `False`,
+      force_probs_to_zero_outside_support: Python `bool`. When `True`,
         `log_prob` returns `-inf` (and `prob` returns `0`) for non-integer
-        inputs. When `True`, `log_prob` evaluates the Skellam pmf as a
+        inputs. When `False`, `log_prob` evaluates the Skellam pmf as a
         continuous function (note that this function is not itself
         a normalized probability log-density).
-        Default value: `True`.
+        Default value: `False`.
       validate_args: Python `bool`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -126,7 +126,7 @@ class Skellam(distribution.Distribution):
       self._log_rate2 = tensor_util.convert_nonref_to_tensor(
           log_rate2, name='log_rate2', dtype=dtype)
 
-      self._interpolate_nondiscrete = interpolate_nondiscrete
+      self._force_probs_to_zero_outside_support = force_probs_to_zero_outside_support
       super(Skellam, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -171,9 +171,9 @@ class Skellam(distribution.Distribution):
     return self._log_rate2
 
   @property
-  def interpolate_nondiscrete(self):
+  def force_probs_to_zero_outside_support(self):
     """Interpolate (log) probs on non-integer inputs."""
-    return self._interpolate_nondiscrete
+    return self._force_probs_to_zero_outside_support
 
   def _batch_shape_tensor(self, log_rate1=None, log_rate2=None):
     x1 = self._rate1 if self._log_rate1 is None else self._log_rate1
@@ -198,7 +198,7 @@ class Skellam(distribution.Distribution):
     # Catch such x's and set the output value accordingly.
     lr1, r1, lr2, r2 = self._all_rate_parameters()
 
-    safe_x = x if self.interpolate_nondiscrete else tf.floor(x)
+    safe_x = tf.floor(x) if self.force_probs_to_zero_outside_support else x
     y = tf.math.multiply_no_nan(0.5 * (lr1 - lr2), safe_x)
     numpy_dtype = dtype_util.as_numpy_dtype(y.dtype)
 
@@ -211,7 +211,7 @@ class Skellam(distribution.Distribution):
         safe_x, 2. * tf.math.sqrt(r1 * r2)) - tf.math.square(
             tf.math.sqrt(r1) - tf.math.sqrt(r2))
     y = tf.where(tf.math.equal(x, safe_x), y, numpy_dtype(-np.inf))
-    if not self.interpolate_nondiscrete:
+    if self.force_probs_to_zero_outside_support:
       # Ensure the gradient wrt `rate` is zero at non-integer points.
       y = tf.where(
           (y < 0.) & tf.math.is_inf(y), numpy_dtype(-np.inf), y)

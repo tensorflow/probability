@@ -33,11 +33,12 @@ class _SkellamTest(object):
                     rate1,
                     rate2,
                     validate_args=True,
-                    interpolate_nondiscrete=True):
-    return tfd.Skellam(rate1=rate1,
-                       rate2=rate2,
-                       validate_args=validate_args,
-                       interpolate_nondiscrete=interpolate_nondiscrete)
+                    force_probs_to_zero_outside_support=False):
+    return tfd.Skellam(
+        rate1=rate1,
+        rate2=rate2,
+        validate_args=validate_args,
+        force_probs_to_zero_outside_support=force_probs_to_zero_outside_support)
 
   def testSkellamShape(self):
     rate1 = tf.constant([3.0] * 5, dtype=self.dtype)
@@ -77,7 +78,7 @@ class _SkellamTest(object):
                  dtype=self.dtype)
     skellam = self._make_skellam(
         rate1=rate1, rate2=rate2,
-        interpolate_nondiscrete=False, validate_args=False)
+        force_probs_to_zero_outside_support=True, validate_args=False)
     log_pmf = skellam.log_prob(x)
     self.assertEqual(log_pmf.shape, (2, batch_size))
     self.assertAllClose(
@@ -124,7 +125,7 @@ class _SkellamTest(object):
         return self._make_skellam(
             rate1=rate1 if apply_to_second_rate else lam,
             rate2=lam if apply_to_second_rate else rate2,
-            interpolate_nondiscrete=False,
+            force_probs_to_zero_outside_support=True,
             validate_args=False).log_prob(x)
       return skellam_log_prob
     _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
@@ -283,12 +284,12 @@ class SkellamLogRateTest(_SkellamTest):
                     rate1,
                     rate2,
                     validate_args=True,
-                    interpolate_nondiscrete=True):
+                    force_probs_to_zero_outside_support=False):
     return tfd.Skellam(
         log_rate1=tf.math.log(rate1),
         log_rate2=tf.math.log(rate2),
         validate_args=validate_args,
-        interpolate_nondiscrete=interpolate_nondiscrete)
+        force_probs_to_zero_outside_support=force_probs_to_zero_outside_support)
 
   # No need to worry about the non-negativity of `rate` when using the
   # `log_rate` parameterization.
