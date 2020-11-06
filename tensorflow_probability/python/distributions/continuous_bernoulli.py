@@ -33,6 +33,51 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
+def _log_xexp_ratio(x):
+  """Compute log(x * (exp(x) + 1) / (exp(x) - 1)) in a numerically stable way."""
+  with tf.name_scope('log_xexp_ratio'):
+    x = tf.convert_to_tensor(x)
+    dtype = dtype_util.as_numpy_dtype(x.dtype)
+    eps = np.finfo(dtype).eps
+
+    # This function is even, hence we use abs(x) everywhere.
+    x = tf.math.abs(x)
+
+    # For x near zero, we have the Taylor series:
+    # log(2) + x**2 / 12 - 7 x**4 / 1440 + 31 x**6 / 90720 + O(x**8)
+    # whose coefficients decrease in magnitude monotonically
+
+    # For x large in magnitude, the ratio (exp(x) + 1) / (exp(x) - 1)) tends to
+    # sign(x), so thus this function should tend to log(abs(x))
+
+    # Finally for x medium in magnitude, we can use the naive expression. Thus,
+    # we generate 2 cutofs.
+
+    # Use the first 3 non-zero terms of the Taylor series when
+    # |x| < small_cutoff.
+    small_cutoff = np.power(eps * 90720. / 31, 1 / 6.)
+
+    # Use log(abs(x)) when |x| > large_cutoff
+    large_cutoff = -np.log(eps)
+
+    x_squared = tf.math.square(x)
+
+    result = (dtype(np.log(2.)) + x_squared / 112. -
+              7 * tf.math.square(x_squared) / 1440.)
+    middle_region = (x > small_cutoff) & (x < large_cutoff)
+    safe_x_medium = tf.where(middle_region, x, dtype(1.))
+    result = tf.where(
+        middle_region,
+        (tf.math.log(safe_x_medium) + tf.math.softplus(safe_x_medium) -
+         tf.math.log(tf.math.expm1(safe_x_medium))),
+        result)
+
+    # We can do this by choosing a cutoff when x > log(1 / machine eps)
+    safe_x_large = tf.where(x >= large_cutoff, x, dtype(1.))
+    result = tf.where(x >= large_cutoff, tf.math.log(safe_x_large), result)
+    return result
+
+
 class ContinuousBernoulli(distribution.Distribution):
   """Continuous Bernoulli distribution.
 
@@ -80,7 +125,7 @@ class ContinuousBernoulli(distribution.Distribution):
       dtype=tf.float32,
       validate_args=False,
       allow_nan_stats=True,
-      name="ContinuousBernoulli"):
+      name='ContinuousBernoulli'):
     """Construct Bernoulli distributions.
 
     Args:
@@ -114,13 +159,13 @@ class ContinuousBernoulli(distribution.Distribution):
     """
     parameters = dict(locals())
     if (probs is None) == (logits is None):
-      raise ValueError("Must pass `probs` or `logits`, but not both.")
+      raise ValueError('Must pass `probs` or `logits`, but not both.')
     self._lims = lims
     with tf.name_scope(name) as name:
       self._probs = tensor_util.convert_nonref_to_tensor(
-          probs, dtype_hint=tf.float32, name="probs")
+          probs, dtype_hint=tf.float32, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
-          logits, dtype_hint=tf.float32, name="logits")
+          logits, dtype_hint=tf.float32, name='logits')
     super(ContinuousBernoulli, self).__init__(
         dtype=dtype,
         reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
@@ -177,25 +222,20 @@ class ContinuousBernoulli(distribution.Distribution):
     sample = self._quantile(uniform, probs)
     return tf.cast(sample, self.dtype)
 
-  def _log_normalizer(self, probs=None):
-    if probs is None:
-      probs = self._probs_parameter_no_checks()
-    cut_probs = self._cut_probs(probs)
-    cut_probs_below_half = tf.where(
-        cut_probs < 0.5, cut_probs, tf.zeros_like(cut_probs))
-    cut_probs_above_half = tf.where(
-        cut_probs > 0.5, cut_probs, tf.ones_like(cut_probs))
-    log_norm = tf.math.log(
-        tf.math.abs(tf.math.log1p(-cut_probs) - tf.math.log(cut_probs))
-    ) - tf.where(
-        cut_probs < 0.5,
-        tf.math.log1p(-2.0 * cut_probs_below_half),
-        tf.math.log(2.0 * cut_probs_above_half - 1.0))
-    x = tf.math.square(probs - 0.5)
-    taylor = np.log(2.).astype(dtype=dtype_util.as_numpy_dtype(x.dtype)) + (
-        4.0 / 3.0 + 104.0 / 45.0 * x) * x
-    return tf.where(
-        (probs < self._lims[0]) | (probs > self._lims[1]), log_norm, taylor)
+  def _log_normalizer(self, logits=None):
+    # The normalizer is 2 * atanh(1 - 2 * probs) / (1 - 2 * probs), with the
+    # removable singularity at probs = 0.5 removed (and replaced with 2).
+    # We do this computation in logit space to be more numerically stable.
+    # Note that 2 * atanh(1 - 2 / (1 + exp(-logits))) = logits.
+    # Thus we end up with
+    # logits / (1 - 2 / (1 + exp(-logits))) =
+    # logits / ((-exp(-logits) + 1) / (exp(-logits) + 1)) =
+    # (exp(-logits) + 1) * logits / (-exp(-logits) + 1) =
+    # (1 + exp(logits)) * logits / (exp(logits) - 1)
+
+    if logits is None:
+      logits = self._logits_parameter_no_checks()
+    return _log_xexp_ratio(logits)
 
   def _log_prob(self, event):
     log_probs0, log_probs1, _ = self._outcome_log_probs()
@@ -223,33 +263,57 @@ class ContinuousBernoulli(distribution.Distribution):
         tf.where(x > 1., tf.ones_like(x), unbounded_cdfs))
 
   def _outcome_log_probs(self):
-    """Returns log(1-probs) and log(probs)."""
+    """Returns log(1-probs), log(probs) and logits."""
     if self._logits is None:
       probs = tf.convert_to_tensor(self._probs)
-      return tf.math.log1p(-probs), tf.math.log(probs), probs
+      logits = tf.math.log(probs) - tf.math.log1p(-probs)
+      return tf.math.log1p(-probs), tf.math.log(probs), logits
     s = tf.convert_to_tensor(self._logits)
     # softplus(s) = -Log[1 - p]
     # -softplus(-s) = Log[p]
     # softplus(+inf) = +inf, softplus(-inf) = 0, so...
     #  logits = -inf ==> log_probs0 = 0, log_probs1 = -inf (as desired)
     #  logits = +inf ==> log_probs0 = -inf, log_probs1 = 0 (as desired)
-    return -tf.math.softplus(s), -tf.math.softplus(-s), tf.math.sigmoid(s)
+    return -tf.math.softplus(s), -tf.math.softplus(-s), s
 
   def _entropy(self):
-    log_probs0, log_probs1, probs = self._outcome_log_probs()
-    return (self._mean(probs) * (log_probs0 - log_probs1)
-            - self._log_normalizer(probs) - log_probs0)
+    log_probs0, log_probs1, logits = self._outcome_log_probs()
+    return (self._mean(logits) * (log_probs0 - log_probs1)
+            - self._log_normalizer(logits) - log_probs0)
 
-  def _mean(self, probs=None):
-    if probs is None:
-      probs = self._probs_parameter_no_checks()
-    cut_probs = self._cut_probs(probs)
-    mus = cut_probs / (2. * cut_probs - 1.0) + 1. / (
-        tf.math.log1p(-cut_probs) - tf.math.log(cut_probs))
-    x = probs - 0.5
-    taylor = 0.5 + (1.0 / 3.0 + 16.0 / 45.0 * tf.math.square(x)) * x
+  def _mean(self, logits=None):
+    # The mean is probs / (2 * probs - 1) + 1 / (2 * arctanh(1 - 2 * probs))
+    # with the removable singularity at 0.5 removed.
+    # We write this in logits space.
+    # The first term becomes
+    # 1 / (1 + exp(-logits)) / (2 / (1 + exp(-logits)) - 1) =
+    # 1 / (2 - 1 - exp(-logits)) =
+    # 1 / (1 - exp(-logits))
+    # The second term becomes 1 / logits.
+    # Thus we have mean = 1 / (1 - exp(-logits)) - 1 / logits.
+
+    # When logits is close to zero, we can compute the Laurent series for the
+    # first term as:
+    # 1 / x + 1 / 2 + x / 12 - x**3 / 720 + x**5 / 30240 + O(x**7).
+    # Thus we get the pole at zero canceling out with the second term.
+
+    dtype = dtype_util.as_numpy_dtype(self.dtype)
+    eps = np.finfo(dtype).eps
+
+    if logits is None:
+      logits = self._logits_parameter_no_checks()
+
+    small_cutoff = np.power(eps * 30240, 1 / 5.)
+    result = dtype(0.5) + logits / 12. - logits * tf.math.square(logits) / 720
+
+    safe_logits_large = tf.where(
+        tf.math.abs(logits) > small_cutoff, logits, dtype(1.))
     return tf.where(
-        (probs < self._lims[0]) | (probs > self._lims[1]), mus, taylor)
+        tf.math.abs(logits) > small_cutoff,
+        -(tf.math.reciprocal(
+            tf.math.expm1(-safe_logits_large)) +
+          tf.math.reciprocal(safe_logits_large)),
+        result)
 
   def _variance(self):
     probs = self._probs_parameter_no_checks()
@@ -278,7 +342,7 @@ class ContinuousBernoulli(distribution.Distribution):
 
   def logits_parameter(self, name=None):
     """Logits computed from non-`None` input arg (`probs` or `logits`)."""
-    with self._name_and_control_scope(name or "logits_parameter"):
+    with self._name_and_control_scope(name or 'logits_parameter'):
       return self._logits_parameter_no_checks()
 
   def _logits_parameter_no_checks(self):
@@ -289,7 +353,7 @@ class ContinuousBernoulli(distribution.Distribution):
 
   def probs_parameter(self, name=None):
     """probs computed from non-`None` input arg (`probs` or `logits`)."""
-    with self._name_and_control_scope(name or "probs_parameter"):
+    with self._name_and_control_scope(name or 'probs_parameter'):
       return self._probs_parameter_no_checks()
 
   def _probs_parameter_no_checks(self):
@@ -310,12 +374,12 @@ class ContinuousBernoulli(distribution.Distribution):
       return assertions
     assertions.append(
         assert_util.assert_non_negative(
-            x, message="Sample must be non-negative."))
+            x, message='Sample must be non-negative.'))
     assertions.append(
         assert_util.assert_less_equal(
             x,
             tf.ones([], dtype=x.dtype),
-            message="Sample must be less than or equal to `1`."))
+            message='Sample must be less than or equal to `1`.'))
     return assertions
 
 
@@ -323,9 +387,9 @@ def maybe_assert_continuous_bernoulli_param_correctness(
     is_init, validate_args, probs, logits):
   """Return assertions for `Bernoulli`-type distributions."""
   if is_init:
-    x, name = (probs, "probs") if logits is None else (logits, "logits")
+    x, name = (probs, 'probs') if logits is None else (logits, 'logits')
     if not dtype_util.is_floating(x.dtype):
-      raise TypeError("Argument `{}` must having floating type.".format(name))
+      raise TypeError('Argument `{}` must having floating type.'.format(name))
 
   if not validate_args:
     return []
@@ -339,11 +403,11 @@ def maybe_assert_continuous_bernoulli_param_correctness(
       assertions += [
           assert_util.assert_non_negative(
               probs,
-              message="probs has components less than 0."),
+              message='probs has components less than 0.'),
           assert_util.assert_less_equal(
               probs,
               one,
-              message="probs has components greater than 1.")]
+              message='probs has components greater than 1.')]
   return assertions
 
 
@@ -361,11 +425,11 @@ def _kl_bernoulli_bernoulli(a, b, name=None):
   Returns:
     Batchwise KL(a || b)
   """
-  with tf.name_scope(name or "kl_continuous_bernoulli_continuous_bernoulli"):
-    a_log_probs0, a_log_probs1, a_probs = a._outcome_log_probs()  # pylint:disable=protected-access
+  with tf.name_scope(name or 'kl_continuous_bernoulli_continuous_bernoulli'):
+    a_log_probs0, a_log_probs1, a_logits = a._outcome_log_probs()  # pylint:disable=protected-access
     b_log_probs0, b_log_probs1, b_probs = b._outcome_log_probs()  # pylint:disable=protected-access
-    a_mean = a._mean(a_probs)  # pylint:disable=protected-access
-    a_log_norm = a._log_normalizer(a_probs)  # pylint:disable=protected-access
+    a_mean = a._mean(a_logits)  # pylint:disable=protected-access
+    a_log_norm = a._log_normalizer(a_logits)  # pylint:disable=protected-access
     b_log_norm = b._log_normalizer(b_probs)  # pylint:disable=protected-access
 
     return (

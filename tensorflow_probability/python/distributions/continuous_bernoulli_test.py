@@ -227,6 +227,24 @@ class ContinuousBernoulliTest(test_util.TestCase):
         ),
     )
 
+  def testLogNormalizerIsNotInf(self):
+    # Parameterize by logits large in magnitude.
+    logits = np.array([-1000., -100., 100., 1000.], dtype=np.float32)
+    dist = tfd.ContinuousBernoulli(logits=logits)
+    log_normalizer_ = self.evaluate(dist._log_normalizer())
+    self.assertFalse(np.any(np.isinf(log_normalizer_)))
+    # The normalizer grows roughly log(abs(logits))
+    self.assertAllClose(log_normalizer_, np.log(np.abs(logits)))
+
+  def testLogNormalizerNearHalfStable(self):
+    # Parameterize by probs near a half
+    probs = tf.random.uniform(
+        [int(1e4)], minval=0.4, maxval=0.6, seed=test_util.test_seed())
+    dist = tfd.ContinuousBernoulli(probs=probs)
+    log_normalizer_ = self.evaluate(dist._log_normalizer())
+    self.assertFalse(np.any(np.isinf(log_normalizer_)))
+    self.assertFalse(np.any(np.isnan(log_normalizer_)))
+
   def testBroadcasting(self):
     probs = lambda prob: tf1.placeholder_with_default(prob, shape=None)
     def dist(p):
@@ -324,6 +342,22 @@ class ContinuousBernoulliTest(test_util.TestCase):
     prob = np.array([[0.2, 0.7], [0.8, 0.4]], dtype=np.float32)
     dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
     self.assertAllClose(self.evaluate(dist.mean()), mean(prob))
+
+  def testMeanNonInfNaN(self):
+    prob = tf.random.uniform([int(1e4)], seed=test_util.test_seed())
+    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    mean_ = self.evaluate(dist.mean())
+    self.assertFalse(np.any(np.isinf(mean_)))
+    self.assertFalse(np.any(np.isnan(mean_)))
+
+  def testMeanNearHalfStable(self):
+    # Parameterize by probs near a half
+    prob = tf.random.uniform(
+        [int(1e4)], minval=0.4, maxval=0.6, seed=test_util.test_seed())
+    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    mean_ = self.evaluate(dist.mean())
+    self.assertFalse(np.any(np.isinf(mean_)))
+    self.assertFalse(np.any(np.isnan(mean_)))
 
   def testVarianceAndStd(self):
     prob = [[0.2, 0.7], [0.8, 0.4]]
