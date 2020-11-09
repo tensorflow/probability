@@ -308,6 +308,146 @@ class _GEVTest(object):
         rtol=.03,
         atol=0)
 
+  @test_util.numpy_disable_gradient_test
+  def testFiniteGradientAtDifficultPoints(self):
+    def make_fn(dtype, attr):
+      x = np.array([1.]).astype(dtype)
+      return lambda m, s, p: getattr(  # pylint: disable=g-long-lambda
+          tfd.GeneralizedExtremeValue(loc=m, scale=s,
+                                      concentration=p, validate_args=True),
+          attr)(x)
+
+    loc = np.array([1.0], dtype=self._dtype)
+    scale = np.array([1.5], dtype=self._dtype)
+    conc = np.array([-0.7, 0.0, 0.5, 1.], dtype=self._dtype)
+
+    for attr in ['log_prob', 'prob', 'cdf', 'log_cdf']:
+      value, grads = self.evaluate(tfp.math.value_and_gradient(
+          make_fn(self._dtype, attr),
+          [self.make_tensor(loc),     # loc
+           self.make_tensor(scale),   # scale
+           self.make_tensor(conc)]))  # conc
+      self.assertAllFinite(value)
+      self.assertAllFinite(grads[0])  # d/d loc
+      self.assertAllFinite(grads[1])  # d/d scale
+      self.assertAllFinite(grads[2])  # d/d conc
+
+
+  def testBroadcastingParams(self):
+
+    def _check(gev_dist):
+      self.assertEqual(gev_dist.mean().shape, (3,))
+      self.assertEqual(gev_dist.variance().shape, (3,))
+      self.assertEqual(gev_dist.entropy().shape, (3,))
+      self.assertEqual(gev_dist.log_prob(6.).shape, (3,))
+      self.assertEqual(gev_dist.prob(6.).shape, (3,))
+      self.assertEqual(gev_dist.sample(
+          37, seed=test_util.test_seed()).shape, (37, 3,))
+
+    _check(
+        tfd.GeneralizedExtremeValue(loc=[
+            2.,
+            3.,
+            4.,
+        ], scale=2., concentration=1., validate_args=True))
+    _check(
+        tfd.GeneralizedExtremeValue(loc=3., scale=[
+            2.,
+            3.,
+            4.,
+        ], concentration=1., validate_args=True))
+    _check(
+        tfd.GeneralizedExtremeValue(loc=3., scale=3., concentration=[
+            2.,
+            3.,
+            4.,
+        ], validate_args=True))
+
+  def testBroadcastingPdfArgs(self):
+
+    def _assert_shape(gev_dist, arg, shape):
+      self.assertEqual(gev_dist.log_prob(arg).shape, shape)
+      self.assertEqual(gev_dist.prob(arg).shape, shape)
+
+    def _check(gev_dist):
+      _assert_shape(gev_dist, 5., (3,))
+      xs = np.array([5., 6., 7.], dtype=np.float32)
+      _assert_shape(gev_dist, xs, (3,))
+      xs = np.array([xs])
+      _assert_shape(gev_dist, xs, (1, 3))
+      xs = xs.T
+      _assert_shape(gev_dist, xs, (3, 3))
+
+    _check(
+        tfd.GeneralizedExtremeValue(loc=[
+            -2.,
+            -3.,
+            -4.,
+        ], scale=2., concentration=1., validate_args=True))
+    _check(
+        tfd.GeneralizedExtremeValue(loc=-6., scale=[
+            2.,
+            3.,
+            4.,
+        ], concentration=1., validate_args=True))
+    _check(
+        tfd.GeneralizedExtremeValue(loc=-7., scale=3., concentration=[
+            2.,
+            3.,
+            4.,
+        ], validate_args=True))
+
+    def _check2d(gev_dist):
+      _assert_shape(gev_dist, 5., (1, 3))
+      xs = np.array([5., 6., 7.], dtype=np.float32)
+      _assert_shape(gev_dist, xs, (1, 3))
+      xs = np.array([xs])
+      _assert_shape(gev_dist, xs, (1, 3))
+      xs = xs.T
+      _assert_shape(gev_dist, xs, (3, 3))
+
+    _check2d(
+        tfd.GeneralizedExtremeValue(loc=[[
+            -2.,
+            -3.,
+            -4.,
+        ]], scale=2., concentration=1., validate_args=True))
+    _check2d(
+        tfd.GeneralizedExtremeValue(loc=-7., scale=[[
+            2.,
+            3.,
+            4.,
+        ]], concentration=1., validate_args=True))
+    _check2d(
+        tfd.GeneralizedExtremeValue(loc=-7., scale=3., concentration=[[
+            2.,
+            3.,
+            4.,
+        ]], validate_args=True))
+
+    def _check2d_rows(gev_dist):
+      _assert_shape(gev_dist, 5., (3, 1))
+      xs = np.array([5., 6., 7.], dtype=np.float32)  # (3,)
+      _assert_shape(gev_dist, xs, (3, 3))
+      xs = np.array([xs])  # (1,3)
+      _assert_shape(gev_dist, xs, (3, 3))
+      xs = xs.T  # (3,1)
+      _assert_shape(gev_dist, xs, (3, 1))
+
+    _check2d_rows(
+        tfd.GeneralizedExtremeValue(
+            loc=[[-2.], [-3.], [-4.]], scale=2., concentration=1.,
+            validate_args=True))
+    _check2d_rows(
+        tfd.GeneralizedExtremeValue(
+            loc=-7., scale=[[2.], [3.], [4.]], concentration=1.,
+            validate_args=True))
+    _check2d_rows(
+        tfd.GeneralizedExtremeValue(
+            loc=-7., scale=3., concentration=[[2.], [3.], [4.]],
+            validate_args=True))
+
+
 @test_util.test_all_tf_execution_regimes
 class GEVTestStaticShape(test_util.TestCase, _GEVTest):
   _dtype = np.float32

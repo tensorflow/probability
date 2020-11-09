@@ -23,14 +23,15 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import gev_cdf as gev_cdf_bijector
-from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
-
+from tensorflow_probability.python.internal import prefer_static as ps
 
 class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
   """The scalar GeneralizedExtremeValue distribution
@@ -42,7 +43,7 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
 
   ```none
   pdf(x; loc, scale, conc) = t(x; loc, scale, conc) ** (1 + conc) * exp(
-  - t(x; loc, scale, conc) ) / scale
+  -t(x; loc, scale, conc) ) / scale
   where t(x) =
     * (1 + conc * (x - loc) / scale) ) ** (-1 / conc) when conc != 0;
     * exp(-(x - loc) / scale) when conc = 0.
@@ -77,7 +78,7 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
   dist.cdf(1.)
 
   # Define a batch of two scalar valued generalized extreme values.
-  # The first has mean 1 and scale 11, the second 2 and 22.
+  # The first has loc 1 and scale 11, the second 2 and 22.
   dist = tfd.GeneralizedExtremeValue(loc=[1, 2.], scale=[11, 22.])
 
   # Evaluate the pdf of the first distribution on 0, and the second on 1.5,
@@ -92,7 +93,7 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
 
   ```python
   # Define a batch of two scalar valued Logistics.
-  # Both have mean 1, but different scales.
+  # Both have location 1, but different scales.
   dist = tfd.GeneralizedExtremeValue(loc=1., scale=1, concentration=[0, 0.9])
 
   # Evaluate the pdf of both distributions on the same point, 3.0,
@@ -116,7 +117,7 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
     that supports broadcasting (e.g. `loc + scale` + `concentration` is valid).
 
     Args:
-      loc: Floating point tensor, the means of the distribution(s).
+      loc: Floating point tensor, the location parameter of the distribution(s).
       scale: Floating point tensor, the scales of the distribution(s).
         scale must contain only positive values.
       concentration: Floating point tensor, the concentration of
@@ -172,15 +173,16 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('loc', 'scale', 'concentration'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 3)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0, concentration=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        concentration=parameter_properties.ParameterProperties())
+    # pylint: enable=g-long-lambda
 
   @property
   def loc(self):
@@ -198,9 +200,11 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
     return self._gev_bijector.concentration
 
   def _entropy(self):
-    # Use broadcasting rules to calculate the full broadcast sigma.
-    scale = self.scale * tf.ones_like(self.loc)
-    return 1. + tf.math.log(scale) + np.euler_gamma*(1. + self.concentration)
+    scale = tf.broadcast_to(self.scale,
+                            ps.broadcast_shape(ps.shape(self.scale),
+                                               ps.shape(self.loc)))
+    euler_gamma = tf.constant(np.euler_gamma, self.dtype)
+    return 1. + tf.math.log(scale) + euler_gamma * (1. + self.concentration)
 
   def _log_prob(self, x):
     with tf.control_dependencies(self._gev_bijector._maybe_assert_valid_x(x)):
@@ -209,8 +213,9 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
 
       conc = tf.convert_to_tensor(self.concentration)
       equal_zero = tf.equal(conc, 0.)
+      safe_conc = tf.where(equal_zero, 1., conc)
       log_t = tf.where(equal_zero, -z,
-                       -tf.math.log1p(z * conc) / conc)
+                       -tf.math.log1p(z * safe_conc) / safe_conc)
 
       return (conc + 1) * log_t - tf.exp(log_t) - tf.math.log(scale)
 
@@ -218,13 +223,17 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
     conc = tf.convert_to_tensor(self.concentration)
     equal_zero = tf.equal(conc, 0.)
     less_than_one = tf.less(conc, 1.)
+    safe_conc = tf.where(equal_zero, 1., conc)
+
+    mean_zero = tf.fill(tf.shape(conc), tf.constant(np.euler_gamma, self.dtype))
+    mean_fin = tf.math.expm1(tf.math.lgamma(1. - safe_conc)) / safe_conc
+    mean_inf = tf.fill(tf.shape(conc), tf.constant(np.inf, self.dtype))
 
     mean_z = tf.where(equal_zero,
-                      np.euler_gamma*tf.ones_like(conc),
+                      mean_zero,
                       tf.where(less_than_one,
-                               tf.math.expm1(tf.math.lgamma(1. - conc)) / conc,
-                               np.inf*tf.ones_like(conc))
-                      )
+                               mean_fin,
+                               mean_inf))
 
     return self.loc + self.scale * mean_z
 
@@ -234,13 +243,16 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
     less_than_half = tf.less(conc, 0.5)
 
     g1_square = tf.exp(tf.math.lgamma(1. - conc)) ** 2
-    g2 = tf.exp(tf.math.lgamma(1. - 2.*conc))
+    g2 = tf.exp(tf.math.lgamma(1. - 2. * conc))
+    safe_conc = tf.where(equal_zero, 1., conc)
 
     std_z = tf.where(equal_zero,
-                     tf.ones_like(conc) * np.pi / np.sqrt(6),
+                     tf.fill(tf.shape(conc),
+                             tf.constant(np.pi / np.sqrt(6), self.dtype)),
                      tf.where(less_than_half,
-                              tf.math.sqrt(g2 - g1_square) / tf.abs(conc),
-                              np.inf*tf.ones_like(conc))
+                              tf.math.sqrt(g2 - g1_square) / tf.abs(safe_conc),
+                              tf.fill(tf.shape(conc),
+                                      tf.constant(np.inf, self.dtype)))
                      )
 
     return self.scale * tf.ones_like(self.loc) * std_z
@@ -248,18 +260,13 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
   def _mode(self):
     conc = tf.convert_to_tensor(self.concentration)
     equal_zero = tf.equal(conc, 0.)
+    safe_conc = tf.where(equal_zero, 1., conc)
 
-    # Use broadcasting rules to calculate the full broadcast sigma.
     mode_z = tf.where(equal_zero,
                       tf.zeros_like(conc),
-                      tf.math.expm1(-conc * tf.math.log1p(conc)) /conc)
+                      tf.math.expm1(-conc * tf.math.log1p(conc)) / safe_conc)
 
     return self.loc + self.scale * mode_z
-
-  def _default_event_space_bijector(self):
-    # TODO(b/145620027) Finalize choice of bijector. Consider switching to
-    # Chain([Softplus(), Log()]) to lighten the doubly-exponential right tail.
-    return identity_bijector.Identity(validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     return self._gev_bijector._parameter_control_dependencies(is_init)  # pylint: disable=protected-access

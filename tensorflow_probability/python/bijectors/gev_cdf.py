@@ -120,14 +120,18 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
   def _forward(self, x):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    concentration = tf.convert_to_tensor(self.concentration)
+    conc = tf.convert_to_tensor(self.concentration)
     with tf.control_dependencies(
         self._maybe_assert_valid_x(
-            x, loc=loc, scale=scale, concentration=concentration)):
+            x, loc=loc, scale=scale, concentration=conc)):
       z = (x - loc) / scale
+
+      equal_zero = tf.equal(conc, 0.)
+      # deal with case that gradient is N/A when conc = 0
+      safe_conc = tf.where(equal_zero, 1., conc)
       t = tf.where(
-          tf.equal(concentration, 0.), tf.math.exp(-z),
-          tf.math.exp(-tf.math.log1p(z * concentration) / concentration))
+          equal_zero, tf.math.exp(-z),
+          tf.math.exp(-tf.math.log1p(z * safe_conc) / safe_conc))
       return tf.exp(-t)
 
   def _inverse(self, y):
@@ -135,24 +139,34 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
       t = -tf.math.log(y)
 
       conc = tf.convert_to_tensor(self.concentration)
+
+      equal_zero = tf.equal(conc, 0.)
+      # deal with case that gradient is N/A when conc = 0
+      safe_conc = tf.where(equal_zero, 1., conc)
+
       z = tf.where(
-          tf.equal(conc, 0.), -tf.math.log(t),
-          tf.math.expm1(-tf.math.log(t) * conc) / conc)
+          equal_zero, -tf.math.log(t),
+          tf.math.expm1(-tf.math.log(t) * safe_conc) / safe_conc)
 
       return self.loc + self.scale * z
 
   def _forward_log_det_jacobian(self, x):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    concentration = tf.convert_to_tensor(self.concentration)
+    conc = tf.convert_to_tensor(self.concentration)
     with tf.control_dependencies(
         self._maybe_assert_valid_x(
-            x, loc=loc, scale=scale, concentration=concentration)):
+            x, loc=loc, scale=scale, concentration=conc)):
       z = (x - loc) / scale
+
+      equal_zero = tf.equal(conc, 0.)
+      # deal with case that gradient is N/A when conc = 0
+      safe_conc = tf.where(equal_zero, 1., conc)
+
       log_t = tf.where(
-          tf.equal(concentration, 0.), -z,
-          -tf.math.log1p(z * concentration) / concentration)
-      return (tf.math.multiply_no_nan(concentration + 1., log_t) -
+          equal_zero, -z,
+          -tf.math.log1p(z * safe_conc) / safe_conc)
+      return (tf.math.multiply_no_nan(conc + 1., log_t) -
               tf.math.exp(log_t) - tf.math.log(scale))
 
   def _inverse_log_det_jacobian(self, y):
