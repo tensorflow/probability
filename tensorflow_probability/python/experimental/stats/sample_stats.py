@@ -41,7 +41,6 @@ __all__ = [
     'RunningMean',
     'RunningMeanState',
     'RunningPotentialScaleReduction',
-    'RunningPotentialScaleReductionState',
     'RunningVariance',
 ]
 
@@ -593,12 +592,9 @@ class RunningCentralMoments(object):
     return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
 
 
-RunningPotentialScaleReductionState = collections.namedtuple(
-    'RunningPotentialScaleReductionState', 'chain_var')
-
-
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
 class RunningPotentialScaleReduction(object):
-  """Holds metadata for and computes a running R-hat diagnostic statistic.
+  """A running R-hat diagnostic.
 
   `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential
   scale reduction (also known as R-hat) for chain convergence [1].
@@ -616,14 +612,9 @@ class RunningPotentialScaleReduction(object):
   independent chain dimensions is defined by the `independent_chain_ndims`
   parameter at initialization.
 
-  `RunningPotentialScaleReduction` objects do not hold state information. That
-  information, which includes intermediate calculations, are held in a
-  `RunningPotentialScaleReductionState` as returned via `initialize` and
-  `update` method calls.
-
   `RunningPotentialScaleReduction` is meant to serve general streaming R-hat.
   For a specialized version that fits streaming over MCMC samples, see
-  `RhatReducer` in `tfp.experimental.mcmc`.
+  `PotentialScaleReductionReducer` in `tfp.experimental.mcmc`.
 
   #### References
 
@@ -631,13 +622,32 @@ class RunningPotentialScaleReduction(object):
        Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
   """
 
-  def __init__(self, shape, independent_chain_ndims, dtype=tf.float32):
-    """Instantiates this object.
+  def __init__(self, chain_variances, independent_chain_ndims):
+    """Construct a `RunningPotentialScaleReduction`.
 
     Args:
-      shape: Python `Tuple` or `TensorShape` representing the shape of
-        incoming samples. Using a collection implies that future samples
-        will mimic that exact structure.
+      chain_variances: A `RunningVariance` or nested structure of
+        `RunningVariance`s, giving the variance estimates for the variables of
+        interest.
+      independent_chain_ndims: A Python `int` or structure of Python `ints`
+        parallel to `chain_variances` giving the number of leading dimensions in
+        `chain_variances` that index the independent chains over which the
+        potential scale reduction factor should be computed.  Must be at least
+        1.
+    """
+    self.chain_variances = chain_variances
+    self.independent_chain_ndims = independent_chain_ndims
+
+  @classmethod
+  def from_shape(cls, shape=(), independent_chain_ndims=1, dtype=tf.float32):
+    """Starts an empty `RunningPotentialScaleReduction` from metadata.
+
+    Args:
+      shape: Python `Tuple` or `TensorShape` representing the shape of incoming
+        samples. Using a collection implies that future samples will mimic that
+        exact structure. This is useful to supply if the
+        `RunningPotentialScaleReduction` will be carried by a `tf.while_loop`,
+        so that broadcasting does not change the shape across loop iterations.
       independent_chain_ndims: Integer or Integer type `Tensor` with value
         `>= 1` giving the number of leading dimensions holding independent
         chain results to be tested for convergence. Using a collection
@@ -647,101 +657,80 @@ class RunningPotentialScaleReduction(object):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
-    """
-    self.shape = shape
-    self.independent_chain_ndims = independent_chain_ndims
-    def _cast_dtype(dtype):
-      if dtype_util.as_numpy_dtype(dtype) is np.int64:
-        return tf.float64
-      elif dtype_util.is_integer(dtype):
-        return tf.float32
-      return dtype
-    self.dtype = tf.nest.map_structure(_cast_dtype, dtype)
-
-  def initialize(self):
-    """Initializes an empty `RunningPotentialScaleReductionState`.
 
     Returns:
-      state: `RunningPotentialScaleReductionState` representing a stream
+      state: `RunningPotentialScaleReduction` representing a stream
         of no inputs.
     """
-    broadcasted_dtype = nest_util.broadcast_structure(
-        self.independent_chain_ndims, self.dtype)
-    chain_var = nest.map_structure_up_to(
-        self.independent_chain_ndims,
-        RunningVariance.from_shape,
-        self.shape,
-        broadcasted_dtype,
-        check_types=False
-    )
-    return RunningPotentialScaleReductionState(chain_var)
+    dtype = tf.nest.map_structure(_float_dtype_like, dtype)
 
-  def update(self, state, new_sample):
-    """Update the `RunningPotentialScaleReductionState` with a new sample.
+    dtype = nest_util.broadcast_structure(independent_chain_ndims, dtype)
+    chain_variances = nest.map_structure_up_to(
+        independent_chain_ndims,
+        RunningVariance.from_shape,
+        shape,
+        dtype,
+        check_types=False)
+    return cls(chain_variances, independent_chain_ndims)
+
+  def update(self, new_sample):
+    """Update the `RunningPotentialScaleReduction` with a new sample.
 
     Args:
-      state: `RunningPotentialScaleReductionState` that represents the
-        current state of running statistics.
       new_sample: Incoming `Tensor` sample or (possibly nested) collection of
         `Tensor`s with shape and dtype compatible with those used to form the
-        `RunningPotentialScaleReductionState`.
+        `RunningPotentialScaleReduction`.
 
     Returns:
-      state: `RunningPotentialScaleReductionState` with updated calculations.
+      state: `RunningPotentialScaleReduction` updated to include the new sample.
     """
-    def _update_for_one_state(chain_var, new_sample):
+    def _update_for_one_state(chain_variances, new_sample):
       """Updates the running variance for one group of Markov chains."""
       # TODO(axch): chunking could be reasonably added here by accepting and
       # including the chunked axis to the running variance object
-      return chain_var.update(new_sample)
-    updated_chain_vars = nest.map_structure_up_to(
-        self.independent_chain_ndims,
+      return chain_variances.update(new_sample)
+    updated_chain_variancess = tf.nest.map_structure(
         _update_for_one_state,
-        state.chain_var,
+        self.chain_variances,
         new_sample,
         check_types=False
     )
-    return RunningPotentialScaleReductionState(updated_chain_vars)
+    return type(self)(updated_chain_variancess, self.independent_chain_ndims)
 
-  def finalize(self, state):
-    """Finalizes potential scale reduction computation for the `state`.
-
-    Args:
-      state: `RunningPotentialScaleReductionState` that represents
-        the current state of running statistics.
+  def potential_scale_reduction(self):
+    """Computes the potential scale reduction for samples accumulated so far.
 
     Returns:
       rhat: An estimate of the R-hat.
     """
-    def _finalize_for_one_state(shape, chain_ndims, chain_var):
+    def _finalize_for_one_state(chain_ndims, chain_variances):
       """Calculates R-hat for one group of Markov chains."""
       # using notation from Brooks and Gelman (1998),
       # n := num samples / chain; m := number of chains
-      n = chain_var.num_samples
+      n = chain_variances.num_samples
+      shape = chain_variances.mean.shape
       m = tf.cast(
           functools.reduce((lambda x, y: x * y), (shape[:chain_ndims])),
           n.dtype)
 
       # b/n is the between-chain variance (the variance of the chain means)
       b_div_n = diagnostic._reduce_variance(  # pylint:disable=protected-access
-          tf.convert_to_tensor(chain_var.mean),
+          tf.convert_to_tensor(chain_variances.mean),
           axis=tf.range(chain_ndims),
           biased=False)
 
       # W is the within sequence variance (the mean of the chain variances)
       sum_of_chain_squared_residuals = tf.reduce_sum(
-          chain_var.sum_squared_residuals, axis=tf.range(chain_ndims))
+          chain_variances.sum_squared_residuals, axis=tf.range(chain_ndims))
       w = sum_of_chain_squared_residuals / (m * (n - 1))
 
       # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper
       true_variance_estimate = ((n - 1) / n) * w + b_div_n
       return ((m + 1.) / m) * true_variance_estimate / w - (n - 1.) / (m * n)
 
-    return nest.map_structure_up_to(
-        self.independent_chain_ndims,
+    return tf.nest.map_structure(
         _finalize_for_one_state,
-        self.shape,
         self.independent_chain_ndims,
-        state.chain_var,
+        self.chain_variances,
         check_types=False
     )
