@@ -624,6 +624,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
           tfd.Sample(tfd.Normal(0., 1.), num_features))
       yield tfd.Independent(tfd.Deterministic(weights_noncentered * scale),
                             reinterpreted_batch_ndims=1)
+
     # Currently sample_dtype is only used for `tf.nest.pack_structure_as`. In
     # the future we may use it for error checking and/or casting.
     sample_dtype = collections.namedtuple('Model', [
@@ -644,6 +645,18 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     tf.nest.assert_same_structure(sample_dtype, xs)
     self.assertEqual([3, 4], joint.log_prob(
         joint.sample([3, 4], seed=test_util.test_seed())).shape)
+
+    # Check that a list dtype doesn't get corrupted by `tf.Module` wrapping.
+    sample_dtype = [None, None, None, None]
+    joint = tfd.JointDistributionCoroutine(
+        lambda: noncentered_horseshoe_prior(4),
+        sample_dtype=sample_dtype,
+        validate_args=True)
+    ds, xs = joint.sample_distributions([2, 3], seed=test_util.test_seed())
+    self.assertEqual(type(sample_dtype), type(xs))
+    self.assertEqual(type(sample_dtype), type(ds))
+    tf.nest.assert_same_structure(sample_dtype, ds)
+    tf.nest.assert_same_structure(sample_dtype, xs)
 
   def test_repr_with_custom_sample_dtype(self):
     def model():
