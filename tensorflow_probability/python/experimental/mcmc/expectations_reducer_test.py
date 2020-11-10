@@ -126,9 +126,9 @@ class ExpectationsReducerTest(test_util.TestCase):
     )
     pkr = reduced_kernel.bootstrap_results(8)
     _, kernel_results = reduced_kernel.one_step(8, pkr)
-    streaming_calculations = self.evaluate(
-        mean_reducer.finalize(kernel_results.streaming_calculations))
-    self.assertEqual(9, streaming_calculations)
+    reduction_results = self.evaluate(
+        mean_reducer.finalize(kernel_results.reduction_results))
+    self.assertEqual(9, reduction_results)
 
   def test_in_step_kernel(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
@@ -142,9 +142,9 @@ class ExpectationsReducerTest(test_util.TestCase):
         kernel=reduced_kernel,
         return_final_kernel_results=True,
     )
-    streaming_calculations = self.evaluate(
-        mean_reducer.finalize(kernel_results.streaming_calculations))
-    self.assertEqual(11, streaming_calculations)
+    reduction_results = self.evaluate(
+        mean_reducer.finalize(kernel_results.reduction_results))
+    self.assertEqual(11, reduction_results)
 
 
 if __name__ == '__main__':
