@@ -80,12 +80,12 @@ class BaseBijectorTest(test_util.TestCase):
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*'):
+        'inverse not implemented'):
       bij.inverse_log_det_jacobian(0, event_ndims=0)
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*'):
+        'forward not implemented'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
 
   @test_util.disable_test_for_backend(
@@ -123,6 +123,53 @@ class BaseBijectorTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         error_clazz, 'Tensor conversion requested dtype'):
       b64.forward(x32)
+
+  @test_util.numpy_disable_gradient_test
+  def testAutodiffLogDetJacobian(self):
+
+    class NoJacobianBijector(tfb.Bijector):
+      """Bijector with no log det jacobian methods."""
+
+      def __init__(self, scale=2.):
+        parameters = dict(locals())
+        self._scale = tensor_util.convert_nonref_to_tensor(scale)
+        super(NoJacobianBijector, self).__init__(
+            validate_args=True,
+            forward_min_event_ndims=0,
+            parameters=parameters)
+
+      def _forward(self, x):
+        return tf.exp(self._scale * x)
+
+      def _inverse(self, y):
+        return tf.math.log(y) / self._scale
+
+    b = NoJacobianBijector(scale=1.4)
+    x = tf.convert_to_tensor([2., -3.])
+    [
+        fldj,
+        true_fldj,
+        ildj
+    ] = self.evaluate([
+        b.forward_log_det_jacobian(x, event_ndims=0),
+        tf.math.log(b._scale) + b._scale * x,
+        b.inverse_log_det_jacobian(b.forward(x), event_ndims=0)
+    ])
+    self.assertAllClose(fldj, true_fldj)
+    self.assertAllClose(fldj, -ildj)
+
+    y = tf.convert_to_tensor([27., 5.])
+    [
+        ildj,
+        true_ildj,
+        fldj
+    ] = self.evaluate([
+        b.inverse_log_det_jacobian(y, event_ndims=0),
+        -tf.math.log(tf.abs(y * b._scale)),
+        b.forward_log_det_jacobian(b.inverse(y), event_ndims=0)
+    ])
+    self.assertAllClose(ildj, true_ildj)
+    self.assertAllClose(ildj, -fldj)
 
 
 class IntentionallyMissingError(Exception):

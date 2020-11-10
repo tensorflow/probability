@@ -22,7 +22,6 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors.kumaraswamy_cdf import KumaraswamyCDF
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import feature_transformed
@@ -62,6 +61,11 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
       name: Python `str` name given to ops managed by this object.
     """
     parameters = dict(locals())
+
+    # Delayed import to avoid circular dependency between `tfp.bijectors` and
+    # `tfp.math`
+    from tensorflow_probability.python.bijectors import kumaraswamy_cdf  # pylint: disable=g-import-not-at-top
+
     with tf.name_scope(name):
       self._concentration1 = tensor_util.convert_nonref_to_tensor(
           concentration1, name='concentration1')
@@ -78,9 +82,9 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
             self.concentration0,
             example_ndims,
             start=-(feature_ndims + 1))
-        bij = KumaraswamyCDF(concentration1,
-                             concentration0,
-                             validate_args=validate_args)
+        bij = kumaraswamy_cdf.KumaraswamyCDF(concentration1,
+                                             concentration0,
+                                             validate_args=validate_args)
         return bij.forward(x)
 
       super(KumaraswamyTransformed, self).__init__(
