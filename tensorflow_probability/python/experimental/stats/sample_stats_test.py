@@ -345,16 +345,14 @@ class RunningCovarianceTest(test_util.TestCase):
 class RunningPotentialScaleReductionTest(test_util.TestCase):
 
   def test_simple_operation(self):
-    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction.from_shape(
         shape=(3,),
-        independent_chain_ndims=1
     )
-    state = running_rhat.initialize()
     # 5 samples from 3 independent Markov chains
     x = np.arange(15, dtype=np.float32).reshape((5, 3))
     for sample in x:
-      state = running_rhat.update(state, sample)
-    rhat = running_rhat.finalize(state)
+      running_rhat = running_rhat.update(sample)
+    rhat = running_rhat.potential_scale_reduction()
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=x,
         independent_chain_ndims=1,
@@ -365,14 +363,12 @@ class RunningPotentialScaleReductionTest(test_util.TestCase):
   def test_random_scalar_computation(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100, 10) * 100
-    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction.from_shape(
         shape=(10,),
-        independent_chain_ndims=1
     )
-    state = running_rhat.initialize()
     for sample in x:
-      state = running_rhat.update(state, sample)
-    rhat = running_rhat.finalize(state)
+      running_rhat = running_rhat.update(sample)
+    rhat = running_rhat.potential_scale_reduction()
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=x,
         independent_chain_ndims=1,
@@ -383,14 +379,12 @@ class RunningPotentialScaleReductionTest(test_util.TestCase):
   def test_non_scalar_samples(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100, 2, 2, 3, 5) * 100
-    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction.from_shape(
         shape=(2, 2, 3, 5),
-        independent_chain_ndims=1
     )
-    state = running_rhat.initialize()
     for sample in x:
-      state = running_rhat.update(state, sample)
-    rhat = running_rhat.finalize(state)
+      running_rhat = running_rhat.update(sample)
+    rhat = running_rhat.potential_scale_reduction()
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=x,
         independent_chain_ndims=1,
@@ -407,28 +401,26 @@ class RunningPotentialScaleReductionTest(test_util.TestCase):
     # shifted.
     offset = np.array([1., -1., 2.]).reshape(3, 1)
     state_1 = np.random.randn(n_samples, 3, 4) + offset
-    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction.from_shape(
         shape=[(2,), (3, 4)],
         independent_chain_ndims=[1, 1]
     )
-    state = running_rhat.initialize()
     for sample in zip(state_0, state_1):
-      state = running_rhat.update(state, sample)
-    rhat = self.evaluate(running_rhat.finalize(state))
+      running_rhat = running_rhat.update(sample)
+    rhat = self.evaluate(running_rhat.potential_scale_reduction())
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=[state_0, state_1], independent_chain_ndims=1)
     self.assertAllClose(true_rhat, rhat, rtol=1e-6)
 
   def test_independent_chain_ndims(self):
-    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction.from_shape(
         shape=(5, 3),
         independent_chain_ndims=2,
     )
-    state = running_rhat.initialize()
     x = np.arange(30, dtype=np.float32).reshape((2, 5, 3))
     for sample in x:
-      state = running_rhat.update(state, sample)
-    rhat = running_rhat.finalize(state)
+      running_rhat = running_rhat.update(sample)
+    rhat = running_rhat.potential_scale_reduction()
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=x,
         independent_chain_ndims=2,
@@ -440,20 +432,19 @@ class RunningPotentialScaleReductionTest(test_util.TestCase):
     rng = test_util.test_np_rng()
     x = rng.rand(100, 10) * 100
     tensor_x = tf.convert_to_tensor(x)
-    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction(
+    running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction.from_shape(
         shape=(10,),
         independent_chain_ndims=1
     )
-    state = running_rhat.initialize()
-    def _loop_body(i, state):
-      new_state = running_rhat.update(state, tensor_x[i])
-      return i + 1, new_state
-    _, state = tf.while_loop(
+    def _loop_body(i, running_rhat):
+      running_rhat = running_rhat.update(tensor_x[i])
+      return i + 1, running_rhat
+    _, running_rhat = tf.while_loop(
         lambda i, _: i < 100,
         _loop_body,
-        (0, state)
+        (0, running_rhat)
     )
-    rhat = running_rhat.finalize(state)
+    rhat = running_rhat.potential_scale_reduction()
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=x,
         independent_chain_ndims=1,

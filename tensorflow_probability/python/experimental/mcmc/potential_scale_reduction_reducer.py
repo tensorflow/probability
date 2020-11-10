@@ -35,7 +35,7 @@ __all__ = [
 
 
 PotentialScaleReductionReducerState = collections.namedtuple(
-    'PotentialScaleReductionReducerState', 'init_state, rhat_state')
+    'PotentialScaleReductionReducerState', 'rhat_state')
 
 
 class PotentialScaleReductionReducer(reducer_base.Reducer):
@@ -114,18 +114,21 @@ class PotentialScaleReductionReducer(reducer_base.Reducer):
         mcmc_util.make_name(
             self.name, 'potential_scale_reduction_reducer', 'initialize')):
       initial_chain_state = tf.nest.map_structure(
-          tf.convert_to_tensor,
+          tf.convert_to_tensor, initial_chain_state)
+      sample_shape = tf.nest.map_structure(
+          lambda chain_state: tuple(ps.shape(chain_state)),
           initial_chain_state)
-      sample_shape, chain_ndims, dtype = _prepare_args(
-          initial_chain_state, self.independent_chain_ndims
-      )
-      running_rhat = sample_stats.RunningPotentialScaleReduction(
+      chain_ndims = tf.nest.map_structure(
+          lambda chain_state: self.independent_chain_ndims,
+          initial_chain_state)
+      dtype = tf.nest.map_structure(
+          lambda chain_state: chain_state.dtype,
+          initial_chain_state)
+      rhat = sample_stats.RunningPotentialScaleReduction.from_shape(
           shape=sample_shape,
           independent_chain_ndims=chain_ndims,
-          dtype=dtype
-      )
-      return PotentialScaleReductionReducerState(
-          initial_chain_state, running_rhat.initialize())
+          dtype=dtype)
+      return PotentialScaleReductionReducerState(rhat)
 
   def one_step(
       self,
@@ -156,20 +159,8 @@ class PotentialScaleReductionReducer(reducer_base.Reducer):
       new_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           new_chain_state)
-      sample_shape, chain_ndims, dtype = _prepare_args(
-          new_chain_state, self.independent_chain_ndims
-      )
-      running_rhat = sample_stats.RunningPotentialScaleReduction(
-          shape=sample_shape,
-          independent_chain_ndims=chain_ndims,
-          dtype=dtype
-      )
-      new_rhat_state = running_rhat.update(
-          current_reducer_state.rhat_state,
-          new_chain_state)
-      return PotentialScaleReductionReducerState(
-          current_reducer_state.init_state,
-          new_rhat_state)
+      new_rhat = current_reducer_state.rhat_state.update(new_chain_state)
+      return PotentialScaleReductionReducerState(new_rhat)
 
   def finalize(self, final_reducer_state):
     """Finalizes R-hat calculation from the `final_reducer_state`.
@@ -181,18 +172,10 @@ class PotentialScaleReductionReducer(reducer_base.Reducer):
     Returns:
       rhat: an estimate of the R-hat.
     """
-    sample_shape, chain_ndims, dtype = _prepare_args(
-        final_reducer_state.init_state, self.independent_chain_ndims
-    )
     with tf.name_scope(
         mcmc_util.make_name(
             self.name, 'potential_scale_reduction_reducer', 'finalize')):
-      running_rhat = sample_stats.RunningPotentialScaleReduction(
-          shape=sample_shape,
-          independent_chain_ndims=chain_ndims,
-          dtype=dtype,
-      )
-      return running_rhat.finalize(final_reducer_state.rhat_state)
+      return final_reducer_state.rhat_state.potential_scale_reduction()
 
   @property
   def parameters(self):
@@ -205,20 +188,3 @@ class PotentialScaleReductionReducer(reducer_base.Reducer):
   @property
   def name(self):
     return self._parameters['name']
-
-
-def _prepare_args(target, chain_ndims):
-  """Infers metadata to instantiate a streaming rhat object from `target`."""
-  sample_shape = tf.nest.map_structure(
-      lambda chain_state: tuple(ps.shape(chain_state)),
-      target
-  )
-  nested_chain_ndims = tf.nest.map_structure(
-      lambda _: chain_ndims,
-      target
-  )
-  dtype = tf.nest.map_structure(
-      lambda chain_state: chain_state.dtype,
-      target
-  )
-  return sample_shape, nested_chain_ndims, dtype
