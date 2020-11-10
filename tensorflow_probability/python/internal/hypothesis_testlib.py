@@ -739,6 +739,10 @@ def positive_definite(x):
   return symmetric(psd)
 
 
+def orthonormal(x):
+  return tf.linalg.qr(positive_definite(x)).q
+
+
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
       tf.linalg.set_diag(x, softplus_plus_eps()(tf.linalg.diag_part(x))),

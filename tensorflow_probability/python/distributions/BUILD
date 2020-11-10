@@ -60,6 +60,7 @@ multi_substrate_py_library(
         ":dirichlet_multinomial",
         ":distribution",
         ":doublesided_maxwell",
+        ":dpp",
         ":empirical",
         ":exp_gamma",
         ":exponential",
@@ -521,6 +522,19 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/random",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "dpp",
+    srcs = ["dpp.py"],
+    deps = [
+        ":distribution",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -2340,6 +2354,21 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "dpp_test",
+    size = "medium",
+    srcs = ["dpp_test.py"],
+    shard_count = 5,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

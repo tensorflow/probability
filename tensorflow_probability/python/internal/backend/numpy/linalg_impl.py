@@ -37,9 +37,11 @@ __all__ = [
     'det',
     'diag',
     'diag_part',
+    'eigh',
     'einsum',
     'eye',
     'inv',
+    'logdet',
     'lu',
     'matmul',
     'matvec',
@@ -56,11 +58,9 @@ __all__ = [
     'trace',
     'triangular_solve',
     # 'cross',
-    # 'eigh',
     # 'eigvalsh',
     # 'expm',
     # 'global_norm',
-    # 'logdet',
     # 'logm',
     # 'lstsq',
     # 'l2_normalize'
@@ -365,6 +365,10 @@ diag_part = utils.copy_docstring(
     lambda input, name=None: np.diagonal(  # pylint: disable=g-long-lambda
         ops.convert_to_tensor(input), axis1=-2, axis2=-1))
 
+eigh = utils.copy_docstring(
+    'tf.linalg.eigh',
+    lambda tensor, name=None: np.linalg.eigh(tensor))
+
 einsum = utils.copy_docstring(
     'tf.linalg.einsum',
     _einsum)
@@ -376,6 +380,10 @@ eye = utils.copy_docstring(
 inv = utils.copy_docstring(
     'tf.linalg.inv',
     lambda input, name=None: np.linalg.inv(input))
+
+logdet = utils.copy_docstring(
+    'tf.linalg.logdet',
+    lambda matrix, name=None: np.linalg.slogdet(matrix)[1])
 
 lu = utils.copy_docstring(
     'tf.linalg.lu',

@@ -139,6 +139,7 @@ XLA_LOGPROB_ATOL.update({
     'Beta': 1e-4,
     'BetaBinomial': 5e-6,
     'Binomial': 5e-6,
+    'DeterminantalPointProcess': 1e-5,
     'DirichletMultinomial': 1e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
@@ -406,17 +407,18 @@ class DistributionXLATest(test_util.TestCase):
 
     num_samples = 3
     sample = self.evaluate(
-        tf.function(experimental_compile=True)(dist.sample)(
+        tf.function(dist.sample, experimental_compile=True)(
             num_samples, seed=seed))
     hp.note('Trying distribution {}'.format(
         self.evaluate_dict(dist.parameters)))
     hp.note('Drew samples {}'.format(sample))
 
-    xla_lp = tf.function(experimental_compile=True)(dist.log_prob)(
-        tf.convert_to_tensor(sample))
-    graph_lp = dist.log_prob(sample)
-    xla_lp_, graph_lp_ = self.evaluate((xla_lp, graph_lp))
-    self.assertAllClose(xla_lp_, graph_lp_,
+    xla_lp = self.evaluate(
+        tf.function(dist.log_prob, experimental_compile=True)(
+            tf.convert_to_tensor(sample)))
+    with tfp_hps.no_tf_rank_errors():
+      graph_lp = self.evaluate(dist.log_prob(sample))
+    self.assertAllClose(xla_lp, graph_lp,
                         atol=XLA_LOGPROB_ATOL[dist_name],
                         rtol=XLA_LOGPROB_RTOL[dist_name])
 

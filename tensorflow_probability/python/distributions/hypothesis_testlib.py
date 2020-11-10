@@ -58,6 +58,7 @@ TF2_FRIENDLY_DISTS = (
     'Cauchy',
     'ContinuousBernoulli',
     'Deterministic',
+    'DeterminantalPointProcess',
     'Dirichlet',
     'DirichletMultinomial',
     'DoublesidedMaxwell',
@@ -263,6 +264,10 @@ CONSTRAINTS = {
         tfp_hps.positive_definite,
     'df':
         tfp_hps.softplus_plus_eps(),
+    'DeterminantalPointProcess.eigenvalues':
+        tfp_hps.softplus_plus_eps(),
+    'eigenvectors':
+        tfp_hps.orthonormal,
     'InverseGaussian.loc':
         tfp_hps.softplus_plus_eps(),
     'JohnsonSU.tailweight':

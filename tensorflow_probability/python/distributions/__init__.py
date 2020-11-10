@@ -40,6 +40,7 @@ from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
+from tensorflow_probability.python.distributions.dpp import DeterminantalPointProcess
 from tensorflow_probability.python.distributions.empirical import Empirical
 from tensorflow_probability.python.distributions.exp_gamma import ExpGamma
 from tensorflow_probability.python.distributions.exp_gamma import ExpInverseGamma
@@ -170,6 +171,7 @@ __all__ = [
     'Deterministic',
     'DoublesidedMaxwell',
     'VectorDeterministic',
+    'DeterminantalPointProcess',
     'Empirical',
     'ExpGamma',
     'ExpInverseGamma',
