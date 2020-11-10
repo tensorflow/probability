@@ -210,13 +210,14 @@ class _DppTest(test_util.TestCase):
         eigvecs, edpp_indices, seed=test_util.test_seed())
     self.assertAllEqual(edpp_indices, samples)
 
-  def testOrthogonalizeWrtI(self):
+  def testOrthogonalComplementEi(self):
     """Checks that row i=0 after orthogonalization."""
     dim, n_vectors, i = 10, 5, 3
     vectors = tf.random.normal([dim, n_vectors], seed=test_util.test_seed(),
                                dtype=self.param_dtype)
 
-    ortho = self.evaluate(dpp_lib._orthogonalize_wrt_i(vectors, i))
+    ortho = self.evaluate(dpp_lib._orthogonal_complement_e_i(vectors, i,
+                                                             n_vectors))
 
     self.assertAllEqual(ortho.shape, [dim, n_vectors])
     self.assertAllClose(ortho[:, -1], np.zeros(dim))

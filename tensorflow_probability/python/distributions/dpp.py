@@ -43,45 +43,62 @@ FAST_PATH_ENABLED = True  # Enables correctness tests w/ and w/o optimization.
 JAX_MODE = False
 
 
-def _orthogonalize_wrt_i(vectors, i):
-  """Orthogonalizes `vectors` wrt coordinate `i`.
+def _orthogonal_complement_e_i(vectors, i, gram_schmidt_iters):
+  """Computes a basis for the orthogonal complement to `e_i` in `span(vectors)`.
 
-  This is done by first choosing a column of `vectors` with non-zero in
+  The orthogonal complement of the coordinate vector `e_i` of the vector space
+  `V` is the set of all vectors in `V` that are orthogonal to `e_i`.
+
+  We compute this by first choosing a column `j` of `vectors` with non-zero in
   coordinate `i`. This vector (`col_j`) is subtracted from all other vectors
-  with an appropriate weight to zero out row `i`.
+  with an appropriate weight to zero out row `i`. Finally, we orthonormalize
+  using (modified) Gram-Schmidt. For performance reasons, the calling code
+  specifies the G-S iteration count.
 
   For example, suppose we start with the matrix of column vectors:
 
   ```none
-  [ 2  4  9 ]
-  [ 4  2  8 ]
-  [ 6  6  2 ]
+  [ 2  4  7 ]
+  [ 4  2  4 ]
+  [ 6  6  3 ]
   ```
 
   If we suppose `i = 1`, we are being asked to zero-out the middle row, i.e.
   orthogonalize with respect to the coordinate vector `e_1 = [0, 1, 0]^T`. We
   can do so by picking `j = argmax(mat[i, :])`, so `j = 0` in this case. Then,
   compute the appropriate weights that would zero out the row, i.e.
-  `w=[1, 0.5, 2]` and subtract `mat[:, j:j+1] * w = [2, 4, 6]^T * [1, .5, 2]`.
-  This yields the result:
+  `w=[1, 0.5, 1]` and subtract `mat[:, j:j+1] * w = [2, 4, 6]^T * [1, .5, 1]`.
+  This yields the intermediate:
 
   ```none
-  [ 2  4  9 ]   [ 2  1  4 ]   [ 0  3   3 ]
-  [ 4  2  8 ] - [ 4  2  8 ] = [ 0  0   0 ]
-  [ 6  6  2 ]   [ 6  3  12]   [ 0  3 -10 ]
+  [ 2  4  7 ]   [ 2  1  2 ]   [ 0  3  5 ]
+  [ 4  2  4 ] - [ 4  2  4 ] = [ 0  0  0 ]
+  [ 6  6  3 ]   [ 6  3  6 ]   [ 0  3 -3 ]
+  ```
+
+  We rotate the zero column to the end, and finally return the result of
+  applying Gram-Schmidt orthogonalization, i.e.
+
+  ```none
+  [ sqrt(.5)  sqrt(.5) 0 ]
+  [     0        0     0 ]
+  [ sqrt(.5) -sqrt(.5) 0 ]
   ```
 
   Args:
     vectors: A Tensor of vectors of shape `[..., d, n]` we are orthogonalizing.
-    i: The coordinate (against dimension d) w.r.t. which orthogonalize.
+    i: The coordinate (against dimension `d`) w.r.t. which we orthogonalize.
+    gram_schmidt_iters: Number of iterations of Gram-Schmidt orthonormalization
+      to run, generally `n_vectors - iter_num`. Since each iteration of sampling
+      reduces the number of nonzero columns by one (in the `n` dim), this allows
+      us to save iterations of orthonormalization work.
 
   Returns:
     orthogonal: A Tensor of shape `[..., d, n]` representing the subspace
       spanned by `vectors` that is orthogonal to `e_i`, the `i`-th coordinate
-      vector. This tensor is not necessarily orthonormal. It will contain at
-      least one more zero row (`i`) and zero column (`j`) than the input vectors
-      (exactly one more if all nonzero columns of `vectors` are linearly
-      independent).
+      vector. The tensor is orthonormalized. It contains at least one more zero
+      row (`i`) and zero column than the input vectors (exactly one more if all
+      nonzero columns of `vectors` are linearly independent).
   """
   i = tf.convert_to_tensor(i, dtype_hint=tf.int32)
   row_i = tf.gather(vectors, i, axis=-2, batch_dims=len(i.shape))
@@ -91,6 +108,7 @@ def _orthogonalize_wrt_i(vectors, i):
   weights = row_i / val_i_j[..., tf.newaxis]
   delta = weights[..., tf.newaxis, :] * col_j[..., :, tf.newaxis]
   result = (vectors - delta)
+  # Rotate the new zero column to the end.
   d = ps.shape(vectors)[-2]
   n = ps.shape(vectors)[-1]
   mask_d = tf.not_equal(tf.range(d, dtype=i.dtype),
@@ -103,7 +121,9 @@ def _orthogonalize_wrt_i(vectors, i):
   result = tf.gather(
       result, shift_indices, axis=-1, batch_dims=len(shift_indices.shape) - 1)
   mask_n = tf.not_equal(tf.range(n), n - 1)
-  return tf.where(mask_d & mask_n, result, 0)
+  result = tf.where(mask_d & mask_n, result, 0)  # Make exactly zero.
+  # Orthonormalize. This is equivalent, but faster than tf.linalg.qr(result).q
+  return tfp_math.gram_schmidt(result, gram_schmidt_iters)
 
 
 def _reconstruct_matrix(eigenvalues, eigenvectors, indices=None):
@@ -199,12 +219,12 @@ def _sample_from_edpp(eigenvectors, vector_onehot, seed):
 
       idx = categorical.Categorical(logits=coord_logits).sample(
           seed=sample_seed)
-      new_vecs = _orthogonalize_wrt_i(vecs, tf.where(is_active, idx, 0))
       new_vecs = tf.where(
           (tf.range(n) < sample_size[..., tf.newaxis, tf.newaxis] - i - 1) &
           ~cur_sample[..., tf.newaxis],
-          # equivalent, but faster than tf.linalg.qr(new_vecs).q,
-          tfp_math.gram_schmidt(new_vecs, max_sample_size - i),
+          _orthogonal_complement_e_i(
+              vecs, i=tf.where(is_active, idx, 0),
+              gram_schmidt_iters=max_sample_size - i),
           0.)
       # Since range(n) may have unknown shape in the stmt above, we clarify.
       tensorshape_util.set_shape(new_vecs, vecs.shape)

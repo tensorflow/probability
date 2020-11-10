@@ -91,4 +91,5 @@ def gram_schmidt(vectors, num_vectors=None):
       return vecs, i + 1
 
     vectors, _ = tf.while_loop(cond, body_fn, (vectors, tf.zeros([], tf.int32)))
-    return tf.math.l2_normalize(vectors, axis=-2)
+    vec_norm = tf.linalg.norm(vectors, ord=2, axis=-2, keepdims=True)
+    return tf.math.divide_no_nan(vectors, vec_norm)
