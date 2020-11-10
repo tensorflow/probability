@@ -219,8 +219,10 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'JointDistributionCoroutine') as name:
-      self._sample_dtype = sample_dtype
       self._model_coroutine = model
+      # Hint `no_dependency` to tell tf.Module not to screw up the sample dtype
+      # with extraneous wrapping (list => ListWrapper, etc.).
+      self._sample_dtype = self._no_dependency(sample_dtype)
       self._single_sample_distributions = {}
       super(JointDistributionCoroutine, self).__init__(
           dtype=sample_dtype,
