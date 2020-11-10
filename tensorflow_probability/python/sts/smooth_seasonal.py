@@ -200,7 +200,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         Default value: 'SmoothSeasonalStateSpaceModel'.
 
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'SmoothSeasonalStateSpaceModel') as name:
 
       dtype = dtype_util.common_dtype(
@@ -254,6 +254,7 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def drift_scale(self):
