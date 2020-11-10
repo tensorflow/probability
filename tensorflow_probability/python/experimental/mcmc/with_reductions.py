@@ -36,7 +36,7 @@ __all__ = [
 class WithReductionsKernelResults(
     mcmc_util.PrettyNamedTupleMixin,
     collections.namedtuple('WithReductionsKernelResults',
-                           ['streaming_calculations',
+                           ['reduction_results',
                             'inner_results'])):
   """Reducer state and diagnostics for `WithReductions`."""
   __slots__ = ()
@@ -56,7 +56,7 @@ class WithReductions(kernel_base.TransitionKernel):
   `Reducer`.  `WithReductions` operates by generating a
   sample with its `inner_kernel`'s `one_step`, then invoking each
   `Reducer`'s `one_step` method on that sample. The updated reducer
-  states are stored in the `streaming_calculations` field of
+  states are stored in the `reduction_results` field of
   `WithReductions`' kernel results.
   """
 
@@ -93,7 +93,7 @@ class WithReductions(kernel_base.TransitionKernel):
         representing the current state(s) of the Markov chain(s),
       previous_kernel_results: `WithReductionsKernelResults` named tuple.
         `WithReductionsKernelResults` contain the state of
-        `streaming_calculations` and a reference to kernel results of
+        `reduction_results` and a reference to kernel results of
         nested `TransitionKernel`s.
       seed: Optional seed for reproducible sampling.
 
@@ -101,7 +101,7 @@ class WithReductions(kernel_base.TransitionKernel):
       new_state: Newest MCMC state drawn from the `inner_kernel`.
       kernel_results: `WithReductionsKernelResults` representing updated
         kernel results. Reducer states are stored in the
-        `streaming_calculations` field. The state structure is identical
+        `reduction_results` field. The state structure is identical
         to `self.reducer`.
     """
     with tf.name_scope(
@@ -117,7 +117,7 @@ class WithReductions(kernel_base.TransitionKernel):
       new_reducer_state = nest.map_structure_up_to(
           self.reducer,
           step_reducer,
-          self.reducer, previous_kernel_results.streaming_calculations,
+          self.reducer, previous_kernel_results.reduction_results,
           check_types=False)
       kernel_results = WithReductionsKernelResults(
           new_reducer_state, inner_kernel_results)
@@ -141,7 +141,7 @@ class WithReductions(kernel_base.TransitionKernel):
     Returns:
       kernel_results: `WithReductionsKernelResults` representing updated
         kernel results. Reducer states are stored in the
-        `streaming_calculations` field. The state structure is identical
+        `reduction_results` field. The state structure is identical
         to `self.reducer`.
     """
     with tf.name_scope(

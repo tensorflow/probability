@@ -157,7 +157,7 @@ def sample_fold(
         reducer,
         lambda r, s: r.finalize(s),
         reducer,
-        final_kernel_results.streaming_calculations,
+        final_kernel_results.reduction_results,
         check_types=False)
     if reducer_was_none:
       reduction_results = None
@@ -169,7 +169,7 @@ def sample_fold(
       return (reduction_results,
               end_state,
               final_kernel_results.inner_results.inner_results,
-              final_kernel_results.streaming_calculations)
+              final_kernel_results.reduction_results)
     else:
       return (reduction_results,
               end_state,

@@ -142,7 +142,7 @@ class PotentialScaleReductionReducerTest(test_util.TestCase):
       chain_state, pkr = reduced_kernel.one_step(
           chain_state, pkr)
     rhat = self.evaluate(
-        rhat_reducer.finalize(pkr.streaming_calculations))
+        rhat_reducer.finalize(pkr.reduction_results))
     self.assertEqual(0.5, rhat)
 
   def test_iid_normal_passes(self):

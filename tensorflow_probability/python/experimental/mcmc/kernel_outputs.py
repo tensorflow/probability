@@ -77,7 +77,7 @@ class KernelOutputs:
           reducers,
           lambda r, s: r.finalize(s),
           reducers,
-          unnest.get_outermost(self.results, 'streaming_calculations'),
+          unnest.get_outermost(self.results, 'reduction_results'),
           check_types=False)
 
       # Grab useful reductions.

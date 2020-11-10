@@ -146,7 +146,7 @@ class SampleDiscardingTest(test_util.TestCase):
     for _ in range(2):
       current_state, kernel_results = reducer_kernel.one_step(
           current_state, kernel_results)
-    cov = cov_reducer.finalize(kernel_results.streaming_calculations)
+    cov = cov_reducer.finalize(kernel_results.reduction_results)
     self.assertAllEqual(16, current_state)
     self.assertAllEqual(2, kernel_results.inner_results.call_counter)
     self.assertAllEqual(
