@@ -59,6 +59,8 @@ from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.minimize import MinimizeTraceableQuantities
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
+from tensorflow_probability.python.math.root_search import find_root_chandrupatla
+from tensorflow_probability.python.math.root_search import find_root_secant
 from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
@@ -93,6 +95,8 @@ _allowed_symbols = [
     'dense_to_sparse',
     'diag_jacobian',
     'erfcinv',
+    'find_root_chandrupatla',
+    'find_root_secant',
     'fill_triangular',
     'fill_triangular_inverse',
     'gram_schmidt',
