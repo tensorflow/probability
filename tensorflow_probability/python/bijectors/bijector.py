@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.math import gradient
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -605,6 +606,11 @@ class Bijector(tf.Module):
     return True
 
   @property
+  def _is_scalar(self):
+    return (tf.get_static_value(self._forward_min_event_ndims) == 0 and
+            tf.get_static_value(self._inverse_min_event_ndims) == 0)
+
+  @property
   def validate_args(self):
     """Returns True if Tensor arguments will be validated."""
     return self._validate_args
@@ -1033,6 +1039,8 @@ class Bijector(tf.Module):
         elif hasattr(self, '_forward_log_det_jacobian'):
           x = self.inverse(y, **kwargs)  # Fall back to computing `-fldj(x)`
           ildj = attrs['ildj'] = -self._forward_log_det_jacobian(x, **kwargs)
+        elif self._is_scalar:
+          ildj = _autodiff_log_det_jacobian(self._inverse, y)
         else:
           raise NotImplementedError(
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
@@ -1136,6 +1144,8 @@ class Bijector(tf.Module):
         elif hasattr(self, '_inverse_log_det_jacobian'):
           y = self.forward(x, **kwargs)  # Fall back to computing `ildj(y)`
           ildj = attrs['ildj'] = self._inverse_log_det_jacobian(y, **kwargs)
+        elif self._is_scalar:
+          ildj = -_autodiff_log_det_jacobian(self._forward, x)
         else:
           raise NotImplementedError(
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
@@ -1670,3 +1680,12 @@ def ldj_reduction_shape(shape_structure,
                            'LDJ reduction shape.')))
 
     return ldj_reduce_shape, assertions
+
+
+def _autodiff_log_det_jacobian(fn, x):
+  """Automatically compute the log det jacobian of a scalar function."""
+  _, grads = gradient.value_and_gradient(fn, x)
+  if grads is None:
+    raise ValueError('Cannot compute log det jacobian; function {} has `None` '
+                     'gradient.'.format(fn))
+  return tf.math.log(tf.abs(grads))

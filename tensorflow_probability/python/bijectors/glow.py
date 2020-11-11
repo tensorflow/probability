@@ -205,6 +205,8 @@ class Glow(chain.Chain):
 
   from functools import reduce
   from operator import mul
+  import tensorflow as tf
+  import tensorflow_datasets as tfds
   import tensorflow_probability as tfp
   tfb = tfp.bijectors
   tfd = tfp.distributions
