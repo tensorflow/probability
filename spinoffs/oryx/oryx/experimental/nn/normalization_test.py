@@ -171,7 +171,7 @@ class NormalizationTest(test_util.TestCase):
     net = net_init.init(net_rng, state.Shape(in_shape))
 
     x = random.normal(data_rng, in_shape)
-    jtu.check_grads(net, (x,), 2)
+    jtu.check_grads(net.call, (x,), 2)
 
 
 def mse(x, y):
