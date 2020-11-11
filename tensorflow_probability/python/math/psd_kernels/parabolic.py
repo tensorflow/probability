@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""ExpSinSquared kernel."""
+"""Parabolic kernel."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
@@ -34,8 +33,7 @@ class Parabolic(PositiveSemidefiniteKernel):
   """The Parabolic kernel.
 
   ```none
-  k(x, y) = 3 / (4 * sqrt(5)) * amplitude *
-            max(0, 1 - (||x_k - y_k|| / (length_scale * sqrt(5)))**2)
+  k(x, y) = 3 / 4 * amplitude * max(0, 1 - (||x_k - y_k|| / length_scale**2)
   ```
 
   where the double-bars represent vector length (ie, Euclidean, or L2 norm).
@@ -46,7 +44,7 @@ class Parabolic(PositiveSemidefiniteKernel):
   `efficiency = sqrt(integral(u**2 k(u) du)) integral(k(u)**2 du)`. This
   optimality was first derived in a different context [1], and suggested for use
   in KDE by Epanechnikov in [2]. This is nicely summarized in [3], adjacent to
-  Fig 3.1.
+  Fig 3.1. The Epanechnikov kernel integrates to `1` over its support `[-1, 1]`.
 
   #### References
 
@@ -121,15 +119,13 @@ class Parabolic(PositiveSemidefiniteKernel):
 
   def _apply_with_distance(
       self, x1, x2, pairwise_square_distance, example_ndims=0):
-    default_bandwidth_sq = 5.
-    pairwise_square_distance = pairwise_square_distance / default_bandwidth_sq
     if self.length_scale is not None:
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
           length_scale, example_ndims)
       pairwise_square_distance = pairwise_square_distance / length_scale**2
 
-    default_scale = tf.cast(.75 / np.sqrt(5.), pairwise_square_distance.dtype)
+    default_scale = tf.cast(.75, pairwise_square_distance.dtype)
     result = tf.nn.relu(1 - pairwise_square_distance) * default_scale
 
     if self.amplitude is not None:
