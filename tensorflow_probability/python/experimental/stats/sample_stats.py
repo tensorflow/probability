@@ -39,7 +39,6 @@ __all__ = [
     'RunningCentralMomentsState',
     'RunningCovariance',
     'RunningMean',
-    'RunningMeanState',
     'RunningPotentialScaleReduction',
     'RunningVariance',
 ]
@@ -327,31 +326,36 @@ class RunningVariance(RunningCovariance):
     return self.covariance(ddof)
 
 
-RunningMeanState = collections.namedtuple(
-    'RunningMeanState', 'num_samples, mean')
-
-
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
 class RunningMean(object):
-  """Holds metadata for and computes a running mean.
+  """Computes a running mean.
 
   In computation, samples can be provided individually or in chunks. A
   "chunk" of size M implies incorporating M samples into a single expectation
-  computation at once, which is more efficient than one by one. If more than one
-  sample is accepted and chunking is enabled, the chunked `axis` will define
-  chunking semantics for all samples.
-
-  `RunningMean` objects do not hold state information. That information,
-  which includes intermediate calculations, are held in a
-  `RunningMeanState` as returned via `initialize` and `update` method
-  calls.
+  computation at once, which is more efficient than one by one.
 
   `RunningMean` is meant to serve general streaming expectations.
   For a specialized version that fits streaming over MCMC samples, see
   `ExpectationsReducer` in `tfp.experimental.mcmc`.
   """
 
-  def __init__(self, shape, dtype=tf.float32):
-    """Instantiates this object.
+  def __init__(self, num_samples, mean):
+    """Instantiates a `RunningMean`.
+
+    Support batch accumulation of multiple independent running means.
+
+    Args:
+      num_samples: A `Tensor` counting the number of samples
+        accumulated so far.
+      mean: A `Tensor` broadcast-compatible with `num_samples` giving the
+        current mean.
+    """
+    self.num_samples = num_samples
+    self.mean = mean
+
+  @classmethod
+  def from_shape(cls, shape, dtype=tf.float32):
+    """Initialize an empty `RunningMean`.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -361,26 +365,17 @@ class RunningMean(object):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
-    """
-    self.shape = shape
-    if dtype is tf.int64:
-      dtype = tf.float64
-    elif dtype.is_integer:
-      dtype = tf.float32
-    self.dtype = dtype
-
-  def initialize(self):
-    """Initializes an empty `RunningMeanState`.
 
     Returns:
       state: `RunningMeanState` representing a stream of no inputs.
     """
-    return RunningMeanState(
-        num_samples=tf.zeros((), dtype=self.dtype),
-        mean=tf.zeros(self.shape, self.dtype))
+    dtype = _float_dtype_like(dtype)
+    return cls(
+        num_samples=tf.zeros((), dtype=dtype),
+        mean=tf.zeros(shape, dtype))
 
-  def update(self, state, new_sample, axis=None):
-    """Update the `RunningMeanState` with a new sample.
+  def update(self, new_sample, axis=None):
+    """Update the `RunningMean` with a new sample.
 
     The update formula is from Philippe Pebay (2008) [1] and is identical to
     that used to calculate the intermediate mean in
@@ -388,16 +383,14 @@ class RunningMean(object):
     `tfp.experimental.stats.RunningVariance`.
 
     Args:
-      state: `RunningMeanState` that represents the current state of
-        running statistics.
       new_sample: Incoming `Tensor` sample with shape and dtype compatible with
-        those used to form the `RunningMeanState`.
+        those used to form the `RunningMean`.
       axis: If chunking is desired, this is an integer that specifies the axis
         with chunked samples. For individual samples, set this to `None`. By
         default, samples are not chunked (`axis` is None).
 
     Returns:
-      state: `RunningMeanState` with updated calculations.
+      mean: `RunningMean` updated to the new sample.
 
     #### References
     [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
@@ -405,34 +398,20 @@ class RunningMean(object):
          SAND2008-6212_, 2008.
          https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
     """
+    dtype = self.mean.dtype
     new_sample = tf.nest.map_structure(
-        lambda new_sample: tf.cast(new_sample, dtype=self.dtype),
+        lambda new_sample: tf.cast(new_sample, dtype=dtype),
         new_sample)
     if axis is None:
-      chunk_n = tf.cast(1, dtype=self.dtype)
+      chunk_n = tf.constant(1, dtype=dtype)
       chunk_mean = new_sample
     else:
-      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=self.dtype)
+      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
       chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
-    new_n = state.num_samples + chunk_n
-    delta_mean = chunk_mean - state.mean
-    new_mean = state.mean + chunk_n * delta_mean / new_n
-    return RunningMeanState(new_n, new_mean)
-
-  def finalize(self, state):
-    """Finalizes expectation computation for the `state`.
-
-    If the `finalized` method is invoked on a running state of no inputs,
-    `RunningMean` will return a corresponding structure of `tf.zeros`.
-
-    Args:
-      state: `RunningMeanState` that represents the current state of
-        running statistics.
-
-    Returns:
-      mean: An estimate of the mean.
-    """
-    return state.mean
+    new_n = self.num_samples + chunk_n
+    delta_mean = chunk_mean - self.mean
+    new_mean = self.mean + chunk_n * delta_mean / new_n
+    return RunningMean(new_n, new_mean)
 
 
 RunningCentralMomentsState = collections.namedtuple(
@@ -494,9 +473,6 @@ class RunningCentralMoments(object):
     elif dtype.is_integer:
       dtype = tf.float32
     self.dtype = dtype
-    self.mean_stream = RunningMean(
-        self.shape, self.dtype
-    )
 
   def initialize(self):
     """Initializes an empty `RunningCentralMomentsState`.
@@ -512,7 +488,7 @@ class RunningCentralMoments(object):
         inputs.
     """
     return RunningCentralMomentsState(
-        mean_state=self.mean_stream.initialize(),
+        mean_state=RunningMean.from_shape(self.shape, self.dtype),
         sum_exponentiated_residuals=tf.zeros(
             (self.max_moment - 1,) + self.shape, self.dtype),
     )
@@ -533,12 +509,12 @@ class RunningCentralMoments(object):
     n_1 = state.mean_state.num_samples
     n = tf.cast(n_1 + n_2, dtype=self.dtype)
     delta_mean = new_sample - state.mean_state.mean
-    new_mean_state = self.mean_stream.update(state.mean_state, new_sample)
+    new_mean_state = state.mean_state.update(new_sample)
     old_res = tf.concat([
         tf.zeros((1,) + self.shape, self.dtype),
         state.sum_exponentiated_residuals], axis=0)
-    # the sum of exponentiated residuals can be thought of as an estimation
-    # of the central moment before diving through by the number of samples.
+    # The sum of exponentiated residuals can be thought of as an estimation
+    # of the central moment before dividing through by the number of samples.
     # Since the first central moment is always 0, it simplifies update
     # logic to prepend an appropriate structure of zeros.
     new_sum_exponentiated_residuals = [tf.zeros(self.shape, self.dtype)]
