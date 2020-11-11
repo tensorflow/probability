@@ -22,7 +22,6 @@ from tensorflow_probability.python.experimental.stats.sample_stats import Runnin
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCentralMomentsState
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovariance
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningMean
-from tensorflow_probability.python.experimental.stats.sample_stats import RunningMeanState
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningPotentialScaleReduction
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningVariance
 
@@ -32,7 +31,6 @@ __all__ = [
     'RunningCentralMomentsState',
     'RunningCovariance',
     'RunningMean',
-    'RunningMeanState',
     'RunningPotentialScaleReduction',
     'RunningVariance',
 ]
