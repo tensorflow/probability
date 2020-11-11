@@ -282,14 +282,13 @@ class UnzipTrace(jax_core.Trace):
       return current_custom_rules()[call_primitive](self, f, *tracers, **params)
     if call_primitive in pe.call_partial_eval_rules:
       raise NotImplementedError
-    in_pvs, in_consts = jax_util.unzip2(t.pval for t in tracers)
+    in_pvals = [t.pval for t in tracers]
     if is_map:
-      pvs = [
-          None if pv is None else mapped_aval(params['axis_size'], pv)
-          for pv in in_pvs
-      ]
-    else:
-      pvs = in_pvs
+      unknown = pe.PartialVal.unknown
+      in_pvals = [pval if pval.is_known() or in_axis is None else
+                  unknown(mapped_aval(params['axis_size'], in_axis, pval[0]))
+                  for pval, in_axis in zip(in_pvals, params['in_axes'])]
+    pvs, in_consts = jax_util.unzip2(t.pval for t in tracers)
     keys = tuple(t.is_key() for t in tracers)
     new_settings = UnzipSettings(settings.tag, call_primitive in block_registry)
     fun, aux = unzip_eval(f, self, keys, tuple(pvs), new_settings)
@@ -360,12 +359,6 @@ class UnzipTrace(jax_core.Trace):
         for pv, const, key in safe_zip(out_pvs, out_consts, out_keys)
     ]
     new_params = dict(params, name=name, call_jaxpr=lifted_jaxpr)
-    if is_map:
-      new_params = dict(
-          new_params,
-          mapped_invars=tuple([True] * len(const_tracers) +
-                              [False] * len(env_tracers) +
-                              [True] * len(in_tracers)))
     if 'donated_invars' in params:
       new_donated_invars = (
           (False,) * len(const_tracers) + (False,) * len(env_tracers) +
