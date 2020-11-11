@@ -32,6 +32,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental import auto_batching
+from tensorflow_probability.python.experimental import bijectors
 from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.experimental import distributions
 from tensorflow_probability.python.experimental import lazybones
@@ -55,6 +56,7 @@ _allowed_symbols = [
     'auto_batching',
     'as_composite',
     'auto_composite_tensor',
+    'bijectors',
     'distribute',
     'distributions',
     'lazybones',
