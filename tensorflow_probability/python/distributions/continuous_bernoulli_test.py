@@ -431,6 +431,21 @@ class ContinuousBernoulliTest(test_util.TestCase):
             [quantile(0.1, 0.2), quantile(0.3, 0.2), quantile(0.9, 0.2)],
             dtype=np.float32))
 
+  def testQuantileAtExtremesIsNotNaN(self):
+    prob = [[0.], [1.]]
+    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    self.assertAllNotNan(
+        self.evaluate(
+            dist.quantile(np.array(
+                [[0., 0.1, 0.3, 0.9, 1.]], dtype=np.float32))))
+
+  def testSampleAtExtremesIsNotNaN(self):
+    prob = [[0.], [1.]]
+    dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
+    self.assertAllNotNan(
+        self.evaluate(
+            dist.sample(int(1e2), seed=test_util.test_seed())))
+
   def testContinuousBernoulliContinuousBernoulliKL(self):
     batch_size = 6
     a_p = np.array([0.6] * batch_size, dtype=np.float32)
