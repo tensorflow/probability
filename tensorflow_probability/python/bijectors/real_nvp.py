@@ -107,7 +107,7 @@ class RealNVP(bijector_lib.Bijector):
 
   x = nvp.sample()
   nvp.log_prob(x)
-  nvp.log_prob(0.)
+  nvp.log_prob((0.0, 0.0, 0.0))
   ```
 
   For more examples, see [Jang (2018)][3].
