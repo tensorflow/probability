@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -330,11 +331,31 @@ class ContinuousBernoulli(distribution.Distribution):
     if probs is None:
       probs = self._probs_parameter_no_checks()
     cut_probs = self._cut_probs(probs)
+    cut_logits = tf.math.log(cut_probs) - tf.math.log1p(-cut_probs)
+    logp = tf.math.log(p)
+    # The expression for the quantile function is:
+    # log(1 + (e^s - 1) * p) / s, where s is `cut_logits`. When s is large,
+    # the e^s sub-term becomes increasingly ill-conditioned.  However,
+    # since the numerator tends to s, we can reformulate the s > 0 case
+    # as a offset from 1, which is more accurate.  Coincidentally,
+    # this eliminates a ratio of infinities problem when `s == +inf`.
+    result = tf.where(
+        cut_logits > 0.,
+        1. + tfp_math.log_add_exp(
+            logp + tfp_math.log1mexp(cut_logits), -cut_logits) / cut_logits,
+        tf.math.log1p(tf.math.expm1(cut_logits) * p) / cut_logits)
+
+    # Finally, handle the case where `cut_logits` and `p` are on the boundary,
+    # as the above expressions can result in ratio of `infs` in that case as
+    # well.
+    result = tf.where(
+        (tf.math.equal(cut_probs, 0.) & tf.math.equal(logp, 0.)) |
+        (tf.math.equal(cut_probs, 1.) & tf.math.is_inf(logp)),
+        tf.ones_like(cut_probs),
+        result)
+
     return tf.where(
-        (probs < self._lims[0]) | (probs > self._lims[1]),
-        (tf.math.log1p(-cut_probs + p * (2.0 * cut_probs - 1.0))
-         - tf.math.log1p(-cut_probs))
-        / (tf.math.log(cut_probs) - tf.math.log1p(-cut_probs)), p)
+        (probs < self._lims[0]) | (probs > self._lims[1]), result, p)
 
   def _mode(self):
     """Returns `1` if `prob > 0.5` and `0` otherwise."""
