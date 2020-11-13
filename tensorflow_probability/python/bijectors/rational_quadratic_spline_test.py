@@ -106,7 +106,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
             bin_heights=self._bin_heights(x),
             knot_slopes=self._knot_slopes(x))
 
-    xs = np.random.randn(1, 15).astype(np.float32)  # Keras won't Dense(.)(vec).
+    xs = np.random.randn(3, 15).astype(np.float32)  # Keras won't Dense(.)(vec).
     splines = [SplineParams() for _ in range(nsplits)]
 
     def spline_flow():
