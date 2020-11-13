@@ -82,23 +82,27 @@ class RationalQuadraticSpline(bijector.Bijector):
       self._bin_heights = None
       self._knot_slopes = None
 
-    def _bin_positions(self, x):
-      x = tf.reshape(x, [-1, self._nbins])
-      return tf.math.softmax(x, axis=-1) * (2 - self._nbins * 1e-2) + 1e-2
-
-    def _slopes(self, x):
-      x = tf.reshape(x, [-1, self._nbins - 1])
-      return tf.math.softplus(x) + 1e-2
-
     def __call__(self, x, nunits):
       if not self._built:
+        def _bin_positions(x):
+          out_shape = tf.concat((tf.shape(x)[:-1], (nunits, self._nbins)), 0)
+          x = tf.reshape(x, out_shape)
+          return tf.math.softmax(x, axis=-1) * (2 - self._nbins * 1e-2) + 1e-2
+
+        def _slopes(x):
+          out_shape = tf.concat((
+            tf.shape(x)[:-1], (nunits, self._nbins - 1)), 0)
+          x = tf.reshape(x, out_shape)
+          return tf.math.softplus(x) + 1e-2
+
         self._bin_widths = tf.keras.layers.Dense(
-            nunits * self._nbins, activation=self._bin_positions, name='w')
+            nunits * self._nbins, activation=_bin_positions, name='w')
         self._bin_heights = tf.keras.layers.Dense(
-            nunits * self._nbins, activation=self._bin_positions, name='h')
+            nunits * self._nbins, activation=_bin_positions, name='h')
         self._knot_slopes = tf.keras.layers.Dense(
-            nunits * (self._nbins - 1), activation=self._slopes, name='s')
+            nunits * (self._nbins - 1), activation=_slopes, name='s')
         self._built = True
+
       return tfb.RationalQuadraticSpline(
           bin_widths=self._bin_widths(x),
           bin_heights=self._bin_heights(x),
