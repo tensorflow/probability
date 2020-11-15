@@ -71,6 +71,7 @@ class Exponential(gamma.Gamma):
 
   def __init__(self,
                rate,
+               force_probs_to_zero_outside_support=False,
                validate_args=False,
                allow_nan_stats=True,
                name="Exponential"):
@@ -79,6 +80,17 @@ class Exponential(gamma.Gamma):
     Args:
       rate: Floating point tensor, equivalent to `1 / mean`. Must contain only
         positive values.
+      force_probs_to_zero_outside_support: Python `bool`. When `True`, negative
+        and non-integer values are evaluated "strictly": `cdf` returns
+        `0`, `sf` returns `1`, and `log_cdf` and `log_sf` correspond.  When
+        `False`, the implementation is free to save computation (and TF graph
+        size) by evaluating something that matches the Exponential cdf at
+        non-negative values `x` but produces an unrestricted result on
+        other inputs. In the case of Exponential distribution, the `cdf`
+        formula in this case happens to be the continuous function
+        `1 - exp(rate * value)`.
+        Note that this function is not itself a cdf function.
+        Default value: `False`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -99,6 +111,8 @@ class Exponential(gamma.Gamma):
           rate,
           name="rate",
           dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
+      self._force_probs_to_zero_outside_support = (
+          force_probs_to_zero_outside_support)
       super(Exponential, self).__init__(
           concentration=1.,
           rate=self._rate,
@@ -120,18 +134,29 @@ class Exponential(gamma.Gamma):
   def rate(self):
     return self._rate
 
+  @property
+  def force_probs_to_zero_outside_support(self):
+    """Return 0 probabilities on non-integer inputs."""
+    return self._force_probs_to_zero_outside_support
+
   def _cdf(self, value):
-    return tf.where(
-        value < 0.,
-        tf.zeros_like(value),
-        -tf.math.expm1(-self.rate * value))
+    cdf = -tf.math.expm1(-self.rate * value)
+
+    if self.force_probs_to_zero_outside_support:
+      # Set cdf = 0 when value is less than 0.
+      cdf = tf.where(value < 0., tf.zeros_like(cdf), cdf)
+
+    return cdf
 
   def _log_survival_function(self, value):
     rate = tf.convert_to_tensor(self._rate)
-    return tf.where(
-        value < 0.,
-        tf.zeros_like(value),
-        self._log_prob(value, rate=rate) - tf.math.log(rate))
+    log_sf = self._log_prob(value, rate=rate) - tf.math.log(rate)
+
+    if self.force_probs_to_zero_outside_support:
+      # Set log_survival_function = 0 when value is less than 0.
+      log_sf = tf.where(value < 0., tf.zeros_like(log_sf), log_sf)
+
+    return log_sf
 
   def _sample_n(self, n, seed=None):
     rate = tf.convert_to_tensor(self.rate)
