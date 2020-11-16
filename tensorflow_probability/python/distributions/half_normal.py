@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import math
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -154,7 +156,7 @@ class HalfNormal(distribution.Distribution):
 
   def _prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
-    coeff = np.sqrt(2) / scale / np.sqrt(np.pi)
+    coeff = math.sqrt(2) / scale / math.sqrt(np.pi)
     pdf = coeff * tf.exp(-0.5 * (x / scale)**2)
     return pdf * tf.cast(x >= 0, self.dtype)
 
@@ -173,10 +175,10 @@ class HalfNormal(distribution.Distribution):
     return 0.5 * tf.math.log(np.pi * self.scale**2.0 / 2.0) + 0.5
 
   def _mean(self):
-    return self.scale * np.sqrt(2.0) / np.sqrt(np.pi)
+    return self.scale * math.sqrt(2.0) / math.sqrt(np.pi)
 
   def _quantile(self, p):
-    return np.sqrt(2.0) * self.scale * tf.math.erfinv(p)
+    return math.sqrt(2.0) * self.scale * tf.math.erfinv(p)
 
   def _mode(self):
     return tf.zeros(self.batch_shape_tensor())
