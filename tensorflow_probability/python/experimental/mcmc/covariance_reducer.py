@@ -148,7 +148,7 @@ class CovarianceReducer(reducer_base.Reducer):
         name=name or 'covariance_reducer'
     )
 
-  def initialize(self, initial_chain_state, initial_kernel_results):
+  def initialize(self, initial_chain_state, initial_kernel_results=None):
     """Initializes a `CovarianceReducerState` using previously defined metadata.
 
     For calculation purposes, the `initial_chain_state` does not count as a
@@ -172,14 +172,13 @@ class CovarianceReducer(reducer_base.Reducer):
       initial_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           initial_chain_state)
-      initial_kernel_results = tf.nest.map_structure(
-          tf.convert_to_tensor,
-          initial_kernel_results,
-      )
+      if initial_kernel_results is not None:
+        initial_kernel_results = tf.nest.map_structure(
+            tf.convert_to_tensor,
+            initial_kernel_results)
       initial_fn_result = tf.nest.map_structure(
           lambda fn: fn(initial_chain_state, initial_kernel_results),
-          self.transform_fn,
-      )
+          self.transform_fn)
       event_ndims = _canonicalize_event_ndims(
           initial_fn_result, self.event_ndims)
       def init(tensor, event_ndims):
@@ -193,7 +192,7 @@ class CovarianceReducer(reducer_base.Reducer):
       self,
       new_chain_state,
       current_reducer_state,
-      previous_kernel_results,
+      previous_kernel_results=None,
       axis=None):
     """Update the `current_reducer_state` with a new chain state.
 
@@ -229,13 +228,13 @@ class CovarianceReducer(reducer_base.Reducer):
       new_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           new_chain_state)
-      previous_kernel_results = tf.nest.map_structure(
-          tf.convert_to_tensor,
-          previous_kernel_results)
+      if previous_kernel_results is not None:
+        previous_kernel_results = tf.nest.map_structure(
+            tf.convert_to_tensor,
+            previous_kernel_results)
       fn_results = tf.nest.map_structure(
           lambda fn: fn(new_chain_state, previous_kernel_results),
-          self.transform_fn,
-      )
+          self.transform_fn)
       if not nest.is_nested(axis):
         axis = nest_util.broadcast_structure(fn_results, axis)
       running_covariances = nest.map_structure(
@@ -243,8 +242,7 @@ class CovarianceReducer(reducer_base.Reducer):
           current_reducer_state.cov_state,
           fn_results,
           axis,
-          check_types=False,
-      )
+          check_types=False)
       return CovarianceReducerState(running_covariances)
 
   def finalize(self, final_reducer_state):
