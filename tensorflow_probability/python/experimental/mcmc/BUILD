@@ -561,6 +561,7 @@ py_test(
         ":sample",
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
