@@ -538,15 +538,13 @@ class RunningMeanTest(test_util.TestCase):
 class RunningCentralMomentsTest(test_util.TestCase):
 
   def test_first_five_moments(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in range(5):
-      state = running_moments.update(state, sample)
+      running_moments = running_moments.update(sample)
     zeroth_moment, var, skew, kur, fifth_moment = self.evaluate(
-        running_moments.finalize(state))
+        running_moments.moments())
     self.assertNear(0, zeroth_moment, err=1e-6)
     self.assertNear(2, var, err=1e-6)
     self.assertNear(0, skew, err=1e-6)
@@ -554,43 +552,35 @@ class RunningCentralMomentsTest(test_util.TestCase):
     self.assertNear(0, fifth_moment, err=1e-6)
 
   def test_specific_moments(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=[5, 3]
-    )
-    state = running_moments.initialize()
+        moment=[5, 3])
     for sample in range(5):
-      state = running_moments.update(state, sample)
-    fifth_moment, skew = self.evaluate(
-        running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    fifth_moment, skew = self.evaluate(running_moments.moments())
     self.assertNear(0, skew, err=1e-6)
     self.assertNear(0, fifth_moment, err=1e-6)
 
   def test_very_high_moments(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=np.arange(15) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(15) + 1)
     for sample in range(5):
-      state = running_moments.update(state, sample)
-    moments = self.evaluate(
-        running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(np.arange(5), moment=np.arange(15) + 1),
         moments,
         rtol=1e-6)
 
   def test_higher_rank_samples(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(2, 2),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in range(5):
-      state = running_moments.update(state, tf.ones((2, 2)) * sample)
+      running_moments = running_moments.update(tf.ones((2, 2)) * sample)
     zeroth_moment, var, skew, kur, fifth_moment = self.evaluate(
-        running_moments.finalize(state))
+        running_moments.moments())
     self.assertAllClose(tf.zeros((2, 2)), zeroth_moment, rtol=1e-6)
     self.assertAllClose(tf.ones((2, 2)) * 2, var, rtol=1e-6)
     self.assertAllClose(tf.zeros((2, 2)), skew, rtol=1e-6)
@@ -600,66 +590,54 @@ class RunningCentralMomentsTest(test_util.TestCase):
   def test_random_scalar_samples(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100)
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in x:
-      state = running_moments.update(state, sample)
-    moments = self.evaluate(running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(x, moment=[1, 2, 3, 4, 5]), moments, rtol=1e-6)
 
   def test_random_higher_rank_samples(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100, 10)
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(10,),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in x:
-      state = running_moments.update(state, sample)
-    moments = self.evaluate(running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(x, moment=[1, 2, 3, 4, 5]), moments, rtol=1e-6)
 
   def test_manual_dtype(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
         moment=1,
-        dtype=tf.float64
-    )
-    state = running_moments.initialize()
-    state = running_moments.update(state, 0)
-    moment = running_moments.finalize(state)
+        dtype=tf.float64)
+    running_moments = running_moments.update(0)
+    moment = running_moments.moments()
     self.assertEqual(tf.float64, moment.dtype)
 
   def test_int_dtype_casts(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
         moment=1,
-        dtype=tf.int32
-    )
-    state = running_moments.initialize()
-    state = running_moments.update(state, 0)
-    moment = running_moments.finalize(state)
+        dtype=tf.int32)
+    running_moments = running_moments.update(0)
+    moment = running_moments.moments()
     self.assertEqual(tf.float32, moment.dtype)
 
   def test_in_tf_while(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
-        shape=(),
-        moment=np.arange(4) + 1
-    )
-    state = running_moments.initialize()
-    _, state = tf.while_loop(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
+        shape=(), moment=[1, 2, 3, 4])
+    _, running_moments = tf.while_loop(
         lambda i, _: i < 5,
-        lambda i, st: (i + 1, running_moments.update(st, tf.ones(()) * i)),
-        (0., state)
+        lambda i, mom: (i + 1, mom.update(tf.ones(()) * i)),
+        (0., running_moments)
     )
-    moments = self.evaluate(
-        running_moments.finalize(state))
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(np.arange(5), moment=np.arange(4) + 1),
         moments,
