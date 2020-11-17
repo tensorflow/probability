@@ -351,5 +351,34 @@ class GlowTest(test_util.TestCase):
     self.assertAllFinite(self.evaluate(z))
     self.assertAllFinite(self.evaluate(zf64))
 
+  def testBijectorFn(self):
+    """Test if the bijector function works for additive coupling."""
+    ims = self._make_images()
+    def shiftfn(input_shape):
+      input_nchan = input_shape[-1]
+      return tf.keras.Sequential([
+          tf.keras.layers.Input(input_shape),
+          tf.keras.layers.Conv2D(
+              input_nchan, 3, padding='same')])
+
+    def shiftexitfn(input_shape, output_chan):
+      return tf.keras.Sequential([
+          tf.keras.layers.Input(input_shape),
+          tf.keras.layers.Conv2D(
+              output_chan, 3, padding='same')])
+
+    shiftonlyglow = tfb.Glow(
+        output_shape=self.output_shape,
+        num_glow_blocks=2,
+        num_steps_per_block=1,
+        coupling_bijector_fn=shiftfn,
+        exit_bijector_fn=shiftexitfn,
+        grab_after_block=[0.5, 0.5]
+        )
+    z = shiftonlyglow.inverse(ims)
+    self.evaluate([v.initializer for v in shiftonlyglow.variables])
+    self.assertAllFinite(self.evaluate(z))
+
+
 if __name__ == '__main__':
   tf.test.main()

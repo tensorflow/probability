@@ -581,7 +581,7 @@ class ExitBijector(blockwise.Blockwise):
           output = this_shift(this_scale)
         elif target_shape[-1] == output_shape[-1]:
 
-          output = shift.Shift(possible_output[..., c:])
+          output = shift.Shift(possible_output[..., :c])
         else:
           raise ValueError('Shape inconsistent with input. Expected shape'
                            '{0} or {1} but tensor was shape {2}'.format(
@@ -676,7 +676,7 @@ class GlowBlock(chain.Chain):
           output = this_shift(this_scale)
         elif input_shape[-1] == output_shape[-1]:
 
-          output = shift.Shift(possible_output[..., c:])
+          output = shift.Shift(possible_output[..., :c])
         else:
           raise ValueError('Shape inconsistent with input. Expected shape'
                            '{0} or {1} but tensor was shape {2}'.format(
@@ -860,4 +860,3 @@ class GlowDefaultExitNetwork(tfk.Sequential):
     super(GlowDefaultExitNetwork, self).__init__([
         tfkl.Input(input_shape),
         conv(this_nchan, kernel_shape)])
-
