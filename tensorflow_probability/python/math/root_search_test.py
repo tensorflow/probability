@@ -191,8 +191,9 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
     self.assertAllClose(roots, true_x, atol=1e-4)
 
   def test_chandrupatla_batch_high_degree_polynomial(self):
-    expected_roots = samplers.normal(
-        [4, 3], seed=test_util.test_seed(sampler_type='stateless'))
+    seed = test_util.test_seed(sampler_type='stateless')
+    expected_roots = self.evaluate(samplers.normal(
+        [4, 3], seed=seed))
     roots, value_at_roots, _ = tfp.math.find_root_chandrupatla(
         objective_fn=lambda x: (x - expected_roots)**15,
         low=-20.,
@@ -218,6 +219,22 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
         max_iterations=max_iterations)
     self.assertAllClose(num_iterations,
                         max_iterations)
+
+  def test_chandrupatla_halts_at_fixed_point(self):
+    # This search would naively get stuck at the interval
+    # {a=1.4717137813568115, b=1.471713662147522}, which does not quite
+    # satisfy the tolerance, but will never be tightened further because it has
+    # the property that `0.5 * a + 0.5 * b == a` in float32. The search should
+    # detect the fixed point and halt early.
+    max_iterations = 50
+    _, _, num_iterations = tfp.math.find_root_chandrupatla(
+        lambda ux: tf.math.igamma(2., tf.nn.softplus(ux)) - 0.5,
+        low=-100.,
+        high=100.,
+        position_tolerance=1e-8,
+        value_tolerance=1e-8,
+        max_iterations=max_iterations)
+    self.assertLess(self.evaluate(num_iterations), max_iterations)
 
   def test_chandrupatla_float64_high_precision(self):
     expected_roots = samplers.normal(
