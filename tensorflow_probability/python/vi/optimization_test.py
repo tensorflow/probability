@@ -159,7 +159,7 @@ class OptimizationTests(test_util.TestCase):
         num_steps=100,
         seed=test_util.test_seed(),
         sample_size=1,
-        trace_fn=lambda loss, grads, variables: (loss, q.sample(seed=42)[0]))
+        trace_fn=lambda t: (t.loss, q.sample(seed=42)[0]))
 
     self.evaluate(tf1.global_variables_initializer())
     losses_, sample_path_ = self.evaluate((losses, sample_path))
