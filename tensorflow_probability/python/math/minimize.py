@@ -22,8 +22,6 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
 
 class MinimizeTraceableQuantities(collections.namedtuple(
     'MinimizeTraceableQuantities',
@@ -49,33 +47,6 @@ class MinimizeTraceableQuantities(collections.namedtuple(
     maintained by the user-provided convergence criterion.
 
   """
-
-
-# Backwards compatibility for older `trace_fns` that took separate
-# loss, grads, and params.
-def _maybe_wrap_old_style_trace_fn(trace_fn):
-  """Returns a `trace_fn that takes the single `minimizer_state` argument."""
-
-  def safe_trace_fn(traceable_quantities):
-    """A `trace_fn that takes the single `minimizer_state` argument."""
-    try:
-      return trace_fn(traceable_quantities)
-    except TypeError:
-      deprecated_trace_fn = deprecation.deprecated_args(
-          '2020-07-01',
-          'The signature for `trace_fn`s passed to `minimize` has changed. '
-          'Trace functions now take a single `traceable_quantities` argument, '
-          'which is a `tfp.math.MinimizeTraceableQuantities` namedtuple '
-          'containing `traceable_quantities.loss`, '
-          '`traceable_quantities.gradients`, etc. '
-          'Please update your `trace_fn` definition.',
-          ('loss', 'grads', 'variables')
-      )(trace_fn)
-      return deprecated_trace_fn(
-          traceable_quantities.loss,
-          traceable_quantities.gradients,
-          traceable_quantities.parameters)
-  return safe_trace_fn
 
 
 def _tile_last_written_value(trace_array, last_written_idx):
@@ -312,8 +283,6 @@ def minimize(loss_fn,
 
   """
 
-  trace_fn = _maybe_wrap_old_style_trace_fn(trace_fn)
-
   def convergence_detected(step, trace_arrays,
                            has_converged=None,
                            convergence_criterion_state=None):
@@ -379,4 +348,3 @@ def minimize(loss_fn,
             trace_arrays)
 
     return tf.nest.map_structure(lambda array: array.stack(), trace_arrays)
-
