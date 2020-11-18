@@ -18,24 +18,15 @@ import inspect
 from oryx.bijectors import bijector_extensions
 from tensorflow_probability.substrates import jax as tfp
 
-__all__ = [
-    'bijector_extensions'
-]
-
 tfb = tfp.bijectors
 
-_bijectors = {}
+__all__ = tfb.__all__
 
-for name in dir(tfb):
+for name in __all__:
   bij = getattr(tfb, name)
   if inspect.isclass(bij) and issubclass(bij, tfb.Bijector):
     if bij is not tfb.Bijector:
       bij = bijector_extensions.make_type(bij)
-  _bijectors[name] = bij
+  locals()[name] = bij
 
-
-for key, val in _bijectors.items():
-  locals()[key] = val
-
-
-del _bijectors
+del tfb
