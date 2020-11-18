@@ -448,7 +448,12 @@ def find_root_chandrupatla(objective_fn,
     # Evaluate the new point.
     x_new = (1 - t) * a + t * b
     f_new = objective_fn(x_new)
-    # Tighten the bounds.
+    # If we've bisected (t==0.5) and the new float value for `a` is identical to
+    # that from the previous iteration, then we'll keep bisecting (the
+    # logic below will set t==0.5 for the next step), and nothing further will
+    # change.
+    at_fixed_point = tf.equal(x_new, a) & tf.equal(t, 0.5)
+    # Otherwise, tighten the bounds.
     a, b, c, f_a, f_b, f_c = _structure_broadcasting_where(
         tf.equal(tf.math.sign(f_new), tf.math.sign(f_a)),
         (x_new, b, a, f_new, f_b, f_a),
@@ -458,7 +463,9 @@ def find_root_chandrupatla(objective_fn,
     f_best = tf.where(tf.abs(f_a) < tf.abs(f_b), f_a, f_b)
     interval_tolerance = position_tolerance / (tf.abs(b - c))
     converged = tf.logical_or(interval_tolerance > 0.5,
-                              tf.math.abs(f_best) <= value_tolerance)
+                              tf.logical_or(
+                                  tf.math.abs(f_best) <= value_tolerance,
+                                  at_fixed_point))
 
     # Propose next point to evaluate.
     xi = (a - b) / (c - b)
