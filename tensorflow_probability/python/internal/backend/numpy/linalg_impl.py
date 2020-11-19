@@ -161,9 +161,9 @@ def _lu(input, output_idx_type=np.int32, name=None):  # pylint: disable=redefine
   input = ops.convert_to_tensor(input)
   if JAX_MODE:  # JAX uses XLA, which can do a batched factorization.
     lu_out, pivots = scipy_linalg.lu_factor(input)
-    from jax import lax_linalg  # pylint: disable=g-import-not-at-top
+    from jax import lax  # pylint: disable=g-import-not-at-top
     return Lu(lu_out,
-              lax_linalg.lu_pivots_to_permutation(pivots, lu_out.shape[-1]))
+              lax.linalg.lu_pivots_to_permutation(pivots, lu_out.shape[-1]))
   # Scipy can't batch, so we must do so manually.
   nbatch = int(np.prod(input.shape[:-2]))
   dim = input.shape[-1]
