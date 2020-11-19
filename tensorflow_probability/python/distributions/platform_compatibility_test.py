@@ -395,7 +395,8 @@ class DistributionCompositeTensorTest(test_util.TestCase):
     dist = data.draw(
         dhps.distributions(
             dist_name=dist_name, enable_vars=False, validate_args=False))
-    self._test_sample_and_log_prob(dist_name, dist)
+    with tfp_hps.no_tf_rank_errors():
+      self._test_sample_and_log_prob(dist_name, dist)
 
 
 @test_util.test_graph_mode_only
@@ -472,7 +473,8 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
     dist = data.draw(dhps.distributions(
         dist_name=dist_name, enable_vars=False,
         validate_args=False))  # TODO(b/142826246): Enable validate_args.
-    self._test_vectorization(dist_name, dist)
+    with tfp_hps.no_tf_rank_errors():
+      self._test_vectorization(dist_name, dist)
 
 
 if __name__ == '__main__':
