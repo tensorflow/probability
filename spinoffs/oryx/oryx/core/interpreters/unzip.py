@@ -34,9 +34,9 @@ from jax import api_util
 from jax import core as jax_core
 from jax import custom_derivatives as cd
 from jax import linear_util as lu
-from jax import source_info_util
 from jax import tree_util
 from jax import util as jax_util
+from jax._src import source_info_util
 from jax.interpreters import partial_eval as pe
 import numpy as onp
 
