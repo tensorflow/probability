@@ -59,7 +59,7 @@ def quap(joint_dist, data=None, max_tries=20, initial_position=None, name=None):
       value will be a quadratic approximation to the distribution itself.
     max_tries: Optional `int` of number of times to run the optimizer internally
       before raising a `RuntimeError`. Default is 10.
-      initial_position: Optional `dict` to initialize the optimizer. Keys should
+    initial_position: Optional `dict` to initialize the optimizer. Keys should
       correspond to names in the JointDistribution. Defaults to random draws
       from `joint_dist`.
     name: Python `str` name prefixed to ops created by this function.
