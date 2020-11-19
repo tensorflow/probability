@@ -104,5 +104,82 @@ class RandomRayleighDynamic64(test_util.TestCase, _RandomRayleigh):
   use_static_shape = True
 
 
+class _RandomSphericalUniform(object):
+
+  def verify_expectations(self, d):
+    shape_ = np.array([int(1e6)], np.int32)
+    shape = (
+        tf.constant(shape_) if self.use_static_shape else
+        tf1.placeholder_with_default(shape_, shape=None))
+    # This shape will require broadcasting before sampling.
+    dimension = (
+        tf.constant(d) if self.use_static_shape else
+        tf1.placeholder_with_default(d, shape=None))
+    x = tfp.random.spherical_uniform(
+        dimension=dimension,
+        shape=shape,
+        dtype=self.dtype,
+        seed=test_util.test_seed())
+    self.assertEqual(self.dtype, dtype_util.as_numpy_dtype(x.dtype))
+    final_shape_ = [int(1e6), d]
+    if self.use_static_shape:
+      self.assertAllEqual(final_shape_, x.shape)
+    sample_mean = tf.reduce_mean(x, axis=0, keepdims=True)
+    sample_covar = tfp.stats.covariance(x)
+    [x_, sample_mean_, sample_covar_] = self.evaluate([
+        x, sample_mean, sample_covar])
+    self.assertAllEqual(final_shape_, x_.shape)
+    self.assertAllClose(
+        np.zeros_like(sample_mean_), sample_mean_, atol=2e-3, rtol=1e-3)
+    self.assertAllClose(
+        np.eye(d, dtype=self.dtype) / d, sample_covar_, atol=2e-3, rtol=1e-2)
+
+  def test_expectations_1d(self):
+    self.verify_expectations(1)
+
+  def test_expectations_2d(self):
+    self.verify_expectations(2)
+
+  def test_expectations_3d(self):
+    self.verify_expectations(3)
+
+  def test_expectations_5d(self):
+    self.verify_expectations(4)
+
+  def test_expectations_9d(self):
+    self.verify_expectations(9)
+
+  def test_jitted_sampling(self):
+    self.skip_if_no_xla()
+    shape = np.int32([2, 3])
+    seed = test_util.test_seed()
+    dimension = np.int32(10)
+
+    @tf.function(experimental_compile=True)
+    def sample():
+      return tfp.random.spherical_uniform(
+          dimension=dimension,
+          shape=shape,
+          seed=seed,
+          dtype=self.dtype)
+
+    samples = self.evaluate(sample())
+    self.assertAllEqual([2, 3, 10], samples.shape)
+
+
+@test_util.test_all_tf_execution_regimes
+class RandomSphericalUniformDynamic32(
+    test_util.TestCase, _RandomSphericalUniform):
+  dtype = np.float32
+  use_static_shape = False
+
+
+@test_util.test_all_tf_execution_regimes
+class RandomSphericalUniformStatic64(
+    test_util.TestCase, _RandomSphericalUniform):
+  dtype = np.float64
+  use_static_shape = True
+
+
 if __name__ == '__main__':
   tf.test.main()
