@@ -14,101 +14,25 @@
 # ============================================================================
 """Chain bijector."""
 
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import composition
+from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "Chain",
+    'Chain',
 ]
 
 
-def _use_static_shape(input_tensor, ndims):
-  return (tensorshape_util.is_fully_defined(input_tensor.shape) and
-          isinstance(ndims, int))
-
-
-def _compute_min_event_ndims(bijector_list, compute_forward=True):
-  """Computes the min_event_ndims associated with the give list of bijectors.
-
-  Given a list `bijector_list` of bijectors, compute the min_event_ndims that is
-  associated with the composition of bijectors in that list.
-
-  min_event_ndims is the # of right most dimensions for which the bijector has
-  done necessary computation on (i.e. the non-broadcastable part of the
-  computation).
-
-  We can derive the min_event_ndims for a chain of bijectors as follows:
-
-  In the case where there are no rank changing bijectors, this will simply be
-  `max(b.forward_min_event_ndims for b in bijector_list)`. This is because the
-  bijector with the most forward_min_event_ndims requires the most dimensions,
-  and hence the chain also requires operating on those dimensions.
-
-  However in the case of rank changing, more care is needed in determining the
-  exact amount of dimensions. Padding dimensions causes subsequent bijectors to
-  operate on the padded dimensions, and Removing dimensions causes bijectors to
-  operate more left.
-
-  Args:
-    bijector_list: List of bijectors to be composed by chain.
-    compute_forward: Boolean. If True, computes the min_event_ndims associated
-      with a forward call to Chain, and otherwise computes the min_event_ndims
-      associated with an inverse call to Chain. The latter is the same as the
-      min_event_ndims associated with a forward call to Invert(Chain(....)).
-
-  Returns:
-    min_event_ndims
-  """
-  min_event_ndims = 0
-  # This is a mouthful, but what this encapsulates is that if not for rank
-  # changing bijectors, we'd only need to compute the largest of the min
-  # required ndims. Hence "max_min". Due to rank changing bijectors, we need to
-  # account for synthetic rank growth / synthetic rank decrease from a rank
-  # changing bijector.
-  rank_changed_adjusted_max_min_event_ndims = 0
-
-  if compute_forward:
-    bijector_list = reversed(bijector_list)
-
-  for b in bijector_list:
-    if compute_forward:
-      current_min_event_ndims = b.forward_min_event_ndims
-      current_inverse_min_event_ndims = b.inverse_min_event_ndims
-    else:
-      current_min_event_ndims = b.inverse_min_event_ndims
-      current_inverse_min_event_ndims = b.forward_min_event_ndims
-
-    # New dimensions were touched.
-    if rank_changed_adjusted_max_min_event_ndims < current_min_event_ndims:
-      min_event_ndims += (
-          current_min_event_ndims - rank_changed_adjusted_max_min_event_ndims)
-    rank_changed_adjusted_max_min_event_ndims = max(
-        current_min_event_ndims, rank_changed_adjusted_max_min_event_ndims)
-
-    # If the number of dimensions has increased via forward, then
-    # inverse_min_event_ndims > forward_min_event_ndims, and hence the
-    # dimensions we computed on, have moved left (so we have operated
-    # on additional dimensions).
-    # Conversely, if the number of dimensions has decreased via forward,
-    # then we have inverse_min_event_ndims < forward_min_event_ndims,
-    # and so we will have operated on fewer right most dimensions.
-
-    number_of_changed_dimensions = (
-        current_min_event_ndims - current_inverse_min_event_ndims)
-    rank_changed_adjusted_max_min_event_ndims -= number_of_changed_dimensions
-  return min_event_ndims
-
-
-class Chain(bijector.Bijector):
+class Chain(composition.Composition):
   """Bijector which applies a sequence of bijectors.
 
   Example Use:
@@ -158,6 +82,7 @@ class Chain(bijector.Bijector):
   def __init__(self,
                bijectors=None,
                validate_args=False,
+               validate_event_size=True,
                parameters=None,
                name=None):
     """Instantiates `Chain` bijector.
@@ -167,6 +92,16 @@ class Chain(bijector.Bijector):
         bijector equivalent to the `Identity` bijector.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
+      validate_event_size: Checks that bijectors are not applied to inputs with
+        incomplete support (that is, inputs where one or more elements are a
+        deterministic transformation of the others). For example, the following
+        LDJ would be incorrect:
+        `Chain([Scale(), SoftmaxCentered()]).forward_log_det_jacobian([1], [1])`
+        The jacobian contribution from `Scale` applies to a 2-dimensional input,
+        but the output from `SoftMaxCentered` is a 1-dimensional input embedded
+        in a 2-dimensional space. Setting `validate_event_size=True` (default)
+        prints warnings in these cases. When `validate_args` is also `True`, the
+        warning is promoted to an exception.
       parameters: Locals dict captured by subclass constructor, to be used for
         copy/slice re-instantiation operators.
       name: Python `str`, name given to ops managed by this object. Default:
@@ -176,164 +111,47 @@ class Chain(bijector.Bijector):
       ValueError: if bijectors have different dtypes.
     """
     parameters = dict(locals()) if parameters is None else parameters
+
     if name is None:
-      name = ("identity" if not bijectors else
-              "_of_".join(["chain"] + [b.name for b in bijectors]))
-      name = name.replace("/", "")
+      name = ('identity' if not bijectors else
+              '_of_'.join(['chain'] + [b.name for b in bijectors]))
+      name = name.replace('/', '')
+
+    if bijectors:
+      f_min_event_ndims, i_min_event_ndims = _infer_min_event_ndims(bijectors)
+    else:
+      # If there are no bijectors, treat this like a single-part Identity.
+      f_min_event_ndims = i_min_event_ndims = None
+
     with tf.name_scope(name) as name:
-      if bijectors is None:
-        bijectors = ()
-      self._bijectors = bijectors
-
-      for a_bijector in bijectors:
-        if not a_bijector._is_injective:  # pylint: disable=protected-access
-          raise NotImplementedError(
-              "Invert is not implemented for non-injective bijector "
-              "({})".format(a_bijector.name))
-
-      inverse_min_event_ndims = _compute_min_event_ndims(
-          bijectors, compute_forward=False)
-      forward_min_event_ndims = _compute_min_event_ndims(
-          bijectors, compute_forward=True)
-
       super(Chain, self).__init__(
-          forward_min_event_ndims=forward_min_event_ndims,
-          inverse_min_event_ndims=inverse_min_event_ndims,
-          is_constant_jacobian=all(b.is_constant_jacobian for b in bijectors),
+          bijectors=bijectors or (),
+          forward_min_event_ndims=f_min_event_ndims,
+          inverse_min_event_ndims=i_min_event_ndims,
           validate_args=validate_args,
+          validate_event_size=validate_event_size,
           parameters=parameters,
           name=name)
-
-  @property
-  def bijectors(self):
-    return self._bijectors
-
-  def _shape_helper(self, func_name, input_shape, reverse):
-    new_shape = input_shape
-    for b in reversed(self.bijectors) if reverse else self.bijectors:
-      func = getattr(b, func_name, None)
-      if func is None:
-        raise ValueError("unable to call %s on bijector %s (%s)" %
-                         (func_name, b.name, func))
-      new_shape = func(new_shape)
-    return new_shape
-
-  def _forward_event_shape(self, input_shape):
-    return self._shape_helper("forward_event_shape", input_shape,
-                              reverse=True)
-
-  def _forward_event_shape_tensor(self, input_shape):
-    return self._shape_helper(
-        "forward_event_shape_tensor", input_shape, reverse=True)
-
-  def _inverse_event_shape(self, output_shape):
-    return self._shape_helper("inverse_event_shape", output_shape,
-                              reverse=False)
-
-  def _inverse_event_shape_tensor(self, output_shape):
-    return self._shape_helper("inverse_event_shape_tensor", output_shape,
-                              reverse=False)
 
   def _is_increasing(self, **kwargs):
     # desc(desc)=>asc, asc(asc)=>asc, other cases=>desc.
     is_increasing = True
-    for b in self.bijectors:
-      is_increasing = prefer_static.equal(
+    for b in self._bijectors:
+      is_increasing = ps.equal(
           is_increasing, b._internal_is_increasing(**kwargs.get(b.name, {})))  # pylint: disable=protected-access
     return is_increasing
 
-  def _inverse(self, y, **kwargs):
-    for b in self.bijectors:
-      y = b.inverse(y, **kwargs.get(b.name, {}))
-    return y
+  def _walk_forward(self, step_fn, x, **kwargs):
+    """Applies `transform_fn` to `x` sequentially over nested bijectors."""
+    for bij in reversed(self._bijectors):
+      x = step_fn(bij, x, **kwargs.get(bij.name, {}))
+    return x  # Now `y`
 
-  def _inverse_log_det_jacobian(self, y, **kwargs):
-    y = tf.convert_to_tensor(y, name="y")
-    ildj = tf.cast(0., dtype=dtype_util.base_dtype(y.dtype))
-
-    if not self.bijectors:
-      return ildj
-
-    # TODO(b/162764645): Remove explicit event_ndims in Composite CL.
-    event_ndims = self.inverse_min_event_ndims
-
-    if _use_static_shape(y, event_ndims):
-      event_shape = y.shape[tensorshape_util.rank(y.shape) - event_ndims:]
-    else:
-      event_shape = tf.shape(y)[tf.rank(y) - event_ndims:]
-
-    # TODO(b/129973548): Document and simplify.
-    for b in self.bijectors:
-      ildj = ildj + b.inverse_log_det_jacobian(
-          y, event_ndims=event_ndims, **kwargs.get(b.name, {}))
-
-      if _use_static_shape(y, event_ndims):
-        event_shape = b.inverse_event_shape(event_shape)
-        event_ndims = tensorshape_util.rank(event_shape)
-      else:
-        event_shape = b.inverse_event_shape_tensor(event_shape)
-        event_shape_ = distribution_util.maybe_get_static_value(event_shape)
-        event_ndims = tf.size(event_shape)
-        event_ndims_ = event_ndims
-
-        if event_ndims_ is not None and event_shape_ is not None:
-          event_ndims = event_ndims_
-          event_shape = event_shape_
-
-      y = b.inverse(y, **kwargs.get(b.name, {}))
-    return ildj
-
-  def _inverse_dtype(self, dtype, **kwargs):
-    for b in self.bijectors:
-      dtype = b.inverse_dtype(dtype, **kwargs.get(b.name, {}))
-    return dtype
-
-  def _forward(self, x, **kwargs):
-    # TODO(b/162023850): Sanitize the kwargs better.
-    for b in reversed(self.bijectors):
-      x = b.forward(x, **kwargs.get(b.name, {}))
-    return x
-
-  def _forward_log_det_jacobian(self, x, **kwargs):
-    x = tf.convert_to_tensor(x, name="x")
-
-    fldj = tf.cast(0., dtype=dtype_util.base_dtype(x.dtype))
-
-    if not self.bijectors:
-      return fldj
-
-    event_ndims = self.forward_min_event_ndims
-
-    if _use_static_shape(x, event_ndims):
-      event_shape = x.shape[tensorshape_util.rank(x.shape) - event_ndims:]
-    else:
-      event_shape = tf.shape(x)[tf.rank(x) - event_ndims:]
-
-    # TODO(b/129973548): Document and simplify.
-    for b in reversed(self.bijectors):
-      fldj = fldj + b.forward_log_det_jacobian(
-          x, event_ndims=event_ndims, **kwargs.get(b.name, {}))
-      if _use_static_shape(x, event_ndims):
-        event_shape = b.forward_event_shape(event_shape)
-        event_ndims = tensorshape_util.rank(event_shape)
-      else:
-        event_shape = b.forward_event_shape_tensor(event_shape)
-        event_shape_ = distribution_util.maybe_get_static_value(event_shape)
-        event_ndims = tf.size(event_shape)
-        event_ndims_ = event_ndims
-
-        if event_ndims_ is not None and event_shape_ is not None:
-          event_ndims = event_ndims_
-          event_shape = event_shape_
-
-      x = b.forward(x, **kwargs.get(b.name, {}))
-
-    return fldj
-
-  def _forward_dtype(self, dtype, **kwargs):
-    for b in reversed(self.bijectors):
-      dtype = b.forward_dtype(dtype, **kwargs.get(b.name, {}))
-    return dtype
+  def _walk_inverse(self, step_fn, y, **kwargs):
+    """Applies `transform_fn` to `y` sequentially over nested bijectors."""
+    for bij in self._bijectors:
+      y = step_fn(bij, y, **kwargs.get(bij.name, {}))
+    return y  # Now `x`
 
   @property
   def _composite_tensor_nonshape_params(self):
@@ -345,4 +163,85 @@ class Chain(bijector.Bijector):
     identifies the keys of parameters that are expected to be tensors, except
     those that are shape-related.
     """
-    return ("bijectors",)
+    return ('bijectors',)
+
+
+def _infer_min_event_ndims(bijectors):
+  """Computes `min_event_ndims` for a sequence of bijectors."""
+  # Find the index of the first bijector with statically-known min_event_ndims.
+  try:
+    idx = next(i for i, b in enumerate(bijectors)
+               if b.has_static_min_event_ndims)
+  except StopIteration:
+    # If none of the nested bijectors have static min_event_ndims, give up
+    # and return tail-structures filled with `None`.
+    return (
+        nest_util.broadcast_structure(
+            bijectors[-1].forward_min_event_ndims, None),
+        nest_util.broadcast_structure(
+            bijectors[0].inverse_min_event_ndims, None))
+
+  # Accumulator tracking the maximum value of "min_event_ndims - ndims".
+  rolling_offset = 0
+
+  def update_event_ndims(input_event_ndims,
+                         input_min_event_ndims,
+                         output_min_event_ndims):
+    """Returns output_event_ndims and updates rolling_offset as needed."""
+    nonlocal rolling_offset
+    ldj_reduce_ndims = bijector_lib.ldj_reduction_ndims(
+        input_event_ndims, input_min_event_ndims)
+    # Update rolling_offset when batch_ndims are negative.
+    rolling_offset = ps.maximum(rolling_offset, -ldj_reduce_ndims)
+    return nest.map_structure(lambda nd: ldj_reduce_ndims + nd,
+                              output_min_event_ndims)
+
+  def sanitize_event_ndims(event_ndims):
+    """Updates `rolling_offset` when event_ndims are negative."""
+    nonlocal rolling_offset
+    max_missing_ndims = -ps.reduce_min(nest.flatten(event_ndims))
+    rolling_offset = ps.maximum(rolling_offset, max_missing_ndims)
+    return event_ndims
+
+  # Wrappers for Bijector.forward_event_ndims and Bijector.inverse_event_ndims
+  # that recursively walk into Composition bijectors when static min_event_ndims
+  # is not available.
+
+  def update_f_event_ndims(bij, event_ndims):
+    event_ndims = nest_util.coerce_structure(
+        bij.inverse_min_event_ndims, event_ndims)
+    if bij.has_static_min_event_ndims:
+      return update_event_ndims(
+          input_event_ndims=event_ndims,
+          input_min_event_ndims=bij.inverse_min_event_ndims,
+          output_min_event_ndims=bij.forward_min_event_ndims)
+    elif isinstance(bij, composition.Composition):
+      return bij._call_walk_inverse(update_f_event_ndims, event_ndims)  # pylint: disable=protected-access
+    else:
+      return sanitize_event_ndims(bij.inverse_event_ndims(event_ndims))
+
+  def update_i_event_ndims(bij, event_ndims):
+    event_ndims = nest_util.coerce_structure(
+        bij.forward_min_event_ndims, event_ndims)
+    if bij.has_static_min_event_ndims:
+      return update_event_ndims(
+          input_event_ndims=event_ndims,
+          input_min_event_ndims=bij.forward_min_event_ndims,
+          output_min_event_ndims=bij.inverse_min_event_ndims)
+    elif isinstance(bij, composition.Composition):
+      return bij._call_walk_forward(update_i_event_ndims, event_ndims)  # pylint: disable=protected-access
+    else:
+      return sanitize_event_ndims(bij.forward_event_ndims(event_ndims))
+
+  # Initialize event_ndims to the first statically-known min_event_ndims in
+  # the Chain of bijectors.
+  f_event_ndims = i_event_ndims = bijectors[idx].inverse_min_event_ndims
+  for b in bijectors[idx:]:
+    f_event_ndims = update_f_event_ndims(b, f_event_ndims)
+  for b in reversed(bijectors[:idx]):
+    i_event_ndims = update_i_event_ndims(b, i_event_ndims)
+
+  # Shift both event_ndims to satisfy min_event_ndims for nested components.
+  return (nest.map_structure(lambda nd: rolling_offset + nd, f_event_ndims),
+          nest.map_structure(lambda nd: rolling_offset + nd, i_event_ndims))
+

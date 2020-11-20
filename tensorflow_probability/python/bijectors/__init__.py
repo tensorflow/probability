@@ -31,6 +31,7 @@ from tensorflow_probability.python.bijectors.blockwise import Blockwise
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
+from tensorflow_probability.python.bijectors.composition import Composition
 from tensorflow_probability.python.bijectors.correlation_cholesky import CorrelationCholesky
 from tensorflow_probability.python.bijectors.cumsum import Cumsum
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
@@ -53,6 +54,7 @@ from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.bijectors.iterated_sigmoid_centered import IteratedSigmoidCentered
+from tensorflow_probability.python.bijectors.joint_map import JointMap
 from tensorflow_probability.python.bijectors.kumaraswamy_cdf import KumaraswamyCDF
 from tensorflow_probability.python.bijectors.lambertw_transform import LambertWTail
 from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveNetwork
@@ -73,6 +75,7 @@ from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_te
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
 from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
 from tensorflow_probability.python.bijectors.reshape import Reshape
+from tensorflow_probability.python.bijectors.restructure import Restructure
 from tensorflow_probability.python.bijectors.scale import Scale
 from tensorflow_probability.python.bijectors.scale_matvec_diag import ScaleMatvecDiag
 from tensorflow_probability.python.bijectors.scale_matvec_linear_operator import ScaleMatvecLinearOperator
@@ -113,6 +116,7 @@ __all__ = [
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
+    "Composition",
     "CorrelationCholesky",
     "Cumsum",
     "DiscreteCosineTransform",
@@ -133,6 +137,7 @@ __all__ = [
     "Inline",
     "Invert",
     "IteratedSigmoidCentered",
+    "JointMap",
     "KumaraswamyCDF",
     "LambertWTail",
     "Log",
@@ -152,6 +157,7 @@ __all__ = [
     "RealNVP",
     "Reciprocal",
     "Reshape",
+    "Restructure",
     "Scale",
     "ScaleMatvecDiag",
     "ScaleMatvecLinearOperator",

@@ -32,6 +32,7 @@ import collections
 
 # pylint: disable=unused-import
 from tree import _assert_shallow_structure
+from tree import _DOT
 from tree import _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ
 from tree import _INPUT_TREE_SMALLER_THAN_SHALLOW_TREE
 from tree import _is_attrs
@@ -40,6 +41,7 @@ from tree import _SHALLOW_TREE_HAS_INVALID_KEYS
 from tree import _STRUCTURES_HAVE_MISMATCHING_LENGTHS
 from tree import _STRUCTURES_HAVE_MISMATCHING_TYPES
 from tree import _yield_flat_up_to
+from tree import _yield_sorted_items
 from tree import _yield_value
 from tree import assert_same_structure
 from tree import flatten as dm_flatten

@@ -123,5 +123,6 @@ class FillScaleTriL(chain.Chain):
           [transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector),
            fill_triangular.FillTriangular()],
           validate_args=validate_args,
+          validate_event_size=False,
           parameters=parameters,
           name=name)
