@@ -106,6 +106,37 @@ class AutoCompositeTensorTest(test_util.TestCase):
                           after_loop,
                           expand_composites=True)
 
+  def test_already_ct_subclass(self):
+
+    @tfp.experimental.auto_composite_tensor
+    class MyCT(tfp.experimental.AutoCompositeTensor):
+
+      def __init__(self, tensor_param, non_tensor_param, maybe_tensor_param):
+        self._tensor_param = tf.convert_to_tensor(tensor_param)
+        self._non_tensor_param = non_tensor_param
+        self._maybe_tensor_param = maybe_tensor_param
+
+    def body(obj):
+      return MyCT(obj._tensor_param + 1,
+                  obj._non_tensor_param,
+                  obj._maybe_tensor_param),
+
+    init = MyCT(0., 0, 0)
+    result, = tf.while_loop(
+        cond=lambda *_: True,
+        body=body,
+        loop_vars=(init,),
+        maximum_iterations=3)
+    self.assertAllClose(3., result._tensor_param)
+
+    init = MyCT(0., 0, tf.constant(0))
+    result, = tf.while_loop(
+        cond=lambda *_: True,
+        body=body,
+        loop_vars=(init,),
+        maximum_iterations=3)
+    self.assertAllClose(3., result._tensor_param)
+
 
 if __name__ == '__main__':
   tf.enable_v2_behavior()
