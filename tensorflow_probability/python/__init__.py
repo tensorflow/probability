@@ -80,7 +80,6 @@ def _validate_tf_environment(package):
 
 # Declare these explicitly to appease pytype, which otherwise misses them,
 # presumably due to lazy loading.
-distributions: types.ModuleType
 bijectors: types.ModuleType
 debugging: types.ModuleType
 distributions: types.ModuleType
