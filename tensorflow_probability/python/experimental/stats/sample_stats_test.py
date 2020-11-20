@@ -34,6 +34,15 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class RunningCovarianceTest(test_util.TestCase):
 
+  def test_from_stats(self):
+    num_counts = 10.
+    mean = 1.
+    variance = 3.
+    var = tfp.experimental.stats.RunningVariance.init_from_stats(
+        num_counts, mean, variance)
+    self.assertEqual(self.evaluate(var.mean), mean)
+    self.assertEqual(self.evaluate(var.variance()), variance)
+
   def test_zero_running_variance(self):
     deterministic_samples = [0., 0., 0., 0.]
     var = tfp.experimental.stats.RunningVariance.from_shape()
@@ -457,45 +466,38 @@ class RunningPotentialScaleReductionTest(test_util.TestCase):
 class RunningMeanTest(test_util.TestCase):
 
   def test_zero_mean(self):
-    running_mean = tfp.experimental.stats.RunningMean(
-        shape=(),
-    )
-    state = running_mean.initialize()
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
+        shape=())
     for _ in range(6):
-      state = running_mean.update(state, 0)
-    mean = self.evaluate(running_mean.finalize(state))
+      running_mean = running_mean.update(0)
+    mean = self.evaluate(running_mean.mean)
     self.assertEqual(0, mean)
 
   def test_higher_rank_shape(self):
-    running_mean = tfp.experimental.stats.RunningMean(
-        shape=(5, 3),
-    )
-    state = running_mean.initialize()
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
+        shape=(5, 3))
     for sample in range(6):
-      state = running_mean.update(state, tf.ones((5, 3)) * sample)
-    mean = self.evaluate(running_mean.finalize(state))
+      running_mean = running_mean.update(tf.ones((5, 3)) * sample)
+    mean = self.evaluate(running_mean.mean)
     self.assertAllEqual(np.ones((5, 3)) * 2.5, mean)
 
   def test_manual_dtype(self):
-    running_mean = tfp.experimental.stats.RunningMean(
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
         shape=(),
-        dtype=tf.float64,
-    )
-    state = running_mean.initialize()
+        dtype=tf.float64)
     for _ in range(6):
-      state = running_mean.update(state, 0)
-    mean = running_mean.finalize(state)
+      running_mean = running_mean.update(0)
+    mean = running_mean.mean
     self.assertEqual(tf.float64, mean.dtype)
 
   def test_integer_dtype(self):
-    running_mean = tfp.experimental.stats.RunningMean(
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
         shape=(),
         dtype=tf.int32,
     )
-    state = running_mean.initialize()
     for sample in range(6):
-      state = running_mean.update(state, sample)
-    mean = running_mean.finalize(state)
+      running_mean = running_mean.update(sample)
+    mean = running_mean.mean
     self.assertEqual(tf.float32, mean.dtype)
     mean = self.evaluate(mean)
     self.assertEqual(2.5, mean)
@@ -503,72 +505,41 @@ class RunningMeanTest(test_util.TestCase):
   def test_random_mean(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100)
-    running_mean = tfp.experimental.stats.RunningMean(
-        shape=(),
-    )
-    state = running_mean.initialize()
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
+        shape=())
     for sample in x:
-      state = running_mean.update(state, sample)
-    mean = self.evaluate(running_mean.finalize(state))
+      running_mean = running_mean.update(sample)
+    mean = self.evaluate(running_mean.mean)
     self.assertAllClose(np.mean(x), mean, rtol=1e-6)
 
   def test_chunking(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100, 10, 5)
-    running_mean = tfp.experimental.stats.RunningMean(
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
         shape=(5,),
     )
-    state = running_mean.initialize()
     for sample in x:
-      state = running_mean.update(state, sample, axis=0)
-    mean = self.evaluate(running_mean.finalize(state))
+      running_mean = running_mean.update(sample, axis=0)
+    mean = self.evaluate(running_mean.mean)
     self.assertAllClose(np.mean(x.reshape(1000, 5), axis=0), mean, rtol=1e-6)
 
   def test_tf_while(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100, 10)
     tensor_x = tf.convert_to_tensor(x, dtype=tf.float32)
-    running_mean = tfp.experimental.stats.RunningMean(
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
         shape=(10,))
-    _, state = tf.while_loop(
+    _, running_mean = tf.while_loop(
         lambda i, _: i < 100,
-        lambda i, state: (i + 1, running_mean.update(state, tensor_x[i])),
-        (0, running_mean.initialize()))
-    mean = self.evaluate(running_mean.finalize(state))
-    self.assertAllClose(np.mean(x, axis=0), mean, rtol=1e-6)
-
-  def test_tf_while_with_dynamic_shape(self):
-    rng = test_util.test_np_rng()
-    x = rng.rand(100, 10)
-    tensor_x = tf.convert_to_tensor(x, dtype=tf.float32)
-    running_mean = tfp.experimental.stats.RunningMean(
-        shape=(10,))
-
-    def _loop_body(i, state):
-      if not tf.executing_eagerly():
-        sample = tf1.placeholder_with_default(tensor_x[i], shape=None)
-      else:
-        sample = tensor_x[i]
-      return (i + 1, running_mean.update(state, sample))
-
-    _, state = tf.while_loop(
-        lambda i, _: i < 100,
-        _loop_body,
-        (tf.constant(0, dtype=tf.int32), running_mean.initialize()),
-        shape_invariants=(
-            None, tfp.experimental.stats.RunningMeanState(
-                None,
-                tf.TensorShape(None),
-            )))
-    mean = self.evaluate(running_mean.finalize(state))
+        lambda i, running_mean: (i + 1, running_mean.update(tensor_x[i])),
+        (0, running_mean))
+    mean = self.evaluate(running_mean.mean)
     self.assertAllClose(np.mean(x, axis=0), mean, rtol=1e-6)
 
   def test_no_inputs(self):
-    running_mean = tfp.experimental.stats.RunningMean(
-        shape=(),
-    )
-    state = running_mean.initialize()
-    mean = self.evaluate(running_mean.finalize(state))
+    running_mean = tfp.experimental.stats.RunningMean.from_shape(
+        shape=())
+    mean = self.evaluate(running_mean.mean)
     self.assertEqual(0, mean)
 
 
@@ -576,15 +547,13 @@ class RunningMeanTest(test_util.TestCase):
 class RunningCentralMomentsTest(test_util.TestCase):
 
   def test_first_five_moments(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in range(5):
-      state = running_moments.update(state, sample)
+      running_moments = running_moments.update(sample)
     zeroth_moment, var, skew, kur, fifth_moment = self.evaluate(
-        running_moments.finalize(state))
+        running_moments.moments())
     self.assertNear(0, zeroth_moment, err=1e-6)
     self.assertNear(2, var, err=1e-6)
     self.assertNear(0, skew, err=1e-6)
@@ -592,43 +561,35 @@ class RunningCentralMomentsTest(test_util.TestCase):
     self.assertNear(0, fifth_moment, err=1e-6)
 
   def test_specific_moments(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=[5, 3]
-    )
-    state = running_moments.initialize()
+        moment=[5, 3])
     for sample in range(5):
-      state = running_moments.update(state, sample)
-    fifth_moment, skew = self.evaluate(
-        running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    fifth_moment, skew = self.evaluate(running_moments.moments())
     self.assertNear(0, skew, err=1e-6)
     self.assertNear(0, fifth_moment, err=1e-6)
 
   def test_very_high_moments(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=np.arange(15) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(15) + 1)
     for sample in range(5):
-      state = running_moments.update(state, sample)
-    moments = self.evaluate(
-        running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(np.arange(5), moment=np.arange(15) + 1),
         moments,
         rtol=1e-6)
 
   def test_higher_rank_samples(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(2, 2),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in range(5):
-      state = running_moments.update(state, tf.ones((2, 2)) * sample)
+      running_moments = running_moments.update(tf.ones((2, 2)) * sample)
     zeroth_moment, var, skew, kur, fifth_moment = self.evaluate(
-        running_moments.finalize(state))
+        running_moments.moments())
     self.assertAllClose(tf.zeros((2, 2)), zeroth_moment, rtol=1e-6)
     self.assertAllClose(tf.ones((2, 2)) * 2, var, rtol=1e-6)
     self.assertAllClose(tf.zeros((2, 2)), skew, rtol=1e-6)
@@ -638,66 +599,54 @@ class RunningCentralMomentsTest(test_util.TestCase):
   def test_random_scalar_samples(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100)
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in x:
-      state = running_moments.update(state, sample)
-    moments = self.evaluate(running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(x, moment=[1, 2, 3, 4, 5]), moments, rtol=1e-6)
 
   def test_random_higher_rank_samples(self):
     rng = test_util.test_np_rng()
     x = rng.rand(100, 10)
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(10,),
-        moment=np.arange(5) + 1
-    )
-    state = running_moments.initialize()
+        moment=np.arange(5) + 1)
     for sample in x:
-      state = running_moments.update(state, sample)
-    moments = self.evaluate(running_moments.finalize(state))
+      running_moments = running_moments.update(sample)
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(x, moment=[1, 2, 3, 4, 5]), moments, rtol=1e-6)
 
   def test_manual_dtype(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
         moment=1,
-        dtype=tf.float64
-    )
-    state = running_moments.initialize()
-    state = running_moments.update(state, 0)
-    moment = running_moments.finalize(state)
+        dtype=tf.float64)
+    running_moments = running_moments.update(0)
+    moment = running_moments.moments()
     self.assertEqual(tf.float64, moment.dtype)
 
   def test_int_dtype_casts(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
         shape=(),
         moment=1,
-        dtype=tf.int32
-    )
-    state = running_moments.initialize()
-    state = running_moments.update(state, 0)
-    moment = running_moments.finalize(state)
+        dtype=tf.int32)
+    running_moments = running_moments.update(0)
+    moment = running_moments.moments()
     self.assertEqual(tf.float32, moment.dtype)
 
   def test_in_tf_while(self):
-    running_moments = tfp.experimental.stats.RunningCentralMoments(
-        shape=(),
-        moment=np.arange(4) + 1
-    )
-    state = running_moments.initialize()
-    _, state = tf.while_loop(
+    running_moments = tfp.experimental.stats.RunningCentralMoments.from_shape(
+        shape=(), moment=[1, 2, 3, 4])
+    _, running_moments = tf.while_loop(
         lambda i, _: i < 5,
-        lambda i, st: (i + 1, running_moments.update(st, tf.ones(()) * i)),
-        (0., state)
+        lambda i, mom: (i + 1, mom.update(tf.ones(()) * i)),
+        (0., running_moments)
     )
-    moments = self.evaluate(
-        running_moments.finalize(state))
+    moments = self.evaluate(running_moments.moments())
     self.assertAllClose(
         stats.moment(np.arange(5), moment=np.arange(4) + 1),
         moments,

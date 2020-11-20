@@ -45,6 +45,7 @@ multi_substrate_py_library(
         ":generic",
         ":gradient",
         ":gram_schmidt",
+        ":hypergeometric",
         ":interpolation",
         ":linalg",
         ":minimize",
@@ -175,6 +176,8 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal/backend/numpy:tf_inspect",
     ],
 )
 
@@ -187,6 +190,35 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "hypergeometric",
+    srcs = [
+        "hypergeometric.py",
+    ],
+    srcs_version = "PY2AND3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "hypergeometric_test",
+    size = "medium",
+    srcs = ["hypergeometric_test.py"],
+    shard_count = 3,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:hypergeometric",
     ],
 )
 

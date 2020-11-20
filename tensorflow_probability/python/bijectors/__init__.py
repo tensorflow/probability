@@ -40,7 +40,6 @@ from tensorflow_probability.python.bijectors.expm1 import Expm1
 from tensorflow_probability.python.bijectors.expm1 import Log1p
 from tensorflow_probability.python.bijectors.ffjord import FFJORD
 from tensorflow_probability.python.bijectors.fill_scale_tril import FillScaleTriL
-from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.frechet_cdf import FrechetCDF
 from tensorflow_probability.python.bijectors.generalized_pareto import GeneralizedPareto
@@ -159,7 +158,6 @@ __all__ = [
     "ScaleMatvecLinearOperatorBlock",
     "ScaleMatvecLU",
     "ScaleMatvecTriL",
-    "ScaleTriL",
     "Shift",
     "ShiftedGompertzCDF",
     "Sigmoid",

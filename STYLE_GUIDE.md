@@ -109,7 +109,7 @@ they supersede all previous conventions.
     *   Definitely use named args for 2nd args onward in docstrings.
 
 1.  Use names which describe semantics, not computation or mathematics, e.g.,
-    avoid `xp1 = x+1` or `tfd.Normal(loc=mu, scale=sigma)`.
+    avoid `xp1 = x + 1` or `tfd.Normal(loc=mu, scale=sigma)`.
 
 1.  Prefer inlining intermediates which are used once.
 
@@ -157,16 +157,16 @@ they supersede all previous conventions.
 
 1.  Prefer using the most specific TF operator. E.g,
 
-    *   Use `tf.squared_difference(x,y)` over `(x-y)**2`.
-    *   Use `tf.rsqrt` over `1./tf.sqrt(x)`.
+    *   Use `tf.squared_difference(x, y)` over `(x - y)**2`.
+    *   Use `tf.rsqrt` over `1. / tf.sqrt(x)`.
 
 1.  Worry about gradients! (It's often not automatic for API builders!)
 
 1.  When forced to choose between FLOPS and numerical accuracy, prefer numerical
     accuracy.
 
-1.  Avoid tf.cast if possible. Eg, prefer `tf.where(cond, a, b)` over
-    `tf.cast(cond,dtype=a.dtype)*a + (1-tf.cast(cond,dtype=b.dtype)*b`
+1.  Avoid tf.cast if possible. Eg, prefer `tf.where(pred, a, b)` over
+    `tf.cast(cond, dtype=a.dtype) * a + (1 - tf.cast(cond, dtype=b.dtype) * b`
 
 1.  Preserve static shape hints.
 
@@ -217,3 +217,15 @@ they supersede all previous conventions.
     `Tensor`s, and Numpy objects. When converting a user-provided literal to a
     `Tensor` (see e.g. `Distribution._call_log_prob`), specify the dtype to
     `tf.convert_to_tensor` if it is available.
+
+1.  Prefer overloaded operators on `Tensor`s (`+`, `-`, etc.) to explicit
+    method calls (`tf.add`, `tf.sub`, etc.). Exceptions:
+
+    * Prefer `tf.equal` to `==` when checking element-wise equality, because the
+      semantics of the latter are inconsistent between eager and graph
+      (`tf.function`) modes.
+    * Use `&` and `|` only if you want bitwise logic. Note that these are
+      equivalent to logical ops only if all inputs are `bool`s or are in
+      `{0, 1}`.
+
+

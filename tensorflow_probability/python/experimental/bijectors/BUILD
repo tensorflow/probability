@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Description:
-#   TensorFlow Probability random samplers/utilities.
+# tfp.experimental distributions library.
 
-load("//tensorflow_probability/python:build_defs.bzl", "multi_substrate_py_library", "multi_substrate_py_test")
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
 
 package(
     default_visibility = [
@@ -25,39 +28,42 @@ package(
 
 licenses(["notice"])
 
+exports_files(["LICENSE"])
+
 multi_substrate_py_library(
-    name = "random",
+    name = "bijectors",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":random_ops",
-        "//tensorflow_probability/python/internal:all_util",
-        "//tensorflow_probability/python/internal:samplers",
+        ":scalar_function_with_inferred_inverse",
     ],
 )
 
 multi_substrate_py_library(
-    name = "random_ops",
-    srcs = [
-        "random_ops.py",
-    ],
+    name = "scalar_function_with_inferred_inverse",
+    srcs = ["scalar_function_with_inferred_inverse.py"],
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/internal:custom_gradient",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
     ],
 )
 
 multi_substrate_py_test(
-    name = "random_ops_test",
-    size = "small",
-    srcs = ["random_ops_test.py"],
+    name = "scalar_function_with_inferred_inverse_test",
+    size = "medium",
+    srcs = ["scalar_function_with_inferred_inverse_test.py"],
+    jax_size = "medium",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
-        # tensorflow/compiler/jit dep,
     ],
 )

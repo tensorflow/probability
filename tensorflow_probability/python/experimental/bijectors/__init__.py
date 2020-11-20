@@ -12,21 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Module for probability bijectors and related functions."""
-import inspect
+"""TensorFlow Probability experimental bijectors package."""
 
-from oryx.bijectors import bijector_extensions
-from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.python.experimental.bijectors.scalar_function_with_inferred_inverse import ScalarFunctionWithInferredInverse
 
-tfb = tfp.bijectors
-
-__all__ = tfb.__all__
-
-for name in __all__:
-  bij = getattr(tfb, name)
-  if inspect.isclass(bij) and issubclass(bij, tfb.Bijector):
-    if bij is not tfb.Bijector:
-      bij = bijector_extensions.make_type(bij)
-  locals()[name] = bij
-
-del tfb
+__all__ = [
+    'ScalarFunctionWithInferredInverse'
+]

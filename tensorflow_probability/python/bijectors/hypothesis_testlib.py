@@ -227,9 +227,6 @@ def bijector_supports():
       'ScaleMatvecTriL':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
-      'ScaleTriL':
-          BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
-                          Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'Shift':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),

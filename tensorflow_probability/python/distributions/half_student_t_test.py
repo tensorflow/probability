@@ -134,8 +134,10 @@ class HalfStudentTTest(test_util.TestCase):
         np.log(2.) + sp_stats.t.logpdf(t, df_v, loc=loc_v, scale=sigma_v))
     expected_pdf = (
         2. * sp_stats.t.pdf(t, df_v, loc=loc_v, scale=sigma_v))
-    self.assertAllClose(expected_log_pdf, log_pdf_values)
-    self.assertAllClose(np.log(expected_pdf), log_pdf_values)
+    self.assertAllClose(expected_log_pdf, log_pdf_values,
+                        atol=0, rtol=1e-5)  # relaxed tol for fp32 in JAX
+    self.assertAllClose(np.log(expected_pdf), log_pdf_values,
+                        atol=0, rtol=1e-5)  # relaxed tol for fp32 in JAX
     self.assertAllClose(expected_pdf, pdf_values)
     self.assertAllClose(np.exp(expected_log_pdf), pdf_values)
 

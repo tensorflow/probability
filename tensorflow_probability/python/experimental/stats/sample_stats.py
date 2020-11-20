@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
 import functools
 import inspect
 import math
@@ -36,10 +35,8 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 __all__ = [
     'RunningCentralMoments',
-    'RunningCentralMomentsState',
     'RunningCovariance',
     'RunningMean',
-    'RunningMeanState',
     'RunningPotentialScaleReduction',
     'RunningVariance',
 ]
@@ -326,32 +323,61 @@ class RunningVariance(RunningCovariance):
     """
     return self.covariance(ddof)
 
+  @classmethod
+  def init_from_stats(cls, num_samples, mean, variance):
+    """Initialize a `RunningVariance` object with given stats.
 
-RunningMeanState = collections.namedtuple(
-    'RunningMeanState', 'num_samples, mean')
+    This allows the user to initialize knowing the mean, variance, and number
+    of samples seen so far.
+
+    Args:
+      num_samples: Scalar `float` `Tensor`, for number of examples already seen.
+      mean: `float` `Tensor`, for starting mean of estimate.
+      variance: `float` `Tensor`, for starting estimate of the variance.
+
+    Returns:
+      `RunningVariance` object, with given mean and variance estimate.
+    """
+    # TODO(b/173736911): Add this to RunningCovariance
+    num_samples = tf.convert_to_tensor(num_samples, name='num_samples')
+    mean = tf.convert_to_tensor(mean, name='mean')
+    variance = tf.convert_to_tensor(variance, name='variance')
+    return cls(num_samples=num_samples,
+               mean=mean,
+               sum_squared_residuals=num_samples * variance,
+               event_ndims=0)
 
 
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
 class RunningMean(object):
-  """Holds metadata for and computes a running mean.
+  """Computes a running mean.
 
   In computation, samples can be provided individually or in chunks. A
   "chunk" of size M implies incorporating M samples into a single expectation
-  computation at once, which is more efficient than one by one. If more than one
-  sample is accepted and chunking is enabled, the chunked `axis` will define
-  chunking semantics for all samples.
-
-  `RunningMean` objects do not hold state information. That information,
-  which includes intermediate calculations, are held in a
-  `RunningMeanState` as returned via `initialize` and `update` method
-  calls.
+  computation at once, which is more efficient than one by one.
 
   `RunningMean` is meant to serve general streaming expectations.
   For a specialized version that fits streaming over MCMC samples, see
   `ExpectationsReducer` in `tfp.experimental.mcmc`.
   """
 
-  def __init__(self, shape, dtype=tf.float32):
-    """Instantiates this object.
+  def __init__(self, num_samples, mean):
+    """Instantiates a `RunningMean`.
+
+    Support batch accumulation of multiple independent running means.
+
+    Args:
+      num_samples: A `Tensor` counting the number of samples
+        accumulated so far.
+      mean: A `Tensor` broadcast-compatible with `num_samples` giving the
+        current mean.
+    """
+    self.num_samples = num_samples
+    self.mean = mean
+
+  @classmethod
+  def from_shape(cls, shape, dtype=tf.float32):
+    """Initialize an empty `RunningMean`.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -361,26 +387,17 @@ class RunningMean(object):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
-    """
-    self.shape = shape
-    if dtype is tf.int64:
-      dtype = tf.float64
-    elif dtype.is_integer:
-      dtype = tf.float32
-    self.dtype = dtype
-
-  def initialize(self):
-    """Initializes an empty `RunningMeanState`.
 
     Returns:
       state: `RunningMeanState` representing a stream of no inputs.
     """
-    return RunningMeanState(
-        num_samples=tf.zeros((), dtype=self.dtype),
-        mean=tf.zeros(self.shape, self.dtype))
+    dtype = _float_dtype_like(dtype)
+    return cls(
+        num_samples=tf.zeros((), dtype=dtype),
+        mean=tf.zeros(shape, dtype))
 
-  def update(self, state, new_sample, axis=None):
-    """Update the `RunningMeanState` with a new sample.
+  def update(self, new_sample, axis=None):
+    """Update the `RunningMean` with a new sample.
 
     The update formula is from Philippe Pebay (2008) [1] and is identical to
     that used to calculate the intermediate mean in
@@ -388,16 +405,14 @@ class RunningMean(object):
     `tfp.experimental.stats.RunningVariance`.
 
     Args:
-      state: `RunningMeanState` that represents the current state of
-        running statistics.
       new_sample: Incoming `Tensor` sample with shape and dtype compatible with
-        those used to form the `RunningMeanState`.
+        those used to form the `RunningMean`.
       axis: If chunking is desired, this is an integer that specifies the axis
         with chunked samples. For individual samples, set this to `None`. By
         default, samples are not chunked (`axis` is None).
 
     Returns:
-      state: `RunningMeanState` with updated calculations.
+      mean: `RunningMean` updated to the new sample.
 
     #### References
     [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
@@ -405,43 +420,25 @@ class RunningMean(object):
          SAND2008-6212_, 2008.
          https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
     """
+    dtype = self.mean.dtype
     new_sample = tf.nest.map_structure(
-        lambda new_sample: tf.cast(new_sample, dtype=self.dtype),
+        lambda new_sample: tf.cast(new_sample, dtype=dtype),
         new_sample)
     if axis is None:
-      chunk_n = tf.cast(1, dtype=self.dtype)
+      chunk_n = tf.constant(1, dtype=dtype)
       chunk_mean = new_sample
     else:
-      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=self.dtype)
+      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
       chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
-    new_n = state.num_samples + chunk_n
-    delta_mean = chunk_mean - state.mean
-    new_mean = state.mean + chunk_n * delta_mean / new_n
-    return RunningMeanState(new_n, new_mean)
-
-  def finalize(self, state):
-    """Finalizes expectation computation for the `state`.
-
-    If the `finalized` method is invoked on a running state of no inputs,
-    `RunningMean` will return a corresponding structure of `tf.zeros`.
-
-    Args:
-      state: `RunningMeanState` that represents the current state of
-        running statistics.
-
-    Returns:
-      mean: An estimate of the mean.
-    """
-    return state.mean
+    new_n = self.num_samples + chunk_n
+    delta_mean = chunk_mean - self.mean
+    new_mean = self.mean + chunk_n * delta_mean / new_n
+    return RunningMean(new_n, new_mean)
 
 
-RunningCentralMomentsState = collections.namedtuple(
-    'RunningCentralMomentsState',
-    'mean_state, sum_exponentiated_residuals')
-
-
+@auto_composite_tensor.auto_composite_tensor
 class RunningCentralMoments(object):
-  """Holds metadata for and computes running central moments.
+  """Computes running central moments.
 
   `RunningCentralMoments` will compute arbitrary central moments in
   streaming fashion following the formula proposed by Philippe Pebay
@@ -454,11 +451,6 @@ class RunningCentralMoments(object):
   `RunningCentralMoments` cannot guarantee numerical stability for all
   moments.
 
-  `RunningCentralMoments` objects do not hold state information. That
-  information, which includes intermediate calculations, are held in a
-  `RunningCentralMomentsState` as returned via `initialize` and `update`
-  method calls.
-
   #### References
   [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
         Covariances and Arbitrary-Order Statistical Moments. _Technical Report
@@ -466,8 +458,28 @@ class RunningCentralMoments(object):
         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
   """
 
-  def __init__(self, shape, moment, dtype=tf.float32):
-    """Instantiates this object.
+  def __init__(self, mean_state, exponentiated_residuals, desired_moments):
+    """Constructs a `RunningCentralMoments`.
+
+    All moments up to the maximum of the desired moments will be computed.
+
+    Args:
+      mean_state:  A `RunningMean` carrying the running mean estimate.
+      exponentiated_residuals: A `Tensor` representing the sum of exponentiated
+        residuals. This is a `Tensor` of shape `[max_moment - 1] +
+        mean_state.mean.shape`, which contains the sum of the residuals raised
+        to the kth power, for all `2 <= k <= max_moment`.
+      desired_moments: A Python list of integers giving the moments to return.
+        The maximum element of this list gives the number of moments that
+        will be computed.
+    """
+    self.mean_state = mean_state
+    self.exponentiated_residuals = exponentiated_residuals
+    self.desired_moments = desired_moments
+
+  @classmethod
+  def from_shape(cls, shape, moment, dtype=tf.float32):
+    """Returns an empty `RunningCentralMoments`.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -479,117 +491,101 @@ class RunningCentralMoments(object):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
+
+    Returns:
+      state: `RunningCentralMoments` representing a stream of no
+        inputs.
     """
-    self.shape = shape
     if isinstance(moment, (tuple, list, np.ndarray)):
       # we want to support numpy arrays too, but must convert to a list to not
       # confuse `tf.nest.map_structure` in `finalize`
-      self.moment = list(moment)
-      self.max_moment = max(self.moment)
+      desired_moments = list(moment)
+      max_moment = max(desired_moments)
     else:
-      self.moment = moment
-      self.max_moment = moment
-    if dtype is tf.int64:
-      dtype = tf.float64
-    elif dtype.is_integer:
-      dtype = tf.float32
-    self.dtype = dtype
-    self.mean_stream = RunningMean(
-        self.shape, self.dtype
-    )
+      desired_moments = [moment]
+      max_moment = moment
+    dtype = _float_dtype_like(dtype)
+    return cls(
+        mean_state=RunningMean.from_shape(shape, dtype),
+        exponentiated_residuals=tf.zeros(
+            ps.concat([(max_moment - 1,), shape], axis=0), dtype),
+        desired_moments=desired_moments)
 
-  def initialize(self):
-    """Initializes an empty `RunningCentralMomentsState`.
-
-    The `RunningCentralMomentsState` contains a `RunningMeanState` and
-    a `Tensor` representing the sum of exponentiated residuals. The sum
-    of exponentiated residuals is a `Tensor` of shape
-    (`self.max_moment - 1`, `self.shape`), which contains the sum of
-    residuals raised to the nth power, for all `2 <= n <= self.max_moment`.
-
-    Returns:
-      state: `RunningCentralMomentsState` representing a stream of no
-        inputs.
-    """
-    return RunningCentralMomentsState(
-        mean_state=self.mean_stream.initialize(),
-        sum_exponentiated_residuals=tf.zeros(
-            (self.max_moment - 1,) + self.shape, self.dtype),
-    )
-
-  def update(self, state, new_sample):
-    """Update the `RunningCentralMomentsState` with a new sample.
+  def update(self, new_sample):
+    """Update with a new sample.
 
     Args:
-      state: `RunningCentralMomentsState` that represents the current
-        state of running statistics.
       new_sample: Incoming `Tensor` sample with shape and dtype compatible with
-        those used to form the `RunningCentralMomentsState`.
+        those used to form the `RunningCentralMoments`.
 
     Returns:
-      state: `RunningCentralMomentsState` with updated calculations.
+      state: `RunningCentralMoments` updated to include the new sample.
     """
+    shape = self.mean_state.mean.shape
+    dtype = self.mean_state.mean.dtype
     n_2 = 1
-    n_1 = state.mean_state.num_samples
-    n = tf.cast(n_1 + n_2, dtype=self.dtype)
-    delta_mean = new_sample - state.mean_state.mean
-    new_mean_state = self.mean_stream.update(state.mean_state, new_sample)
-    old_res = tf.concat([
-        tf.zeros((1,) + self.shape, self.dtype),
-        state.sum_exponentiated_residuals], axis=0)
-    # the sum of exponentiated residuals can be thought of as an estimation
-    # of the central moment before diving through by the number of samples.
+    n_1 = self.mean_state.num_samples
+    n = tf.cast(n_1 + n_2, dtype=dtype)
+    delta_mean = new_sample - self.mean_state.mean
+    new_mean_state = self.mean_state.update(new_sample)
+    # The sum of exponentiated residuals can be thought of as an estimation
+    # of the central moment before dividing through by the number of samples.
     # Since the first central moment is always 0, it simplifies update
     # logic to prepend an appropriate structure of zeros.
-    new_sum_exponentiated_residuals = [tf.zeros(self.shape, self.dtype)]
+    old_res = tf.concat([
+        tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
+        self.exponentiated_residuals], axis=0)
+    # Not storing said zeros in the carried state, though
+    new_exponentiated_residuals = []
 
     # the following two nested for loops calculate equation 2.9 in Pebay's
     # 2008 paper from smallest moment to highest.
-    for p in range(2, self.max_moment + 1):
-      summation = tf.zeros(self.shape, self.dtype)
+    max_moment = max(self.desired_moments)
+    for p in range(2, max_moment + 1):
+      summation = tf.zeros(shape, dtype)
       for k in range(1, p - 1):
         adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p - k - 1]
-        summation += self._n_choose_k(p, k) * adjusted_old_res
+        summation += _n_choose_k(p, k) * adjusted_old_res
       # the `adj_term` refers to the final term in equation 2.9 and is not
       # transcribed exactly; rather, it's simplified to avoid having a
       # `(n - 1)` denominator.
       adj_term = (((delta_mean / n) ** p) * (n - 1) *
                   ((n - 1) ** (p - 1) + (-1) ** p))
-      new_sum_pth_residual = old_res[p - 1] + summation + adj_term
-      new_sum_exponentiated_residuals.append(new_sum_pth_residual)
+      new_pth_residual = old_res[p - 1] + summation + adj_term
+      new_exponentiated_residuals.append(new_pth_residual)
 
-    return RunningCentralMomentsState(
+    return RunningCentralMoments(
         new_mean_state,
-        sum_exponentiated_residuals=tf.convert_to_tensor(
-            new_sum_exponentiated_residuals[1:], dtype=self.dtype
-        )
-    )
+        # The cast is needed in case new_exponentiated_residuals is the empty
+        # list, which will happen if the user requested only the first moment.
+        exponentiated_residuals=tf.cast(
+            tf.stack(new_exponentiated_residuals, axis=0), dtype=dtype),
+        desired_moments=self.desired_moments)
 
-  def finalize(self, state):
-    """Finalizes streaming computation for all central moments.
-
-    Args:
-      state: `RunningCentralMomentsState` that represents the current state
-        of running statistics.
+  def moments(self):
+    """Returns the central moments represented by this `RunningCentralMoments`.
 
     Returns:
       all_moments: A `Tensor` representing estimates of the requested central
         moments. Its leading dimension indexes the moment, in order of those
-        requested (i.e. in order of `self.moment`).
+        requested (i.e. in order of `self.desired_moments`).
     """
     # prepend a structure of zeros for the first moment
+    shape = self.mean_state.mean.shape
+    dtype = self.mean_state.mean.dtype
     all_unfinalized_moments = tf.concat([
-        tf.zeros((1,) + self.shape, self.dtype),
-        state.sum_exponentiated_residuals], axis=0)
+        tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
+        self.exponentiated_residuals], axis=0)
     all_moments = all_unfinalized_moments / tf.cast(
-        state.mean_state.num_samples, self.dtype)
-    return tf.convert_to_tensor(tf.nest.map_structure(
-        lambda i: all_moments[i - 1],
-        self.moment), self.dtype)
+        self.mean_state.num_samples, dtype)
+    desired_moment_indices = tf.convert_to_tensor(
+        self.desired_moments, dtype=tf.int32) - 1
+    return tf.gather(all_moments, desired_moment_indices)
 
-  def _n_choose_k(self, n, k):
-    """Computes nCk."""
-    return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
+
+def _n_choose_k(n, k):
+  """Computes nCk."""
+  return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
 
 
 @auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')

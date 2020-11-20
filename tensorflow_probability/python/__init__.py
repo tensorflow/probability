@@ -18,20 +18,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal import lazy_loader
 
 
-# Ensure TensorFlow is importable and its version is sufficiently recent. This
-# needs to happen before anything else, since the imports below will try to
-# import tensorflow, too.
 # pylint: disable=g-import-not-at-top
-def _ensure_tf_install():
-  """Attempt to import tensorflow, and ensure its version is sufficient.
+def _validate_tf_environment(package):
+  """Check TF version and (depending on package) warn about TensorFloat32.
+
+  Args:
+    package: Python `str` indicating which package is being imported. Used for
+      package-dependent warning about TensorFloat32.
 
   Raises:
     ImportError: if either tensorflow is not importable or its version is
-    inadequate.
+      inadequate.
   """
   try:
     import tensorflow.compat.v1 as tf
@@ -62,9 +65,10 @@ def _ensure_tf_install():
             required=required_tensorflow_version,
             present=tf.__version__))
 
-  if tf.config.experimental.tensor_float_32_execution_enabled():
+  if (package == 'mcmc' and
+      tf.config.experimental.tensor_float_32_execution_enabled()):
     # Must import here, because symbols get pruned to __all__.
-    import warnings  # pylint: disable=g-import-not-at-top
+    import warnings
     warnings.warn(
         'TensorFloat-32 matmul/conv are enabled for NVIDIA Ampere+ GPUs. The '
         'resulting loss of precision may hinder MCMC convergence. To turn off, '
@@ -94,6 +98,8 @@ _allowed_symbols = [
 for pkg in _allowed_symbols:
   globals()[pkg] = lazy_loader.LazyLoader(
       pkg, globals(), 'tensorflow_probability.python.{}'.format(pkg),
-      on_first_access=_ensure_tf_install)
+      # These checks need to happen before lazy-loading, since the modules
+      # themselves will try to import tensorflow, too.
+      on_first_access=functools.partial(_validate_tf_environment, pkg))
 
 all_util.remove_undocumented(__name__, _allowed_symbols)

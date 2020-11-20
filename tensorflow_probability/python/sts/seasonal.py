@@ -207,7 +207,7 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
     {seasonal_init_args}
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'SeasonalStateSpaceModel') as name:
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -262,6 +262,7 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def drift_scale(self):
@@ -419,7 +420,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
     {seasonal_init_args}
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'ConstrainedSeasonalStateSpaceModel') as name:
 
       # The initial state prior determines the dtype of sampled values.
@@ -483,6 +484,7 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def drift_scale(self):

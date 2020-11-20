@@ -77,7 +77,6 @@ TF2_FRIENDLY_BIJECTORS = (
     'ScaleMatvecTriL',
     'Shift',
     'ShiftedGompertzCDF',
-    'ScaleTriL',
     'Sigmoid',
     'Sinh',
     'SinhArcsinh',

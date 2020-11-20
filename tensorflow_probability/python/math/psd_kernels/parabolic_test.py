@@ -56,9 +56,15 @@ class ParabolicTest(test_util.TestCase):
       x = np.random.uniform(-1, 1, size=shape).astype(np.float32)
       y = np.random.uniform(-1, 1, size=shape).astype(np.float32)
       self.assertAllClose(
-          amplitude * .75 / np.sqrt(5) *
-          np.maximum(0., 1 - np.sum((x - y)**2) / length_scale**2 / 5),
+          amplitude * .75 *
+          np.maximum(0., 1 - np.sum((x - y)**2) / length_scale**2),
           self.evaluate(k.apply(x, y)))
+
+  def testEpanechnikov(self):
+    k = tfp.math.psd_kernels.Parabolic()
+    self.assertAllClose(.75, k.matrix([[0.]], [[0.]])[0, 0])
+    self.assertAllEqual([0., 0.], k.matrix([[0.]], [[1.], [-1.]])[0])
+    self.assertAllEqual([0., 0.], k.matrix([[0.]], [[1.1], [-1.1]])[0])
 
   def testNoneShapes(self):
     k = tfp.math.psd_kernels.Parabolic(

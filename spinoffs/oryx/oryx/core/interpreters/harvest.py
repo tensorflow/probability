@@ -335,8 +335,8 @@ class HarvestTrace(jax_core.Trace):
       params = params.copy()
       new_params = dict(
           params,
-          mapped_invars=(True,) * len(tree_util.tree_leaves(plants)) +
-          params['mapped_invars'])
+          in_axes=(0,) * len(tree_util.tree_leaves(plants)) +
+          params['in_axes'])
     else:
       new_params = dict(params)
     all_args, all_tree = tree_util.tree_flatten((plants, vals))

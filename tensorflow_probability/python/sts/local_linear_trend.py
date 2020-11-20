@@ -158,7 +158,7 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       name: Python `str` name prefixed to ops created by this class.
         Default value: "LocalLinearTrendStateSpaceModel".
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'LocalLinearTrendStateSpaceModel') as name:
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -205,6 +205,7 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def level_scale(self):
