@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.experimental.mcmc.covariance_reducer import CovarianceReducer
 from tensorflow_probability.python.experimental.mcmc.covariance_reducer import VarianceReducer
+from tensorflow_probability.python.experimental.mcmc.diagonal_mass_matrix_adaptation import DiagonalMassMatrixAdaptation
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.expectations_reducer import ExpectationsReducer
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import chees_criterion
@@ -64,6 +65,17 @@ from tensorflow_probability.python.experimental.mcmc.with_reductions import With
 
 
 __all__ = [
+    'CovarianceReducer',
+    'DiagonalMassMatrixAdaptation',
+    'EllipticalSliceSampler',
+    'ExpectationsReducer',
+    'NoUTurnSampler',
+    'PreconditionedHamiltonianMonteCarlo',
+    'ProgressBarReducer',
+    'SequentialMonteCarlo',
+    'SequentialMonteCarloResults',
+    'StateWithHistory',
+    'WeightedParticles',
     'augment_prior_with_state_history',
     'augment_with_observation_history',
     'augment_with_state_history',
