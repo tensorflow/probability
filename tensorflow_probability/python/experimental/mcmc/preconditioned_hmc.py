@@ -331,14 +331,15 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
         mcmc_util.make_name(self.name, 'phmc', 'bootstrap_results')):
       result = super(UncalibratedPreconditionedHamiltonianMonteCarlo,
                      self).bootstrap_results(init_state)
+
+      if (not self._store_parameters_in_results or
+          self.momentum_distribution is None):
+        momentum_distribution = []
+      else:
+        momentum_distribution = self.momentum_distribution
       result = UncalibratedPreconditionedHamiltonianMonteCarloKernelResults(
           **result._asdict(),  # pylint: disable=protected-access
-          momentum_distribution=[])
-
-      if self._store_parameters_in_results:
-        result = result._replace(
-            momentum_distribution=[] if self.momentum_distribution is None else
-            self.momentum_distribution)
+          momentum_distribution=momentum_distribution)
     return result
 
 
