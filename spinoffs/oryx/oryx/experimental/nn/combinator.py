@@ -40,7 +40,7 @@ class Serial(base.Layer):
     """
     in_specs, layer_inits = args[:-1], args[-1]
     layers = state.init(list(layer_inits), name='layers')(init_key, *in_specs)
-    return base.LayerParams(tuple(layers))
+    return base.LayerParams(tuple(layers))  # pytype: disable=wrong-arg-types
 
   @classmethod
   def spec(cls, *args):
