@@ -96,7 +96,17 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
 
       transform = jit_decorator
     else:
-      raise NotImplementedError('Could not find compiler: Numpy only.')
+
+      # The decoration will succeed, but calling such a function will fail. This
+      # allows us to have jitted top-level functions in a module, as long as
+      # they aren't called in Numpy mode.
+      def decorator(f):
+        @functools.wraps(f)
+        def wrapped_f(*args, **kwargs):
+          raise NotImplementedError('Could not find compiler: Numpy only.')
+        return wrapped_f
+
+      transform = decorator
   # This code path is for the `foo = tf.function(foo, ...)` use case.
   if func is not None:
     return transform(func)
