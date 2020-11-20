@@ -323,7 +323,7 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
             bijectors.append(shift_lib.Shift(shift))
           if log_scale is not None:
             bijectors.append(scale_lib.Scale(log_scale=log_scale))
-          return chain.Chain(bijectors)
+          return chain.Chain(bijectors, validate_event_size=False)
 
         bijector_fn = _bijector_fn
 

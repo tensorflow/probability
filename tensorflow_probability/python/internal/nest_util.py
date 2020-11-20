@@ -253,6 +253,9 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
   elif hint_is_nested:
     dtype = broadcast_structure(dtype_hint, dtype)
 
+  # Call coerce_structure to force the argument structure to match dtype.
+  value = coerce_structure(dtype, value)
+
   def convert_fn(path, value, dtype, dtype_hint, name=None):
     if not allow_packing and nest.is_nested(value) and any(
         # Treat arrays like Tensors for full parity in JAX backend.
@@ -280,3 +283,110 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
   else:
     return nest.map_structure_with_tuple_paths_up_to(
         dtype, convert_fn, value, dtype, dtype_hint, check_types=False)
+
+
+# pylint: disable=protected-access
+# TODO(b/173044916): Support namedtuple interop in nest and remove this method.
+def coerce_structure(shallow_tree, input_tree):
+  """Coerces the containers in `input_tree` to exactly match `shallow_tree`.
+
+  This method largely parallels the behavior of `nest.assert_shallow_structure`,
+  but allows `namedtuples` to be interpreted as either sequences or mappings.
+  It returns a structure with the container-classes found in `shallow_tree`
+  and the contents of `input_tree`, such that `shallow_tree` and `input_tree`
+  may be used safely in downstream calls to `nest.map_structure_up_to`.
+
+  Note: this method does not currently support `expand_composites`.
+
+  Example Usage:
+  ```python
+
+  ab = collections.namedtuple('AB', 'a b')(0, 1)
+  ba = collections.namedtuple('BA', 'b a')(2, 3)
+
+  coerce_structure(ab, ba)
+  # -> AB(a=3, b=2)
+  ```
+
+  Args:
+    shallow_tree: A (shallow) structure to be populated.
+    input_tree: A (parallel) structure of values.
+  Returns:
+    A structure with containers from shallow_tree and values from input_tree.
+  Raises:
+    ValueError: When nested sub-structures have differing lengths.
+    ValueError: When nested sub-structures have different keys.
+    TypeError: When `shallow_tree` is deeper than `input_tree`
+    TypeError: When nested sub-structures are incompatible (e.g., list vs dict).
+  """
+  try:
+    return _coerce_structure(shallow_tree, input_tree)
+  except (ValueError, TypeError) as e:
+    str1 = str(nest.map_structure(lambda _: nest._DOT, shallow_tree))
+    str2 = str(nest.map_structure(lambda _: nest._DOT, input_tree))
+    raise type(e)(('{}\n'
+                   'Entire first structure:\n{}\n'
+                   'Entire second structure:\n{}'
+                   ).format(e, str1, str2))
+
+
+def _coerce_structure(shallow_tree, input_tree):
+  """Implementation of coerce_structure."""
+  if not nest.is_nested(shallow_tree):
+    return input_tree
+
+  if not nest.is_nested(input_tree):
+    raise TypeError(nest._IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ.format(
+        type(input_tree)))
+
+  if len(input_tree) != len(shallow_tree):
+    raise ValueError(
+        nest._STRUCTURES_HAVE_MISMATCHING_LENGTHS.format(
+            input_length=len(input_tree),
+            shallow_length=len(shallow_tree)))
+
+  # Determine whether shallow_tree should be treated as a Mapping or a Sequence.
+  # Namedtuples can be interpreted either way (but keys take precedence).
+  _shallow_is_namedtuple = nest._is_namedtuple(shallow_tree)  # pylint: disable=invalid-name
+  _shallow_is_mapping = isinstance(shallow_tree, collections.abc.Mapping)  # pylint: disable=invalid-name
+  shallow_supports_keys = _shallow_is_namedtuple or _shallow_is_mapping
+  shallow_supports_iter = _shallow_is_namedtuple or not _shallow_is_mapping
+
+  # Branch-selection depends on both shallow and input container-classes.
+  input_is_mapping = isinstance(input_tree, collections.abc.Mapping)
+  if nest._is_namedtuple(input_tree):
+    if shallow_supports_keys:
+      lookup_branch = lambda k: getattr(input_tree, k)
+    else:
+      input_iter = nest._yield_value(input_tree)
+      lookup_branch = lambda _: next(input_iter)
+  elif shallow_supports_keys and input_is_mapping:
+    lookup_branch = lambda k: input_tree[k]
+  elif shallow_supports_iter and not input_is_mapping:
+    input_iter = nest._yield_value(input_tree)
+    lookup_branch = lambda _: next(input_iter)
+  else:
+    raise TypeError(nest._STRUCTURES_HAVE_MISMATCHING_TYPES.format(
+        input_type=type(input_tree),
+        shallow_type=(
+            type(shallow_tree.__wrapped__)
+            if hasattr(shallow_tree, '__wrapped__') else
+            type(shallow_tree))))
+
+  flat_coerced = []
+  needs_wrapping = type(shallow_tree) is not type(input_tree)
+  for shallow_key, shallow_branch in nest._yield_sorted_items(shallow_tree):
+    try:
+      input_branch = lookup_branch(shallow_key)
+    except (KeyError, AttributeError):
+      raise ValueError(
+          nest._SHALLOW_TREE_HAS_INVALID_KEYS.format([shallow_key]))
+    flat_coerced.append(_coerce_structure(shallow_branch, input_branch))
+    # Keep track of whether nested elements have changed.
+    needs_wrapping |= input_branch is not flat_coerced[-1]
+
+  # Only create a new instance if containers differ or contents changed.
+  return (nest._sequence_like(shallow_tree, flat_coerced)
+          if needs_wrapping else input_tree)
+
+# pylint: enable=protected-access
