@@ -332,8 +332,7 @@ class MixtureSameFamily(distribution.Distribution):
     ], axis=0)
     mask = tf.reshape(mask, shape=target_shape)
 
-    if x.dtype in [tf.bfloat16, tf.float16, tf.float32, tf.float64,
-                   tf.complex64, tf.complex128]:
+    if dtype_util.is_floating(x.dtype) or dtype_util.is_complex(x.dtype):
       masked = tf.math.multiply_no_nan(x, mask)
     else:
       masked = x * mask

@@ -87,7 +87,7 @@ INTERNALS = ('assert_util', 'batched_rejection_sampler', 'cache_util',
              'name_util', 'nest_util', 'parameter_properties', 'prefer_static',
              'samplers', 'special_math', 'structural_tuple', 'tensor_util',
              'tensorshape_util', 'test_combinations', 'test_util', 'unnest',
-             'vectorization_util')
+             'variadic_reduce', 'vectorization_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')

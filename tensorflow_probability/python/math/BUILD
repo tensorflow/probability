@@ -151,6 +151,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:variadic_reduce",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -164,7 +166,6 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
-#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -488,17 +489,4 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
-)
-
-exports_files(
-    [
-        "generic.py",
-        "generic_test.py",
-        "gradient.py",
-        "gradient_test.py",
-        "linalg.py",
-        "numeric.py",
-        "special.py",
-    ],
-    visibility = ["//tensorflow_probability:__subpackages__"],
 )
