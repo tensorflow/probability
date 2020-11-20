@@ -166,9 +166,8 @@ def reshape_ildj(incells, outcells, **params):
     ))], None
   elif outcell.top() and not incell.top():
     val = outcell.val
-    ndslice = NDSlice.new(np.reshape(val, incell.aval.shape))  # pytype: disable=missing-parameter
     new_incells = [
-        InverseAndILDJ(incell.aval, [ndslice])
+        InverseAndILDJ.new(np.reshape(val, incell.aval.shape))
     ]
     return new_incells, outcells, None
   return incells, outcells, None
