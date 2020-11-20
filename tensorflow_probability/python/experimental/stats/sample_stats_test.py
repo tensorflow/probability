@@ -34,6 +34,15 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class RunningCovarianceTest(test_util.TestCase):
 
+  def test_from_stats(self):
+    num_counts = 10.
+    mean = 1.
+    variance = 3.
+    var = tfp.experimental.stats.RunningVariance.init_from_stats(
+        num_counts, mean, variance)
+    self.assertEqual(self.evaluate(var.mean), mean)
+    self.assertEqual(self.evaluate(var.variance()), variance)
+
   def test_zero_running_variance(self):
     deterministic_samples = [0., 0., 0., 0.]
     var = tfp.experimental.stats.RunningVariance.from_shape()
