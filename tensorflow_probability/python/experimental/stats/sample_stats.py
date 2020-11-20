@@ -323,6 +323,30 @@ class RunningVariance(RunningCovariance):
     """
     return self.covariance(ddof)
 
+  @classmethod
+  def init_from_stats(cls, num_samples, mean, variance):
+    """Initialize a `RunningVariance` object with given stats.
+
+    This allows the user to initialize knowing the mean, variance, and number
+    of samples seen so far.
+
+    Args:
+      num_samples: Scalar `float` `Tensor`, for number of examples already seen.
+      mean: `float` `Tensor`, for starting mean of estimate.
+      variance: `float` `Tensor`, for starting estimate of the variance.
+
+    Returns:
+      `RunningVariance` object, with given mean and variance estimate.
+    """
+    # TODO(b/173736911): Add this to RunningCovariance
+    num_samples = tf.convert_to_tensor(num_samples, name='num_samples')
+    mean = tf.convert_to_tensor(mean, name='mean')
+    variance = tf.convert_to_tensor(variance, name='variance')
+    return cls(num_samples=num_samples,
+               mean=mean,
+               sum_squared_residuals=num_samples * variance,
+               event_ndims=0)
+
 
 @auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
 class RunningMean(object):
