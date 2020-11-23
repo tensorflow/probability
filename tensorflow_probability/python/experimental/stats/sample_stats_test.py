@@ -38,7 +38,7 @@ class RunningCovarianceTest(test_util.TestCase):
     num_counts = 10.
     mean = 1.
     variance = 3.
-    var = tfp.experimental.stats.RunningVariance.init_from_stats(
+    var = tfp.experimental.stats.RunningVariance.from_stats(
         num_counts, mean, variance)
     self.assertEqual(self.evaluate(var.mean), mean)
     self.assertEqual(self.evaluate(var.variance()), variance)
