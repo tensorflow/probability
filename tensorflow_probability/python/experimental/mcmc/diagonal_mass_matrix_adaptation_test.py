@@ -63,7 +63,7 @@ class DiagonalMassMatrixAdaptationShapesTest(test_util.TestCase):
         reinterpreted_batch_ndims=len(state_part_shape) - len(log_prob_shape))
     state_part = tf.zeros(state_part_shape)
 
-    running_variance = tfp.experimental.stats.RunningVariance.init_from_stats(
+    running_variance = tfp.experimental.stats.RunningVariance.from_stats(
         num_samples=10.,
         mean=tf.zeros(variance_part_shape),
         variance=tf.ones(variance_part_shape))
@@ -96,7 +96,7 @@ class DiagonalMassMatrixAdaptationShapesTest(test_util.TestCase):
         num_leapfrog_steps=2,
         step_size=1.)
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=1.,
             mean=tf.zeros(3),
             variance=tf.ones(3)))
@@ -125,9 +125,9 @@ class DiagonalMassMatrixAdaptationShapesTest(test_util.TestCase):
         num_leapfrog_steps=2,
         step_size=1.)
     initial_running_variance = [
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=1., mean=tf.zeros(3), variance=tf.ones(3)),
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=1., mean=tf.zeros(2), variance=tf.ones(2))]
     kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
         inner_kernel=kernel,
@@ -164,7 +164,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
         step_size=1.)
     self.assertFalse(kernel.parameters['store_parameters_in_results'])
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=1., mean=tf.zeros(3), variance=tf.ones(3)))
     kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
         inner_kernel=kernel,
@@ -245,7 +245,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     init_mean = tf.zeros(3)
     init_variance = tf.ones(3)
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=10., mean=init_mean, variance=init_variance))
     results = self._run_hmc(
         num_results=50,
@@ -273,7 +273,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     init_variance = error_factor * tf.convert_to_tensor(self.mvn_scale)**2
     init_mean = tf.convert_to_tensor(self.mvn_mean)
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=10., mean=init_mean, variance=init_variance))
     results = self._run_hmc(
         num_results=1000,
@@ -299,7 +299,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     init_variance = error_factor * mvn_scale**2
     init_mean = tf.convert_to_tensor(self.mvn_mean) + error_factor
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=10., mean=init_mean, variance=init_variance))
     results = self._run_hmc(
         num_results=1000,
@@ -317,7 +317,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
     # mean estimates do not get too away if initialized at the true variance
     # and mean.
     initial_running_variance = (
-        tfp.experimental.stats.RunningVariance.init_from_stats(
+        tfp.experimental.stats.RunningVariance.from_stats(
             num_samples=10., mean=self.mvn_mean,
             variance=tf.convert_to_tensor(self.mvn_scale)**2))
     results = self._run_hmc(

@@ -106,7 +106,7 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
 
     Users must provide an `initial_running_variance`, either from a previous
     `DiagonalMassMatrixAdaptation`, or some other source. See
-    `RunningCovariance.init_from_stats` for a helper function.
+    `RunningCovariance.from_stats` for a convenient way to construct these.
 
 
     Args:

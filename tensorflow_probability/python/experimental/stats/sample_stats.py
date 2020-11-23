@@ -316,7 +316,7 @@ class RunningVariance(RunningCovariance):
     return self.covariance(ddof)
 
   @classmethod
-  def init_from_stats(cls, num_samples, mean, variance):
+  def from_stats(cls, num_samples, mean, variance):
     """Initialize a `RunningVariance` object with given stats.
 
     This allows the user to initialize knowing the mean, variance, and number
