@@ -30,7 +30,7 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
   def __init__(self,
                fn,
                domain_constraint_fn=None,
-               root_search_fn=tfp_math.secant_root,
+               root_search_fn=tfp_math.find_root_secant,
                max_iterations=50,
                require_convergence=True,
                validate_args=False,
@@ -124,21 +124,103 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
     """Wraps the inverse to provide implicit reparameterization gradients."""
 
     def _vjp_fwd(y):
-      x = self._inverse_no_gradient(y)
-      return x, x  # Keep `x` as an auxiliary value for the backwards pass.
+      # Prevent autodiff from trying to backprop through the root search.
+      x = tf.stop_gradient(self._inverse_no_gradient(y))
+      return x, (x, y)  # Auxiliary values for the backwards pass.
 
     # By the inverse function theorem, the derivative of an
     # inverse function is the reciprocal of the forward derivative. This has
     # been popularized in machine learning by [1].
     # [1] Michael Figurnov, Shakir Mohamed, Andriy Mnih (2018). Implicit
     #     Reparameterization Gradients. https://arxiv.org/abs/1805.08498.
-    def _vjp_bwd(x, grad_x):
-      _, grads = tfp_math.value_and_gradient(self.fn, x)
-      return (grad_x / grads,)
+    def _vjp_bwd(aux, dresult_dx):
+      x, y = aux
+      return [dresult_dx /
+              _make_dy_dx_with_implicit_derivative_wrt_y(self.fn, x)(y)]
+
+    def _inverse_jvp(primals, tangents):
+      y, = primals
+      dy, = tangents
+      # Prevent autodiff from trying to backprop through the root search.
+      x = tf.stop_gradient(self._inverse_no_gradient(y))
+      return x, dy / _make_dy_dx_with_implicit_derivative_wrt_y(self.fn, x)(y)
 
     @tfp_custom_gradient.custom_gradient(
         vjp_fwd=_vjp_fwd,
-        vjp_bwd=_vjp_bwd)
+        vjp_bwd=_vjp_bwd,
+        jvp_fn=_inverse_jvp)
     def _inverse_with_gradient(y):
       return self._inverse_no_gradient(y)
     return _inverse_with_gradient
+
+
+def _make_dy_dx_with_implicit_derivative_wrt_y(fn, x):
+  """Given `y = fn(x)`, returns a function `dy_dx(y)` differentiable wrt y.
+
+  The returned function `dy_dx(y)` computes the reciprocal of the derivative of
+  `x = inverse_of_fn(y)`. By the inverse function theorem, this is just the
+  derivative `dy / dx` of `y = fn(x)`. Even though we'll actually care about
+  the derivative of the inverse, `dx / dy`, it's more efficient to return the
+  reciprocal of that quantity from the forward derivative.
+
+  Since `dy_dx(y)` is the first derivative of `fn(x)` evaluated at
+  `x = inverse_of_fn(y)`, we define *its* derivative in terms of the
+  second derivative of `fn`, via the chain rule:
+
+  ```
+  d / dy fn'(inverse_of_fn(y)) = fn''(inverse_of_fn(y)) * inverse_of_fn'(y)
+                               = fn''(x) / fn'(x)
+  ```
+
+  When bijector log-det-jacobians are computed using autodiff, as in
+  `ScalarFunctionWithInferredInverse`, the gradients of the log-det-jacobians
+  make use of these second-derivative annotations.
+
+  Args:
+    fn: Python `callable` invertible scalar function of a scalar `x`. Must be
+      twice differentiable.
+    x: Float `Tensor` input at which `fn` and its derivatives are evaluated.
+  Returns:
+    dy_dx_fn: Python `callable` that takes an argument `y` and returns the
+      derivative of `fn(x)`. The argument `y` is ignored (it is assumed to be
+      `y = fn(x)`), but the derivative of `dy_dx_fn` wrt `y` is defined.
+  """
+
+  # To override first and second derivatives of the inverse
+  # (second derivatives are needed for gradients of
+  #  `inverse_log_det_jacobian`s), we'll need the first and second
+  # derivatives from the forward direction.
+  def _dy_dx_fwd(unused_y):
+    first_order = lambda x: tfp_math.value_and_gradient(fn, x)[1]
+    dy_dx, d2y_dx2 = tfp_math.value_and_gradient(first_order, x)
+    return (dy_dx,
+            (dy_dx, d2y_dx2))  # Auxiliary values for the second-order pass.
+
+  # Chain rule for second derivative of an inverse function:
+  # f''(inv_f(y)) = f''(x) * inv_f'(y)
+  #               = f''(x) / f'(x).
+  def _dy_dx_bwd(aux, dresult_d_dy_dx):
+    dy_dx, d2y_dx2 = aux
+    return [dresult_d_dy_dx * d2y_dx2 / dy_dx]
+
+  def _dy_dx_jvp(primals, tangents):
+    unused_y, = primals
+    dy, = tangents
+    first_order = lambda x: tfp_math.value_and_gradient(fn, x)[1]
+    dy_dx, ddy_dx2 = tfp_math.value_and_gradient(first_order, x)
+    return dy_dx, (dy / dy_dx) * ddy_dx2
+
+  # Naively, autodiff of this derivative would attempt to backprop through
+  # `x = root_search(fn, y)` when computing the second derivative with
+  # respect to `y`. Since that's no good, we need to provide our own
+  # custom gradient wrt `y`.
+  @tfp_custom_gradient.custom_gradient(
+      vjp_fwd=_dy_dx_fwd,
+      vjp_bwd=_dy_dx_bwd,
+      jvp_fn=_dy_dx_jvp)
+  def _dy_dx_fn(y):
+    del y  # Unused.
+    _, dy_dx = tfp_math.value_and_gradient(fn, x)
+    return dy_dx
+
+  return _dy_dx_fn
