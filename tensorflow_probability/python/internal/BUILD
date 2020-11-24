@@ -579,6 +579,21 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "variadic_reduce",
+    srcs = [
+        "variadic_reduce.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        ":implementation_selection",
+        ":prefer_static",
+        ":tensorshape_util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
 exports_files(
     [
         "assert_util.py",

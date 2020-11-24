@@ -369,7 +369,7 @@ _ASYMPTOTIC_OLVER_EXPANSION_COEFFICIENTS = [
 ]
 
 
-def _olver_asymptotic_uniform(v, z, name=None):
+def _olver_asymptotic_uniform(v, z, output_log_space=False, name=None):
   """Use Olver's uniform asymptotic expansion for the Bessel function.
 
   Olver's uniform asymptotic expansion [1] is specified by
@@ -391,6 +391,8 @@ def _olver_asymptotic_uniform(v, z, name=None):
   Args:
     v: value for which `I_{v}(z)` and `K_{v}(z) should be computed.
     z: value for which `I_{v}(z)` and `K_{v}(z) should be computed.
+    output_log_space: `bool`. If `True`, output is in log-space.
+      Default value: `False`.
     name: A name for the operation (optional).
       Default value: `None` (i.e., 'olver_asymptotic_uniform').
   Returns:
@@ -423,22 +425,35 @@ def _olver_asymptotic_uniform(v, z, name=None):
     # since we are subtracting off x.
     shared_prefactor = 1. / (tf.math.sqrt(
         1 + tf.math.square(w)) + w) + tf.math.log(w / (1 + 1. / t))
-    i_prefactor = tf.math.sqrt(
-        t / (2 * np.pi * v_abs)) * tf.math.exp(v_abs * shared_prefactor)
+    log_i_prefactor = 0.5 * tf.math.log(
+        t / (2 * np.pi * v_abs)) + v_abs * shared_prefactor
 
     # Not the same here since they will have the same sign.
-    k_prefactor = tf.math.sqrt(np.pi * t / (2 * v_abs)) * tf.math.exp(
-        -v_abs * shared_prefactor)
-    kve = k_prefactor * kve_sum
+    log_k_prefactor = 0.5 * tf.math.log(
+        np.pi * t / (2 * v_abs)) - v_abs * shared_prefactor
 
-    ive = tf.where(
-        v > 0.,
-        i_prefactor * ive_sum,
-        # This uses the reflection formulation for negative v, to
-        # write this in terms of kve.
-        i_prefactor * ive_sum + 2 / np.pi * tf.math.sin(
-            np.pi * v_abs) * k_prefactor * kve_sum * tf.math.exp(-2. * z))
-    return ive, kve
+    log_kve = log_k_prefactor + tf.math.log(kve_sum)
+    log_ive = log_i_prefactor + tf.math.log(ive_sum)
+
+    # We need to add a correction term for negative v.
+    negative_v_correction = log_kve - 2. * z
+    n = tf.math.round(v)
+    u = v - n
+    coeff = 2 / np.pi * tf.math.sin(np.pi * u)
+    coeff = (1. - 2. * tf.math.mod(n, 2.)) * coeff
+    ive_negative_v = tf.where(
+        log_ive > negative_v_correction,
+        tf.math.exp(log_ive + tf.math.log1p(
+            coeff * tf.math.exp(negative_v_correction - log_ive))),
+        tf.math.exp(negative_v_correction) * (tf.math.exp(
+            log_ive - negative_v_correction) + coeff))
+
+    ive = tf.where(v > 0., tf.math.exp(log_ive), ive_negative_v)
+    if output_log_space:
+      log_ive = tf.where(
+          v > 0., log_ive, tf.math.log(tf.math.abs(ive_negative_v)))
+      return log_ive, log_kve
+    return ive, tf.math.exp(log_kve)
 
 
 def _evaluate_temme_coeffs(v):
@@ -491,7 +506,7 @@ def _evaluate_temme_coeffs(v):
 
 
 def _temme_series(v, z):
-  """Computes K(v, z) and K(v + 1., z) via Power series expansion."""
+  """Computes Kve(v, z) and Kve(v + 1., z) via Power series expansion."""
   # This is based on:
   # [1] N. Temme, On the Numerical Evaluation of the Modified Bessel Function
   #   of the Third Kind. Journal of Computational Physics 19, 1975.
@@ -556,10 +571,12 @@ def _temme_series(v, z):
           initial_f,
           initial_p))
 
-  return kv_sum, 2 * kvp1_sum / z
+  log_kve = tf.math.log(kv_sum) + z
+  log_kvep1 = tf.math.log(2. * kvp1_sum) + z - tf.math.log(z)
+  return tf.math.exp(log_kve), tf.math.exp(log_kvep1)
 
 
-def _continued_fraction_kv(v, z):
+def _continued_fraction_kv(v, z, output_log_space=False):
   """Compute Modified Bessels of Second Kind using Hypergeometric functions.
 
   First define `k_n(z) = (-1)**n U(v + n + 0.5, 2 * v + 1., 2 * z)` where
@@ -567,7 +584,7 @@ def _continued_fraction_kv(v, z):
 
   We can compute via [1] `K_v(z)` and `K_{v + 1}(z)` via the identities:
 
-  `K_v(z) = sqrt(pi) * (2 * z) ** v * ezp(-z) * k_0(z)`,
+  `K_v(z) = sqrt(pi) * (2 * z) ** v * exp(-z) * k_0(z)`,
   `K_{v + 1}(z) = K_v(z) * (v + z + 0.5 - k_1(z) / k_0(z)`,
 
   This function aims to compute the ratio `k_1(z) / k_0(z)` via
@@ -577,6 +594,8 @@ def _continued_fraction_kv(v, z):
   Args:
     v: Floating-point `Tensor` broadcastable with `z`.
     z: Floating-point `Tensor` broadcastable with `v`.
+    output_log_space: `bool`. If `True`, output is in log-space.
+      Default value: `False`.
   Returns:
     kv_tuple: `K_v(z)` and `K_{v + 1}(z)`.
 
@@ -669,9 +688,12 @@ def _continued_fraction_kv(v, z):
            initial_seq,
            1 - initial_numerator * initial_ratio))
 
-  kv = tf.math.sqrt(np.pi / (2 * z))  * tf.math.exp(-z) / hypergeometric_sum
-  kvp1 = kv * (0.5 + v + z + initial_numerator * hypergeometric_ratio) / z
-  return kv, kvp1
+  log_kve = 0.5 * tf.math.log(np.pi / (2 * z)) - tf.math.log(hypergeometric_sum)
+  log_kvp1e = log_kve + tf.math.log(
+      0.5 + v + z + initial_numerator * hypergeometric_ratio) - tf.math.log(z)
+  if output_log_space:
+    return log_kve, log_kvp1e
+  return tf.math.exp(log_kve), tf.math.exp(log_kvp1e)
 
 
 def _temme_expansion(v, x):
@@ -690,53 +712,66 @@ def _temme_expansion(v, x):
 
   small_x = tf.where(x_abs <= 2., x_abs, numpy_dtype(0.1))
   large_x = tf.where(x_abs > 2., x_abs, numpy_dtype(1000.))
-  temme_ku, temme_kup1 = _temme_series(u, small_x)
-  cf_ku, cf_kup1 = _continued_fraction_kv(u, large_x)
+  temme_kue, temme_kuep1 = _temme_series(u, small_x)
+  cf_kue, cf_kuep1 = _continued_fraction_kv(u, large_x)
 
-  ku = tf.where(x_abs <= 2., temme_ku, cf_ku)
-  kup1 = tf.where(x_abs <= 2., temme_kup1, cf_kup1)
+  kue = tf.where(x_abs <= 2., temme_kue, cf_kue)
+  kuep1 = tf.where(x_abs <= 2., temme_kuep1, cf_kuep1)
 
   # Now use the forward recurrence for modified bessel functions
   # to compute Kv(v, x). That is,
   # K_{v + 1}(z) - (2v / z) K_v(z) - K_{v - 1}(z) = 0.
   # This is known to be forward numerically stable.
+  # Note: This recurrence is also satisfied by K_v(z) * exp(z)
 
-  def bessel_recurrence(index, kv, kvp1):
-    next_kvp1 = 2 * (u + index) * kvp1 / x_abs + kv
-    kv = tf.where(index > n, kv, kvp1)
-    kvp1 = tf.where(index > n, kvp1, next_kvp1)
-    return index + 1., kv, kvp1
+  def bessel_recurrence(index, kve, kvep1):
+    next_kvep1 = 2 * (u + index) * kvep1 / x_abs + kve
+    kve = tf.where(index > n, kve, kvep1)
+    kvep1 = tf.where(index > n, kvep1, next_kvep1)
+    return index + 1., kve, kvep1
 
-  _, kv, kvp1 = tf.while_loop(
+  _, kve, kvep1 = tf.while_loop(
       cond=lambda i, *_: tf.reduce_any(i <= n),
       body=bessel_recurrence,
-      loop_vars=(tf.cast(1., dtype=dtype), ku, kup1))
+      loop_vars=(tf.cast(1., dtype=dtype), kue, kuep1))
 
   # Finally, it is known that the Wronskian
   # det(I_v * K'_v - K_v * I'_v) = - 1. / x. We can
   # use this to evaluate I_v by taking advantage of identities of Bessel
   # derivatives.
 
-  iv = tf.math.reciprocal(
-      x_abs * (kv * bessel_iv_ratio(v + 1., x) + kvp1))
+  ive = tf.math.reciprocal(
+      x_abs * (kve * bessel_iv_ratio(v + 1., x) + kvep1))
+
+  # We need to add a correction term for negative v.
+  negative_v_correction = tf.math.log(kve) - 2. * x_abs
+  coeff = 2 / np.pi * tf.math.sin(np.pi * u)
+  coeff = (1. - 2. * tf.math.mod(n, 2.)) * coeff
+  log_ive = tf.math.log(ive)
+
+  ive_negative_v = tf.where(
+      log_ive > negative_v_correction,
+      tf.math.exp(log_ive + tf.math.log1p(
+          coeff * tf.math.exp(negative_v_correction - log_ive))),
+      tf.math.exp(negative_v_correction) * (tf.math.exp(
+          log_ive - negative_v_correction) + coeff))
+
+  ive = tf.where(v_less_than_zero, ive_negative_v, ive)
+
   z = u + tf.math.mod(n, 2.)
 
-  iv = tf.where(
-      v_less_than_zero,
-      iv + 2. / np.pi * tf.math.sin(np.pi * z) * kv, iv)
-  iv = tf.where(
+  ive = tf.where(
       tf.math.equal(x, 0.),
-      tf.where(tf.math.equal(v, 0.), numpy_dtype(1.), numpy_dtype(0.)), iv)
-  iv = tf.where(tf.math.equal(x, 0.) & v_less_than_zero,
-                tf.where(
-                    tf.math.equal(z, tf.math.floor(z)),
-                    iv,
-                    numpy_dtype(np.inf)),
-                iv)
-  kv = tf.where(tf.math.equal(x, 0.), numpy_dtype(np.inf), kv)
-  iv = tf.where(x < 0., numpy_dtype(np.nan), iv)
-  kv = tf.where(x < 0., numpy_dtype(np.nan), kv)
-  return iv, kv
+      tf.where(tf.math.equal(v, 0.), numpy_dtype(1.), numpy_dtype(0.)), ive)
+  ive = tf.where(tf.math.equal(x, 0.) & v_less_than_zero,
+                 tf.where(
+                     tf.math.equal(z, tf.math.floor(z)),
+                     ive,
+                     numpy_dtype(np.inf)), ive)
+  kve = tf.where(tf.math.equal(x, 0.), numpy_dtype(np.inf), kve)
+  ive = tf.where(x < 0., numpy_dtype(np.nan), ive)
+  kve = tf.where(x < 0., numpy_dtype(np.nan), kve)
+  return ive, kve
 
 
 @tf.custom_gradient
@@ -782,7 +817,7 @@ def bessel_ive(v, z, name=None):
     large_v = tf.where(tf.math.abs(v_abs) >= 50., v_abs, numpy_dtype(1000.))
 
     olver_ive, _ = _olver_asymptotic_uniform(large_v, z_abs)
-    temme_ive = _temme_expansion(small_v, z_abs)[0] * tf.math.exp(-z_abs)
+    temme_ive = _temme_expansion(small_v, z_abs)[0]
     ive = tf.where(tf.math.abs(v) >= 50., olver_ive, temme_ive)
 
     # Handle when z is zero.
@@ -873,7 +908,7 @@ def bessel_kve(v, z, name=None):
     large_v = tf.where(v >= 50., v, numpy_dtype(1000.))
 
     _, olver_kve = _olver_asymptotic_uniform(large_v, z_abs)
-    temme_kve = _temme_expansion(small_v, z_abs)[1] * tf.math.exp(z_abs)
+    temme_kve = _temme_expansion(small_v, z_abs)[1]
     kve = tf.where(v >= 50., olver_kve, temme_kve)
 
     # Handle when z is zero.

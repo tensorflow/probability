@@ -103,12 +103,12 @@ class _SkellamTest(object):
     err = self.compute_max_gradient_error(
         lambda lam: self._make_skellam(  # pylint:disable=g-long-lambda
             rate1=lam, rate2=rate2).log_prob(x), [rate1])
-    self.assertLess(err, 3e-4)
+    self.assertLess(err, 5e-4)
 
     err = self.compute_max_gradient_error(
         lambda lam: self._make_skellam(  # pylint:disable=g-long-lambda
             rate1=rate1, rate2=lam).log_prob(x), [rate2])
-    self.assertLess(err, 3e-4)
+    self.assertLess(err, 5e-4)
 
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(

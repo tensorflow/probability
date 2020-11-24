@@ -939,6 +939,30 @@ class JointDistributionCoroutineTest(test_util.TestCase):
           self.evaluate(bijectors[i].inverse_event_shape_tensor(
               event_shapes[i])))
 
+  def test_default_event_space_bijector_nested(self):
+    @tfd.JointDistributionCoroutine
+    def inner():
+      a = yield Root(tfd.Exponential(1., name='a'))
+      yield tfd.Sample(tfd.LogNormal(a, a), [5], name='b')
+
+    @tfd.JointDistributionCoroutine
+    def outer():
+      yield Root(inner)
+      yield Root(inner)
+      yield Root(inner)
+
+    xs = outer.sample(seed=test_util.test_seed())
+
+    outer_bij = outer.experimental_default_event_space_bijector()
+    joint_ldj = outer_bij.forward_log_det_jacobian(xs, [(0, 1)] * len(xs))
+
+    inner_bij = inner.experimental_default_event_space_bijector()
+    inner_ldjs = [inner_bij.forward_log_det_jacobian(x, (0, 1)) for x in xs]
+
+    # Evaluate both at once, to make sure we're using the same samples.
+    joint_ldj_, inner_ldjs_ = self.evaluate((joint_ldj, inner_ldjs))
+    self.assertAllClose(joint_ldj_, sum(inner_ldjs_))
+
   def test_sample_kwargs(self):
 
     @tfd.JointDistributionCoroutine

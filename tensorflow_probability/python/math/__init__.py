@@ -33,6 +33,7 @@ from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import log_cosh
 from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.generic import log_sub_exp
+from tensorflow_probability.python.math.generic import reduce_kahan_sum
 from tensorflow_probability.python.math.generic import reduce_log_harmonic_mean_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
@@ -124,6 +125,7 @@ _allowed_symbols = [
     'psd_kernels',
     'random_rademacher',
     'random_rayleigh',
+    'reduce_kahan_sum',
     'reduce_log_harmonic_mean_exp',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',

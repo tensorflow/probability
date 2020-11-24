@@ -154,11 +154,14 @@ class HalfNormal(distribution.Distribution):
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
     return tf.abs(sampled * scale)
 
-  def _prob(self, x):
+  def _log_prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
-    coeff = math.sqrt(2) / scale / math.sqrt(np.pi)
-    pdf = coeff * tf.exp(-0.5 * (x / scale)**2)
-    return pdf * tf.cast(x >= 0, self.dtype)
+    log_unnormalized = -0.5 * (x / scale)**2
+    log_normalization = tf.math.log(scale) + tf.constant(0.5 * np.log(np.pi/2.),
+                                                         dtype=self.dtype)
+    return tf.where(x >= 0,
+                    log_unnormalized - log_normalization,
+                    tf.constant(-np.inf, dtype=self.dtype))
 
   def _cdf(self, x):
     truncated_x = tf.nn.relu(x)

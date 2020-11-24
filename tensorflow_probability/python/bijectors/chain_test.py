@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+import mock
 
 import numpy as np
 import tensorflow.compat.v1 as tf1
@@ -68,6 +69,16 @@ class ChainBijectorTest(test_util.TestCase):
         0., self.evaluate(chain.inverse_log_det_jacobian(x, event_ndims=1)))
     self.assertAllClose(
         0., self.evaluate(chain.forward_log_det_jacobian(x, event_ndims=1)))
+
+  def testNestedDtype(self):
+    chain = tfb.Chain([
+        tfb.Identity(),
+        tfb.Scale(tf.constant(2., tf.float64)),
+        tfb.Identity()
+    ])
+
+    self.assertAllClose(tf.constant([2, 4, 6], tf.float64),
+                        self.evaluate(chain.forward([1, 2, 3])))
 
   def testScalarCongruency(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Softplus()))
@@ -155,6 +166,29 @@ class ChainBijectorTest(test_util.TestCase):
     self.assertEqual(4, chain.forward_min_event_ndims)
     self.assertEqual(1, chain.inverse_min_event_ndims)
 
+  def testMinEventNdimsWithJointMap(self):
+    jm_0 = tfb.JointMap([ShapeChanging(1, 1), ShapeChanging(3, 1)])
+    split = ShapeChanging(1, [1, 1])
+    concat = ShapeChanging([1, 1], 1)
+    jm_1 = tfb.JointMap([ShapeChanging(1, 0), ShapeChanging(1, 1)])
+
+    self.assertFalse(jm_0.has_static_min_event_ndims)
+    self.assertFalse(jm_1.has_static_min_event_ndims)
+    self.assertTrue(split.has_static_min_event_ndims)
+    self.assertTrue(concat.has_static_min_event_ndims)
+
+    # Decidable. Inner bijectors have static min_event_ndims.
+    chain = tfb.Chain([jm_0, split, concat, jm_1])
+    self.assertTrue(chain.has_static_min_event_ndims)
+    self.assertAllEqualNested([4, 3], chain.forward_min_event_ndims)
+    self.assertAllEqualNested([3, 1], chain.inverse_min_event_ndims)
+
+    # Undecidable. None of the nested bijectors have known event_ndims.
+    chain = tfb.Chain([jm_0, jm_1])
+    self.assertFalse(chain.has_static_min_event_ndims)
+    self.assertAllEqualNested([None, None], chain.forward_min_event_ndims)
+    self.assertAllEqualNested([None, None], chain.inverse_min_event_ndims)
+
   def testChainExpAffine(self):
     scale_diag = np.array([1., 2., 3.], dtype=np.float32)
     chain = tfb.Chain([tfb.Exp(), tfb.Affine(scale_diag=scale_diag)])
@@ -233,12 +267,41 @@ class ChainBijectorTest(test_util.TestCase):
     # The shape of `ildj` is known statically to be scalar; its value is
     # not statically known.
     self.assertTrue(tensorshape_util.is_fully_defined(ildj.shape))
-    self.assertEqual(self.evaluate(ildj), -9.)
+
+    # `ldj_reduce_shape` uses `prefer_static` to get input shapes. That means
+    # that we respect statically-known shape information where present.
+    # In this case, the manually-assigned static shape is incorrect.
+    self.assertEqual(self.evaluate(ildj), -7.)
 
     # Ditto.
     fldj = chain.forward_log_det_jacobian([0.], event_ndims=0)
     self.assertTrue(tensorshape_util.is_fully_defined(fldj.shape))
     self.assertEqual(self.evaluate(fldj), 3.)
+
+  def testDofChangeError(self):
+    exp = tfb.Exp()
+    smc = tfb.SoftmaxCentered()
+
+    # Increase in event-size is the last step. No problems here.
+    safe_bij = tfb.Chain([smc, exp], validate_args=True)
+    self.evaluate(safe_bij.forward_log_det_jacobian([1., 2., 3.], 1))
+
+    # Increase in event-size before Exp.
+    raise_bij = tfb.Chain([exp, smc], validate_args=True)
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                r".+degrees of freedom.+"):
+      self.evaluate(raise_bij.forward_log_det_jacobian([1., 2., 3.], 1))
+
+    # When validate_args is False, warns instead of raising.
+    warn_bij = tfb.Chain([exp, smc], validate_args=False)
+    with mock.patch.object(tf, "print", return_value=tf.no_op()) as mock_print:
+      self.evaluate(warn_bij.forward_log_det_jacobian([1., 2., 3.], 1))
+      print_args, _ = mock_print.call_args
+      self.assertRegex(print_args[0], r"WARNING:.+degrees of freedom")
+
+    # When validate_event_shape is False, neither warns nor raises.
+    ignore_bij = tfb.Chain([exp, smc], validate_event_size=False)
+    self.evaluate(ignore_bij.forward_log_det_jacobian([1., 2., 3.], 1))
 
 
 if __name__ == "__main__":

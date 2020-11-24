@@ -170,7 +170,8 @@ class WeakStructRef(object):
 
   def __call__(self):
     """Unwraps the tensor reference."""
-    return nest.map_structure(lambda x: x(), self._struct)
+    if self.alive:
+      return nest.map_structure(lambda x: x(), self._struct)
 
   def __hash__(self):
     """Returns the cached hash of this structure."""

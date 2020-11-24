@@ -289,6 +289,7 @@ class ParameterBijectorsTest(test_util.TestCase):
     non_trainable_tensor_params = (
         'atol',
         'rtol',
+        'eigenvectors',  # TODO(b/171872834): DeterminantalPointProcess
         'total_count',
         'num_samples',
         'df',  # Can't represent constraint that Wishart df > dimension.
