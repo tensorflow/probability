@@ -55,7 +55,7 @@ def quap(joint_dist, data=None, max_tries=20, initial_position=None, name=None):
     joint_dist: A `JointDistributionNamed` or `JointDistributionSequential`
       model. Also works with auto batched versions of the same.
     data: Optional `dict` of data to condition the joint_dist with. The return
-      value will be conditioned o this data. If this is `None`, the return
+      value will be conditioned on this data. If this is `None`, the return
       value will be a quadratic approximation to the distribution itself.
     max_tries: Optional `int` of number of times to run the optimizer internally
       before raising a `RuntimeError`. Default is 20.
