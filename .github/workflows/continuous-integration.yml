@@ -1,0 +1,59 @@
+name: Tests
+on: [push, pull_request]
+env:
+  TEST_VENV_PATH: ~/test_virtualenv
+jobs:
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7]
+    env:
+      BEFORE_HASH: ${{ github.event.before }}
+      AFTER_HASH: ${{ github.event.after }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 20
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup virtualenv
+        run: |
+          sudo apt install virtualenv
+          virtualenv -p python${{ matrix.python-version }} ${TEST_VENV_PATH}
+      - name: Lints
+        run: |
+          source ${TEST_VENV_PATH}/bin/activate
+          ./testing/run_travis_lints.sh
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7]
+        shard: [0, 1, 2, 3, 4]
+    env:
+      TEST_VENV_PATH: ~/test_virtualenv
+      SHARD: ${{ matrix.shard }}
+      NUM_SHARDS: 5 # Empirically, GitHub runs at most 5 jobs in parallel.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup virtualenv
+        run: |
+          sudo apt install virtualenv
+          virtualenv -p python${{ matrix.python-version }} ${TEST_VENV_PATH}
+      - name: Tests
+        run: |
+          source ${TEST_VENV_PATH}/bin/activate
+          ./testing/run_travis_tests.sh

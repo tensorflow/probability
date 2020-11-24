@@ -34,13 +34,6 @@ if [ -z "${NUM_SHARDS}" ]; then
   exit -1
 fi
 
-call_with_log_folding() {
-  local command=$1
-  echo "travis_fold:start:$command"
-  $command
-  echo "travis_fold:end:$command"
-}
-
 install_bazel() {
   # Install Bazel for tests. Based on instructions at
   # https://docs.bazel.build/versions/master/install-ubuntu.html#install-on-ubuntu
@@ -63,8 +56,8 @@ install_python_packages() {
 
 # Only install bazel if not already present (useful for locally testing this
 # script).
-which bazel || call_with_log_folding install_bazel
-call_with_log_folding install_python_packages
+which bazel || install_bazel
+install_python_packages
 
 test_tags_to_skip="(gpu|requires-gpu-nvidia|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
 
