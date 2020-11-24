@@ -55,7 +55,6 @@ py_test(
     size = "small",
     srcs = ["sample_stats_test.py"],
     python_version = "PY3",
-    shard_count = 10,
     srcs_version = "PY3",
     deps = [
         ":sample_stats",
