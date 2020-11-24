@@ -82,6 +82,7 @@ DISABLED_BY_PKG = {
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'random', 'stats', 'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'cache_util',
+             'callable_util',
              'custom_gradient', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'implementation_selection', 'monte_carlo',
              'name_util', 'nest_util', 'parameter_properties', 'prefer_static',
