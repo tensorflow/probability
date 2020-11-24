@@ -45,7 +45,6 @@ def merge_flat_args(args, defaults):
 def quap(joint_dist, data=None, max_tries=20, initial_position=None, name=None):
   """Compute a quadratic approximation to a ``JointDistributionNamed``.
 
-
   Traverses a JointDistribution*, uses bfgs to minimize the negative
   log probability and estimate the hessian, and returns a JointDistribution of
   the same type,  whose distributions are all Gaussians, and covariances are
@@ -73,7 +72,6 @@ def quap(joint_dist, data=None, max_tries=20, initial_position=None, name=None):
     RuntimeError: In case the optimizer does not converge within `max_tries`.
   """
   with tf.name_scope(name or "quap"):
-    max_tries = tf.convert_to_tensor(max_tries)
     structure = joint_dist.sample()
 
     # A dictionary is the only structure that does not already
@@ -98,16 +96,15 @@ def quap(joint_dist, data=None, max_tries=20, initial_position=None, name=None):
         return tfp.math.value_and_gradient(neg_logp, vals)
       return idx + 1, tfp.optimizer.bfgs_minimize(neg_logp_and_grad, locs)
 
-    def should_stop(idx, opt):
+    def should_continue(idx, opt):
       return (idx < max_tries) & ~opt.converged
 
-    idx = tf.constant(0, dtype=max_tries.dtype)
-    idx, opt = try_optimize(idx, None)
-    _, opt = tf.while_loop(should_stop, try_optimize, [idx, opt])
+    idx, opt = try_optimize(0, None)
+    _, opt = tf.while_loop(should_continue, try_optimize, [idx, opt])
 
     with tf.control_dependencies([tf.debugging.Assert(
         condition=opt.converged, data=opt)]):
-      dists = {}
+
       stddevs = tf.sqrt(tf.linalg.diag_part(opt.inverse_hessian_estimate))
 
       gaussians = tf.nest.map_structure(
