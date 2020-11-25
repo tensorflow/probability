@@ -53,6 +53,7 @@ from tensorflow_probability.python.distributions.generalized_normal import Gener
 from tensorflow_probability.python.distributions.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
+from tensorflow_probability.python.distributions.gev import GeneralizedExtremeValue
 from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.half_student_t import HalfStudentT
@@ -185,6 +186,7 @@ __all__ = [
     'GaussianProcessRegressionModel',
     'VariationalGaussianProcess',
     'Gumbel',
+    'GeneralizedExtremeValue',
     'HalfCauchy',
     'HalfNormal',
     'HalfStudentT',
