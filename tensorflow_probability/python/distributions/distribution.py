@@ -605,14 +605,6 @@ class Distribution(_BaseDistribution):
         instances.
     """
     with tf.name_scope('parameter_properties'):
-      # Instead of a dtype, subclass implementations take an `eps` argument
-      # representing a small value in the requested dtype. This may be used to
-      # avoid constraint boundaries, e.g., Softplus(low=eps) will avoid
-      # infinitesimally small values for a scale param. The dtype
-      # may be recovered as `eps.dtype`.
-      # Numpy defines `eps` using the difference between 1.0 and the next
-      # smallest representable float larger than 1.0. This is approximately
-      # 1.19e-07 in float32, 2.22e-16 in float64, and 0.00098 in float16.
       return cls._parameter_properties(dtype, num_classes=num_classes)
 
   @classmethod
