@@ -54,6 +54,8 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'FiniteDiscrete',
     # TODO(b/159996966)
     'Gamma',
+    # TODO(b/173546024)
+    'GeneralizedExtremeValue',
     'OneHotCategorical',
     'LogNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
@@ -189,7 +191,9 @@ XLA_LOGPROB_RTOL.update({
 
 SKIP_KL_CHECK_DIST_VAR_GRADS = [
     'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
-    'JohnsonSU'  # TD's KL gradients do not rely on bijector variables.
+    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
+    'GeneralizedExtremeValue',  # TD's KL gradients do not rely on bijector
+                                # variables.
 ]
 
 

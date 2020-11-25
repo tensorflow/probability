@@ -73,6 +73,7 @@ TF2_FRIENDLY_DISTS = (
     'GeneralizedPareto',
     'Geometric',
     'Gumbel',
+    'GeneralizedExtremeValue',
     'HalfCauchy',
     'HalfNormal',
     'HalfStudentT',

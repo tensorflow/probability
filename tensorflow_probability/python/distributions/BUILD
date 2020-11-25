@@ -72,6 +72,7 @@ multi_substrate_py_library(
         ":generalized_normal",
         ":generalized_pareto",
         ":geometric",
+        ":gev",
         ":gumbel",
         ":half_cauchy",
         ":half_normal",
@@ -751,6 +752,24 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gev",
+    srcs = ["gev.py"],
+    deps = [
+        ":kullback_leibler",
+        ":transformed_distribution",
+        ":uniform",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:gev_cdf",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -2547,6 +2566,19 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "gumbel_test",
     srcs = ["gumbel_test.py"],
+    jax_size = "medium",
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "gev_test",
+    srcs = ["gev_test.py"],
     jax_size = "medium",
     deps = [
         # numpy dep,
