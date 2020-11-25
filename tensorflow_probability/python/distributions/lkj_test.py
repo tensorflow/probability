@@ -70,7 +70,8 @@ volume_bounds = {
 
 
 @test_util.test_all_tf_execution_regimes
-@parameterized.parameters(np.float32, np.float64)
+@parameterized.named_parameters(('_float32', np.float32),
+                                ('_float64', np.float64))
 class LKJTest(test_util.TestCase):
 
   def testNormConst2D(self, dtype):
@@ -418,6 +419,12 @@ class LKJTest(test_util.TestCase):
     with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
       with tf.control_dependencies([concentration.assign(0.5)]):
         self.evaluate(d.mean())
+
+  def testDefaultEventSpaceBijectorValidCorrelation(self, dtype):
+    d = tfd.LKJ(3, tf.constant(1., dtype), validate_args=True)
+    b = d.experimental_default_event_space_bijector()
+    sample = b(tf.zeros((3, 3), dtype))
+    self.evaluate(d.log_prob(sample))
 
 
 class LKJTestGraphOnly(test_util.TestCase):
