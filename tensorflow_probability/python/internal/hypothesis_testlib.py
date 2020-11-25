@@ -61,6 +61,12 @@ def hypothesis_max_examples(default=None):
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', default or 20))
 
 
+def hypothesis_timeout():
+  # Use --test_env=TFP_HYPOTHESIS_TIMEOUT_SECS=600 to permit longer runs,
+  # ergo deeper exploration of the search tree.
+  return int(os.environ.get('TFP_HYPOTHESIS_TIMEOUT_SECS', 60))
+
+
 def hypothesis_reproduction_seed():
   # Use --test_env=TFP_HYPOTHESIS_REPRODUCE=hexjunk to reproduce a failure.
   return os.environ.get('TFP_HYPOTHESIS_REPRODUCE', None)
@@ -92,6 +98,7 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
       deadline=None,
       suppress_health_check=[hp.HealthCheck.too_slow],
       max_examples=hypothesis_max_examples(default=default_max_examples),
+      timeout=hypothesis_timeout(),
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
   def decorator(test_method):
