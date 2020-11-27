@@ -151,6 +151,29 @@ class BfgsTest(test_util.TestCase):
           quadratic, initial_position=start, tolerance=1e-8,
           initial_inverse_hessian_estimate=bad_inv_hessian))
 
+  def test_batched_inverse_hessian(self):
+    """Checks that specifying a batch of inverse hessians works."""
+    minimum = np.array([1.0, 1.0], dtype=np.float32)
+    scales = np.array([2.0, 3.0], dtype=np.float32)
+
+    @_make_val_and_grad_fn
+    def batched_quadratic(x):
+      return tf.reduce_sum(
+        scales * tf.math.squared_difference(x, minimum), axis=-1)
+
+    start = tf.constant([[0.6, 0.8], [0.5, 0.5]], dtype=tf.float32)
+    test_inv_hessian = tf.constant([[[2.0, 1.0], [1.0, 2.0]],
+                                    [[1.0, 0.0], [0.0, 1.0]]], dtype=tf.float32)
+    results = self.evaluate(tfp.optimizer.bfgs_minimize(
+        batched_quadratic, initial_position=start, tolerance=1e-8,
+        initial_inverse_hessian_estimate=test_inv_hessian))
+    self.assertAllTrue(results.converged)
+    final_gradient = results.objective_gradient
+    final_gradient_norm = _norm(final_gradient)
+    self.assertAllLessEqual(final_gradient_norm, 1e-8)
+    self.assertArrayNear(results.position[0], minimum, 1e-5)
+    self.assertArrayNear(results.position[1], minimum, 1e-5)
+
   def test_quadratic_bowl_10d(self):
     """Can minimize a ten dimensional quadratic function."""
     dim = 10
