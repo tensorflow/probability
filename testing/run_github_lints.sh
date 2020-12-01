@@ -18,13 +18,13 @@ set -v  # print commands as they are executed
 set -e  # fail and exit on any command erroring
 
 get_changed_py_files() {
-  # Need to fetch the base branch in case it is not master.
-  git remote set-branches --add origin ${TRAVIS_BRANCH}
-  git fetch --depth=20 --quiet
-  git diff \
-      --name-only \
-      --diff-filter=AM origin/${TRAVIS_BRANCH}...HEAD \
-    | grep '^tensorflow_probability.*\.py$' || true
+  if [ $GITHUB_BASE_REF ]; then
+    git fetch origin ${GITHUB_BASE_REF} --depth=1
+    git diff \
+        --name-only \
+        --diff-filter=AM origin/${GITHUB_BASE_REF} \
+      | grep '^tensorflow_probability.*\.py$'
+  fi
 }
 
 pip install --quiet pylint
