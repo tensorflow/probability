@@ -86,7 +86,7 @@ find_good_tf_nightly_version_str() {
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
   # to be updated on every new TF release.
-  python -m pip install $PKG_NAME==X 2>&1 \
+  python -m pip install --use-deprecated=legacy-resolver $PKG_NAME==X 2>&1 \
     | grep -o "[0-9.]\+dev[0-9]\{8\}" \
     | sort \
     | grep -v "$BAD_NIGHTLY_DATES" \
