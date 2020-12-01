@@ -102,11 +102,17 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
   def decorator(test_method):
-    seed = hypothesis_reproduction_seed()
-    if seed is not None:
+    repro_seed = hypothesis_reproduction_seed()
+    if repro_seed is not None:
       # This implements the semantics of TFP_HYPOTHESIS_REPRODUCE via
       # the `hp.reproduce_failure` decorator.
-      test_method = hp.reproduce_failure('3.56.5', seed)(test_method)
+      test_method = hp.reproduce_failure('3.56.5', repro_seed)(test_method)
+    elif randomize_hypothesis():
+      # Hypothesis defaults to seeding its internal PRNG from the system time,
+      # so since we actually want randomization (including across machines) we
+      # have to force it.
+      entropy = os.urandom(64)
+      test_method = hp.seed(int.from_bytes(entropy, 'big'))(test_method)
     return hp.settings(**kwds)(test_method)
   return decorator
 
