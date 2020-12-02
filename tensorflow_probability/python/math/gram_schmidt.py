@@ -53,7 +53,7 @@ def gram_schmidt(vectors, num_vectors=None):
   [2] P. S. Laplace, Thiorie Analytique des Probabilites. Premier Supple'ment,
       Mme. Courtier, Paris, 1816.
 
-  [3] E. Schmidt, ijber die Auflosung linearer Gleichungen mit unendlich vielen
+  [3] E. Schmidt, über die Auflosung linearer Gleichungen mit unendlich vielen
       Unbekannten, Rend. Circ. Mat. Pulermo (1) 25:53-77 (1908).
 
   Args:
