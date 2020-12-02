@@ -190,7 +190,7 @@ def main(argv):
   })
 
   filename = argv[1]
-  contents = open(filename).read()
+  contents = open(filename, encoding='utf-8').read()
   if '__init__.py' in filename:
     # Comment out items from __all__.
     for pkg, disabled in disabled_by_pkg.items():
@@ -248,7 +248,7 @@ def main(argv):
   print('# ' + '@' * 78)
   print('\n# (This notice adds 10 to line numbering.)\n\n')
 
-  print(contents)
+  print(contents, file=open(1, 'w', encoding='utf-8', closefd=False))
 
 
 if __name__ == '__main__':
