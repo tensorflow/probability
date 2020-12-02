@@ -94,23 +94,39 @@ class JointDistributionTest(test_util.TestCase):
     @tf.function(autograph=False)
     def run(key):
       sample = dist.sample(seed=key)
-      return sample, dist.log_prob(sample)
+      # The identity is to prevent reparameterization gradients from kicking in.
+      log_prob, (log_prob_grads,) = tfp.math.value_and_gradient(
+          dist.log_prob, (tf.nest.map_structure(tf.identity, sample),))
+      return sample, log_prob, log_prob_grads
 
-    sample, log_prob = per_replica_to_tensor(
-        self.strategy.run(run, (tf.ones(2, tf.int32),)))
+    sample, log_prob, log_prob_grads = self.strategy.run(
+        run, (tf.ones(2, tf.int32),))
+    sample, log_prob, log_prob_grads = per_replica_to_tensor(
+        (sample, log_prob, log_prob_grads))
 
-    def true_log_prob(sample):
-      if isinstance(dist, jd.JointDistributionNamed):
-        w, x, data = sample['w'], sample['x'], sample['data']
-      else:
-        w, x, data = sample
-      return (tfd.Normal(0., 1.).log_prob(w[0]) +
+    def true_log_prob_fn(w, x, data):
+      return (tfd.Normal(0., 1.).log_prob(w) +
               tfd.Sample(tfd.Normal(w, 1.), (4, 1)).log_prob(x) +
               tfd.Independent(tfd.Normal(x, 1.), 2).log_prob(data))
 
+    if isinstance(dist, jd.JointDistributionNamed):
+      # N.B. the global RV 'w' gets replicated, so we grab any single replica's
+      # result.
+      w, x, data = sample['w'][0], sample['x'], sample['data']
+      log_prob_grads = (log_prob_grads['w'][0], log_prob_grads['x'],
+                        log_prob_grads['data'])
+    else:
+      w, x, data = sample[0][0], sample[1], sample[2]
+      log_prob_grads = (log_prob_grads[0][0], log_prob_grads[1],
+                        log_prob_grads[2])
+
+    true_log_prob, true_log_prob_grads = tfp.math.value_and_gradient(
+        true_log_prob_fn, (w, x, data))
+
     self.assertAllClose(
-        self.evaluate(log_prob),
-        self.evaluate(tf.ones(4) * true_log_prob(sample)))
+        self.evaluate(log_prob), self.evaluate(tf.ones(4) * true_log_prob))
+    self.assertAllCloseNested(
+        self.evaluate(log_prob_grads), self.evaluate(true_log_prob_grads))
 
 
 if __name__ == '__main__':

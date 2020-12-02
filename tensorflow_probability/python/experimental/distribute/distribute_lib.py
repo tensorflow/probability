@@ -62,9 +62,6 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded):
 
   @tf.custom_gradient
   def sharded_log_prob_parts(value):
-    if not isinstance(value, (list, tuple)):
-      raise NotImplementedError('Can only shard functions that output `list`s.'
-                                ' or `tuple`s')
     tf.nest.assert_same_structure(value, is_sharded)
     with tf.GradientTape(persistent=True) as tape:
       tape.watch(value)
@@ -78,15 +75,15 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded):
         is_sharded)
 
     def vjp(*gs):
-      assert len(gs) == len(log_prob_parts)
+      gs = tf.nest.pack_sequence_as(log_prob_parts, gs)
 
       def local_grad(v, g):
-        return _DummyGrads([
-            tape.gradient(log_prob_part, v, output_gradients=g)
-            for log_prob_part in log_prob_parts
-        ])
+        return _DummyGrads(
+            tf.nest.map_structure(
+                lambda lp: tape.gradient(lp, v, output_gradients=g),
+                log_prob_parts))
 
-      local_grads = tf.nest.map_structure(local_grad, value, list(gs))
+      local_grads = tf.nest.map_structure(local_grad, value, gs)
 
       def value_grad(v, value_sharded, term_grads):
         """Computes reductions of output gradients.
@@ -117,12 +114,15 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded):
           `log_prob_parts` function.
         """
         term_grads = term_grads.grads
-        total_grad = []
-        for term_grad, term_sharded in zip(term_grads, is_sharded):
+
+        def psum_grads(term_grad, term_sharded):
           if term_grad is not None:
             if not value_sharded and term_sharded:
               term_grad = psum(term_grad)
-          total_grad.append(term_grad)
+          return term_grad
+
+        total_grad = tf.nest.map_structure(psum_grads, term_grads,
+                                           is_sharded)
         if all([grad is None for grad in tf.nest.flatten(total_grad)]):
           return None
         return tf.add_n(
