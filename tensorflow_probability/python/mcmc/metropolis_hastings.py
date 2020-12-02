@@ -196,6 +196,8 @@ class MetropolisHastings(kernel_base.TransitionKernel):
           current_state,
           previous_kernel_results.accepted_results,
           **inner_kwargs)
+      if mcmc_util.is_list_like(current_state):
+        proposed_state = tf.nest.pack_sequence_as(current_state, proposed_state)
 
       if (not has_target_log_prob(proposed_results) or
           not has_target_log_prob(previous_kernel_results.accepted_results)):
