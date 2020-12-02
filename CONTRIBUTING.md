@@ -32,20 +32,19 @@ repository (with credit to the original author) and closes the pull request.
 
 ## Continuous Integration
 
-We use [Travis CI](https://travis-ci.org/tensorflow/probability) to do automated
-style checking and run unit-tests (discussed in more detail below). A build
-will be triggered when you open a pull request, or update the pull request by
-adding a commit, rebasing etc.
+We use [GitHub Actions](https://github.com/tensorflow/probability/actions) to do
+automated style checking and run unit-tests (discussed in more detail below). A
+build will be triggered when you open a pull request, or update the pull request
+by adding a commit, rebasing etc.
 
-We test against TensorFlow nightly on Python 2.7 and 3.6. We shard our tests
+We test against TensorFlow nightly on Python 3.7. We shard our tests
 across several build jobs (identified by the `SHARD` environment variable).
-Linting, in particular, is only done on the first shard, so look at that shard's
-logs for lint errors if any.
+Lints are also done in a separate job.
 
 All pull-requests will need to pass the automated lint and unit-tests before
-being merged. As Travis-CI tests can take a bit of time, see the following
-sections on how to run the lint checks and unit-tests locally while you're
-developing your change.
+being merged. As the tests can take a bit of time, see the following sections
+on how to run the lint checks and unit-tests locally while you're developing
+your change.
 
 ## Style
 
