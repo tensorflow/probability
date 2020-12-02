@@ -81,7 +81,9 @@ def make_transform_fn(bijector, direction):
     if len(bijector) != len(state_parts):
       raise ValueError('State has {} parts, but bijector has {}.'.format(
           len(state_parts), len(bijector)))
-    return [getattr(b, direction)(sp) for b, sp in zip(bijector, state_parts)]
+    transformed_parts = [
+        getattr(b, direction)(sp) for b, sp in zip(bijector, state_parts)]
+    return tf.nest.pack_sequence_as(state_parts, transformed_parts)
   return fn
 
 
@@ -397,8 +399,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     with tf.name_scope(mcmc_util.make_name(
         self.name, 'transformed_kernel', 'one_step')):
       inner_kwargs = {} if seed is None else dict(seed=seed)
+      transformed_prev_state = previous_kernel_results.transformed_state
       transformed_next_state, kernel_results = self._inner_kernel.one_step(
-          previous_kernel_results.transformed_state,
+          transformed_prev_state,
           previous_kernel_results.inner_results,
           **inner_kwargs)
       transformed_next_state_parts = (
@@ -410,6 +413,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       next_state = (
           next_state_parts if mcmc_util.is_list_like(transformed_next_state)
           else next_state_parts[0])
+      if mcmc_util.is_list_like(transformed_prev_state):
+        transformed_next_state = tf.nest.pack_sequence_as(
+            transformed_prev_state, transformed_next_state)
       kernel_results = TransformedTransitionKernelResults(
           transformed_state=transformed_next_state,
           inner_results=kernel_results)
@@ -472,14 +478,15 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         transformed_init_state_parts = (
             self._transform_target_support_to_unconstrained(init_state_parts))
         transformed_init_state = (
-            transformed_init_state_parts if mcmc_util.is_list_like(init_state)
+            tf.nest.pack_sequence_as(init_state, transformed_init_state_parts)
+            if mcmc_util.is_list_like(init_state)
             else transformed_init_state_parts[0])
       else:
         if mcmc_util.is_list_like(transformed_init_state):
-          transformed_init_state = [
-              tf.convert_to_tensor(s, name='transformed_init_state')
-              for s in transformed_init_state
-          ]
+          transformed_init_state = tf.nest.pack_sequence_as(
+              transformed_init_state,
+              [tf.convert_to_tensor(s, name='transformed_init_state')
+               for s in transformed_init_state])
         else:
           transformed_init_state = tf.convert_to_tensor(
               value=transformed_init_state, name='transformed_init_state')
