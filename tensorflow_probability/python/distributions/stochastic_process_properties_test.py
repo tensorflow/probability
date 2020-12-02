@@ -418,7 +418,8 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
       try:
         with tfp_hps.assert_no_excessive_var_usage(
             'method `{}` of `{}`'.format(stat, process),
-            max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)):
+            max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)
+            ), kernel_hps.no_pd_errors():
           getattr(process, stat)()
 
       except NotImplementedError:
