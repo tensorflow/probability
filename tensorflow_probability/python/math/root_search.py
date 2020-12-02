@@ -20,15 +20,21 @@ from __future__ import print_function
 
 import collections
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import callable_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
+NUMPY_MODE = False
 
 __all__ = [
+    'bracket_root',
     'secant_root',
     'find_root_chandrupatla',
     'find_root_secant',
@@ -338,8 +344,8 @@ def _structure_broadcasting_where(c, x, y):
 
 
 def find_root_chandrupatla(objective_fn,
-                           low,
-                           high,
+                           low=None,
+                           high=None,
                            position_tolerance=1e-8,
                            value_tolerance=0.,
                            max_iterations=50,
@@ -362,9 +368,15 @@ def find_root_chandrupatla(objective_fn,
       callable of a single variable. `objective_fn` must return a `Tensor` with
       shape `batch_shape` and dtype matching `lower_bound` and `upper_bound`.
     low: Float `Tensor` of shape `batch_shape` representing a lower
-      bound(s) on the value of a root(s).
+      bound(s) on the value of a root(s). If either of `low` or `high` is not
+      provided, both are ignored and `tfp.math.bracket_root` is used to attempt
+      to infer bounds.
+      Default value: `None`.
     high: Float `Tensor` of shape `batch_shape` representing an upper
-      bound(s) on the value of a root(s).
+      bound(s) on the value of a root(s). If either of `low` or `high` is not
+      provided, both are ignored and `tfp.math.bracket_root` is used to attempt
+      to infer bounds.
+      Default value: `None`.
     position_tolerance: Optional `Tensor` representing the maximum absolute
       error in the positions of the estimated roots. Shape must broadcast with
       `batch_shape`.
@@ -492,8 +504,18 @@ def find_root_chandrupatla(objective_fn,
   with tf.name_scope(name):
     max_iterations = tf.convert_to_tensor(
         max_iterations, name='max_iterations', dtype_hint=tf.int32)
-    a = tf.convert_to_tensor(low, name='lower_bound')
-    b = tf.convert_to_tensor(high, name='upper_bound')
+    dtype = dtype_util.common_dtype(
+        [low, high, position_tolerance, value_tolerance], dtype_hint=tf.float32)
+    position_tolerance = tf.convert_to_tensor(
+        position_tolerance, name='position_tolerance', dtype=dtype)
+    value_tolerance = tf.convert_to_tensor(
+        value_tolerance, name='value_tolerance', dtype=dtype)
+
+    if low is None or high is None:
+      a, b = bracket_root(objective_fn, dtype=dtype)
+    else:
+      a = tf.convert_to_tensor(low, name='lower_bound', dtype=dtype)
+      b = tf.convert_to_tensor(high, name='upper_bound', dtype=dtype)
     f_a, f_b = objective_fn(a), objective_fn(b)
     batch_shape = ps.broadcast_shape(ps.shape(f_a), ps.shape(f_b))
 
@@ -529,3 +551,95 @@ def find_root_chandrupatla(objective_fn,
       estimated_root=x_best,
       objective_at_estimated_root=f_best,
       num_iterations=num_iterations)
+
+
+def bracket_root(objective_fn,
+                 dtype=tf.float32,
+                 num_points=512,
+                 name='bracket_root'):
+  """Finds bounds that bracket a root of the objective function.
+
+  This method attempts to return an interval bracketing a root of the objective
+  function. It evaluates the objective in parallel at `num_points`
+  locations, at exponentially increasing distance from the origin, and returns
+  the first pair of adjacent points `[low, high]` such that the objective is
+  finite and has a different sign at the two points. If no such pair was
+  observed, it returns the trivial interval
+  `[np.finfo(dtype).min, np.finfo(dtype).max]` containing all float values of
+  the specified `dtype`. If the objective has multiple
+  roots, the returned interval will contain at least one (but perhaps not all)
+  of the roots.
+
+  Args:
+    objective_fn: Python callable for which roots are searched. It must be a
+      continuous function that accepts a scalar `Tensor` of type `dtype` and
+      returns a `Tensor` of shape `batch_shape`.
+    dtype: Optional float `dtype` of inputs to `objective_fn`.
+      Default value: `tf.float32`.
+    num_points: Optional Python `int` number of points at which to evaluate
+      the objective.
+      Default value: `512`.
+    name: Python `str` name given to ops created by this method.
+  Returns:
+    low: Float `Tensor` of shape `batch_shape` and dtype `dtype`. Lower bound
+      on a root of `objective_fn`.
+    high: Float `Tensor` of shape `batch_shape` and dtype `dtype`. Upper bound
+      on a root of `objective_fn`.
+  """
+  with tf.name_scope(name):
+    # Build a logarithmic sequence of `num_points` values from -inf to inf.
+    dtype_info = np.finfo(dtype_util.as_numpy_dtype(dtype))
+    xs_positive = tf.exp(tf.linspace(tf.cast(-10., dtype),
+                                     tf.math.log(dtype_info.max),
+                                     num_points // 2))
+    xs = tf.concat([-xs_positive, xs_positive], axis=0)
+
+    # Evaluate the objective at all points. The objective function may return
+    # a batch of values (e.g., `objective(x) = x - batch_of_roots`).
+    if NUMPY_MODE:
+      objective_output_spec = objective_fn(tf.zeros([], dtype=dtype))
+    else:
+      objective_output_spec = callable_util.get_output_spec(
+          objective_fn,
+          tf.convert_to_tensor(0., dtype=dtype))
+    batch_ndims = tensorshape_util.rank(objective_output_spec.shape)
+    if batch_ndims is None:
+      raise ValueError('Cannot infer tensor rank of objective values.')
+    xs_pad_shape = ps.pad([num_points],
+                          paddings=[[0, batch_ndims]],
+                          constant_values=1)
+    ys = objective_fn(tf.reshape(xs, xs_pad_shape))
+
+    # Find the smallest point where the objective is finite.
+    is_finite = tf.math.is_finite(ys)
+    ys_transposed = distribution_util.move_dimension(  # For batch gather.
+        ys, 0, -1)
+    first_finite_value = tf.gather(
+        ys_transposed,
+        tf.argmax(is_finite, axis=0),  # Index of smallest finite point.
+        batch_dims=batch_ndims,
+        axis=-1)
+    # Select the next point where the objective has a different sign.
+    sign_change_idx = tf.argmax(
+        tf.not_equal(tf.math.sign(ys),
+                     tf.math.sign(first_finite_value)) & is_finite,
+        axis=0)
+    # If the sign never changes, we can't bracket a root.
+    bracketing_failed = tf.equal(sign_change_idx, 0)
+    # If the objective's sign is zero, we've found an actual root.
+    root_found = tf.equal(tf.gather(tf.math.sign(ys_transposed),
+                                    sign_change_idx,
+                                    batch_dims=batch_ndims,
+                                    axis=-1),
+                          0.)
+    return _structure_broadcasting_where(
+        bracketing_failed,
+        # If we didn't detect a sign change, fall back to the trivial interval.
+        (dtype_info.min, dtype_info.max),
+        # Otherwise, return the points around the sign change, unless we
+        # actually evaluated a root, in which case, return the zero-width
+        # bracket at that root.
+        (tf.gather(xs, tf.where(bracketing_failed | root_found,
+                                sign_change_idx,
+                                sign_change_idx - 1)),
+         tf.gather(xs, sign_change_idx)))
