@@ -121,10 +121,12 @@ def log_cumsum_exp(x, axis=-1, name=None):
 
 
 def _kahan_reduction(x, y):
+  """Implements the Kahan summation reduction."""
   (s, c), (s1, c1) = x, y
   for val in -c1, s1:
     u = val - c
     t = s + u
+    # TODO(b/173158845): XLA:CPU reassociates-to-zero the correction term.
     c = (t - s) - u
     s = t
   return s, c
@@ -167,7 +169,7 @@ def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
   """
   with tf.name_scope(name or 'reduce_kahan_sum'):
     t = tf.convert_to_tensor(input_tensor)
-    operands = (t, tf.zeros_like(t))
+    operands = (t / 2., -t / 2.)
     inits = (tf.zeros([], dtype=t.dtype),) * 2
     return Kahan._make(
         _reduce_kahan_sum(operands, inits, axis=axis, keepdims=keepdims))
