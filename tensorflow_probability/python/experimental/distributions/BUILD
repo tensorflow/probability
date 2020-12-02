@@ -52,7 +52,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "joint_distribution_pinned_test",
-    size = "medium",
+    size = "large",
     srcs = ["joint_distribution_pinned_test.py"],
     jax_size = "large",
     shard_count = 13,

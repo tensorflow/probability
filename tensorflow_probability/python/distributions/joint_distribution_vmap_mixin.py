@@ -138,7 +138,7 @@ class JointDistributionVmapMixin(object):
       if self.use_vectorized_map and (
           _might_have_nonzero_size(sample_shape) or
           value_might_have_sample_dims):
-        raise NotImplementedError('sample_distributions` with nontrivial '
+        raise NotImplementedError('`sample_distributions` with nontrivial '
                                   'sample shape is not yet supported '
                                   'for autovectorized JointDistributions.')
       else:
@@ -146,7 +146,7 @@ class JointDistributionVmapMixin(object):
             sample_shape=sample_shape, seed=seed, value=value)
       return self._model_unflatten(ds), self._model_unflatten(xs)
 
-  def _sample_n(self, sample_shape, seed, value=None):
+  def _sample_n(self, sample_shape, seed, value=None, **kwargs):
 
     value_might_have_sample_dims = False
     if value is not None:
@@ -162,7 +162,7 @@ class JointDistributionVmapMixin(object):
         value_might_have_sample_dims):
       # No need to auto-vectorize.
       xs = self._call_flat_sample_distributions(
-          sample_shape=sample_shape, seed=seed, value=value)[1]
+          sample_shape=sample_shape, seed=seed, value=value, **kwargs)[1]
       return self._model_unflatten(xs)
 
     # Set up for autovectorized sampling. To support the `value` arg, we need to
@@ -209,12 +209,3 @@ class JointDistributionVmapMixin(object):
           validate_args=self.validate_args)
 
     return map_measure_fn(value)
-
-  # Redefine not to attempt to cache the sampled distributions, since we might
-  # be inside of a vectorized_map.
-  def _call_flat_sample_distributions(
-      self, sample_shape=(), seed=None, value=None):
-    if value is not None:
-      value = self._model_flatten(value)
-    ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
-    return ds, xs
