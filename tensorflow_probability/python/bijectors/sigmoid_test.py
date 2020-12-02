@@ -82,7 +82,8 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
     x = [[[1., 2., -5., -0.3]]]
     y = self.evaluate(equivalent_bijector.forward(x))
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-    self.assertAllClose(x, self.evaluate(bijector.inverse(y)[..., :1, :]))
+    self.assertAllClose(
+        x, self.evaluate(bijector.inverse(y)[..., :1, :]), rtol=1e-5)
     self.assertAllClose(
         self.evaluate(equivalent_bijector.inverse_log_det_jacobian(
             y, event_ndims=1)),

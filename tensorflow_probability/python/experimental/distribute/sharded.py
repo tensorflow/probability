@@ -52,6 +52,8 @@ class ShardedSample(sample_lib.Sample):
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `'Sample' + distribution.name`).
     """
+    parameters = dict(locals())
+
     with tf.name_scope(name or 'ShardedSample' + distribution.name) as name:
       self._shard_axis = shard_axis
 
@@ -60,6 +62,7 @@ class ShardedSample(sample_lib.Sample):
           validate_args=validate_args,
           sample_shape=sample_shape,
           name=name)
+      self._parameters = parameters
 
   @property
   def sample_shape(self):

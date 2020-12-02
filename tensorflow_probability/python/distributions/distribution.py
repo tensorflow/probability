@@ -527,7 +527,7 @@ class Distribution(_BaseDistribution):
     for i, t in enumerate(graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError('Graph parent item %d is not a Tensor; %s.' % (i, t))
-    self._dtype = dtype
+    self._dtype = self._no_dependency(dtype)
     self._reparameterization_type = reparameterization_type
     self._allow_nan_stats = allow_nan_stats
     self._validate_args = validate_args
