@@ -334,6 +334,11 @@ class JointDistribution(distribution_lib.Distribution):
     with self._name_and_control_scope(name):
       ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
                                                     **kwargs)
+      if not sample_shape and value is None:
+        # This is a single sample with no pinned values; this call will cache
+        # the distributions if they are not already cached.
+        self._get_single_sample_distributions(candidate_dists=ds)
+
       return self._model_unflatten(ds), self._model_unflatten(xs)
 
   def log_prob_parts(self, value, name='log_prob_parts'):
@@ -424,8 +429,13 @@ class JointDistribution(distribution_lib.Distribution):
       raise ValueError('Supplied both `value` and keyword arguments to '
                        'parameterize sampling. Supplied keywords were: '
                        '{}'.format(keywords))
-    _, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
-                                                 **kwargs)
+    ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
+                                                  **kwargs)
+    if not sample_shape and value is None:
+      # This is a single sample with no pinned values; this call will cache
+      # the distributions if they are not already cached.
+      self._get_single_sample_distributions(candidate_dists=ds)
+
     return self._model_unflatten(xs)
 
   def _map_measure_over_dists(self, attr, value):
@@ -464,10 +474,6 @@ class JointDistribution(distribution_lib.Distribution):
     if value is not None:
       value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
-
-    if not sample_shape and value is None:
-      # Maybe cache these distributions.
-      self._get_single_sample_distributions(candidate_dists=ds)
 
     return ds, xs
 

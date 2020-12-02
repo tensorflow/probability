@@ -55,13 +55,36 @@ def jd_coroutine():
   return model
 
 
+def jd_coroutine_autobatched():
+  d0, d1, d2, d3 = part_dists()
+
+  root = tfd.JointDistributionCoroutineAutoBatched.Root
+  @tfd.JointDistributionCoroutineAutoBatched
+  def model():
+    w = yield root(d0)
+    x = yield root(d1)
+    y = yield d2(x)
+    yield d3(y, x, w)
+  return model
+
+
 def jd_sequential(model_from_seq=tuple):
   return tfd.JointDistributionSequential(model_from_seq(part_dists()))
+
+
+def jd_sequential_autobatched(model_from_seq=tuple):
+  return tfd.JointDistributionSequentialAutoBatched(
+      model_from_seq(part_dists()))
 
 
 def jd_named():
   d0, d1, d2, d3 = part_dists()
   return tfd.JointDistributionNamed(dict(w=d0, x=d1, y=d2, z=d3))
+
+
+def jd_named_autobatched():
+  d0, d1, d2, d3 = part_dists()
+  return tfd.JointDistributionNamedAutoBatched(dict(w=d0, x=d1, y=d2, z=d3))
 
 
 def jd_named_ordered():
@@ -82,8 +105,10 @@ def jd_named_namedtuple():
                                          '_'.join(map(str, sample_shape))),
            jd_factory=jd_factory,
            sample_shape=sample_shape)
-      for jd_factory in (jd_coroutine, jd_sequential, jd_named,
-                         jd_named_ordered, jd_named_namedtuple)
+      for jd_factory in (jd_coroutine, jd_coroutine_autobatched, jd_sequential,
+                         jd_sequential_autobatched, jd_named,
+                         jd_named_autobatched, jd_named_ordered,
+                         jd_named_namedtuple)
       # TODO(b/168139745): Add support for: [13], [13, 1], [1, 13]
       for sample_shape in ([],)))
 class JointDistributionPinnedParameterizedTest(test_util.TestCase):
@@ -95,7 +120,7 @@ class JointDistributionPinnedParameterizedTest(test_util.TestCase):
     underlying = jd_factory()
 
     tuple_args = (None, x,), (None, x, None, None), (None, x, None, z)
-    if jd_factory is jd_named:
+    if jd_factory is jd_named or jd_factory is jd_named_autobatched:
       # JDNamed does not support unnamed args unless model is ordered.
       for args in tuple_args:
         with self.assertRaisesRegexp(ValueError, r'unordered'):
@@ -129,7 +154,8 @@ class JointDistributionPinnedParameterizedTest(test_util.TestCase):
       self._check_pinning(pinned, sample_shape)
 
   def _check_pinning(self, pinned, sample_shape):
-    self.evaluate(pinned.event_shape_tensor())
+    self.evaluate(tf.nest.map_structure(tf.convert_to_tensor,
+                                        pinned.event_shape_tensor()))
 
     s0 = pinned.sample_unpinned(
         sample_shape, seed=test_util.test_seed(sampler_type='stateless'))
