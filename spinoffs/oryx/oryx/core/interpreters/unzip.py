@@ -289,7 +289,7 @@ class UnzipTrace(jax_core.Trace):
                   unknown(mapped_aval(params['axis_size'], in_axis, pval[0]))
                   for pval, in_axis in zip(in_pvals, params['in_axes'])]
       out_axes_thunk = params['out_axes_thunk']
-      @jax_util.as_hashable_function(key=('unzip', out_axes_thunk))
+      @jax_util.as_hashable_function(closure=('unzip', out_axes_thunk))
       def new_out_axes_thunk():
         out_axes = out_axes_thunk()
         assert all(out_axis == 0 for out_axis in out_axes)

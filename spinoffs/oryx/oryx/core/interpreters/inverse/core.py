@@ -381,7 +381,7 @@ def map_ildj(prim, incells, outcells, **params):
     assert all(out_axis == 0 for out_axis in params['out_axes'])
     new_params['out_axes_thunk'] = jax_util.HashableFunction(
         lambda: (0,) * aux().num_leaves,
-        key=('ildj', params['out_axes']))
+        closure=('ildj', params['out_axes']))
     del new_params['out_axes']
   subenv_vals = prim.bind(f, *flat_vals, **new_params)
   subenv_tree = aux()
