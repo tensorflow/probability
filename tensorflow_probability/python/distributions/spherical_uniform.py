@@ -31,9 +31,9 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.random import random_ops
 
 
 __all__ = ['SphericalUniform']
@@ -164,11 +164,11 @@ class SphericalUniform(distribution.Distribution):
     return tf.fill(batch_shape, -log_nsphere_surface_area)
 
   def _sample_n(self, n, seed=None):
-    raw = samplers.normal(
-        shape=ps.concat([[n], self.batch_shape, [self.dimension]], axis=0),
-        seed=seed, dtype=self.dtype)
-    unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
-    return unit_norm
+    return random_ops.spherical_uniform(
+        shape=ps.concat([[n], self.batch_shape], axis=0),
+        dimension=self.dimension,
+        dtype=self.dtype,
+        seed=seed)
 
   def _entropy(self):
     log_nsphere_surface_area = (
