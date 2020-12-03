@@ -431,7 +431,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/mcmc/internal:slice_sampler_utils",
         "//tensorflow_probability/python/mcmc/internal:util",
-        "//tensorflow_probability/python/util:seed_stream",
+        "//tensorflow_probability/python/random:random_ops",
     ],
 )
 
