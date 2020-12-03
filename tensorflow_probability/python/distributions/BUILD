@@ -2635,6 +2635,27 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "independent_test_gpu",
+    srcs = ["independent_test.py"],
+    disabled_substrates = ["numpy"],
+    jax_size = "medium",
+    main = "independent_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = ["requires-gpu-nvidia"],
+    deps = [
+        # hypothesis dep,
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "inverse_gamma_test",
     size = "medium",
     srcs = ["inverse_gamma_test.py"],
@@ -3304,6 +3325,24 @@ multi_substrate_py_test(
     name = "sample_test",
     srcs = ["sample_test.py"],
     jax_size = "medium",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "sample_test_gpu",
+    srcs = ["sample_test.py"],
+    disabled_substrates = ["numpy"],
+    jax_size = "medium",
+    main = "sample_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = ["requires-gpu-nvidia"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

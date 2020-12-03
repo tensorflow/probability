@@ -18,8 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats as sp_stats
 import tensorflow.compat.v1 as tf1
@@ -30,12 +33,11 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 
+JAX_MODE = False
+
+
 @test_util.test_all_tf_execution_regimes
 class IndependentDistributionTest(test_util.TestCase):
-
-  def setUp(self):
-    super(IndependentDistributionTest, self).setUp()
-    self._rng = np.random.RandomState(42)
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():
@@ -269,7 +271,7 @@ class IndependentDistributionTest(test_util.TestCase):
     sample_shape = [4, 5]
     batch_shape = [10]
     image_shape = [28, 28, 1]
-    logits = 3 * self._rng.random_sample(
+    logits = 3 * np.random.random_sample(
         batch_shape + image_shape).astype(np.float32) - 1
 
     def expected_log_prob(x, logits):
@@ -308,7 +310,7 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual(sample_shape + batch_shape + image_shape, x_shape)
     self.assertAllEqual(sample_shape + batch_shape, log_prob_x_shape)
     self.assertAllClose(
-        expected_log_prob(x_, logits), actual_log_prob_x, rtol=1e-6, atol=0.)
+        expected_log_prob(x_, logits), actual_log_prob_x, rtol=1.5e-6, atol=0.)
 
   def testMnistLikeStaticShape(self):
     self._testMnistLike(static_shape=True)
@@ -497,6 +499,31 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual(
         (2, 3), tf.shape(dist.log_prob(np.zeros((2, 3, 7, 1, 1, 1)))))
 
+  @parameterized.named_parameters(dict(testcase_name=''),
+                                  dict(testcase_name='_jit', jit=True))
+  def test_kahan_precision(self, jit=False):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(experimental_compile=True)
+    stream = test_util.test_seed_stream()
+    n = 20_000
+    samps = tfd.Poisson(rate=1.).sample(n, seed=stream())
+    log_rate = tf.fill([n], tfd.Normal(0, .2).sample(seed=stream()))
+    pois = tfd.Poisson(log_rate=log_rate)
+    lp_fn = maybe_jit(tfd.Independent(pois, reinterpreted_batch_ndims=1,
+                                      experimental_use_kahan_sum=True).log_prob)
+    lp = lp_fn(samps)
+    pois64 = tfd.Poisson(log_rate=tf.cast(log_rate, tf.float64))
+    lp64 = tfd.Independent(pois64, reinterpreted_batch_ndims=1).log_prob(
+        tf.cast(samps, tf.float64))
+    # Evaluate together to ensure we use the same samples.
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # Fails ~75% CPU, 1-75% GPU --vary_seed runs w/o experimental_use_kahan_sum.
+    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

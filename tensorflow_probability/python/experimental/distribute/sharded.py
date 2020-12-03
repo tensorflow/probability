@@ -36,6 +36,7 @@ class ShardedSample(sample_lib.Sample):
                sample_shape=(),
                shard_axis=0,
                validate_args=False,
+               experimental_use_kahan_sum=False,
                name=None):
     """Construct the `ShardedSample` distribution.
 
@@ -49,6 +50,11 @@ class ShardedSample(sample_lib.Sample):
       validate_args: Python `bool`.  Whether to validate input with asserts. If
         `validate_args` is `False`, and the inputs are invalid, correct behavior
         is not guaranteed.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `'Sample' + distribution.name`).
     """
@@ -61,6 +67,7 @@ class ShardedSample(sample_lib.Sample):
           distribution,
           validate_args=validate_args,
           sample_shape=sample_shape,
+          experimental_use_kahan_sum=experimental_use_kahan_sum,
           name=name)
       self._parameters = parameters
 

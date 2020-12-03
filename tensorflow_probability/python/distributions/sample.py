@@ -25,6 +25,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -121,6 +122,7 @@ class Sample(distribution_lib.Distribution):
       distribution,
       sample_shape=(),
       validate_args=False,
+      experimental_use_kahan_sum=False,
       name=None):
     """Construct the `Sample` distribution.
 
@@ -141,10 +143,16 @@ class Sample(distribution_lib.Distribution):
       validate_args: Python `bool`.  Whether to validate input with asserts.
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `'Sample' + distribution.name`).
     """
     parameters = dict(locals())
+    self._experimental_use_kahan_sum = experimental_use_kahan_sum
     with tf.name_scope(name or 'Sample' + distribution.name) as name:
       self._distribution = distribution
       self._sample_shape = tensor_util.convert_nonref_to_tensor(
@@ -223,6 +231,11 @@ class Sample(distribution_lib.Distribution):
         **kwargs)
     return tf.transpose(a=x, perm=perm)
 
+  def _sum_fn(self):
+    if self._experimental_use_kahan_sum:
+      return lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
+    return tf.math.reduce_sum
+
   def _log_prob(self, x, **kwargs):
     batch_ndims = ps.rank_from_shape(
         self.distribution.batch_shape_tensor,
@@ -266,7 +279,7 @@ class Sample(distribution_lib.Distribution):
     lp = tf.broadcast_to(lp, bcast_lp_shape)
     # (5) Make the final reduction in x.
     axis = ps.range(sample_ndims, sample_ndims + extra_sample_ndims)
-    return tf.reduce_sum(lp, axis=axis)
+    return self._sum_fn()(lp, axis=axis)
 
   def _entropy(self, **kwargs):
     h = self.distribution.entropy(**kwargs)
@@ -282,7 +295,8 @@ class Sample(distribution_lib.Distribution):
     # TODO(b/170405182): In scenarios where we can statically prove that it has
     #   no batch part, avoid the transposes by directly using
     #   `self.distribution.experimental_default_event_space_bijector()`.
-    return _DefaultSampleBijector(self.distribution, self.sample_shape)
+    return _DefaultSampleBijector(self.distribution, self.sample_shape,
+                                  self._sum_fn())
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
@@ -335,11 +349,12 @@ class Sample(distribution_lib.Distribution):
 class _DefaultSampleBijector(bijector_lib.Bijector):
   """Since tfd.Sample uses transposes, it requires a custom event bijector."""
 
-  def __init__(self, distribution, sample_shape):
+  def __init__(self, distribution, sample_shape, sum_fn):
     parameters = dict(locals())
     self.distribution = distribution
     self.bijector = distribution.experimental_default_event_space_bijector()
     self.sample_shape = sample_shape
+    self._sum_fn = sum_fn
     sample_ndims = ps.rank_from_shape(self.sample_shape)
     super(_DefaultSampleBijector, self).__init__(
         forward_min_event_ndims=(
@@ -466,7 +481,7 @@ class _DefaultSampleBijector(bijector_lib.Bijector):
                    ps.ones([batch_ndims], tf.int32),
                    ps.reshape(self.sample_shape, shape=[-1])], axis=0))
     ldj = tf.broadcast_to(underlying_ldj, bcast_ldj_shape)
-    return tf.reduce_sum(ldj, axis=-1 - ps.range(extra_sample_ndims))
+    return self._sum_fn(ldj, axis=-1 - ps.range(extra_sample_ndims))
 
   def _forward_log_det_jacobian(self, x, **kwargs):
     dist = self.distribution
