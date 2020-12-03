@@ -44,7 +44,7 @@ class LogHarmonicMeanExpTest(test_util.TestCase):
       ('Axis', (0,), False),
       ('KeepDims', (0,), True),
   )
-  def _testBasic(self, axis, keepdims):
+  def testBasic(self, axis, keepdims):
     x = np.array([[0.1, 0.2], [0.3, 0.4]]).astype(np.float32)
     true_val = np.log(1 / (1 / x).mean(axis=axis, keepdims=keepdims))
     val = tfp.math.reduce_log_harmonic_mean_exp(
@@ -55,7 +55,7 @@ class LogHarmonicMeanExpTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class LogCombinationsTest(test_util.TestCase):
 
-  def _testLogCombinationsBinomial(self):
+  def testLogCombinationsBinomial(self):
     n = [2, 5, 12, 15]
     k = [1, 2, 4, 11]
 
@@ -67,7 +67,7 @@ class LogCombinationsTest(test_util.TestCase):
     self.assertEqual([4], log_binom.shape)
     self.assertAllClose(log_combs, self.evaluate(log_binom))
 
-  def _testLogCombinationsShape(self):
+  def testLogCombinationsShape(self):
     # Shape [2, 2]
     n = [[2, 5], [12, 15]]
 
@@ -90,7 +90,7 @@ class ReduceWeightedLogSumExp(test_util.TestCase):
     return m + np.log(sgn * sum_), sgn
 
   @test_util.numpy_disable_gradient_test
-  def _testNoWeights(self):
+  def testNoWeights(self):
     logx_ = np.array([[0., -1, 1000.],
                       [0, 1, -1000.],
                       [-5, 0, 5]])
@@ -120,7 +120,7 @@ class ReduceWeightedLogSumExp(test_util.TestCase):
     self.assertAllEqual(grad_expected_, grad_actual_)
     self.assertAllEqual([1., 1, 1], actual_sgn_)
 
-  def _testNegativeWeights(self):
+  def testNegativeWeights(self):
     logx_ = np.array([[0., -1, 1000.],
                       [0, 1, -1000.],
                       [-5, 0, 5]])
@@ -136,7 +136,7 @@ class ReduceWeightedLogSumExp(test_util.TestCase):
     self.assertAllEqual(expected, actual_)
     self.assertAllEqual([-1., -1, 1], actual_sgn_)
 
-  def _testKeepDims(self):
+  def testKeepDims(self):
     logx_ = np.array([[0., -1, 1000.],
                       [0, 1, -1000.],
                       [-5, 0, 5]])
@@ -153,7 +153,7 @@ class ReduceWeightedLogSumExp(test_util.TestCase):
     self.assertAllEqual(expected, actual_)
     self.assertAllEqual([[-1.], [-1], [1]], actual_sgn_)
 
-  def _testDocString(self):
+  def testDocString(self):
     """This test verifies the correctness of the docstring examples."""
 
     x = tf.constant([[0., 0, 0],
@@ -211,7 +211,7 @@ class SoftThresholdTest(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   # pylint: enable=bad-whitespace
   # pyformat: enable
-  def _test_soft_threshold(self, x, threshold, expected_y, expected_dydx):
+  def test_soft_threshold(self, x, threshold, expected_y, expected_dydx):
     x = tf.convert_to_tensor(x, dtype=self.dtype)
     y, dydx = tfp.math.value_and_gradient(
         lambda x_: tfp.math.soft_threshold(x_, threshold), x)
@@ -258,7 +258,7 @@ class SoftplusInverseTest(test_util.TestCase):
                         np.isfinite(tf_softplus_inverse))
 
   @test_util.numpy_disable_gradient_test  # TODO(sharadmv): fix Numpy test
-  def _testNumbers(self):
+  def testNumbers(self):
     for t in [np.float32, np.float64]:
       lower = {np.float32: -50, np.float64: -50}.get(t, -100)
       upper = {np.float32: 50, np.float64: 50}.get(t, 100)
@@ -302,7 +302,7 @@ class SoftplusInverseTest(test_util.TestCase):
           use_gpu=True)
 
   @test_util.numpy_disable_gradient_test
-  def _testGradient(self):
+  def testGradient(self):
     x = tf.constant(
         [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9],
         shape=[2, 5],
@@ -312,7 +312,7 @@ class SoftplusInverseTest(test_util.TestCase):
     self.assertLess(err, 1e-4)
 
   @test_util.numpy_disable_gradient_test
-  def _testInverseSoftplusGradientNeverNan(self):
+  def testInverseSoftplusGradientNeverNan(self):
     # Note that this range contains both zero and inf.
     x = tf.constant(np.logspace(-8, 6).astype(np.float16))
     _, grads = self.evaluate(tfp.math.value_and_gradient(
@@ -321,7 +321,7 @@ class SoftplusInverseTest(test_util.TestCase):
     self.assertAllEqual(np.zeros_like(grads).astype(np.bool), np.isnan(grads))
 
   @test_util.numpy_disable_gradient_test
-  def _testInverseSoftplusGradientFinite(self):
+  def testInverseSoftplusGradientFinite(self):
     # This range of x is all finite, and so is 1 / x.  So the
     # gradient and its approximations should be finite as well.
     x = tf.constant(np.logspace(-4.8, 4.5).astype(np.float16))
@@ -340,21 +340,21 @@ class LogCumsumExpTests(test_util.TestCase):
     result_fused = tf.exp(tfp.math.log_cumsum_exp(x, axis=axis))
     self.assertAllClose(result_naive, result_fused)
 
-  def _testMinusInfinity(self):
+  def testMinusInfinity(self):
     x = np.log([0., 0., 1., 1., 1., 1., 0., 0.])
     self._testCumulativeLogSumExp(x)
 
-  def _test1D(self):
+  def test1D(self):
     x = np.arange(10) / 10.0 - 0.5
     self._testCumulativeLogSumExp(x)
 
-  def _test2D(self):
+  def test2D(self):
     x = np.reshape(np.arange(20) / 20.0 - 0.5, (2, 10))
     for axis in (-2, -1, 0, 1):
       self._testCumulativeLogSumExp(x, axis=axis)
 
   @test_util.numpy_disable_gradient_test
-  def _testGradient(self):
+  def testGradient(self):
     x = tf.convert_to_tensor(
         np.arange(10)[np.newaxis, ...] / 10.0 - 0.5, dtype=tf.float64)
     jac_naive = batch_jacobian(lambda t: tf.cumsum(tf.exp(t), axis=-1), x)
@@ -362,7 +362,7 @@ class LogCumsumExpTests(test_util.TestCase):
         lambda t: tf.exp(tfp.math.log_cumsum_exp(t, axis=-1)), x)
     self.assertAllClose(jac_naive, jac_fused)
 
-  def _test1DLarge(self):
+  def test1DLarge(self):
     # This test ensures that the operation is correct even when the naive
     # implementation would overflow.
     x = tf.convert_to_tensor(np.arange(20) * 20.0, dtype=tf.float32)
@@ -379,7 +379,7 @@ class LogCumsumExpTests(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
       '`GradientTape` does not have `jacobian` method')
-  def _testGradientAtMinusInf(self, xla_compile):
+  def testGradientAtMinusInf(self, xla_compile):
     # This ensures that cumulative sums involving `-np.inf` behave
     # correctly even when compiled with XLA.
     x = tf.constant([1., -np.inf, -np.inf, 4., 5., 6., 7., 8.])
@@ -401,7 +401,7 @@ class LogCumsumExpTests(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
       '`GradientTape` does not have `jacobian` method')
-  def _testGradientCumsumViaLogCumsumExp(self):
+  def testGradientCumsumViaLogCumsumExp(self):
     # Regression test for b/156297366.
     x = tf.constant([1., 2., 3., 4.])
     with tf.GradientTape(persistent=True) as g:
@@ -416,7 +416,7 @@ class LogCumsumExpTests(test_util.TestCase):
 class LogAddExpTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
-  def _test_small(self):
+  def test_small(self):
     x = [-2, -1000]
     y = [-1000, -3]
     z, g = self.evaluate(
@@ -425,7 +425,7 @@ class LogAddExpTest(test_util.TestCase):
     self.assertAllEqual(np.eye(2), g)
 
   @test_util.numpy_disable_gradient_test
-  def _test_medium(self):
+  def test_medium(self):
     x = [-2, -3]
     y = [-3, 2]
     z, g = self.evaluate(
@@ -434,7 +434,7 @@ class LogAddExpTest(test_util.TestCase):
     self.assertAllNotNone(g)
 
   @test_util.numpy_disable_gradient_test
-  def _test_big(self):
+  def test_big(self):
     x = [2, 1000]
     y = [1000, 3]
     z, g = self.evaluate(
@@ -443,7 +443,7 @@ class LogAddExpTest(test_util.TestCase):
     self.assertAllEqual(1. - np.eye(2), g)
 
   @test_util.numpy_disable_gradient_test
-  def _test_equal_arguments(self):
+  def test_equal_arguments(self):
     # The standard way to compute `log_add_exp` makes use of
     # the subexpression `abs(x - y)` which has a discontinuous
     # gradient at `x == y`.
@@ -457,7 +457,7 @@ class LogAddExpTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class LogSubExpTest(test_util.TestCase):
 
-  def _testLogSubExp(self):
+  def testLogSubExp(self):
     self.assertAllClose(-np.inf, self.evaluate(tfp.math.log_sub_exp(1., 1.)))
 
     # Try log(exp(-1000) - (exp(-1000) + 2)
@@ -469,7 +469,7 @@ class LogSubExpTest(test_util.TestCase):
         self.evaluate(tfp.math.log_sub_exp(-1000., -1000. + np.log(.5))))
 
   @test_util.numpy_disable_gradient_test
-  def _test_small(self):
+  def test_small(self):
     x = [-2]
     y = [-1000]
     z, g = self.evaluate(
@@ -478,7 +478,7 @@ class LogSubExpTest(test_util.TestCase):
     self.assertAllClose([[1.], [0.]], g)
 
   @test_util.numpy_disable_gradient_test
-  def _test_medium(self):
+  def test_medium(self):
     x = [-2, -3, -5, -3]
     y = [-3, -5, -3, -2]
     z, g = self.evaluate(
@@ -490,7 +490,7 @@ class LogSubExpTest(test_util.TestCase):
     self.assertAllNotNone(g)
 
   @test_util.numpy_disable_gradient_test
-  def _test_big(self):
+  def test_big(self):
     x = [1000, -3]
     y = [2, 1000]
     z, g = self.evaluate(
@@ -504,7 +504,7 @@ class LogSubExpTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class Log1mexpTest(test_util.TestCase):
 
-  def _testLog1mexp(self):
+  def testLog1mexp(self):
     self.assertAllClose(-np.inf, self.evaluate(tfp.math.log1mexp(0.)))
     self.assertAllClose(0., self.evaluate(tfp.math.log1mexp(np.inf)))
 
@@ -520,27 +520,27 @@ class Log1mexpTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class LogCoshTest(test_util.TestCase):
 
-  def _testLogCoshNonNegative(self):
+  def testLogCoshNonNegative(self):
     x = np.logspace(-10., 6., 100)
     self.assertAllGreaterEqual(tfp.math.log_cosh(x), 0.)
 
-  def _testLogCoshAtZero(self):
+  def testLogCoshAtZero(self):
     self.assertAllClose(0., self.evaluate(tfp.math.log_cosh(0.)))
 
-  def _testLogCoshSymmetric(self):
+  def testLogCoshSymmetric(self):
     x = np.linspace(0., 20., 100)
     self.assertAllClose(
         self.evaluate(tfp.math.log_cosh(x)),
         self.evaluate(tfp.math.log_cosh(-x)))
 
-  def _testLogCoshNoInf(self):
+  def testLogCoshNoInf(self):
     # Check that the computation succeeds over a large range of values.
     x = np.logspace(10., 20., 100)
     self.assertAllEqual(
         np.zeros(x.shape, dtype=np.bool),
         self.evaluate(tf.math.is_inf(tfp.math.log_cosh(x))))
 
-  def _testLogCosh(self):
+  def testLogCosh(self):
     x = np.linspace(10., 40., 100)
     self.assertAllClose(
         np.log(np.cosh(x)), self.evaluate(tfp.math.log_cosh(x)))
@@ -556,7 +556,7 @@ class LogCoshTest(test_util.TestCase):
         np.log(np.cosh(x)), self.evaluate(tfp.math.log_cosh(x)))
 
   @test_util.numpy_disable_gradient_test
-  def _testLogCoshGrad(self):
+  def testLogCoshGrad(self):
     x = np.linspace(-30., 30., 100)
     err = self.compute_max_gradient_error(tfp.math.log_cosh, [x])
     self.assertLess(err, 1e-6)
@@ -566,7 +566,7 @@ class LogCoshTest(test_util.TestCase):
 class Smootherstep(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
-  def _test_value_vector(self):
+  def test_value_vector(self):
     x = tf.constant([-np.inf, -20., 0., 0.5, 1., 20., np.inf])
     y, _ = tfp.math.value_and_gradient(tfp.math.smootherstep, x)
     self.assertAllEqual([7], y.shape)
@@ -574,7 +574,7 @@ class Smootherstep(test_util.TestCase):
     self.assertAllClose([0., 0., 0., 0.5, 1., 1., 1.], y_, atol=1e-5, rtol=1e-5)
 
   @test_util.numpy_disable_gradient_test
-  def _test_gradient_matrix(self):
+  def test_gradient_matrix(self):
     x = tf.constant([[-np.inf, -20., 0., 0.5],
                      [np.inf, 20., 1., 0.5]])
     _, g = tfp.math.value_and_gradient(tfp.math.smootherstep, x)
@@ -599,7 +599,7 @@ class SoftSortingMatrixTest(test_util.TestCase):
       {'shape': (5, 5, 4), 'temperature': 1e0},
       {'shape': (5, 5, 4), 'temperature': 1e-1},
   )
-  def _testMatchesArgsort(self, shape, temperature):
+  def testMatchesArgsort(self, shape, temperature):
     x = np.random.randn(*shape)
     # We sort in decreasing order.
     expected_sort = np.flip(np.argsort(x, axis=-1), axis=-1)
