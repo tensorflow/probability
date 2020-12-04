@@ -18,8 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import collections
+import os
 
 # Dependency imports
 from absl.testing import parameterized
@@ -597,21 +597,21 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
       g = yield tfd.LogNormal(0., [1., 2.])
       df = yield tfd.Exponential([1., 2.])
       loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+      yield tfd.StudentT(df[:, tf.newaxis], loc, 1)
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
         tfd.LogNormal(0., [1., 2.]),
         tfd.Exponential([1., 2.]),
         lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
-        lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+        lambda loc, df: tfd.StudentT(df[:, tf.newaxis], loc, 1)
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
         ('g', tfd.LogNormal(0., [1., 2.])),
         ('df', tfd.Exponential([1., 2.])),
         ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
-        ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
+        ('x', lambda loc, df: tfd.StudentT(df[:, tf.newaxis], loc, 1))))
 
     joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
     joint_bijector = joint.experimental_default_event_space_bijector()
@@ -650,6 +650,59 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     lp2 = joint.log_prob(z2)
     self.assertAllEqual(lp2.shape, [5])
 
+  @parameterized.named_parameters(*[
+      dict(testcase_name='_{}{}'.format(jd_class.__name__,  # pylint: disable=g-complex-comprehension
+                                        '_jit' if jit else ''),
+           jd_class=jd_class, jit=jit)
+      for jd_class in (tfd.JointDistributionCoroutineAutoBatched,
+                       tfd.JointDistributionSequentialAutoBatched,
+                       tfd.JointDistributionNamedAutoBatched)
+      for jit in (False, True)
+  ])
+  def test_kahan_precision(self, jd_class, jit):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(experimental_compile=True)
+
+    def make_models(dtype):
+      models = {}
+      def mk_20k_poisson(log_rate):
+        return tfd.Poisson(log_rate=tf.broadcast_to(log_rate[..., tf.newaxis],
+                                                    log_rate.shape + (20_000,)))
+      def coroutine_model():
+        log_rate = yield tfd.Normal(0., dtype(.2), name='log_rate')
+        yield mk_20k_poisson(log_rate).copy(name='x')
+      models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+      models[tfd.JointDistributionSequentialAutoBatched] = [
+          tfd.Normal(0., dtype(.2)), mk_20k_poisson
+      ]
+
+      models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+          ('log_rate', tfd.Normal(0., dtype(.2))), ('x', mk_20k_poisson)))
+      return models
+
+    joint = jd_class(make_models(np.float32)[jd_class], validate_args=True,
+                     experimental_use_kahan_sum=True)
+    joint64 = jd_class(make_models(np.float64)[jd_class], validate_args=True)
+    stream = test_util.test_seed_stream()
+    nsamp = 7
+    xs = self.evaluate(
+        joint.sample(log_rate=tf.zeros([nsamp]), seed=stream()))
+    if isinstance(xs, dict):
+      xs['log_rate'] = tfd.Normal(0, .2).sample(nsamp, seed=stream())
+    else:
+      xs = (tfd.Normal(0, .2).sample(nsamp, seed=stream()), xs[1])
+    xs64 = tf.nest.map_structure(lambda x: tf.cast(x, tf.float64), xs)
+    lp = maybe_jit(joint.copy(validate_args=not jit).log_prob)(xs)
+    lp64 = joint64.log_prob(xs64)
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # Without Kahan, example max-abs-diff: ~0.06
+    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

@@ -2717,12 +2717,13 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["joint_distribution_auto_batched_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 2,
+    shard_count = 7,
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

@@ -139,6 +139,25 @@ class Kahan(collections.namedtuple('Kahan', ['total', 'correction'])):
   """Result of Kahan summation, i.e. `sum = total - correction`."""
   __slots__ = ()
 
+  def __add__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __radd__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __neg__(self):
+    return Kahan(-self.total, -self.correction)
+
+  def __sub__(self, y):
+    return Kahan._make(_kahan_reduction(
+        self, -y if isinstance(y, Kahan) else (-y, 0)))
+
+  def __rsub__(self, x):
+    return Kahan._make(_kahan_reduction(
+        x if isinstance(x, Kahan) else (x, 0), -self))
+
 
 def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
   """Reduces the input tensor along the given axis using Kahan summation.
@@ -169,7 +188,7 @@ def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
   """
   with tf.name_scope(name or 'reduce_kahan_sum'):
     t = tf.convert_to_tensor(input_tensor)
-    operands = (t / 2., -t / 2.)
+    operands = (t, tf.zeros_like(t))
     inits = (tf.zeros([], dtype=t.dtype),) * 2
     return Kahan._make(
         _reduce_kahan_sum(operands, inits, axis=axis, keepdims=keepdims))

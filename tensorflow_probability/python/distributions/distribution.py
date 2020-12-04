@@ -809,13 +809,14 @@ class Distribution(_BaseDistribution):
       return slicing.batch_slice(self, self._params_event_ndims(),
                                  override_parameters_kwargs, Ellipsis)
     except NotImplementedError:
-      parameters = dict(self.parameters, **override_parameters_kwargs)
-      d = type(self)(**parameters)
-      # pylint: disable=protected-access
-      d._parameters = parameters
-      d._parameters_sanitized = True
-      # pylint: enable=protected-access
-      return d
+      pass
+    parameters = dict(self.parameters, **override_parameters_kwargs)
+    d = type(self)(**parameters)
+    # pylint: disable=protected-access
+    d._parameters = self._no_dependency(parameters)
+    d._parameters_sanitized = True
+    # pylint: enable=protected-access
+    return d
 
   def _batch_shape_tensor(self):
     raise NotImplementedError(
