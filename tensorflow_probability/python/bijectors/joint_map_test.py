@@ -124,6 +124,11 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertDTypeEqual(fldj, np.float64)
     self.assertAllClose(np.log(1) + np.log(2) + np.log(3), self.evaluate(fldj))
 
+  def test_inverse_has_event_ndims(self):
+    bij_reshape = tfb.Invert(tfb.JointMap([tfb.Reshape([])]))
+    bij_reshape.inverse_event_ndims([10])  # expect [9]
+    self.assertEqual(bij_reshape.inverse_event_ndims([10]), [9])
+
 
 if __name__ == '__main__':
   tf.test.main()
