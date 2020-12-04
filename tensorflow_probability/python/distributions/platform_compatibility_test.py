@@ -106,6 +106,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
+    'ExponentiallyModifiedGaussian',  # b/174778704
     'HalfStudentT',  # Numerical problem: b/149785284
     'Skellam',
     'StudentT',  # Numerical problem: b/149785284
@@ -124,6 +125,7 @@ VECTORIZED_LOGPROB_ATOL.update({
     'Beta': 1e-5,
     'BetaBinomial': 1e-5,
     'CholeskyLKJ': 1e-4,
+    'GammaGamma': 2e-5,
     'LKJ': 1e-3,
     'PowerSpherical': 2e-5,
 })
@@ -131,6 +133,7 @@ VECTORIZED_LOGPROB_ATOL.update({
 VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_RTOL.update({
     'Beta': 1e-5,
+    'GammaGamma': 1e-4,
     'NegativeBinomial': 1e-5,
     'PERT': 1e-5,
     'PowerSpherical': 5e-5,
