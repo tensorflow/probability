@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
@@ -687,17 +688,11 @@ class DenseFlipout(_DenseVariational):
 
     seed_stream = SeedStream(self.seed, salt='DenseFlipout')
 
-    def random_rademacher(shape, dtype=tf.float32, seed=None):
-      int_dtype = tf.int64 if tf.as_dtype(dtype) != tf.int32 else tf.int32
-      random_bernoulli = tf.random.uniform(
-          shape, minval=0, maxval=2, dtype=int_dtype, seed=seed)
-      return tf.cast(2 * random_bernoulli - 1, dtype)
-
-    sign_input = random_rademacher(
+    sign_input = tfp_random.rademacher(
         input_shape,
         dtype=inputs.dtype,
         seed=seed_stream())
-    sign_output = random_rademacher(
+    sign_output = tfp_random.rademacher(
         tf.concat([batch_shape,
                    tf.expand_dims(self.units, 0)], 0),
         dtype=inputs.dtype,
