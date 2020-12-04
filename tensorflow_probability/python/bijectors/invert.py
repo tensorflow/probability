@@ -117,3 +117,9 @@ class Invert(bijector_lib.Bijector):
 
   def inverse_dtype(self, dtype=bijector_lib.UNSPECIFIED, **kwargs):
     return self.bijector.forward_dtype(dtype, **kwargs)
+
+  def inverse_event_ndims(self, event_ndims, **kwargs):
+    return self.bijector.forward_event_ndims(event_ndims, **kwargs)
+
+  def forward_event_ndims(self, event_ndims, **kwargs):
+    return self.bijector.inverse_event_ndims(event_ndims, **kwargs)
