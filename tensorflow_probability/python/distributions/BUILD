@@ -64,6 +64,7 @@ multi_substrate_py_library(
         ":empirical",
         ":exp_gamma",
         ":exponential",
+        ":exponentially_modified_gaussian",
         ":finite_discrete",
         ":gamma",
         ":gamma_gamma",
@@ -3774,5 +3775,35 @@ py_binary(
         # absl:app dep,
         # absl/logging dep,
         "//tensorflow_probability/python/distributions:hypothesis_testlib",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "exponentially_modified_gaussian",
+    srcs = ["exponentially_modified_gaussian.py"],
+    deps = [
+        ":distribution",
+        ":exponential",
+        ":normal",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "exponentially_modified_gaussian_test",
+    srcs = ["exponentially_modified_gaussian_test.py"],
+    jax_size = "medium",
+    # Disable numpy test for now because a bug in the types returned by special_math.ndtr
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
