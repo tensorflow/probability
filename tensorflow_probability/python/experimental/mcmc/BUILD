@@ -51,6 +51,7 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
         ":progress_bar_reducer",
         ":reducer",
+        ":run",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
@@ -72,6 +73,7 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
         ":progress_bar_reducer",
         ":reducer",
+        ":run",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
@@ -618,6 +620,35 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "run",
+    srcs = ["run.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":sample",
+        ":tracing_reducer",
+        ":with_reductions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "run_test",
+    size = "small",
+    srcs = ["run_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":run",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
