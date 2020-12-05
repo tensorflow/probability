@@ -53,7 +53,7 @@ class DenseVariational(tf.keras.layers.Layer):
                **kwargs):
     """Creates the `DenseVariational` layer.
 
-    Arguments:
+    Args:
       units: Positive integer, dimensionality of the output space.
       make_posterior_fn: Python callable taking `tf.size(kernel)`,
         `tf.size(bias)`, `dtype` and returns another callable which takes an

@@ -293,7 +293,7 @@ class Composition(bijector.Bijector):
     The `_walk_{direction}` methods define how arguments are routed through
     nested bijectors, expressing the directed topology of the underlying graph.
 
-    Arguments:
+    Args:
       step_fn: A method taking a bijector, a single positional argument
         matching `bijector.forward_min_event_ndims`, and arbitrary **kwargs,
         and returning a structure matching `bijector.inverse_min_event_ndims`.
@@ -312,7 +312,7 @@ class Composition(bijector.Bijector):
     The `_walk_{direction}` methods define how arguments are routed through
     nested bijectors, expressing the directed topology of the underlying graph.
 
-    Arguments:
+    Args:
       step_fn: A method taking a bijector, a single positional argument
         matching `bijector.inverse_min_event_ndims`, and arbitrary **kwargs,
         and returning a structure matching `bijector.forward_min_event_ndims`.

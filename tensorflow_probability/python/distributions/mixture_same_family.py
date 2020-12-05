@@ -453,7 +453,7 @@ class MixtureSameFamily(distribution.Distribution):
       3. Distributional transform currently only works for known rank of the
         batch tensor.
 
-    Arguments:
+    Args:
       x: Sample of mixture distribution
       event_shape: The event shape of this distribution
 
@@ -512,7 +512,7 @@ class MixtureSameFamily(distribution.Distribution):
       w_i^k = w_k prob_k(x_1, ..., x_i-1) / sum_k' w_k' prob_k'(x_1, ..., x_i-1)
     and w_0^k = w_k is the mixture probability of the k-th component.
 
-    Arguments:
+    Args:
       x: Sample of mixture distribution
       event_shape: The event shape of this distribution
 
@@ -682,7 +682,7 @@ def _prevent_2nd_derivative(x):
   NB: you need to apply a non-identity function to the output tensor for the
   exception to be raised.
 
-  Arguments:
+  Args:
     x: A tensor.
 
   Returns:

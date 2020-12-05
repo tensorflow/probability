@@ -30,7 +30,7 @@ class BlockwiseInitializer(tf.keras.initializers.Initializer):
   def __init__(self, initializers, sizes, validate_args=False):
     """Creates the `BlockwiseInitializer`.
 
-    Arguments:
+    Args:
       initializers: `list` of Keras initializers, e.g., `"glorot_uniform"` or
         `tf.keras.initializers.Constant(0.5413)`.
       sizes: `list` of `int` scalars representing the number of elements
