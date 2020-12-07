@@ -123,6 +123,10 @@ class Split(bijector.Bijector):
   def axis(self):
     return self._axis
 
+  @property
+  def _is_permutation(self):
+    return True
+
   def _inverse(self, y):
     """Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
 

@@ -363,6 +363,39 @@ class TransformedDistributionTest(test_util.TestCase):
         validate_args=True)
     self.assertAllClose(shift, self.evaluate(fake_mvn.mean()))
 
+  def testStddev(self):
+    base_stddev = 2.
+    shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
+    scale = np.array([[1, -2, 3], [2, -3, 2]], dtype=np.float32)
+    expected_stddev = tf.abs(base_stddev * scale)
+    normal = self._cls()(
+        distribution=tfd.Normal(loc=tf.zeros_like(shift),
+                                scale=base_stddev * tf.ones_like(scale),
+                                validate_args=True),
+        bijector=tfb.Chain([tfb.Shift(shift=shift),
+                            tfb.Scale(scale=scale)],
+                           validate_args=True),
+        validate_args=True)
+    self.assertAllClose(expected_stddev, normal.stddev())
+    self.assertAllClose(expected_stddev**2, normal.variance())
+
+    split_normal = self._cls()(
+        distribution=tfd.Independent(normal, reinterpreted_batch_ndims=1),
+        bijector=tfb.Split(3),
+        validate_args=True)
+    self.assertAllCloseNested(tf.split(expected_stddev,
+                                       num_or_size_splits=3,
+                                       axis=-1),
+                              split_normal.stddev())
+
+    scaled_normal = self._cls()(
+        distribution=tfd.Independent(normal, reinterpreted_batch_ndims=1),
+        bijector=tfb.ScaleMatvecTriL([[1., 0.], [-1., 2.]]),
+        validate_args=True)
+    with self.assertRaisesRegex(
+        NotImplementedError, 'is a multivariate transformation'):
+      scaled_normal.stddev()
+
   def testEntropy(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
     diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)

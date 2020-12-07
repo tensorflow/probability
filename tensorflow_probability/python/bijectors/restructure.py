@@ -154,6 +154,10 @@ class Restructure(bijector.Bijector):
         parameters=parameters,
         name=name)
 
+  @property
+  def _is_permutation(self):
+    return True
+
   def _forward(self, x):
     flat_dict = {}
     nest.map_structure_up_to(
