@@ -189,6 +189,10 @@ class Transpose(bijector.Bijector):
   def rightmost_transposed_ndims(self):
     return self._rightmost_transposed_ndims
 
+  @property
+  def _is_permutation(self):
+    return True
+
   def _is_increasing(self):
     if self.forward_min_event_ndims == 0:
       return True

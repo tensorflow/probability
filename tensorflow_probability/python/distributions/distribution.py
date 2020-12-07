@@ -1302,7 +1302,7 @@ class Distribution(_BaseDistribution):
         return self._variance(**kwargs)
       except NotImplementedError:
         try:
-          return tf.square(self._stddev(**kwargs))
+          return tf.nest.map_structure(tf.square, self._stddev(**kwargs))
         except NotImplementedError:
           pass
         raise
@@ -1337,7 +1337,7 @@ class Distribution(_BaseDistribution):
         return self._stddev(**kwargs)
       except NotImplementedError:
         try:
-          return tf.sqrt(self._variance(**kwargs))
+          return tf.nest.map_structure(tf.sqrt, self._variance(**kwargs))
         except NotImplementedError:
           pass
         raise

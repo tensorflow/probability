@@ -478,6 +478,32 @@ class TransformedDistribution(distribution_lib.Distribution):
     y = self._set_sample_static_shape(y, sample_shape)
     return y
 
+  def _stddev(self, **kwargs):
+    if not self.bijector.is_constant_jacobian:
+      raise NotImplementedError('`stddev` is not implemented for non-affine '
+                                '`bijectors`.')
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError('`stddev` is not implemented when '
+                                '`bijector` is not injective.')
+    if not (self.bijector._is_scalar  # pylint: disable=protected-access
+            or self.bijector._is_permutation):  # pylint: disable=protected-access
+      raise NotImplementedError('`stddev` is not implemented when `bijector` '
+                                'is a multivariate transformation.')
+
+    # A scalar affine bijector is of the form `forward(x) = scale * x + shift`,
+    # where the standard deviation is invariant to the shift, so we extract the
+    # shift and subtract it.
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x_stddev = self.distribution.stddev(**distribution_kwargs)
+    y_stddev_plus_shift = self.bijector.forward(x_stddev, **bijector_kwargs)
+    shift = self.bijector.forward(
+        tf.nest.map_structure(
+            tf.zeros_like, x_stddev),
+        **bijector_kwargs)
+    return tf.nest.map_structure(
+        tf.abs,
+        tf.nest.map_structure(tf.subtract, y_stddev_plus_shift, shift))
+
   def _entropy(self, **kwargs):
     if not self.bijector.is_constant_jacobian:
       raise NotImplementedError('`entropy` is not implemented.')
