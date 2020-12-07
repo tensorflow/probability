@@ -3048,6 +3048,7 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -3084,7 +3085,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["mvn_tril_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 5,
+    shard_count = 7,
     tags = ["nomsan"],
     deps = [
         # absl/testing:parameterized dep,
@@ -3094,6 +3095,7 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
@@ -382,6 +384,33 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       with tf.control_dependencies([scale_identity_multiplier.assign(0.)]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @parameterized.named_parameters(dict(testcase_name=''),
+                                  dict(testcase_name='_jit', jit=True))
+  def test_kahan_precision(self, jit=False):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(experimental_compile=True)
+
+    n = 20_000
+    stream = test_util.test_seed_stream()
+    samps = tfd.Normal(0, 1).sample(n, seed=stream())
+
+    scale = tfd.LogNormal(0, .2).sample([7, 1], seed=stream())
+    mvn = tfd.MultivariateNormalDiag(
+        loc=tf.zeros([n]), scale_diag=tf.zeros([n]) + scale,
+        experimental_use_kahan_sum=True)
+    mvn64 = tfd.MultivariateNormalDiag(
+        loc=tf.zeros([n], dtype=tf.float64),
+        scale_diag=tf.zeros([n], dtype=tf.float64) + tf.cast(scale, tf.float64))
+    lp = maybe_jit(mvn.log_prob)(samps)
+    lp64 = mvn64.log_prob(tf.cast(samps, tf.float64))
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # Without fastmath, without Kahan fails ~30-100%, max abs error up to .2
+    self.assertAllClose(lp64, lp, rtol=0, atol=.006)
+
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()
