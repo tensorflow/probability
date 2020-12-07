@@ -46,12 +46,13 @@ py_library(
     ],
     srcs_version = "PY3",
     deps = [
-        # numpy dep,
+        ":util",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:kullback_leibler",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -83,7 +84,8 @@ py_library(
         "//tensorflow_probability/python/distributions:kullback_leibler",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:docstring_util",
-        "//tensorflow_probability/python/util:seed_stream",
+        "//tensorflow_probability/python/random",
+        "//tensorflow_probability/python/util",
     ],
 )
 

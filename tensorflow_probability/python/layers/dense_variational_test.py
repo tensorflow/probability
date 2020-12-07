@@ -390,20 +390,16 @@ class DenseVariational(test_util.TestCase):
       expected_kernel_posterior_affine_tensor = (
           expected_kernel_posterior_affine.sample(seed=42))
 
-      stream = tfp.util.SeedStream(layer.seed, salt='DenseFlipout')
+      seed_stream = tfp.util.SeedStream(layer.seed, salt='DenseFlipout')
 
-      sign_input = tf.random.uniform([batch_size, in_size],
-                                     minval=0,
-                                     maxval=2,
-                                     dtype=tf.int64,
-                                     seed=stream())
-      sign_input = tf.cast(2 * sign_input - 1, inputs.dtype)
-      sign_output = tf.random.uniform([batch_size, out_size],
-                                      minval=0,
-                                      maxval=2,
-                                      dtype=tf.int64,
-                                      seed=stream())
-      sign_output = tf.cast(2 * sign_output - 1, inputs.dtype)
+      sign_input = tfp.random.rademacher(
+          [batch_size, in_size],
+          dtype=inputs.dtype,
+          seed=seed_stream())
+      sign_output = tfp.random.rademacher(
+          [batch_size, out_size],
+          dtype=inputs.dtype,
+          seed=seed_stream())
       perturbed_inputs = tf.matmul(
           inputs * sign_input, expected_kernel_posterior_affine_tensor)
       perturbed_inputs *= sign_output
