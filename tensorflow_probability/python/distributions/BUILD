@@ -3667,6 +3667,7 @@ py_test(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
         # tensorflow/compiler/jit dep,
     ],
 )
