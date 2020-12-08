@@ -70,10 +70,9 @@ class JointMap(composition.Composition):
         checked for correctness.
       parameters: Locals dict captured by subclass constructor, to be used for
         copy/slice re-instantiation operators.
-      name: Python `str`, name given to ops managed by this object. Default:
-        E.g., ```
-          JointMap([Exp(), Softplus()]).name == "jointmap_of_exp_and_softplus"
-        ```.
+      name: Python `str`, name given to ops managed by this object.
+        Default value: automatically constructed, e.g.,
+          `jointmap_of_exp_and_softplus`.
 
     Raises:
       ValueError: if bijectors have different dtypes.
