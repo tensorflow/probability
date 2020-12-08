@@ -178,7 +178,7 @@ install_python_packages() {
 
   # The following unofficial dependencies are used only by tests.
   # TODO(b/148685448): Unpin Hypothesis and coverage versions.
-  python -m pip install $PIP_FLAGS hypothesis==3.56.5 coverage==4.4.2 matplotlib mock scipy
+  python -m pip install $PIP_FLAGS hypothesis==3.56.5 coverage==4.4.2 matplotlib mock mpmath scipy
 
   # Install additional TFP dependencies.
   python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
