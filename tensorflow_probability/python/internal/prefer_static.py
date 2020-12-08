@@ -471,6 +471,7 @@ reduce_min = _prefer_static(tf.reduce_min, nptf.reduce_min)
 reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
+reverse = _prefer_static(tf.reverse, nptf.reverse)
 round = _prefer_static(tf.math.round, nptf.math.round)  # pylint: disable=redefined-builtin
 rsqrt = _prefer_static(tf.math.rsqrt, nptf.math.rsqrt)
 slice = _prefer_static(tf.slice, nptf.slice)  # pylint: disable=redefined-builtin
