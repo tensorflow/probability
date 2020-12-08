@@ -134,7 +134,7 @@ py_test(
 py_library(
     name = "kernel_outputs",
     srcs = ["kernel_outputs.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":tracing_reducer",
         "//tensorflow_probability/python/internal:unnest",
@@ -191,7 +191,7 @@ py_test(
 py_library(
     name = "preconditioned_hmc",
     srcs = ["preconditioned_hmc.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
@@ -225,7 +225,7 @@ py_test(
 py_library(
     name = "progress_bar_reducer",
     srcs = ["progress_bar_reducer.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,

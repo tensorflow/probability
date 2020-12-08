@@ -183,6 +183,9 @@ def multi_substrate_py_library(
         srcs_version: As with `py_library`.
     """
 
+    if srcs_version != "PY3":
+        fail("Must use PY3 for srcs_version", srcs_version)
+
     native.py_library(
         name = name,
         srcs = srcs,
