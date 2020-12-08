@@ -131,6 +131,7 @@ multi_substrate_py_library(
         ":sinh_arcsinh",
         ":skellam",
         ":spherical_uniform",
+        ":stopping_ratio_logistic",
         ":student_t",
         ":student_t_process",
         ":transformed_distribution",
@@ -569,6 +570,21 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "exponentially_modified_gaussian",
+    srcs = ["exponentially_modified_gaussian.py"],
+    deps = [
+        ":distribution",
+        ":exponential",
+        ":normal",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -1749,6 +1765,23 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "stopping_ratio_logistic",
+    srcs = ["stopping_ratio_logistic.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "half_student_t",
     srcs = ["half_student_t.py"],
     deps = [
@@ -2406,6 +2439,21 @@ multi_substrate_py_test(
     srcs = ["exponential_test.py"],
     deps = [
         ":exponential",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "exponentially_modified_gaussian_test",
+    srcs = ["exponentially_modified_gaussian_test.py"],
+    jax_size = "medium",
+    # Disable numpy test for now because a bug in the types returned by special_math.ndtr
+    numpy_tags = ["notap"],
+    deps = [
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
@@ -3384,6 +3432,18 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "stopping_ratio_logistic_test",
+    srcs = ["stopping_ratio_logistic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "half_student_t_test",
     size = "medium",
     srcs = ["half_student_t_test.py"],
@@ -3748,35 +3808,5 @@ py_binary(
         # absl:app dep,
         # absl/logging dep,
         "//tensorflow_probability/python/distributions:hypothesis_testlib",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "exponentially_modified_gaussian",
-    srcs = ["exponentially_modified_gaussian.py"],
-    deps = [
-        ":distribution",
-        ":exponential",
-        ":normal",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/internal:tensor_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "exponentially_modified_gaussian_test",
-    srcs = ["exponentially_modified_gaussian_test.py"],
-    jax_size = "medium",
-    # Disable numpy test for now because a bug in the types returned by special_math.ndtr
-    numpy_tags = ["notap"],
-    deps = [
-        # numpy dep,
-        # scipy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
