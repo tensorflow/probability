@@ -572,31 +572,6 @@ def stringify_slices(slices):
   return pretty_slices
 
 
-@hps.composite
-def broadcasting_params(draw,
-                        dist_name,
-                        batch_shape,
-                        event_dim=None,
-                        enable_vars=False):
-  """Strategy for drawing parameters broadcasting to `batch_shape`."""
-  if dist_name not in INSTANTIABLE_BASE_DISTS:
-    raise ValueError('Unknown Distribution name {}'.format(dist_name))
-
-  params_event_ndims = INSTANTIABLE_BASE_DISTS[dist_name].params_event_ndims
-
-  def _constraint(param):
-    return constraint_for(dist_name, param)
-
-  return draw(
-      tfp_hps.broadcasting_params(
-          batch_shape,
-          params_event_ndims,
-          event_dim=event_dim,
-          enable_vars=enable_vars,
-          constraint_fn_for=_constraint,
-          mutex_params=MUTEX_PARAMS))
-
-
 def prime_factors(v):
   """Compute the prime factors of v."""
   factors = []
@@ -639,6 +614,7 @@ def base_distribution_unconstrained_params(draw,
                                            batch_shape=None,
                                            event_dim=None,
                                            enable_vars=False,
+                                           param_strategy_fn=None,
                                            params=None):
   """Strategy for drawing unconstrained parameters of a base Distribution.
 
@@ -660,6 +636,10 @@ def base_distribution_unconstrained_params(draw,
       initialization in slicing_test.  If `False`, the returned parameters are
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}.
+    param_strategy_fn: Optional callable with signature
+      `strategy = param_strategy_fn(shape, dtype, constraint_fn)`. If provided,
+      overrides the default strategy for generating float-valued parameters.
+      Default value: `None`.
     params: An optional set of Distribution parameters. If params are not
       provided, Hypothesis will choose a set of parameters.
 
@@ -675,11 +655,21 @@ def base_distribution_unconstrained_params(draw,
     batch_shape = draw(tfp_hps.shapes())
 
   # Draw raw parameters
+  if dist_name not in INSTANTIABLE_BASE_DISTS:
+    raise ValueError('Unknown Distribution name {}'.format(dist_name))
+  params_event_ndims = INSTANTIABLE_BASE_DISTS[dist_name].params_event_ndims
+
   params_kwargs = draw(
-      broadcasting_params(
-          dist_name, batch_shape, event_dim=event_dim, enable_vars=enable_vars))
-  hp.note('Forming dist {} with raw parameters {}'.format(
-      dist_name, params_kwargs))
+      tfp_hps.broadcasting_params(
+          batch_shape,
+          params_event_ndims,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          constraint_fn_for=lambda param: constraint_for(dist_name, param),
+          mutex_params=MUTEX_PARAMS,
+          param_strategy_fn=param_strategy_fn))
+  hp.note('Forming dist {} with raw parameters {}'.format(dist_name,
+                                                          params_kwargs))
 
   return params_kwargs, batch_shape
 
@@ -732,8 +722,9 @@ def base_distributions(draw,
                        event_dim=None,
                        enable_vars=False,
                        eligibility_filter=lambda name: True,
-                       validate_args=True,
-                       params=None):
+                       params=None,
+                       param_strategy_fn=None,
+                       validate_args=True):
   """Strategy for drawing arbitrary base Distributions.
 
   This does not draw compound distributions like `Independent`,
@@ -756,9 +747,13 @@ def base_distributions(draw,
       `tfp.util.TransformedVariable`}.
     eligibility_filter: Optional Python callable.  Blacklists some Distribution
       class names so they will not be drawn at the top level.
-    validate_args: Python `bool`; whether to enable runtime assertions.
     params: An optional set of Distribution parameters. If params are not
       provided, Hypothesis will choose a set of parameters.
+    param_strategy_fn: Optional callable with signature
+      `strategy = param_strategy_fn(shape, dtype, constraint_fn)`. If provided,
+      overrides the default strategy for generating float-valued parameters.
+      Default value: `None`.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     dists: A strategy for drawing Distributions with the specified `batch_shape`
@@ -780,13 +775,14 @@ def base_distributions(draw,
 
   if params is None:
     params_unconstrained, batch_shape = draw(
-        base_distribution_unconstrained_params(dist_name,
-                                               batch_shape=batch_shape,
-                                               event_dim=event_dim,
-                                               enable_vars=enable_vars))
+        base_distribution_unconstrained_params(
+            dist_name,
+            batch_shape=batch_shape,
+            event_dim=event_dim,
+            enable_vars=enable_vars,
+            param_strategy_fn=param_strategy_fn))
     params = constrain_params(params_unconstrained, dist_name)
-  params = modify_params(
-      params, dist_name, validate_args=validate_args)
+  params = modify_params(params, dist_name, validate_args=validate_args)
   # Actually construct the distribution
   dist_cls = INSTANTIABLE_BASE_DISTS[dist_name].cls
   result_dist = dist_cls(**params)
@@ -1436,8 +1432,12 @@ def distributions(draw,
       or dist_name in INSTANTIABLE_BASE_DISTS
       or dist_name == 'Empirical'):
     return draw(base_distributions(
-        dist_name, batch_shape, event_dim, enable_vars,
-        eligibility_filter, validate_args))
+        dist_name,
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        enable_vars=enable_vars,
+        eligibility_filter=eligibility_filter,
+        validate_args=validate_args))
   if dist_name == 'BatchReshape':
     return draw(batch_reshapes(
         batch_shape, event_dim, enable_vars, depth,
