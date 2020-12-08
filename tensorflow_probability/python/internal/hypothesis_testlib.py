@@ -435,6 +435,7 @@ def broadcasting_params(draw,
                         enable_vars=False,
                         constraint_fn_for=lambda param: identity_fn,
                         mutex_params=(),
+                        param_strategy_fn=None,
                         dtype=np.float32):
   """Streategy for drawing parameters which jointly have the given batch shape.
 
@@ -467,6 +468,10 @@ def broadcasting_params(draw,
       mutually exclusive parameters (e.g., the 'probs' and 'logits' of a
       Categorical).  At most one parameter from each set will appear in the
       result.
+    param_strategy_fn: Optional callable with signature
+      `strategy = param_strategy_fn(shape, dtype, constraint_fn)`. If provided,
+      overrides the default strategy for generating float-valued parameters.
+      Default value: `constrained_tensors`.
     dtype: Dtype for generated parameters.
 
   Returns:
@@ -479,6 +484,8 @@ def broadcasting_params(draw,
   """
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
+  if param_strategy_fn is None:
+    param_strategy_fn = constrained_tensors
 
   params_event_ndims = params_event_ndims or {}
   remaining_params = set(params_event_ndims.keys())
@@ -504,12 +511,14 @@ def broadcasting_params(draw,
     hp.assume(len(param_shape) < 6)
 
     # TODO(axch): Can I replace `params_event_ndims` and `constraint_fn_for`
-    # with a map from params to `Suppport`s, and use `tensors_in_support` here
-    # instead of this explicit `constrained_tensors` function?
-    param_strategy = constrained_tensors(
-        constraint_fn_for(param), param_shape, dtype=dtype)
-    params_kwargs[param] = draw(maybe_variable(
-        param_strategy, enable_vars=enable_vars, dtype=dtype, name=param))
+    # with a map from params to `Suppport`s, and use `tensors_in_support` here?
+    param_strategy = param_strategy_fn(constraint_fn=constraint_fn_for(param),
+                                       shape=param_shape,
+                                       dtype=dtype)
+    params_kwargs[param] = draw(maybe_variable(param_strategy,
+                                               enable_vars=enable_vars,
+                                               dtype=dtype,
+                                               name=param))
   return params_kwargs
 
 
