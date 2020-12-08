@@ -371,7 +371,7 @@ def von_mises_cdf(x, concentration):
   using automatic differentiation. We use forward mode for the series case
   (which allows to save memory) and backward mode for the Normal approximation.
 
-  Arguments:
+  Args:
     x: The point at which to evaluate the CDF.
     concentration: The concentration parameter of the von Mises distribution.
 
@@ -498,7 +498,7 @@ def _von_mises_cdf_normal(x, concentration, dtype):
 def _von_mises_sample_no_gradient(shape, concentration, seed):
   """Performs rejection sampling for standardized von Mises.
 
-  Arguments:
+  Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the distribution.
     seed: The random seed.
@@ -641,7 +641,7 @@ def _von_mises_sample_jvp(shape, primals, tangents):
 def _von_mises_sample_with_gradient(shape, concentration, seed):
   """Performs rejection sampling for standardized von Mises.
 
-  Arguments:
+  Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the distribution.
     seed: (optional) The random seed.
@@ -662,7 +662,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
   The sampling algorithm is rejection sampling with wrapped Cauchy proposal [1].
   The samples are pathwise differentiable using the approach of [2].
 
-  Arguments:
+  Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the von Mises distribution.
     dtype: The data type of concentration and the outputs.

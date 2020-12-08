@@ -435,7 +435,7 @@ def masked_dense(inputs,
 
   See [Germain et al. (2015)][1] for detailed explanation.
 
-  Arguments:
+  Args:
     inputs: Tensor input.
     units: Python `int` scalar representing the dimensionality of the output
       space.
@@ -894,7 +894,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
                **kwargs):
     """Constructs the MADE layer.
 
-    Arguments:
+    Args:
       params: Python integer specifying the number of parameters to output
         per input.
       event_shape: Python `list`-like of positive integers (or a single int),

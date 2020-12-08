@@ -353,7 +353,7 @@ class Zipf(distribution.Distribution):
     pmf. This function implements `hat` integral: H(x) = int_x^inf h(t) dt;
     which is needed for sampling purposes.
 
-    Arguments:
+    Args:
       x: A Tensor of points x at which to evaluate H(x).
       power: Power that parameterized hat function.
 

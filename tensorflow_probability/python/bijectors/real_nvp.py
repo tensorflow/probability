@@ -344,7 +344,7 @@ def real_nvp_default_template(hidden_layers,
   Real NVP bijector, implement a conditioned shift/scale template that
   handles the `condition_kwargs`.
 
-  Arguments:
+  Args:
     hidden_layers: Python `list`-like of non-negative integer, scalars
       indicating the number of units in each hidden layer. Default: `[512,
         512]`.
