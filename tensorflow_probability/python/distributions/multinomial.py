@@ -413,7 +413,7 @@ def _sample_multinomial_as_iterated_binomial(
 
     num_trials = tf.cast(num_trials, probs.dtype)
     # Pre-broadcast with probs
-    num_trials += tf.zeros_like(probs[..., 0])
+    num_trials = num_trials + tf.zeros_like(probs[..., 0])
     # Pre-enlarge for different output samples
     num_trials = _replicate_along_left(num_trials, num_samples)
     i = tf.constant(0)
