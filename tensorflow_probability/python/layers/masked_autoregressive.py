@@ -123,7 +123,7 @@ class AutoregressiveTransform(DistributionLambda):
   def __init__(self, made, **kwargs):
     """Constructs the AutoregressiveTransform layer.
 
-    Arguments:
+    Args:
       made: A `Made` layer, which must output two parameters for each input.
       **kwargs: Additional keyword arguments passed to `tf.keras.Layer`.
     """

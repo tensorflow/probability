@@ -205,7 +205,7 @@ def broadcast_shape(x_shape, y_shape):
   computed statically and returned as a `TensorShape`.  Otherwise, a rank-1
   `Tensor` will be returned.
 
-  Arguments:
+  Args:
     x_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
       broadcast against this shape.
     y_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
@@ -230,7 +230,7 @@ def cond(pred, true_fn=None, false_fn=None, name=None):
   If `pred` is a bool or has a constant value, we return either `true_fn()`
   or `false_fn()`, otherwise we use `tf.cond` to dynamically route to both.
 
-  Arguments:
+  Args:
     pred: A scalar determining whether to return the result of `true_fn` or
       `false_fn`.
     true_fn: The callable to be performed if pred is true.

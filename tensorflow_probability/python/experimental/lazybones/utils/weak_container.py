@@ -114,7 +114,7 @@ class HashableWeakRef(weakref.ref):
   def __init__(self, referrent, callback=None):
     """weakref.ref which makes any object hashable.
 
-    Arguments:
+    Args:
       referrent: Object that is being referred to.
       callback: Optional callback to invoke when object is GCed.
     """

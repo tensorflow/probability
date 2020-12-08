@@ -83,7 +83,7 @@ class VariableLayer(tf.keras.layers.Layer):
                **kwargs):
     """Creates the `VariableLayer`.
 
-    Arguments:
+    Args:
       shape: integer or integer vector specifying the shape of the output of
         this layer.
       dtype: TensorFlow `dtype` of the variable created by this layer.
