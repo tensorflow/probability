@@ -66,7 +66,7 @@ multi_substrate_py_library(
     srcs = [
         "bessel.py",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -119,7 +119,7 @@ multi_substrate_py_library(
     srcs = [
         "gram_schmidt.py",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
@@ -199,7 +199,7 @@ multi_substrate_py_library(
     srcs = [
         "hypergeometric.py",
     ],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
