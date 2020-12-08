@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -403,6 +404,40 @@ class SampleChainTest(test_util.TestCase):
           kernel=kernel, num_burnin_steps=nburnin, trace_fn=None,
           seed=seed_stream())
     self.evaluate(sample())
+
+  @test_util.jax_disable_test_missing_functionality('PHMC b/175107050')
+  @test_util.numpy_disable_gradient_test('HMC')
+  def testStructuredState2(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def model():
+      mu = yield tfd.Sample(tfd.Normal(0, 1), [65], name='mu')
+      sigma = yield tfd.Sample(tfd.Exponential(1.), [65], name='sigma')
+      beta = yield tfd.Sample(
+          tfd.Normal(loc=tf.gather(mu, tf.range(436) % 65, axis=-1),
+                     scale=tf.gather(sigma, tf.range(436) % 65, axis=-1)),
+          4, name='beta')
+      _ = yield tfd.Multinomial(total_count=100.,
+                                logits=tfb.Pad([[0, 1]])(beta),
+                                name='y')
+
+    stream = test_util.test_seed_stream()
+    pinned = model.experimental_pin(y=model.sample(seed=stream()).y)
+    struct = pinned.dtype
+    stddevs = struct._make([
+        tf.fill([65], .1), tf.fill([65], 1.), tf.fill([436, 4], 10.)])
+    momentum_dist = tfd.JointDistributionNamedAutoBatched(
+        struct._make(tfd.Normal(0, 1 / std) for std in stddevs))
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        pinned.unnormalized_log_prob,
+        step_size=.1, num_leapfrog_steps=10,
+        momentum_distribution=momentum_dist)
+    bijector = pinned.experimental_default_event_space_bijector()
+    kernel = tfp.mcmc.TransformedTransitionKernel(kernel, bijector)
+    state = bijector(struct._make(
+        tfd.Uniform(-2., 2.).sample(shp)
+        for shp in bijector.inverse_event_shape(pinned.event_shape)))
+    self.evaluate(tfp.mcmc.sample_chain(
+        3, current_state=state, kernel=kernel, seed=stream()))
 
 
 if __name__ == '__main__':

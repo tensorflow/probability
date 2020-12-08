@@ -280,7 +280,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
           state_gradients_are_stopped=self.state_gradients_are_stopped)
 
       seed = samplers.sanitize_seed(seed)
-      current_momentum_parts = momentum_distribution.sample(seed=seed)
+      current_momentum_parts = list(momentum_distribution.sample(seed=seed))
       momentum_log_prob = getattr(momentum_distribution,
                                   '_log_prob_unnormalized',
                                   momentum_distribution.log_prob)
