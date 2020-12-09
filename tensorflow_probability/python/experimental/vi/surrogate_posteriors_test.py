@@ -28,6 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.vi import surrogate_posteriors
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -265,10 +266,16 @@ class _TrainableASVISurrogate(object):
     # Test that the correct number of trainable variables are being tracked
     prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
     expected_num_trainable_vars = 0
-    for dist in prior_dists:
+    for original_dist in prior_dists:
+      try:
+        original_dist = original_dist.distribution
+      except AttributeError:
+        pass
+      dist = surrogate_posteriors._as_trainable_family(original_dist)
       dist_params = dist.parameters
       for param, value in dist_params.items():
-        if param not in surrogate_posteriors._NON_STATISTICAL_PARAMS and value is not None:
+        if (param not in surrogate_posteriors._NON_STATISTICAL_PARAMS
+            and value is not None and param not in ('low', 'high')):
           expected_num_trainable_vars += 2  # prior_weight, mean_field_parameter
 
     self.assertLen(surrogate_posterior.trainable_variables,
@@ -285,9 +292,9 @@ class _TrainableASVISurrogate(object):
     # Test that the sample shape is correct
     three_posterior_samples = surrogate_posterior.sample(3)
     three_prior_samples = prior_dist.sample(3)
-
-    self.assertAllEqualNested([s.shape for s in three_prior_samples],
-                              [s.shape for s in three_posterior_samples])
+    self.assertAllEqualNested(
+        [s.shape for s in tf.nest.flatten(three_prior_samples)],
+        [s.shape for s in tf.nest.flatten(three_posterior_samples)])
 
   def test_fitting_surrogate_posterior(self):
 
@@ -308,8 +315,9 @@ class _TrainableASVISurrogate(object):
     # Compute posterior statistics.
     with tf.control_dependencies([losses]):
       posterior_samples = surrogate_posterior.sample(100)
-      posterior_mean = [tf.reduce_mean(x) for x in posterior_samples]
-      posterior_stddev = [tf.math.reduce_std(x) for x in posterior_samples]
+      posterior_mean = tf.nest.map_structure(tf.reduce_mean, posterior_samples)
+      posterior_stddev = tf.nest.map_structure(tf.math.reduce_std,
+                                               posterior_samples)
 
     self.evaluate(tf1.global_variables_initializer())
     _ = self.evaluate(losses)
@@ -328,8 +336,16 @@ class _TrainableASVISurrogate(object):
     # Confirm that there exists correct number of trainable variables.
     for (prior_distribution, trained_vars_dict) in zip(prior_dists,
                                                        trained_vars):
-      for param_name, prior_value in prior_distribution.parameters.items():
-        if param_name not in surrogate_posteriors._NON_STATISTICAL_PARAMS and prior_value is not None:
+      substituted_dist = surrogate_posteriors._as_trainable_family(
+          prior_distribution)
+      try:
+        posterior_distribution = substituted_dist.distribution
+      except AttributeError:
+        posterior_distribution = substituted_dist
+
+      for param_name, prior_value in posterior_distribution.parameters.items():
+        if (param_name not in surrogate_posteriors._NON_STATISTICAL_PARAMS
+            and prior_value is not None and param_name not in ('low', 'high')):
           self.assertIsInstance(trained_vars_dict[param_name],
                                 surrogate_posteriors.ASVIParameters)
 
@@ -375,9 +391,101 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     return target_log_prob
 
 
+@test_util.test_all_tf_execution_regimes
+class ASVISurrogatePosteriorTestEightSchools(test_util.TestCase,
+                                             _TrainableASVISurrogate):
+
+  def make_prior_dist(self):
+    treatment_effects = tf.constant([28, 8, -3, 7, -1, 1, 18, 12],
+                                    dtype=tf.float32)
+    num_schools = ps.shape(treatment_effects)[-1]
+
+    return tfd.JointDistributionNamed({
+        'avg_effect':
+            tfd.Normal(loc=0., scale=10., name='avg_effect'),
+        'log_stddev':
+            tfd.Normal(loc=5., scale=1., name='log_stddev'),
+        'school_effects':
+            lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
+                tfd.Independent(
+                    tfd.Normal(
+                        loc=avg_effect[..., None] * tf.ones(num_schools),
+                        scale=tf.exp(log_stddev[..., None]) * tf.ones(
+                            num_schools),
+                        name='school_effects'),
+                    reinterpreted_batch_ndims=1))
+    })
+
+  def make_likelihood_model(self, x, observation_noise=None):
+    treatment_stddevs = tf.constant([15, 10, 16, 11, 9, 11, 10, 18],
+                                    dtype=tf.float32)
+
+    return tfd.Independent(
+        tfd.Normal(loc=x['school_effects'], scale=treatment_stddevs),
+        reinterpreted_batch_ndims=1)
+
+  def get_observations(self, prior_dist):
+    ground_truth = self.evaluate(prior_dist.sample())
+    likelihood = self.make_likelihood_model(x=ground_truth)
+    return likelihood.sample(1)
+
+  def get_target_log_prob(self, observations, prior_dist):
+
+    def target_log_prob(**x):
+      likelihood_dist = self.make_likelihood_model(x=x)
+      return likelihood_dist.log_prob(observations) + prior_dist.log_prob(x)
+
+    return target_log_prob
+
+
+@test_util.test_all_tf_execution_regimes
+class ASVISurrogatePosteriorTestHalfNormal(test_util.TestCase,
+                                           _TrainableASVISurrogate):
+
+  def make_prior_dist(self):
+
+    def _prior_model_fn():
+      innovation_noise = 1.
+      yield tfd.HalfNormal(
+          scale=innovation_noise, validate_args=True, allow_nan_stats=False)
+
+    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
+
+  def make_likelihood_model(self, x, observation_noise):
+
+    def _likelihood_model():
+      yield tfd.Normal(
+          loc=x,
+          scale=observation_noise,
+          validate_args=True,
+          allow_nan_stats=False)
+
+    return tfd.JointDistributionCoroutineAutoBatched(_likelihood_model)
+
+  def get_observations(self, prior_dist):
+    observation_noise = 1.
+    ground_truth = prior_dist.sample()
+    likelihood = self.make_likelihood_model(
+        x=ground_truth, observation_noise=observation_noise)
+    return likelihood.sample(1)
+
+  def get_target_log_prob(self, observations, prior_dist):
+
+    obs = observations
+    def target_log_prob(*x):
+      observation_noise = 0.15
+      likelihood_dist = self.make_likelihood_model(
+          x=x, observation_noise=observation_noise)
+
+      return likelihood_dist.log_prob(obs) + prior_dist.log_prob(x)
+
+    return target_log_prob
+
 # TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.
 # TODO(kateslin): Add an ASVI surrogate posterior test with for a model with
 #  missing observations.
+# TODO(kateslin): Add an ASVI surrogate posterior test for Uniform distribution
+# to check that Beta substitution works properly
 
 if __name__ == '__main__':
   tf.test.main()
