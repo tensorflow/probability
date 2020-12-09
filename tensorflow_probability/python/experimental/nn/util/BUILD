@@ -28,7 +28,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":im2row",
+        ":convolution_util",
         ":random_variable",
         ":utils",
         "//tensorflow_probability/python/internal:all_util",
@@ -36,24 +36,32 @@ py_library(
 )
 
 py_library(
-    name = "im2row",
-    srcs = ["im2row.py"],
+    name = "convolution_util",
+    srcs = ["convolution_util.py"],
     srcs_version = "PY3",
     deps = [
+        ":utils",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
 py_test(
-    name = "im2row_test",
+    name = "convolution_util_test",
     size = "medium",
-    srcs = ["im2row_test.py"],
+    srcs = ["convolution_util_test.py"],
     python_version = "PY3",
+    shard_count = 4,
     srcs_version = "PY3",
     deps = [
+        ":convolution_util",
+        # absl/testing:parameterized dep,
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
