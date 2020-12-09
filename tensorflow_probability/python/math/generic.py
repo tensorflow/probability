@@ -21,13 +21,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import variadic_reduce
 from tensorflow_probability.python.math.scan_associative import scan_associative
 
 
@@ -38,6 +41,7 @@ __all__ = [
     'log_combinations',
     'log_cumsum_exp',
     'log1mexp',
+    'reduce_kahan_sum',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'smootherstep',
@@ -116,6 +120,80 @@ def log_cumsum_exp(x, axis=-1, name=None):
                                     dest_idx=axis)
 
 
+def _kahan_reduction(x, y):
+  """Implements the Kahan summation reduction."""
+  (s, c), (s1, c1) = x, y
+  for val in -c1, s1:
+    u = val - c
+    t = s + u
+    # TODO(b/173158845): XLA:CPU reassociates-to-zero the correction term.
+    c = (t - s) - u
+    s = t
+  return s, c
+
+
+_reduce_kahan_sum = variadic_reduce.make_variadic_reduce(_kahan_reduction)
+
+
+class Kahan(collections.namedtuple('Kahan', ['total', 'correction'])):
+  """Result of Kahan summation, i.e. `sum = total - correction`."""
+  __slots__ = ()
+
+  def __add__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __radd__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __neg__(self):
+    return Kahan(-self.total, -self.correction)
+
+  def __sub__(self, y):
+    return Kahan._make(_kahan_reduction(
+        self, -y if isinstance(y, Kahan) else (-y, 0)))
+
+  def __rsub__(self, x):
+    return Kahan._make(_kahan_reduction(
+        x if isinstance(x, Kahan) else (x, 0), -self))
+
+
+def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
+  """Reduces the input tensor along the given axis using Kahan summation.
+
+  Returns both the total and the correction term, as a `namedtuple`, so that a
+  more accurate sum may be written as `total - correction`.
+
+  A practical use-case is computing the difference of two large (magnitude) sums
+  we expect to be nearly equal. If instead we take their difference as
+  `(s0.total - s1.total) - (s0.correction - s1.correction)`, we can retain more
+  precision in computing their difference.
+
+  Note: (TF + JAX) This function does not work properly on XLA:CPU without the
+  environment variable: `XLA_FLAGS=--xla_cpu_enable_fast_math=false`, due to
+  LLVM's reassociation optimizations, which simplify error terms to zero.
+
+  Args:
+    input_tensor: The tensor to sum.
+    axis: One of `None`, a Python `int`, or a sequence of Python `int`. The axes
+      to be reduced. `None` is taken as "reduce all axes".
+    keepdims: Python `bool` indicating whether we return a tensor with singleton
+      dimensions in the reduced axes (`True`), or squeeze the axes out (default,
+      `False`).
+    name: Optional name for ops in scope.
+
+  Returns:
+    reduced: A `Kahan(total, correction)` namedtuple.
+  """
+  with tf.name_scope(name or 'reduce_kahan_sum'):
+    t = tf.convert_to_tensor(input_tensor)
+    operands = (t, tf.zeros_like(t))
+    inits = (tf.zeros([], dtype=t.dtype),) * 2
+    return Kahan._make(
+        _reduce_kahan_sum(operands, inits, axis=axis, keepdims=keepdims))
+
+
 def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
   """Computes `log(mean(exp(input_tensor)))`.
 
@@ -146,7 +224,7 @@ def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
   """
   with tf.name_scope(name or 'reduce_logmeanexp'):
     lse = tf.reduce_logsumexp(input_tensor, axis=axis, keepdims=keepdims)
-    n = prefer_static.size(input_tensor) // prefer_static.size(lse)
+    n = ps.size(input_tensor) // ps.size(lse)
     log_n = tf.math.log(tf.cast(n, lse.dtype))
     return lse - log_n
 

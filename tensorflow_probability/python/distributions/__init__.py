@@ -41,6 +41,7 @@ from tensorflow_probability.python.distributions.dirichlet_multinomial import Di
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.empirical import Empirical
+from tensorflow_probability.python.distributions.exponentially_modified_gaussian import ExponentiallyModifiedGaussian
 from tensorflow_probability.python.distributions.exp_gamma import ExpGamma
 from tensorflow_probability.python.distributions.exp_gamma import ExpInverseGamma
 from tensorflow_probability.python.distributions.exponential import Exponential
@@ -53,6 +54,7 @@ from tensorflow_probability.python.distributions.generalized_normal import Gener
 from tensorflow_probability.python.distributions.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
+from tensorflow_probability.python.distributions.gev import GeneralizedExtremeValue
 from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.half_student_t import HalfStudentT
@@ -171,6 +173,7 @@ __all__ = [
     'DoublesidedMaxwell',
     'VectorDeterministic',
     'Empirical',
+    'ExponentiallyModifiedGaussian',
     'ExpGamma',
     'ExpInverseGamma',
     'Exponential',
@@ -185,6 +188,7 @@ __all__ = [
     'GaussianProcessRegressionModel',
     'VariationalGaussianProcess',
     'Gumbel',
+    'GeneralizedExtremeValue',
     'HalfCauchy',
     'HalfNormal',
     'HalfStudentT',

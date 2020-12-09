@@ -265,7 +265,7 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
 
       # First, compute how many 'extra' (batch) ndims each part has. This must
       # be nonnegative.
-      vectorized_arg_shapes = [tf.shape(arg) for arg in vectorized_args]
+      vectorized_arg_shapes = [ps.shape(arg) for arg in vectorized_args]
       batch_ndims = [
           ps.rank_from_shape(arg_shape) - nd
           for (arg_shape, nd) in zip(

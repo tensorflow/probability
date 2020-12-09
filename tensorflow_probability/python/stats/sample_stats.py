@@ -319,8 +319,8 @@ def covariance(x,
   cov_matrix = tfp.stats.covariance(x, y, sample_axis=0, event_axis=-1)
   ```
 
-  Notice we divide by `N` (the numpy default), which does not create `NaN`
-  when `N = 1`, but is slightly biased.
+  Notice we divide by `N`, which does not create `NaN` when `N = 1`, but is
+  slightly biased.
 
   Args:
     x:  A numeric `Tensor` holding samples.

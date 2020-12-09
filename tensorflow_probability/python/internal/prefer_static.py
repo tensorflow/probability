@@ -37,6 +37,7 @@ try:
 except ImportError:
   from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 
+from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -109,8 +110,10 @@ def _get_static_value(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
+    # Explicitly check for ops.Tensor, to avoid an AttributeError
+    # when requesting `KerasTensor.graph`.
     # pylint: disable=protected-access
-    if pred_value is None:
+    if pred_value is None and isinstance(pred, ops.Tensor):
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
@@ -468,6 +471,7 @@ reduce_min = _prefer_static(tf.reduce_min, nptf.reduce_min)
 reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
+reverse = _prefer_static(tf.reverse, nptf.reverse)
 round = _prefer_static(tf.math.round, nptf.math.round)  # pylint: disable=redefined-builtin
 rsqrt = _prefer_static(tf.math.rsqrt, nptf.math.rsqrt)
 slice = _prefer_static(tf.slice, nptf.slice)  # pylint: disable=redefined-builtin

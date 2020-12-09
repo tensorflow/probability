@@ -77,6 +77,16 @@ else
   TF_NIGHTLY_PACKAGE=tf-nightly-cpu
 fi
 
+PYTHON_PARSE_PACKAGE_JSON="
+import sys
+import json
+package_data = json.loads(sys.stdin.read())
+linux_versions = []
+for release, release_info in package_data['releases'].items():
+  if any('linux' in wheel['filename'] for wheel in release_info):
+    print(release)
+"
+
 find_good_tf_nightly_version_str() {
   PKG_NAME=$1
   # These are nightly builds we'd like to avoid for some reason; separated by
@@ -86,7 +96,9 @@ find_good_tf_nightly_version_str() {
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
   # to be updated on every new TF release.
-  python -m pip install $PKG_NAME==X 2>&1 \
+  VERSIONS=$(curl -s https://pypi.org/pypi/$PKG_NAME/json \
+    | python -c "$PYTHON_PARSE_PACKAGE_JSON")
+  echo $VERSIONS \
     | grep -o "[0-9.]\+dev[0-9]\{8\}" \
     | sort \
     | grep -v "$BAD_NIGHTLY_DATES" \

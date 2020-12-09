@@ -20,6 +20,7 @@ from __future__ import print_function
 
 from tensorflow_probability.python.experimental.mcmc.covariance_reducer import CovarianceReducer
 from tensorflow_probability.python.experimental.mcmc.covariance_reducer import VarianceReducer
+from tensorflow_probability.python.experimental.mcmc.diagonal_mass_matrix_adaptation import DiagonalMassMatrixAdaptation
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.expectations_reducer import ExpectationsReducer
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import chees_criterion
@@ -40,6 +41,7 @@ from tensorflow_probability.python.experimental.mcmc.preconditioned_hmc import P
 from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import make_tqdm_progress_bar_fn
 from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import ProgressBarReducer
 from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
+from tensorflow_probability.python.experimental.mcmc.run import run_kernel
 from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
 from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain
@@ -64,6 +66,17 @@ from tensorflow_probability.python.experimental.mcmc.with_reductions import With
 
 
 __all__ = [
+    'CovarianceReducer',
+    'DiagonalMassMatrixAdaptation',
+    'EllipticalSliceSampler',
+    'ExpectationsReducer',
+    'NoUTurnSampler',
+    'PreconditionedHamiltonianMonteCarlo',
+    'ProgressBarReducer',
+    'SequentialMonteCarlo',
+    'SequentialMonteCarloResults',
+    'StateWithHistory',
+    'WeightedParticles',
     'augment_prior_with_state_history',
     'augment_with_observation_history',
     'augment_with_state_history',
@@ -93,6 +106,7 @@ __all__ = [
     'resample_independent',
     'resample_stratified',
     'resample_systematic',
+    'run_kernel',
     'sample_chain',
     'sample_fold',
     'sample_sequential_monte_carlo',

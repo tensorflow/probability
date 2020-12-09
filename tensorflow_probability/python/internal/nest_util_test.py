@@ -86,7 +86,8 @@ class LeafDict(dict):
     return 'LeafDict' + super(LeafDict, self).__repr__()
 
 
-NamedTuple = collections.namedtuple('NamedTuple', 'x, y')
+NamedTuple = collections.namedtuple('NamedTuple', 'x y')
+NamedTupleYX = collections.namedtuple('NamedTuple', 'y x')
 
 # Alias for readability.
 Tensor = np.array  # pylint: disable=invalid-name
@@ -341,6 +342,65 @@ class NestUtilTest(test_util.TestCase):
           value=tf.constant(1, tf.float32),
           dtype=tf.float64)
 
+  @parameterized.named_parameters({
+      'testcase_name': '_ntup_ntup',
+      'target': NamedTupleYX(1, 2),
+      'source': NamedTuple(3, 4),
+      'expect': NamedTupleYX(y=4, x=3)
+  },{
+      'testcase_name': '_ntup_dict',
+      'target': NamedTupleYX(1, 2),
+      'source': {'x': 3, 'y': 4},
+      'expect': NamedTupleYX(y=4, x=3)
+  },{
+      'testcase_name': '_ntup_list',
+      'target': NamedTupleYX(1, 2),
+      'source': [3, 4],
+      'expect': NamedTupleYX(y=3, x=4)
+  },{
+      'testcase_name': '_list_ntup',
+      'target': [1, 2],
+      'source': NamedTupleYX(3, 4),
+      'expect': [3, 4]
+  },{
+      'testcase_name': '_dict_ntup',
+      'target': {'x': 1, 'y': 2},
+      'source': NamedTupleYX(3, 4),
+      'expect': {'x': 4, 'y': 3}
+  },{
+      'testcase_name': '_up_to',
+      'target': NamedTupleYX(1, 2),
+      'source': NamedTuple([3,4], [5,6]),
+      'expect': NamedTupleYX(y=[5,6], x=[3,4])
+  },{
+      'testcase_name': '_deep_wrap',
+      'target': {'foo': NamedTuple(1, 2), 'bar': NamedTupleYX(3, 4)},
+      'source': {'foo': NamedTupleYX(5, 6), 'bar': NamedTuple(7, 8)},
+      'expect': {'foo': NamedTuple(6, 5), 'bar': NamedTupleYX(8, 7)}
+  })
+  def testCoerceStructure(self, target, source, expect):
+    coerced = nest_util.coerce_structure(target, source)
+    self.assertAllEqualNested(expect, coerced)
+
+  @parameterized.named_parameters({
+      'testcase_name': '_seqlength',
+      'target': NamedTuple(1, 2),
+      'source': [3, 4, 5],
+      'message': 'sequence length'
+  },{
+      'testcase_name': '_dict_list',
+      'target': {'foo': 1, 'bar': 2},
+      'source': [3, 4],
+      'message': 'sequence type'
+  },{
+      'testcase_name': '_shallow_input',
+      'target': [1, 2],
+      'source': 3,
+      'message': 'input must also be a sequence'
+  })
+  def testCoerceStructureRaises(self, target, source, message):
+    with self.assertRaisesRegex((ValueError, TypeError), message):
+      nest_util.coerce_structure(target, source)
 
 if __name__ == '__main__':
   tf.test.main()

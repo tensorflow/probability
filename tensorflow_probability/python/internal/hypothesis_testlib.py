@@ -61,6 +61,12 @@ def hypothesis_max_examples(default=None):
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', default or 20))
 
 
+def hypothesis_timeout():
+  # Use --test_env=TFP_HYPOTHESIS_TIMEOUT_SECS=600 to permit longer runs,
+  # ergo deeper exploration of the search tree.
+  return int(os.environ.get('TFP_HYPOTHESIS_TIMEOUT_SECS', 60))
+
+
 def hypothesis_reproduction_seed():
   # Use --test_env=TFP_HYPOTHESIS_REPRODUCE=hexjunk to reproduce a failure.
   return os.environ.get('TFP_HYPOTHESIS_REPRODUCE', None)
@@ -92,14 +98,21 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
       deadline=None,
       suppress_health_check=[hp.HealthCheck.too_slow],
       max_examples=hypothesis_max_examples(default=default_max_examples),
+      timeout=hypothesis_timeout(),
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
   def decorator(test_method):
-    seed = hypothesis_reproduction_seed()
-    if seed is not None:
+    repro_seed = hypothesis_reproduction_seed()
+    if repro_seed is not None:
       # This implements the semantics of TFP_HYPOTHESIS_REPRODUCE via
       # the `hp.reproduce_failure` decorator.
-      test_method = hp.reproduce_failure('3.56.5', seed)(test_method)
+      test_method = hp.reproduce_failure('3.56.5', repro_seed)(test_method)
+    elif randomize_hypothesis():
+      # Hypothesis defaults to seeding its internal PRNG from the system time,
+      # so since we actually want randomization (including across machines) we
+      # have to force it.
+      entropy = os.urandom(64)
+      test_method = hp.seed(int.from_bytes(entropy, 'big'))(test_method)
     return hp.settings(**kwds)(test_method)
   return decorator
 

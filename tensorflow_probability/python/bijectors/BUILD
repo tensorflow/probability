@@ -72,6 +72,7 @@ multi_substrate_py_library(
         ":inline",
         ":invert",
         ":iterated_sigmoid_centered",
+        ":joint_map",
         ":kumaraswamy_cdf",
         ":lambertw_transform",
         ":masked_autoregressive",
@@ -88,6 +89,7 @@ multi_substrate_py_library(
         ":real_nvp",
         ":reciprocal",
         ":reshape",
+        ":restructure",
         ":scale",
         ":scale_matvec_diag",
         ":scale_matvec_linear_operator",
@@ -117,6 +119,7 @@ multi_substrate_py_library(
     srcs = [
         "bijector.py",
         "chain.py",
+        "composition.py",
     ],
     deps = [
         # numpy dep,
@@ -317,7 +320,18 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_map",
+    srcs = ["joint_map.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:nest_util",
     ],
 )
 
@@ -767,6 +781,17 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "restructure",
+    srcs = ["restructure.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
@@ -1472,6 +1497,19 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "joint_map_test",
+    size = "small",
+    srcs = ["joint_map_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "kumaraswamy_cdf_test",
     size = "small",
     srcs = ["kumaraswamy_cdf_test.py"],
@@ -1722,6 +1760,18 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "restructure_test",
+    size = "small",
+    srcs = ["restructure_test.py"],
+    deps = [
+        ":bijector_test_util",
+        ":bijectors",
+        # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

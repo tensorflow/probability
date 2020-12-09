@@ -345,21 +345,19 @@ def _value_and_grad_impl(f, grad_fn, *args, output_gradients,
 
 def _prepare_args(args, kwargs):
   """Returns structures like inputs with values as Tensors."""
-  i = [-1]
+  i = -1
   def c2t(x):
+    nonlocal i
     # Don't use convert_nonref_to_tensor here. We want to have semantics like
     # tf.GradientTape which watches only trainable_variables. (Note: we also
     # don't want to cal c2t on non-trainable variables since these are already
     # watchable by GradientTape.)
     if tensor_util.is_module(x) or tensor_util.is_variable(x):
       return x
-    i[0] += 1
+    i += 1
     return tf.convert_to_tensor(
-        x, dtype_hint=tf.float32, name='x{}'.format(i[0]))
-  return (
-      type(args)(c2t(v) for v in args),
-      type(kwargs)((k, c2t(v)) for k, v in kwargs.items()),
-  )
+        x, dtype_hint=tf.float32, name='x{}'.format(i))
+  return tf.nest.map_structure(c2t, (args, kwargs))
 
 
 def _has_args(fn):

@@ -288,19 +288,29 @@ class UnzipTrace(jax_core.Trace):
       in_pvals = [pval if pval.is_known() or in_axis is None else
                   unknown(mapped_aval(params['axis_size'], in_axis, pval[0]))
                   for pval, in_axis in zip(in_pvals, params['in_axes'])]
+      out_axes_thunk = params['out_axes_thunk']
+      @jax_util.as_hashable_function(closure=('unzip', out_axes_thunk))
+      def new_out_axes_thunk():
+        out_axes = out_axes_thunk()
+        assert all(out_axis == 0 for out_axis in out_axes)
+        _, num_outputs, _ = aux()
+        return (0,) * num_outputs
+      new_params = dict(params, out_axes_thunk=new_out_axes_thunk)
+    else:
+      new_params = params
     pvs, in_consts = jax_util.unzip2(t.pval for t in tracers)
     keys = tuple(t.is_key() for t in tracers)
     new_settings = UnzipSettings(settings.tag, call_primitive in block_registry)
     fun, aux = unzip_eval(f, self, keys, tuple(pvs), new_settings)
-    out_flat = call_primitive.bind(fun, *in_consts, **params)
-    success, results = aux()
+    out_flat = call_primitive.bind(fun, *in_consts, **new_params)
+    success, _, results = aux()
     if not success:
       out_pvs, out_keys, jaxpr, env = results
       out_pv_consts, consts = jax_util.split_list(out_flat, [len(out_pvs)])
-      out_tracers = self._bound_output_tracers(call_primitive, params, jaxpr,
-                                               consts, env, tracers, out_pvs,
-                                               out_pv_consts, out_keys, name,
-                                               is_map)
+      out_tracers = self._bound_output_tracers(call_primitive, new_params,
+                                               jaxpr, consts, env, tracers,
+                                               out_pvs, out_pv_consts,
+                                               out_keys, name, is_map)
       return out_tracers
     init_name = jax_util.wrap_name(name, 'init')
     apply_name = jax_util.wrap_name(name, 'apply')
@@ -319,15 +329,16 @@ class UnzipTrace(jax_core.Trace):
                                                         [len(apply_pvs)])
 
     variable_tracers = self._bound_output_tracers(
-        call_primitive, params, init_jaxpr, init_consts, init_env, key_tracers,
-        init_pvs, init_pv_consts, [True] * len(init_pvs), init_name, is_map)
+        call_primitive, new_params, init_jaxpr, init_consts, init_env,
+        key_tracers, init_pvs, init_pv_consts, [True] * len(init_pvs),
+        init_name, is_map)
 
     unflat_variables = tree_util.tree_unflatten(variable_tree, variable_tracers)
     if call_primitive is harvest.nest_p:
       variable_dict = harvest.sow(
           dict(safe_zip(variable_names, unflat_variables)),
           tag=settings.tag,
-          name=params['scope'],
+          name=new_params['scope'],
           mode='strict')
       unflat_variables = tuple(variable_dict[name] for name in variable_names)
     else:
@@ -342,7 +353,7 @@ class UnzipTrace(jax_core.Trace):
     variable_tracers = tree_util.tree_leaves(unflat_variables)
 
     out_tracers = self._bound_output_tracers(
-        call_primitive, params, apply_jaxpr, apply_consts, apply_env,
+        call_primitive, new_params, apply_jaxpr, apply_consts, apply_env,
         variable_tracers + abstract_tracers, apply_pvs, apply_pv_consts,
         apply_keys, apply_name, is_map)
     return out_tracers
@@ -365,6 +376,11 @@ class UnzipTrace(jax_core.Trace):
           tuple(v for v, t in zip(params['donated_invars'], in_tracers)
                 if not t.pval.is_known()))
       new_params['donated_invars'] = new_donated_invars
+    if is_map:
+      out_axes = params['out_axes_thunk']()
+      assert all(out_axis == 0 for out_axis in out_axes)
+      new_params['out_axes'] = (0,) * len(out_tracers)
+      del new_params['out_axes_thunk']
     eqn = pe.new_eqn_recipe(
         tuple(const_tracers + env_tracers + in_tracers), out_tracers, primitive,
         new_params, source_info_util.current())  # pytype: disable=wrong-arg-types
@@ -442,14 +458,16 @@ def unzip_eval_wrapper(pvs, *consts):
     out = (
         tuple(init_pv_consts) + tuple(init_consts) + tuple(apply_pv_consts) +
         tuple(apply_consts))
-    yield out, (success, ((init_pvs, len(init_consts), apply_pvs),
-                          (init_jaxpr, apply_jaxpr), (init_env,
-                                                      apply_env), metadata))
+    yield out, (success, len(out),
+                ((init_pvs, len(init_consts), apply_pvs),
+                 (init_jaxpr, apply_jaxpr),
+                 (init_env, apply_env),
+                 metadata))
   else:
     jaxpr, (out_pvals, out_keys, consts, env) = result
     out_pvs, out_consts = jax_util.unzip2(out_pvals)
     out = tuple(out_consts) + tuple(consts)
-    yield out, (success, (out_pvs, out_keys, jaxpr, env))
+    yield out, (success, len(out), (out_pvs, out_keys, jaxpr, env))
 
 
 @lu.transformation

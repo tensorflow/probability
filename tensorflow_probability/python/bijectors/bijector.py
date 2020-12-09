@@ -214,6 +214,8 @@ class Bijector(tf.Module):
   (e.g. a bijector which pads an extra dimension at the end, might have
   `forward_min_event_ndims=0` and `inverse_min_event_ndims=1`.
 
+  ##### Additional Considerations for "Multi Tensor" Bijectors
+
   Bijectors which operate on structures of `Tensor` require structured
   `min_event_ndims` matching the structure of the inputs. In these cases,
   `min_event_ndims` describes both the minimum dimensionality *and* the
@@ -225,8 +227,12 @@ class Bijector(tf.Module):
     inverse_min_event_ndims=[-axis] * len(sizes)
   ```
 
-  In these cases, the leftmost `min_event_ndims[i]` elements of
-  `tensor[i].shape` must be identical for all structured inputs `i`.
+  Note: By default, we require `shape(x[i])[-event_ndims:-min_event_ndims]` to
+  be identical for all elements `i` of the structured input `x`. Specifically,
+  broadcasting over non-minimal event-dims is not allowed for structured inputs.
+  In cases where broadcasting is used as a "computational shorthand" for a dense
+  operation (that is, the _broadcasted_ inputs are assumed to be independent),
+  users should set `bijector._allow_event_shape_broadcasting = True`.
 
   Finally, some bijectors that operate on structures of inputs may not know
   the minimum structured rank of their inputs without calltime shape information
@@ -537,12 +543,14 @@ class Bijector(tf.Module):
     # structures, so it is important that we retain the original containers.
     self._forward_min_event_ndims = self._no_dependency(forward_min_event_ndims)
     self._inverse_min_event_ndims = self._no_dependency(inverse_min_event_ndims)
+    self._has_static_min_event_ndims = None not in (
+        nest.flatten([forward_min_event_ndims, inverse_min_event_ndims]))
 
-    # By default, allow broadcasting within the `event_shape`, and do not check
-    # for differences in the total number of degrees of freedom between forward
-    # and inverse event shapes. This may cause incorrect LDJ values.
-    # Subclasses may set this value to `False`.
-    self._allow_event_shape_broadcasting = True
+    # Whether to allow broadcasting over the (non-minimal) event-shape for
+    # structured inputs. When `False` (default), assert that LDJ reduction
+    # shapes are identical for all components of nested inputs. When `True`,
+    # event-shape broadcasing is allow, but LDJ may be incorrect.
+    self._allow_event_shape_broadcasting = False
 
     # Batch shape implied by the bijector's parameters, for use in validating
     # LDJ shapes (currently only used in multipart bijectors.)
@@ -578,6 +586,11 @@ class Bijector(tf.Module):
     return self._inverse_min_event_ndims
 
   @property
+  def has_static_min_event_ndims(self):
+    """Returns True if the bijector has statically-known `min_event_ndims`."""
+    return self._has_static_min_event_ndims
+
+  @property
   def is_constant_jacobian(self):
     """Returns true iff the Jacobian matrix is not a function of x.
 
@@ -609,6 +622,11 @@ class Bijector(tf.Module):
   def _is_scalar(self):
     return (tf.get_static_value(self._forward_min_event_ndims) == 0 and
             tf.get_static_value(self._inverse_min_event_ndims) == 0)
+
+  @property
+  def _is_permutation(self):
+    """Whether `y` is purely a reordering / restructuring of `x`."""
+    return False
 
   @property
   def validate_args(self):
@@ -780,7 +798,7 @@ class Bijector(tf.Module):
         indicating event-portion shape after applying `forward`.
     """
     with self._name_and_control_scope(name):
-      # Use statically-known dtype attribute to infer structure.
+      # Use statically-known structure from min_event_ndims.
       input_shape_dtype = nest_util.broadcast_structure(
           self.forward_min_event_ndims, tf.int32)
       input_shape = nest_util.convert_to_nested_tensor(
@@ -817,7 +835,9 @@ class Bijector(tf.Module):
     """
     # Use statically-known dtype attribute to infer structure.
     input_shape = nest.map_structure_up_to(
-        self.forward_min_event_ndims, tf.TensorShape, input_shape)
+        self.forward_min_event_ndims, tf.TensorShape,
+        nest_util.coerce_structure(self.forward_min_event_ndims, input_shape),
+        check_types=False)
     return nest.map_structure_up_to(
         self.inverse_min_event_ndims, tf.TensorShape,
         self._forward_event_shape(input_shape))
@@ -877,7 +897,9 @@ class Bijector(tf.Module):
     """
     # Use statically-known dtype attribute to infer structure.
     output_shape = nest.map_structure_up_to(
-        self.inverse_min_event_ndims, tf.TensorShape, output_shape)
+        self.inverse_min_event_ndims, tf.TensorShape,
+        nest_util.coerce_structure(self.inverse_min_event_ndims, output_shape),
+        check_types=False)
     return nest.map_structure_up_to(
         self.forward_min_event_ndims, tf.TensorShape,
         self._inverse_event_shape(output_shape))
@@ -1001,7 +1023,7 @@ class Bijector(tf.Module):
       ildj: the inverse log det jacobian at `y`. Also updates the cache as
         needed.
     """
-    if any(nd is None for nd in nest.flatten(self.inverse_min_event_ndims)):
+    if not self.has_static_min_event_ndims:
       raise NotImplementedError(
           'Subclasses without static `inverse_min_event_ndims` must override '
           '`_call_inverse_log_det_jacobian`.')
@@ -1015,7 +1037,8 @@ class Bijector(tf.Module):
 
       reduce_shape, assertions = ldj_reduction_shape(
           nest.map_structure(ps.shape, y),
-          event_ndims=event_ndims,
+          event_ndims=nest_util.coerce_structure(
+              self.inverse_min_event_ndims, event_ndims),
           min_event_ndims=self._inverse_min_event_ndims,
           parameter_batch_shape=self._parameter_batch_shape,
           allow_event_shape_broadcasting=self._allow_event_shape_broadcasting,
@@ -1113,7 +1136,7 @@ class Bijector(tf.Module):
           'forward_log_det_jacobian cannot be implemented for non-injective '
           'transforms.')
 
-    if any(nd is None for nd in nest.flatten(self.forward_min_event_ndims)):
+    if not self.has_static_min_event_ndims:
       raise NotImplementedError(
           'Subclasses without static `forward_min_event_ndims` must override '
           '`_call_forward_log_det_jacobian`.')
@@ -1127,9 +1150,10 @@ class Bijector(tf.Module):
 
       reduce_shape, assertions = ldj_reduction_shape(
           nest.map_structure(ps.shape, x),
-          event_ndims=event_ndims,
-          parameter_batch_shape=self._parameter_batch_shape,
+          event_ndims=nest_util.coerce_structure(
+              self.forward_min_event_ndims, event_ndims),
           min_event_ndims=self._forward_min_event_ndims,
+          parameter_batch_shape=self._parameter_batch_shape,
           allow_event_shape_broadcasting=self._allow_event_shape_broadcasting,
           validate_args=self.validate_args)
 
@@ -1198,20 +1222,26 @@ class Bijector(tf.Module):
   def forward_dtype(self, dtype=UNSPECIFIED, name='forward_dtype', **kwargs):
     """Returns the dtype returned by `forward` for the provided input."""
     with tf.name_scope('{}/{}'.format(self.name, name)):
-      input_dtype = nest_util.broadcast_structure(
-          self.forward_min_event_ndims, self.dtype)
-      if dtype is not UNSPECIFIED:
+      if dtype is UNSPECIFIED:
+        # We pass the the broadcasted input structure through `_forward_dtype`
+        # rather than directly returning the output structure, allowing
+        # subclasses to alter results based on `**kwargs`.
+        input_dtype = nest_util.broadcast_structure(
+            self.forward_min_event_ndims, self.dtype)
+      else:
         # Make sure inputs are compatible with statically-known dtype.
         input_dtype = nest.map_structure_up_to(
-            input_dtype,
-            lambda x, dt: dtype_util.convert_to_dtype(x, dtype=dt),
-            dtype, input_dtype)
+            self.forward_min_event_ndims,
+            lambda x: dtype_util.convert_to_dtype(x, dtype=self.dtype),
+            nest_util.coerce_structure(self.forward_min_event_ndims, dtype),
+            check_types=False)
 
       output_dtype = self._forward_dtype(input_dtype, **kwargs)
       try:
         # kwargs may alter dtypes themselves, but we currently require
         # structure to be statically known.
-        nest.assert_same_structure(self.inverse_min_event_ndims, output_dtype)
+        nest.assert_same_structure(self.inverse_min_event_ndims, output_dtype,
+                                   check_types=False)
       except Exception as err:
         raise NotImplementedError(
             'Changing output structure in `forward_dtype` '
@@ -1219,22 +1249,28 @@ class Bijector(tf.Module):
       return output_dtype
 
   def inverse_dtype(self, dtype=UNSPECIFIED, name='inverse_dtype', **kwargs):
-    """Returns the dtype returned by forward for the provided input."""
+    """Returns the dtype returned by `inverse` for the provided input."""
     with tf.name_scope('{}/{}'.format(self.name, name)):
-      output_dtype = nest_util.broadcast_structure(
-          self.inverse_min_event_ndims, self.dtype)
-      if dtype is not UNSPECIFIED:
+      if dtype is UNSPECIFIED:
+        # We pass the the broadcasted output structure through `_inverse_dtype`
+        # rather than directly returning the input structure, allowing
+        # subclasses to alter results based on `**kwargs`.
+        output_dtype = nest_util.broadcast_structure(
+            self.inverse_min_event_ndims, self.dtype)
+      else:
         # Make sure inputs are compatible with statically-known dtype.
         output_dtype = nest.map_structure_up_to(
-            output_dtype,
-            lambda y, dt: dtype_util.convert_to_dtype(y, dtype=dt),
-            dtype, output_dtype)
+            self.inverse_min_event_ndims,
+            lambda y: dtype_util.convert_to_dtype(y, dtype=self.dtype),
+            nest_util.coerce_structure(self.inverse_min_event_ndims, dtype),
+            check_types=False)
 
       input_dtype = self._inverse_dtype(output_dtype, **kwargs)
       try:
         # kwargs may alter dtypes themselves, but we currently require
         # structure to be statically known.
-        nest.assert_same_structure(self.forward_min_event_ndims, input_dtype)
+        nest.assert_same_structure(self.forward_min_event_ndims, input_dtype,
+                                   check_types=False)
       except Exception as err:
         raise NotImplementedError(
             'Changing output structure in `inverse_dtype` '
@@ -1243,28 +1279,26 @@ class Bijector(tf.Module):
 
   def forward_event_ndims(self, event_ndims, **kwargs):
     """Returns the number of event dimensions produced by `forward`."""
-    if self._forward_min_event_ndims is None:
+    if not self.has_static_min_event_ndims:
       raise NotImplementedError(
           'Subclasses without static min_event_ndims must override '
           '`forward_event_ndims`')
     ldj_reduce_ndims = ldj_reduction_ndims(
-        event_ndims,
-        self._forward_min_event_ndims,
-        self.validate_args)
+        nest_util.coerce_structure(self.forward_min_event_ndims, event_ndims),
+        self._forward_min_event_ndims)
     return nest.map_structure(
         lambda ndims: ldj_reduce_ndims + ndims,
         self._inverse_min_event_ndims)
 
   def inverse_event_ndims(self, event_ndims, **kwargs):
     """Returns the number of event dimensions produced by `inverse`."""
-    if self._inverse_min_event_ndims is None:
+    if not self.has_static_min_event_ndims:
       raise NotImplementedError(
           'Subclasses without static min_event_ndims must override '
           '`inverse_event_ndims`')
     ldj_reduce_ndims = ldj_reduction_ndims(
-        event_ndims,
-        self._inverse_min_event_ndims,
-        validate_args=self.validate_args)
+        nest_util.coerce_structure(self.inverse_min_event_ndims, event_ndims),
+        self._inverse_min_event_ndims)
     return nest.map_structure(
         lambda ndims: ldj_reduce_ndims + ndims,
         self._forward_min_event_ndims)
@@ -1429,7 +1463,6 @@ def ldj_reduction_ndims(event_ndims,
   Raises:
     ValueError: When the structured difference between `event_ndims` and
       `min_event_ndims` is not the same for all elements.
-    ValueError: If the resulting `reduction_ndims` is negative.
   """
   with tf.name_scope(name):
     assertions = []
@@ -1467,20 +1500,8 @@ def ldj_reduction_ndims(event_ndims,
                        'input. Saw event_ndims={}, min_event_ndims={}.'
                        ).format(event_ndims, min_event_ndims)))
 
-    # Finally, make sure the difference is positive.
+    # Now the we know they're all the same, just choose the first.
     result = flat_differences[0]
-    if differences_all_static:
-      if result < 0:
-        raise ValueError('`event_ndims` must be at least {}. Saw: {}'
-                         .format(min_event_ndims, event_ndims))
-    elif validate_args:
-      with tf.control_dependencies(assertions):
-        assertions.append(
-            assert_util.assert_greater_equal(
-                result, 0,
-                message='`event_ndims` must be at least {}. Saw: {}'.format(
-                    min_event_ndims, event_ndims)))
-
     if assertions:
       with tf.control_dependencies(assertions):
         result = tf.identity(result)
@@ -1594,6 +1615,20 @@ def ldj_reduction_shape(shape_structure,
         event_ndims, min_event_ndims, validate_args=validate_args,
         name='reduce_ndims')
 
+    # Make sure the number of dimensions we're reducing over is non-negative.
+    reduce_ndims_ = tf.get_static_value(reduce_ndims)
+    if reduce_ndims_ is not None:
+      if reduce_ndims_ < 0:
+        raise ValueError('`event_ndims must be at least {}. Saw: {}.'
+                         .format(event_ndims, min_event_ndims))
+    elif validate_args:
+      with tf.control_dependencies(assertions):
+        assertions.append(
+            assert_util.assert_non_negative(
+                reduce_ndims,
+                message='`event_ndims` must be at least {}. Saw: {}'.format(
+                    min_event_ndims, event_ndims)))
+
     # Make sure inputs have rank greater than event_ndims.
     rank_structure = nest.map_structure_up_to(
         event_ndims, ps.size, shape_structure)
@@ -1609,8 +1644,9 @@ def ldj_reduction_shape(shape_structure,
         with tf.control_dependencies(assertions):
           assertions.append(
               assert_util.assert_greater_equal(
-                  rank, ndims, message=('Input must have rank at least {}.'
-                                        'Saw: {}'.format(ndims, rank))))
+                  rank, tf.cast(ndims, dtype_util.convert_to_dtype(rank)),
+                  message=('Input must have rank at least {}.'
+                           'Saw: {}'.format(ndims, rank))))
 
     # Get the non-minimal portion of the event shape over which to reduce LDJ.
     ldj_reduce_shapes = nest.flatten(

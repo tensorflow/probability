@@ -568,7 +568,7 @@ erfinv = utils.copy_docstring(
 
 exp = utils.copy_docstring(
     'tf.math.exp',
-    lambda x, name=None: np.exp(x))
+    lambda x, name=None: np.exp(_convert_to_tensor(x)))
 
 expm1 = utils.copy_docstring(
     'tf.math.expm1',

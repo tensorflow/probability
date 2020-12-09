@@ -33,6 +33,7 @@ from tensorflow_probability.python.math.generic import log_combinations
 from tensorflow_probability.python.math.generic import log_cosh
 from tensorflow_probability.python.math.generic import log_cumsum_exp
 from tensorflow_probability.python.math.generic import log_sub_exp
+from tensorflow_probability.python.math.generic import reduce_kahan_sum
 from tensorflow_probability.python.math.generic import reduce_log_harmonic_mean_exp
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.math.generic import reduce_weighted_logsumexp
@@ -59,6 +60,7 @@ from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.minimize import MinimizeTraceableQuantities
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
+from tensorflow_probability.python.math.root_search import bracket_root
 from tensorflow_probability.python.math.root_search import find_root_chandrupatla
 from tensorflow_probability.python.math.root_search import find_root_secant
 from tensorflow_probability.python.math.root_search import secant_root
@@ -88,6 +90,7 @@ _allowed_symbols = [
     'bessel_iv_ratio',
     'bessel_ive',
     'bessel_kve',
+    'bracket_root',
     'cholesky_concat',
     'cholesky_update',
     'clip_by_value_preserve_gradient',
@@ -124,6 +127,7 @@ _allowed_symbols = [
     'psd_kernels',
     'random_rademacher',
     'random_rayleigh',
+    'reduce_kahan_sum',
     'reduce_log_harmonic_mean_exp',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',

@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 # Dependency imports
 
 from absl.testing import parameterized
@@ -26,6 +28,9 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
+
+
+JAX_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -422,6 +427,29 @@ class SampleDistributionTest(test_util.TestCase):
     ildj = bij.inverse_log_det_jacobian(tf.zeros([2, 3]), event_ndims=2)
     self.assertAllClose(-np.log([2., 3.]).sum() * 3, ildj)
 
+  @parameterized.named_parameters(dict(testcase_name=''),
+                                  dict(testcase_name='_jit', jit=True))
+  def test_kahan_precision(self, jit=False):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(experimental_compile=True)
+    stream = test_util.test_seed_stream()
+    n = 20_000
+    samps = tfd.Poisson(rate=1.).sample(n, seed=stream())
+    log_rate = tfd.Normal(0, .2).sample(seed=stream())
+    pois = tfd.Poisson(log_rate=log_rate)
+    lp = maybe_jit(
+        tfd.Sample(pois, n, experimental_use_kahan_sum=True).log_prob)(samps)
+    pois64 = tfd.Poisson(log_rate=tf.cast(log_rate, tf.float64))
+    lp64 = tfd.Sample(pois64, n).log_prob(tf.cast(samps, tf.float64))
+    # Evaluate together to ensure we use the same samples.
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # Fails 75% CPU, 0-80% GPU --vary_seed runs w/o experimental_use_kahan_sum.
+    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

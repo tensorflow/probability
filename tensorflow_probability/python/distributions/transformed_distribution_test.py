@@ -363,6 +363,39 @@ class TransformedDistributionTest(test_util.TestCase):
         validate_args=True)
     self.assertAllClose(shift, self.evaluate(fake_mvn.mean()))
 
+  def testStddev(self):
+    base_stddev = 2.
+    shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
+    scale = np.array([[1, -2, 3], [2, -3, 2]], dtype=np.float32)
+    expected_stddev = tf.abs(base_stddev * scale)
+    normal = self._cls()(
+        distribution=tfd.Normal(loc=tf.zeros_like(shift),
+                                scale=base_stddev * tf.ones_like(scale),
+                                validate_args=True),
+        bijector=tfb.Chain([tfb.Shift(shift=shift),
+                            tfb.Scale(scale=scale)],
+                           validate_args=True),
+        validate_args=True)
+    self.assertAllClose(expected_stddev, normal.stddev())
+    self.assertAllClose(expected_stddev**2, normal.variance())
+
+    split_normal = self._cls()(
+        distribution=tfd.Independent(normal, reinterpreted_batch_ndims=1),
+        bijector=tfb.Split(3),
+        validate_args=True)
+    self.assertAllCloseNested(tf.split(expected_stddev,
+                                       num_or_size_splits=3,
+                                       axis=-1),
+                              split_normal.stddev())
+
+    scaled_normal = self._cls()(
+        distribution=tfd.Independent(normal, reinterpreted_batch_ndims=1),
+        bijector=tfb.ScaleMatvecTriL([[1., 0.], [-1., 2.]]),
+        validate_args=True)
+    with self.assertRaisesRegex(
+        NotImplementedError, 'is a multivariate transformation'):
+      scaled_normal.stddev()
+
   def testEntropy(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
     diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
@@ -810,74 +843,6 @@ class ExcessiveConcretizationTestUnknownShape(ExcessiveConcretizationTest):
     self.shape = tf.TensorShape(None)
 
 
-class ToyZipMap(tfb.Bijector):
-
-  def __init__(self, bijectors):
-    parameters = dict(locals())
-    self._bijectors = bijectors
-
-    super(ToyZipMap, self).__init__(
-        forward_min_event_ndims=tf.nest.map_structure(
-            lambda b: b.forward_min_event_ndims, bijectors),
-        inverse_min_event_ndims=tf.nest.map_structure(
-            lambda b: b.inverse_min_event_ndims, bijectors),
-        is_constant_jacobian=all([
-            b.is_constant_jacobian for b in tf.nest.flatten(bijectors)]),
-        parameters=parameters)
-
-  @property
-  def bijectors(self):
-    return self._bijectors
-
-  def forward(self, x):
-    return tf.nest.map_structure(lambda b_i, x_i: b_i.forward(x_i),
-                                 self.bijectors, x)
-
-  def inverse(self, y):
-    return tf.nest.map_structure(lambda b_i, y_i: b_i.inverse(y_i),
-                                 self.bijectors, y)
-
-  def forward_dtype(self, dtype):
-    return tf.nest.map_structure(lambda b_i, d_i: b_i.forward_dtype(d_i),
-                                 self.bijectors, dtype)
-
-  def inverse_dtype(self, dtype):
-    return tf.nest.map_structure(lambda b_i, d_i: b_i.inverse_dtype(d_i),
-                                 self.bijectors, dtype)
-
-  def forward_event_shape(self, x_shape):
-    return tf.nest.map_structure(
-        lambda b_i, x_i: b_i.forward_event_shape(x_i),
-        self.bijectors, x_shape)
-
-  def inverse_event_shape(self, y_shape):
-    return tf.nest.map_structure(
-        lambda b_i, y_i: b_i.inverse_event_shape(y_i),
-        self.bijectors, y_shape)
-
-  def forward_event_shape_tensor(self, x_shape_tensor):
-    return tf.nest.map_structure(
-        lambda b_i, x_i: b_i.forward_event_shape_tensor(x_i),
-        self.bijectors, x_shape_tensor)
-
-  def inverse_event_shape_tensor(self, y_shape_tensor):
-    return tf.nest.map_structure(
-        lambda b_i, y_i: b_i.inverse_event_shape_tensor(y_i),
-        self.bijectors, y_shape_tensor)
-
-  def forward_log_det_jacobian(self, x, event_ndims):
-    fldj_parts = tf.nest.map_structure(
-        lambda b, y, n: b.forward_log_det_jacobian(x, event_ndims=n),
-        self.bijectors, x, event_ndims)
-    return sum(tf.nest.flatten(fldj_parts))
-
-  def inverse_log_det_jacobian(self, y, event_ndims):
-    ildj_parts = tf.nest.map_structure(
-        lambda b, y, n: b.inverse_log_det_jacobian(y, event_ndims=n),
-        self.bijectors, y, event_ndims)
-    return sum(tf.nest.flatten(ildj_parts))
-
-
 @test_util.test_all_tf_execution_regimes
 class MultipartBijectorsTest(test_util.TestCase):
 
@@ -958,6 +923,10 @@ class MultipartBijectorsTest(test_util.TestCase):
     bijector = tfb.Split(known_split_sizes, axis=-1)
     split_dist = tfd.TransformedDistribution(base_dist, bijector)
 
+    self.assertRegex(
+        str(split_dist),
+        '{}.*batch_shape.*event_shape.*dtype'.format(split_dist.name))
+
     expected_event_shape = [np.array([s]) for s in true_split_sizes]
     output_event_shape = [np.array(s) for s in split_dist.event_shape]
     self.assertAllEqual(output_event_shape, expected_event_shape)
@@ -1027,10 +996,15 @@ class MultipartBijectorsTest(test_util.TestCase):
                          minval=1., maxval=2.,
                          shape=bijector_batch_shape, seed=seed())),
                  tfb.Reshape([2, 1])]
-    bijector = ToyZipMap(tf.nest.pack_sequence_as(split_sizes, bijectors))
+    bijector = tfb.JointMap(tf.nest.pack_sequence_as(split_sizes, bijectors),
+                            validate_args=True)
 
     # Transform a joint distribution that has different batch shape components
     transformed_dist = tfd.TransformedDistribution(base_dist, bijector)
+
+    self.assertRegex(
+        str(transformed_dist),
+        '{}.*batch_shape.*event_shape.*dtype'.format(transformed_dist.name))
 
     self.assertAllEqualNested(
         transformed_dist.event_shape,

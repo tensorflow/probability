@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-import inspect
 import math
 # Dependency imports
 
@@ -43,7 +42,7 @@ __all__ = [
 
 
 @auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
-class RunningCovariance(object):
+class RunningCovariance(auto_composite_tensor.AutoCompositeTensor):
   """A running covariance computation.
 
   The running covariance computation supports batching. The `event_ndims`
@@ -301,14 +300,7 @@ class RunningVariance(RunningCovariance):
     Returns:
       var: An empty `RunningCovariance`, ready for incoming samples.
     """
-    # TODO(b/172068479): Get rid of this method resolution order hack.
-    mro = inspect.getmro(RunningVariance)
-    # This `super` needs to exclude not just the subclass of CompositeTensor
-    # that `auto_composite_tensor` generates, but also the base class
-    # `RunningVariance`.  That way, we get the from_shape of
-    # `RunningCovariance`, which is what we want here.
-    # pylint: disable=bad-super-call
-    return super(mro[1], cls).from_shape(shape, dtype, event_ndims=0)
+    return super().from_shape(shape, dtype, event_ndims=0)
 
   def variance(self, ddof=0):
     """Returns the variance accumulated so far.
@@ -324,7 +316,7 @@ class RunningVariance(RunningCovariance):
     return self.covariance(ddof)
 
   @classmethod
-  def init_from_stats(cls, num_samples, mean, variance):
+  def from_stats(cls, num_samples, mean, variance):
     """Initialize a `RunningVariance` object with given stats.
 
     This allows the user to initialize knowing the mean, variance, and number
@@ -349,7 +341,7 @@ class RunningVariance(RunningCovariance):
 
 
 @auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
-class RunningMean(object):
+class RunningMean(auto_composite_tensor.AutoCompositeTensor):
   """Computes a running mean.
 
   In computation, samples can be provided individually or in chunks. A
@@ -437,7 +429,7 @@ class RunningMean(object):
 
 
 @auto_composite_tensor.auto_composite_tensor
-class RunningCentralMoments(object):
+class RunningCentralMoments(auto_composite_tensor.AutoCompositeTensor):
   """Computes running central moments.
 
   `RunningCentralMoments` will compute arbitrary central moments in
@@ -589,7 +581,7 @@ def _n_choose_k(n, k):
 
 
 @auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
-class RunningPotentialScaleReduction(object):
+class RunningPotentialScaleReduction(auto_composite_tensor.AutoCompositeTensor):
   """A running R-hat diagnostic.
 
   `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential

@@ -18,6 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+import os
+
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
@@ -612,5 +615,61 @@ class SoftSortingMatrixTest(test_util.TestCase):
     actual_sort_ = np.argmax(soft_sort_permutation_, axis=-1)
     self.assertAllClose(expected_sort, actual_sort_)
 
+
+@test_util.test_all_tf_execution_regimes
+class _KahanSumTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_all',
+           sample_shape=[3, int(1e6)], axis=None),
+      dict(testcase_name='_ax1',
+           sample_shape=[13, int(1e6)], axis=1),
+      dict(testcase_name='_ax1_list_keepdims',
+           sample_shape=[13, int(1e6)], axis=[-1], keepdims=True),
+      dict(testcase_name='_ax_both_tuple',
+           sample_shape=[3, int(1e6)], axis=(-2, 1)),
+      dict(testcase_name='_ax_01_keepdims',
+           sample_shape=[2, int(1e6), 13], axis=[0, 1], keepdims=True),
+      dict(testcase_name='_ax_21',
+           sample_shape=[13, int(1e6), 3], axis=[2, -2]))
+  def testKahanSum(self, sample_shape, axis, keepdims=False):
+    fn = functools.partial(tfp.math.reduce_kahan_sum,
+                           axis=axis, keepdims=keepdims)
+    if self.jit:
+      self.skip_if_no_xla()
+      fn = tf.function(fn, experimental_compile=True)
+    dist = tfd.MixtureSameFamily(tfd.Categorical(logits=[0., 0]),
+                                 tfd.Normal(loc=[0., 1e6], scale=[1., 1e3]))
+    vals = self.evaluate(dist.sample(sample_shape, seed=test_util.test_seed()))
+    oracle = tf.reduce_sum(tf.cast(vals, tf.float64), axis=axis,
+                           keepdims=keepdims)
+    result = fn(vals)
+    self.assertEqual(oracle.shape, result.total.shape)
+    self.assertEqual(oracle.shape, result.correction.shape)
+    kahan64 = (tf.cast(result.total, tf.float64) -
+               self.evaluate(tf.cast(result.correction, tf.float64)))
+    if np.prod(result.correction.shape) > 1:
+      self.assertNotAllEqual(
+          result.correction, tf.zeros_like(result.correction))
+    self.assertAllClose(oracle, kahan64)  # passes even with --vary_seed
+    # The counterpoint naive sum below would not typically pass (but does not
+    # reliably fail, either). It can fail w/ rtol as high as 0.006.
+    # naive_sum = tf.cast(tf.reduce_sum(vals, axis=axis, keepdims=keepdims),
+    #                     tf.float64)
+    # self.assertAllClose(oracle, naive_sum)
+
+
+class KahanSumJitTest(_KahanSumTest):
+  jit = True
+
+
+class KahanSumTest(_KahanSumTest):
+  jit = False
+
+del _KahanSumTest
+
+
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

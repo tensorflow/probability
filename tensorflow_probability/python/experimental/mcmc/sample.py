@@ -43,6 +43,9 @@ def step_kernel(
 ):
   """Takes `num_steps` repeated `TransitionKernel` steps from `current_state`.
 
+  This is meant to be a minimal driver for executing `TransitionKernel`s; for
+  something more featureful, see `run_kernel`.
+
   Args:
     num_steps: Integer number of Markov chain steps.
     current_state: `Tensor` or Python `list` of `Tensor`s representing the

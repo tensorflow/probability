@@ -57,6 +57,16 @@ class GradientTest(test_util.TestCase):
     self.assertAllClose(g(*args), dydx, atol=1e-6, rtol=1e-6)
 
   @test_util.numpy_disable_gradient_test
+  def test_nested(self):
+    f = lambda value: value['x'] * value['y']
+    g = lambda value: {'x': value['y'], 'y': value['x']}
+    args = {'x': np.linspace(0, 100, int(1e1)),
+            'y': np.linspace(-100, 0, int(1e1))}
+    y, dydx = self.evaluate(tfm.value_and_gradient(f, args))
+    self.assertAllClose(f(args), y, atol=1e-6, rtol=1e-6)
+    self.assertAllCloseNested(g(args), dydx, atol=1e-6, rtol=1e-6)
+
+  @test_util.numpy_disable_gradient_test
   def test_output_list(self):
     f = lambda x, y: [x, x * y]
     g = lambda x, y: [y + 1., x]

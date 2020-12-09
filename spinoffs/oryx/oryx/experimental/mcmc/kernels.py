@@ -52,8 +52,8 @@ def random_walk(scale=1.) -> Program:
 
     def _sample(key, state):
       return ppl.random_variable(
-          bd.Independent(
-              bd.Normal(state, scale),
+          bd.Independent(  # pytype: disable=module-attr
+              bd.Normal(state, scale),  # pytype: disable=module-attr
               reinterpreted_batch_ndims=np.ndim(state)))(
                   key)
 
@@ -176,7 +176,7 @@ def hmc(unnormalized_log_prob: LogProbFunction,
 
       def _sample(key, s):
         return ppl.random_variable(
-            bd.Sample(bd.Normal(0., 1.),
+            bd.Sample(bd.Normal(0., 1.),  # pytype: disable=module-attr
                       sample_shape=s.shape))(key).astype(s.dtype)
 
       return tree_util.tree_multimap(_sample, momentum_keys, state)

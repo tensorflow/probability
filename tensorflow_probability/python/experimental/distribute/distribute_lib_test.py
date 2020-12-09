@@ -305,8 +305,48 @@ class LogProbPartsTest(test_util.TestCase):
     self.assertAllEqualNested(self.evaluate(out_grads),
                               self.evaluate(true_grad))
 
+  def test_correct_gradient_for_global_and_local_variable_dict(self):
 
-if __name__ == "__main__":
+    @tf.function(autograph=False)
+    def run(w, x, data):
+
+      def log_prob_parts(value):
+        return {
+            'w': tfd.Normal(0., 1.).log_prob(value['w']),
+            'x': tfd.Normal(w, 1.).log_prob(value['x']),
+            'data': tfd.Normal(x, 1.).log_prob(value['data']),
+        }
+
+      def log_prob(*value):
+        w, x = value
+        sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
+            log_prob_parts, {'w': False, 'x': True, 'data': True})
+        parts = sharded_log_prob_parts({'w': w, 'x': x, 'data': data})
+        return tf.add_n(tf.nest.flatten(parts))
+
+      return tfp.math.value_and_gradient(log_prob, [w, x])[1]
+
+    w = tf.constant(1.)
+    x = tf.range(4.)
+    sharded_x = self.shard_values(x)
+    data = 2 * tf.ones(4)
+    sharded_data = self.shard_values(data)
+    out_grads = per_replica_to_tensor(self.strategy.run(run, (w, sharded_x,
+                                                              sharded_data)))
+
+    def true_log_prob(*value):
+      w, x = value
+      return (tfd.Normal(0., 1.).log_prob(w) +
+              tf.reduce_sum(tfd.Normal(w, 1.).log_prob(x)) +
+              tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data)))
+
+    true_grad = tfp.math.value_and_gradient(true_log_prob, [w, x])[1]
+    true_grad[0] = tf.ones(4) * true_grad[0]
+
+    self.assertAllEqualNested(self.evaluate(out_grads),
+                              self.evaluate(true_grad))
+
+if __name__ == '__main__':
   tf.enable_v2_behavior()
   physical_devices = tf.config.experimental.list_physical_devices()
 

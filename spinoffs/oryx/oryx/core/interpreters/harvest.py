@@ -333,10 +333,16 @@ class HarvestTrace(jax_core.Trace):
     if is_map:
       # TODO(sharadmv): figure out if invars are mapped or unmapped
       params = params.copy()
+      out_axes_thunk = params['out_axes_thunk']
+      @jax_util.as_hashable_function(closure=('harvest', out_axes_thunk))
+      def new_out_axes_thunk():
+        out_axes = out_axes_thunk()
+        assert all(out_axis == 0 for out_axis in out_axes)
+        return (0,) * out_tree().num_leaves
       new_params = dict(
           params,
-          in_axes=(0,) * len(tree_util.tree_leaves(plants)) +
-          params['in_axes'])
+          in_axes=(0,) * len(tree_util.tree_leaves(plants)) + params['in_axes'],
+          out_axes_thunk=new_out_axes_thunk)
     else:
       new_params = dict(params)
     all_args, all_tree = tree_util.tree_flatten((plants, vals))
@@ -344,11 +350,10 @@ class HarvestTrace(jax_core.Trace):
     if 'donated_invars' in params:
       new_params['donated_invars'] = ((False,) * num_plants
                                       + params['donated_invars'])
-    f, aux = harvest_eval(f, self, context.settings, all_tree)
+    f, out_tree = harvest_eval(f, self, context.settings, all_tree)
     out_flat = primitive.bind(
         f, *all_args, **new_params, name=jax_util.wrap_name(name, 'harvest'))
-    out_tree = aux()
-    out, reaps = tree_util.tree_unflatten(out_tree, out_flat)
+    out, reaps = tree_util.tree_unflatten(out_tree(), out_flat)
     out_tracers = safe_map(self.pure, out)
     reap_tracers = tree_util.tree_map(self.pure, reaps)
     if primitive is nest_p and reap_tracers:

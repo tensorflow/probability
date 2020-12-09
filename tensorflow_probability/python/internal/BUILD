@@ -114,6 +114,27 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "callable_util",
+    srcs = ["callable_util.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "callable_util_test",
+    size = "small",
+    srcs = ["callable_util_test.py"],
+    deps = [
+        ":callable_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "custom_gradient",
     srcs = ["custom_gradient.py"],
     deps = [
@@ -576,6 +597,21 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "variadic_reduce",
+    srcs = [
+        "variadic_reduce.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        ":implementation_selection",
+        ":prefer_static",
+        ":tensorshape_util",
+        # numpy dep,
+        # tensorflow dep,
     ],
 )
 

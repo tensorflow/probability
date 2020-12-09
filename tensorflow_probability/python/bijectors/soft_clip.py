@@ -288,15 +288,16 @@ class SoftClip(bijector.Bijector):
     return self._chain.forward(x)
 
   def _forward_log_det_jacobian(self, x):
-    return self._chain._forward_log_det_jacobian(x)  # pylint: disable=protected-access
+    return self._chain.forward_log_det_jacobian(x, self.forward_min_event_ndims)
 
   def _inverse(self, y):
     with tf.control_dependencies(self._assert_valid_inverse_input(y)):
-      return self._chain._inverse(y)  # pylint: disable=protected-access
+      return self._chain.inverse(y)  # pylint: disable=protected-access
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._assert_valid_inverse_input(y)):
-      return self._chain._inverse_log_det_jacobian(y)  # pylint: disable=protected-access
+      return self._chain.inverse_log_det_jacobian(
+          y, self.inverse_min_event_ndims)
 
   def _assert_valid_inverse_input(self, y):
     assertions = []

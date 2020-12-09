@@ -61,22 +61,39 @@ class ScalarFunctionWithInferredInverseTests(test_util.TestCase):
     self.assertAllClose(xs, bij.inverse(bij.forward(xs)))
 
   @test_util.numpy_disable_gradient_test
-  def test_transformed_distribution_log_prob(self):
-    uniform = tfd.Uniform(low=0, high=1.)
+  def test_transformed_distribution_log_prob_and_grads(self):
     normal = tfd.Normal(loc=0., scale=1.)
     xs = self.evaluate(normal.sample(100, seed=test_util.test_seed()))
+    lp_true, lp_grad_true = tfp.math.value_and_gradient(normal.log_prob, xs)
 
     # Define a normal distribution using inverse-CDF sampling. Computing
     # log probs under this definition requires inverting the quantile function,
     # i.e., numerically approximating `normal.cdf`.
+    uniform = tfd.Uniform(low=0, high=1.)
     inverse_transform_normal = tfbe.ScalarFunctionWithInferredInverse(
         fn=normal.quantile,
         domain_constraint_fn=uniform.experimental_default_event_space_bijector()
         )(uniform)
-    self.assertAllClose(normal.log_prob(xs),
-                        inverse_transform_normal.log_prob(xs),
-                        atol=1e-4)
+    lp, lp_grad = tfp.math.value_and_gradient(inverse_transform_normal.log_prob,
+                                              xs)
+    self.assertAllClose(lp_true, lp, atol=1e-4)
+    self.assertAllClose(lp_grad_true, lp_grad, atol=1e-4)
 
+  @test_util.numpy_disable_gradient_test
+  def test_ildj_gradients(self):
+    bij = tfbe.ScalarFunctionWithInferredInverse(lambda x: x**2)
+    ys = tf.convert_to_tensor([0.25, 1., 4., 9.])
+    ildj, ildj_grad = tfp.math.value_and_gradient(
+        lambda y: bij.inverse_log_det_jacobian(y, event_ndims=0),
+        ys)
+
+    # Compare ildjs from inferred inverses to ildjs from the true inverse.
+    def ildj_fn(y):
+      _, inverse_grads = tfp.math.value_and_gradient(tf.sqrt, y)
+      return tf.math.log(tf.abs(inverse_grads))
+    ildj_true, ildj_grad_true = tfp.math.value_and_gradient(ildj_fn, ys)
+    self.assertAllClose(ildj, ildj_true, atol=1e-4)
+    self.assertAllClose(ildj_grad, ildj_grad_true, rtol=1e-4)
 
 if __name__ == '__main__':
   tf.test.main()

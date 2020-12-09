@@ -25,7 +25,7 @@ import six
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
@@ -334,6 +334,11 @@ class JointDistribution(distribution_lib.Distribution):
     with self._name_and_control_scope(name):
       ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
                                                     **kwargs)
+      if not sample_shape and value is None:
+        # This is a single sample with no pinned values; this call will cache
+        # the distributions if they are not already cached.
+        self._get_single_sample_distributions(candidate_dists=ds)
+
       return self._model_unflatten(ds), self._model_unflatten(xs)
 
   def log_prob_parts(self, value, name='log_prob_parts'):
@@ -424,8 +429,13 @@ class JointDistribution(distribution_lib.Distribution):
       raise ValueError('Supplied both `value` and keyword arguments to '
                        'parameterize sampling. Supplied keywords were: '
                        '{}'.format(keywords))
-    _, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
-                                                 **kwargs)
+    ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
+                                                  **kwargs)
+    if not sample_shape and value is None:
+      # This is a single sample with no pinned values; this call will cache
+      # the distributions if they are not already cached.
+      self._get_single_sample_distributions(candidate_dists=ds)
+
     return self._model_unflatten(xs)
 
   def _map_measure_over_dists(self, attr, value):
@@ -464,10 +474,6 @@ class JointDistribution(distribution_lib.Distribution):
     if value is not None:
       value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
-
-    if not sample_shape and value is None:
-      # Maybe cache these distributions.
-      self._get_single_sample_distributions(candidate_dists=ds)
 
     return ds, xs
 
@@ -732,139 +738,75 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
     return tuple(tf.identity(x) for x in flat_xs)
 
 
-# TODO(b/162764645): Implement as a Composite bijector.
-# The Composite CL generalizes Chain to arbitrary bijector DAGs. It will:
-#   1) Define an abstract `CompositeBijector` class (for any bijector that
-#      wraps other bijectors, and does nothing else)
-#   2) Express `Chain` and friends (including this) in terms of Composite.
-#   3) Introduce `JointMap` (this class sans coroutine)
-#   4) Introduce `Restructure`, as Chain+JM are pretty useless without it.
-class _DefaultJointBijector(bijector_lib.Bijector):
+# pylint: disable=protected-access
+class _DefaultJointBijector(composition.Composition):
   """Minimally-viable event space bijector for `JointDistribution`."""
 
-  # TODO(b/148485798): Support joint bijectors in TransformedDistribution.
-  def __init__(self, jd):
+  def __init__(self, jd, parameters=None):
+    parameters = dict(locals()) if parameters is None else parameters
+
     with tf.name_scope('default_joint_bijector') as name:
-      structure = tf.nest.map_structure(lambda _: None, jd.dtype)
+      bijectors = tuple(
+          d.experimental_default_event_space_bijector()
+          for d in jd._get_single_sample_distributions())
+      i_min_event_ndims = tf.nest.map_structure(
+          prefer_static.size, jd.event_shape)
+      f_min_event_ndims = jd._model_unflatten([
+          b.inverse_event_ndims(nd) for b, nd in
+          zip(bijectors, jd._model_flatten(i_min_event_ndims))])
       super(_DefaultJointBijector, self).__init__(
-          forward_min_event_ndims=structure,
-          inverse_min_event_ndims=structure,
+          bijectors=bijectors,
+          forward_min_event_ndims=f_min_event_ndims,
+          inverse_min_event_ndims=i_min_event_ndims,
           validate_args=jd.validate_args,
+          parameters=parameters,
           name=name)
       self._jd = jd
 
-  def _check_inputs_not_none(self, value):
-    if any(x is None for x in tf.nest.flatten(value)):
-      raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
+  def _conditioned_bijectors(self, samples, constrained=False):
+    if samples is None:
+      return self.bijectors
 
-  # pylint: disable=protected-access
-  def _evaluate_bijector(self, bijector_fn, values):
+    bijectors = []
     gen = self._jd._model_coroutine()
-    outputs = []
-    d = next(gen)
-    index = 0
-    try:
-      while True:
-        dist = d.distribution if type(d).__name__ == 'Root' else d
-        bijector = dist.experimental_default_event_space_bijector()
+    cond = None
+    for rv in self._jd._model_flatten(samples):
+      d = gen.send(cond)
+      dist = d.distribution if type(d).__name__ == 'Root' else d
+      bij = dist.experimental_default_event_space_bijector()
 
-        # For discrete distributions, the default event space bijector is None.
-        # For a joint distribution's discrete components, we want the behavior
-        # of the Identity bijector.
-        bijector = (identity_bijector.Identity()
-                    if bijector is None else bijector)
+      if bij is None:
+        bij = identity_bijector.Identity()
+      bijectors.append(bij)
 
-        out, y = bijector_fn(bijector, values[index])
-        outputs.append(out)
-        d = gen.send(y)
-        index += 1
-    except StopIteration:
-      pass
-    return outputs
+      # If the RV is not yet constrained, transform it.
+      cond = rv if constrained else bij.forward(rv)
+    return bijectors
 
-  def _event_shapes(self, input_shapes, event_shape_attr):
-    """For forward/inverse static event shapes."""
-    input_shapes = self._jd._model_flatten(input_shapes)
-    support_bijectors = [
-        d.experimental_default_event_space_bijector()
-        for d in self._jd._get_single_sample_distributions()]
-    output_shapes = [
-        getattr(bijector, event_shape_attr)(input_shape)
-        for (bijector, input_shape) in zip(support_bijectors, input_shapes)]
-    return self._jd._model_unflatten(output_shapes)
+  def _walk_forward(self, step_fn, values, _jd_conditioning=None):  # pylint: disable=invalid-name
+    bijectors = self._conditioned_bijectors(_jd_conditioning, constrained=False)
+    return self._jd._model_unflatten(tuple(
+        step_fn(bij, value) for bij, value in
+        zip(bijectors, self._jd._model_flatten(values))))
 
-  # We override the public methods so that the `default_event_space_bijector`s
-  # of the component distributions, instead of that of the `JointDistribution`,
-  # hit the global bijector cache.
-  def forward(self, values, name=None):
-    with tf.name_scope(name or 'forward'):
-      values = self._jd._model_flatten(values)
-      self._check_inputs_not_none(values)
+  def _walk_inverse(self, step_fn, values, _jd_conditioning=None):  # pylint: disable=invalid-name
+    bijectors = self._conditioned_bijectors(_jd_conditioning, constrained=True)
+    return self._jd._model_unflatten(tuple(
+        step_fn(bij, value) for bij, value
+        in zip(bijectors, self._jd._model_flatten(values))))
 
-      def bijector_fn(bijector, value):
-        y = bijector.forward(value)
-        return y, y
+  def _forward(self, x, **kwargs):
+    return super(_DefaultJointBijector, self)._forward(
+        x, _jd_conditioning=x, **kwargs)
 
-      out = self._evaluate_bijector(bijector_fn, values)
-      return self._jd._model_unflatten(out)
+  def _forward_log_det_jacobian(self, x, event_ndims, **kwargs):
+    return super(_DefaultJointBijector, self)._forward_log_det_jacobian(
+        x, event_ndims, _jd_conditioning=x, **kwargs)
 
-  def inverse(self, values, name=None):
-    with tf.name_scope(name or 'inverse'):
-      self._check_inputs_not_none(values)
-      values = self._jd._model_flatten(values)
+  def _inverse(self, y, **kwargs):
+    return super(_DefaultJointBijector, self)._inverse(
+        y, _jd_conditioning=y, **kwargs)
 
-      def bijector_fn(bijector, value):
-        x = bijector.inverse(value)
-        return x, value
-
-      out = self._evaluate_bijector(bijector_fn, values)
-      return self._jd._model_unflatten(out)
-
-  def forward_log_det_jacobian(self, values, event_ndims, name=None):
-    with tf.name_scope(name or 'forward_log_det_jacobian'):
-      self._check_inputs_not_none(values)
-      values = self._jd._model_flatten(values)
-      event_ndims = self._jd._model_flatten(event_ndims)
-
-      def bijector_fn(bijector, value):
-        x, event_ndims = value
-        y = bijector.forward(x)
-        fldj = bijector.forward_log_det_jacobian(x, event_ndims)
-        return fldj, y
-
-      fldjs = self._evaluate_bijector(bijector_fn,
-                                      list(zip(values, event_ndims)))
-      return sum(fldjs)
-
-  def inverse_log_det_jacobian(self, values, event_ndims, name=None):
-    with tf.name_scope(name or 'inverse_log_det_jacobian'):
-      self._check_inputs_not_none(values)
-      values = self._jd._model_flatten(values)
-      event_ndims = self._jd._model_flatten(event_ndims)
-
-      def bijector_fn(bijector, value):
-        y, event_ndims = value
-        ildj = bijector.inverse_log_det_jacobian(y, event_ndims)
-        return ildj, y
-
-      ildjs = self._evaluate_bijector(bijector_fn,
-                                      list(zip(values, event_ndims)))
-      return sum(ildjs)
-  # pylint: enable=protected-access
-
-  # TODO(b/148485931): Fix bijector caching.
-  def forward_event_shape(self, input_shapes):
-    return self._event_shapes(input_shapes, 'forward_event_shape')
-
-  def forward_event_shape_tensor(self, input_shapes, name=None):
-    with tf.name_scope(name or 'forward_event_shape_tensor'):
-      self._check_inputs_not_none(input_shapes)
-      return self._event_shapes(input_shapes, 'forward_event_shape_tensor')
-
-  def inverse_event_shape(self, output_shapes):
-    return self._event_shapes(output_shapes, 'inverse_event_shape')
-
-  def inverse_event_shape_tensor(self, output_shapes, name=None):
-    with tf.name_scope('inverse_event_shape_tensor'):
-      self._check_inputs_not_none(output_shapes)
-      return self._event_shapes(output_shapes, 'inverse_event_shape_tensor')
+  def _inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
+    return super(_DefaultJointBijector, self)._inverse_log_det_jacobian(
+        y, event_ndims, _jd_conditioning=y, **kwargs)

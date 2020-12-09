@@ -40,6 +40,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":covariance_reducer",
+        ":diagonal_mass_matrix_adaptation",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":kernel_builder",
@@ -50,6 +51,7 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
         ":progress_bar_reducer",
         ":reducer",
+        ":run",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
@@ -58,6 +60,7 @@ multi_substrate_py_library(
     ],
     deps = [
         ":covariance_reducer",
+        ":diagonal_mass_matrix_adaptation",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":gradient_based_trajectory_length_adaptation",
@@ -70,6 +73,7 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
         ":progress_bar_reducer",
         ":reducer",
+        ":run",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
@@ -147,6 +151,39 @@ py_test(
     deps = [
         ":kernel_builder",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "diagonal_mass_matrix_adaptation",
+    srcs = ["diagonal_mass_matrix_adaptation.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "diagonal_mass_matrix_adaptation_test",
+    size = "large",
+    timeout = "long",
+    srcs = ["diagonal_mass_matrix_adaptation_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -583,6 +620,35 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "run",
+    srcs = ["run.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":sample",
+        ":tracing_reducer",
+        ":with_reductions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "run_test",
+    size = "small",
+    srcs = ["run_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":run",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",

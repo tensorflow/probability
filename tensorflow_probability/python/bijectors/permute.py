@@ -132,6 +132,11 @@ class Permute(bijector.Bijector):
   def axis(self):
     return self._axis
 
+  @property
+  def _is_permutation(self):
+    # Definitely a permutation.
+    return True
+
   def _forward(self, x):
     y = tf.gather(x, self.permutation, axis=self.axis)
     tensorshape_util.set_shape(y, x.shape)

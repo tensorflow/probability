@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import types
 
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal import lazy_loader
@@ -76,6 +77,24 @@ def _validate_tf_environment(package):
         'For more detail, see https://github.com/tensorflow/community/pull/287.'
         )
 
+
+# Declare these explicitly to appease pytype, which otherwise misses them,
+# presumably due to lazy loading.
+bijectors: types.ModuleType
+debugging: types.ModuleType
+distributions: types.ModuleType
+experimental: types.ModuleType
+glm: types.ModuleType
+layers: types.ModuleType
+math: types.ModuleType
+mcmc: types.ModuleType
+monte_carlo: types.ModuleType
+optimizer: types.ModuleType
+random: types.ModuleType
+stats: types.ModuleType
+sts: types.ModuleType
+util: types.ModuleType
+vi: types.ModuleType
 
 _allowed_symbols = [
     'bijectors',

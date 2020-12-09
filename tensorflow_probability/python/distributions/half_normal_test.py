@@ -83,9 +83,9 @@ class HalfNormalTest(test_util.TestCase):
     self._testParamStaticShapes(tf.TensorShape(sample_shape), sample_shape)
 
   def testHalfNormalLogPDF(self):
-    batch_size = 6
-    scale = tf.constant([3.0] * batch_size)
-    x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], dtype=np.float32)
+
+    x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0, 60.], dtype=np.float32)
+    scale = tf.constant([3.0] * len(x))
     halfnorm = tfd.HalfNormal(scale=scale, validate_args=False)
 
     log_pdf = halfnorm.log_prob(x)

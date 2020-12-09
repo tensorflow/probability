@@ -347,7 +347,7 @@ def adaptive_hamiltonian_monte_carlo_step(
       hmc_state.state,
       axis=tuple(range(chain_ndims)) if chain_ndims else None,
       window_size=int(np.prod(hmc_state.target_log_prob.shape)) *
-      variance_window_steps)
+      variance_window_steps)  # pytype: disable=wrong-arg-types
 
   if num_adaptation_steps is not None:
     # Take care of adaptation for variance and step size.
