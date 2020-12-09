@@ -592,7 +592,7 @@ def bracket_root(objective_fn,
     xs_positive = tf.exp(tf.linspace(tf.cast(-10., dtype),
                                      tf.math.log(dtype_info.max),
                                      num_points // 2))
-    xs = tf.concat([-xs_positive, xs_positive], axis=0)
+    xs = tf.concat([tf.reverse(-xs_positive, axis=[0]), xs_positive], axis=0)
 
     # Evaluate the objective at all points. The objective function may return
     # a batch of values (e.g., `objective(x) = x - batch_of_roots`).

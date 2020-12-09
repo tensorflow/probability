@@ -288,6 +288,20 @@ class BracketRootTest(test_util.TestCase):
     self.assertAllTrue(low < roots)
     self.assertAllTrue(high > roots)
 
+  def test_negative_root(self):
+    root = -17.314
+    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    self.assertLess(low, root)
+    self.assertGreater(high, root)
+
+  def test_root_near_zero(self):
+    root = tf.exp(-13.)
+    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    self.assertLess(low, np.exp(-13.))
+    self.assertGreater(high, np.exp(-13))
+    self.assertAllClose(low, root, atol=1e-4)
+    self.assertAllClose(high, root, atol=1e-4)
+
   def test_returns_zero_width_bracket_at_root(self):
     root = tf.exp(-10.)
     low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
