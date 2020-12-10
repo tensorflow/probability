@@ -133,6 +133,7 @@ class ShardedIndependent(independent_lib.Independent):
                reinterpreted_batch_ndims=None,
                validate_args=False,
                shard_axis_name=None,
+               experimental_use_kahan_sum=False,
                name=None):
     """Construct a `ShardedIndependent` distribution.
 
@@ -147,6 +148,11 @@ class ShardedIndependent(independent_lib.Independent):
         `validate_args` is `False`, and the inputs are invalid, correct behavior
         is not guaranteed.
       shard_axis_name: `str` for axis name for use in JAX backend.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
         Default value: `Independent + distribution.name`.
 
@@ -154,6 +160,8 @@ class ShardedIndependent(independent_lib.Independent):
       ValueError: if `reinterpreted_batch_ndims` exceeds
         `distribution.batch_ndims`
     """
+    parameters = dict(locals())
+
     with tf.name_scope(name or
                        'ShardedIndependent' + distribution.name) as name:
       self._shard_axis_name = shard_axis_name
@@ -161,8 +169,9 @@ class ShardedIndependent(independent_lib.Independent):
           distribution,
           reinterpreted_batch_ndims=reinterpreted_batch_ndims,
           validate_args=validate_args,
+          experimental_use_kahan_sum=experimental_use_kahan_sum,
           name=name)
-      self._parameters['shard_axis_name'] = shard_axis_name
+      self._parameters = parameters
 
   @property
   def shard_axis_name(self):
