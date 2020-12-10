@@ -1047,6 +1047,37 @@ class MultipartBijectorsTest(test_util.TestCase):
     self.assertAllEqual(tf.nest.map_structure(lambda y: y.shape, y),
                         tf.nest.map_structure(lambda y: y.shape, y_sampled))
 
+    # Test that a `Restructure` bijector applied to a `JointDistribution` works
+    # as expected.
+    num_components = len(split_sizes)
+    input_keys = (split_sizes.keys() if isinstance(split_sizes, dict)
+                  else range(num_components))
+    output_keys = [str(i) for i in range(num_components)]
+    output_structure = {k: v for k, v in zip(output_keys, input_keys)}
+    restructure = tfb.Restructure(output_structure)
+    restructured_dist = tfd.TransformedDistribution(
+        base_dist, bijector=restructure, validate_args=True)
+
+    # Check that attributes of the restructured distribution have the same
+    # nested structure as the `output_structure` of the bijector. Pass a no-op
+    # as the `assert_fn` since the contents of the structures are not
+    # required to be the same.
+    noop_assert_fn = lambda *_: None
+    self.assertAllAssertsNested(
+        noop_assert_fn, restructured_dist.event_shape, output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn, restructured_dist.batch_shape, output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn,
+        self.evaluate(restructured_dist.event_shape_tensor()),
+        output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn,
+        self.evaluate(restructured_dist.batch_shape_tensor()),
+        output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn,
+        self.evaluate(restructured_dist.sample(seed=test_util.test_seed())))
 
 if __name__ == '__main__':
   tf.test.main()
