@@ -41,8 +41,11 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
 
   Args:
     vjp_fwd: A function (*args) => (output, auxiliaries).
-    vjp_bwd: A function (auxiliaries, output_gradient) => args_gradients.
-    jvp_fn: A function (primals, tangents) => (primal_out, tangent_out).
+    vjp_bwd: A function (auxiliaries, output_gradient) =>
+      nondiff_args_gradients. `None` gradients will be inserted into the correct
+      positions for `nondiff_argnums`.
+    jvp_fn: A function (*nondiff_args, primals, tangents) =>
+      (primal_out, tangent_out).
     nondiff_argnums: Tuple of argument indices which are not differentiable.
 
   Returns:
