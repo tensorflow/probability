@@ -289,12 +289,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     # dtype.)
     if tf.nest.is_nested(base_batch_shape_tensor):
       if self._is_joint:
-        return base_batch_shape_tensor
-
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(base_batch_shape_tensor))
       base_batch_shape_tensor = functools.reduce(
           ps.broadcast_shape,
           tf.nest.flatten(base_batch_shape_tensor))
-
     return base_batch_shape_tensor
 
   def _batch_shape(self):
@@ -308,7 +307,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the batch shape components of the base distribution are broadcast to
     # obtain the batch shape of the transformed distribution.
     batch_shape = self.distribution.batch_shape
-    if tf.nest.is_nested(batch_shape) and not self._is_joint:
+    if tf.nest.is_nested(batch_shape):
+      if self._is_joint:
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(batch_shape))
       batch_shape = functools.reduce(
           tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
     return batch_shape
