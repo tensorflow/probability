@@ -55,6 +55,7 @@ multi_substrate_py_library(
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":with_reductions",
     ],
@@ -79,6 +80,7 @@ multi_substrate_py_library(
         ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
         ":with_reductions",
@@ -706,6 +708,34 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "thinning_kernel",
+    srcs = ["thinning_kernel.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":sample",
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+py_test(
+    name = "thinning_kernel_test",
+    size = "small",
+    srcs = ["thinning_kernel_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":thinning_kernel",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
