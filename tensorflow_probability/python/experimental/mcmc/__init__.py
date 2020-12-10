@@ -56,6 +56,7 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
+from tensorflow_probability.python.experimental.mcmc.thinning_kernel import ThinningKernel
 from tensorflow_probability.python.experimental.mcmc.tracing_reducer import TracingReducer
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
@@ -116,6 +117,7 @@ __all__ = [
     'simple_heuristic_tuning',
     'StateWithHistory',
     'step_kernel',
+    'ThinningKernel',
     'TracingReducer',
     'VarianceReducer',
     'WeightedParticles',
