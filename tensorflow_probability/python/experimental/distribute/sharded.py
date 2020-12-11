@@ -62,7 +62,7 @@ class ShardedSample(sample_lib.Sample):
         noticeable in particular for large dimensions in float32. See CPU caveat
         on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
-        Default value: `None` (i.e., `'Sample' + distribution.name`).
+        Default value: `None` (i.e., `'ShardedSample' + distribution.name`).
     """
     parameters = dict(locals())
 
@@ -154,7 +154,7 @@ class ShardedIndependent(independent_lib.Independent):
         noticeable in particular for large dimensions in float32. See CPU caveat
         on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
-        Default value: `Independent + distribution.name`.
+        Default value: `'ShardedIndependent' + distribution.name`.
 
     Raises:
       ValueError: if `reinterpreted_batch_ndims` exceeds
