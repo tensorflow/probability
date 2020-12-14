@@ -433,11 +433,17 @@ class SampleChainTest(test_util.TestCase):
         momentum_distribution=momentum_dist)
     bijector = pinned.experimental_default_event_space_bijector()
     kernel = tfp.mcmc.TransformedTransitionKernel(kernel, bijector)
+    pullback_shape = bijector.inverse_event_shape(pinned.event_shape)
+    kernel = tfp.experimental.mcmc.DiagonalMassMatrixAdaptation(
+        kernel,
+        initial_running_variance=struct._make(
+            tfp.experimental.stats.RunningVariance.from_shape(t)
+            for t in pullback_shape))
     state = bijector(struct._make(
         tfd.Uniform(-2., 2.).sample(shp)
         for shp in bijector.inverse_event_shape(pinned.event_shape)))
     self.evaluate(tfp.mcmc.sample_chain(
-        3, current_state=state, kernel=kernel, seed=stream()))
+        3, current_state=state, kernel=kernel, seed=stream()).all_states)
 
 
 if __name__ == '__main__':
