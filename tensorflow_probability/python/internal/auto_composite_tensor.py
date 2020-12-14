@@ -36,10 +36,11 @@ _registry = {}  # Mapping from (python pkg, class name) -> class.
 
 _SENTINEL = object()
 
-_AUTO_COMPOSITE_TENSOR_VERSION = 1
+_AUTO_COMPOSITE_TENSOR_VERSION = 2
 
 
-def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None):
+def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
+                         prefer_static_value=()):
   """Extract constructor kwargs to reconstruct `obj`."""
   argspec = inspect.getfullargspec(obj.__init__)
   if argspec.varargs or argspec.varkw:
@@ -61,6 +62,10 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None):
       raise ValueError(
           'Object did not have an attr corresponding to constructor argument '
           '{k}. (Tried both `obj.{k}` and obj._{k}`).'.format(k=k))
+    if k in prefer_static_value and kwargs[k] is not None:
+      static_val = tf.get_static_value(kwargs[k])
+      if static_val is not None:
+        kwargs[k] = static_val
   return kwargs
 
 
@@ -101,16 +106,22 @@ def _extract_type_spec_recursively(value):
 class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
   """A tf.TypeSpec for `AutoCompositeTensor` objects."""
 
-  __slots__ = ('_param_specs', '_non_tensor_params', '_omit_kwargs')
+  __slots__ = ('_param_specs', '_non_tensor_params', '_omit_kwargs',
+               '_prefer_static_value')
 
-  def __init__(self, param_specs, non_tensor_params, omit_kwargs):
+  def __init__(self, param_specs, non_tensor_params, omit_kwargs,
+               prefer_static_value):
     self._param_specs = param_specs
     self._non_tensor_params = non_tensor_params
     self._omit_kwargs = omit_kwargs
+    self._prefer_static_value = prefer_static_value
 
   @classmethod
   def from_instance(cls, instance, omit_kwargs=()):
-    kwargs = _extract_init_kwargs(instance, omit_kwargs)
+    prefer_static_value = tuple(
+        getattr(instance, '_composite_tensor_shape_params', ()))
+    kwargs = _extract_init_kwargs(instance, omit_kwargs=omit_kwargs,
+                                  prefer_static_value=prefer_static_value)
 
     non_tensor_params = {}
     param_specs = {}
@@ -125,7 +136,8 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
     # Construct the spec.
     return cls(param_specs=param_specs,
                non_tensor_params=non_tensor_params,
-               omit_kwargs=omit_kwargs)
+               omit_kwargs=omit_kwargs,
+               prefer_static_value=prefer_static_value)
 
   def _to_components(self, obj):
     return _extract_init_kwargs(obj, limit_to=list(self._param_specs))
@@ -142,16 +154,20 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
     result = (_AUTO_COMPOSITE_TENSOR_VERSION,
               self._param_specs,
               self._non_tensor_params,
-              self._omit_kwargs)
+              self._omit_kwargs,
+              self._prefer_static_value)
     return result
 
   @classmethod
   def _deserialize(cls, encoded):
-    version, param_specs, non_tensor_params, omit_kwargs = encoded
+    version = encoded[0]
+    if version == 1:
+      encoded = encoded + ((),)
+      version = 2
     if version != _AUTO_COMPOSITE_TENSOR_VERSION:
       raise ValueError('Expected version {}, but got {}'
                        .format(_AUTO_COMPOSITE_TENSOR_VERSION, version))
-    return cls(param_specs, non_tensor_params, omit_kwargs)
+    return cls(*encoded[1:])
 
 
 _TypeSpecCodec = nested_structure_coder._TypeSpecCodec  # pylint: disable=protected-access
@@ -192,6 +208,12 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
     - object.attribute = [1., 2., 'abc']                        # valid
     - object.attribute = [tf.constant(1.), [tf.constant(2.)]]   # valid
     - object.attribute = ['abc', tf.constant(1.)]               # invalid
+
+  If the object has a `_composite_tensor_shape_parameters` field (presumed to
+  have `tuple` of `str` value), the flattening code will use
+  `tf.get_static_value` to attempt to preserve shapes as static metadata, for
+  fields whose name matches a name specified in that field. Preserving static
+  values can be important to correctly propagating shapes through a loop.
 
   If the decorated class `A` does not subclass `CompositeTensor`, a *new class*
   will be generated, which mixes in `A` and `CompositeTensor`.
@@ -277,7 +299,8 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
     composite_tensor_subclass: A subclass of `cls` and TF CompositeTensor.
   """
   if cls is None:
-    return functools.partial(auto_composite_tensor, omit_kwargs=omit_kwargs)
+    return functools.partial(auto_composite_tensor,
+                             omit_kwargs=omit_kwargs)
 
   # If the declared class is already a CompositeTensor subclass, we can avoid
   # affecting the actual type of the returned class. Otherwise, we need to
