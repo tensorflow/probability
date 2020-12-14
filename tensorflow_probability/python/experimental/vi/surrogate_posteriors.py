@@ -25,6 +25,7 @@ import functools
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_lib
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import half_normal
@@ -41,8 +42,10 @@ from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
-
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation
+from tensorflow.python.util import nest
+# pylint: enable=g-direct-tensorflow-import
 
 Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
 
@@ -122,8 +125,13 @@ _build_trainable_normal_dist = functools.partial(
     build_trainable_location_scale_distribution, distribution_fn=normal.Normal)
 
 
+@deprecation.deprecated_args(
+    '2021-03-15',
+    '`constraining_bijectors` is deprecated, use `bijector` instead',
+    'constraining_bijectors')
 def build_factored_surrogate_posterior(
     event_shape=None,
+    bijector=None,
     constraining_bijectors=None,
     initial_unconstrained_loc=_sample_uniform_initial_loc,
     initial_unconstrained_scale=1e-2,
@@ -142,6 +150,13 @@ def build_factored_surrogate_posterior(
   Args:
     event_shape: `Tensor` shape, or nested structure of `Tensor` shapes,
       specifying the event shape(s) of the posterior variables.
+    bijector: Optional `tfb.Bijector` instance, or nested structure of such
+      instances, defining support(s) of the posterior variables. The structure
+      must match that of `event_shape` and may contain `None` values. A
+      posterior variable will be modeled as
+      `tfd.TransformedDistribution(underlying_dist, bijector)` if a
+      corresponding constraining bijector is specified, otherwise it is modeled
+      as supported on the unconstrained real line.
     constraining_bijectors: Optional `tfb.Bijector` instance, or nested
       structure of such instances, defining support(s) of the posterior
       variables. The structure must match that of `event_shape` and may
@@ -156,8 +171,8 @@ def build_factored_surrogate_posterior(
       variable. May alternately be a nested structure of
       `Tensor`s, giving specific initial locations for each variable; these
       must have structure matching `event_shape` and shapes determined by the
-      inverse image of `event_shape` under `constraining_bijectors`, which
-      may optionally be prefixed with a common batch shape.
+      inverse image of `event_shape` under `bijector`, which may optionally be
+      prefixed with a common batch shape.
       Default value: `functools.partial(tf.random.uniform,
         minval=-2., maxval=2., dtype=tf.float32)`.
     initial_unconstrained_scale: Optional scalar float `Tensor` initial
@@ -209,8 +224,8 @@ def build_factored_surrogate_posterior(
   ```python
   surrogate_posterior = tfp.experimental.vi.build_factored_surrogate_posterior(
     event_shape=model.event_shape_tensor()[:-1],  # Omit the observed `y`.
-    constraining_bijectors=[tfb.Softplus(),   # Rate is positive.
-                            tfb.Softplus()])  # Concentration is positive.
+    bijector=[tfb.Softplus(),   # Rate is positive.
+              tfb.Softplus()])  # Concentration is positive.
   ```
 
   This creates a trainable joint distribution, defined by variables in
@@ -241,14 +256,13 @@ def build_factored_surrogate_posterior(
 
   ```python
   initial_loc = {'concentration': 0.4, 'rate': 0.2}
-  constraining_bijectors={'concentration': tfb.Softplus(),   # Rate is positive.
-                          'rate': tfb.Softplus()}   # Concentration is positive.
+  bijector={'concentration': tfb.Softplus(),   # Rate is positive.
+            'rate': tfb.Softplus()}   # Concentration is positive.
   initial_unconstrained_loc = tf.nest.map_fn(
-    lambda b, x: b.inverse(x) if b is not None else x,
-    constraining_bijectors, initial_loc)
+    lambda b, x: b.inverse(x) if b is not None else x, bijector, initial_loc)
   surrogate_posterior = tfp.experimental.vi.build_factored_surrogate_posterior(
     event_shape=tf.nest.map_fn(tf.shape, initial_loc),
-    constraining_bijectors=constraining_bijectors,
+    bijector=bijector,
     initial_unconstrained_loc=initial_unconstrained_state,
     initial_unconstrained_scale=1e-4)
   ```
@@ -256,6 +270,9 @@ def build_factored_surrogate_posterior(
   """
 
   with tf.name_scope(name or 'build_factored_surrogate_posterior'):
+    bijector = deprecation.deprecated_argument_lookup(
+        'bijector', bijector, 'constraining_bijectors', constraining_bijectors)
+
     seed = tfp_util.SeedStream(seed, salt='build_factored_surrogate_posterior')
 
     # Convert event shapes to Tensors.
@@ -263,58 +280,59 @@ def build_factored_surrogate_posterior(
     event_shape = nest.map_structure_up_to(
         shallow_structure, lambda s: tf.convert_to_tensor(s, dtype=tf.int32),
         event_shape)
-    flat_event_shapes = tf.nest.flatten(event_shape)
 
-    # For simplicity, we'll work with flattened lists of state parts and
-    # repack the structure at the end.
-    if constraining_bijectors is not None:
-      flat_bijectors = tf.nest.flatten(constraining_bijectors)
+    if nest.is_nested(bijector):
+      bijector = nest.map_structure(
+          lambda b: identity_bijector.Identity() if b is None else b,
+          bijector)
+
+      # Support mismatched nested structures for backwards compatibility (e.g.
+      # non-nested `event_shape` and a single-element list of `bijector`s).
+      bijector = nest.pack_sequence_as(event_shape, nest.flatten(bijector))
+
+      event_space_bijector = tfb.JointMap(bijector, validate_args=validate_args)
     else:
-      flat_bijectors = [None for _ in flat_event_shapes]
-    flat_unconstrained_event_shapes = [
-        b.inverse_event_shape_tensor(s) if b is not None else s
-        for s, b in zip(flat_event_shapes, flat_bijectors)]
+      event_space_bijector = bijector
+
+    if event_space_bijector is None:
+      unconstrained_event_shape = event_shape
+    else:
+      unconstrained_event_shape = (
+          event_space_bijector.inverse_event_shape_tensor(event_shape))
 
     # Construct initial locations for the internal unconstrained dists.
     if callable(initial_unconstrained_loc):  # Sample random initialization.
-      flat_unconstrained_locs = [initial_unconstrained_loc(
-          shape=s, seed=seed()) for s in flat_unconstrained_event_shapes]
-    else:  # Use provided initialization.
-      flat_unconstrained_locs = nest.flatten_up_to(
-          shallow_structure, initial_unconstrained_loc, check_types=False)
+      initial_unconstrained_loc = nest.map_structure(
+          lambda s: initial_unconstrained_loc(shape=s, seed=seed()),
+          unconstrained_event_shape)
 
-    if nest.is_nested(initial_unconstrained_scale):
-      flat_unconstrained_scales = nest.flatten_up_to(
-          shallow_structure, initial_unconstrained_scale, check_types=False)
-    else:
-      flat_unconstrained_scales = [
-          initial_unconstrained_scale for _ in flat_unconstrained_locs]
+    if not nest.is_nested(initial_unconstrained_scale):
+      initial_unconstrained_scale = nest.map_structure(
+          lambda _: initial_unconstrained_scale,
+          unconstrained_event_shape)
 
     # Extract the rank of each event, so that we build distributions with the
     # correct event shapes.
-    flat_unconstrained_event_ndims = [prefer_static.rank_from_shape(s)
-                                      for s in flat_unconstrained_event_shapes]
+    unconstrained_event_ndims = nest.map_structure(
+        prefer_static.rank_from_shape,
+        unconstrained_event_shape)
 
     # Build the component surrogate posteriors.
-    flat_component_dists = []
-    for initial_loc, initial_scale, event_ndims, bijector in zip(
-        flat_unconstrained_locs,
-        flat_unconstrained_scales,
-        flat_unconstrained_event_ndims,
-        flat_bijectors):
-      unconstrained_dist = trainable_distribution_fn(
-          initial_loc=initial_loc, initial_scale=initial_scale,
-          event_ndims=event_ndims, validate_args=validate_args)
-      flat_component_dists.append(
-          bijector(unconstrained_dist) if bijector is not None
-          else unconstrained_dist)
-    component_distributions = tf.nest.pack_sequence_as(
-        event_shape, flat_component_dists)
+    unconstrained_distributions = nest.map_structure_up_to(
+        unconstrained_event_shape,
+        lambda loc, scale, ndims: trainable_distribution_fn(  # pylint: disable=g-long-lambda
+            loc, scale, ndims, validate_args=validate_args),
+        initial_unconstrained_loc,
+        initial_unconstrained_scale,
+        unconstrained_event_ndims)
 
-    # Return a `Distribution` object whose events have the specified structure.
-    return (
+    base_distribution = (
         joint_distribution_util.independent_joint_distribution_from_structure(
-            component_distributions, validate_args=validate_args))
+            unconstrained_distributions, validate_args=validate_args))
+    if event_space_bijector is None:
+      return base_distribution
+    return transformed_distribution.TransformedDistribution(
+        base_distribution, event_space_bijector)
 
 
 def _as_trainable_family(distribution):

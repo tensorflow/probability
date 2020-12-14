@@ -245,6 +245,46 @@ class FactoredSurrogatePosterior(test_util.TestCase):
     _ = self.evaluate(posterior_mean)
     _ = self.evaluate(posterior_stddev)
 
+  def test_multipart_bijector(self):
+    dist = tfd.JointDistributionNamed({
+        'a': tfd.Exponential(1.),
+        'b': tfd.Normal(0., 1.),
+        'c': lambda b, a: tfd.Sample(tfd.Normal(b, a), sample_shape=[5])})
+
+    seed = test_util.test_seed_stream()
+    surrogate_posterior = (
+        tfp.experimental.vi.build_factored_surrogate_posterior(
+            event_shape=dist.event_shape,
+            constraining_bijectors=(
+                dist.experimental_default_event_space_bijector()),
+            initial_unconstrained_loc=functools.partial(
+                tf.random.uniform, minval=-2., maxval=2.),
+            seed=seed(),
+            validate_args=True))
+    self.evaluate([v.initializer
+                   for v in surrogate_posterior.trainable_variables])
+
+    # Test that the posterior has the specified event shape(s).
+    self.assertAllEqualNested(
+        self.evaluate(dist.event_shape_tensor()),
+        self.evaluate(surrogate_posterior.event_shape_tensor()))
+
+    posterior_sample_ = self.evaluate(surrogate_posterior.sample(seed=seed()))
+    posterior_logprob_ = self.evaluate(
+        surrogate_posterior.log_prob(posterior_sample_))
+
+    # Test that all sample Tensors have the expected shapes.
+    check_shape = lambda s, x: self.assertAllEqual(s, x.shape)
+    self.assertAllAssertsNested(
+        check_shape, dist.event_shape, posterior_sample_)
+
+    # Test that samples are finite and not NaN.
+    self.assertAllAssertsNested(self.assertAllFinite, posterior_sample_)
+
+    # Test that logprob is scalar, finite, and not NaN.
+    self.assertEmpty(posterior_logprob_.shape)
+    self.assertAllFinite(posterior_logprob_)
+
 
 def _build_tensor(ndarray, dtype, use_static_shape):
   # Enforce parameterized dtype and static/dynamic testing.
