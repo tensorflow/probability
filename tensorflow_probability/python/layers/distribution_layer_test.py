@@ -320,7 +320,7 @@ class DistributionLambdaSerializationTest(test_util.TestCase):
   def assertSerializable(self, model, batch_size=1):
     """Assert that a model can be saved/loaded via Keras Model.save/load_model.
 
-    Arguments:
+    Args:
       model: A Keras model that outputs a `tfd.Distribution`.
       batch_size: The batch size to use when checking that the model produces
         the same results as a serialized/deserialized copy.  Default value: 1.
@@ -348,7 +348,7 @@ class DistributionLambdaSerializationTest(test_util.TestCase):
   def assertExportable(self, model, batch_size=1):
     """Assert a Keras model supports export_saved_model/load_from_saved_model.
 
-    Arguments:
+    Args:
       model: A Keras model with Tensor output.
       batch_size: The batch size to use when checking that the model produces
         the same results as a serialized/deserialized copy.  Default value: 1.

@@ -22,6 +22,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -67,6 +68,8 @@ class JointDistributionSamplePathMixin(object):
 
   def __init__(self, *args, **kwargs):
     self._batch_ndims = kwargs.pop('batch_ndims', 0)
+    self._experimental_use_kahan_sum = kwargs.pop(
+        'experimental_use_kahan_sum', False)
     super(JointDistributionSamplePathMixin, self).__init__(*args, **kwargs)
 
   @property
@@ -143,6 +146,10 @@ class JointDistributionSamplePathMixin(object):
     return assertions
 
   def _log_prob(self, value):
+    if self._experimental_use_kahan_sum:
+      xs = self._map_and_reduce_measure_over_dists(
+          'log_prob', tfp_math.reduce_kahan_sum, value)
+      return sum(xs).total
     xs = self._map_and_reduce_measure_over_dists(
         'log_prob', tf.reduce_sum, value)
     return sum(xs)
@@ -162,8 +169,11 @@ class JointDistributionSamplePathMixin(object):
         each `distribution_fn` evaluated at each corresponding `value`.
     """
     with self._name_and_control_scope(name):
+      sum_fn = tf.reduce_sum
+      if self._experimental_use_kahan_sum:
+        sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
       xs = self._map_and_reduce_measure_over_dists(
-          'log_prob', tf.reduce_sum, value)
+          'log_prob', sum_fn, value)
       return self._model_unflatten(xs)
 
   def prob_parts(self, value, name='prob_parts'):

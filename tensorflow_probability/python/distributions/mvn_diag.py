@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
@@ -29,6 +30,17 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 __all__ = [
     'MultivariateNormalDiag',
 ]
+
+
+class KahanLogDetLinOpDiag(tf.linalg.LinearOperatorDiag):
+  """Override `LinearOperatorDiag` logdet to use Kahan summation."""
+
+  def _log_abs_determinant(self):
+    log_det = tfp_math.reduce_kahan_sum(
+        tf.math.log(tf.math.abs(self._diag)), axis=[-1]).total
+    if dtype_util.is_complex(self.dtype):
+      log_det = tf.cast(log_det, dtype=self.dtype)
+    return log_det
 
 
 class MultivariateNormalDiag(
@@ -146,6 +158,7 @@ class MultivariateNormalDiag(
                scale_identity_multiplier=None,
                validate_args=False,
                allow_nan_stats=True,
+               experimental_use_kahan_sum=False,
                name='MultivariateNormalDiag'):
     """Construct Multivariate Normal distribution on `R^k`.
 
@@ -194,6 +207,12 @@ class MultivariateNormalDiag(
         statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values as well as
+        when computing the log-determinant of the scale matrix. Doing so
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
@@ -213,7 +232,9 @@ class MultivariateNormalDiag(
             'please combine it directly into `scale_diag` instead.')
 
       if scale_diag is not None:
-        scale = tf.linalg.LinearOperatorDiag(
+        diag_cls = (KahanLogDetLinOpDiag if experimental_use_kahan_sum else
+                    tf.linalg.LinearOperatorDiag)
+        scale = diag_cls(
             diag=scale_diag,
             is_non_singular=True,
             is_self_adjoint=True,
@@ -249,6 +270,7 @@ class MultivariateNormalDiag(
           scale=scale,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
+          experimental_use_kahan_sum=experimental_use_kahan_sum,
           name=name)
       self._parameters = parameters
 

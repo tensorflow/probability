@@ -42,6 +42,7 @@ from tensorflow_probability.python.distributions.distribution import Distributio
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
 from tensorflow_probability.python.distributions.dpp import DeterminantalPointProcess
 from tensorflow_probability.python.distributions.empirical import Empirical
+from tensorflow_probability.python.distributions.exponentially_modified_gaussian import ExponentiallyModifiedGaussian
 from tensorflow_probability.python.distributions.exp_gamma import ExpGamma
 from tensorflow_probability.python.distributions.exp_gamma import ExpInverseGamma
 from tensorflow_probability.python.distributions.exponential import Exponential
@@ -54,6 +55,7 @@ from tensorflow_probability.python.distributions.generalized_normal import Gener
 from tensorflow_probability.python.distributions.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
+from tensorflow_probability.python.distributions.gev import GeneralizedExtremeValue
 from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.half_student_t import HalfStudentT
@@ -108,6 +110,7 @@ from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.skellam import Skellam
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
+from tensorflow_probability.python.distributions.stopping_ratio_logistic import StoppingRatioLogistic
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
@@ -173,6 +176,7 @@ __all__ = [
     'VectorDeterministic',
     'DeterminantalPointProcess',
     'Empirical',
+    'ExponentiallyModifiedGaussian',
     'ExpGamma',
     'ExpInverseGamma',
     'Exponential',
@@ -187,6 +191,7 @@ __all__ = [
     'GaussianProcessRegressionModel',
     'VariationalGaussianProcess',
     'Gumbel',
+    'GeneralizedExtremeValue',
     'HalfCauchy',
     'HalfNormal',
     'HalfStudentT',
@@ -221,6 +226,7 @@ __all__ = [
     'SinhArcsinh',
     'Skellam',
     'SphericalUniform',
+    'StoppingRatioLogistic',
     'StudentT',
     'StudentTProcess',
     'Triangular',

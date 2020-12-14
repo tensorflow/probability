@@ -377,6 +377,12 @@ def map_ildj(prim, incells, outcells, **params):
   new_params = dict(params, in_axes=new_in_axes)
   if 'donated_invars' in params:
     new_params['donated_invars'] = (False,) * len(flat_vals)
+  if 'out_axes' in params:
+    assert all(out_axis == 0 for out_axis in params['out_axes'])
+    new_params['out_axes_thunk'] = jax_util.HashableFunction(
+        lambda: (0,) * aux().num_leaves,
+        closure=('ildj', params['out_axes']))
+    del new_params['out_axes']
   subenv_vals = prim.bind(f, *flat_vals, **new_params)
   subenv_tree = aux()
   subenv = tree_util.tree_unflatten(subenv_tree, subenv_vals)

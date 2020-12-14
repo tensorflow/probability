@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
     'categorical',
+    'fold_in',
     'gamma',
     'is_stateful_seed',
     'normal',
@@ -88,14 +89,22 @@ def sanitize_seed(seed, salt=None, name=None):
 
     if salt is not None:
       salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
-      if JAX_MODE:
-        from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
-        seed = jaxrand.fold_in(seed, salt & (2**32 - 1))
-      else:
-        seed = tf.bitwise.bitwise_xor(
-            seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
+      seed = fold_in(seed, salt)
 
     return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
+
+
+def fold_in(seed, salt):
+  """Folds salt into seed to form a new seed."""
+  if JAX_MODE:
+    from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
+    return jaxrand.fold_in(seed, salt & (2**32 - 1))
+  if isinstance(salt, (six.integer_types)):
+    seed = tf.bitwise.bitwise_xor(
+        seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
+  else:
+    seed = tf.random.experimental.stateless_fold_in(seed, salt)
+  return seed
 
 
 def split_seed(seed, n=2, salt=None, name=None):

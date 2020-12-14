@@ -19,35 +19,28 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
 from tensorflow_probability.python.experimental.distribute import sharded
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
-NUM_DEVICES = 4
 
-
-def per_replica_to_tensor(value):
-  return tf.nest.map_structure(
-      lambda per_replica: tf.stack(per_replica.values, axis=0), value)
-
-
-class ShardedDistributionTest(test_util.TestCase):
-
-  def setUp(self):
-    super(ShardedDistributionTest, self).setUp()
-    self.strategy = tf.distribute.MirroredStrategy(
-        devices=tf.config.list_logical_devices())
+@test_util.test_all_tf_execution_regimes
+class ShardedDistributionTest(test_lib.DistributedTest):
 
   def test_sharded_sample_samples_differently_across_shards(self):
 
     @tf.function(autograph=False)
     def run(key):
-      return sharded.ShardedSample(tfd.Normal(0., 1.),
-                                   NUM_DEVICES).sample(seed=key)
+      return sharded.ShardedSample(
+          tfd.Normal(0., 1.),
+          test_lib.NUM_DEVICES,
+          shard_axis_name=self.axis_name).sample(seed=key)
 
     sample = self.evaluate(
-        per_replica_to_tensor(self.strategy.run(run, (tf.zeros(2, tf.int32),))))
+        self.per_replica_to_tensor(
+            self.strategy_run(run, (self.key,), in_axes=None)))
     for i in range(4):
       for j in range(4):
         if i == j:
@@ -59,10 +52,13 @@ class ShardedDistributionTest(test_util.TestCase):
     @tf.function(autograph=False)
     def run(key):
       return sharded.ShardedIndependent(
-          tfd.Normal(tf.zeros(1), tf.ones(1)), 1).sample(seed=key)
+          tfd.Normal(tf.zeros(1), tf.ones(1)),
+          1,
+          shard_axis_name=self.axis_name).sample(seed=key)
 
     sample = self.evaluate(
-        per_replica_to_tensor(self.strategy.run(run, (tf.zeros(2, tf.int32),))))
+        self.per_replica_to_tensor(
+            self.strategy_run(run, (self.key,), in_axes=None)))
     for i in range(4):
       for j in range(4):
         if i == j:
@@ -71,11 +67,4 @@ class ShardedDistributionTest(test_util.TestCase):
 
 
 if __name__ == "__main__":
-  tf.enable_v2_behavior()
-  physical_devices = tf.config.experimental.list_physical_devices()
-
-  num_logical_devices = 4
-  tf.config.experimental.set_virtual_device_configuration(
-      physical_devices[0],
-      [tf.config.experimental.VirtualDeviceConfiguration()] * NUM_DEVICES)
   tf.test.main()

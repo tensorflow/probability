@@ -128,9 +128,11 @@ class Composition(bijector.Bijector):
     with tf.name_scope(name):
       is_constant_jacobian = True
       is_injective = True
+      is_permutation = True
       for bij in nest.flatten(bijectors):
         is_injective &= bij._is_injective
         is_constant_jacobian &= bij.is_constant_jacobian
+        is_permutation &= bij._is_permutation
 
       super(Composition, self).__init__(
           forward_min_event_ndims=forward_min_event_ndims,
@@ -144,6 +146,7 @@ class Composition(bijector.Bijector):
       self._bijectors = nest.map_structure(lambda b: b, bijectors)
       self._validate_event_size = validate_event_size
       self.__is_injective = is_injective
+      self.__is_permutation = is_permutation
 
   @property
   def bijectors(self):
@@ -156,6 +159,10 @@ class Composition(bijector.Bijector):
   @property
   def _is_injective(self):
     return self.__is_injective
+
+  @property
+  def _is_permutation(self):
+    return self.__is_permutation
 
   # pylint: disable=redefined-builtin
 
@@ -293,7 +300,7 @@ class Composition(bijector.Bijector):
     The `_walk_{direction}` methods define how arguments are routed through
     nested bijectors, expressing the directed topology of the underlying graph.
 
-    Arguments:
+    Args:
       step_fn: A method taking a bijector, a single positional argument
         matching `bijector.forward_min_event_ndims`, and arbitrary **kwargs,
         and returning a structure matching `bijector.inverse_min_event_ndims`.
@@ -312,7 +319,7 @@ class Composition(bijector.Bijector):
     The `_walk_{direction}` methods define how arguments are routed through
     nested bijectors, expressing the directed topology of the underlying graph.
 
-    Arguments:
+    Args:
       step_fn: A method taking a bijector, a single positional argument
         matching `bijector.inverse_min_event_ndims`, and arbitrary **kwargs,
         and returning a structure matching `bijector.forward_min_event_ndims`.

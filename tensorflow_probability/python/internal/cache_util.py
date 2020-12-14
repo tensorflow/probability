@@ -91,7 +91,7 @@ class HashableWeakRef(weakref.ref):
   def __init__(self, referrent, callback=None):
     """weakref.ref which makes tf.Tensor and np.array objects hashable.
 
-    Arguments:
+    Args:
       referrent: Object that is being referred to.
       callback: Optional callback to invoke when object is GCed.
     """
@@ -327,7 +327,7 @@ class BijectorCache(object):
   def forward(self, x, **kwargs):
     """Invokes the 'forward' transformation, or looks up previous results.
 
-    Arguments:
+    Args:
       x: The singular argument passed to `bijector._forward`.
       **kwargs: Any auxiliary arguments passed to the function.
         These reflect shared context to the function, and are associated
@@ -340,7 +340,7 @@ class BijectorCache(object):
   def inverse(self, y, **kwargs):
     """Invokes the 'inverse' transformation, or looks up previous results.
 
-    Arguments:
+    Args:
       y: The singular argument passed to `bijector._inverse`.
       **kwargs: Any auxiliary arguments passed to the function.
         These reflect shared context to the function, and are associated
@@ -431,7 +431,7 @@ class BijectorCache(object):
             == 0)
     ```
 
-    Arguments:
+    Args:
       input: The singular ordered argument passed to the wrapped function.
       fn_name: `str`, name of the directed function to which `input` is an arg
         (typically `'_forward'` or `'_inverse'`).
@@ -469,7 +469,7 @@ class BijectorCache(object):
     assert cache.inverse._lookup(y, '_inverse', '_forward') == (x, attrs)
     ```
 
-    Arguments:
+    Args:
       input: The singular ordered argument passed to the wrapped function.
       forward_name: `str`, the name of the function implementing the bijector's
         forward transformation (typically `'_forward'`).

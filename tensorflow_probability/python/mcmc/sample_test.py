@@ -22,8 +22,8 @@ import collections
 import warnings
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
-
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -31,6 +31,11 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
+tfb = tfp.bijectors
+tfd = tfp.distributions
+
+
+NUMPY_MODE = False
 
 TestTransitionKernelResults = collections.namedtuple(
     'TestTransitionKernelResults', 'counter_1, counter_2')
@@ -337,6 +342,102 @@ class SampleChainTest(test_util.TestCase):
     ])
     self.assertAllCloseNested(
         first_final_state, second_final_state, rtol=1e-6)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='RWM_tuple',
+           kernel_from_log_prob=tfp.mcmc.RandomWalkMetropolis,
+           sample_dtype=(tf.float32,) * 4),
+      dict(testcase_name='RWM_namedtuple',
+           kernel_from_log_prob=tfp.mcmc.RandomWalkMetropolis),
+      dict(testcase_name='HMC_tuple',
+           kernel_from_log_prob=lambda lp_fn: tfp.mcmc.HamiltonianMonteCarlo(  # pylint: disable=g-long-lambda
+               lp_fn, step_size=0.1, num_leapfrog_steps=10),
+           skip='HMC requires gradients' if NUMPY_MODE else '',
+           sample_dtype=(tf.float32,) * 4),
+      dict(testcase_name='HMC_namedtuple',
+           kernel_from_log_prob=lambda lp_fn: tfp.mcmc.HamiltonianMonteCarlo(  # pylint: disable=g-long-lambda
+               lp_fn, step_size=0.1, num_leapfrog_steps=10),
+           skip='HMC requires gradients' if NUMPY_MODE else '')
+      )
+  def testStructuredState(self, kernel_from_log_prob, skip='',
+                          **model_kwargs):
+    if skip:
+      self.skipTest(skip)
+    seed_stream = test_util.test_seed_stream()
+
+    n = 300
+    p = 50
+    x = tf.random.normal([n, p], seed=seed_stream())
+
+    def beta_proportion(mu, kappa):
+      return tfd.Beta(concentration0=mu * kappa,
+                      concentration1=(1 - mu) * kappa)
+
+    root = tfd.JointDistributionCoroutine.Root
+    def model_coroutine():
+      beta = yield root(tfd.Sample(tfd.Normal(0, 1), [p], name='beta'))
+      alpha = yield root(tfd.Normal(0, 1, name='alpha'))
+      kappa = yield root(tfd.Gamma(1, 1, name='kappa'))
+      mu = tf.math.sigmoid(alpha[..., tf.newaxis] +
+                           tf.einsum('...p,np->...n', beta, x))
+      yield tfd.Independent(beta_proportion(mu, kappa[..., tf.newaxis]),
+                            reinterpreted_batch_ndims=1,
+                            name='prob')
+
+    model = tfd.JointDistributionCoroutine(model_coroutine, **model_kwargs)
+    probs = model.sample(seed=seed_stream())[-1]
+    pinned = model.experimental_pin(prob=probs)
+
+    kernel = kernel_from_log_prob(pinned.unnormalized_log_prob)
+    nburnin = 5
+    if not isinstance(kernel, tfp.mcmc.RandomWalkMetropolis):
+      kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+          kernel, num_adaptation_steps=nburnin // 2)
+    kernel = tfp.mcmc.TransformedTransitionKernel(
+        kernel, pinned.experimental_default_event_space_bijector())
+    nchains = 4
+
+    @tf.function
+    def sample():
+      return tfp.mcmc.sample_chain(
+          1, current_state=pinned.sample_unpinned(nchains, seed=seed_stream()),
+          kernel=kernel, num_burnin_steps=nburnin, trace_fn=None,
+          seed=seed_stream())
+    self.evaluate(sample())
+
+  @test_util.jax_disable_test_missing_functionality('PHMC b/175107050')
+  @test_util.numpy_disable_gradient_test('HMC')
+  def testStructuredState2(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def model():
+      mu = yield tfd.Sample(tfd.Normal(0, 1), [65], name='mu')
+      sigma = yield tfd.Sample(tfd.Exponential(1.), [65], name='sigma')
+      beta = yield tfd.Sample(
+          tfd.Normal(loc=tf.gather(mu, tf.range(436) % 65, axis=-1),
+                     scale=tf.gather(sigma, tf.range(436) % 65, axis=-1)),
+          4, name='beta')
+      _ = yield tfd.Multinomial(total_count=100.,
+                                logits=tfb.Pad([[0, 1]])(beta),
+                                name='y')
+
+    stream = test_util.test_seed_stream()
+    pinned = model.experimental_pin(y=model.sample(seed=stream()).y)
+    struct = pinned.dtype
+    stddevs = struct._make([
+        tf.fill([65], .1), tf.fill([65], 1.), tf.fill([436, 4], 10.)])
+    momentum_dist = tfd.JointDistributionNamedAutoBatched(
+        struct._make(tfd.Normal(0, 1 / std) for std in stddevs))
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        pinned.unnormalized_log_prob,
+        step_size=.1, num_leapfrog_steps=10,
+        momentum_distribution=momentum_dist)
+    bijector = pinned.experimental_default_event_space_bijector()
+    kernel = tfp.mcmc.TransformedTransitionKernel(kernel, bijector)
+    state = bijector(struct._make(
+        tfd.Uniform(-2., 2.).sample(shp)
+        for shp in bijector.inverse_event_shape(pinned.event_shape)))
+    self.evaluate(tfp.mcmc.sample_chain(
+        3, current_state=state, kernel=kernel, seed=stream()))
 
 
 if __name__ == '__main__':

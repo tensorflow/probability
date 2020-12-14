@@ -527,7 +527,7 @@ class Distribution(_BaseDistribution):
     for i, t in enumerate(graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError('Graph parent item %d is not a Tensor; %s.' % (i, t))
-    self._dtype = dtype
+    self._dtype = self._no_dependency(dtype)
     self._reparameterization_type = reparameterization_type
     self._allow_nan_stats = allow_nan_stats
     self._validate_args = validate_args
@@ -605,14 +605,6 @@ class Distribution(_BaseDistribution):
         instances.
     """
     with tf.name_scope('parameter_properties'):
-      # Instead of a dtype, subclass implementations take an `eps` argument
-      # representing a small value in the requested dtype. This may be used to
-      # avoid constraint boundaries, e.g., Softplus(low=eps) will avoid
-      # infinitesimally small values for a scale param. The dtype
-      # may be recovered as `eps.dtype`.
-      # Numpy defines `eps` using the difference between 1.0 and the next
-      # smallest representable float larger than 1.0. This is approximately
-      # 1.19e-07 in float32, 2.22e-16 in float64, and 0.00098 in float16.
       return cls._parameter_properties(dtype, num_classes=num_classes)
 
   @classmethod
@@ -817,13 +809,14 @@ class Distribution(_BaseDistribution):
       return slicing.batch_slice(self, self._params_event_ndims(),
                                  override_parameters_kwargs, Ellipsis)
     except NotImplementedError:
-      parameters = dict(self.parameters, **override_parameters_kwargs)
-      d = type(self)(**parameters)
-      # pylint: disable=protected-access
-      d._parameters = parameters
-      d._parameters_sanitized = True
-      # pylint: enable=protected-access
-      return d
+      pass
+    parameters = dict(self.parameters, **override_parameters_kwargs)
+    d = type(self)(**parameters)
+    # pylint: disable=protected-access
+    d._parameters = self._no_dependency(parameters)
+    d._parameters_sanitized = True
+    # pylint: enable=protected-access
+    return d
 
   def _batch_shape_tensor(self):
     raise NotImplementedError(
@@ -1309,7 +1302,7 @@ class Distribution(_BaseDistribution):
         return self._variance(**kwargs)
       except NotImplementedError:
         try:
-          return tf.square(self._stddev(**kwargs))
+          return tf.nest.map_structure(tf.square, self._stddev(**kwargs))
         except NotImplementedError:
           pass
         raise
@@ -1344,7 +1337,7 @@ class Distribution(_BaseDistribution):
         return self._stddev(**kwargs)
       except NotImplementedError:
         try:
-          return tf.sqrt(self._variance(**kwargs))
+          return tf.nest.map_structure(tf.sqrt, self._variance(**kwargs))
         except NotImplementedError:
           pass
         raise

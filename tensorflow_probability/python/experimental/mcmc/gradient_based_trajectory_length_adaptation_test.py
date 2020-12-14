@@ -121,7 +121,6 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=num_adaptation_steps,
-        adaptation_rate=tf.constant(0.025, self.dtype),
         validate_args=True)
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)
@@ -179,7 +178,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=5,
-        adaptation_rate=tf.constant(1., self.dtype),
+        adaptation_rate=1.,
         validate_args=True)
 
     state = tf.zeros([64], self.dtype)
@@ -211,7 +210,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
             kernel,
             num_adaptation_steps=5,
-            adaptation_rate=tf.constant(1., self.dtype),
+            adaptation_rate=1.,
             validate_args=True))
 
     state = tf.zeros([64, 2, 3], self.dtype)
@@ -242,7 +241,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=5,
-        adaptation_rate=tf.constant(1., self.dtype),
+        adaptation_rate=1.,
         validate_args=True)
 
     state = [tf.zeros([64], self.dtype), tf.zeros([64], self.dtype)]
@@ -273,7 +272,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=1,
-        adaptation_rate=tf.constant(1., self.dtype),
+        adaptation_rate=1.,
         validate_args=True)
 
     state = tf.zeros([64], self.dtype)

@@ -183,6 +183,9 @@ def multi_substrate_py_library(
         srcs_version: As with `py_library`.
     """
 
+    if srcs_version != "PY3":
+        fail("Must use PY3 for srcs_version", srcs_version)
+
     native.py_library(
         name = name,
         srcs = srcs,
@@ -266,6 +269,7 @@ def multi_substrate_py_test(
         jax_size = None,
         numpy_size = None,
         srcs = [],
+        main = None,
         deps = [],
         tags = [],
         numpy_tags = [],
@@ -286,6 +290,9 @@ def multi_substrate_py_test(
         numpy_size: A size override for the numpy target.
         srcs: As with `py_test`. These will have a `genrule` emitted to rewrite
             NumPy and JAX variants, writing the test file into a subdirectory.
+        main: As with `py_test`. If this does not match "{name}.py", then we
+            suppress the genrule that rewrites "{name}.py", since the typical
+            use-case of the `main` argument is a secondary, i.e. GPU, test.
         deps: As with `py_test`. The list is rewritten to depend on
             substrate-specific libraries for substrate variants.
         tags: Tags global to this test target. NumPy also gets a `'tfp_numpy'`
@@ -309,7 +316,7 @@ def multi_substrate_py_test(
         name = "{}.tf".format(name),
         size = size,
         srcs = srcs,
-        main = "{}.py".format(name),
+        main = main or "{}.py".format(name),
         deps = deps,
         tags = tags,
         srcs_version = srcs_version,
@@ -321,18 +328,19 @@ def multi_substrate_py_test(
 
     if "numpy" not in disabled_substrates:
         numpy_srcs = _substrate_srcs(srcs, "numpy")
-        native.genrule(
-            name = "rewrite_{}_numpy".format(name),
-            srcs = srcs,
-            outs = numpy_srcs,
-            cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
-            exec_tools = [REWRITER_TARGET],
-        )
+        if main == None or main == "{}.py".format(name):
+            native.genrule(
+                name = "rewrite_{}_numpy".format(name),
+                srcs = srcs,
+                outs = numpy_srcs,
+                cmd = "$(location {}) $(SRCS) > $@".format(REWRITER_TARGET),
+                exec_tools = [REWRITER_TARGET],
+            )
         native.py_test(
             name = "{}.numpy".format(name),
             size = numpy_size or size,
             srcs = numpy_srcs,
-            main = _substrate_src("{}.py".format(name), "numpy"),
+            main = _substrate_src(main or "{}.py".format(name), "numpy"),
             deps = _substrate_deps(deps, "numpy"),
             tags = tags + ["tfp_numpy"] + numpy_tags,
             srcs_version = srcs_version,
@@ -344,20 +352,21 @@ def multi_substrate_py_test(
 
     if "jax" not in disabled_substrates:
         jax_srcs = _substrate_srcs(srcs, "jax")
-        native.genrule(
-            name = "rewrite_{}_jax".format(name),
-            srcs = srcs,
-            outs = jax_srcs,
-            cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
-            exec_tools = [REWRITER_TARGET],
-        )
+        if main == None or main == "{}.py".format(name):
+            native.genrule(
+                name = "rewrite_{}_jax".format(name),
+                srcs = srcs,
+                outs = jax_srcs,
+                cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
+                exec_tools = [REWRITER_TARGET],
+            )
         jax_deps = _substrate_deps(deps, "jax")
         # [internal] Add JAX build dep
         native.py_test(
             name = "{}.jax".format(name),
             size = jax_size or size,
             srcs = jax_srcs,
-            main = _substrate_src("{}.py".format(name), "jax"),
+            main = _substrate_src(main or "{}.py".format(name), "jax"),
             deps = jax_deps,
             tags = tags + ["tfp_jax"] + jax_tags,
             srcs_version = srcs_version,

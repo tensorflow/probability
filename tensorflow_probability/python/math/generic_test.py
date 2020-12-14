@@ -623,15 +623,15 @@ class _KahanSumTest(test_util.TestCase):
       dict(testcase_name='_all',
            sample_shape=[3, int(1e6)], axis=None),
       dict(testcase_name='_ax1',
-           sample_shape=[3, int(1e6)], axis=1),
-      dict(testcase_name='_ax1_seq_kd',
-           sample_shape=[3, int(1e6)], axis=[-1], keepdims=True),
-      dict(testcase_name='_ax_both',
-           sample_shape=[3, int(1e6)], axis=[-2, 1]),
-      dict(testcase_name='_ax_01_kd',
-           sample_shape=[2, int(1e6), 3], axis=[0, 1], keepdims=True),
+           sample_shape=[13, int(1e6)], axis=1),
+      dict(testcase_name='_ax1_list_keepdims',
+           sample_shape=[13, int(1e6)], axis=[-1], keepdims=True),
+      dict(testcase_name='_ax_both_tuple',
+           sample_shape=[3, int(1e6)], axis=(-2, 1)),
+      dict(testcase_name='_ax_01_keepdims',
+           sample_shape=[2, int(1e6), 13], axis=[0, 1], keepdims=True),
       dict(testcase_name='_ax_21',
-           sample_shape=[2, int(1e6), 3], axis=[2, -2]))
+           sample_shape=[13, int(1e6), 3], axis=[2, -2]))
   def testKahanSum(self, sample_shape, axis, keepdims=False):
     fn = functools.partial(tfp.math.reduce_kahan_sum,
                            axis=axis, keepdims=keepdims)
@@ -647,7 +647,10 @@ class _KahanSumTest(test_util.TestCase):
     self.assertEqual(oracle.shape, result.total.shape)
     self.assertEqual(oracle.shape, result.correction.shape)
     kahan64 = (tf.cast(result.total, tf.float64) -
-               tf.cast(result.correction, tf.float64))
+               self.evaluate(tf.cast(result.correction, tf.float64)))
+    if np.prod(result.correction.shape) > 1:
+      self.assertNotAllEqual(
+          result.correction, tf.zeros_like(result.correction))
     self.assertAllClose(oracle, kahan64)  # passes even with --vary_seed
     # The counterpoint naive sum below would not typically pass (but does not
     # reliably fail, either). It can fail w/ rtol as high as 0.006.
@@ -667,6 +670,6 @@ del _KahanSumTest
 
 
 if __name__ == '__main__':
-  # TODO(b/173158845): XLA:CPU optimizes away the correction term.
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
   os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

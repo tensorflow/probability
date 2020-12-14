@@ -121,10 +121,12 @@ def log_cumsum_exp(x, axis=-1, name=None):
 
 
 def _kahan_reduction(x, y):
+  """Implements the Kahan summation reduction."""
   (s, c), (s1, c1) = x, y
   for val in -c1, s1:
     u = val - c
     t = s + u
+    # TODO(b/173158845): XLA:CPU reassociates-to-zero the correction term.
     c = (t - s) - u
     s = t
   return s, c
@@ -136,6 +138,25 @@ _reduce_kahan_sum = variadic_reduce.make_variadic_reduce(_kahan_reduction)
 class Kahan(collections.namedtuple('Kahan', ['total', 'correction'])):
   """Result of Kahan summation, i.e. `sum = total - correction`."""
   __slots__ = ()
+
+  def __add__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __radd__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __neg__(self):
+    return Kahan(-self.total, -self.correction)
+
+  def __sub__(self, y):
+    return Kahan._make(_kahan_reduction(
+        self, -y if isinstance(y, Kahan) else (-y, 0)))
+
+  def __rsub__(self, x):
+    return Kahan._make(_kahan_reduction(
+        x if isinstance(x, Kahan) else (x, 0), -self))
 
 
 def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):

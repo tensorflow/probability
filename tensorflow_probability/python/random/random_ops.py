@@ -131,7 +131,7 @@ def spherical_uniform(
   """
   with tf.name_scope(name or 'spherical_uniform'):
     seed = samplers.sanitize_seed(seed)
-    dimension = ps.convert_to_shape_tensor(tf.cast(dimension, dtype=tf.int32))
+    dimension = ps.convert_to_shape_tensor(ps.cast(dimension, dtype=tf.int32))
     shape = ps.convert_to_shape_tensor(shape, dtype=tf.int32)
     dimension_static = tf.get_static_value(dimension)
     sample_shape = ps.concat([shape, [dimension]], axis=0)

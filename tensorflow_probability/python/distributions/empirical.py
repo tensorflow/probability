@@ -123,7 +123,7 @@ class Empirical(distribution.Distribution):
     """Initialize `Empirical` distributions.
 
     Args:
-      samples: Numeric `Tensor` of shape [B1, ..., Bk, S, E1, ..., En]`,
+      samples: Numeric `Tensor` of shape `[B1, ..., Bk, S, E1, ..., En]`,
         `k, n >= 0`. Samples or batches of samples on which the distribution
         is based. The first `k` dimensions index into a batch of independent
         distributions. Length of `S` dimension determines number of samples

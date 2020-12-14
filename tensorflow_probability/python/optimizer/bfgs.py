@@ -314,13 +314,17 @@ def _inv_hessian_control_inputs(inv_hessian):
   """
   # The easiest way to validate if the inverse Hessian is positive definite is
   # to compute its Cholesky decomposition.
-  is_positive_definite = tf.reduce_all(
-      tf.math.is_finite(tf.linalg.cholesky(inv_hessian)),
-      axis=[-1, -2])
+  try:
+    is_positive_definite = tf.reduce_all(
+        tf.math.is_finite(tf.linalg.cholesky(inv_hessian)))
+  except tf.errors.InvalidArgumentError:
+    is_positive_definite = False
 
   # Then check that the supplied inverse Hessian is symmetric.
-  is_symmetric = tf.equal(bfgs_utils.norm(
-      inv_hessian - _batch_transpose(inv_hessian), dims=2), 0)
+  is_symmetric = tf.reduce_all(
+      tf.equal(
+          bfgs_utils.norm(inv_hessian - _batch_transpose(inv_hessian), dims=2),
+          0))
 
   # Simply adding a control dependencies on these results is not enough to
   # trigger them, we need to add asserts on the results.

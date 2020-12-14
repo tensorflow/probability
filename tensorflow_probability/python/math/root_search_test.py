@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+import numpy as np
 import scipy.optimize as optimize
 
 import tensorflow.compat.v2 as tf
@@ -256,6 +257,72 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
           3.,
           4.,
           validate_args=True))
+
+  def test_chandrupatla_automatically_selects_bounds(self):
+    expected_roots = 1e6 * samplers.normal(
+        [4, 3], seed=test_util.test_seed(sampler_type='stateless'))
+    _, value_at_roots, _ = tfp.math.find_root_chandrupatla(
+        objective_fn=lambda x: (x - expected_roots)**5,
+        position_tolerance=1e-8)
+    self.assertAllClose(value_at_roots, tf.zeros_like(value_at_roots))
+
+
+@test_util.test_all_tf_execution_regimes
+class BracketRootTest(test_util.TestCase):
+
+  def test_batch_with_nans(self):
+
+    idxs = np.arange(20, dtype=np.float32)
+    bounds = np.reshape(np.exp(idxs), [4, -1])
+    roots = np.reshape(1. / (20. - idxs), [4, -1])
+    def objective_fn(x):
+      return tf.where(x < -bounds,
+                      np.nan,
+                      tf.where(x > bounds,
+                               np.inf,
+                               (x - roots)**3))
+    low, high = self.evaluate(tfp.math.bracket_root(objective_fn))
+    f_low, f_high = self.evaluate((objective_fn(low), objective_fn(high)))
+    self.assertAllFinite(f_low)
+    self.assertAllFinite(f_high)
+    self.assertAllTrue(low < roots)
+    self.assertAllTrue(high > roots)
+
+  def test_negative_root(self):
+    root = -17.314
+    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    self.assertLess(low, root)
+    self.assertGreater(high, root)
+
+  def test_root_near_zero(self):
+    root = tf.exp(-13.)
+    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    self.assertLess(low, np.exp(-13.))
+    self.assertGreater(high, np.exp(-13))
+    self.assertAllClose(low, root, atol=1e-4)
+    self.assertAllClose(high, root, atol=1e-4)
+
+  def test_returns_zero_width_bracket_at_root(self):
+    root = tf.exp(-10.)
+    low, high = self.evaluate(tfp.math.bracket_root(lambda x: (x - root)))
+    self.assertAllClose(low, root)
+    self.assertAllClose(high, root)
+
+  def test_backs_off_to_trivial_bracket(self):
+    dtype_info = np.finfo(np.float32)
+    low, high = self.evaluate(tfp.math.bracket_root(
+        lambda x: np.nan * x, dtype=np.float32))
+    self.assertEqual(low, dtype_info.min)
+    self.assertEqual(high, dtype_info.max)
+
+  def test_float64(self):
+    low, high = self.evaluate(tfp.math.bracket_root(
+        lambda x: (x - np.pi)**3, dtype=np.float64))
+    self.assertEqual(low.dtype, np.float64)
+    self.assertEqual(high.dtype, np.float64)
+    self.assertLess(low, np.pi)
+    self.assertGreater(high, np.pi)
+
 
 if __name__ == '__main__':
   tf.test.main()

@@ -190,6 +190,10 @@ class Reshape(bijector.Bijector):
           self._event_shape_out, self.validate_args))
     return assertions
 
+  @property
+  def _is_permutation(self):
+    return True
+
   def _forward(self, x):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
         ps.shape(x), self._event_shape_in, self._event_shape_out,

@@ -142,6 +142,7 @@ class MultivariateNormalLinearOperator(
                scale=None,
                validate_args=False,
                allow_nan_stats=True,
+               experimental_use_kahan_sum=False,
                name='MultivariateNormalLinearOperator'):
     """Construct Multivariate Normal distribution on `R^k`.
 
@@ -168,6 +169,13 @@ class MultivariateNormalLinearOperator(
         exception if a statistic (e.g. mean/mode/etc...) is undefined for any
         batch member If `True`, batch members with valid parameters leading to
         undefined statistics will return NaN for this statistic.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values. For best
+        results, Kahan summation should also be applied when computing the
+        log-determinant of the `LinearOperator` representing the scale matrix.
+        Kahan summation improves against the precision of a naive float32 sum.
+        This can be noticeable in particular for large dimensions in float32.
+        See CPU caveat on `tfp.math.reduce_kahan_sum`.
       name: The name to give Ops created by the initializer.
 
     Raises:
@@ -175,6 +183,7 @@ class MultivariateNormalLinearOperator(
       TypeError: if not `scale.dtype.is_floating`
     """
     parameters = dict(locals())
+    self._experimental_use_kahan_sum = experimental_use_kahan_sum
     if scale is None:
       raise ValueError('Missing required `scale` parameter.')
     if not dtype_util.is_floating(scale.dtype):
@@ -207,7 +216,8 @@ class MultivariateNormalLinearOperator(
             normal.Normal(
                 loc=tf.zeros(batch_shape, dtype=dtype),
                 scale=tf.ones([], dtype=dtype)),
-            event_shape),
+            event_shape,
+            experimental_use_kahan_sum=experimental_use_kahan_sum),
         bijector=bijector,
         validate_args=validate_args,
         name=name)

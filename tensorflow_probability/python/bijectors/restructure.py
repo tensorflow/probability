@@ -43,13 +43,7 @@ def unique_token_set(source_structure):
 
 
 class Restructure(bijector.Bijector):
-  """Converts between nested structures of Tensor."""
-
-  def __init__(self,
-               output_structure,
-               input_structure=None,
-               name='restructure'):
-    """Converts between nested structures of Tensor.
+  """Converts between nested structures of Tensors.
 
     This is useful when constructing non-trivial chains of multipart bijectors.
     It partitions inputs into different logical "blocks", which may be fed as
@@ -69,7 +63,7 @@ class Restructure(bijector.Bijector):
       # To permute elements of an individual Tensor, see `tfb.Permute`.
       x = [1, 2, 4, 8, 16, 32, 64]
 
-      assert restructure.forward() == {
+      assert restructure.forward(x) == {
           'foo': [1, 2],
           'bar': [8, 4],
           'baz': [16, 32, 64]
@@ -93,6 +87,13 @@ class Restructure(bijector.Bijector):
         Split([2, 4, 6, 8, 10, 12, 14])
       ])
       ```
+  """
+
+  def __init__(self,
+               output_structure,
+               input_structure=None,
+               name='restructure'):
+    """Creates a `Restructure` bijector.
 
     Args:
       output_structure: A tf.nest-compatible structure of tokens describing the
@@ -152,6 +153,10 @@ class Restructure(bijector.Bijector):
         validate_args=False,
         parameters=parameters,
         name=name)
+
+  @property
+  def _is_permutation(self):
+    return True
 
   def _forward(self, x):
     flat_dict = {}

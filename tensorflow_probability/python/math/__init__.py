@@ -60,6 +60,7 @@ from tensorflow_probability.python.math.minimize import minimize
 from tensorflow_probability.python.math.minimize import MinimizeTraceableQuantities
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
+from tensorflow_probability.python.math.root_search import bracket_root
 from tensorflow_probability.python.math.root_search import find_root_chandrupatla
 from tensorflow_probability.python.math.root_search import find_root_secant
 from tensorflow_probability.python.math.root_search import secant_root
@@ -89,6 +90,7 @@ _allowed_symbols = [
     'bessel_iv_ratio',
     'bessel_ive',
     'bessel_kve',
+    'bracket_root',
     'cholesky_concat',
     'cholesky_update',
     'clip_by_value_preserve_gradient',

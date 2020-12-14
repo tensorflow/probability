@@ -144,7 +144,8 @@ def make_name(super_name, default_super_name, sub_name):
 def _choose_base_case(is_accepted,
                       proposed,
                       current,
-                      name=None):
+                      name=None,
+                      addr=None,):
   """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
   def _where(proposed, current):
     """Wraps `tf.where`."""
@@ -162,28 +163,36 @@ def _choose_base_case(is_accepted,
   with tf.name_scope(name or 'choose'):
     if not is_list_like(proposed):
       return _where(proposed, current)
-    return [(choose(is_accepted, p, c, name=name) if is_namedtuple_like(p)
-             else _where(p, c))
-            for p, c in zip(proposed, current)]
+    return tf.nest.pack_sequence_as(
+        current,
+        [(_choose_recursive(is_accepted, p, c, name=name, addr=f'{addr}[i]')
+          if is_namedtuple_like(p) else
+          _where(p, c)) for i, (p, c) in enumerate(zip(proposed, current))])
+
+
+def _choose_recursive(is_accepted, proposed, current, name=None, addr='<root>'):
+  """Recursion helper which also reports the address of any failures."""
+  with tf.name_scope(name or 'choose'):
+    if not is_namedtuple_like(proposed):
+      return _choose_base_case(is_accepted, proposed, current, name=name,
+                               addr=addr)
+    if not isinstance(proposed, type(current)):
+      raise TypeError(
+          f'Type of `proposed` ({type(proposed).__name__}) must be identical '
+          f'to type of `current` ({type(current).__name__}). (At "{addr}".)')
+    items = {}
+    for fn in proposed._fields:
+      items[fn] = _choose_recursive(is_accepted,
+                                    getattr(proposed, fn),
+                                    getattr(current, fn),
+                                    name=name,
+                                    addr=f'{addr}/{fn}')
+    return type(proposed)(**items)
 
 
 def choose(is_accepted, proposed, current, name=None):
   """Helper which expand_dims `is_accepted` then applies tf.where."""
-  with tf.name_scope(name or 'choose'):
-    if not is_namedtuple_like(proposed):
-      return _choose_base_case(is_accepted, proposed, current, name=name)
-    if not isinstance(proposed, type(current)):
-      raise TypeError('Type of `proposed` ({}) must be identical to '
-                      'type of `current` ({})'.format(
-                          type(proposed).__name__,
-                          type(current).__name__))
-    items = {}
-    for fn in proposed._fields:
-      items[fn] = choose(is_accepted,
-                         getattr(proposed, fn),
-                         getattr(current, fn),
-                         name=name)
-    return type(proposed)(**items)
+  return _choose_recursive(is_accepted, proposed, current, name=name)
 
 
 def strip_seeds(obj):

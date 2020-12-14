@@ -105,7 +105,7 @@ py_test(
 py_library(
     name = "convolutional_layers_v2",
     srcs = ["convolutional_layers_v2.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":layers",
         ":variational_base",

@@ -44,6 +44,7 @@ from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
 
 WORKING_PRECISION_TEST_BLOCK_LIST = (
@@ -115,7 +116,7 @@ class LogProbConsistentPrecisionTest(test_util.TestCase):
     hp.note('Trying distribution {}'.format(
         self.evaluate_dict(dist.parameters)))
     seed = test_util.test_seed()
-    with tfp_hps.no_tf_rank_errors():
+    with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
       samples = dist.sample(5, seed=seed)
       self.assertIn(samples.dtype, [tf.float32, tf.int32])
       self.assertEqual(dist.log_prob(samples).dtype, tf.float32)
@@ -125,7 +126,7 @@ class LogProbConsistentPrecisionTest(test_util.TestCase):
 
     dist64 = tf.nest.map_structure(
         tensor_to_f64, tfe.as_composite(dist), expand_composites=True)
-    with tfp_hps.no_tf_rank_errors():
+    with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
       result64 = log_prob_function(dist64, tensor_to_f64(samples))
     self.assertEqual(result64.dtype, tf.float64)
 

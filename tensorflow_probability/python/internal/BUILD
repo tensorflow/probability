@@ -114,6 +114,27 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "callable_util",
+    srcs = ["callable_util.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "callable_util_test",
+    size = "small",
+    srcs = ["callable_util_test.py"],
+    deps = [
+        ":callable_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "custom_gradient",
     srcs = ["custom_gradient.py"],
     deps = [

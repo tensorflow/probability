@@ -82,6 +82,7 @@ DISABLED_BY_PKG = {
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'random', 'stats', 'util')
 INTERNALS = ('assert_util', 'batched_rejection_sampler', 'cache_util',
+             'callable_util',
              'custom_gradient', 'distribution_util', 'dtype_util',
              'hypothesis_testlib', 'implementation_selection', 'monte_carlo',
              'name_util', 'nest_util', 'parameter_properties', 'prefer_static',
@@ -189,7 +190,7 @@ def main(argv):
   })
 
   filename = argv[1]
-  contents = open(filename).read()
+  contents = open(filename, encoding='utf-8').read()
   if '__init__.py' in filename:
     # Comment out items from __all__.
     for pkg, disabled in disabled_by_pkg.items():
@@ -247,7 +248,7 @@ def main(argv):
   print('# ' + '@' * 78)
   print('\n# (This notice adds 10 to line numbering.)\n\n')
 
-  print(contents)
+  print(contents, file=open(1, 'w', encoding='utf-8', closefd=False))
 
 
 if __name__ == '__main__':

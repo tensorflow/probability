@@ -624,6 +624,11 @@ class Bijector(tf.Module):
             tf.get_static_value(self._inverse_min_event_ndims) == 0)
 
   @property
+  def _is_permutation(self):
+    """Whether `y` is purely a reordering / restructuring of `x`."""
+    return False
+
+  @property
   def validate_args(self):
     """Returns True if Tensor arguments will be validated."""
     return self._validate_args

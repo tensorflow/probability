@@ -21,104 +21,124 @@ from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
 from tensorflow_probability.python.experimental.distribute import joint_distribution as jd
 from tensorflow_probability.python.experimental.distribute import sharded
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
-NUM_DEVICES = 4
+
+def make_jd_sequential(axis_name):
+  return jd.JointDistributionSequential([
+      tfd.Normal(0., 1.),
+      lambda w: sharded.ShardedSample(  # pylint: disable=g-long-lambda
+          tfd.Normal(w, 1.), test_lib.NUM_DEVICES, shard_axis_name=axis_name),
+      lambda x: sharded.ShardedIndependent(  # pylint: disable=g-long-lambda
+          tfd.Normal(x, 1.), 1, shard_axis_name=axis_name),
+  ], shard_axis_name=axis_name)
 
 
-def per_replica_to_tensor(value):
-  return tf.nest.map_structure(
-      lambda per_replica: tf.stack(per_replica.values, axis=0), value)
+def make_jd_named(axis_name):
+  return jd.JointDistributionNamed(  # pylint: disable=g-long-lambda
+      dict(
+          w=tfd.Normal(0., 1.),
+          x=lambda w: sharded.ShardedSample(  # pylint: disable=g-long-lambda
+              tfd.Normal(w, 1.),
+              test_lib.NUM_DEVICES,
+              shard_axis_name=axis_name),
+          data=lambda x: sharded.ShardedIndependent(  # pylint: disable=g-long-lambda
+              tfd.Normal(x, 1.),
+              1,
+              shard_axis_name=axis_name),
+      ), shard_axis_name=axis_name)
 
 
-def model_coroutine():
-  w = yield tfd.JointDistributionCoroutine.Root(tfd.Normal(0., 1.))
-  x = yield sharded.ShardedSample(tfd.Normal(w, 1.), NUM_DEVICES)
-  yield sharded.ShardedIndependent(tfd.Normal(x, 1.), 1)
+def make_jd_coroutine(axis_name):
+
+  def model_coroutine():
+    w = yield tfd.JointDistributionCoroutine.Root(tfd.Normal(0., 1.))
+    x = yield sharded.ShardedSample(
+        tfd.Normal(w, 1.), test_lib.NUM_DEVICES, shard_axis_name=axis_name)
+    yield sharded.ShardedIndependent(
+        tfd.Normal(x, 1.), 1, shard_axis_name=axis_name)
+
+  return jd.JointDistributionCoroutine(
+      model_coroutine, shard_axis_name=axis_name)
 
 
 distributions = (
-    ('coroutine', lambda: jd.JointDistributionCoroutine(model_coroutine)),
-    ('sequential', lambda: jd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-        tfd.Normal(0., 1.),
-        lambda w: sharded.ShardedSample(tfd.Normal(w, 1.), NUM_DEVICES),
-        lambda x: sharded.ShardedIndependent(tfd.Normal(x, 1.), 1),
-    ])),
-    ('named', lambda: jd.JointDistributionNamed(  # pylint: disable=g-long-lambda
-        dict(
-            w=tfd.Normal(0., 1.),
-            x=lambda w: sharded.ShardedSample(tfd.Normal(w, 1.), NUM_DEVICES),
-            data=lambda x: sharded.ShardedIndependent(tfd.Normal(x, 1.), 1),
-        ))),
+    ('coroutine', make_jd_coroutine),
+    ('sequential', make_jd_sequential),
+    ('named', make_jd_named),
 )
 
 
 @test_util.test_all_tf_execution_regimes
-class JointDistributionTest(test_util.TestCase):
+class JointDistributionTest(test_lib.DistributedTest):
 
-  def setUp(self):
-    super(JointDistributionTest, self).setUp()
-    self.strategy = tf.distribute.MirroredStrategy(
-        devices=tf.config.list_logical_devices())
-
-  def shard_values(self, values):
-
-    def value_fn(ctx):
-      return values[ctx.replica_id_in_sync_group]
-
-    return self.strategy.experimental_distribute_values_from_function(value_fn)
-
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      reason='Cannot call `get_sharded_distributions` outside of pmap.')
   def test_get_sharded_distribution_coroutine(self):
-    dist = distributions[0][1]()
-    self.assertTupleEqual(dist.get_sharded_distributions(),
-                          (False, True, True))
+    dist = distributions[0][1](self.axis_name)
+    self.assertTupleEqual(dist.get_sharded_distributions(), (False, True, True))
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      reason='Cannot call `get_sharded_distributions` outside of pmap.')
   def test_get_sharded_distribution_sequential(self):
-    dist = distributions[1][1]()
-    self.assertListEqual(dist.get_sharded_distributions(),
-                         [False, True, True])
+    dist = distributions[1][1](self.axis_name)
+    self.assertListEqual(dist.get_sharded_distributions(), [False, True, True])
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      reason='Cannot call `get_sharded_distributions` outside of pmap.')
   def test_get_sharded_distribution_named(self):
-    dist = distributions[2][1]()
+    dist = distributions[2][1](self.axis_name)
     self.assertDictEqual(dist.get_sharded_distributions(),
                          dict(w=False, x=True, data=True))
 
   @parameterized.named_parameters(*distributions)
   def test_jd(self, dist_fn):
-    dist = dist_fn()
+    dist = dist_fn(self.axis_name)
 
-    @tf.function(autograph=False)
     def run(key):
       sample = dist.sample(seed=key)
-      return sample, dist.log_prob(sample)
+      # The identity is to prevent reparameterization gradients from kicking in.
+      log_prob, (log_prob_grads,) = tfp.math.value_and_gradient(
+          dist.log_prob, (tf.nest.map_structure(tf.identity, sample),))
+      return sample, log_prob, log_prob_grads
 
-    sample, log_prob = per_replica_to_tensor(
-        self.strategy.run(run, (tf.ones(2, tf.int32),)))
+    sample, log_prob, log_prob_grads = self.strategy_run(
+        run, (self.key,), in_axes=None)
+    sample, log_prob, log_prob_grads = self.per_replica_to_tensor(
+        (sample, log_prob, log_prob_grads))
 
-    def true_log_prob(sample):
-      if isinstance(dist, jd.JointDistributionNamed):
-        w, x, data = sample['w'], sample['x'], sample['data']
-      else:
-        w, x, data = sample
-      return (tfd.Normal(0., 1.).log_prob(w[0]) +
+    def true_log_prob_fn(w, x, data):
+      return (tfd.Normal(0., 1.).log_prob(w) +
               tfd.Sample(tfd.Normal(w, 1.), (4, 1)).log_prob(x) +
               tfd.Independent(tfd.Normal(x, 1.), 2).log_prob(data))
 
+    if isinstance(dist, jd.JointDistributionNamed):
+      # N.B. the global RV 'w' gets replicated, so we grab any single replica's
+      # result.
+      w, x, data = sample['w'][0], sample['x'], sample['data']
+      log_prob_grads = (log_prob_grads['w'][0], log_prob_grads['x'],
+                        log_prob_grads['data'])
+    else:
+      w, x, data = sample[0][0], sample[1], sample[2]
+      log_prob_grads = (log_prob_grads[0][0], log_prob_grads[1],
+                        log_prob_grads[2])
+
+    true_log_prob, true_log_prob_grads = tfp.math.value_and_gradient(
+        true_log_prob_fn, (w, x, data))
+
     self.assertAllClose(
-        self.evaluate(log_prob),
-        self.evaluate(tf.ones(4) * true_log_prob(sample)))
+        self.evaluate(log_prob), self.evaluate(tf.ones(4) * true_log_prob))
+    self.assertAllCloseNested(
+        self.evaluate(log_prob_grads), self.evaluate(true_log_prob_grads))
 
 
 if __name__ == '__main__':
-  tf.enable_v2_behavior()
-  physical_devices = tf.config.experimental.list_physical_devices()
-
-  num_logical_devices = 4
-  tf.config.experimental.set_virtual_device_configuration(
-      physical_devices[0],
-      [tf.config.experimental.VirtualDeviceConfiguration()] * NUM_DEVICES)
   tf.test.main()

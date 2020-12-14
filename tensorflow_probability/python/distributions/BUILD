@@ -64,6 +64,7 @@ multi_substrate_py_library(
         ":empirical",
         ":exp_gamma",
         ":exponential",
+        ":exponentially_modified_gaussian",
         ":finite_discrete",
         ":gamma",
         ":gamma_gamma",
@@ -72,6 +73,7 @@ multi_substrate_py_library(
         ":generalized_normal",
         ":generalized_pareto",
         ":geometric",
+        ":gev",
         ":gumbel",
         ":half_cauchy",
         ":half_normal",
@@ -130,6 +132,7 @@ multi_substrate_py_library(
         ":sinh_arcsinh",
         ":skellam",
         ":spherical_uniform",
+        ":stopping_ratio_logistic",
         ":student_t",
         ":student_t_process",
         ":transformed_distribution",
@@ -586,6 +589,21 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "exponentially_modified_gaussian",
+    srcs = ["exponentially_modified_gaussian.py"],
+    deps = [
+        ":distribution",
+        ":exponential",
+        ":normal",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "finite_discrete",
     srcs = ["finite_discrete.py"],
     deps = [
@@ -751,6 +769,24 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gev",
+    srcs = ["gev.py"],
+    deps = [
+        ":kullback_leibler",
+        ":transformed_distribution",
+        ":uniform",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:gev_cdf",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -1124,6 +1160,7 @@ multi_substrate_py_library(
         ":normal",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/bijectors:chain",
         "//tensorflow_probability/python/bijectors:cholesky_outer_product",
         "//tensorflow_probability/python/bijectors:correlation_cholesky",
@@ -1135,6 +1172,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:numeric",
         "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -1741,6 +1779,23 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "stopping_ratio_logistic",
+    srcs = ["stopping_ratio_logistic.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "half_student_t",
     srcs = ["half_student_t.py"],
     deps = [
@@ -1900,6 +1955,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/random:random_ops",
     ],
 )
 
@@ -2421,6 +2477,21 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "exponentially_modified_gaussian_test",
+    srcs = ["exponentially_modified_gaussian_test.py"],
+    jax_size = "medium",
+    # Disable numpy test for now because a bug in the types returned by special_math.ndtr
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "finite_discrete_test",
     size = "medium",
     srcs = ["finite_discrete_test.py"],
@@ -2558,6 +2629,19 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "gev_test",
+    srcs = ["gev_test.py"],
+    jax_size = "medium",
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "half_cauchy_test",
     srcs = ["half_cauchy_test.py"],
     numpy_tags = ["notap"],
@@ -2630,6 +2714,27 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "independent_test_gpu",
+    srcs = ["independent_test.py"],
+    disabled_substrates = ["numpy"],
+    jax_size = "medium",
+    main = "independent_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = ["requires-gpu-nvidia"],
+    deps = [
+        # hypothesis dep,
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "inverse_gamma_test",
     size = "medium",
     srcs = ["inverse_gamma_test.py"],
@@ -2689,12 +2794,13 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["joint_distribution_auto_batched_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 2,
+    shard_count = 7,
     deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -2990,6 +3096,7 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -3026,7 +3133,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["mvn_tril_test.py"],
     numpy_tags = ["notap"],
-    shard_count = 5,
+    shard_count = 7,
     tags = ["nomsan"],
     deps = [
         # absl/testing:parameterized dep,
@@ -3036,6 +3143,7 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -3309,6 +3417,24 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "sample_test_gpu",
+    srcs = ["sample_test.py"],
+    disabled_substrates = ["numpy"],
+    jax_size = "medium",
+    main = "sample_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    tags = ["requires-gpu-nvidia"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "sinh_arcsinh_test",
     srcs = ["sinh_arcsinh_test.py"],
     deps = [
@@ -3333,6 +3459,18 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "stopping_ratio_logistic_test",
+    srcs = ["stopping_ratio_logistic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -3591,6 +3729,7 @@ py_test(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
         # tensorflow/compiler/jit dep,
     ],
 )

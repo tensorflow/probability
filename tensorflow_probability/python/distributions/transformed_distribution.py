@@ -289,12 +289,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     # dtype.)
     if tf.nest.is_nested(base_batch_shape_tensor):
       if self._is_joint:
-        return base_batch_shape_tensor
-
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(base_batch_shape_tensor))
       base_batch_shape_tensor = functools.reduce(
           ps.broadcast_shape,
           tf.nest.flatten(base_batch_shape_tensor))
-
     return base_batch_shape_tensor
 
   def _batch_shape(self):
@@ -308,7 +307,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the batch shape components of the base distribution are broadcast to
     # obtain the batch shape of the transformed distribution.
     batch_shape = self.distribution.batch_shape
-    if tf.nest.is_nested(batch_shape) and not self._is_joint:
+    if tf.nest.is_nested(batch_shape):
+      if self._is_joint:
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(batch_shape))
       batch_shape = functools.reduce(
           tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
     return batch_shape
@@ -477,6 +479,32 @@ class TransformedDistribution(distribution_lib.Distribution):
     sample_shape = tf.convert_to_tensor([], dtype=tf.int32, name='sample_shape')
     y = self._set_sample_static_shape(y, sample_shape)
     return y
+
+  def _stddev(self, **kwargs):
+    if not self.bijector.is_constant_jacobian:
+      raise NotImplementedError('`stddev` is not implemented for non-affine '
+                                '`bijectors`.')
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError('`stddev` is not implemented when '
+                                '`bijector` is not injective.')
+    if not (self.bijector._is_scalar  # pylint: disable=protected-access
+            or self.bijector._is_permutation):  # pylint: disable=protected-access
+      raise NotImplementedError('`stddev` is not implemented when `bijector` '
+                                'is a multivariate transformation.')
+
+    # A scalar affine bijector is of the form `forward(x) = scale * x + shift`,
+    # where the standard deviation is invariant to the shift, so we extract the
+    # shift and subtract it.
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x_stddev = self.distribution.stddev(**distribution_kwargs)
+    y_stddev_plus_shift = self.bijector.forward(x_stddev, **bijector_kwargs)
+    shift = self.bijector.forward(
+        tf.nest.map_structure(
+            tf.zeros_like, x_stddev),
+        **bijector_kwargs)
+    return tf.nest.map_structure(
+        tf.abs,
+        tf.nest.map_structure(tf.subtract, y_stddev_plus_shift, shift))
 
   def _entropy(self, **kwargs):
     if not self.bijector.is_constant_jacobian:

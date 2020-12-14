@@ -19,7 +19,6 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import unnest
@@ -412,14 +411,8 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
     with tf.name_scope(
         mcmc_util.make_name(name, 'gradient_based_trajectory_length_adaptation',
                             '__init__')) as name:
-      dtype = dtype_util.common_dtype([adaptation_rate, jitter_amount],
-                                      tf.float32)
       num_adaptation_steps = tf.convert_to_tensor(
           num_adaptation_steps, dtype=tf.int32, name='num_adaptation_steps')
-      adaptation_rate = tf.convert_to_tensor(
-          adaptation_rate, dtype=dtype, name='adaptation_rate')
-      jitter_amount = tf.convert_to_tensor(
-          jitter_amount, dtype=dtype, name='jitter_amount')
       max_leapfrog_steps = tf.convert_to_tensor(
           max_leapfrog_steps, dtype=tf.int32, name='max_leapfrog_steps')
 
@@ -571,7 +564,7 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
                             'gradient_based_trajectory_length_adaptation',
                             'bootstrap_results')):
       inner_results = self.inner_kernel.bootstrap_results(init_state)
-      dtype = self.parameters['adaptation_rate'].dtype
+      dtype = self.log_accept_prob_getter_fn(inner_results).dtype
       init_state = tf.nest.map_structure(
           lambda x: tf.convert_to_tensor(x, dtype=dtype), init_state)
       step_size = _ensure_step_size_is_scalar(
@@ -583,8 +576,11 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
           inner_results=inner_results,
           max_trajectory_length=init_max_trajectory_length,
           step=tf.zeros([], tf.int32),
-          adaptation_rate=self.parameters['adaptation_rate'],
-          jitter_amount=self.parameters['jitter_amount'],
+          adaptation_rate=tf.convert_to_tensor(
+              self.parameters['adaptation_rate'], dtype,
+              name='adaptation_rate'),
+          jitter_amount=tf.convert_to_tensor(
+              self.parameters['jitter_amount'], dtype, name='jitter_amount'),
           averaged_sq_grad=tf.zeros([], dtype),
           averaged_max_trajectory_length=tf.zeros([], dtype),
           criterion=tf.zeros_like(
