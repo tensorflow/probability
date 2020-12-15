@@ -53,6 +53,16 @@ class MinimizeTests(test_util.TestCase):
     self.assertAllClose(results_['x'][-1], target_x, atol=0.2)
     self.assertAllClose(results_['sqdiff'][-1], [0., 0.], atol=0.1)
 
+  def test_can_trace_all_traceable_quantities(self):
+    x = tf.Variable(5.0)
+    trace_fn = lambda traceable_quantities: traceable_quantities
+    results = tfp.math.minimize(loss_fn=lambda: tf.reduce_sum((x - 1.0)**2),
+                                num_steps=10,
+                                optimizer=tf.optimizers.Adam(0.1),
+                                trace_fn=trace_fn)
+    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(results)
+
   def test_respects_trainable_variables(self):
     # Variables not included in `trainable_variables` should stay fixed.
     x = tf.Variable(5.)
