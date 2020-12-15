@@ -180,6 +180,8 @@ class VectorExponentialLinearOperator(
       TypeError: if not `scale.dtype.is_floating`
     """
     parameters = dict(locals())
+    if loc is None:
+      loc = 0.0  # Implicit value for backwards compatibility.
     if scale is None:
       raise ValueError('Missing required `scale` parameter.')
     if not dtype_util.is_floating(scale.dtype):
