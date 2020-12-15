@@ -39,7 +39,7 @@ class DiscreteCosineTransform(bijector.Bijector):
 
   The inverse `X = g^{-1}(Y) = IDCT(Y)`, where IDCT is DCT-III for type==2.
 
-  This bijector can be interleaved with Affine bijectors to build a cascade of
+  This bijector can be interleaved with affine bijectors to build a cascade of
   structured efficient linear layers as in [1].
 
   Note that the operator applied is orthonormal (i.e. `norm='ortho'`).

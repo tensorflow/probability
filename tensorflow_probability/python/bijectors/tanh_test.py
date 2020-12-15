@@ -66,11 +66,10 @@ class TanhBijectorTest(test_util.TestCase):
   def testMatchWithAffineTransform(self):
     direct_bj = tfb.Tanh()
     indirect_bj = tfb.Chain([
-        tfb.AffineScalar(
-            shift=tf.cast(-1.0, dtype=tf.float64),
-            scale=tf.cast(2.0, dtype=tf.float64)),
+        tfb.Shift(tf.cast(-1.0, dtype=tf.float64)),
+        tfb.Scale(tf.cast(2.0, dtype=tf.float64)),
         tfb.Sigmoid(),
-        tfb.AffineScalar(scale=tf.cast(2.0, dtype=tf.float64))
+        tfb.Scale(tf.cast(2.0, dtype=tf.float64))
     ])
 
     x = np.linspace(-3.0, 3.0, 100)

@@ -103,7 +103,7 @@ def _masked_autoregressive_gated_bijector_fn(hidden_units,
     shift = reshape_output(shift)
     logit_gate = reshape_output(logit_gate)
     gate = tf.nn.sigmoid(logit_gate)
-    return tfb.AffineScalar(shift=(1. - gate) * shift, scale=gate)
+    return tfb.Shift(shift=(1. - gate) * shift)(tfb.Scale(scale=gate))
 
   return _bijector_fn
 

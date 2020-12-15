@@ -32,7 +32,7 @@ __all__ = [
 class Expm1(bijector.Bijector):
   """Compute `Y = g(X) = exp(X) - 1`.
 
-    This `Bijector` is no different from Chain([AffineScalar(shift=-1), Exp()]).
+    This `Bijector` is no different from Chain([Shift(-1), Exp()]).
 
     However, this makes use of the more numerically stable routines
     `tf.math.expm1` and `tf.log1p`.
