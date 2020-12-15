@@ -282,7 +282,8 @@ class ParameterBijectorsTest(test_util.TestCase):
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
                            'MultivariateStudentTLinearOperator',
                            'PoissonLogNormalQuadratureCompound',
-                           'SphericalUniform', 'SinhArcsinh')
+                           'SphericalUniform', 'SinhArcsinh',
+                           'StoppingRatioLogistic',)
     non_trainable_dists = (
         high_gt_low_constraint_dists + not_annotated_dists +
         dhps.INSTANTIABLE_META_DISTS)
