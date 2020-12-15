@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import implementation_selection
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
@@ -94,7 +95,7 @@ def _variadic_reduce(t, init, axis, reducer):
   return tuple(tf.squeeze(part, axis=ax) for part in result)
 
 
-def make_variadic_reduce(reducer):
+def make_variadic_reduce(reducer, vjp_bwd, tangents_fn):
   """Wraps a generic reducer function as a variadic reduction.
 
   The current use-case for this is TFP-internal. This function captures logic
@@ -104,6 +105,12 @@ def make_variadic_reduce(reducer):
   Args:
     reducer: The reducer callable. Takes two tuple args and returns a single
       reduced tuple.
+    vjp_bwd: Custom VJP function. Takes `(aux, grads)` args with
+      `aux = (operands, inits, axis, unsqueezed_shape)` and returns a tuple of
+      grads w.r.t `operands`. Gradients w.r.t. `inits` are presumed `None`.
+    tangents_fn: Custom JVP function. Takes `(inits, axis, primals, tangents)`
+      args with `primals = (operands,)` and corresponding tangents and returns
+      `tangents_out` (which must be linear w.r.t. `tangents`).
 
   Returns:
     reduce_fn: A callable with taking args
@@ -129,6 +136,39 @@ def make_variadic_reduce(reducer):
       tensorshape_util.set_shape(
           part, tuple(dim for i, dim in enumerate(shp) if i not in axis))
     return result
+
+  def _variadic_reduce_no_grad(operands, inits, axis, reducer):
+    if JAX_MODE:
+      from jax import lax  # pylint: disable=g-import-not-at-top
+      return lax.reduce(
+          operands, init_values=inits, dimensions=axis, computation=reducer)
+    elif (tf.executing_eagerly() or
+          not control_flow_util.GraphOrParentsInXlaContext(
+              tf1.get_default_graph())):
+      return _variadic_reduce(
+          operands, init=inits, axis=axis, reducer=reducer)
+    else:
+      return _xla_reduce(operands, inits, axis)
+
+  def _variadic_reduce_fwd(operands, inits, axis, reducer, unsqueezed_shape):
+    return (_variadic_reduce_no_grad(operands, inits, axis, reducer),
+            (operands, inits, axis, unsqueezed_shape))
+
+  def _variadic_reduce_jvp(inits, axis, reducer, unsqueezed_shape, primals,
+                           tangents):
+    del unsqueezed_shape
+    operands, = primals
+    return (_variadic_reduce_no_grad(operands, inits, axis, reducer),
+            tangents_fn(inits, axis, primals, tangents))
+
+  @tfp_custom_gradient.custom_gradient(vjp_fwd=_variadic_reduce_fwd,
+                                       vjp_bwd=vjp_bwd,
+                                       jvp_fn=_variadic_reduce_jvp,
+                                       nondiff_argnums=(1, 2, 3, 4))
+  def _variadic_reduce_custom_grad(operands, inits, axis, reducer,
+                                   unsqueezed_shape):
+    del unsqueezed_shape  # provided for backprop convenience
+    return _variadic_reduce_no_grad(operands, inits, axis, reducer)
 
   def reduce_fn(operands, inits, axis=None, keepdims=False):
     """Applies `reducer` to the given operands along the given axes.
@@ -161,29 +201,21 @@ def make_variadic_reduce(reducer):
     axis = np.where(axis < 0, axis + ndims, axis)
     axis = tuple(int(ax) for ax in axis)
 
-    if JAX_MODE:
-      from jax import lax  # pylint: disable=g-import-not-at-top
-      result = lax.reduce(
-          operands, init_values=inits, dimensions=axis, computation=reducer)
-    elif (tf.executing_eagerly() or
-          not control_flow_util.GraphOrParentsInXlaContext(
-              tf1.get_default_graph())):
-      result = _variadic_reduce(
-          operands, init=inits, axis=axis, reducer=reducer)
-    else:
-      result = _xla_reduce(operands, inits, axis)
+    axis_nhot = ps.reduce_sum(
+        ps.one_hot(axis, depth=ndims,
+                   on_value=True, off_value=False, dtype=tf.bool),
+        axis=0)
+    in_shape = args_shape
+    if not tensorshape_util.is_fully_defined(in_shape):
+      in_shape = tf.shape(operands[0])
+    unsqueezed_shape = ps.where(axis_nhot, 1, in_shape)
+
+    result = _variadic_reduce_custom_grad(
+        operands, inits, axis, reducer, unsqueezed_shape)
 
     if keepdims:
-      axis_nhot = ps.reduce_sum(
-          ps.one_hot(axis, depth=ndims,
-                     on_value=True, off_value=False, dtype=tf.bool),
-          axis=0)
-      in_shape = args_shape
-      if not tensorshape_util.is_fully_defined(in_shape):
-        in_shape = tf.shape(operands[0])
-      final_shape = ps.where(axis_nhot, 1, in_shape)
       result = tf.nest.map_structure(
-          lambda t: tf.reshape(t, final_shape), result)
+          lambda t: tf.reshape(t, unsqueezed_shape), result)
     return result
 
   return reduce_fn

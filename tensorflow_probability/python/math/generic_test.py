@@ -36,6 +36,9 @@ from tensorflow_probability.python.math.gradient import batch_jacobian
 tfd = tfp.distributions
 
 
+JAX_MODE = False
+
+
 @test_util.test_all_tf_execution_regimes
 class LogHarmonicMeanExpTest(test_util.TestCase):
 
@@ -657,6 +660,25 @@ class _KahanSumTest(test_util.TestCase):
     # naive_sum = tf.cast(tf.reduce_sum(vals, axis=axis, keepdims=keepdims),
     #                     tf.float64)
     # self.assertAllClose(oracle, naive_sum)
+
+    if test_util.is_numpy_not_jax_mode():
+      # Skip checking gradients for Numpy.
+      return
+
+    dy = self.evaluate(
+        tfd.Normal(0, 1).sample(result.total.shape, seed=test_util.test_seed()))
+    def grad_fn(x):
+      return tfp.math.value_and_gradient(lambda x: fn(x).total ** 2., x,
+                                         output_gradients=dy)[1]
+    if self.jit:
+      grad_fn = tf.function(grad_fn, experimental_compile=True)
+    grad = grad_fn(vals)
+    self.assertIsNotNone(grad)
+    keepdims_shape = tf.reduce_sum(vals, axis=axis, keepdims=True).shape
+    self.assertAllClose(
+        tf.broadcast_to(tf.reshape(dy * 2. * result.total, keepdims_shape),
+                        vals.shape),
+        grad)
 
 
 class KahanSumJitTest(_KahanSumTest):
