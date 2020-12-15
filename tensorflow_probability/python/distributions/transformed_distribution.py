@@ -134,9 +134,7 @@ class TransformedDistribution(distribution_lib.Distribution):
   tfb = tfp.bijectors
   normal = tfd.TransformedDistribution(
     distribution=tfd.Normal(loc=0., scale=1.),
-    bijector=tfb.Affine(
-      shift=-1.,
-      scale_identity_multiplier=2.)
+    bijector=tfb.Shift(shift=-1.)(tfb.Scale(scale=2.)),
     name='NormalTransformedDistribution')
   ```
 

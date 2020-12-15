@@ -89,8 +89,7 @@ class SampleDistributionTest(test_util.TestCase):
   def test_transformed_affine(self):
     sample_shape = 3
     mvn = tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1)
-    aff = tfb.Affine(scale_tril=[[0.75, 0.],
-                                 [0.05, 0.5]])
+    aff = tfb.ScaleMatvecTriL(scale_tril=[[0.75, 0.], [0.05, 0.5]])
 
     def expected_lp(y):
       x = aff.inverse(y)  # Ie, tf.random.normal([4, 3, 2])

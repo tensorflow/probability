@@ -188,7 +188,7 @@ class QuantizedDistribution(distributions.Distribution):
   discretized_logistic_dist = tfd.QuantizedDistribution(
       distribution=tfd.TransformedDistribution(
           distribution=tfd.Logistic(loc=loc, scale=scale),
-          bijector=tfb.AffineScalar(shift=-0.5)),
+          bijector=tfb.Shift(shift=-0.5)),
       low=0.,
       high=2**16 - 1.)
   mixture_dist = tfd.MixtureSameFamily(

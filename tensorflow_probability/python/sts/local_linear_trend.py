@@ -404,7 +404,7 @@ class LocalLinearTrend(StructuralTimeSeries):
               initial_slope_prior.stddev()
           ], axis=-1))
 
-      scaled_softplus = tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+      scaled_softplus = tfb.Chain([tfb.Scale(scale=observed_stddev),
                                    tfb.Softplus()])
       super(LocalLinearTrend, self).__init__(
           parameters=[

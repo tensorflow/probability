@@ -252,8 +252,8 @@ class TransformedTransitionKernelTest(test_util.TestCase):
             step_size=[1.23 / 0.75, 1.23 / 0.5],
             num_leapfrog_steps=2),
         bijector=[
-            tfb.AffineScalar(scale=0.75),
-            tfb.AffineScalar(scale=0.5),
+            tfb.Scale(scale=0.75),
+            tfb.Scale(scale=0.5),
         ])
     # Recall, tfp.mcmc.sample_chain calls
     # transformed_hmc.bootstrap_results too.
@@ -304,7 +304,7 @@ class TransformedTransitionKernelTest(test_util.TestCase):
   def test_copy_works(self):
     transformed = tfp.mcmc.TransformedTransitionKernel(
         inner_kernel=FakeInnerKernel(target_log_prob_fn=fake_target_log_prob),
-        bijector=tfb.AffineScalar(2.))
+        bijector=tfb.Scale(2.))
 
     transformed_copy = tfp.mcmc.TransformedTransitionKernel(
         **transformed.parameters)

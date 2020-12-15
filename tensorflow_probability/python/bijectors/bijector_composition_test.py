@@ -38,9 +38,9 @@ class BijectorCompositionTest(test_util.TestCase):
     x = tf.constant([-5., 0., 5.])
     sigmoid = functools.reduce(lambda chain, f: chain(f), [
         tfb.Reciprocal(),
-        tfb.AffineScalar(shift=1.),
+        tfb.Shift(shift=1.),
         tfb.Exp(),
-        tfb.AffineScalar(scale=-1.),
+        tfb.Scale(scale=-1.),
     ])
     self.assertIsInstance(sigmoid, tfb.Chain)
     self.assertAllClose(
@@ -50,7 +50,7 @@ class BijectorCompositionTest(test_util.TestCase):
   def testComposeFromTransformedDistribution(self):
     actual_log_normal = tfb.Exp()(tfd.TransformedDistribution(
         distribution=tfd.Normal(0, 1),
-        bijector=tfb.AffineScalar(shift=0.5, scale=2.)))
+        bijector=tfb.Shift(shift=0.5)(tfb.Scale(scale=2.))))
     expected_log_normal = tfd.LogNormal(0.5, 2.)
     x = tf.constant([0.1, 1., 5.])
     self.assertAllClose(
