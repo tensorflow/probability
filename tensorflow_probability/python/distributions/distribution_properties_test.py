@@ -526,6 +526,29 @@ class DistributionSlicingTest(test_util.TestCase):
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
 
 
+# Don't decorate with test_util.test_all_tf_execution_regimes, since we're
+# explicitly mixing modes.
+class TestMixingGraphAndEagerModes(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in  sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                           list(dhps.INSTANTIABLE_META_DISTS))
+  )
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testSampleEagerCreatedDistributionInGraphMode(self, dist_name, data):
+    if not tf.executing_eagerly():
+      self.skipTest('Only test mixed eager/graph behavior in eager tests.')
+    # Create in eager mode.
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False))
+
+    @tf.function
+    def f():
+      dist.sample()
+    f()
+
+
 if __name__ == '__main__':
   # Hypothesis often finds numerical near misses.  Debugging them is much aided
   # by seeing all the digits of every floating point number, instead of the
