@@ -80,6 +80,7 @@ PMAP_LOGPROB_BLOCKLIST = (
 
 JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = (
+    'GeneralizedExtremeValue',  # http://b/175654800
     'Skellam',  # http://b/171079052
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
@@ -89,6 +90,7 @@ JVP_LOGPROB_PARAM_BLOCKLIST = (
 
 VJP_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
+    'GeneralizedExtremeValue',  # http://b/175654800
     'Skellam',  # http://b/171079052
 )
 VJP_LOGPROB_PARAM_BLOCKLIST = (
