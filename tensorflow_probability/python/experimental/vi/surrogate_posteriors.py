@@ -157,14 +157,7 @@ def build_factored_surrogate_posterior(
       `tfd.TransformedDistribution(underlying_dist, bijector)` if a
       corresponding constraining bijector is specified, otherwise it is modeled
       as supported on the unconstrained real line.
-    constraining_bijectors: Optional `tfb.Bijector` instance, or nested
-      structure of such instances, defining support(s) of the posterior
-      variables. The structure must match that of `event_shape` and may
-      contain `None` values. A posterior variable will
-      be modeled as `tfd.TransformedDistribution(underlying_dist,
-      constraining_bijector)` if a corresponding constraining bijector is
-      specified, otherwise it is modeled as supported on the
-      unconstrained real line.
+    constraining_bijectors: Deprecated alias for `bijector`.
     initial_unconstrained_loc: Optional Python `callable` with signature
       `tensor = initial_unconstrained_loc(shape, seed)` used to sample
       real-valued initializations for the unconstrained representation of each
