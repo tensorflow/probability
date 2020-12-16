@@ -21,8 +21,10 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -569,3 +571,22 @@ def _kl_transformed_transformed(a, b, name=None):
       'Unable to calculate KL divergence between {} and {} because '
       'their bijectors are not equal: {} vs. {}'.format(
           a, b, a.bijector, b.bijector))
+
+
+@log_prob_ratio.RegisterLogProbRatio(TransformedDistribution)
+def _transformed_log_prob_ratio(p, x, q, y):
+  """Computes p.log_prob(x) - q.log_prob(y) for p and q both TDs."""
+  x_ = p.bijector.inverse(x)
+  y_ = q.bijector.inverse(y)
+
+  base_log_prob_ratio = log_prob_ratio.log_prob_ratio(
+      p.distribution, x_, q.distribution, y_)
+
+  event_ndims = tf.nest.map_structure(
+      ps.rank_from_shape,
+      p.event_shape_tensor,
+      tf.nest.map_structure(tensorshape_util.merge_with,
+                            p.event_shape, q.event_shape))
+  ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
+      p.bijector, x, q.bijector, y, event_ndims)
+  return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)

@@ -97,6 +97,7 @@ multi_substrate_py_library(
         ":laplace",
         ":linear_gaussian_ssm",
         ":lkj",
+        ":log_prob_ratio",
         ":logistic",
         ":logitnormal",
         ":loglogistic",
@@ -874,6 +875,7 @@ multi_substrate_py_library(
     deps = [
         ":distribution",
         ":kullback_leibler",
+        ":log_prob_ratio",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -952,6 +954,7 @@ multi_substrate_py_library(
     srcs = ["joint_distribution.py"],
     deps = [
         ":distribution",
+        ":log_prob_ratio",
         # numpy dep,
         # six dep,
         # tensorflow dep,
@@ -1161,6 +1164,14 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/math:numeric",
         "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "log_prob_ratio",
+    srcs = ["log_prob_ratio.py"],
+    deps = [
+        # tensorflow dep,
     ],
 )
 
@@ -1718,6 +1729,7 @@ multi_substrate_py_library(
     deps = [
         ":distribution",
         ":kullback_leibler",
+        ":log_prob_ratio",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -1867,7 +1879,9 @@ multi_substrate_py_library(
     deps = [
         ":distribution",
         ":kullback_leibler",
+        ":log_prob_ratio",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:ldj_ratio",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -3376,6 +3390,7 @@ multi_substrate_py_test(
     name = "sample_test",
     srcs = ["sample_test.py"],
     jax_size = "medium",
+    shard_count = 2,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

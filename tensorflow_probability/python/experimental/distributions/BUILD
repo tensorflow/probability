@@ -37,6 +37,7 @@ multi_substrate_py_library(
     deps = [
         ":joint_distribution_pinned",
         ":mvn_precision_factor_linop",
+        "//tensorflow_probability/python/distributions:log_prob_ratio",
     ],
 )
 

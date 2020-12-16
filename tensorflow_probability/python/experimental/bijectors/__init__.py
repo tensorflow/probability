@@ -14,8 +14,10 @@
 # ============================================================================
 """TensorFlow Probability experimental bijectors package."""
 
+from tensorflow_probability.python.bijectors.ldj_ratio import inverse_log_det_jacobian_ratio
 from tensorflow_probability.python.experimental.bijectors.scalar_function_with_inferred_inverse import ScalarFunctionWithInferredInverse
 
 __all__ = [
-    'ScalarFunctionWithInferredInverse'
+    'inverse_log_det_jacobian_ratio',
+    'ScalarFunctionWithInferredInverse',
 ]
