@@ -464,7 +464,7 @@ def _prepare_args(target_log_prob_fn,
     def _batched_isotropic_normal_like(state_part):
       event_ndims = ps.rank(state_part) - batch_rank
       return independent.Independent(
-          normal.Normal(ps.zeros_like(state_part, tf.float32), 1.),
+          normal.Normal(ps.zeros_like(state_part), 1.),
           reinterpreted_batch_ndims=event_ndims)
 
     momentum_distribution = jds.JointDistributionSequential(

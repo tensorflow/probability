@@ -386,6 +386,36 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
     dict(testcase_name='_explicit', use_default=False))
 class PreconditionedHMCTest(test_util.TestCase):
 
+  def test_f64(self, use_default):
+    if use_default:
+      momentum_distribution = None
+    else:
+      momentum_distribution = tfp.experimental.as_composite(
+          tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        lambda x: -x**2, step_size=.5, num_leapfrog_steps=2,
+        momentum_distribution=momentum_distribution)
+    kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
+    self.evaluate(tfp.mcmc.sample_chain(
+        1, kernel=kernel, current_state=tf.ones([], tf.float64),
+        num_burnin_steps=5, trace_fn=None))
+
+  # TODO(b/175787154): Enable this test
+  def DISABLED_test_f64_multichain(self, use_default):
+    if use_default:
+      momentum_distribution = None
+    else:
+      momentum_distribution = tfp.experimental.as_composite(
+          tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        lambda x: -x**2, step_size=.5, num_leapfrog_steps=2,
+        momentum_distribution=momentum_distribution)
+    kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
+    nchains = 7
+    self.evaluate(tfp.mcmc.sample_chain(
+        1, kernel=kernel, current_state=tf.ones([nchains], tf.float64),
+        num_burnin_steps=5, trace_fn=None))
+
   def test_diag(self, use_default):
     """Test that a diagonal multivariate normal can be effectively sampled from.
 
