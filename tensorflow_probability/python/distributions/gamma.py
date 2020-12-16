@@ -384,7 +384,7 @@ def _tensorshape_or_scalar(v0, v1):
 def _random_gamma_cpu(
     shape, concentration, rate=None, log_rate=None, seed=None, log_space=False):
   """Sample using *fast* `tf.random.stateless_gamma`."""
-  bad_concentration = (concentration <= 0.) | tf.math.is_nan(concentration)
+  bad_concentration = (concentration < 0.) | tf.math.is_nan(concentration)
   safe_concentration = tf.where(
       bad_concentration,
       dtype_util.as_numpy_dtype(concentration.dtype)(100.), concentration)
@@ -711,7 +711,7 @@ def _random_gamma_rejection(
     # Note, concentration here already has a shape that is broadcast with rate.
     cast_concentration = tf.cast(concentration, internal_dtype)
 
-    good_params_mask = (concentration > 0.)
+    good_params_mask = (concentration >= 0.)
     # When replacing NaN values, use 100. for concentration, since that leads to
     # a high-likelihood of the rejection sampler accepting on the first pass.
     safe_concentration = tf.where(good_params_mask, cast_concentration, 100.)
