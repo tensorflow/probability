@@ -161,7 +161,6 @@ def run_kernel(
       Default value: `None` (i.e., 'mcmc_run_kernel').
 
   Returns:
-
     result: A `RunKernelResults` instance containing information about the
       sampling run.  Main fields are `trace`, the history of outputs of
       `trace_fn`, and `reduction_results`, the final outputs of all supplied
