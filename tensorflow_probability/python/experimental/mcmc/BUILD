@@ -663,8 +663,10 @@ py_library(
     srcs = ["sample_fold.py"],
     srcs_version = "PY3",
     deps = [
+        ":run",
         ":sample",
         ":sample_discarding_kernel",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":with_reductions",
         # numpy dep,

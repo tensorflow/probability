@@ -44,7 +44,7 @@ from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
 from tensorflow_probability.python.experimental.mcmc.run import run_kernel
 from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
-from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain_with_burnin
 from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
@@ -108,7 +108,7 @@ __all__ = [
     'resample_stratified',
     'resample_systematic',
     'run_kernel',
-    'sample_chain',
+    'sample_chain_with_burnin',
     'sample_fold',
     'sample_sequential_monte_carlo',
     'SampleDiscardingKernel',
