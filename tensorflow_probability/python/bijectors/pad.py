@@ -23,7 +23,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -124,14 +124,14 @@ class Pad(bijector.Bijector):
     parameters = dict(locals())
     with tf.name_scope(name or 'pad') as name:
       paddings = tensor_util.convert_nonref_to_tensor(
-          paddings, dtype_hint=tf.int32, name='paddings')
+          paddings, dtype_hint=tf.int32, name='paddings', as_shape_tensor=True)
       if axis is None:
-        axis = prefer_static.range(
-            start=-prefer_static.size0(paddings), limit=0,
+        axis = ps.range(
+            start=-ps.size0(paddings), limit=0,
             dtype=tf.int32, name='axis')
       else:
         axis = tensor_util.convert_nonref_to_tensor(
-            axis, dtype_hint=tf.int32, name='axis')
+            axis, dtype_hint=tf.int32, name='axis', as_shape_tensor=True)
       axis_ = tf.get_static_value(axis)
       if axis_ is None:
         raise NotImplementedError(
@@ -170,29 +170,27 @@ class Pad(bijector.Bijector):
     return self._axis
 
   def _forward(self, x):
-    ndims = prefer_static.rank(x)
-    indices = prefer_static.reshape(prefer_static.add(self.axis, ndims),
-                                    shape=[-1, 1])
+    ndims = ps.rank(x)
+    indices = ps.reshape(ps.add(self.axis, ndims), shape=[-1, 1])
     return tf.pad(
         x,
-        paddings=prefer_static.tensor_scatter_nd_update(
-            prefer_static.zeros([ndims, 2], dtype=tf.int32),
+        paddings=ps.tensor_scatter_nd_update(
+            ps.zeros([ndims, 2], dtype=tf.int32),
             indices, self.paddings),
         mode=self.mode,
-        constant_values=prefer_static.cast(self.constant_values, dtype=x.dtype))
+        constant_values=ps.cast(self.constant_values, dtype=x.dtype))
 
   def _inverse(self, y):
-    ndims = prefer_static.rank(y)
-    indices = prefer_static.reshape(prefer_static.add(self.axis, ndims),
-                                    shape=[-1, 1])
-    num_left, num_right = prefer_static.unstack(self.paddings, num=2, axis=-1)
+    ndims = ps.rank(y)
+    indices = ps.reshape(ps.add(self.axis, ndims), shape=[-1, 1])
+    num_left, num_right = ps.unstack(self.paddings, num=2, axis=-1)
     x = tf.slice(
         y,
-        begin=prefer_static.tensor_scatter_nd_update(
-            prefer_static.zeros(ndims, dtype=tf.int32),
+        begin=ps.tensor_scatter_nd_update(
+            ps.zeros(ndims, dtype=tf.int32),
             indices, num_left),
-        size=prefer_static.tensor_scatter_nd_sub(
-            prefer_static.shape(y),
+        size=ps.tensor_scatter_nd_sub(
+            ps.shape(y),
             indices, num_left + num_right))
     if not self.validate_args:
       return x
@@ -225,13 +223,12 @@ class Pad(bijector.Bijector):
     return output_shape
 
   def _forward_event_shape_tensor(self, input_shape, is_inverse=False):
-    ndims = prefer_static.size(input_shape)
-    indices = prefer_static.reshape(prefer_static.add(self.axis, ndims),
-                                    shape=[-1, 1])
-    extra_sizes = prefer_static.reduce_sum(self.paddings, axis=-1)
-    update_fn = (prefer_static.tensor_scatter_nd_sub if is_inverse else
-                 prefer_static.tensor_scatter_nd_add)
-    return update_fn(prefer_static.identity(input_shape), indices, extra_sizes)
+    ndims = ps.size(input_shape)
+    indices = ps.reshape(ps.add(self.axis, ndims), shape=[-1, 1])
+    extra_sizes = ps.reduce_sum(self.paddings, axis=-1)
+    update_fn = (ps.tensor_scatter_nd_sub if is_inverse else
+                 ps.tensor_scatter_nd_add)
+    return update_fn(ps.identity(input_shape), indices, extra_sizes)
 
   def _inverse_event_shape(self, output_shape):
     input_shape = self._forward_event_shape(output_shape, is_inverse=True)
@@ -284,8 +281,8 @@ class Pad(bijector.Bijector):
       elif self.validate_args:
         if axis is None: axis = tf.convert_to_tensor(self.axis)
         assertions.append(assert_util.assert_equal(
-            prefer_static.size0(axis),
-            prefer_static.size0(prefer_static.setdiff1d(axis)),
+            ps.size0(axis),
+            ps.size0(ps.setdiff1d(axis)),
             message=msg))
 
     if is_init != tensor_util.is_ref(self.paddings):
@@ -320,19 +317,19 @@ class Pad(bijector.Bijector):
       axis_ = tf.get_static_value(self.axis)
       if axis_ is None and axis is None:
         axis = tf.convert_to_tensor(self.axis)
-      len_axis = prefer_static.size0(prefer_static.reshape(
+      len_axis = ps.size0(ps.reshape(
           axis if axis_ is None else axis_, shape=-1))
 
       paddings_ = tf.get_static_value(self.paddings)
       if paddings_ is None and paddings is None:
         paddings = tf.convert_to_tensor(self.paddings)
-      len_paddings = prefer_static.size0(
+      len_paddings = ps.size0(
           paddings if paddings_ is None else paddings_)
 
       msg = ('Arguments `axis` and `paddings` must have the same number '
              'of elements.')
-      if (prefer_static.is_numpy(len_axis) and
-          prefer_static.is_numpy(len_paddings)):
+      if (ps.is_numpy(len_axis) and
+          ps.is_numpy(len_paddings)):
         if len_axis != len_paddings:
           raise ValueError(msg + ' Saw: {}, {}.'.format(
               self.axis, self.paddings))

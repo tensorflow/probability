@@ -137,7 +137,8 @@ def _convert_to_shape_tensor_jax(value, dtype=None, dtype_hint=None, name=None):
   """Converts vectors and scalars of `int`-like to `ndarray`."""
   dtype = dtype_util.as_numpy_dtype(dtype or dtype_hint or np.int32)
   try:
-    return np.array([int(v) for v in value], dtype=dtype)
+    return np.array([_convert_to_shape_tensor_jax(v, dtype) for v in value],
+                    dtype=dtype)
   except:  # JAX throws raw Exception in some cases.  # pylint: disable=bare-except
     pass
   return np.array(int(value), dtype=dtype)
