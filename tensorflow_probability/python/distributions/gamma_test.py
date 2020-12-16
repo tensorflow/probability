@@ -303,7 +303,7 @@ class GammaTest(test_util.TestCase):
         sp_stats.gamma.var(concentration_v, scale=1 / rate_v),
         atol=.15)
 
-  def testGammaSampleReturnsNansForNonPositiveParameters(self):
+  def testGammaSampleZeroAndNegativeParameters(self):
     gamma = tfd.Gamma([1., 2.], 1., validate_args=False)
     seed_stream = test_util.test_seed_stream()
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
@@ -311,6 +311,12 @@ class GammaTest(test_util.TestCase):
     self.assertAllFinite(samples)
 
     gamma = tfd.Gamma([0., 2.], 1., validate_args=False)
+    samples = self.evaluate(gamma.sample(seed=seed_stream()))
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllEqual([s in [0, np.finfo(np.float32).tiny]
+                         for s in samples], [True, False])
+
+    gamma = tfd.Gamma([-0.001, 2.], 1., validate_args=False)
     samples = self.evaluate(gamma.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [True, False])
