@@ -18,11 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.distributions.log_prob_ratio import log_prob_ratio
 from tensorflow_probability.python.experimental.distributions.joint_distribution_pinned import JointDistributionPinned
 from tensorflow_probability.python.experimental.distributions.mvn_precision_factor_linop import MultivariateNormalPrecisionFactorLinearOperator
 
 
 __all__ = [
+    'log_prob_ratio',
     'JointDistributionPinned',
     'MultivariateNormalPrecisionFactorLinearOperator',
 ]

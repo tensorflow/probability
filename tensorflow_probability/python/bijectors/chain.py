@@ -22,6 +22,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
+from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
@@ -245,3 +246,16 @@ def _infer_min_event_ndims(bijectors):
   return (nest.map_structure(lambda nd: rolling_offset + nd, f_event_ndims),
           nest.map_structure(lambda nd: rolling_offset + nd, i_event_ndims))
 
+
+@ldj_ratio.RegisterILDJRatio(Chain)
+def _ildj_ratio_chain(p, x, q, y):
+  """Sum-of-diffs ILDJRatio for Chains."""
+  if len(p.bijectors) != len(q.bijectors):
+    raise ValueError('Mismatched lengths of bijectors: `p` has '
+                     f'{len(p.bijectors)} but `q` has {len(q.bijectors)}.')
+  ratios = []
+  for p, q in zip(p.bijectors, q.bijectors):
+    ratios.append(ldj_ratio.inverse_log_det_jacobian_ratio(
+        p, x, q, y, p.inverse_min_event_ndims))
+    x, y = p.inverse(x), q.inverse(y)
+  return tf.add_n(ratios)

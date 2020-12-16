@@ -36,6 +36,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         ":scalar_function_with_inferred_inverse",
+        "//tensorflow_probability/python/bijectors:ldj_ratio",
     ],
 )
 

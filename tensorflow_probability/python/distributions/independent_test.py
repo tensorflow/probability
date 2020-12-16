@@ -27,11 +27,12 @@ import numpy as np
 from scipy import stats as sp_stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
+tfd = tfp.distributions
 
 JAX_MODE = False
 
@@ -522,6 +523,38 @@ class IndependentDistributionTest(test_util.TestCase):
     # Fails ~75% CPU, 1-75% GPU --vary_seed runs w/o experimental_use_kahan_sum.
     self.assertAllClose(lp64, lp, rtol=0., atol=.01)
 
+  def testLargeLogProbDiff(self):
+    b = 15
+    n = 5_000
+    d0 = tfd.Independent(tfd.Normal(tf.fill([b, n], 0.), tf.fill([n], .1)),
+                         reinterpreted_batch_ndims=1,
+                         experimental_use_kahan_sum=True)
+    d1 = tfd.Independent(tfd.Normal(tf.fill([b, n], 1e-5), tf.fill([n], .1)),
+                         reinterpreted_batch_ndims=1,
+                         experimental_use_kahan_sum=True)
+    strm = test_util.test_seed_stream()
+    x0 = self.evaluate(  # overdispersed
+        tfd.Normal(0, 2).sample([b, n], seed=strm()))
+    x1 = self.evaluate(  # overdispersed, perturbed
+        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(distribution=tfd.Normal(
+        tf.cast(d0.distribution.loc, tf.float64),
+        tf.cast(d0.distribution.scale, tf.float64)))
+    d1_64 = d1.copy(distribution=tfd.Normal(
+        tf.cast(d1.distribution.loc, tf.float64),
+        tf.cast(d1.distribution.scale, tf.float64)))
+    self.assertNotAllZero(d0.log_prob(x0) < -1_000_000)
+    self.assertAllClose(
+        d0_64.log_prob(tf.cast(x0, tf.float64)) -
+        d1_64.log_prob(tf.cast(x1, tf.float64)),
+        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0., atol=0.0075)
+    # In contrast: the below fails consistently w/ errors around 0.5-1.0
+    # self.assertAllClose(
+    #     d0_64.log_prob(tf.cast(x0, tf.float64)) -
+    #     d1_64.log_prob(tf.cast(x1, tf.float64)),
+    #     d0.log_prob(x0) - d1.log_prob(x1),
+    #     rtol=0., atol=0.007)
 
 if __name__ == '__main__':
   # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
