@@ -904,6 +904,47 @@ class Bijector(tf.Module):
         self.forward_min_event_ndims, tf.TensorShape,
         self._inverse_event_shape(output_shape))
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    raise NotImplementedError(
+        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+
+  @classmethod
+  def parameter_properties(cls, dtype=tf.float32):
+    """Returns a dict mapping constructor arg names to property annotations.
+
+    This dict should include an entry for each of the bijector's
+    `Tensor`-valued constructor arguments.
+
+    Args:
+      dtype: Optional float `dtype` to assume for continuous-valued parameters.
+        Some constraining bijectors require advance knowledge of the dtype
+        because certain constants (e.g., `tfb.Softplus.low`) must be
+        instantiated with the same dtype as the values to be transformed.
+    Returns:
+      parameter_properties: A
+        `str -> `tfp.python.internal.parameter_properties.ParameterProperties`
+        dict mapping constructor argument names to `ParameterProperties`
+        instances.
+    """
+    with tf.name_scope('parameter_properties'):
+      return cls._parameter_properties(dtype)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    """Returns a dict mapping constructor argument names to per-event rank.
+
+    The ranks are pulled from `cls.parameter_properties()`; this is a
+    convenience wrapper.
+
+    Returns:
+      params_event_ndims: Per-event parameter ranks, a `str->int dict`.
+    """
+    return {
+        param_name: param.event_ndims
+        for param_name, param in cls.parameter_properties().items()
+    }
+
   def _forward(self, x):
     """Subclass implementation for `forward` public function."""
     raise NotImplementedError('forward not implemented.')

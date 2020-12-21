@@ -215,6 +215,7 @@ multi_substrate_py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -226,6 +227,7 @@ multi_substrate_py_library(
         ":bijector",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -265,6 +267,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
     ],
 )
 
