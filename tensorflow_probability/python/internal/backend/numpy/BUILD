@@ -363,7 +363,7 @@ py_library(
 py_library(
     name = "numpy_testlib",
     testonly = 1,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":numpy",
         # absl/testing:parameterized dep,

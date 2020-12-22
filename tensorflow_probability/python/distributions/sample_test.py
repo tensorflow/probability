@@ -25,9 +25,11 @@ import os
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+
+tfb = tfp.bijectors
+tfd = tfp.distributions
 
 
 JAX_MODE = False
@@ -89,8 +91,7 @@ class SampleDistributionTest(test_util.TestCase):
   def test_transformed_affine(self):
     sample_shape = 3
     mvn = tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1)
-    aff = tfb.Affine(scale_tril=[[0.75, 0.],
-                                 [0.05, 0.5]])
+    aff = tfb.ScaleMatvecTriL(scale_tril=[[0.75, 0.], [0.05, 0.5]])
 
     def expected_lp(y):
       x = aff.inverse(y)  # Ie, tf.random.normal([4, 3, 2])
@@ -447,6 +448,66 @@ class SampleDistributionTest(test_util.TestCase):
     lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
     # Fails 75% CPU, 0-80% GPU --vary_seed runs w/o experimental_use_kahan_sum.
     self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
+  def testLargeLogProbDiffScalarUnderlying(self):
+    shp = [25, 200]
+    d0 = tfd.Sample(tfd.Normal(0., .1), shp)
+    d1 = tfd.Sample(tfd.Normal(1e-5, .1), shp)
+    strm = test_util.test_seed_stream()
+    x0 = self.evaluate(  # overdispersed
+        tfd.Normal(0, 2).sample(shp, seed=strm()))
+    x1 = self.evaluate(  # overdispersed, perturbed
+        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(distribution=tfd.Normal(
+        tf.cast(d0.distribution.loc, tf.float64),
+        tf.cast(d0.distribution.scale, tf.float64)))
+    d1_64 = d1.copy(distribution=tfd.Normal(
+        tf.cast(d1.distribution.loc, tf.float64),
+        tf.cast(d1.distribution.scale, tf.float64)))
+    oracle_64 = tf.reduce_sum(
+        d0_64.distribution.log_prob(tf.cast(x0, tf.float64)) -
+        d1_64.distribution.log_prob(tf.cast(x1, tf.float64)))
+    self.assertAllClose(
+        oracle_64,
+        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0., atol=0.007)
+    # In contrast: below fails with errors of ~0.07 - 0.15
+    # self.assertAllClose(
+    #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1), rtol=0., atol=0.007)
+
+  def testLargeLogProbDiffBatchOfVecUnderlying(self):
+    nsamp = 5
+    nbatch = 3
+    nevt = 250
+    dim = 500
+    d0 = tfd.Sample(tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 0.),
+                                               tf.fill([dim], .1)),
+                    sample_shape=nevt)
+    self.assertEqual(tf.float32, d0.dtype)
+    d1 = tfd.Sample(tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 1e-5),
+                                               d0.distribution.scale.diag),
+                    sample_shape=nevt)
+    strm = test_util.test_seed_stream()
+    x0 = self.evaluate(  # overdispersed
+        tfd.Normal(0, 2).sample([nsamp, nbatch, nevt, dim], seed=strm()))
+    x1 = self.evaluate(  # overdispersed + perturbed
+        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(distribution=tfd.MultivariateNormalDiag(
+        tf.cast(d0.distribution.loc, tf.float64),
+        tf.cast(d0.distribution.scale.diag, tf.float64)))
+    d1_64 = d1.copy(distribution=tfd.MultivariateNormalDiag(
+        tf.cast(d1.distribution.loc, tf.float64),
+        tf.cast(d1.distribution.scale.diag, tf.float64)))
+    oracle_64 = (d0_64.log_prob(tf.cast(x0, tf.float64)) -
+                 d1_64.log_prob(tf.cast(x1, tf.float64)))
+    self.assertNotAllZero(d0.log_prob(x0) < -10_000_000)
+    self.assertAllClose(
+        oracle_64,
+        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0., atol=0.045)
+    # In contrast, the following fails w/ abs errors of ~5. to 10.
+    # self.assertAllClose(
+    #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1), rtol=0., atol=0.045)
 
 
 if __name__ == '__main__':

@@ -55,6 +55,7 @@ multi_substrate_py_library(
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":with_reductions",
     ],
@@ -79,6 +80,7 @@ multi_substrate_py_library(
         ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
         ":with_reductions",
@@ -134,7 +136,7 @@ py_test(
 py_library(
     name = "kernel_outputs",
     srcs = ["kernel_outputs.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":tracing_reducer",
         "//tensorflow_probability/python/internal:unnest",
@@ -191,7 +193,7 @@ py_test(
 py_library(
     name = "preconditioned_hmc",
     srcs = ["preconditioned_hmc.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
@@ -225,7 +227,7 @@ py_test(
 py_library(
     name = "progress_bar_reducer",
     srcs = ["progress_bar_reducer.py"],
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -661,8 +663,10 @@ py_library(
     srcs = ["sample_fold.py"],
     srcs_version = "PY3",
     deps = [
+        ":run",
         ":sample",
         ":sample_discarding_kernel",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":with_reductions",
         # numpy dep,
@@ -706,6 +710,34 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "thinning_kernel",
+    srcs = ["thinning_kernel.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":sample",
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+py_test(
+    name = "thinning_kernel_test",
+    size = "small",
+    srcs = ["thinning_kernel_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":thinning_kernel",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

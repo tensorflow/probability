@@ -83,8 +83,8 @@ class VectorExponentialDiagTest(test_util.TestCase):
   def testSingularScaleRaises(self):
     mu = [-1., 1]
     diag = [1., 0]
-    dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
     with self.assertRaisesOpError('Singular'):
+      dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
       self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   def testSampleWithBroadcastScale(self):

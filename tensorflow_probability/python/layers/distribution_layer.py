@@ -1510,7 +1510,7 @@ class MixtureSameFamily(DistributionLambda):
   def params_size(num_components, component_params_size, name=None):
     """Number of `params` needed to create a `MixtureSameFamily` distribution.
 
-    Arguments:
+    Args:
       num_components: Number of component distributions in the mixture
         distribution.
       component_params_size: Number of parameters needed to create a single

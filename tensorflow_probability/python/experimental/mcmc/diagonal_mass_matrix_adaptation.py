@@ -240,7 +240,7 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
                     sample_stats.RunningVariance):
         variance_parts = [self.initial_running_variance]
       else:
-        variance_parts = self.initial_running_variance
+        variance_parts = list(self.initial_running_variance)
 
       diags = [variance_part.variance() for variance_part in variance_parts]
 

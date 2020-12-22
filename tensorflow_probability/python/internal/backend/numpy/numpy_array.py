@@ -384,7 +384,7 @@ expand_dims = utils.copy_docstring(
 
 fill = utils.copy_docstring(
     'tf.fill',
-    lambda dims, value, name=None: np.full(dims, value))
+    lambda dims, value, name=None: np.full(dims, ops.convert_to_tensor(value)))
 
 gather = utils.copy_docstring(
     'tf.gather',

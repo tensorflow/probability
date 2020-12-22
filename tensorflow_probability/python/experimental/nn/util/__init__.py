@@ -17,7 +17,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python.experimental.nn.util.im2row import im2row
+from tensorflow_probability.python.experimental.nn.util.convolution_util import im2row
+from tensorflow_probability.python.experimental.nn.util.convolution_util import im2row_index
+from tensorflow_probability.python.experimental.nn.util.convolution_util import make_convolution_fn
+from tensorflow_probability.python.experimental.nn.util.convolution_util import make_convolution_transpose_fn_with_dilation
+from tensorflow_probability.python.experimental.nn.util.convolution_util import make_convolution_transpose_fn_with_subkernels
+from tensorflow_probability.python.experimental.nn.util.convolution_util import make_convolution_transpose_fn_with_subkernels_matrix
 from tensorflow_probability.python.experimental.nn.util.random_variable import CallOnce
 from tensorflow_probability.python.experimental.nn.util.random_variable import RandomVariable
 from tensorflow_probability.python.experimental.nn.util.utils import batchify_op
@@ -53,10 +58,15 @@ _allowed_symbols = [
     'flatten_rightmost',
     'halflife_decay',
     'im2row',
+    'im2row_index',
     'make_fit_op',
     'make_kernel_bias',
     'make_kernel_bias_posterior_mvn_diag',
     'make_kernel_bias_prior_spike_and_slab',
+    'make_convolution_fn',
+    'make_convolution_transpose_fn_with_dilation',
+    'make_convolution_transpose_fn_with_subkernels',
+    'make_convolution_transpose_fn_with_subkernels_matrix',
     'negloglik',
     'prepare_conv_args',
     'prepare_strides',

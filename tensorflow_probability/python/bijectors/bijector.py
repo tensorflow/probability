@@ -718,14 +718,14 @@ class Bijector(tf.Module):
 
     ```python
     sigmoid = tfb.Reciprocal()(
-        tfb.AffineScalar(shift=1.)(
+        tfb.Shift(shift=1.)(
           tfb.Exp()(
-            tfb.AffineScalar(scale=-1.))))
+            tfb.Scale(scale=-1.))))
     # ==> `tfb.Chain([
     #         tfb.Reciprocal(),
-    #         tfb.AffineScalar(shift=1.),
+    #         tfb.Shift(shift=1.),
     #         tfb.Exp(),
-    #         tfb.AffineScalar(scale=-1.),
+    #         tfb.Scale(scale=-1.),
     #      ])`  # ie, `tfb.Sigmoid()`
 
     log_normal = tfb.Exp()(tfd.Normal(0, 1))

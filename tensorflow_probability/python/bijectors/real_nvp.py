@@ -48,7 +48,8 @@ class RealNVP(bijector_lib.Bijector):
   while the first `d` units are 'masked' and left unchanged. Real NVP's
   `shift_and_log_scale_fn` computes vector-valued quantities. For
   scale-and-shift transforms that do not depend on any masked units, i.e.
-  `d=0`, use the `tfb.Affine` bijector with learned parameters instead.
+  `d=0`, use the `tfb.Scale` and `tfb.Shift` bijectors with learned parameters
+  instead.
 
   Masking is currently only supported for base distributions with
   `event_ndims=1`. For more sophisticated masking schemes like checkerboard or
@@ -344,7 +345,7 @@ def real_nvp_default_template(hidden_layers,
   Real NVP bijector, implement a conditioned shift/scale template that
   handles the `condition_kwargs`.
 
-  Arguments:
+  Args:
     hidden_layers: Python `list`-like of non-negative integer, scalars
       indicating the number of units in each hidden layer. Default: `[512,
         512]`.

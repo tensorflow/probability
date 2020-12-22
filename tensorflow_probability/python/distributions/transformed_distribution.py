@@ -21,8 +21,10 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -134,9 +136,7 @@ class TransformedDistribution(distribution_lib.Distribution):
   tfb = tfp.bijectors
   normal = tfd.TransformedDistribution(
     distribution=tfd.Normal(loc=0., scale=1.),
-    bijector=tfb.Affine(
-      shift=-1.,
-      scale_identity_multiplier=2.)
+    bijector=tfb.Shift(shift=-1.)(tfb.Scale(scale=2.)),
     name='NormalTransformedDistribution')
   ```
 
@@ -289,12 +289,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     # dtype.)
     if tf.nest.is_nested(base_batch_shape_tensor):
       if self._is_joint:
-        return base_batch_shape_tensor
-
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(base_batch_shape_tensor))
       base_batch_shape_tensor = functools.reduce(
           ps.broadcast_shape,
           tf.nest.flatten(base_batch_shape_tensor))
-
     return base_batch_shape_tensor
 
   def _batch_shape(self):
@@ -308,7 +307,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the batch shape components of the base distribution are broadcast to
     # obtain the batch shape of the transformed distribution.
     batch_shape = self.distribution.batch_shape
-    if tf.nest.is_nested(batch_shape) and not self._is_joint:
+    if tf.nest.is_nested(batch_shape):
+      if self._is_joint:
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(batch_shape))
       batch_shape = functools.reduce(
           tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
     return batch_shape
@@ -569,3 +571,22 @@ def _kl_transformed_transformed(a, b, name=None):
       'Unable to calculate KL divergence between {} and {} because '
       'their bijectors are not equal: {} vs. {}'.format(
           a, b, a.bijector, b.bijector))
+
+
+@log_prob_ratio.RegisterLogProbRatio(TransformedDistribution)
+def _transformed_log_prob_ratio(p, x, q, y):
+  """Computes p.log_prob(x) - q.log_prob(y) for p and q both TDs."""
+  x_ = p.bijector.inverse(x)
+  y_ = q.bijector.inverse(y)
+
+  base_log_prob_ratio = log_prob_ratio.log_prob_ratio(
+      p.distribution, x_, q.distribution, y_)
+
+  event_ndims = tf.nest.map_structure(
+      ps.rank_from_shape,
+      p.event_shape_tensor,
+      tf.nest.map_structure(tensorshape_util.merge_with,
+                            p.event_shape, q.event_shape))
+  ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
+      p.bijector, x, q.bijector, y, event_ndims)
+  return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)

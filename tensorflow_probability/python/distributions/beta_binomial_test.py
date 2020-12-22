@@ -143,6 +143,12 @@ class BetaBinomialTest(test_util.TestCase):
           np.sum(x == i, axis=0) / (num_samples * 1.0),
           atol=0.01, rtol=0.1)
 
+  def testSampleCornerConcentrations(self):
+    seed_stream = test_util.test_seed_stream()
+    d = tfd.BetaBinomial(concentration0=[1., 0.], concentration1=[0., 1.],
+                         total_count=50.)
+    self.assertAllEqual(d.sample(10, seed=seed_stream()), [[0, 50]] * 10)
+
   def testEmpiricalCdfAgainstDirichletMultinomial(self):
     # This test is too slow for Eager mode.
     if tf.executing_eagerly():

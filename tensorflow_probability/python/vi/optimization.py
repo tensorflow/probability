@@ -24,7 +24,7 @@ import functools
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.vi import csiszar_divergence
 
-_trace_loss = lambda loss, grads, variables: loss
+_trace_loss = lambda traceable_quantities: traceable_quantities.loss
 
 # Silent fallback to score-function gradients leads to difficult-to-debug
 # failures, so we force reparameterization gradients by default.

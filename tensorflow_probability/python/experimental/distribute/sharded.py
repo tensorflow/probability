@@ -24,8 +24,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import independent as independent_lib
 from tensorflow_probability.python.distributions import sample as sample_lib
+from tensorflow_probability.python.experimental.distribute import distribute_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+
+
+JAX_MODE = False
 
 
 class ShardedSample(sample_lib.Sample):
@@ -35,6 +39,7 @@ class ShardedSample(sample_lib.Sample):
                distribution,
                sample_shape=(),
                shard_axis=0,
+               shard_axis_name=None,
                validate_args=False,
                experimental_use_kahan_sum=False,
                name=None):
@@ -47,6 +52,7 @@ class ShardedSample(sample_lib.Sample):
         single sample.
       shard_axis: `int` representing which axis of `sample_shape` will be
         sharded across devices.
+      shard_axis_name: `str` for axis name for use in JAX backend.
       validate_args: Python `bool`.  Whether to validate input with asserts. If
         `validate_args` is `False`, and the inputs are invalid, correct behavior
         is not guaranteed.
@@ -56,13 +62,13 @@ class ShardedSample(sample_lib.Sample):
         noticeable in particular for large dimensions in float32. See CPU caveat
         on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
-        Default value: `None` (i.e., `'Sample' + distribution.name`).
+        Default value: `None` (i.e., `'ShardedSample' + distribution.name`).
     """
     parameters = dict(locals())
 
     with tf.name_scope(name or 'ShardedSample' + distribution.name) as name:
       self._shard_axis = shard_axis
-
+      self._shard_axis_name = shard_axis_name
       super(ShardedSample, self).__init__(
           distribution,
           validate_args=validate_args,
@@ -82,9 +88,12 @@ class ShardedSample(sample_lib.Sample):
     sample_shape = ps.concat([
         sample_shape[:self.shard_axis], [shard_size],
         sample_shape[self.shard_axis + 1:]
-    ],
-                             axis=0)
+    ], axis=0)
     return sample_shape
+
+  @property
+  def shard_axis_name(self):
+    return self._shard_axis_name
 
   @property
   def shard_axis(self):
@@ -92,29 +101,103 @@ class ShardedSample(sample_lib.Sample):
 
   @property
   def replica_id(self):
-    ctx = tf.distribute.get_replica_context()
-    return ctx.replica_id_in_sync_group
+    return distribute_lib.get_replica_id(axis_name=self.shard_axis_name)
 
   @property
   def num_devices(self):
-    ctx = tf.distribute.get_replica_context()
-    return ctx.num_replicas_in_sync
+    return distribute_lib.get_num_replicas(axis_name=self.shard_axis_name)
 
   def _sample_n(self, n, seed, **kwargs):
     seed = samplers.sanitize_seed(seed, salt='sharded_sample_sample')
-    return super(ShardedSample, self)._sample_n(n, seed + self.replica_id,
-                                                **kwargs)
+    seed = samplers.fold_in(seed, tf.cast(self.replica_id, tf.int32))
+    return super(ShardedSample, self)._sample_n(n, seed, **kwargs)
+
+  def _log_prob(self, value, reduce_over_shards=True, **kwargs):
+    out_log_prob = super(ShardedSample, self)._log_prob(value, **kwargs)
+    if reduce_over_shards:
+      return distribute_lib.psum(out_log_prob, axis_name=self.shard_axis_name)
+    return out_log_prob
+
+  def _parameter_control_dependencies(self, is_init=False):
+    if not self.validate_args:
+      return []
+    return super(ShardedSample, self)._parameter_control_dependencies(
+        is_init=is_init)
 
 
 class ShardedIndependent(independent_lib.Independent):
   """A version of `tfd.Independent` that folds device id into its randomness."""
 
+  def __init__(self,
+               distribution,
+               reinterpreted_batch_ndims=None,
+               validate_args=False,
+               shard_axis_name=None,
+               experimental_use_kahan_sum=False,
+               name=None):
+    """Construct a `ShardedIndependent` distribution.
+
+    Args:
+      distribution: The base distribution instance to transform. Typically an
+        instance of `Distribution`.
+      reinterpreted_batch_ndims: Scalar, integer number of rightmost batch dims
+        which will be regarded as event dims. When `None` all but the first
+        batch axis (batch axis 0) will be transferred to event dimensions
+        (analogous to `tf.layers.flatten`).
+      validate_args: Python `bool`.  Whether to validate input with asserts. If
+        `validate_args` is `False`, and the inputs are invalid, correct behavior
+        is not guaranteed.
+      shard_axis_name: `str` for axis name for use in JAX backend.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
+      name: The name for ops managed by the distribution.
+        Default value: `'ShardedIndependent' + distribution.name`.
+
+    Raises:
+      ValueError: if `reinterpreted_batch_ndims` exceeds
+        `distribution.batch_ndims`
+    """
+    parameters = dict(locals())
+
+    with tf.name_scope(name or
+                       'ShardedIndependent' + distribution.name) as name:
+      self._shard_axis_name = shard_axis_name
+      super(ShardedIndependent, self).__init__(
+          distribution,
+          reinterpreted_batch_ndims=reinterpreted_batch_ndims,
+          validate_args=validate_args,
+          experimental_use_kahan_sum=experimental_use_kahan_sum,
+          name=name)
+      self._parameters = parameters
+
+  @property
+  def shard_axis_name(self):
+    return self._shard_axis_name
+
+  def _log_prob(self, value, reduce_over_shards=True, **kwargs):
+    out_log_prob = super(ShardedIndependent, self)._log_prob(value, **kwargs)
+    if reduce_over_shards:
+      return distribute_lib.psum(out_log_prob, axis_name=self.shard_axis_name)
+    return out_log_prob
+
   @property
   def replica_id(self):
-    ctx = tf.distribute.get_replica_context()
-    return ctx.replica_id_in_sync_group
+    return distribute_lib.get_replica_id(axis_name=self.shard_axis_name)
+
+  @property
+  def num_devices(self):
+    return distribute_lib.get_num_replicas(axis_name=self.shard_axis_name)
 
   def _sample_n(self, n, seed, **kwargs):
     seed = samplers.sanitize_seed(seed, salt='sharded_independent_sample')
-    return super(ShardedIndependent, self)._sample_n(n, seed + self.replica_id,
-                                                     **kwargs)
+    seed = samplers.fold_in(seed, tf.cast(self.replica_id, tf.int32))
+    return super(ShardedIndependent, self)._sample_n(n, seed, **kwargs)
+
+  def _parameter_control_dependencies(self, is_init):
+    if JAX_MODE:
+      return []
+    return super(ShardedIndependent, self)._parameter_control_dependencies(
+        is_init=is_init)

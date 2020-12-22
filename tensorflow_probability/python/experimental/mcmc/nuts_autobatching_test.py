@@ -303,9 +303,9 @@ class NutsTest(test_util.TestCase):
                                                     scale=tf.ones_like(loc)),
                                          reinterpreted_batch_ndims=1),
             bijector=tfb.Chain([
-                tfb.Affine(shift=loc),
-                tfb.Invert(tfb.Affine(scale_tril=chol_precision_tril,
-                                      adjoint=True)),
+                tfb.Shift(shift=loc),
+                tfb.Invert(tfb.ScaleMatvecTriL(scale_tril=chol_precision_tril,
+                                               adjoint=True)),
             ]),
             name=name)
 

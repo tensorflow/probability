@@ -108,19 +108,24 @@ class ChainBijectorTest(test_util.TestCase):
     self.assertEqual(0, chain.forward_min_event_ndims)
     self.assertEqual(0, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([tfb.Affine(), tfb.Affine(), tfb.Affine()])
+    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
     self.assertEqual(1, chain.forward_min_event_ndims)
     self.assertEqual(1, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([tfb.Exp(), tfb.Affine()])
+    chain = tfb.Chain([tfb.Exp(), tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
     self.assertEqual(1, chain.forward_min_event_ndims)
     self.assertEqual(1, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([tfb.Affine(), tfb.Exp()])
+    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]), tfb.Exp()])
     self.assertEqual(1, chain.forward_min_event_ndims)
     self.assertEqual(1, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([tfb.Affine(), tfb.Exp(), tfb.Softplus(), tfb.Affine()])
+    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+                       tfb.Exp(),
+                       tfb.Softplus(),
+                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
     self.assertEqual(1, chain.forward_min_event_ndims)
     self.assertEqual(1, chain.inverse_min_event_ndims)
 
@@ -129,11 +134,13 @@ class ChainBijectorTest(test_util.TestCase):
     self.assertEqual(0, chain.forward_min_event_ndims)
     self.assertEqual(3, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([ShapeChanging(), tfb.Affine()])
+    chain = tfb.Chain([ShapeChanging(),
+                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
     self.assertEqual(1, chain.forward_min_event_ndims)
     self.assertEqual(4, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([tfb.Affine(), ShapeChanging()])
+    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+                       ShapeChanging()])
     self.assertEqual(0, chain.forward_min_event_ndims)
     self.assertEqual(3, chain.inverse_min_event_ndims)
 
@@ -146,11 +153,13 @@ class ChainBijectorTest(test_util.TestCase):
     self.assertEqual(3, chain.forward_min_event_ndims)
     self.assertEqual(0, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([ShapeChanging(3, 0), tfb.Affine()])
+    chain = tfb.Chain([ShapeChanging(3, 0),
+                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
     self.assertEqual(3, chain.forward_min_event_ndims)
     self.assertEqual(0, chain.inverse_min_event_ndims)
 
-    chain = tfb.Chain([tfb.Affine(), ShapeChanging(3, 0)])
+    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+                       ShapeChanging(3, 0)])
     self.assertEqual(4, chain.forward_min_event_ndims)
     self.assertEqual(1, chain.inverse_min_event_ndims)
 
@@ -191,7 +200,7 @@ class ChainBijectorTest(test_util.TestCase):
 
   def testChainExpAffine(self):
     scale_diag = np.array([1., 2., 3.], dtype=np.float32)
-    chain = tfb.Chain([tfb.Exp(), tfb.Affine(scale_diag=scale_diag)])
+    chain = tfb.Chain([tfb.Exp(), tfb.ScaleMatvecDiag(scale_diag=scale_diag)])
     x = [0., np.log(2., dtype=np.float32), np.log(3., dtype=np.float32)]
     y = [1., 4., 27.]
     self.assertAllClose(y, self.evaluate(chain.forward(x)))
@@ -206,7 +215,7 @@ class ChainBijectorTest(test_util.TestCase):
 
   def testChainAffineExp(self):
     scale_diag = np.array([1., 2., 3.], dtype=np.float32)
-    chain = tfb.Chain([tfb.Affine(scale_diag=scale_diag), tfb.Exp()])
+    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=scale_diag), tfb.Exp()])
     x = [0., np.log(2., dtype=np.float32), np.log(3., dtype=np.float32)]
     y = [1., 4., 9.]
     self.assertAllClose(y, self.evaluate(chain.forward(x)))

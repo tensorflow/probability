@@ -122,9 +122,6 @@ def bijector_supports():
     return BIJECTOR_SUPPORTS
   Support = tfp_hps.Support  # pylint: disable=invalid-name
   supports = {
-      'AffineScalar':
-          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
-                          Support.SCALAR_UNCONSTRAINED),
       'Ascending':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_STRICTLY_INCREASING),

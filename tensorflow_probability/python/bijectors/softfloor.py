@@ -93,7 +93,7 @@ class Softfloor(bijector.Bijector):
 
   # Ceiling is just a shifted floor at non-integer points.
   soft_ceiling = tfb.Chain(
-    [tfb.AffineScalar(1.),
+    [tfb.Shift(1.),
      tfb.Softfloor(temperature=1.)])
   soft_ceiling.forward(x) # Should be close to [3., 5., 6.]
   ```

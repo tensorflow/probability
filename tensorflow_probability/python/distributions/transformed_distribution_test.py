@@ -477,6 +477,42 @@ class TransformedDistributionTest(test_util.TestCase):
       self.assertAllClose(kl_val, kl_expected)
       self.assertAllClose(kl_expected, kl_sample_, atol=0.0, rtol=1e-2)
 
+  def testLogProbRatio(self):
+    nsamp = 5
+    nbatch = 3
+    dim = 5000
+    d0 = tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 0.),
+                                    tf.fill([dim], .1))
+    d1 = tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 1e-5),
+                                    d0.scale.diag)
+    strm = test_util.test_seed_stream()
+    x0 = self.evaluate(  # overdispersed
+        tfd.Normal(0, 2).sample([nsamp, nbatch, dim], seed=strm()))
+    x1 = self.evaluate(  # overdispersed + perturbed
+        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = tfd.MultivariateNormalDiag(
+        tf.cast(d0.loc, tf.float64), tf.cast(d0.scale.diag, tf.float64))
+    d1_64 = tfd.MultivariateNormalDiag(
+        tf.cast(d1.loc, tf.float64), tf.cast(d1.scale.diag, tf.float64))
+    oracle_64 = (d0_64.log_prob(tf.cast(x0, tf.float64)) -
+                 d1_64.log_prob(tf.cast(x1, tf.float64)))
+    # For a sense of the order of magnitude log_probs we're dealing with:
+    self.assertNotAllZero(d0.log_prob(x0) < -1_000_000.)
+    self.assertAllClose(
+        oracle_64,
+        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0., atol=0.007)
+    # In contrast, this test fails with max-abs-error around 0.05 to 0.1
+    # self.assertAllClose(
+    #     oracle_64,
+    #     d0.copy(experimental_use_kahan_sum=True).log_prob(x0) -
+    #     d1.copy(experimental_use_kahan_sum=True).log_prob(x1),
+    #     rtol=0., atol=0.007)
+    # In contrast, this test fails with max-abs-error around 0.8 to 1.5
+    # self.assertAllClose(
+    #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1),
+    #     rtol=0., atol=0.007)
+
 
 @test_util.test_all_tf_execution_regimes
 class ScalarToMultiTest(test_util.TestCase):
@@ -1046,6 +1082,38 @@ class MultipartBijectorsTest(test_util.TestCase):
     y_sampled = transformed_dist.sample(sample_shape, seed=seed())
     self.assertAllEqual(tf.nest.map_structure(lambda y: y.shape, y),
                         tf.nest.map_structure(lambda y: y.shape, y_sampled))
+
+    # Test that a `Restructure` bijector applied to a `JointDistribution` works
+    # as expected.
+    num_components = len(split_sizes)
+    input_keys = (split_sizes.keys() if isinstance(split_sizes, dict)
+                  else range(num_components))
+    output_keys = [str(i) for i in range(num_components)]
+    output_structure = {k: v for k, v in zip(output_keys, input_keys)}
+    restructure = tfb.Restructure(output_structure)
+    restructured_dist = tfd.TransformedDistribution(
+        base_dist, bijector=restructure, validate_args=True)
+
+    # Check that attributes of the restructured distribution have the same
+    # nested structure as the `output_structure` of the bijector. Pass a no-op
+    # as the `assert_fn` since the contents of the structures are not
+    # required to be the same.
+    noop_assert_fn = lambda *_: None
+    self.assertAllAssertsNested(
+        noop_assert_fn, restructured_dist.event_shape, output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn, restructured_dist.batch_shape, output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn,
+        self.evaluate(restructured_dist.event_shape_tensor()),
+        output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn,
+        self.evaluate(restructured_dist.batch_shape_tensor()),
+        output_structure)
+    self.assertAllAssertsNested(
+        noop_assert_fn,
+        self.evaluate(restructured_dist.sample(seed=test_util.test_seed())))
 
 
 if __name__ == '__main__':

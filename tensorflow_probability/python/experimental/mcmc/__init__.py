@@ -44,7 +44,7 @@ from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
 from tensorflow_probability.python.experimental.mcmc.run import run_kernel
 from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
 from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
-from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain
+from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain_with_burnin
 from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import default_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
@@ -56,6 +56,7 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
+from tensorflow_probability.python.experimental.mcmc.thinning_kernel import ThinningKernel
 from tensorflow_probability.python.experimental.mcmc.tracing_reducer import TracingReducer
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
@@ -107,7 +108,7 @@ __all__ = [
     'resample_stratified',
     'resample_systematic',
     'run_kernel',
-    'sample_chain',
+    'sample_chain_with_burnin',
     'sample_fold',
     'sample_sequential_monte_carlo',
     'SampleDiscardingKernel',
@@ -116,6 +117,7 @@ __all__ = [
     'simple_heuristic_tuning',
     'StateWithHistory',
     'step_kernel',
+    'ThinningKernel',
     'TracingReducer',
     'VarianceReducer',
     'WeightedParticles',

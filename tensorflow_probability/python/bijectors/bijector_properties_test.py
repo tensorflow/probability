@@ -36,7 +36,6 @@ from tensorflow_probability.python.internal import test_util
 
 
 TF2_FRIENDLY_BIJECTORS = (
-    'AffineScalar',
     'Ascending',
     'BatchNormalization',
     # 'CategoricalToDiscrete', TODO(b/137956955): Add support
@@ -59,7 +58,6 @@ TF2_FRIENDLY_BIJECTORS = (
     'KumaraswamyCDF',
     'Log',
     'Log1p',
-    'MatvecLU',
     'MatrixInverseTriL',
     'MoyalCDF',
     'NormalCDF',
@@ -92,13 +90,11 @@ TF2_FRIENDLY_BIJECTORS = (
 )
 
 BIJECTOR_PARAMS_NDIMS = {
-    'AffineScalar': dict(shift=0, scale=0, log_scale=0),
     'FrechetCDF': dict(loc=0, scale=0, concentration=0),
     'GompertzCDF': dict(concentration=0, rate=0),
     'GumbelCDF': dict(loc=0, scale=0),
     'GeneralizedExtremeValueCDF': dict(loc=0, scale=0, concentration=0),
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
-    'MatvecLU': dict(lower_upper=2, permutation=1),
     'MoyalCDF': dict(loc=0, scale=0),
     'Power': dict(power=0),
     'RayleighCDF': dict(scale=0),
@@ -125,7 +121,6 @@ ILDJ = 'inverse_log_det_jacobian'
 INVERT_LDJ = {FLDJ: ILDJ, ILDJ: FLDJ}
 
 NO_LDJ_GRADS_EXPECTED = {
-    'AffineScalar': dict(shift={FLDJ, ILDJ}),
     'BatchNormalization': dict(beta={FLDJ, ILDJ}),
     'FrechetCDF': dict(loc={ILDJ}),
     'GeneralizedExtremeValueCDF': dict(loc={ILDJ}),
@@ -135,7 +130,6 @@ NO_LDJ_GRADS_EXPECTED = {
 }
 
 TRANSFORM_DIAGONAL_ALLOWLIST = {
-    'AffineScalar',
     'BatchNormalization',
     'DiscreteCosineTransform',
     'Exp',
@@ -813,8 +807,6 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'temperature':
         tfp_hps.softplus_plus_eps(eps=0.5),
-    'AffineScalar.scale':
-        tfp_hps.softplus_plus_eps(),
     'Scale.scale':
         tfp_hps.softplus_plus_eps(),
     'ScaleMatvecDiag.scale_diag':

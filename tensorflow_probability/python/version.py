@@ -24,7 +24,7 @@ _PATCH_VERSION = '0'
 # stable release (indicated by `_VERSION_SUFFIX = ''`). Outside the context of a
 # release branch, the current version is by default assumed to be a
 # 'development' version, labeled 'dev'.
-_VERSION_SUFFIX = 'rc4'
+_VERSION_SUFFIX = ''
 
 # Example, '0.4.0-dev'
 __version__ = '.'.join([

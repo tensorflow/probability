@@ -137,7 +137,8 @@ def _convert_to_shape_tensor_jax(value, dtype=None, dtype_hint=None, name=None):
   """Converts vectors and scalars of `int`-like to `ndarray`."""
   dtype = dtype_util.as_numpy_dtype(dtype or dtype_hint or np.int32)
   try:
-    return np.array([int(v) for v in value], dtype=dtype)
+    return np.array([_convert_to_shape_tensor_jax(v, dtype) for v in value],
+                    dtype=dtype)
   except:  # JAX throws raw Exception in some cases.  # pylint: disable=bare-except
     pass
   return np.array(int(value), dtype=dtype)
@@ -205,7 +206,7 @@ def broadcast_shape(x_shape, y_shape):
   computed statically and returned as a `TensorShape`.  Otherwise, a rank-1
   `Tensor` will be returned.
 
-  Arguments:
+  Args:
     x_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
       broadcast against this shape.
     y_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
@@ -230,7 +231,7 @@ def cond(pred, true_fn=None, false_fn=None, name=None):
   If `pred` is a bool or has a constant value, we return either `true_fn()`
   or `false_fn()`, otherwise we use `tf.cond` to dynamically route to both.
 
-  Arguments:
+  Args:
     pred: A scalar determining whether to return the result of `true_fn` or
       `false_fn`.
     true_fn: The callable to be performed if pred is true.

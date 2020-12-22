@@ -97,6 +97,7 @@ multi_substrate_py_library(
         ":laplace",
         ":linear_gaussian_ssm",
         ":lkj",
+        ":log_prob_ratio",
         ":logistic",
         ":logitnormal",
         ":loglogistic",
@@ -131,6 +132,7 @@ multi_substrate_py_library(
         ":sinh_arcsinh",
         ":skellam",
         ":spherical_uniform",
+        ":stopping_ratio_logistic",
         ":student_t",
         ":student_t_process",
         ":transformed_distribution",
@@ -574,6 +576,21 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "exponentially_modified_gaussian",
+    srcs = ["exponentially_modified_gaussian.py"],
+    deps = [
+        ":distribution",
+        ":exponential",
+        ":normal",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "finite_discrete",
     srcs = ["finite_discrete.py"],
     deps = [
@@ -858,6 +875,7 @@ multi_substrate_py_library(
     deps = [
         ":distribution",
         ":kullback_leibler",
+        ":log_prob_ratio",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -936,6 +954,7 @@ multi_substrate_py_library(
     srcs = ["joint_distribution.py"],
     deps = [
         ":distribution",
+        ":log_prob_ratio",
         # numpy dep,
         # six dep,
         # tensorflow dep,
@@ -1145,6 +1164,14 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/math:numeric",
         "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "log_prob_ratio",
+    srcs = ["log_prob_ratio.py"],
+    deps = [
+        # tensorflow dep,
     ],
 )
 
@@ -1702,6 +1729,7 @@ multi_substrate_py_library(
     deps = [
         ":distribution",
         ":kullback_leibler",
+        ":log_prob_ratio",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -1719,9 +1747,10 @@ multi_substrate_py_library(
         ":normal",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:affine_scalar",
         "//tensorflow_probability/python/bijectors:chain",
         "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/bijectors:sinh_arcsinh",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -1745,6 +1774,23 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:special",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "stopping_ratio_logistic",
+    srcs = ["stopping_ratio_logistic.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -1833,7 +1879,9 @@ multi_substrate_py_library(
     deps = [
         ":distribution",
         ":kullback_leibler",
+        ":log_prob_ratio",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:ldj_ratio",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -1950,7 +1998,6 @@ multi_substrate_py_library(
         ":sample",
         ":transformed_distribution",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:affine_linear_operator",
         "//tensorflow_probability/python/bijectors:chain",
         "//tensorflow_probability/python/bijectors:scale_matvec_linear_operator",
         "//tensorflow_probability/python/bijectors:shift",
@@ -2406,6 +2453,21 @@ multi_substrate_py_test(
     srcs = ["exponential_test.py"],
     deps = [
         ":exponential",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "exponentially_modified_gaussian_test",
+    srcs = ["exponentially_modified_gaussian_test.py"],
+    jax_size = "medium",
+    # Disable numpy test for now because a bug in the types returned by special_math.ndtr
+    numpy_tags = ["notap"],
+    deps = [
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
@@ -3328,6 +3390,7 @@ multi_substrate_py_test(
     name = "sample_test",
     srcs = ["sample_test.py"],
     jax_size = "medium",
+    shard_count = 2,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -3380,6 +3443,18 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "stopping_ratio_logistic_test",
+    srcs = ["stopping_ratio_logistic_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -3748,35 +3823,5 @@ py_binary(
         # absl:app dep,
         # absl/logging dep,
         "//tensorflow_probability/python/distributions:hypothesis_testlib",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "exponentially_modified_gaussian",
-    srcs = ["exponentially_modified_gaussian.py"],
-    deps = [
-        ":distribution",
-        ":exponential",
-        ":normal",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/internal:tensor_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "exponentially_modified_gaussian_test",
-    srcs = ["exponentially_modified_gaussian_test.py"],
-    jax_size = "medium",
-    # Disable numpy test for now because a bug in the types returned by special_math.ndtr
-    numpy_tags = ["notap"],
-    deps = [
-        # numpy dep,
-        # scipy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )

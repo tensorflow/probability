@@ -17,11 +17,13 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 rng = np.random.RandomState(0)
@@ -255,6 +257,7 @@ class DeterministicTest(test_util.TestCase):
       self.evaluate(deterministic.log_prob(1.))
 
 
+@test_util.test_all_tf_execution_regimes
 class VectorDeterministicTest(test_util.TestCase):
 
   def testParamBroadcasts(self):
@@ -453,6 +456,51 @@ class VectorDeterministicTest(test_util.TestCase):
     with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
                                  'Condition x >= 0'):
       self.evaluate(deterministic.log_prob([1.]))
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_scalar',
+           dist_fn=lambda: tfd.Deterministic(3.)),
+      dict(testcase_name='_batch_scalar',
+           dist_fn=lambda: tfd.Deterministic([3., -7.])),
+      dict(testcase_name='_vector',
+           dist_fn=lambda: tfd.VectorDeterministic([3., -7.])),
+      dict(testcase_name='_batch_vector',
+           dist_fn=lambda: tfd.VectorDeterministic([[3., -7.], [-2, 4.]])))
+  def testDefaultBijector(self, dist_fn):
+    dist = dist_fn()
+    bijector = dist.experimental_default_event_space_bijector()
+    self.assertEqual(dist.loc.shape, dist.batch_shape + dist.event_shape)
+    self.assertEqual(dist.event_shape + (0,),
+                     bijector.inverse_event_shape(dist.event_shape))
+    self.assertEqual(dist.loc.shape + (0,),
+                     bijector.inverse_event_shape(dist.loc.shape))
+    null_point = tf.ones(bijector.inverse_event_shape(dist.loc.shape))
+    self.assertAllEqual(
+        tf.zeros([]),
+        bijector.forward_log_det_jacobian(
+            null_point, tensorshape_util.rank(null_point.shape)))
+    self.assertAllEqual(dist.loc, bijector(null_point))
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_scalar',
+           dist_fn=lambda: tfd.Deterministic(3.)),
+      dict(testcase_name='_batch_scalar',
+           dist_fn=lambda: tfd.Deterministic([3., -7.])),
+      dict(testcase_name='_vector',
+           dist_fn=lambda: tfd.VectorDeterministic([3., -7.])),
+      dict(testcase_name='_batch_vector',
+           dist_fn=lambda: tfd.VectorDeterministic([[3., -7.], [-2, 4.]])))
+  def testDefaultBijectorXLA(self, dist_fn):
+    self.skip_if_no_xla()
+    @tf.function(experimental_compile=True)
+    def fn(x):
+      bijector = dist_fn().experimental_default_event_space_bijector()
+      ndim = tensorshape_util.rank(x.shape)
+      return (bijector(x),
+              bijector.forward_log_det_jacobian(x, ndim),
+              bijector.inverse(0 + bijector(x)),
+              bijector.inverse_log_det_jacobian(0 + bijector(x), ndim - 1))
+    self.evaluate(fn(tf.zeros(dist_fn().loc.shape + (0,))))
 
 
 if __name__ == '__main__':

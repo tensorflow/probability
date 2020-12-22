@@ -19,13 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
 
 from tensorflow_probability.python.internal import test_util
 
@@ -33,10 +31,7 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class MinimizeTests(test_util.TestCase):
 
-  @parameterized.named_parameters(
-      {'testcase_name': 'new_style', 'new_style_trace_fn': True},
-      {'testcase_name': 'old_style', 'new_style_trace_fn': False})
-  def test_custom_trace_fn(self, new_style_trace_fn):
+  def test_custom_trace_fn(self):
 
     init_x = np.array([0., 0.]).astype(np.float32)
     target_x = np.array([3., 4.]).astype(np.float32)
@@ -45,15 +40,9 @@ class MinimizeTests(test_util.TestCase):
     loss_fn = lambda: tf.reduce_sum((x - target_x)**2)
 
     # The trace_fn should determine the structure and values of the results.
-    if new_style_trace_fn:  # Takes a `MinimizerState` namedtuple.
-      def trace_fn(traceable_quantities):
-        return {'loss': traceable_quantities.loss, 'x': x,
-                'sqdiff': (x - target_x)**2}
-    else:
-      def trace_fn(loss, grads, values):  # Takes individual args.
-        del grads
-        del values
-        return {'loss': loss, 'x': x, 'sqdiff': (x - target_x)**2}
+    def trace_fn(traceable_quantities):
+      return {'loss': traceable_quantities.loss, 'x': x,
+              'sqdiff': (x - target_x)**2}
 
     results = tfp.math.minimize(loss_fn, num_steps=100,
                                 optimizer=tf.optimizers.Adam(0.1),
@@ -63,6 +52,16 @@ class MinimizeTests(test_util.TestCase):
     self.assertAllClose(results_['x'][0], init_x, atol=0.5)
     self.assertAllClose(results_['x'][-1], target_x, atol=0.2)
     self.assertAllClose(results_['sqdiff'][-1], [0., 0.], atol=0.1)
+
+  def test_can_trace_all_traceable_quantities(self):
+    x = tf.Variable(5.0)
+    trace_fn = lambda traceable_quantities: traceable_quantities
+    results = tfp.math.minimize(loss_fn=lambda: tf.reduce_sum((x - 1.0)**2),
+                                num_steps=10,
+                                optimizer=tf.optimizers.Adam(0.1),
+                                trace_fn=trace_fn)
+    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(results)
 
   def test_respects_trainable_variables(self):
     # Variables not included in `trainable_variables` should stay fixed.
@@ -94,7 +93,7 @@ class MinimizeTests(test_util.TestCase):
         num_steps=num_steps,
         # TODO(b/137299119) Replace with TF2 optimizer.
         optimizer=tf1.train.AdamOptimizer(0.1),
-        trace_fn=lambda loss, grads, vars: (loss, grads),
+        trace_fn=lambda t: (t.loss, t.gradients),
         trainable_variables=[x])
     with tf.control_dependencies([losses]):
       final_x = tf.identity(x)

@@ -20,33 +20,17 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.distribute import distribute_lib
+from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
-NUM_DEVICES = 4
-
-
-def per_replica_to_tensor(value):
-  return tf.nest.map_structure(
-      lambda per_replica: tf.stack(per_replica.values, axis=0), value)
-
 
 @test_util.test_all_tf_execution_regimes
-class LogProbPartsTest(test_util.TestCase):
+class LogProbPartsTest(test_lib.DistributedTest):
 
-  def setUp(self):
-    super(LogProbPartsTest, self).setUp()
-    self.strategy = tf.distribute.MirroredStrategy(
-        devices=tf.config.list_logical_devices())
-
-  def shard_values(self, values):
-
-    def value_fn(ctx):
-      return values[ctx.replica_id_in_sync_group]
-
-    return self.strategy.experimental_distribute_values_from_function(value_fn)
-
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='Behavior supported natively')
   def test_can_shard_values_across_logical_devices(self):
 
     @tf.function(autograph=False)
@@ -59,9 +43,12 @@ class LogProbPartsTest(test_util.TestCase):
     values = self.strategy.experimental_distribute_values_from_function(
         value_fn)
     out_values = self.evaluate(
-        per_replica_to_tensor(self.strategy.run(add_one, (values,))))
+        self.per_replica_to_tensor(self.strategy_run(add_one, (values,))))
     self.assertAllEqual(out_values, [1., 2., 3., 4.])
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      reason='Cannot use sharded distributions outside of pmap.')
   def test_correct_log_prob_for_global_variable_no_strategy(self):
     data = tf.ones(4)
 
@@ -73,7 +60,7 @@ class LogProbPartsTest(test_util.TestCase):
       ]
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-        log_prob_parts, [False, True])
+        log_prob_parts, [False, True], axis_name=None)
     self.assertAllEqualNested(
         self.evaluate(sharded_log_prob_parts([tf.constant(0.), data])),
         self.evaluate([
@@ -81,6 +68,9 @@ class LogProbPartsTest(test_util.TestCase):
             tf.reduce_sum(tfd.Normal(0., 1.).log_prob(data))
         ]))
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      reason='Cannot use sharded distributions outside of pmap.')
   def test_correct_log_prob_for_local_variable_no_strategy(self):
 
     data = tf.ones(4)
@@ -93,7 +83,7 @@ class LogProbPartsTest(test_util.TestCase):
       ]
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-        log_prob_parts, [True, True])
+        log_prob_parts, [True, True], axis_name=None)
     self.assertAllEqualNested(
         self.evaluate(sharded_log_prob_parts([tf.ones(4), data])),
         self.evaluate([
@@ -103,7 +93,6 @@ class LogProbPartsTest(test_util.TestCase):
 
   def test_correct_log_prob_for_global_variable(self):
 
-    @tf.function(autograph=False)
     def run(x, data):
 
       def log_prob_parts(value):
@@ -114,14 +103,15 @@ class LogProbPartsTest(test_util.TestCase):
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_parts, [False, True])
+          log_prob_parts, [False, True], axis_name=self.axis_name)
 
       return sharded_log_prob_parts([x, data])
 
     x = tf.constant(0.)
     data = tf.ones(4)
     sharded_data = self.shard_values(data)
-    out_parts = per_replica_to_tensor(self.strategy.run(run, (x, sharded_data)))
+    out_parts = self.per_replica_to_tensor(
+        self.strategy_run(run, (x, sharded_data), in_axes=(None, 0)))
 
     self.assertAllEqualNested(
         self.evaluate(out_parts),
@@ -132,7 +122,6 @@ class LogProbPartsTest(test_util.TestCase):
 
   def test_correct_log_prob_for_local_variable(self):
 
-    @tf.function(autograph=False)
     def run(x, data):
 
       def log_prob_parts(value):
@@ -143,7 +132,7 @@ class LogProbPartsTest(test_util.TestCase):
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_parts, [True, True])
+          log_prob_parts, [True, True], axis_name=self.axis_name)
 
       return sharded_log_prob_parts([x, data])
 
@@ -151,8 +140,8 @@ class LogProbPartsTest(test_util.TestCase):
     sharded_x = self.shard_values(x)
     data = tf.ones(4)
     sharded_data = self.shard_values(data)
-    out_parts = per_replica_to_tensor(
-        self.strategy.run(run, (sharded_x, sharded_data)))
+    out_parts = self.per_replica_to_tensor(
+        self.strategy_run(run, (sharded_x, sharded_data)))
 
     self.assertAllEqualNested(
         self.evaluate(out_parts),
@@ -163,7 +152,6 @@ class LogProbPartsTest(test_util.TestCase):
 
   def test_correct_log_prob_for_global_and_local_variable(self):
 
-    @tf.function(autograph=False)
     def run(w, x, data):
 
       def log_prob_parts(values):
@@ -175,7 +163,7 @@ class LogProbPartsTest(test_util.TestCase):
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_parts, [False, True, True])
+          log_prob_parts, [False, True, True], axis_name=self.axis_name)
 
       return sharded_log_prob_parts([w, x, data])
 
@@ -184,8 +172,9 @@ class LogProbPartsTest(test_util.TestCase):
     sharded_x = self.shard_values(x)
     data = 3 * tf.ones(4)
     sharded_data = self.shard_values(data)
-    out_parts = per_replica_to_tensor(
-        self.strategy.run(run, (w, sharded_x, sharded_data)))
+    out_parts = self.per_replica_to_tensor(
+        self.strategy_run(
+            run, (w, sharded_x, sharded_data), in_axes=(None, 0, 0)))
 
     self.assertAllEqualNested(
         self.evaluate(out_parts),
@@ -197,7 +186,6 @@ class LogProbPartsTest(test_util.TestCase):
 
   def test_correct_gradient_for_global_variable(self):
 
-    @tf.function(autograph=False)
     def run(x, data):
 
       def log_prob_parts(value):
@@ -209,7 +197,7 @@ class LogProbPartsTest(test_util.TestCase):
 
       def log_prob(x):
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [False, True])
+            log_prob_parts, [False, True], axis_name=self.axis_name)
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
@@ -218,7 +206,8 @@ class LogProbPartsTest(test_util.TestCase):
     x = tf.constant(1.)
     data = 2 * tf.ones(4)
     sharded_data = self.shard_values(data)
-    out_grads = per_replica_to_tensor(self.strategy.run(run, (x, sharded_data)))
+    out_grads = self.per_replica_to_tensor(
+        self.strategy_run(run, (x, sharded_data), in_axes=(None, 0)))
 
     def true_log_prob(x):
       return (tfd.Normal(0., 1.).log_prob(x) +
@@ -242,7 +231,7 @@ class LogProbPartsTest(test_util.TestCase):
 
       def log_prob(x):
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [True, True])
+            log_prob_parts, [True, True], axis_name=self.axis_name)
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
@@ -252,8 +241,8 @@ class LogProbPartsTest(test_util.TestCase):
     sharded_x = self.shard_values(x)
     data = 2 * tf.ones(4)
     sharded_data = self.shard_values(data)
-    out_grads = per_replica_to_tensor(self.strategy.run(run, (sharded_x,
-                                                              sharded_data)))
+    out_grads = self.per_replica_to_tensor(
+        self.strategy_run(run, (sharded_x, sharded_data)))
 
     def true_log_prob(x):
       return (tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x)) +
@@ -265,7 +254,6 @@ class LogProbPartsTest(test_util.TestCase):
 
   def test_correct_gradient_for_global_and_local_variable(self):
 
-    @tf.function(autograph=False)
     def run(w, x, data):
 
       def log_prob_parts(value):
@@ -279,7 +267,7 @@ class LogProbPartsTest(test_util.TestCase):
       def log_prob(*value):
         w, x = value
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [False, True, True])
+            log_prob_parts, [False, True, True], axis_name=self.axis_name)
         parts = sharded_log_prob_parts([w, x, data])
         return tf.add_n(parts)
 
@@ -290,8 +278,9 @@ class LogProbPartsTest(test_util.TestCase):
     sharded_x = self.shard_values(x)
     data = 2 * tf.ones(4)
     sharded_data = self.shard_values(data)
-    out_grads = per_replica_to_tensor(self.strategy.run(run, (w, sharded_x,
-                                                              sharded_data)))
+    out_grads = self.per_replica_to_tensor(
+        self.strategy_run(
+            run, (w, sharded_x, sharded_data), in_axes=(None, 0, 0)))
 
     def true_log_prob(*value):
       w, x = value
@@ -302,8 +291,8 @@ class LogProbPartsTest(test_util.TestCase):
     true_grad = tfp.math.value_and_gradient(true_log_prob, [w, x])[1]
     true_grad[0] = tf.ones(4) * true_grad[0]
 
-    self.assertAllEqualNested(self.evaluate(out_grads),
-                              self.evaluate(true_grad))
+    self.assertAllEqualNested(
+        self.evaluate(out_grads), self.evaluate(true_grad))
 
   def test_correct_gradient_for_global_and_local_variable_dict(self):
 
@@ -313,14 +302,15 @@ class LogProbPartsTest(test_util.TestCase):
       def log_prob_parts(value):
         return {
             'w': tfd.Normal(0., 1.).log_prob(value['w']),
-            'x': tfd.Normal(w, 1.).log_prob(value['x']),
-            'data': tfd.Normal(x, 1.).log_prob(value['data']),
+            'x': tfd.Normal(value['w'], 1.).log_prob(value['x']),
+            'data': tfd.Normal(value['x'], 1.).log_prob(value['data']),
         }
 
       def log_prob(*value):
         w, x = value
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, {'w': False, 'x': True, 'data': True})
+            log_prob_parts, {'w': False, 'x': True, 'data': True},
+            axis_name=self.axis_name)
         parts = sharded_log_prob_parts({'w': w, 'x': x, 'data': data})
         return tf.add_n(tf.nest.flatten(parts))
 
@@ -331,8 +321,9 @@ class LogProbPartsTest(test_util.TestCase):
     sharded_x = self.shard_values(x)
     data = 2 * tf.ones(4)
     sharded_data = self.shard_values(data)
-    out_grads = per_replica_to_tensor(self.strategy.run(run, (w, sharded_x,
-                                                              sharded_data)))
+    out_grads = self.per_replica_to_tensor(
+        self.strategy_run(run, (w, sharded_x, sharded_data),
+                          in_axes=(None, 0, 0)))
 
     def true_log_prob(*value):
       w, x = value
@@ -347,11 +338,4 @@ class LogProbPartsTest(test_util.TestCase):
                               self.evaluate(true_grad))
 
 if __name__ == '__main__':
-  tf.enable_v2_behavior()
-  physical_devices = tf.config.experimental.list_physical_devices()
-
-  num_logical_devices = 4
-  tf.config.experimental.set_virtual_device_configuration(
-      physical_devices[0],
-      [tf.config.experimental.VirtualDeviceConfiguration()] * NUM_DEVICES)
   tf.test.main()

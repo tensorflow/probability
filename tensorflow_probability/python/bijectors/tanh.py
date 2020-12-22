@@ -34,9 +34,10 @@ class Tanh(bijector.Bijector):
   This can be achieved by an affine transform of the Sigmoid bijector, i.e.,
   it is equivalent to
   ```
-  tfb.Chain([tfb.Affine(shift=-1, scale=2.),
+  tfb.Chain([tfb.Shift(shift=-1.),
+             tfb.Scale(scale=2.),
              tfb.Sigmoid(),
-             tfb.Affine(scale=2.)])
+             tfb.Scale(scale=2.)])
   ```
 
   However, using the `Tanh` bijector directly is slightly faster and more

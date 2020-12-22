@@ -19,9 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.bijectors import affine_linear_operator as affine_linear_operator_bijector
 from tensorflow_probability.python.bijectors import chain as chain_bijector
-from tensorflow_probability.python.bijectors import scale_matvec_linear_operator as scale_matvec_linear_operator_bijector
+from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import exponential
@@ -181,6 +180,8 @@ class VectorExponentialLinearOperator(
       TypeError: if not `scale.dtype.is_floating`
     """
     parameters = dict(locals())
+    if loc is None:
+      loc = 0.0  # Implicit value for backwards compatibility.
     if scale is None:
       raise ValueError('Missing required `scale` parameter.')
     if not dtype_util.is_floating(scale.dtype):
@@ -193,7 +194,8 @@ class VectorExponentialLinearOperator(
           loc, name='loc', dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, scale)
-
+      self._loc = loc
+      self._scale = scale
       super(VectorExponentialLinearOperator, self).__init__(
           # TODO(b/137665504): Use batch-adding meta-distribution to set the
           # batch shape instead of tf.ones.
@@ -206,8 +208,9 @@ class VectorExponentialLinearOperator(
                   rate=tf.ones(batch_shape, dtype=scale.dtype),
                   allow_nan_stats=allow_nan_stats),
               event_shape),
-          bijector=affine_linear_operator_bijector.AffineLinearOperator(
-              shift=loc, scale=scale, validate_args=validate_args),
+          bijector=shift_bijector.Shift(shift=loc)(
+              scale_matvec_linear_operator.ScaleMatvecLinearOperator(
+                  scale=scale, validate_args=validate_args)),
           validate_args=validate_args,
           name=name)
       self._parameters = parameters
@@ -215,12 +218,12 @@ class VectorExponentialLinearOperator(
   @property
   def loc(self):
     """The `loc` `Tensor` in `Y = scale @ X + loc`."""
-    return self.bijector.shift
+    return self._loc
 
   @property
   def scale(self):
     """The `scale` `LinearOperator` in `Y = scale @ X + loc`."""
-    return self.bijector.scale
+    return self._scale
 
   @distribution_util.AppendDocstring(_mvn_sample_note)
   def _log_prob(self, x):
@@ -236,7 +239,7 @@ class VectorExponentialLinearOperator(
     # Then this distribution is
     #   X = loc + LW,
     # and then E[X] = loc + L1, where 1 is the vector of ones.
-    scale_x_ones = self.bijector.scale.matvec(
+    scale_x_ones = self.scale.matvec(
         tf.ones(self._mode_mean_shape(), self.dtype))
 
     if self.loc is None:
@@ -279,7 +282,7 @@ class VectorExponentialLinearOperator(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
 
   def _mode(self):
-    scale_x_zeros = self.bijector.scale.matvec(
+    scale_x_zeros = self.scale.matvec(
         tf.zeros(self._mode_mean_shape(), self.dtype))
 
     if self.loc is None:
@@ -311,7 +314,7 @@ class VectorExponentialLinearOperator(
   def _default_event_space_bijector(self):
     return chain_bijector.Chain([
         shift_bijector.Shift(shift=self.loc, validate_args=self.validate_args),
-        scale_matvec_linear_operator_bijector.ScaleMatvecLinearOperator(
+        scale_matvec_linear_operator.ScaleMatvecLinearOperator(
             scale=self.scale, validate_args=self.validate_args),
         softplus_bijector.Softplus(validate_args=self.validate_args)
     ], validate_args=self.validate_args)

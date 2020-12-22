@@ -217,7 +217,7 @@ class ExpGammaTest(test_util.TestCase):
         d.variance(),
         atol=.15)
 
-  def testSampleReturnsNansForNonPositiveParameters(self):
+  def testSampleNonPositiveParameters(self):
     d = tfd.ExpGamma([1., 2.], 1., validate_args=False)
     seed_stream = test_util.test_seed_stream()
     samples = self.evaluate(d.sample(seed=seed_stream()))
@@ -225,6 +225,11 @@ class ExpGammaTest(test_util.TestCase):
     self.assertAllFinite(samples)
 
     d = tfd.ExpGamma([0., 2.], 1., validate_args=False)
+    samples = self.evaluate(d.sample(seed=seed_stream()))
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllEqual([s == -np.inf for s in samples], [True, False])
+
+    d = tfd.ExpGamma([-0.001, 2.], 1., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [True, False])

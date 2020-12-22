@@ -36,7 +36,7 @@ class InvertBijectorTest(test_util.TestCase):
     for fwd in [
         tfb.Identity(),
         tfb.Exp(),
-        tfb.Affine(shift=[0., 1.], scale_diag=[2., 3.]),
+        tfb.ScaleMatvecDiag(scale_diag=[2., 3.]),
         tfb.Softplus(),
         tfb.SoftmaxCentered(),
     ]:
