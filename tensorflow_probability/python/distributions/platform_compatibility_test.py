@@ -178,7 +178,7 @@ XLA_LOGPROB_RTOL.update({
     'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
     'LKJ': .07,
-    'LogLogistic': 1.5e-2,  # TODO(b/163118820)
+    'LogLogistic': 4.5e-2,  # TODO(b/163118820)
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'Pareto': 2e-2,  # TODO(b/159997708)
