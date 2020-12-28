@@ -57,6 +57,8 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/173546024)
     'GeneralizedExtremeValue',
     'OneHotCategorical',
+    # TODO(b/163118820)
+    'LogLogistic',
     'LogNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
@@ -178,7 +180,6 @@ XLA_LOGPROB_RTOL.update({
     'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
     'LKJ': .07,
-    'LogLogistic': 4.5e-2,  # TODO(b/163118820)
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'Pareto': 2e-2,  # TODO(b/159997708)
