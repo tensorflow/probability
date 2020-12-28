@@ -175,7 +175,8 @@ class CovarianceReducer(reducer_base.Reducer):
       if initial_kernel_results is not None:
         initial_kernel_results = tf.nest.map_structure(
             tf.convert_to_tensor,
-            initial_kernel_results)
+            initial_kernel_results,
+            expand_composites=True)
       initial_fn_result = tf.nest.map_structure(
           lambda fn: fn(initial_chain_state, initial_kernel_results),
           self.transform_fn)
@@ -231,13 +232,14 @@ class CovarianceReducer(reducer_base.Reducer):
       if previous_kernel_results is not None:
         previous_kernel_results = tf.nest.map_structure(
             tf.convert_to_tensor,
-            previous_kernel_results)
+            previous_kernel_results,
+            expand_composites=True)
       fn_results = tf.nest.map_structure(
           lambda fn: fn(new_chain_state, previous_kernel_results),
           self.transform_fn)
       if not nest.is_nested(axis):
         axis = nest_util.broadcast_structure(fn_results, axis)
-      running_covariances = nest.map_structure(
+      running_covariances = tf.nest.map_structure(
           lambda cov, *args: cov.update(*args),
           current_reducer_state.cov_state,
           fn_results,
