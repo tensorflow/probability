@@ -358,10 +358,12 @@ class Sample(distribution_lib.Distribution):
 class _DefaultSampleBijector(bijector_lib.Bijector):
   """Since tfd.Sample uses transposes, it requires a custom event bijector."""
 
-  def __init__(self, distribution, sample_shape, sum_fn):
+  def __init__(self, distribution, sample_shape, sum_fn, bijector=None):
     parameters = dict(locals())
     self.distribution = distribution
-    self.bijector = distribution.experimental_default_event_space_bijector()
+    if bijector is None:
+      bijector = distribution.experimental_default_event_space_bijector()
+    self.bijector = bijector
     self.sample_shape = sample_shape
     self._sum_fn = sum_fn
     sample_ndims = ps.rank_from_shape(self.sample_shape)

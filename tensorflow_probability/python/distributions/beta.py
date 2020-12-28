@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -273,9 +275,15 @@ class Beta(distribution.Distribution):
   def _cdf(self, x):
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
-    shape = self._batch_shape_tensor(concentration1, concentration0)
+    shape = functools.reduce(
+        ps.broadcast_shape,
+        [ps.shape(concentration1),
+         ps.shape(concentration0),
+         ps.shape(x)])
     concentration1 = tf.broadcast_to(concentration1, shape)
     concentration0 = tf.broadcast_to(concentration0, shape)
+    x = tf.broadcast_to(x, shape)
+
     safe_x = tf.where(tf.logical_and(x >= 0, x < 1), x, 0.5)
     answer = tf.math.betainc(concentration1, concentration0, safe_x)
     return distribution_util.extend_cdf_outside_support(

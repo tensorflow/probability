@@ -35,6 +35,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
+        ":distribution_bijectors",
         ":scalar_function_with_inferred_inverse",
         "//tensorflow_probability/python/bijectors:ldj_ratio",
     ],
@@ -65,6 +66,38 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "distribution_bijectors",
+    srcs = ["distribution_bijectors.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":scalar_function_with_inferred_inverse",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "distribution_bijectors_test",
+    size = "medium",
+    srcs = ["distribution_bijectors_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # hypothesis dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

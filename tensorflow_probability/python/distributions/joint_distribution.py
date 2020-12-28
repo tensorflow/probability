@@ -743,13 +743,14 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
 class _DefaultJointBijector(composition.Composition):
   """Minimally-viable event space bijector for `JointDistribution`."""
 
-  def __init__(self, jd, parameters=None):
+  def __init__(self, jd, parameters=None, bijector_fn=None):
     parameters = dict(locals()) if parameters is None else parameters
 
     with tf.name_scope('default_joint_bijector') as name:
-      bijectors = tuple(
-          d.experimental_default_event_space_bijector()
-          for d in jd._get_single_sample_distributions())
+      if bijector_fn is None:
+        bijector_fn = lambda d: d.experimental_default_event_space_bijector()
+      bijectors = tuple(bijector_fn(d)
+                        for d in jd._get_single_sample_distributions())
       i_min_event_ndims = tf.nest.map_structure(
           prefer_static.size, jd.event_shape)
       f_min_event_ndims = jd._model_unflatten([
@@ -763,6 +764,7 @@ class _DefaultJointBijector(composition.Composition):
           parameters=parameters,
           name=name)
       self._jd = jd
+      self._bijector_fn = bijector_fn
 
   def _conditioned_bijectors(self, samples, constrained=False):
     if samples is None:
@@ -774,7 +776,7 @@ class _DefaultJointBijector(composition.Composition):
     for rv in self._jd._model_flatten(samples):
       d = gen.send(cond)
       dist = d.distribution if type(d).__name__ == 'Root' else d
-      bij = dist.experimental_default_event_space_bijector()
+      bij = self._bijector_fn(dist)
 
       if bij is None:
         bij = identity_bijector.Identity()
