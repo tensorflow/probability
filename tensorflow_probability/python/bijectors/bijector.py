@@ -511,6 +511,7 @@ class Bijector(tf.Module):
     name = name_util.strip_invalid_chars(name)
     super(Bijector, self).__init__(name=name)
     self._name = name
+    # TODO(b/176242804): Infer `parameters` if not specified by the child class.
     self._parameters = self._no_dependency(parameters)
 
     self._graph_parents = self._no_dependency(graph_parents or [])
@@ -648,6 +649,8 @@ class Bijector(tf.Module):
     # Remove "self", "__class__", or other special variables. These can appear
     # if the subclass used:
     # `parameters = dict(locals())`.
+    if self._parameters is None:
+      return None
     return {k: v for k, v in self._parameters.items()
             if not k.startswith('__') and k != 'self'}
 
@@ -689,6 +692,11 @@ class Bijector(tf.Module):
     return True
 
   def _get_parameterization(self):
+    if self.parameters is None:
+      # If a user-written bijector doesn't specify `parameters`, we must assume
+      # that all instances are unique.
+      # TODO(b/176242804): this can be removed if we always infer `parameters`.
+      return id(self)
     return self.parameters
 
   def __call__(self, value, name=None, **kwargs):
