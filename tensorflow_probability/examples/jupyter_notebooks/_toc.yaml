@@ -78,6 +78,8 @@ toc:
 - heading: "Releases"
 - title: TFP 0.11.0
   path: /probability/examples/TFP_Release_Notebook_0_11_0
+- title: TFP 0.12.1
+  path: /probability/examples/TFP_Release_Notebook_0_12_1
 - title: "Tutorials (TF1)"
   style: accordion
   status: deprecated
@@ -86,4 +88,3 @@ toc:
     path: /probability/examples/Fitting_DPMM_Using_pSGLD
   - title: HLM R stan
     path: /probability/examples/HLM_TFP_R_Stan
-
