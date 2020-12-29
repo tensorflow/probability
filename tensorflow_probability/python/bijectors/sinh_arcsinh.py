@@ -22,8 +22,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -99,6 +101,14 @@ class SinhArcsinh(bijector.Bijector):
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        skewness=parameter_properties.ParameterProperties(),
+        tailweight=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   @property
   def skewness(self):

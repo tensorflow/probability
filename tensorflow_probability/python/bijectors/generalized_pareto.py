@@ -25,6 +25,7 @@ from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -75,6 +76,17 @@ class GeneralizedPareto(bijector_lib.Bijector):
           dtype=dtype,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   def _is_increasing(self):
     return True

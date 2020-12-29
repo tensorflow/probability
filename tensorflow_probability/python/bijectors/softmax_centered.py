@@ -73,6 +73,10 @@ class SoftmaxCentered(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward_event_shape(self, input_shape):
     return self._pad.forward_event_shape(input_shape)
 

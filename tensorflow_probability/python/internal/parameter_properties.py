@@ -29,6 +29,12 @@ def BIJECTOR_NOT_IMPLEMENTED():  # pylint: disable=invalid-name
                             'parameter.')
 
 
+def SHAPE_FN_NOT_IMPLEMENTED(sample_shape):  # pylint: disable=invalid-name
+  del sample_shape  # Unused.
+  raise NotImplementedError('No shape function is implemented for this '
+                            'parameter.')
+
+
 class ParameterProperties(
     collections.namedtuple('ParameterProperties', [
         'event_ndims', 'shape_fn', 'default_constraining_bijector_fn',

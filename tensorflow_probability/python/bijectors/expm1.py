@@ -69,6 +69,10 @@ class Expm1(bijector.Bijector):
   def _is_increasing(cls):
     return True
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     """Returns the forward `Bijector` evaluation, i.e., X = g(Y)."""
     return tf.math.expm1(x)

@@ -21,8 +21,10 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -76,6 +78,14 @@ class GumbelCDF(bijector.Bijector):
           forward_min_event_ndims=0,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   @property
   def loc(self):

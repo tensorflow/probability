@@ -82,6 +82,10 @@ class IteratedSigmoidCentered(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward_event_shape(self, input_shape):
     if not input_shape[-1:].is_fully_defined():
       return input_shape

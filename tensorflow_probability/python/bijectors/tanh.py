@@ -57,6 +57,10 @@ class Tanh(bijector.Bijector):
   def _is_increasing(cls):
     return True
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     return tf.math.tanh(x)
 

@@ -153,6 +153,10 @@ class Composition(bijector.Bijector):
       self.__is_injective = is_injective
       self.__is_permutation = is_permutation
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   @property
   def bijectors(self):
     return self._bijectors
@@ -568,4 +572,3 @@ class Composition(bijector.Bijector):
     return self._call_walk_inverse(
         lambda b, nd, **kwds: b.inverse_event_ndims(nd, **kwds),
         event_ndims, **kwargs)
-

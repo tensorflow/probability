@@ -58,6 +58,10 @@ class Ascending(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     y0 = x[..., :1]
     yk = tf.exp(x[..., 1:])

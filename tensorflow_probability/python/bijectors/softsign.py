@@ -65,6 +65,10 @@ class Softsign(bijector.Bijector):
   def _is_increasing(cls):
     return True
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     abs_x = tf.math.abs(x)
     # This is right for finite x, but if x == +-inf, this formula will give nan,

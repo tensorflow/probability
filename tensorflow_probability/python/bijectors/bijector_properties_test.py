@@ -665,9 +665,9 @@ class BijectorPropertiesTest(test_util.TestCase):
     self.assertAllEqualNested(ys.dtype, bijector.forward_dtype(xs.dtype))
     self.assertAllEqualNested(xs.dtype, bijector.inverse_dtype(ys.dtype))
 
-  @parameterized.named_parameters(
-      {'testcase_name': bname, 'bijector_name': bname}
-      for bname in TF2_FRIENDLY_BIJECTORS)
+  @parameterized.named_parameters({
+      'testcase_name': bname, 'bijector_name': bname
+  } for bname in TF2_FRIENDLY_BIJECTORS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testParameterProperties(self, bijector_name, data):
@@ -675,8 +675,7 @@ class BijectorPropertiesTest(test_util.TestCase):
       self.skipTest('To reduce test weight, parameter properties tests run in '
                     'eager mode only.')
 
-    non_trainable_tensor_params = ()
-    non_trainable_non_tensor_params = (
+    non_trainable_params = (
         'bijector',  # Several.
         'forward_fn',  # Inline.
         'inverse_fn',  # Inline.
@@ -684,6 +683,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         'inverse_min_event_ndims',  # Inline.
         'event_shape_out',  # Reshape.
         'event_shape_in',  # Reshape.
+        'perm',  # Transpose.
         'rightmost_transposed_ndims',  # Transpose.
         'diag_bijector',  # TransformDiagonal.
     )
@@ -705,44 +705,48 @@ class BijectorPropertiesTest(test_util.TestCase):
     except NotImplementedError as e:
       self.skipTest(str(e))
 
+    seeds = samplers.split_seed(test_util.test_seed(), n=len(params))
     new_parameters = {}
-    seeds = {k: s for (k, s) in zip(params.keys(),
-                                    samplers.split_seed(test_util.test_seed(),
-                                                        n=len(params)))}
-    for param_name, param in params.items():
+    for i, (param_name, param) in enumerate(params.items()):
       # Check that the shape_fn is consistent with event_ndims.
-      param_shape = param.shape_fn(sample_shape=output_shape)
+      try:
+        param_shape = param.shape_fn(sample_shape=output_shape)
+      except NotImplementedError:
+        self.skipTest('No shape function implemented for bijector {} '
+                      'parameter {}.'.format(bijector_name, param_name))
       self.assertGreaterEqual(
           param.event_ndims,
           prefer_static.rank_from_shape(param_shape) - sample_and_batch_ndims)
 
-      if param_name in non_trainable_tensor_params:
-        new_parameters[param_name] = bijector.parameters[param_name]
-      elif param.is_preferred:
-        param_bijector = param.default_constraining_bijector_fn()
+      if param.is_preferred:
+        try:
+          param_bijector = param.default_constraining_bijector_fn()
+        except NotImplementedError:
+          self.skipTest('No constraining bijector implemented for {} '
+                        'parameter {}.'.format(bijector_name, param_name))
         unconstrained_shape = (
             param_bijector.inverse_event_shape_tensor(param_shape))
-        unconstrained_param = samplers.normal(unconstrained_shape,
-                                              seed=seeds[param_name])
+        unconstrained_param = samplers.normal(
+            unconstrained_shape, seed=seeds[i])
         new_parameters[param_name] = param_bijector.forward(unconstrained_param)
 
         # Check that passing a float64 `eps` works with float64 parameters.
         b_float64 = params64[param_name].default_constraining_bijector_fn()
         b_float64(tf.cast(unconstrained_param, tf.float64))
 
-    # Copy over any non-Tensor parameters.
+    # Copy over any non-trainable parameters.
     new_parameters.update({
         k: v
         for (k, v) in bijector.parameters.items()
-        if k in non_trainable_non_tensor_params
+        if k in non_trainable_params
     })
 
     # Sanity check that we got valid parameters.
     new_parameters['validate_args'] = True
     new_bijector = type(bijector)(**new_parameters)
     self.evaluate(tf.group(*[v.initializer for v in new_bijector.variables]))
-    yys = new_bijector.forward(tf.identity(new_bijector.inverse(ys)))
-    self.assertAllClose(ys, yys, atol=1e-2)
+    xs = self._draw_domain_tensor(new_bijector, data, event_dim)
+    self.evaluate(new_bijector.forward(xs))
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}

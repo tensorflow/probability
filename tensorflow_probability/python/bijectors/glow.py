@@ -446,6 +446,10 @@ class Glow(chain.Chain):
     super(Glow, self).__init__(
         bijectors=glow_chain, validate_args=validate_args, name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _get_blockwise_splits(self, input_shape, grab_after_block):
     """build list of splits to give to the blockwise_bijectors.
 

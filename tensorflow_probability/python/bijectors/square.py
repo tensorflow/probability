@@ -70,6 +70,10 @@ class Square(bijector.Bijector):
   def _is_increasing(cls):
     return True
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
       return tf.square(x)

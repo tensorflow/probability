@@ -81,6 +81,10 @@ class Invert(bijector_lib.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def forward_event_shape(self, input_shape):
     return self.bijector.inverse_event_shape(input_shape)
 

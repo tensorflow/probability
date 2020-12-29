@@ -134,6 +134,10 @@ class Chain(composition.Composition):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _is_increasing(self, **kwargs):
     # desc(desc)=>asc, asc(asc)=>asc, other cases=>desc.
     is_increasing = True

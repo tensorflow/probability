@@ -339,6 +339,10 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x, **kwargs):
     static_event_size = tensorshape_util.num_elements(
         tensorshape_util.with_rank_at_least(

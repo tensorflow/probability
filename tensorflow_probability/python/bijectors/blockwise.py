@@ -156,6 +156,10 @@ class Blockwise(chain.Chain):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   @property
   def _b_joint(self):
     return self._bijectors[1]

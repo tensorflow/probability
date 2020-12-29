@@ -19,13 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic as generic_math
 
 
 __all__ = [
@@ -143,10 +143,9 @@ class Softplus(bijector.Bijector):
   def _inverse(self, y):
     y = y - self.low if self.low is not None else y
     if self.hinge_softness is None:
-      return tfp_math.softplus_inverse(y)
+      return generic_math.softplus_inverse(y)
     hinge_softness = tf.cast(self.hinge_softness, y.dtype)
-    return hinge_softness * tfp_math.softplus_inverse(
-        y / hinge_softness)
+    return hinge_softness * generic_math.softplus_inverse(y / hinge_softness)
 
   def _inverse_log_det_jacobian(self, y):
     # Could also do:
@@ -167,6 +166,14 @@ class Softplus(bijector.Bijector):
     if self.hinge_softness is not None:
       x = x / tf.cast(self.hinge_softness, x.dtype)
     return -tf.math.softplus(-x)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        hinge_softness=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: Softplus(low=dtype_util.eps(dtype)))),
+        low=parameter_properties.ParameterProperties())
 
   @property
   def hinge_softness(self):

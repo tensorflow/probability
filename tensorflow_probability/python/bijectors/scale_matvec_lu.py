@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.linalg import lu_reconstruct
@@ -134,6 +135,21 @@ class ScaleMatvecLU(bijector.Bijector):
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    # pylint: disable=g-long-lambda
+    return dict(
+        lower_upper=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, sample_shape[-1:]], axis=0),
+        ),
+        permutation=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED))
+    # pylint: enable=g-long-lambda
 
   @property
   def lower_upper(self):

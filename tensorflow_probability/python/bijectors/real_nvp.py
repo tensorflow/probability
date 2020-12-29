@@ -246,6 +246,10 @@ class RealNVP(bijector_lib.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   @property
   def _masked_size(self):
     masked_size = (

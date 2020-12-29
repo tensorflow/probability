@@ -75,6 +75,10 @@ class DiscreteCosineTransform(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     return tf.signal.dct(x, type=self._dct_type, norm='ortho')
 

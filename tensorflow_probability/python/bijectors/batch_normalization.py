@@ -165,6 +165,10 @@ class BatchNormalization(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _validate_bn_layer(self, layer):
     """Check for valid BatchNormalization layer.
 

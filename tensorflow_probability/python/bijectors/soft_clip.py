@@ -32,6 +32,7 @@ from tensorflow_probability.python.bijectors import softplus
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -267,6 +268,17 @@ class SoftClip(bijector.Bijector):
         parameters=parameters,
         is_constant_jacobian=not components,
         name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        low=parameter_properties.ParameterProperties(),
+        high=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        hinge_softness=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
   @property
   def low(self):
