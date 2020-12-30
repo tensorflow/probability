@@ -254,7 +254,7 @@ class BetaBinomialTest(test_util.TestCase):
     seed = test_util.test_seed(sampler_type='stateless')
     num_samples = 20000
     sample = self.evaluate(
-        tf.function(experimental_compile=True)(dist.sample)(
+        tf.function(jit_compile=True)(dist.sample)(
             num_samples, seed=seed))
     self.assertAllEqual(np.zeros_like(sample), np.isnan(sample))
     # Beta(1e-7, 1e-5) should basically always be either 1 or 0, and 1 should

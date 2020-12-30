@@ -492,7 +492,7 @@ class VectorDeterministicTest(test_util.TestCase):
            dist_fn=lambda: tfd.VectorDeterministic([[3., -7.], [-2, 4.]])))
   def testDefaultBijectorXLA(self, dist_fn):
     self.skip_if_no_xla()
-    @tf.function(experimental_compile=True)
+    @tf.function(jit_compile=True)
     def fn(x):
       bijector = dist_fn().experimental_default_event_space_bijector()
       ndim = tensorshape_util.rank(x.shape)

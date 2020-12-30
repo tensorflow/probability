@@ -417,14 +417,14 @@ class DistributionXLATest(test_util.TestCase):
 
     num_samples = 3
     sample = self.evaluate(
-        tf.function(dist.sample, experimental_compile=True)(
+        tf.function(dist.sample, jit_compile=True)(
             num_samples, seed=seed))
     hp.note('Trying distribution {}'.format(
         self.evaluate_dict(dist.parameters)))
     hp.note('Drew samples {}'.format(sample))
 
     xla_lp = self.evaluate(
-        tf.function(dist.log_prob, experimental_compile=True)(
+        tf.function(dist.log_prob, jit_compile=True)(
             tf.convert_to_tensor(sample)))
     with tfp_hps.no_tf_rank_errors():
       graph_lp = self.evaluate(dist.log_prob(sample))

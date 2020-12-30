@@ -56,7 +56,7 @@ class XLATest(test_util.TestCase):
     jacobian_diag_part = np.float32([-0.5, -1.])
     initial_state = np.float32([1., 2.])
     fn = lambda: linear(solver, jacobian_diag_part, initial_state)
-    fn = tf.function(fn, autograph=False, experimental_compile=True)
+    fn = tf.function(fn, autograph=False, jit_compile=True)
     with tf.device(FLAGS.test_device):
       times, states = self.evaluate(fn())
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *

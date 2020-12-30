@@ -522,7 +522,7 @@ class GammaSamplingTest(test_util.TestCase):
 
   def testSampleXLA(self):
     self.skip_if_no_xla()
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     concentration = np.exp(np.random.rand(4, 3).astype(np.float32))
     rate = np.exp(np.random.rand(4, 3).astype(np.float32))
     dist = tfd.ExpGamma(
@@ -530,7 +530,7 @@ class GammaSamplingTest(test_util.TestCase):
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
-                    experimental_compile=True)())
+                    jit_compile=True)())
 
   def testSampleLowConcentration(self):
     concentration = np.linspace(0.1, 1., 10)

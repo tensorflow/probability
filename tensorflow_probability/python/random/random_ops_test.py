@@ -155,7 +155,7 @@ class _RandomSphericalUniform(object):
     seed = test_util.test_seed()
     dimension = np.int32(10)
 
-    @tf.function(experimental_compile=True)
+    @tf.function(jit_compile=True)
     def sample():
       return tfp.random.spherical_uniform(
           dimension=dimension,

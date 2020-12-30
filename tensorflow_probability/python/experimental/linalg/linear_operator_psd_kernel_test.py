@@ -33,7 +33,7 @@ tfpk = tfp.math.psd_kernels
 
 def skip_if_no_xla(skip_test_fn):
   try:
-    tf.function(lambda: tf.constant(0), experimental_compile=True)()
+    tf.function(lambda: tf.constant(0), jit_compile=True)()
   except tf.errors.UnimplementedError as e:
     if 'Could not find compiler' in str(e):
       skip_test_fn('XLA not available')
@@ -81,13 +81,13 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
 
   def test_diag_part_xla(self):
     skip_if_no_xla(self.skipTest)
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     kernel = tfpk.ExponentiatedQuadratic()
     x1 = tf.random.normal([7, 3, 5, 2])  # square matrix 5x5
     linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x1)),
-        tf.function(linop.diag_part, experimental_compile=True)()
+        tf.function(linop.diag_part, jit_compile=True)()
     ])
     self.assertAllClose(expected, actual)
 
@@ -95,7 +95,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x2)),
-        tf.function(linop.diag_part, experimental_compile=True)()
+        tf.function(linop.diag_part, jit_compile=True)()
     ])
     self.assertAllClose(expected, actual)
 
@@ -103,7 +103,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x2)),
-        tf.function(linop.diag_part, experimental_compile=True)()
+        tf.function(linop.diag_part, jit_compile=True)()
     ])
     self.assertAllClose(expected, actual)
 
@@ -219,7 +219,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
 
   def test_matmul_xla(self):
     skip_if_no_xla(self.skipTest)
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     kernel = tfpk.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 3])
     x2 = tf.random.normal([7, 3])
@@ -227,7 +227,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
         kernel, x1, x2, num_matmul_parts=3)
     x = tf.random.normal([7, 2])
 
-    @tf.function(experimental_compile=True)
+    @tf.function(jit_compile=True)
     def f():
       return linop.matmul(x)
 
@@ -239,7 +239,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
 
   def test_matmul_grad_xla(self):
     skip_if_no_xla(self.skipTest)
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     kernel = tfpk.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 3])
     x2 = tf.random.normal([7, 3])
@@ -247,7 +247,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
         kernel, x1, x2, num_matmul_parts=3)
     x = tf.random.normal([7, 2])
 
-    @tf.function(experimental_compile=True)
+    @tf.function(jit_compile=True)
     def f():
       with tf.GradientTape() as tape:
         tape.watch((x1, x2, x))
@@ -273,7 +273,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
   def test_matmul_grad_xla_kernelparams(self):
     self.skipTest('b/149145533')
     skip_if_no_xla(self.skipTest)
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     feature_dim = 3
 
     def kernel_fn(eq_params, poly_params):
@@ -293,7 +293,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
         kernel_fn, x1, x2, kernel_args=kernel_args, num_matmul_parts=3)
     x = tf.random.normal([7, 2], dtype=tf.float64)
 
-    @tf.function(experimental_compile=True)
+    @tf.function(jit_compile=True)
     def f():
       with tf.GradientTape() as tape:
         tape.watch((x1, x2, x, kernel_args))

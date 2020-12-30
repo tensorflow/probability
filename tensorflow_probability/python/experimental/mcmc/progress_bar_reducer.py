@@ -53,7 +53,7 @@ def make_tqdm_progress_bar_fn(description='', leave=True):
 class ProgressBarReducer(reducer_base.Reducer):
   """`Reducer` that displays a progress bar.
 
-  Note this is not XLA-compatible (`tf.function(experimental_compile=True)`).
+  Note this is not XLA-compatible (`tf.function(jit_compile=True)`).
   Numpy and JAX substrates are not supported.
 
   Example usage:

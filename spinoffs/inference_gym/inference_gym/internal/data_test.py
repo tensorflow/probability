@@ -45,7 +45,7 @@ class DataTest(test_util.InferenceGymTestCase):
   @test_util.numpy_disable_test_missing_functionality('No XLA in NumPy')
   def testGermanCreditNumericInXLA(self):
 
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def load_dataset_in_xla():
       dataset = data.german_credit_numeric()
       # The actual dataset loading will happen in Eager mode, courtesy of the

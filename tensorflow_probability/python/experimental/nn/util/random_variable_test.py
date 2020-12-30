@@ -72,7 +72,7 @@ class RandomVariableTest(test_util.TestCase):
     if tf.config.functions_run_eagerly():
       self.skipTest('Graph mode test only.')
     x = tfn.util.RandomVariable(tfd.Normal(0, 1))
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def run():
       tf.convert_to_tensor(x)
     run()
@@ -84,9 +84,9 @@ class RandomVariableTest(test_util.TestCase):
       self.skipTest('Graph mode test only.')
     x = tfn.util.RandomVariable(
         tfd.Normal(0, 1), tfd.Distribution.mean, name='rv')
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def run():
-      @tf.function(autograph=False, experimental_compile=True)
+      @tf.function(autograph=False, jit_compile=True)
       def _inner():
         return tf.convert_to_tensor(x, name='inner')
       y = _inner()

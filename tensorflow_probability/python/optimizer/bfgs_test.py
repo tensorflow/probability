@@ -78,7 +78,7 @@ class BfgsTest(test_util.TestCase):
 
     start = tf.constant([0.6, 0.8])
     results = tf.function(
-        tfp.optimizer.bfgs_minimize, experimental_compile=True)(
+        tfp.optimizer.bfgs_minimize, jit_compile=True)(
             quadratic, initial_position=start, tolerance=np.float32(1e-8))
 
     results = self.evaluate(results)
@@ -363,7 +363,7 @@ class BfgsTest(test_util.TestCase):
                                 [-3.779310, -3.283186],
                                 [3.584428, -1.848126]], dtype=dtype)
     batch_results = tf.function(
-        tfp.optimizer.bfgs_minimize, experimental_compile=True)(
+        tfp.optimizer.bfgs_minimize, jit_compile=True)(
             himmelblau,
             initial_position=starts,
             stopping_condition=tfp.optimizer.converged_all,

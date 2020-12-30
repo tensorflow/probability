@@ -62,7 +62,7 @@ class ImplSelectTest(test_util.TestCase):
     oracle = tf.math.cumsum(arg)
     with tf.device('CPU'):
       ans, runtime = self.evaluate(
-          tf.function(cumsum, experimental_compile=True)(arg))
+          tf.function(cumsum, jit_compile=True)(arg))
     self.assertAllEqual(oracle, ans)
     self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
 
@@ -74,9 +74,9 @@ class ImplSelectTest(test_util.TestCase):
     oracle = tf.math.cumsum(arg)
     with tf.device('GPU'):
       ans1, runtime1 = self.evaluate(
-          tf.function(cumsum, experimental_compile=False)(arg))
+          tf.function(cumsum, jit_compile=False)(arg))
       ans2, runtime2 = self.evaluate(
-          tf.function(cumsum, experimental_compile=True)(arg))
+          tf.function(cumsum, jit_compile=True)(arg))
     self.assertAllEqual(oracle, ans1)
     self.assertAllEqual(oracle, ans2)
     self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime1)

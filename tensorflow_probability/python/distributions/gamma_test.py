@@ -626,14 +626,14 @@ class GammaSamplingTest(test_util.TestCase):
 
   def testSampleXLA(self):
     self.skip_if_no_xla()
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     concentration = np.exp(np.random.rand(4, 3).astype(np.float32))
     rate = np.exp(np.random.rand(4, 3).astype(np.float32))
     dist = tfd.Gamma(concentration=concentration, rate=rate, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
-                    experimental_compile=True)())
+                    jit_compile=True)())
     # Also test the low-level sampler and verify the XLA-friendly variant.
     # TODO(bjp): functools.partial, after eliminating PY2 which breaks
     # tf_inspect in interesting ways:
@@ -642,7 +642,7 @@ class GammaSamplingTest(test_util.TestCase):
     # not be expressed with ArgSpec.
     scalar_gamma = tf.function(
         lambda **kwds: gamma_lib.random_gamma_with_runtime(shape=[], **kwds),
-        experimental_compile=True)
+        jit_compile=True)
     _, runtime = self.evaluate(
         scalar_gamma(
             concentration=tf.constant(1.),

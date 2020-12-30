@@ -707,8 +707,8 @@ NUMPY_TEST_CASES = [
                 dtype=np.complex64,
                 elements=complex_numbers(max_magnitude=1e3))
         ],
-        atol=1e-3,
-        rtol=1e-3),
+        atol=2e-3,
+        rtol=2e-3),
     TestCase(
         'signal.rfft', [
             single_arrays(
@@ -1761,7 +1761,7 @@ class NumpyTest(test_util.TestCase):
             alt_value = self.evaluate(
                 tf.function(
                     lambda args, kwargs: const_closure(*args, **kwargs),
-                    experimental_compile=True)(nonconst_args, nonconst_kwargs))
+                    jit_compile=True)(nonconst_args, nonconst_kwargs))
           else:
             alt_value = self.evaluate(
                 tpu_strategy.run(tf.function(const_closure),

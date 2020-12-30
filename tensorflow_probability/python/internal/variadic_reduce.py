@@ -119,7 +119,7 @@ def make_variadic_reduce(reducer, vjp_bwd, tangents_fn):
 
   # Top-level `tf.function` for XLA (closed-over by the returned reduce_fn).
   @implementation_selection.never_runs_functions_eagerly
-  @tf.function(experimental_compile=True)
+  @tf.function(jit_compile=True)
   def _xla_reduce(operands, inits, axis):
     """JIT-ed wrapper for TF `xla.variadic_reduce(..., reducer)`."""
     from tensorflow.compiler.tf2xla.python import xla  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top

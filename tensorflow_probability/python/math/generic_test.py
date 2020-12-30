@@ -386,7 +386,7 @@ class LogCumsumExpTests(test_util.TestCase):
     # This ensures that cumulative sums involving `-np.inf` behave
     # correctly even when compiled with XLA.
     x = tf.constant([1., -np.inf, -np.inf, 4., 5., 6., 7., 8.])
-    @tf.function(experimental_compile=xla_compile)
+    @tf.function(jit_compile=xla_compile)
     def compute_jacobian(x):
       with tf.GradientTape() as g:
         g.watch(x)
@@ -640,7 +640,7 @@ class _KahanSumTest(test_util.TestCase):
                            axis=axis, keepdims=keepdims)
     if self.jit:
       self.skip_if_no_xla()
-      fn = tf.function(fn, experimental_compile=True)
+      fn = tf.function(fn, jit_compile=True)
     dist = tfd.MixtureSameFamily(tfd.Categorical(logits=[0., 0]),
                                  tfd.Normal(loc=[0., 1e6], scale=[1., 1e3]))
     vals = self.evaluate(dist.sample(sample_shape, seed=test_util.test_seed()))
@@ -671,7 +671,7 @@ class _KahanSumTest(test_util.TestCase):
       return tfp.math.value_and_gradient(lambda x: fn(x).total ** 2., x,
                                          output_gradients=dy)[1]
     if self.jit:
-      grad_fn = tf.function(grad_fn, experimental_compile=True)
+      grad_fn = tf.function(grad_fn, jit_compile=True)
     grad = grad_fn(vals)
     self.assertIsNotNone(grad)
     keepdims_shape = tf.reduce_sum(vals, axis=axis, keepdims=True).shape

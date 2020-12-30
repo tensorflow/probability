@@ -1002,7 +1002,7 @@ class _KalmanSmootherTest(test_util.TestCase):
     if self.compile:
       self.skip_if_no_xla()
       filter_and_smooth = tf.function(filter_and_smooth, autograph=False,
-                                      experimental_compile=True)
+                                      jit_compile=True)
     [
         filtered_means,
         filtered_covs,
@@ -1131,7 +1131,7 @@ class _KalmanSmootherTest(test_util.TestCase):
       self.skip_if_no_xla()
       sample_and_marginals = tf.function(sample_and_marginals,
                                          autograph=False,
-                                         experimental_compile=True)
+                                         jit_compile=True)
     posterior_samples, posterior_mean, posterior_covs = sample_and_marginals()
     self.assertAllEqual(posterior_samples.shape,
                         sample_shape + [1, 1, 5, 3])

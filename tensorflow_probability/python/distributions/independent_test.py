@@ -506,7 +506,7 @@ class IndependentDistributionTest(test_util.TestCase):
     maybe_jit = lambda f: f
     if jit:
       self.skip_if_no_xla()
-      maybe_jit = tf.function(experimental_compile=True)
+      maybe_jit = tf.function(jit_compile=True)
     stream = test_util.test_seed_stream()
     n = 20_000
     samps = tfd.Poisson(rate=1.).sample(n, seed=stream())

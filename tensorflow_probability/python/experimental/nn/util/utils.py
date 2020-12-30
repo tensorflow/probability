@@ -145,7 +145,7 @@ def tune_dataset(dataset,
     image = tf.cast(u < image, dtype=tf.float32)   # Randomly binarize.
     return image, label
 
-  # TODO(b/144500779): Cant use `experimental_compile=True`.
+  # TODO(b/144500779): Cant use `jit_compile=True`.
   @tf.function(autograph=False)
   def one_step(iter):
     x, y = next(iter)
@@ -246,7 +246,7 @@ def tfcompile(func=None,
   tf_function = tf_function or xla_compile_all
   xla_best_effort = xla_best_effort and not xla_compile_all
   maybe_tf_function = (tf.function(autograph=False,
-                                   experimental_compile=xla_compile_all)
+                                   jit_compile=xla_compile_all)
                        if tf_function else _dummy_context())
   def decorator(f):
     @functools.wraps(f)

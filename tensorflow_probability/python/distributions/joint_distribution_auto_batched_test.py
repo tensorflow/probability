@@ -663,7 +663,7 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     maybe_jit = lambda f: f
     if jit:
       self.skip_if_no_xla()
-      maybe_jit = tf.function(experimental_compile=True)
+      maybe_jit = tf.function(jit_compile=True)
 
     def make_models(dtype):
       models = {}

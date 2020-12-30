@@ -390,7 +390,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     maybe_jit = lambda f: f
     if jit:
       self.skip_if_no_xla()
-      maybe_jit = tf.function(experimental_compile=True)
+      maybe_jit = tf.function(jit_compile=True)
 
     n = 20_000
     stream = test_util.test_seed_stream()

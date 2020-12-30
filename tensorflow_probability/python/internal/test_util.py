@@ -368,7 +368,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
 
   def skip_if_no_xla(self):
     try:
-      tf.function(lambda: tf.constant(0), experimental_compile=True)()
+      tf.function(lambda: tf.constant(0), jit_compile=True)()
     except (tf.errors.UnimplementedError, NotImplementedError) as e:
       if 'Could not find compiler' in str(e):
         self.skipTest('XLA not available')

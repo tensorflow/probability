@@ -81,7 +81,7 @@ class GramSchmidtTest(test_util.TestCase):
 
   def testXLA(self):
     self.skip_if_no_xla()
-    gs = tf.function(tfp.math.gram_schmidt, experimental_compile=True)
+    gs = tf.function(tfp.math.gram_schmidt, jit_compile=True)
     mat = self.evaluate(tf.random.normal([10, 5], seed=test_util.test_seed()))
     self.assertAllClose(gs(mat), tfp.math.gram_schmidt(mat))
 
