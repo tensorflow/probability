@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""LogNormal distribution classes."""
+"""LogLogistic distribution classes."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -46,12 +46,12 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     """Construct a log-logistic distribution.
 
     The LogLogistic distribution models positive-valued random variables
-    whose logarithm is a logistic distribution with loc `loc` and
+    whose logarithm is a logistic distribution with location `loc` and
     scale `scale`. It is constructed as the exponential
     transformation of a Logistic distribution.
 
     Args:
-      loc: Floating-point `Tensor`; the loc of the underlying logistic
+      loc: Floating-point `Tensor`; the location of the underlying logistic
         distribution(s).
       scale: Floating-point `Tensor`; the scale of the underlying logistic
         distribution(s).
@@ -160,7 +160,7 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
 
 
 def sinc(x, name=None):
-  """Calculate the (normalized) sinus cardinal of x."""
+  """Calculate the (normalized) sinus cardinalis of x."""
   name = name or 'sinc'
   with tf.name_scope(name):
     x *= np.pi

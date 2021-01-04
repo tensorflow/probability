@@ -509,7 +509,7 @@ class NutsTest(test_util.TestCase):
 
     number_of_steps, burnin, nchain = 200, 50, 10
 
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def run_chain_and_get_diagnostic():
       # Ensure we're really in graph mode.
       assert hasattr(tf.constant([]), 'graph')

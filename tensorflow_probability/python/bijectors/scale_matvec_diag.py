@@ -20,8 +20,10 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -115,3 +117,17 @@ class ScaleMatvecDiag(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
     those that are shape-related.
     """
     return ('scale_diag',)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return {
+        'scale_diag': parameter_properties.ParameterProperties(event_ndims=1)
+    }
+
+
+@ldj_ratio.RegisterILDJRatio(ScaleMatvecDiag)
+def _ildj_ratio_scale_matvec_diag(p, x, q, y):
+  del x, y
+  return tf.math.reduce_sum(tf.math.log(tf.math.abs(q.scale.diag_part())) -
+                            tf.math.log(tf.math.abs(p.scale.diag_part())),
+                            axis=-1)

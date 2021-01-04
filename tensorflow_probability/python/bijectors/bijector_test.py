@@ -280,6 +280,24 @@ class UniqueCacheKey(tfb.Bijector):
     return id(self)
 
 
+class UnspecifiedParameters(tfb.Bijector):
+  """A bijector that fails to pass `parameters` to the base class."""
+
+  def __init__(self, loc):
+    self._loc = loc
+    super(UnspecifiedParameters, self).__init__(
+        validate_args=False,
+        is_constant_jacobian=True,
+        forward_min_event_ndims=0,
+        name='unspecified_parameters')
+
+  def _forward(self, x):
+    return x + self._loc
+
+  def _forward_log_det_jacobian(self, x):
+    return tf.constant(0., x.dtype)
+
+
 @test_util.test_all_tf_execution_regimes
 class BijectorTestEventNdims(test_util.TestCase):
 
@@ -431,6 +449,18 @@ class BijectorCachingTest(test_util.TestCase):
   def testUniqueCacheKey(self):
     bijector_1 = UniqueCacheKey()
     bijector_2 = UniqueCacheKey()
+
+    x = tf.constant(3., dtype=tf.float32)
+    y_1 = bijector_1.forward(x)
+    y_2 = bijector_2.forward(x)
+
+    self.assertIsNot(y_1, y_2)
+    self.assertLen(bijector_1._cache.weak_keys(direction='forward'), 1)
+    self.assertLen(bijector_2._cache.weak_keys(direction='forward'), 1)
+
+  def testBijectorsWithUnspecifiedParametersDoNotShareCache(self):
+    bijector_1 = UnspecifiedParameters(loc=tf.constant(1., dtype=tf.float32))
+    bijector_2 = UnspecifiedParameters(loc=tf.constant(2., dtype=tf.float32))
 
     x = tf.constant(3., dtype=tf.float32)
     y_1 = bijector_1.forward(x)

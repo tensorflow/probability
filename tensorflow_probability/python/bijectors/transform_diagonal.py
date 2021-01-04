@@ -66,6 +66,10 @@ class TransformDiagonal(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   @property
   def diag_bijector(self):
     return self._diag_bijector

@@ -58,6 +58,7 @@ NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST = (
     'ContinuousBernoulli',  # b/169321398
     'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
     'TransformedDistribution',  # Bijectors may introduce nans
+    'Zipf',  # b/175929563 triggered by Zipf inside Independent
 )
 
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
@@ -282,7 +283,8 @@ class ParameterBijectorsTest(test_util.TestCase):
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
                            'MultivariateStudentTLinearOperator',
                            'PoissonLogNormalQuadratureCompound',
-                           'SphericalUniform', 'SinhArcsinh')
+                           'SphericalUniform', 'SinhArcsinh',
+                           'StoppingRatioLogistic',)
     non_trainable_dists = (
         high_gt_low_constraint_dists + not_annotated_dists +
         dhps.INSTANTIABLE_META_DISTS)
@@ -523,6 +525,29 @@ class DistributionSlicingTest(test_util.TestCase):
     dist = tfb.Expm1()(dist)
     samps = 1.7182817 + tf.zeros_like(dist.sample(seed=test_util.test_seed()))
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
+
+
+# Don't decorate with test_util.test_all_tf_execution_regimes, since we're
+# explicitly mixing modes.
+class TestMixingGraphAndEagerModes(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in  sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                           list(dhps.INSTANTIABLE_META_DISTS))
+  )
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testSampleEagerCreatedDistributionInGraphMode(self, dist_name, data):
+    if not tf.executing_eagerly():
+      self.skipTest('Only test mixed eager/graph behavior in eager tests.')
+    # Create in eager mode.
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False))
+
+    @tf.function
+    def f():
+      dist.sample()
+    f()
 
 
 if __name__ == '__main__':

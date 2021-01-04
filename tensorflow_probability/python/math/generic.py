@@ -132,7 +132,23 @@ def _kahan_reduction(x, y):
   return s, c
 
 
-_reduce_kahan_sum = variadic_reduce.make_variadic_reduce(_kahan_reduction)
+def _kahan_reduce_bwd(aux, grads):
+  operands, inits, axis, unsqueezed_shape = aux
+  del inits, axis  # unused
+  return (tf.broadcast_to(tf.reshape(grads[0], unsqueezed_shape),
+                          ps.shape(operands[0])),
+          None)
+
+
+def _kahan_reduce_tangents(inits, axis, primals, tangents):
+  del inits, primals  # unused
+  doperands, = tangents
+  reduced_tangent = tf.reduce_sum(doperands[0], axis)
+  return (reduced_tangent, tf.zeros_like(reduced_tangent))
+
+
+_reduce_kahan_sum = variadic_reduce.make_variadic_reduce(
+    _kahan_reduction, _kahan_reduce_bwd, _kahan_reduce_tangents)
 
 
 class Kahan(collections.namedtuple('Kahan', ['total', 'correction'])):

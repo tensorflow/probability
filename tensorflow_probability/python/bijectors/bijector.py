@@ -511,6 +511,7 @@ class Bijector(tf.Module):
     name = name_util.strip_invalid_chars(name)
     super(Bijector, self).__init__(name=name)
     self._name = name
+    # TODO(b/176242804): Infer `parameters` if not specified by the child class.
     self._parameters = self._no_dependency(parameters)
 
     self._graph_parents = self._no_dependency(graph_parents or [])
@@ -648,6 +649,8 @@ class Bijector(tf.Module):
     # Remove "self", "__class__", or other special variables. These can appear
     # if the subclass used:
     # `parameters = dict(locals())`.
+    if self._parameters is None:
+      return None
     return {k: v for k, v in self._parameters.items()
             if not k.startswith('__') and k != 'self'}
 
@@ -689,6 +692,11 @@ class Bijector(tf.Module):
     return True
 
   def _get_parameterization(self):
+    if self.parameters is None:
+      # If a user-written bijector doesn't specify `parameters`, we must assume
+      # that all instances are unique.
+      # TODO(b/176242804): this can be removed if we always infer `parameters`.
+      return id(self)
     return self.parameters
 
   def __call__(self, value, name=None, **kwargs):
@@ -718,14 +726,14 @@ class Bijector(tf.Module):
 
     ```python
     sigmoid = tfb.Reciprocal()(
-        tfb.AffineScalar(shift=1.)(
+        tfb.Shift(shift=1.)(
           tfb.Exp()(
-            tfb.AffineScalar(scale=-1.))))
+            tfb.Scale(scale=-1.))))
     # ==> `tfb.Chain([
     #         tfb.Reciprocal(),
-    #         tfb.AffineScalar(shift=1.),
+    #         tfb.Shift(shift=1.),
     #         tfb.Exp(),
-    #         tfb.AffineScalar(scale=-1.),
+    #         tfb.Scale(scale=-1.),
     #      ])`  # ie, `tfb.Sigmoid()`
 
     log_normal = tfb.Exp()(tfd.Normal(0, 1))
@@ -903,6 +911,47 @@ class Bijector(tf.Module):
     return nest.map_structure_up_to(
         self.forward_min_event_ndims, tf.TensorShape,
         self._inverse_event_shape(output_shape))
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    raise NotImplementedError(
+        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+
+  @classmethod
+  def parameter_properties(cls, dtype=tf.float32):
+    """Returns a dict mapping constructor arg names to property annotations.
+
+    This dict should include an entry for each of the bijector's
+    `Tensor`-valued constructor arguments.
+
+    Args:
+      dtype: Optional float `dtype` to assume for continuous-valued parameters.
+        Some constraining bijectors require advance knowledge of the dtype
+        because certain constants (e.g., `tfb.Softplus.low`) must be
+        instantiated with the same dtype as the values to be transformed.
+    Returns:
+      parameter_properties: A
+        `str -> `tfp.python.internal.parameter_properties.ParameterProperties`
+        dict mapping constructor argument names to `ParameterProperties`
+        instances.
+    """
+    with tf.name_scope('parameter_properties'):
+      return cls._parameter_properties(dtype)
+
+  @classmethod
+  def _params_event_ndims(cls):
+    """Returns a dict mapping constructor argument names to per-event rank.
+
+    The ranks are pulled from `cls.parameter_properties()`; this is a
+    convenience wrapper.
+
+    Returns:
+      params_event_ndims: Per-event parameter ranks, a `str->int dict`.
+    """
+    return {
+        param_name: param.event_ndims
+        for param_name, param in cls.parameter_properties().items()
+    }
 
   def _forward(self, x):
     """Subclass implementation for `forward` public function."""

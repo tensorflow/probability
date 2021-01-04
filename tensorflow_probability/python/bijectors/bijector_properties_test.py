@@ -30,13 +30,13 @@ from tensorflow_probability.python import experimental
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 
 TF2_FRIENDLY_BIJECTORS = (
-    'AffineScalar',
     'Ascending',
     'BatchNormalization',
     # 'CategoricalToDiscrete', TODO(b/137956955): Add support
@@ -59,7 +59,6 @@ TF2_FRIENDLY_BIJECTORS = (
     'KumaraswamyCDF',
     'Log',
     'Log1p',
-    'MatvecLU',
     'MatrixInverseTriL',
     'MoyalCDF',
     'NormalCDF',
@@ -92,13 +91,11 @@ TF2_FRIENDLY_BIJECTORS = (
 )
 
 BIJECTOR_PARAMS_NDIMS = {
-    'AffineScalar': dict(shift=0, scale=0, log_scale=0),
     'FrechetCDF': dict(loc=0, scale=0, concentration=0),
     'GompertzCDF': dict(concentration=0, rate=0),
     'GumbelCDF': dict(loc=0, scale=0),
     'GeneralizedExtremeValueCDF': dict(loc=0, scale=0, concentration=0),
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
-    'MatvecLU': dict(lower_upper=2, permutation=1),
     'MoyalCDF': dict(loc=0, scale=0),
     'Power': dict(power=0),
     'RayleighCDF': dict(scale=0),
@@ -125,7 +122,6 @@ ILDJ = 'inverse_log_det_jacobian'
 INVERT_LDJ = {FLDJ: ILDJ, ILDJ: FLDJ}
 
 NO_LDJ_GRADS_EXPECTED = {
-    'AffineScalar': dict(shift={FLDJ, ILDJ}),
     'BatchNormalization': dict(beta={FLDJ, ILDJ}),
     'FrechetCDF': dict(loc={ILDJ}),
     'GeneralizedExtremeValueCDF': dict(loc={ILDJ}),
@@ -135,7 +131,6 @@ NO_LDJ_GRADS_EXPECTED = {
 }
 
 TRANSFORM_DIAGONAL_ALLOWLIST = {
-    'AffineScalar',
     'BatchNormalization',
     'DiscreteCosineTransform',
     'Exp',
@@ -670,6 +665,89 @@ class BijectorPropertiesTest(test_util.TestCase):
     self.assertAllEqualNested(ys.dtype, bijector.forward_dtype(xs.dtype))
     self.assertAllEqualNested(xs.dtype, bijector.inverse_dtype(ys.dtype))
 
+  @parameterized.named_parameters({
+      'testcase_name': bname, 'bijector_name': bname
+  } for bname in TF2_FRIENDLY_BIJECTORS)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testParameterProperties(self, bijector_name, data):
+    if tf.config.functions_run_eagerly() or not tf.executing_eagerly():
+      self.skipTest('To reduce test weight, parameter properties tests run in '
+                    'eager mode only.')
+
+    non_trainable_params = (
+        'bijector',  # Several.
+        'forward_fn',  # Inline.
+        'inverse_fn',  # Inline.
+        'forward_min_event_ndims',  # Inline.
+        'inverse_min_event_ndims',  # Inline.
+        'event_shape_out',  # Reshape.
+        'event_shape_in',  # Reshape.
+        'perm',  # Transpose.
+        'rightmost_transposed_ndims',  # Transpose.
+        'diag_bijector',  # TransformDiagonal.
+    )
+    bijector, event_dim = self._draw_bijector(
+        bijector_name, data,
+        validate_args=True,
+        allowed_bijectors=TF2_FRIENDLY_BIJECTORS)
+
+    # Extract the full shape of an output from this bijector.
+    xs = self._draw_domain_tensor(bijector, data, event_dim)
+    ys = bijector.forward(xs)
+    output_shape = prefer_static.shape(ys)
+    sample_and_batch_ndims = (prefer_static.rank_from_shape(output_shape) -
+                              bijector.inverse_min_event_ndims)
+
+    try:
+      params = type(bijector).parameter_properties()
+      params64 = type(bijector).parameter_properties(dtype=tf.float64)
+    except NotImplementedError as e:
+      self.skipTest(str(e))
+
+    seeds = samplers.split_seed(test_util.test_seed(), n=len(params))
+    new_parameters = {}
+    for i, (param_name, param) in enumerate(params.items()):
+      # Check that the shape_fn is consistent with event_ndims.
+      try:
+        param_shape = param.shape_fn(sample_shape=output_shape)
+      except NotImplementedError:
+        self.skipTest('No shape function implemented for bijector {} '
+                      'parameter {}.'.format(bijector_name, param_name))
+      self.assertGreaterEqual(
+          param.event_ndims,
+          prefer_static.rank_from_shape(param_shape) - sample_and_batch_ndims)
+
+      if param.is_preferred:
+        try:
+          param_bijector = param.default_constraining_bijector_fn()
+        except NotImplementedError:
+          self.skipTest('No constraining bijector implemented for {} '
+                        'parameter {}.'.format(bijector_name, param_name))
+        unconstrained_shape = (
+            param_bijector.inverse_event_shape_tensor(param_shape))
+        unconstrained_param = samplers.normal(
+            unconstrained_shape, seed=seeds[i])
+        new_parameters[param_name] = param_bijector.forward(unconstrained_param)
+
+        # Check that passing a float64 `eps` works with float64 parameters.
+        b_float64 = params64[param_name].default_constraining_bijector_fn()
+        b_float64(tf.cast(unconstrained_param, tf.float64))
+
+    # Copy over any non-trainable parameters.
+    new_parameters.update({
+        k: v
+        for (k, v) in bijector.parameters.items()
+        if k in non_trainable_params
+    })
+
+    # Sanity check that we got valid parameters.
+    new_parameters['validate_args'] = True
+    new_bijector = type(bijector)(**new_parameters)
+    self.evaluate(tf.group(*[v.initializer for v in new_bijector.variables]))
+    xs = self._draw_domain_tensor(new_bijector, data, event_dim)
+    self.evaluate(new_bijector.forward(xs))
+
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}
       for bname in (set(TF2_FRIENDLY_BIJECTORS) -
@@ -813,8 +891,6 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'temperature':
         tfp_hps.softplus_plus_eps(eps=0.5),
-    'AffineScalar.scale':
-        tfp_hps.softplus_plus_eps(),
     'Scale.scale':
         tfp_hps.softplus_plus_eps(),
     'ScaleMatvecDiag.scale_diag':

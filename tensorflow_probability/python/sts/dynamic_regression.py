@@ -314,7 +314,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
       super(DynamicLinearRegression, self).__init__(
           parameters=[
               Parameter('drift_scale', drift_scale_prior,
-                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                        tfb.Chain([tfb.Scale(scale=observed_stddev),
                                    tfb.Softplus()]))
           ],
           latent_size=num_features,

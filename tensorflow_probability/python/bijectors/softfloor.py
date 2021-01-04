@@ -24,8 +24,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -93,7 +95,7 @@ class Softfloor(bijector.Bijector):
 
   # Ceiling is just a shifted floor at non-integer points.
   soft_ceiling = tfb.Chain(
-    [tfb.AffineScalar(1.),
+    [tfb.Shift(1.),
      tfb.Softfloor(temperature=1.)])
   soft_ceiling.forward(x) # Should be close to [3., 5., 6.]
   ```
@@ -219,6 +221,13 @@ class Softfloor(bijector.Bijector):
     return (-tf.math.softplus(-inner_part) -
             tf.math.softplus(inner_part) -
             offset)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        temperature=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   @property
   def temperature(self):

@@ -21,6 +21,7 @@ from __future__ import print_function
 import abc
 import sys
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
@@ -28,12 +29,16 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'Composition',
 ]
+
+
+JAX_MODE = False
 
 
 def pack_structs_like(template, *structures):
@@ -147,6 +152,10 @@ class Composition(bijector.Bijector):
       self._validate_event_size = validate_event_size
       self.__is_injective = is_injective
       self.__is_permutation = is_permutation
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
 
   @property
   def bijectors(self):
@@ -491,6 +500,10 @@ class Composition(bijector.Bijector):
         raise ValueError(error_message)
       return assert_util.assert_equal(False, increased_dof, error_message)
 
+    if (not tf.executing_eagerly() and
+        control_flow_util.GraphOrParentsInXlaContext(tf1.get_default_graph())):
+      return  # No StringFormat or Print ops in XLA.
+
     # Otherwise, we print a warning and continue.
     return ps.cond(
         pred=increased_dof,
@@ -559,4 +572,3 @@ class Composition(bijector.Bijector):
     return self._call_walk_inverse(
         lambda b, nd, **kwds: b.inverse_event_ndims(nd, **kwds),
         event_ndims, **kwargs)
-

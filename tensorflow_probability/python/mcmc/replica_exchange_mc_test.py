@@ -551,7 +551,7 @@ class REMCTest(test_util.TestCase):
 
     if use_xla:
       states, trace = tf.function(
-          _get_states_and_trace, experimental_compile=True)()
+          _get_states_and_trace, jit_compile=True)()
     else:
       states, trace = _get_states_and_trace()
 

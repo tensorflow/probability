@@ -29,6 +29,8 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
 
+tfd = tfp.distributions
+
 
 FakeKernelResults = collections.namedtuple(
         'FakeKernelResults', 'value, inner_results')
@@ -128,6 +130,15 @@ class CovarianceReducersTest(test_util.TestCase):
     final_cov = self.evaluate(cov_red.finalize(state))
     self.assertEqual(2, len(final_cov))
     self.assertAllEqual(np.ones((2, 2, 2)) * 2, final_cov)
+
+  def test_composite_kernel_results(self):
+    composite_normal_cls = tfp.experimental.auto_composite_tensor(
+        tfd.Normal, omit_kwargs='name')
+    kr = composite_normal_cls(0., 1.)
+    cov_red = tfp.experimental.mcmc.CovarianceReducer()
+    state = cov_red.initialize(tf.zeros((2,)), kr)
+    state = cov_red.one_step(tf.ones((2,)), state, kr)
+    cov_red.finalize(state)
 
 
 if __name__ == '__main__':

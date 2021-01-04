@@ -29,6 +29,7 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -236,7 +237,7 @@ class Sample(distribution_lib.Distribution):
       return lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
     return tf.math.reduce_sum
 
-  def _log_prob(self, x, **kwargs):
+  def _prepare_for_underlying(self, x):
     batch_ndims = ps.rank_from_shape(
         self.distribution.batch_shape_tensor,
         self.distribution.batch_shape)
@@ -266,10 +267,12 @@ class Sample(distribution_lib.Distribution):
         ndims)
     perm = ps.concat(
         [sample_dims, extra_sample_dims, batch_dims, event_dims], axis=0)
-    x = tf.transpose(a=x, perm=perm)
-    # (3) Compute x's log_prob.
-    lp = self.distribution.log_prob(x, **kwargs)
-    # (4) Ensure lp is fully broadcast in the sample dims, i.e. ensure lp has
+    x = tf.transpose(x, perm=perm)
+    return x, (sample_ndims, extra_sample_ndims, batch_ndims)
+
+  def _finish_log_prob(self, lp, aux):
+    (sample_ndims, extra_sample_ndims, batch_ndims) = aux
+    # (1) Ensure lp is fully broadcast in the sample dims, i.e. ensure lp has
     #     full sample shape in the sample axes, before we reduce.
     bcast_lp_shape = ps.broadcast_shape(
         ps.shape(lp),
@@ -277,9 +280,15 @@ class Sample(distribution_lib.Distribution):
                    ps.reshape(self.sample_shape, shape=[-1]),
                    ps.ones([batch_ndims], tf.int32)], axis=0))
     lp = tf.broadcast_to(lp, bcast_lp_shape)
-    # (5) Make the final reduction in x.
+    # (2) Make the final reduction.
     axis = ps.range(sample_ndims, sample_ndims + extra_sample_ndims)
     return self._sum_fn()(lp, axis=axis)
+
+  def _log_prob(self, x, **kwargs):
+    x, aux = self._prepare_for_underlying(x)
+    return self._finish_log_prob(
+        self.distribution.log_prob(x, **kwargs),
+        aux)
 
   def _entropy(self, **kwargs):
     h = self.distribution.entropy(**kwargs)
@@ -349,10 +358,12 @@ class Sample(distribution_lib.Distribution):
 class _DefaultSampleBijector(bijector_lib.Bijector):
   """Since tfd.Sample uses transposes, it requires a custom event bijector."""
 
-  def __init__(self, distribution, sample_shape, sum_fn):
+  def __init__(self, distribution, sample_shape, sum_fn, bijector=None):
     parameters = dict(locals())
     self.distribution = distribution
-    self.bijector = distribution.experimental_default_event_space_bijector()
+    if bijector is None:
+      bijector = distribution.experimental_default_event_space_bijector()
+    self.bijector = bijector
     self.sample_shape = sample_shape
     self._sum_fn = sum_fn
     sample_ndims = ps.rank_from_shape(self.sample_shape)
@@ -544,3 +555,18 @@ def _kl_sample(a, b, name='kl_sample'):
         a.distribution, b.distribution, name=name)
     n = ps.reduce_prod(a.sample_shape)
     return tf.cast(x=n, dtype=kl.dtype) * kl
+
+
+@log_prob_ratio.RegisterLogProbRatio(Sample)
+def _sample_log_prob_ratio(p, x, q, y):
+  checks = []
+  if p.validate_args or q.validate_args:
+    checks.append(tf.debugging.assert_equal(p.sample_shape, q.sample_shape))
+  with tf.control_dependencies(checks):
+    # pylint: disable=protected-access
+    x, aux = p._prepare_for_underlying(x)
+    y, _ = q._prepare_for_underlying(y)
+    return p._finish_log_prob(
+        log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
+        aux)
+    # pylint: enable=protected-access

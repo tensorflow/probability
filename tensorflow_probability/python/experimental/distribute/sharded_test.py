@@ -65,6 +65,28 @@ class ShardedDistributionTest(test_lib.DistributedTest):
           continue
         self.assertNotEqual(sample[i], sample[j])
 
+  def test_kahan_custom_grad(self):
+    def model_fn():
+      root = tfp.experimental.distribute.JointDistributionCoroutine.Root
+      _ = yield root(tfp.experimental.distribute.ShardedIndependent(
+          tfd.Normal(0, tf.ones([7])),
+          reinterpreted_batch_ndims=1,
+          experimental_use_kahan_sum=True,
+          shard_axis_name=self.axis_name))
+    model = tfp.experimental.distribute.JointDistributionCoroutine(
+        model_fn, shard_axis_name=self.axis_name)
 
-if __name__ == "__main__":
+    samps = self.strategy_run(lambda seed: model.sample(seed=seed),
+                              (test_util.test_seed(sampler_type='stateless'),),
+                              in_axes=None)
+
+    @tf.function(jit_compile=True)
+    def lp_grad(x):
+      return tfp.math.value_and_gradient(model.log_prob, x)
+
+    self.evaluate(
+        self.per_replica_to_tensor(self.strategy_run(lp_grad, (samps,))))
+
+
+if __name__ == '__main__':
   tf.test.main()

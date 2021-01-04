@@ -427,16 +427,16 @@ class PoissonSamplingTest(test_util.TestCase):
 
   def testSampleXLA(self):
     self.skip_if_no_xla()
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     log_rates = np.random.rand(4, 3).astype(np.float32)
     dist = tfd.Poisson(log_rate=log_rates, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
-                    experimental_compile=True)())
+                    jit_compile=True)())
     # Also test the low-level sampler and verify the XLA-friendly variant.
     _, runtime = self.evaluate(
-        tf.function(poisson_lib.random_poisson, experimental_compile=True)(
+        tf.function(poisson_lib.random_poisson, jit_compile=True)(
             shape=tf.constant([], dtype=tf.int32),
             rates=tf.constant(10.),
             seed=test_util.test_seed()))

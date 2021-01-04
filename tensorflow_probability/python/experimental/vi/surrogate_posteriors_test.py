@@ -84,28 +84,27 @@ class FactoredSurrogatePosterior(test_util.TestCase):
   @parameterized.named_parameters(
       {'testcase_name': 'TensorEvent',
        'event_shape': tf.TensorShape([4]),
-       'constraining_bijectors': [tfb.Sigmoid()],
+       'bijector': [tfb.Sigmoid()],
        'dtype': np.float64, 'use_static_shape': True},
       {'testcase_name': 'ListEvent',
        'event_shape': [tf.TensorShape([3]),
                        tf.TensorShape([]),
                        tf.TensorShape([2, 2])],
-       'constraining_bijectors': [tfb.Softplus(), None, tfb.FillTriangular()],
+       'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
        'dtype': np.float32, 'use_static_shape': False},
       {'testcase_name': 'DictEvent',
        'event_shape': {'x': tf.TensorShape([1]), 'y': tf.TensorShape([])},
-       'constraining_bijectors': None,
+       'bijector': None,
        'dtype': np.float64, 'use_static_shape': True},
       {'testcase_name': 'NestedEvent',
        'event_shape': {'x': [tf.TensorShape([1]), tf.TensorShape([1, 2])],
                        'y': tf.TensorShape([])},
-       'constraining_bijectors': {
+       'bijector': {
            'x': [tfb.Identity(), tfb.Softplus()], 'y': tfb.Sigmoid()},
        'dtype': np.float32, 'use_static_shape': True},
   )
-  def test_specifying_event_shape(self, event_shape,
-                                  constraining_bijectors,
-                                  dtype, use_static_shape):
+  def test_specifying_event_shape(
+      self, event_shape, bijector, dtype, use_static_shape):
     seed = test_util.test_seed_stream()
     surrogate_posterior = (
         tfp.experimental.vi.build_factored_surrogate_posterior(
@@ -114,7 +113,7 @@ class FactoredSurrogatePosterior(test_util.TestCase):
                                   dtype=np.int32,
                                   use_static_shape=use_static_shape),
                 event_shape),
-            constraining_bijectors=constraining_bijectors,
+            bijector=bijector,
             initial_unconstrained_loc=functools.partial(
                 tf.random.uniform, minval=-2., maxval=2., dtype=dtype),
             seed=seed(),
@@ -150,7 +149,7 @@ class FactoredSurrogatePosterior(test_util.TestCase):
        'event_shape': [4],
        'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
        'implicit_batch_shape': [1, 1],
-       'constraining_bijectors': tfb.Sigmoid(),
+       'bijector': tfb.Sigmoid(),
        'dtype': np.float32, 'use_static_shape': False},
       {'testcase_name': 'ListEvent',
        'event_shape': [[3], [], [2, 2]],
@@ -158,29 +157,28 @@ class FactoredSurrogatePosterior(test_util.TestCase):
                        0.1,
                        np.array([[1., 0], [-4., 2.]])],
        'implicit_batch_shape': [],
-       'constraining_bijectors': [tfb.Softplus(), None, tfb.FillTriangular()],
+       'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
        'dtype': np.float64, 'use_static_shape': True},
       {'testcase_name': 'DictEvent',
        'event_shape': {'x': [2], 'y': []},
        'initial_loc': {'x': np.array([[0.9, 1.2]]),
                        'y': np.array([-4.1])},
        'implicit_batch_shape': [1],
-       'constraining_bijectors': None,
+       'bijector': None,
        'dtype': np.float32, 'use_static_shape': False},
   )
   def test_specifying_initial_loc(self, event_shape, initial_loc,
-                                  implicit_batch_shape,
-                                  constraining_bijectors,
+                                  implicit_batch_shape, bijector,
                                   dtype, use_static_shape):
     initial_loc = tf.nest.map_structure(
         lambda s: _build_tensor(s, dtype=dtype,  # pylint: disable=g-long-lambda
                                 use_static_shape=use_static_shape),
         initial_loc)
 
-    if constraining_bijectors is not None:
+    if bijector is not None:
       initial_unconstrained_loc = tf.nest.map_structure(
           lambda x, b: x if b is None else b.inverse(x),
-          initial_loc, constraining_bijectors)
+          initial_loc, bijector)
     else:
       initial_unconstrained_loc = initial_loc
 
@@ -189,7 +187,7 @@ class FactoredSurrogatePosterior(test_util.TestCase):
             event_shape=event_shape,
             initial_unconstrained_loc=initial_unconstrained_loc,
             initial_unconstrained_scale=1e-6,
-            constraining_bijectors=constraining_bijectors,
+            bijector=bijector,
             validate_args=True))
     self.evaluate([v.initializer
                    for v in surrogate_posterior.trainable_variables])
@@ -223,7 +221,7 @@ class FactoredSurrogatePosterior(test_util.TestCase):
     surrogate_posterior = (
         tfp.experimental.vi.build_factored_surrogate_posterior(
             event_shape=model.event_shape_tensor()[:-1],
-            constraining_bijectors=[tfb.Softplus(), tfb.Softplus()]))
+            bijector=[tfb.Softplus(), tfb.Softplus()]))
 
     # Fit model.
     y = [0.2, 0.5, 0.3, 0.7]
@@ -244,6 +242,46 @@ class FactoredSurrogatePosterior(test_util.TestCase):
     _ = self.evaluate(losses)
     _ = self.evaluate(posterior_mean)
     _ = self.evaluate(posterior_stddev)
+
+  def test_multipart_bijector(self):
+    dist = tfd.JointDistributionNamed({
+        'a': tfd.Exponential(1.),
+        'b': tfd.Normal(0., 1.),
+        'c': lambda b, a: tfd.Sample(tfd.Normal(b, a), sample_shape=[5])})
+
+    seed = test_util.test_seed_stream()
+    surrogate_posterior = (
+        tfp.experimental.vi.build_factored_surrogate_posterior(
+            event_shape=dist.event_shape,
+            bijector=(
+                dist.experimental_default_event_space_bijector()),
+            initial_unconstrained_loc=functools.partial(
+                tf.random.uniform, minval=-2., maxval=2.),
+            seed=seed(),
+            validate_args=True))
+    self.evaluate([v.initializer
+                   for v in surrogate_posterior.trainable_variables])
+
+    # Test that the posterior has the specified event shape(s).
+    self.assertAllEqualNested(
+        self.evaluate(dist.event_shape_tensor()),
+        self.evaluate(surrogate_posterior.event_shape_tensor()))
+
+    posterior_sample_ = self.evaluate(surrogate_posterior.sample(seed=seed()))
+    posterior_logprob_ = self.evaluate(
+        surrogate_posterior.log_prob(posterior_sample_))
+
+    # Test that all sample Tensors have the expected shapes.
+    check_shape = lambda s, x: self.assertAllEqual(s, x.shape)
+    self.assertAllAssertsNested(
+        check_shape, dist.event_shape, posterior_sample_)
+
+    # Test that samples are finite and not NaN.
+    self.assertAllAssertsNested(self.assertAllFinite, posterior_sample_)
+
+    # Test that logprob is scalar, finite, and not NaN.
+    self.assertEmpty(posterior_logprob_.shape)
+    self.assertAllFinite(posterior_logprob_)
 
 
 def _build_tensor(ndarray, dtype, use_static_shape):

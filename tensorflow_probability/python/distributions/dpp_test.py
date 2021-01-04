@@ -338,7 +338,7 @@ class _DppTest(test_util.TestCase):
 
     _, eigvals, eigvecs = kernel_over_unit_square(20, dtype=self.param_dtype)
     for n in 1, 5:
-      @tf.function(experimental_compile=True)
+      @tf.function(jit_compile=True)
       def f(eigvals):
         return tfd.DeterminantalPointProcess(eigvals, eigvecs).sample(
             n, seed=test_util.test_seed())  # pylint: disable=cell-var-from-loop

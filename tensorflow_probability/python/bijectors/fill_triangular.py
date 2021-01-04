@@ -88,6 +88,10 @@ class FillTriangular(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     return fill_triangular(x, upper=self._upper)
 

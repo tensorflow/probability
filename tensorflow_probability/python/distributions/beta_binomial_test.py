@@ -143,6 +143,12 @@ class BetaBinomialTest(test_util.TestCase):
           np.sum(x == i, axis=0) / (num_samples * 1.0),
           atol=0.01, rtol=0.1)
 
+  def testSampleCornerConcentrations(self):
+    seed_stream = test_util.test_seed_stream()
+    d = tfd.BetaBinomial(concentration0=[1., 0.], concentration1=[0., 1.],
+                         total_count=50.)
+    self.assertAllEqual(d.sample(10, seed=seed_stream()), [[0, 50]] * 10)
+
   def testEmpiricalCdfAgainstDirichletMultinomial(self):
     # This test is too slow for Eager mode.
     if tf.executing_eagerly():
@@ -248,7 +254,7 @@ class BetaBinomialTest(test_util.TestCase):
     seed = test_util.test_seed(sampler_type='stateless')
     num_samples = 20000
     sample = self.evaluate(
-        tf.function(experimental_compile=True)(dist.sample)(
+        tf.function(jit_compile=True)(dist.sample)(
             num_samples, seed=seed))
     self.assertAllEqual(np.zeros_like(sample), np.isnan(sample))
     # Beta(1e-7, 1e-5) should basically always be either 1 or 0, and 1 should

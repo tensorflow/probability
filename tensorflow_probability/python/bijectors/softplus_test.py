@@ -171,7 +171,7 @@ class SoftplusBijectorTest(test_util.TestCase):
   def testLeftTailGrad(self, dtype, do_compile):
     x = np.linspace(-50., -8., 1000).astype(dtype)
 
-    @tf.function(autograph=False, experimental_compile=do_compile)
+    @tf.function(autograph=False, jit_compile=do_compile)
     def fn(x):
       return tf.math.log(tfb.Softplus().forward(x))
 

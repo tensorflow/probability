@@ -20,11 +20,12 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
+from tensorflow_probability.python.math import gradient as math_gradient
+
 
 JAX_MODE = False
 
 if JAX_MODE:
-  import jax  # pylint: disable=g-import-not-at-top
   from jax import lax  # pylint: disable=g-import-not-at-top
 
 
@@ -105,40 +106,9 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
 
   def _sharded_log_prob_parts_fwd(value):
     tf.nest.assert_same_structure(value, is_sharded)
-    if JAX_MODE:
-      def flat_log_prob_parts_fn(flat_args):
-        args = tf.nest.pack_sequence_as(is_sharded, flat_args)
-        log_prob_parts = log_prob_parts_fn(args)
-        return tf.nest.flatten(log_prob_parts)
+    log_prob_parts = log_prob_parts_fn(value)
+    tf.nest.assert_same_structure(log_prob_parts, is_sharded)
 
-      def wrapped_log_prob(value):
-        flat_sharded = tf.nest.flatten(is_sharded)
-        return tf.nest.pack_sequence_as(
-            is_sharded,
-            [
-                _DummyGrads(tf.nest.pack_sequence_as(is_sharded, [  # pylint: disable=g-complex-comprehension
-                    jax.grad(lambda v: flat_log_prob_parts_fn(v)[i])  # pylint: disable=cell-var-from-loop
-                    (tf.nest.flatten(value))[j]
-                    for i in range(len(flat_sharded))
-                ]))
-                for j in range(len(flat_sharded))
-            ])
-
-      log_prob_parts = log_prob_parts_fn(value)
-      local_grads = wrapped_log_prob(value)
-    else:
-      with tf.GradientTape(persistent=True) as tape:
-        tape.watch(value)
-        log_prob_parts = log_prob_parts_fn(value)
-        tf.nest.assert_same_structure(log_prob_parts, is_sharded)
-
-      def local_grad(v):
-        return _DummyGrads(
-            tf.nest.map_structure(
-                lambda log_prob_part: tape.gradient(log_prob_part, v),
-                log_prob_parts))
-
-      local_grads = tf.nest.map_structure(local_grad, value)
     total_log_prob_parts = tf.nest.map_structure(
         lambda log_prob_part, sharded: (  # pylint: disable=g-long-lambda
             psum(log_prob_part, axis_name=axis_name)
@@ -146,16 +116,33 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
         log_prob_parts,
         is_sharded)
 
-    return total_log_prob_parts, (value, local_grads)
+    return total_log_prob_parts, value
 
-  def _sharded_log_prob_parts_bwd(res, gs):
-    value, local_grads = res
+  def _sharded_log_prob_parts_bwd(value, gs):
 
-    def grad_mul(vs, g):
-      return tf.nest.map_structure(lambda v: v * g if v is not None else v, vs)
+    def flat_log_prob_parts_fn(flat_args):
+      args = tf.nest.pack_sequence_as(is_sharded, flat_args)
+      log_prob_parts = log_prob_parts_fn(args)
+      return tf.nest.flatten(log_prob_parts)
 
-    local_grads = tf.nest.map_structure(
-        lambda v, g: _DummyGrads(grad_mul(v.grads, g)), local_grads, gs)
+    # Operate with flattened lists, to make it easier to tease-out individual
+    # outputs for the local grads.
+    flat_value = tf.nest.flatten(value)
+    flat_gs = tf.nest.flatten(gs)
+    local_grads = [
+        math_gradient.value_and_gradient(  # pylint: disable=g-complex-comprehension
+            lambda *val: flat_log_prob_parts_fn(val)[out_idx],  # pylint: disable=cell-var-from-loop
+            flat_value,
+            output_gradients=flat_gs[out_idx])[1]
+        for out_idx, value_part in enumerate(flat_value)
+    ]
+    # Transpose.
+    local_grads = list(zip(*local_grads))
+    # Repack.
+    local_grads = tf.nest.pack_sequence_as(is_sharded, [
+        _DummyGrads(tf.nest.pack_sequence_as(is_sharded, v))
+        for v in local_grads
+    ])
 
     def value_grad(v, value_sharded, term_grads):
       """Computes reductions of output gradients.

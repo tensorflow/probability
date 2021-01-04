@@ -241,6 +241,10 @@ class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
       return _cumulative_broadcast_dynamic(output_shape)
     return output_shape
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return {}
+
 
 def _cumulative_broadcast_static(event_shape):
   broadcast_shapes = [s[:-1] for s in event_shape]

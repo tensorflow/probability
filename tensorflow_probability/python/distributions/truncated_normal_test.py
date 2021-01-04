@@ -380,7 +380,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
 
   def testSampleXLA(self):
     self.skip_if_no_xla()
-    @tf.function(experimental_compile=True)
+    @tf.function(jit_compile=True)
     def f(loc):
       return tfd.TruncatedNormal(
           loc=loc, scale=1., low=-1., high=1.).sample(

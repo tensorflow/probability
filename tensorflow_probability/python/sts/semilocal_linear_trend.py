@@ -429,7 +429,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       else:
         autoregressive_coef_bijector = tfb.Identity()  # unconstrained
 
-      stddev_preconditioner = tfb.AffineScalar(scale=observed_stddev)
+      stddev_preconditioner = tfb.Scale(scale=observed_stddev)
       scaled_softplus = tfb.Chain([stddev_preconditioner, tfb.Softplus()])
       super(SemiLocalLinearTrend, self).__init__(
           parameters=[

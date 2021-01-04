@@ -217,7 +217,7 @@ class ExpGammaTest(test_util.TestCase):
         d.variance(),
         atol=.15)
 
-  def testSampleReturnsNansForNonPositiveParameters(self):
+  def testSampleNonPositiveParameters(self):
     d = tfd.ExpGamma([1., 2.], 1., validate_args=False)
     seed_stream = test_util.test_seed_stream()
     samples = self.evaluate(d.sample(seed=seed_stream()))
@@ -225,6 +225,11 @@ class ExpGammaTest(test_util.TestCase):
     self.assertAllFinite(samples)
 
     d = tfd.ExpGamma([0., 2.], 1., validate_args=False)
+    samples = self.evaluate(d.sample(seed=seed_stream()))
+    self.assertEqual(samples.shape, (2,))
+    self.assertAllEqual([s == -np.inf for s in samples], [True, False])
+
+    d = tfd.ExpGamma([-0.001, 2.], 1., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [True, False])
@@ -517,7 +522,7 @@ class GammaSamplingTest(test_util.TestCase):
 
   def testSampleXLA(self):
     self.skip_if_no_xla()
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     concentration = np.exp(np.random.rand(4, 3).astype(np.float32))
     rate = np.exp(np.random.rand(4, 3).astype(np.float32))
     dist = tfd.ExpGamma(
@@ -525,7 +530,7 @@ class GammaSamplingTest(test_util.TestCase):
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
-                    experimental_compile=True)())
+                    jit_compile=True)())
 
   def testSampleLowConcentration(self):
     concentration = np.linspace(0.1, 1., 10)

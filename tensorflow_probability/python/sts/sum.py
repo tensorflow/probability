@@ -460,7 +460,7 @@ class Sum(StructuralTimeSeries):
       parameters = [Parameter('observation_noise_scale',
                               observation_noise_scale_prior,
                               tfb.Chain([
-                                  tfb.AffineScalar(scale=observed_stddev),
+                                  tfb.Scale(scale=observed_stddev),
                                   tfb.Softplus()]))]
       for component in components:
         for parameter in component.parameters:

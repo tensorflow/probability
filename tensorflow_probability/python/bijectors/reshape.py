@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -189,6 +190,20 @@ class Reshape(bijector.Bijector):
       assertions.extend(_maybe_check_valid_shape(
           self._event_shape_out, self.validate_args))
     return assertions
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        event_shape_out=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        event_shape_in=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED))
 
   @property
   def _is_permutation(self):

@@ -294,6 +294,55 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(
         self.evaluate(out_grads), self.evaluate(true_grad))
 
+  def test_correct_gradient_for_global_and_local_variable_batched(self):
+
+    def run(w, x, data):
+
+      def log_prob_parts(value):
+        w, x, data = value
+        return [
+            tf.reduce_sum(tfd.Normal(tf.zeros(2), 1.).log_prob(w), -1),
+            # w is non-scalar, to detect spurious broadcasting.
+            # The squares are to add some extra non-linearities.
+            tfd.Normal(tf.reduce_sum(w, -1)**2, 1.).log_prob(x),
+            tfd.Normal(x**2, 1.).log_prob(data)
+        ]
+
+      def log_prob(*value):
+        w, x = value
+        sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
+            log_prob_parts, [False, True, True], axis_name=self.axis_name)
+        parts = sharded_log_prob_parts([w, x, data])
+        return tf.add_n(parts)
+
+      return tfp.math.value_and_gradient(log_prob, [w, x])[1]
+
+    batch_size = 3
+    # We'll add an extra dimensions to w to make sure we get non-scalars inside
+    # the distributed log_prob function.
+    w = tf.ones([batch_size, 2])
+    x = tf.tile(tf.range(4.)[tf.newaxis], [batch_size, 1])
+    sharded_x = self.shard_values(x, axis=1)
+    data = 2 * tf.ones([4])
+    sharded_data = self.shard_values(data, axis=0)
+    out_grads = self.per_replica_to_tensor(
+        self.strategy_run(
+            run, (w, sharded_x, sharded_data), in_axes=(None, 1, 0)), axis=1)
+
+    def true_log_prob(*value):
+      w, x = value
+      return (tf.reduce_sum(tfd.Normal(tf.zeros(2), 1.).log_prob(w), -1) +
+              tf.reduce_sum(
+                  tfd.Normal(tf.reduce_sum(w, -1, keepdims=True)**2,
+                             1.).log_prob(x), -1) +
+              tf.reduce_sum(tfd.Normal(x**2, 1.).log_prob(data), -1))
+
+    true_grad = tfp.math.value_and_gradient(true_log_prob, [w, x])[1]
+    true_grad[0] = tf.ones([batch_size, 4, 1]) * true_grad[0][:, tf.newaxis]
+
+    self.assertAllEqualNested(
+        self.evaluate(out_grads), self.evaluate(true_grad))
+
   def test_correct_gradient_for_global_and_local_variable_dict(self):
 
     @tf.function(autograph=False)

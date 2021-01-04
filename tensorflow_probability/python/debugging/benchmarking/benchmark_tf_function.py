@@ -121,7 +121,7 @@ def _run_function_under_strategies(user_fn, iters, config, hardware,
 
   if RUNTIME_XLA in config.strategies:
     xla_fn = tf.function(
-        user_fn, autograph=use_autograph, experimental_compile=True)
+        user_fn, autograph=use_autograph, jit_compile=True)
     data_dicts.append(run_one(xla_fn, RUNTIME_XLA))
 
   if RUNTIME_XLA_AUTOCLUSTER in config.strategies:

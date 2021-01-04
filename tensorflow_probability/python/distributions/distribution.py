@@ -1555,6 +1555,13 @@ class Distribution(_BaseDistribution):
         if not deps:
           yield name_scope
           return
+        # In eager mode, some `assert_util.assert_xyz` calls return None. If a
+        # Distribution is created in eager mode with `validate_args=True`, then
+        # used in a `tf.function` context, it can result in errors when
+        # `tf.convert_to_tensor` is called on the inputs to
+        # `tf.control_dependencies` below. To avoid these errors, we drop the
+        # `None`s here.
+        deps = [x for x in deps if x is not None]
         with tf.control_dependencies(deps) as deps_scope:
           yield deps_scope
 

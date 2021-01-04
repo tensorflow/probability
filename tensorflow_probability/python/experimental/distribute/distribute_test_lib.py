@@ -17,6 +17,7 @@ import os
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import test_util
 
 tf.enable_v2_behavior()
@@ -48,11 +49,13 @@ class DistributedTest(test_util.TestCase):
       self.key = [0, 0]
     self.axis_name = 'i'
 
-  def per_replica_to_tensor(self, value):
+  def per_replica_to_tensor(self, value, axis=0):
     if JAX_MODE:
-      return value
+      # JAX, by default, stacks outputs along the first axis.
+      return tf.nest.map_structure(
+          lambda v: distribution_util.move_dimension(v, 0, axis), value)
     return tf.nest.map_structure(
-        lambda per_replica: tf.stack(per_replica.values, axis=0), value)
+        lambda per_replica: tf.stack(per_replica.values, axis=axis), value)
 
   def strategy_run(self, f, args, in_axes=0):
     if JAX_MODE:
@@ -64,9 +67,13 @@ class DistributedTest(test_util.TestCase):
       return jax.pmap(f, axis_name=self.axis_name, in_axes=in_axes)(*args)
     return self.strategy.run(tf.function(f, autograph=False), args)
 
-  def shard_values(self, values):
+  def shard_values(self, values, axis=0):
+    self.assertEqual(values.shape[axis], NUM_DEVICES)
+
     if JAX_MODE:
-      return jax.pmap(lambda x: x)(values)
+      return values
+
+    values = distribution_util.move_dimension(values, axis, 0)
 
     def value_fn(ctx):
       return values[ctx.replica_id_in_sync_group]

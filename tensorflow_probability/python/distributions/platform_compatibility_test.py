@@ -57,6 +57,8 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/173546024)
     'GeneralizedExtremeValue',
     'OneHotCategorical',
+    # TODO(b/163118820)
+    'LogLogistic',
     'LogNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
@@ -178,7 +180,6 @@ XLA_LOGPROB_RTOL.update({
     'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
     'LKJ': .07,
-    'LogLogistic': 1.5e-2,  # TODO(b/163118820)
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'Pareto': 2e-2,  # TODO(b/159997708)
@@ -416,14 +417,14 @@ class DistributionXLATest(test_util.TestCase):
 
     num_samples = 3
     sample = self.evaluate(
-        tf.function(dist.sample, experimental_compile=True)(
+        tf.function(dist.sample, jit_compile=True)(
             num_samples, seed=seed))
     hp.note('Trying distribution {}'.format(
         self.evaluate_dict(dist.parameters)))
     hp.note('Drew samples {}'.format(sample))
 
     xla_lp = self.evaluate(
-        tf.function(dist.log_prob, experimental_compile=True)(
+        tf.function(dist.log_prob, jit_compile=True)(
             tf.convert_to_tensor(sample)))
     with tfp_hps.no_tf_rank_errors():
       graph_lp = self.evaluate(dist.log_prob(sample))

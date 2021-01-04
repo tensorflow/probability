@@ -69,6 +69,10 @@ class CholeskyToInvCholesky(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
       x_shape = ps.shape(x)

@@ -19,10 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.bijectors import affine_scalar as affine_scalar_bijector
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import scale as scale_bijector
+from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
+
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
@@ -179,11 +181,8 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
           validate_args=validate_args)
 
       # Make the AffineScalar bijector, Z --> loc + scale * Z (2 / F_0(2))
-      affine = affine_scalar_bijector.AffineScalar(
-          shift=self._loc,
-          scale=self._scale,
-          validate_args=validate_args)
-
+      affine = shift_bijector.Shift(shift=self._loc)(
+          scale_bijector.Scale(scale=self._scale))
       bijector = chain_bijector.Chain([affine, f])
 
       super(SinhArcsinh, self).__init__(

@@ -478,7 +478,7 @@ if JAX_MODE:
 
     def testShape(self):
 
-      @tf.function(experimental_compile=True)
+      @tf.function(jit_compile=True)
       def f(x):
         return tf.zeros(ps.shape(x))
 
@@ -487,7 +487,7 @@ if JAX_MODE:
 
     def testConcat(self):
 
-      @tf.function(experimental_compile=True)
+      @tf.function(jit_compile=True)
       def f(x):
         return tf.zeros(ps.concat([ps.shape(x), [7]], 0))
 

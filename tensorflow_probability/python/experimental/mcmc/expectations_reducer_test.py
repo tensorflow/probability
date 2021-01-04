@@ -26,6 +26,8 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
 
+tfd = tfp.distributions
+
 
 FakeKernelResults = collections.namedtuple(
         'FakeKernelResults', 'value, inner_results')
@@ -79,6 +81,15 @@ class ExpectationsReducerTest(test_util.TestCase):
     reduction_results = self.evaluate(
         mean_reducer.finalize(kernel_results.reduction_results))
     self.assertEqual(11, reduction_results)
+
+  def test_composite_kernel_results(self):
+    composite_normal_cls = tfp.experimental.auto_composite_tensor(
+        tfd.Normal, omit_kwargs='name')
+    kr = composite_normal_cls(0., 1.)
+    mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
+    state = mean_reducer.initialize(tf.zeros((2,)), kr)
+    state = mean_reducer.one_step(tf.ones((2,)), state, kr)
+    mean_reducer.finalize(state)
 
 
 if __name__ == '__main__':

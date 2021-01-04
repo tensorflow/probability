@@ -450,7 +450,7 @@ class LBfgsTest(test_util.TestCase):
 
     start_position = np.random.rand(dim) * 2.0 * 5.12 - 5.12
 
-    res = tf.function(tfp.optimizer.lbfgs_minimize, experimental_compile=True)(
+    res = tf.function(tfp.optimizer.lbfgs_minimize, jit_compile=True)(
         rastrigin,
         initial_position=tf.constant(start_position),
         tolerance=1e-5)

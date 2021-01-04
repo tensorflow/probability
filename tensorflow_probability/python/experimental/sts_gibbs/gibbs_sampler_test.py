@@ -176,7 +176,7 @@ class GibbsSamplerTests(test_util.TestCase):
         batch_shape=[3],
         prior_class=gibbs_sampler.XLACompilableInverseGamma)
 
-    @tf.function(experimental_compile=use_xla)
+    @tf.function(jit_compile=use_xla)
     def do_sampling(observed_time_series, is_missing):
       return gibbs_sampler.fit_with_gibbs_sampling(
           model, tfp.sts.MaskedTimeSeries(

@@ -192,7 +192,7 @@ class SlicingTest(test_util.TestCase):
     self.skip_if_no_xla()
     shp = [7, 6, 5, 4]
     t = tf.cast(tf.reshape(tf.range(np.prod(shp)), shp), tf.float32)
-    @tf.function(experimental_compile=True)
+    @tf.function(jit_compile=True)
     def f(ix):
       return slicing._slice_params_to_dict(
           tfd.MultivariateNormalDiag(t, tf.ones([shp[-1]])),

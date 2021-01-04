@@ -387,7 +387,7 @@ class Autoregressive(StructuralTimeSeries):
                         coefficients_prior,
                         coefficient_constraining_bijector),
               Parameter('level_scale', level_scale_prior,
-                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                        tfb.Chain([tfb.Scale(scale=observed_stddev),
                                    tfb.Softplus()]))
           ],
           latent_size=order,

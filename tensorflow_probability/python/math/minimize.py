@@ -49,6 +49,14 @@ class MinimizeTraceableQuantities(collections.namedtuple(
   """
 
 
+def _sanitize_traced_values(traced_values):
+  """Represents Python values and `None` as Tensors."""
+  return tf.nest.map_structure(
+      lambda x: (tf.zeros([0], dtype=tf.int32) if x is None  # pylint: disable=g-long-lambda
+                 else tf.convert_to_tensor(x)),
+      traced_values)
+
+
 def _tile_last_written_value(trace_array, last_written_idx):
   last_written_value = trace_array.read(last_written_idx)
   _, tiled_trace_array = tf.while_loop(
@@ -99,7 +107,7 @@ def _make_training_loop_body(optimizer_step_fn,
         loss=loss, gradients=grads, parameters=parameters, step=step,
         has_converged=has_converged,
         convergence_criterion_state=convergence_criterion_state)
-    traced_values = trace_fn(traceable_quantities)
+    traced_values = _sanitize_traced_values(trace_fn(traceable_quantities))
     trace_arrays = tf.nest.map_structure(
         lambda ta, x: ta.write(step, x), trace_arrays, traced_values)
     potential_new_loop_vars = (
@@ -113,6 +121,7 @@ def _initialize_arrays(initial_values,
                        num_steps,
                        truncate_at_convergence):
   """Construct a structure of `TraceArray`s from initial values."""
+  initial_values = _sanitize_traced_values(initial_values)
   num_steps_ = tf.get_static_value(tf.convert_to_tensor(num_steps))
   size_is_dynamic = (num_steps_ is None or truncate_at_convergence)
   trace_arrays = tf.nest.map_structure(

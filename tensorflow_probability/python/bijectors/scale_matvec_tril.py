@@ -19,9 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-
+from tensorflow_probability.python.bijectors import fill_triangular as fill_triangular_bijector
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -101,6 +103,18 @@ class ScaleMatvecTriL(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    # pylint: disable=g-long-lambda
+    return dict(
+        scale_tril=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, sample_shape[-1:]], axis=0),
+            default_constraining_bijector_fn=fill_triangular_bijector
+            .FillTriangular))
+    # pylint: enable=g-long-lambda
 
   @property
   def _composite_tensor_nonshape_params(self):

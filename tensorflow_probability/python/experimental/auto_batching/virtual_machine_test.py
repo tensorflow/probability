@@ -93,7 +93,7 @@ class VMTest(test_util.TestCase):
     # Force XLA compilation using tf.function.
     backend = TF_BACKEND_NO_ASSERTS
     f = functools.partial(execute_program_fn, backend=backend)
-    f = tf.function(f, autograph=False, experimental_compile=True)
+    f = tf.function(f, autograph=False, jit_compile=True)
     with tf.device(FLAGS.test_device):
       run_asserts_fn(f)
 

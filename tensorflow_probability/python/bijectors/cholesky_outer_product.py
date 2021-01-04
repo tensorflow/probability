@@ -86,6 +86,10 @@ class CholeskyOuterProduct(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
       # For safety, explicitly zero-out the upper triangular part.
@@ -209,4 +213,3 @@ class CholeskyOuterProduct(bijector.Bijector):
     is_positive_definite = assert_util.assert_positive(
         tf.linalg.diag_part(t), message="Input must be positive definite.")
     return [is_matrix, is_square, is_positive_definite]
-

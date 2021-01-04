@@ -61,10 +61,10 @@ Assert = debugging.Assert
 
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
-              experimental_relax_shapes=False, experimental_compile=None):  # pylint: disable=unused-argument
+              experimental_relax_shapes=False, jit_compile=None):  # pylint: disable=unused-argument
   """Like `tf.function`, for JAX."""
   transform = lambda fn: fn
-  if experimental_compile:
+  if jit_compile:
     if JAX_MODE:
       from jax import jit  # pylint: disable=g-import-not-at-top
 

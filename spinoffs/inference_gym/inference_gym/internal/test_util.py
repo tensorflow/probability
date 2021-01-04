@@ -253,7 +253,7 @@ def run_hmc_on_model(
           (pkr.inner_results.inner_results.is_accepted),
           seed=seed),
       autograph=False,
-      experimental_compile=use_xla)(current_state)
+      jit_compile=use_xla)(current_state)
 
   accept_rate = tf.reduce_mean(tf.cast(is_accepted, dtype))
   ess = tf.nest.map_structure(

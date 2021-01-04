@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Bijectors Tests."""
+"""FeatureTransformed tests."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -83,7 +83,7 @@ class _FeatureTransformedTest(test_util.TestCase):
         amplitude, length_scale, feature_ndims)
     input_shape = [dims] * feature_ndims
 
-    bij = tfp.bijectors.AffineScalar(self.dtype(0.), self.dtype(2.))
+    bij = tfp.bijectors.Scale(scale=self.dtype(2.))
     # Flat multiplication by 2.
     def scale_transform(x, feature_ndims, param_expansion_ndims):
       del feature_ndims, param_expansion_ndims
@@ -114,7 +114,7 @@ class _FeatureTransformedTest(test_util.TestCase):
     input_shape = [dims] * feature_ndims
 
     scale_diag = np.random.uniform(-1, 1, size=(dims,)).astype(self.dtype)
-    bij = tfp.bijectors.Affine(scale_diag=scale_diag)
+    bij = tfp.bijectors.ScaleMatvecDiag(scale_diag=scale_diag)
 
     # Scaling the last dimension.
     def vector_transform(x, feature_ndims, param_expansion_ndims):

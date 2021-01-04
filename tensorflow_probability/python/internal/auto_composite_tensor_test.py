@@ -24,6 +24,9 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 
 
+tfd = tfp.distributions
+
+
 AutoIdentity = tfp.experimental.auto_composite_tensor(
     tf.linalg.LinearOperatorIdentity, omit_kwargs=('name',))
 AutoDiag = tfp.experimental.auto_composite_tensor(
@@ -32,6 +35,11 @@ AutoBlockDiag = tfp.experimental.auto_composite_tensor(
     tf.linalg.LinearOperatorBlockDiag, omit_kwargs=('name',))
 AutoTriL = tfp.experimental.auto_composite_tensor(
     tf.linalg.LinearOperatorLowerTriangular, omit_kwargs=('name',))
+
+AutoNormal = tfp.experimental.auto_composite_tensor(
+    tfd.Normal, omit_kwargs=('name',))
+AutoIndependent = tfp.experimental.auto_composite_tensor(
+    tfd.Independent, omit_kwargs=('name',))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -77,6 +85,18 @@ class AutoCompositeTensorTest(test_util.TestCase):
         maximum_iterations=3)
     self.assertAllClose(2.**3 * tf.ones([3]), lop.matvec(tf.ones([3])))
 
+  def test_shape_parameters(self):
+    dist = AutoIndependent(AutoNormal(0, tf.ones([1])),
+                           reinterpreted_batch_ndims=1)
+    stream = test_util.test_seed_stream()
+    lp = dist.log_prob(dist.sample(seed=stream()))
+    lp, _ = tf.while_loop(
+        lambda *_: True,
+        lambda lp, d: (d.log_prob(d.sample(seed=stream())), d),
+        (lp, dist),
+        maximum_iterations=2)
+    self.evaluate(lp)
+
   def test_nested(self):
     lop = AutoBlockDiag([AutoDiag(tf.ones([2]) * 2), AutoIdentity(1)])
     self.assertAllClose(
@@ -90,9 +110,9 @@ class AutoCompositeTensorTest(test_util.TestCase):
         is_self_adjoint=True,
         is_positive_definite=True)
 
-    tfd = tfp.experimental.distributions
+    tfed = tfp.experimental.distributions
     auto_ct_mvn_prec_linop = tfp.experimental.auto_composite_tensor(
-        tfd.MultivariateNormalPrecisionFactorLinearOperator,
+        tfed.MultivariateNormalPrecisionFactorLinearOperator,
         omit_kwargs=('name',))
     tril = AutoTriL(**cov_linop.cholesky().parameters)
     momentum_distribution = auto_ct_mvn_prec_linop(precision_factor=tril)

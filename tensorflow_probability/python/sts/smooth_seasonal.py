@@ -441,7 +441,7 @@ class SmoothSeasonal(StructuralTimeSeries):
       if allow_drift:
         parameters.append(Parameter(
             'drift_scale', drift_scale_prior,
-            tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+            tfb.Chain([tfb.Scale(scale=observed_stddev),
                        tfb.Softplus()])))
       self._allow_drift = allow_drift
 

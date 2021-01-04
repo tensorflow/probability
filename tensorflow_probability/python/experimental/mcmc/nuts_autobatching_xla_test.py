@@ -64,7 +64,7 @@ class NutsXLATest(test_util.TestCase):
     tf.set_random_seed(3)
     with tf.device(FLAGS.test_device):
       f = run_nuts_chain(event_size, batch_size, num_steps)
-      f = tf.function(f, autograph=False, experimental_compile=True)
+      f = tf.function(f, autograph=False, jit_compile=True)
       samples, leapfrogs = self.evaluate(f())
 
     # TODO(axch) Figure out what the right thing to test about the leapfrog
@@ -98,7 +98,7 @@ class NutsXLATest(test_util.TestCase):
             loc=tf.cast(mu, dtype=tf.float32),
             scale_diag=tf.cast(stddev, dtype=tf.float32)).log_prob(event)
 
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def _run_nuts_chain():
       kernel = tfp.mcmc.NoUTurnSampler(
           target_log_prob_fn,
