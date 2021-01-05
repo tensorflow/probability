@@ -23,8 +23,8 @@ import collections
 from tensorflow_probability.python.experimental.mcmc import kernel_outputs
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc
 from tensorflow_probability.python.experimental.mcmc import progress_bar_reducer
-from tensorflow_probability.python.experimental.mcmc import sample
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
+from tensorflow_probability.python.experimental.mcmc import step
 from tensorflow_probability.python.experimental.mcmc import tracing_reducer
 from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation
@@ -295,7 +295,7 @@ class KernelBuilder(
       outputs: A `KernelOutputs` object containing the states, trace, etc.
     """
     kernel = self.build(num_steps)
-    state, results = sample.step_kernel(
+    state, results = step.step_kernel(
         num_steps=num_steps,
         current_state=current_state,
         previous_kernel_results=previous_kernel_results,

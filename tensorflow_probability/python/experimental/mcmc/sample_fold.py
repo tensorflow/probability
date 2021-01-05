@@ -23,9 +23,9 @@ import warnings
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import random
-from tensorflow_probability.python.experimental.mcmc import run
-from tensorflow_probability.python.experimental.mcmc import sample as exp_sample_lib
+from tensorflow_probability.python.experimental.mcmc import sample
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
+from tensorflow_probability.python.experimental.mcmc import step
 from tensorflow_probability.python.experimental.mcmc import thinning_kernel
 from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -144,7 +144,7 @@ def sample_fold(
     reduction_pkr = reduction_kernel.bootstrap_results(
         current_state, thinning_pkr, previous_reducer_state)
 
-    end_state, final_kernel_results = exp_sample_lib.step_kernel(
+    end_state, final_kernel_results = step.step_kernel(
         num_steps=num_steps,
         current_state=current_state,
         previous_kernel_results=reduction_pkr,
@@ -267,7 +267,7 @@ def sample_chain_with_burnin(
     burnin_seed, sampling_seed = random.split_seed(seed, n=2)
 
     # Burn-in run
-    chain_state, kr = exp_sample_lib.step_kernel(
+    chain_state, kr = step.step_kernel(
         num_steps=num_burnin_steps,
         current_state=current_state,
         previous_kernel_results=previous_kernel_results,
@@ -282,7 +282,7 @@ def sample_chain_with_burnin(
 
     # ThinningKernel doesn't wrap the kernel_results structure, so we don't need
     # any of the usual munging.
-    results = run.run_kernel(
+    results = sample.sample_chain(
         num_results=num_results,
         current_state=chain_state,
         previous_kernel_results=kr,

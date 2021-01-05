@@ -41,8 +41,7 @@ from tensorflow_probability.python.experimental.mcmc.preconditioned_hmc import P
 from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import make_tqdm_progress_bar_fn
 from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import ProgressBarReducer
 from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
-from tensorflow_probability.python.experimental.mcmc.run import run_kernel
-from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
+from tensorflow_probability.python.experimental.mcmc.sample import sample_chain
 from tensorflow_probability.python.experimental.mcmc.sample_discarding_kernel import SampleDiscardingKernel
 from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_chain_with_burnin
 from tensorflow_probability.python.experimental.mcmc.sample_fold import sample_fold
@@ -56,6 +55,7 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
+from tensorflow_probability.python.experimental.mcmc.step import step_kernel
 from tensorflow_probability.python.experimental.mcmc.thinning_kernel import ThinningKernel
 from tensorflow_probability.python.experimental.mcmc.tracing_reducer import TracingReducer
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_deterministic_minimum_error
@@ -107,7 +107,7 @@ __all__ = [
     'resample_independent',
     'resample_stratified',
     'resample_systematic',
-    'run_kernel',
+    'sample_chain',
     'sample_chain_with_burnin',
     'sample_fold',
     'sample_sequential_monte_carlo',
