@@ -60,8 +60,8 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
 
   ##### Simple chain with warm-up.
 
-  In this example we sample from a non-isotropic distribution, and show that
-  we may sample efficiently with HMC by pre-conditioning.
+  In this example we can use an estimate of the target covariance to sample
+  efficiently with HMC.
 
   ```python
   import tensorflow as tf
@@ -176,7 +176,8 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
         for. Total progress per HMC step is roughly proportional to
         `step_size * num_leapfrog_steps`.
       momentum_distribution: A `tfp.distributions.Distribution` instance to draw
-        momentum from. Defaults to isotropic normal distributions.
+        momentum from. Defaults to normal distributions with identity
+        covariance.
       state_gradients_are_stopped: Python `bool` indicating that the proposed
         new state be run through `tf.stop_gradient`. This is particularly useful
         when combining optimization over samples from the HMC chain.
@@ -458,7 +459,9 @@ def _prepare_args(target_log_prob_fn,
       step_size, dtype=target_log_prob.dtype, name='step_size')
 
   # Default momentum distribution is None, but if `store_parameters_in_results`
-  # is true, then `momentum_distribution` defaults to an empty list
+  # is true, then `momentum_distribution` defaults to an empty list.
+  # In any other case, `momentum_distribution` must be a single distribution,
+  # so we do not have to check that the list is actually empty.
   if momentum_distribution is None or isinstance(momentum_distribution, list):
     batch_rank = ps.rank(target_log_prob)
     def _batched_isotropic_normal_like(state_part):
