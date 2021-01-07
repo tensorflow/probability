@@ -157,6 +157,7 @@ XLA_LOGPROB_ATOL.update({
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
     'PowerSpherical': 2e-5,
+    'Skellam': 1e-4
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
