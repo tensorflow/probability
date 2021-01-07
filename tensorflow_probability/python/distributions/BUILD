@@ -141,6 +141,7 @@ multi_substrate_py_library(
         ":truncated_cauchy",
         ":truncated_normal",
         ":uniform",
+        ":unit_normal",
         ":variational_gaussian_process",
         ":vector_exponential_diag",
         ":von_mises",
@@ -1958,6 +1959,23 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "unit_normal",
+    srcs = ["unit_normal.py"],
+    deps = [
+        ":distribution",
+        ":kullback_leibler",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:special_math",
+    ],
+)
+
+multi_substrate_py_library(
     name = "spherical_uniform",
     srcs = ["spherical_uniform.py"],
     deps = [
@@ -3598,6 +3616,18 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "uniform_test",
     srcs = ["uniform_test.py"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "unit_normal_test",
+    srcs = ["unit_normal_test.py"],
     deps = [
         # numpy dep,
         # scipy dep,

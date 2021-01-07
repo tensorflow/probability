@@ -118,6 +118,7 @@ from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_cauchy import TruncatedCauchy
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
+from tensorflow_probability.python.distributions.unit_normal import UnitNormal
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
 from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
 from tensorflow_probability.python.distributions.von_mises import VonMises
@@ -233,6 +234,7 @@ __all__ = [
     'TruncatedCauchy',
     'TruncatedNormal',
     'Uniform',
+    'UnitNormal',
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalLinearOperator',
