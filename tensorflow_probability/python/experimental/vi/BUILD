@@ -60,10 +60,10 @@ py_library(
 
 py_test(
     name = "surrogate_posteriors_test",
-    size = "large",
+    size = "medium",
     srcs = ["surrogate_posteriors_test.py"],
     python_version = "PY3",
-    shard_count = 5,
+    shard_count = 4,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,

@@ -40,7 +40,7 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation
@@ -307,7 +307,7 @@ def build_factored_surrogate_posterior(
     # Extract the rank of each event, so that we build distributions with the
     # correct event shapes.
     unconstrained_event_ndims = nest.map_structure(
-        prefer_static.rank_from_shape,
+        ps.rank_from_shape,
         unconstrained_event_shape)
 
     # Build the component surrogate posteriors.
@@ -371,41 +371,67 @@ def _make_asvi_trainable_variables(prior,
       #  Build trainable ASVI representation for each distribution's parameters.
       parameter_properties = actual_dist.parameter_properties(
           dtype=actual_dist.dtype)
-      sample_shape = tf.concat(
-          [dist.batch_shape_tensor(),
-           dist.event_shape_tensor()], axis=0)
+
+      if isinstance(original_dist, sample.Sample):
+        posterior_batch_shape = ps.concat(
+            [actual_dist.batch_shape_tensor(), original_dist.sample_shape],
+            axis=0)
+      else:
+        posterior_batch_shape = actual_dist.batch_shape_tensor()
+
       for param, value in actual_dist.parameters.items():
+
         if param in (_NON_STATISTICAL_PARAMS +
                      _NON_TRAINABLE_PARAMS) or value is None:
           continue
+
+        actual_event_shape = parameter_properties[param].shape_fn(
+            actual_dist.event_shape_tensor())
         try:
           bijector = parameter_properties[
               param].default_constraining_bijector_fn()
         except NotImplementedError:
           bijector = tfb.Identity()
-        unconstrained_ones = tf.ones(
-            shape=bijector.inverse_event_shape_tensor(
-                parameter_properties[param].shape_fn(
-                    sample_shape=sample_shape)),
-            dtype=actual_dist.dtype)
 
         if mean_field:
-          new_params_dict[param] = ASVIParameters(
-              prior_weight=None,
-              mean_field_parameter=tfp_util.TransformedVariable(
-                  value,
-                  bijector=bijector,
-                  name='mean_field_parameter/{}/{}'.format(dist.name, param)))
+          prior_weight = None
         else:
-          new_params_dict[param] = ASVIParameters(
-              prior_weight=tfp_util.TransformedVariable(
-                  initial_prior_weight * unconstrained_ones,
-                  bijector=tfb.Sigmoid(),
-                  name='prior_weight/{}/{}'.format(dist.name, param)),
-              mean_field_parameter=tfp_util.TransformedVariable(
-                  value,
-                  bijector=bijector,
-                  name='mean_field_parameter/{}/{}'.format(dist.name, param)))
+          unconstrained_ones = tf.ones(
+              shape=ps.concat([
+                  posterior_batch_shape,
+                  bijector.inverse_event_shape_tensor(
+                      actual_event_shape)
+              ], axis=0),
+              dtype=actual_dist.dtype)
+
+          prior_weight = tfp_util.TransformedVariable(
+              initial_prior_weight * unconstrained_ones,
+              bijector=tfb.Sigmoid(),
+              name='prior_weight/{}/{}'.format(dist.name, param))
+
+        # If the prior distribution was a tfd.Sample wrapping a base
+        # distribution, we want to give every single sample in the prior its
+        # own lambda and alpha value (rather than having a single lambda and
+        # alpha).
+        if isinstance(original_dist, sample.Sample):
+          value = tf.reshape(
+              value,
+              ps.concat([
+                  actual_dist.batch_shape_tensor(),
+                  ps.ones(ps.rank_from_shape(original_dist.sample_shape)),
+                  actual_event_shape
+              ],
+                        axis=0))
+          value = tf.broadcast_to(
+              value,
+              ps.concat([posterior_batch_shape, actual_event_shape], axis=0))
+        new_params_dict[param] = ASVIParameters(
+            prior_weight=prior_weight,
+            mean_field_parameter=tfp_util.TransformedVariable(
+                value,
+                bijector=bijector,
+                name='mean_field_parameter/{}/{}'.format(dist.name, param)))
+
       param_dicts.append(new_params_dict)
   return param_dicts
 
@@ -552,8 +578,12 @@ def build_asvi_surrogate_posterior(prior,
                       1. - prior_weight) * mean_field_parameter
 
             if isinstance(original_dist, sample.Sample):
-              surrogate_dist = sample.Sample(
-                  type(actual_dist)(**temp_params_dict))
+              inner_dist = type(actual_dist)(**temp_params_dict)
+
+              surrogate_dist = independent.Independent(
+                  inner_dist,
+                  reinterpreted_batch_ndims=ps.rank_from_shape(
+                      original_dist.sample_shape))
             else:
               surrogate_dist = type(actual_dist)(**temp_params_dict)
 
@@ -586,11 +616,12 @@ def build_asvi_surrogate_posterior(prior,
     try:
       tf.nest.assert_same_structure(prior.dtype, surrogate_posterior.dtype)
     except TypeError:
-      tokenize = lambda structure: tf.nest.pack_sequence_as(  # pylint:disable=g-long-lambda
-          structure, [i for (i, _) in enumerate(tf.nest.flatten(structure))])
+      tokenize = lambda jd: jd._model_unflatten(  # pylint: disable=protected-access, g-long-lambda
+          range(len(jd._model_flatten(jd.dtype)))  # pylint: disable=protected-access
+      )
       surrogate_posterior = tfb.Restructure(
-          output_structure=tokenize(prior.dtype),
-          input_structure=tokenize(surrogate_posterior.dtype))(
+          output_structure=tokenize(prior),
+          input_structure=tokenize(surrogate_posterior))(
               surrogate_posterior)
 
     surrogate_posterior.also_track = param_dicts
