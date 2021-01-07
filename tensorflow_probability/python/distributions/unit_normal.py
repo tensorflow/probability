@@ -238,15 +238,15 @@ class UnitNormal(distribution.Distribution):
 def _kl_normal_normal(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b UnitNormal.
 
-    Args:
-      a: instance of a UnitNormal distribution object.
-      b: instance of a UnitNormal distribution object.
-      name: Name to use for created operations.
-        Default value: `None` (i.e., `'kl_normal_normal'`).
+  Args:
+    a: instance of a UnitNormal distribution object.
+    b: instance of a UnitNormal distribution object.
+    name: Name to use for created operations.
+      Default value: `None` (i.e. `'kl_unit_normal_unit_normal'`).
 
-    Returns:
-      kl_div: Batchwise KL(a || b)
-    """
+  Returns:
+    kl_div: Batchwise KL(a || b)
+  """
   with tf.name_scope(name or "kl_unit_normal_unit_normal"):
     dtype = dtype_util.common_dtype([a, b])
     batch_shape = ps.broadcast_shape(a.batch_shape, b.batch_shape)
