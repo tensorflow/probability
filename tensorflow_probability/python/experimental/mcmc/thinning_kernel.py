@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental.mcmc import sample
+from tensorflow_probability.python.experimental.mcmc import step
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -77,7 +77,7 @@ class ThinningKernel(kernel_base.TransitionKernel):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'thinned_kernel', 'one_step')):
-      return sample.step_kernel(
+      return step.step_kernel(
           num_steps=self.num_steps_to_skip + 1,
           current_state=current_state,
           previous_kernel_results=previous_kernel_results,

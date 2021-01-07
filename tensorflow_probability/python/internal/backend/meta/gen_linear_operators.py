@@ -131,6 +131,7 @@ def gen_module(module_name):
       'tensorflow_probability.python.internal.backend.numpy import')
   code = code.replace('tensor_util.constant_value(', '(')
   code = code.replace('tensor_util.is_tensor(', 'ops.is_tensor(')
+  code = code.replace('tensor_util.is_tf_type(', 'ops.is_tensor(')
   code = code.replace(
       'from tensorflow.python.ops.distributions import '
       'util as distribution_util', UTIL_IMPORTS)

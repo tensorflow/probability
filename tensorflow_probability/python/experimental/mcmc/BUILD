@@ -51,8 +51,8 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
         ":progress_bar_reducer",
         ":reducer",
-        ":run",
         ":sample",
+        ":step",
         ":sample_discarding_kernel",
         ":sample_fold",
         ":thinning_kernel",
@@ -74,12 +74,12 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
         ":progress_bar_reducer",
         ":reducer",
-        ":run",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":step",
         ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
@@ -97,8 +97,8 @@ py_library(
         ":kernel_outputs",
         ":preconditioned_hmc",
         ":progress_bar_reducer",
-        ":sample",
         ":sample_discarding_kernel",
+        ":step",
         ":tracing_reducer",
         ":with_reductions",
         "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
@@ -542,8 +542,8 @@ multi_substrate_py_test(
 )
 
 py_library(
-    name = "sample",
-    srcs = ["sample.py"],
+    name = "step",
+    srcs = ["step.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,
@@ -553,9 +553,9 @@ py_library(
 )
 
 py_test(
-    name = "sample_test",
+    name = "step_test",
     size = "small",
-    srcs = ["sample_test.py"],
+    srcs = ["step_test.py"],
     python_version = "PY3",
     shard_count = 5,
     srcs_version = "PY3",
@@ -597,7 +597,7 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":covariance_reducer",
-        ":sample",
+        ":step",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
@@ -630,11 +630,11 @@ py_test(
 )
 
 py_library(
-    name = "run",
-    srcs = ["run.py"],
+    name = "sample",
+    srcs = ["sample.py"],
     srcs_version = "PY3",
     deps = [
-        ":sample",
+        ":step",
         ":tracing_reducer",
         ":with_reductions",
         # numpy dep,
@@ -644,13 +644,13 @@ py_library(
 )
 
 py_test(
-    name = "run_test",
+    name = "sample_test",
     size = "small",
-    srcs = ["run_test.py"],
+    srcs = ["sample_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        ":run",
+        ":step",
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
@@ -663,9 +663,8 @@ py_library(
     srcs = ["sample_fold.py"],
     srcs_version = "PY3",
     deps = [
-        ":run",
-        ":sample",
         ":sample_discarding_kernel",
+        ":step",
         ":thinning_kernel",
         ":tracing_reducer",
         ":with_reductions",
@@ -696,7 +695,7 @@ py_library(
     srcs = ["sample_discarding_kernel.py"],
     srcs_version = "PY3",
     deps = [
-        ":sample",
+        ":step",
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal",
@@ -723,7 +722,7 @@ py_library(
     srcs = ["thinning_kernel.py"],
     srcs_version = "PY3",
     deps = [
-        ":sample",
+        ":step",
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal",

@@ -780,6 +780,16 @@ class FillTriangularTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class FillTriangularInverseTest(FillTriangularTest):
 
+  def testFillTriangularJitIssue1210(self):
+    self.skip_if_no_xla()
+
+    @tf.function(jit_compile=True)
+    def transform(x):
+      return tfp.bijectors.FillScaleTriL(
+          diag_bijector=tfp.bijectors.Exp(), diag_shift=None).inverse(x)
+
+    self.evaluate(transform(tf.linalg.eye(3, dtype=tf.float32)))
+
   def _run_test(self, x_, use_deferred_shape=False, **kwargs):
     x_ = np.asarray(x_)
     static_shape = None if use_deferred_shape else x_.shape
@@ -794,7 +804,8 @@ class FillTriangularInverseTest(FillTriangularTest):
     inverse_actual_ = self.evaluate(inverse_actual)
 
     if use_deferred_shape and not tf.executing_eagerly():
-      self.assertEqual(None, inverse_actual.shape)
+      # TensorShape(None) is not None.
+      self.assertEqual(None, inverse_actual.shape)  # pylint: disable=g-generic-assert
     else:
       self.assertAllEqual(x_.shape, inverse_actual.shape)
     self.assertAllEqual(x_, inverse_actual_)

@@ -152,11 +152,12 @@ XLA_LOGPROB_ATOL.update({
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
-    'InverseGamma': 5e-5,
+    'InverseGamma': 1e-4,
     'Kumaraswamy': 3e-6,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
     'PowerSpherical': 2e-5,
+    'Skellam': 1e-4
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
@@ -216,7 +217,7 @@ def extra_tensor_conversions_allowed(dist):
   return 0
 
 
-@test_util.test_all_tf_execution_regimes
+@test_util.test_graph_and_eager_modes
 class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
 
   @parameterized.named_parameters(
@@ -444,7 +445,12 @@ class DistributionXLATest(test_util.TestCase):
     self._test_sample_and_log_prob(dist_name, dist)
 
 
-@test_util.test_graph_and_eager_modes
+# Autovectorization tests run in graph mode only, because vectorized_map
+# works in graph mode (applies tf.function wrapping) internally. The purpose of
+# these tests is to verify that converters exist for all distribution ops and
+# give results consistent with manual batching; searching for discrepancies
+# between graph and eager behavior is out of scope.
+@test_util.test_graph_mode_only
 class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
 
   def _test_vectorization(self, dist_name, dist):

@@ -22,7 +22,7 @@ import collections
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental.mcmc import sample
+from tensorflow_probability.python.experimental.mcmc import step
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -112,7 +112,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'sample_discarding_kernel', 'one_step')):
-      new_chain_state, inner_kernel_results = sample.step_kernel(
+      new_chain_state, inner_kernel_results = step.step_kernel(
           num_steps=self._num_samples_to_skip(
               previous_kernel_results.call_counter
           ) + 1,
