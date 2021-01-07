@@ -93,11 +93,6 @@ py_test(
     name = "inverse_test",
     srcs = ["inverse_test.py"],
     python_version = "PY3",
-    # This test no longer works after cl/346850541, because no inverse is registered
-    # for convert_element_type.
-    tags = [
-        "notap",
-    ],
     deps = [
         ":core",
         ":rules",

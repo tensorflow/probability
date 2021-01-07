@@ -190,3 +190,19 @@ jax.scipy.special.expit.def_inverse_unary(f_inv=jax.scipy.special.logit,
                                           f_ildj=expit_ildj)
 jax.scipy.special.logit.def_inverse_unary(f_inv=jax.scipy.special.expit,
                                           f_ildj=logit_ildj)
+
+
+def convert_element_type_ildj(incells, outcells, *, new_dtype, **params):
+  """InverseAndILDJ rule for convert_element_type primitive."""
+  incell, = incells
+  outcell, = outcells
+  if incell.top() and not outcell.top():
+    outcells = [InverseAndILDJ.new(lax.convert_element_type_p.bind(
+        incell.val, new_dtype=new_dtype, **params))]
+  elif outcell.top() and not incell.top():
+    val = outcell.val
+    incells = [
+        InverseAndILDJ.new(lax.convert_element_type_p.bind(
+            val, new_dtype=incell.aval.dtype, **params))]
+  return incells, outcells, None
+ildj_registry[lax.convert_element_type_p] = convert_element_type_ildj
