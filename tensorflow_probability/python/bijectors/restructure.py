@@ -23,6 +23,7 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import nest_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -226,3 +227,81 @@ class Restructure(bijector.Bijector):
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     with self._name_and_control_scope(name):
       return tf.zeros([], tf.float32)
+
+
+def tree_flatten(example, name='restructure'):
+  """Returns a Bijector variant of tf.nest.flatten.
+
+  To make it a Bijector, it has to know how to "unflatten" as
+  well---unlike the real `tf.nest.flatten`, this can only flatten or
+  unflatten a specific structure.  The `example` argument defines the
+  structure.
+
+  See also the `Restructure` bijector for general rearrangements.
+
+  Args:
+    example: A Tensor or (potentially nested) collection of Tensors.
+    name: An optional Python string, inserted into names of TF ops
+      created by this bijector.
+
+  Returns:
+    flatten: A Bijector whose `forward` method flattens structures
+      parallel to `example` into a list of Tensors, and whose
+      `inverse` method packs a list of Tensors of the right length
+      into a structure parallel to `example`.
+
+  #### Example
+
+  ```python
+  x = tf.constant(1)
+  example = collections.OrderedDict([
+      ('a', [x, x, x]),
+      ('b', x)])
+  bij = tfb.tree_flatten(example)
+  ys = collections.OrderedDict([
+      ('a', [1, 2, 3]),
+      ('b', 4.)])
+  bij.forward(ys)
+  # Returns [1, 2, 3, 4.]
+  ```
+
+  """
+  return invert.Invert(pack_sequence_as(example, name))
+
+
+def pack_sequence_as(example, name='restructure'):
+  """Returns a Bijector variant of tf.nest.pack_sequence_as.
+
+  See also the `Restructure` bijector for general rearrangements.
+
+  Args:
+    example: A Tensor or (potentially nested) collection of Tensors.
+    name: An optional Python string, inserted into names of TF ops
+      created by this bijector.
+
+  Returns:
+    pack: A Bijector whose `forward` method packs a list of Tensors of
+      the right length into a structure parallel to `example`, and
+      whose `inverse` method flattens structures parallel to `example`
+      into a list of Tensors.
+
+  #### Example
+
+  ```python
+  x = tf.constant(1)
+  example = collections.OrderedDict([
+      ('a', [x, x, x]),
+      ('b', x)])
+  bij = tfb.pack_sequence_as(example)
+  bij.forward([1, 2, 3, 4.])
+
+  # Returns
+  # collections.OrderedDict([
+  #     ('a', [1, 2, 3]),
+  #     ('b', 4.)])
+  ```
+
+  """
+  tokens = tf.nest.pack_sequence_as(
+      example, list(range(len(tf.nest.flatten(example)))))
+  return Restructure(output_structure=tokens, name=name)

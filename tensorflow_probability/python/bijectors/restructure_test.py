@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -80,6 +82,23 @@ class RestructureBijectorTest(test_util.TestCase):
         0., self.evaluate(bij.forward_log_det_jacobian(x, x_ndims)))
     self.assertAllEqualNested(
         0., self.evaluate(bij.inverse_log_det_jacobian(y, y_ndims)))
+
+  def testSmartConstructors(self):
+    x = collections.OrderedDict([
+        ('a', [1, 2, 3]),
+        ('b', [4, 5, 6]),
+        ('c', 7.),
+        ('d', 8.),
+        ('e', 9.)])
+    bij = tfb.tree_flatten(x)
+
+    bij_2 = tfb.pack_sequence_as(x)
+
+    # Invert assertion arguments to infer structure from bijector output.
+    self.assertAllEqualNested(
+        bij.forward(x), [1, 2, 3, 4, 5, 6, 7, 8, 9], check_types=True)
+    self.assertAllEqualNested(
+        bij_2.forward(bij.forward(x)), x, check_types=True)
 
   def testStructureToStructure(self):
     bij = tfb.Restructure(

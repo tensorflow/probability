@@ -1272,7 +1272,7 @@ class Bijector(tf.Module):
     """Returns the dtype returned by `forward` for the provided input."""
     with tf.name_scope('{}/{}'.format(self.name, name)):
       if dtype is UNSPECIFIED:
-        # We pass the the broadcasted input structure through `_forward_dtype`
+        # We pass the broadcasted input structure through `_forward_dtype`
         # rather than directly returning the output structure, allowing
         # subclasses to alter results based on `**kwargs`.
         input_dtype = nest_util.broadcast_structure(
@@ -1301,7 +1301,7 @@ class Bijector(tf.Module):
     """Returns the dtype returned by `inverse` for the provided input."""
     with tf.name_scope('{}/{}'.format(self.name, name)):
       if dtype is UNSPECIFIED:
-        # We pass the the broadcasted output structure through `_inverse_dtype`
+        # We pass the broadcasted output structure through `_inverse_dtype`
         # rather than directly returning the input structure, allowing
         # subclasses to alter results based on `**kwargs`.
         output_dtype = nest_util.broadcast_structure(
