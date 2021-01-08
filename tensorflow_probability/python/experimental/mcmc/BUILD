@@ -167,6 +167,7 @@ py_library(
         "//tensorflow_probability/python/distributions:joint_distribution_sequential",
         "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:unnest",
         "//tensorflow_probability/python/mcmc:kernel",
@@ -457,6 +458,7 @@ multi_substrate_py_library(
         ":weighted_resampling",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal:util",
@@ -830,6 +832,7 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:unnest",

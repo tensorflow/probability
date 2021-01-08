@@ -105,6 +105,15 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "broadcast_util",
+    srcs = ["broadcast_util.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_library(
     name = "cache_util",
     srcs = ["cache_util.py"],
     deps = [

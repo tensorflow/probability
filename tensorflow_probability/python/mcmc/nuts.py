@@ -42,6 +42,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
@@ -543,13 +544,11 @@ class NoUTurnSampler(TransitionKernel):
           dtype=tf.bool)
 
       tree_start_states = tf.nest.map_structure(
-          lambda v: tf.where(  # pylint: disable=g-long-lambda
-              mcmc_util.left_justified_expand_dims_like(direction, v[1]),
-              v[1], v[0]),
+          lambda v: bu.where_left_justified_mask(direction, v[1], v[0]),
           initial_step_state)
 
       directions_expanded = [
-          mcmc_util.left_justified_expand_dims_like(direction, state)
+          bu.left_justified_expand_dims_like(direction, state)
           for state in tree_start_states.state
       ]
 
@@ -615,30 +614,23 @@ class NoUTurnSampler(TransitionKernel):
 
       new_candidate_state = TreeDoublingStateCandidate(
           state=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      choose_new_state, s0),
-                  s0, s1)
+              bu.where_left_justified_mask(choose_new_state, s0, s1)
               for s0, s1 in zip(candidate_tree_state.state,
                                 last_candidate_state.state)
           ],
-          target=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  choose_new_state,
-                  candidate_tree_state.target),
-              candidate_tree_state.target, last_candidate_state.target),
+          target=bu.where_left_justified_mask(
+              choose_new_state,
+              candidate_tree_state.target,
+              last_candidate_state.target),
           target_grad_parts=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      choose_new_state, grad0),
-                  grad0, grad1)
+              bu.where_left_justified_mask(choose_new_state, grad0, grad1)
               for grad0, grad1 in zip(candidate_tree_state.target_grad_parts,
                                       last_candidate_state.target_grad_parts)
           ],
-          energy=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  choose_new_state, candidate_tree_state.target),
-              candidate_tree_state.energy, last_candidate_state.energy),
+          energy=bu.where_left_justified_mask(
+              choose_new_state,
+              candidate_tree_state.energy,
+              last_candidate_state.energy),
           weight=weight_sum)
 
       for new_candidate_state_temp, old_candidate_state_temp in zip(
@@ -655,18 +647,13 @@ class NoUTurnSampler(TransitionKernel):
       # Update left right information of the trajectory, and check trajectory
       # level U turn
       tree_otherend_states = tf.nest.map_structure(
-          lambda v: tf.where(  # pylint: disable=g-long-lambda
-              mcmc_util.left_justified_expand_dims_like(direction, v[1]),
-              v[0], v[1]), initial_step_state)
+          lambda v: bu.where_left_justified_mask(direction, v[0], v[1]),
+          initial_step_state)
 
       new_step_state = tf.nest.pack_sequence_as(initial_step_state, [
           tf.stack([  # pylint: disable=g-complex-comprehension
-              tf.where(
-                  mcmc_util.left_justified_expand_dims_like(direction, left),
-                  right, left),
-              tf.where(
-                  mcmc_util.left_justified_expand_dims_like(direction, left),
-                  left, right),
+              bu.where_left_justified_mask(direction, right, left),
+              bu.where_left_justified_mask(direction, left, right),
           ], axis=0)
           for left, right in zip(tf.nest.flatten(tree_final_states),
                                  tf.nest.flatten(tree_otherend_states))
@@ -895,27 +882,20 @@ class NoUTurnSampler(TransitionKernel):
 
       next_candidate_tree_state = TreeDoublingStateCandidate(
           state=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      is_sample_accepted, s0), s0, s1)
+              bu.where_left_justified_mask(is_sample_accepted, s0, s1)
               for s0, s1 in zip(next_state_parts, candidate_tree_state.state)
           ],
-          target=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  is_sample_accepted, next_target),
-              next_target, candidate_tree_state.target),
+          target=bu.where_left_justified_mask(
+              is_sample_accepted, next_target, candidate_tree_state.target),
           target_grad_parts=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      is_sample_accepted, grad0),
-                  grad0, grad1)
+              bu.where_left_justified_mask(is_sample_accepted, grad0, grad1)
               for grad0, grad1 in zip(next_target_grad_parts,
                                       candidate_tree_state.target_grad_parts)
           ],
-          energy=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  is_sample_accepted, next_target),
-              current_energy, candidate_tree_state.energy),
+          energy=bu.where_left_justified_mask(
+              is_sample_accepted,
+              current_energy,
+              candidate_tree_state.energy),
           weight=weight_sum)
 
       continue_tree = not_divergent & continue_tree_previous

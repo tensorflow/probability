@@ -25,6 +25,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -37,10 +38,6 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 __all__ = [
     'choose',
     'enable_store_parameters_in_results',
-    'left_justified_expand_dims_like',
-    'left_justified_expand_dims_to',
-    'left_justified_broadcast_like',
-    'left_justified_broadcast_to',
     'index_remapping_gather',
     'is_list_like',
     'is_namedtuple_like',
@@ -76,36 +73,6 @@ class PrettyNamedTupleMixin(object):
         type(self).__name__,
         ',\n'.join('  {}={}'.format(k, repr(v).replace('\n', '\n    '))
                    for (k, v) in self._asdict().items()))
-
-
-def left_justified_expand_dims_like(x, reference, name=None):
-  """Right pads `x` with `rank(reference) - rank(x)` ones."""
-  with tf.name_scope(name or 'left_justified_expand_dims_like'):
-    return left_justified_expand_dims_to(x, ps.rank(reference))
-
-
-def left_justified_expand_dims_to(x, rank, name=None):
-  """Right pads `x` with `rank - rank(x)` ones."""
-  with tf.name_scope(name or 'left_justified_expand_dims_to'):
-    expand_ndims = ps.maximum(rank - ps.rank(x), 0)
-    expand_shape = ps.concat(
-        [ps.shape(x),
-         ps.ones(shape=[expand_ndims], dtype=tf.int32)],
-        axis=0)
-    return tf.reshape(x, expand_shape)
-
-
-def left_justified_broadcast_like(x, reference, name=None):
-  """Broadcasts `x` to shape of reference, in a left-justified manner."""
-  with tf.name_scope(name or 'left_justified_broadcast_like'):
-    return left_justified_broadcast_to(x, ps.shape(reference))
-
-
-def left_justified_broadcast_to(x, shape, name=None):
-  """Broadcasts `x` to shape, in a left-justified manner."""
-  with tf.name_scope(name or 'left_justified_broadcast_to'):
-    return tf.broadcast_to(
-        left_justified_expand_dims_to(x, ps.size(shape)), shape)
 
 
 def prepare_state_parts(state_or_state_part, dtype=None, name=None):
@@ -158,7 +125,7 @@ def _choose_base_case(is_accepted,
       name = name.rpartition('/')[2].rsplit(':', 1)[0]
     # Since this is an internal utility it is ok to assume
     # tf.shape(proposed) == tf.shape(current).
-    return tf.where(left_justified_expand_dims_like(is_accepted, proposed),
+    return tf.where(bu.left_justified_expand_dims_like(is_accepted, proposed),
                     proposed, current, name=name)
   with tf.name_scope(name or 'choose'):
     if not is_list_like(proposed):

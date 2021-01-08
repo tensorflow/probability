@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import joint_distribution_seque
 from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvn_pfl
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -293,7 +294,7 @@ def _make_momentum_distribution(running_variance_parts, state_parts,
     state_rank = ps.rank(state_part)
     # Pad dimensions and tile by multiplying by tf.ones to add a batch shape
     ones = tf.ones(ps.shape(state_part)[:-(state_rank - running_variance_rank)])
-    ones = mcmc_util.left_justified_expand_dims_like(ones, state_part)
+    ones = bu.left_justified_expand_dims_like(ones, state_part)
     variance_tiled = variance_part * ones
     reinterpreted_batch_ndims = state_rank - batch_ndims - 1
 

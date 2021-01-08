@@ -19,6 +19,7 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import unnest
@@ -192,7 +193,7 @@ def chees_criterion(previous_state,
     # diagnostic of the unrelying dynamics, rather than incorporating the effect
     # of the MetropolisHastings correction.
     # TODO(mhoffman): Needs more experimentation.
-    expanded_accept_prob = mcmc_util.left_justified_expand_dims_like(
+    expanded_accept_prob = bu.left_justified_expand_dims_like(
         accept_prob, x)
 
     # accept_prob is zero when x is NaN, but we still want to sanitize such
@@ -645,7 +646,7 @@ def _update_trajectory_grad(previous_kernel_results, previous_state,
         previous_state,
         tf.nest.map_structure(
             lambda x, v:  # pylint: disable=g-long-lambda
-            (x + mcmc_util.left_justified_expand_dims_like(dt, v) * v),
+            (x + bu.left_justified_expand_dims_like(dt, v) * v),
             proposed_state,
             proposed_velocity),
         accept_prob)
