@@ -157,6 +157,26 @@ class AutoCompositeTensorTest(test_util.TestCase):
         maximum_iterations=3)
     self.assertAllClose(3., result._tensor_param)
 
+  def test_parameters_lookup(self):
+
+    @tfp.experimental.auto_composite_tensor
+    class ThingWithParametersButNoAttrs(tfp.experimental.AutoCompositeTensor):
+
+      def __init__(self, a, b):
+        self.a = tf.convert_to_tensor(a, dtype_hint=tf.float32, name='a')
+        self.b = tf.convert_to_tensor(b, dtype_hint=tf.float32, name='a')
+        self.parameters = dict(a=self.a, b=self.b)
+
+    t = ThingWithParametersButNoAttrs(1., 2.)
+    self.assertIsInstance(t, tf.__internal__.CompositeTensor)
+
+    ts = t._type_spec
+    components = ts._to_components(t)
+    self.assertAllEqualNested(components, dict(a=1., b=2.))
+
+    t2 = ts._from_components(components)
+    self.assertIsInstance(t2, ThingWithParametersButNoAttrs)
+
 
 if __name__ == '__main__':
   tf.enable_v2_behavior()

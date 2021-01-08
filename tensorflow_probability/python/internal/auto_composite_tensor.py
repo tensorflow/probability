@@ -19,12 +19,12 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
-import inspect
 
 import tensorflow.compat.v2 as tf
 
 from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'auto_composite_tensor',
@@ -42,7 +42,7 @@ _AUTO_COMPOSITE_TENSOR_VERSION = 2
 def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
                          prefer_static_value=()):
   """Extract constructor kwargs to reconstruct `obj`."""
-  argspec = inspect.getfullargspec(obj.__init__)
+  argspec = tf_inspect.getfullargspec(obj.__init__)
   if argspec.varargs or argspec.varkw:
     raise ValueError(
         '*args and **kwargs are not supported. Found `{}`'.format(argspec))
@@ -58,10 +58,15 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
       kwargs[k] = getattr(obj, k)
     elif hasattr(obj, '_' + k):
       kwargs[k] = getattr(obj, '_' + k)
+    elif hasattr(obj, 'parameters') and k in obj.parameters:
+      kwargs[k] = obj.parameters[k]
     else:
       raise ValueError(
-          'Object did not have an attr corresponding to constructor argument '
-          '{k}. (Tried both `obj.{k}` and obj._{k}`).'.format(k=k))
+          f'Could not determine an appropriate value for field `{k}` in object '
+          ' `{obj}`. Looked for \n'
+          ' 1. an attr called `{k}`,\n'
+          ' 2. an attr called `_{k}`,\n'
+          ' 3. an entry in `obj.parameters` with key "{k}".')
     if k in prefer_static_value and kwargs[k] is not None:
       static_val = tf.get_static_value(kwargs[k])
       if static_val is not None:
