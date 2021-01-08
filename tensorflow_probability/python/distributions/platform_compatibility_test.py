@@ -152,6 +152,7 @@ XLA_LOGPROB_ATOL.update({
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
+    'HalfCauchy': 2e-6,
     'InverseGamma': 1e-4,
     'Kumaraswamy': 3e-6,
     'Logistic': 3e-6,
