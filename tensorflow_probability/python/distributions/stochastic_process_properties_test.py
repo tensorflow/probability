@@ -437,8 +437,11 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
         process_name=process_name, enable_vars=True))
     self.evaluate([var.initializer for var in process.variables])
 
-    with tf.GradientTape() as tape:
-      sample = process.sample()
+    # TODO(b/147770193): Avoid non-PSD matrices in
+    # `GaussianProcessRegressionModel`.
+    with kernel_hps.no_pd_errors():
+      with tf.GradientTape() as tape:
+        sample = process.sample()
     if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       grads = tape.gradient(sample, process.variables)
       for grad, var in zip(grads, process.variables):
