@@ -26,6 +26,7 @@ from tensorflow_probability.python.experimental.mcmc.expectations_reducer import
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import chees_criterion
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptation
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptationResults
+from tensorflow_probability.python.experimental.mcmc.initialization import init_near_unconstrained_zero
 from tensorflow_probability.python.experimental.mcmc.kernel_builder import KernelBuilder
 from tensorflow_probability.python.experimental.mcmc.kernel_outputs import KernelOutputs
 from tensorflow_probability.python.experimental.mcmc.nuts_autobatching import NoUTurnSampler
@@ -92,6 +93,7 @@ __all__ = [
     'GradientBasedTrajectoryLengthAdaptation',
     'GradientBasedTrajectoryLengthAdaptationResults',
     'infer_trajectories',
+    'init_near_unconstrained_zero',
     'KernelBuilder',
     'KernelOutputs',
     'make_rwmh_kernel_fn',

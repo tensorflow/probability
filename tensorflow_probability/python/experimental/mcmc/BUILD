@@ -65,6 +65,7 @@ multi_substrate_py_library(
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":gradient_based_trajectory_length_adaptation",
+        ":initialization",
         ":kernel_builder",
         ":kernel_outputs",
         ":nuts_autobatching",
@@ -86,6 +87,29 @@ multi_substrate_py_library(
         ":with_reductions",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "initialization",
+    srcs = ["initialization.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "initialization_test",
+    srcs = ["initialization_test.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":initialization",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
