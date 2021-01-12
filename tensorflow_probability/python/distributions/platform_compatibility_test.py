@@ -46,17 +46,10 @@ from tensorflow_probability.python.internal import test_util
 XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/159995894): SegmentMean not registered for XLA.
     'Bates',
-    # TODO(b/159996837):
-    'Categorical',
-    # TODO(b/159996484): Continuous Bernoulli nan/inf locations mismatch.
-    'ContinuousBernoulli',
-    # TODO(b/159997119): Finite discrete produces NaNs.
-    'FiniteDiscrete',
     # TODO(b/159996966)
     'Gamma',
     # TODO(b/173546024)
     'GeneralizedExtremeValue',
-    'OneHotCategorical',
     # TODO(b/163118820)
     'LogLogistic',
     'LogNormal',
