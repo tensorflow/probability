@@ -111,8 +111,8 @@ class KernelPropertiesTest(test_util.TestCase):
 
     # Check that reconstructing the kernel works
     with tfp_hps.no_tf_rank_errors():
-      diag2 = type(kernel)(**kernel._parameters).apply(
-          xs, xs, example_ndims=example_ndims)
+      diag2 = self.evaluate(type(kernel)(**kernel._parameters).apply(
+          xs, xs, example_ndims=example_ndims))
     self.assertAllClose(diag, diag2)
 
 
