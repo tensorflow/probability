@@ -162,7 +162,8 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
         num_steps=4000,
         num_leapfrog_steps=15,
         step_size=0.03,
-        dtype=tf.float64)
+        dtype=tf.float64,
+        standard_deviation_fudge_atol=1e-4)
 
 
 @test_util.multi_backend_test(globals(),
