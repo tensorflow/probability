@@ -415,8 +415,9 @@ class PositiveSemidefiniteKernel(tf.Module):
     The parameter batch shape of `[2]` and the input batch shape of `[5]` can't
     be broadcast together. We can fix this in either of two ways:
 
-    1. Give the parameter a shape of `[2, 1]` which will correctly
-    broadcast with `[5]` to yield `[2, 5]`:
+    ##### Fix #1
+    Give the parameter a shape of `[2, 1]` which will correctly broadcast with
+    `[5]` to yield `[2, 5]`:
 
     ```python
     batch_kernel = tfp.math.psd_kernels.SomeKernel(
@@ -427,9 +428,10 @@ class PositiveSemidefiniteKernel(tf.Module):
     # ==> [2, 5]
     ```
 
-    2. By specifying `example_ndims`, which tells the kernel to treat the `5`
-    in the input shape as part of the "example shape", and "pushing" the
-    kernel batch shape to the left:
+    ##### Fix #2
+    By specifying `example_ndims`, which tells the kernel to treat the `5` in
+    the input shape as part of the "example shape", and "pushing" the kernel
+    batch shape to the left:
 
     ```python
     batch_kernel = tfp.math.psd_kernels.SomeKernel(param=[.2, .5])
@@ -437,6 +439,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     # ==> [2]
     batch_kernel.apply(x, y, example_ndims=1).shape
     # ==> [2, 5]
+    ```
 
     """
     with self._name_and_control_scope(name):
