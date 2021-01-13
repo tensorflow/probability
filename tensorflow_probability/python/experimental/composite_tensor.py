@@ -106,7 +106,7 @@ def _make_convertible(cls):
                 self)._parameter_control_dependencies(is_init=True))
       result += tuple(
           super(_CompositeTensorDist,
-                self)._parameter_control_dependencies(is_init=True))
+                self)._parameter_control_dependencies(is_init=False))
       return result
 
     @property
