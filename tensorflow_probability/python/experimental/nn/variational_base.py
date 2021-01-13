@@ -24,13 +24,10 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import independent as independent_lib
-from tensorflow_probability.python.distributions import kullback_leibler as kl_lib
 from tensorflow_probability.python.distributions import mvn_diag as mvn_diag_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.experimental.nn import layers as layers_lib
-from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
-from tensorflow_probability.python.monte_carlo import expectation
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
 
@@ -41,23 +38,6 @@ __all__ = [
 
 # The following aliases ensure docstrings read more succinctly.
 tfd = distribution_lib
-
-
-def kl_divergence_monte_carlo(q, r, w):
-  """Monte Carlo KL Divergence."""
-  return expectation(
-      lambda w: q.log_prob(w) - r.log_prob(w),
-      samples=w,
-      log_prob=q.log_prob,
-      use_reparameterization=all(
-          rt == FULLY_REPARAMETERIZED
-          for rt in tf.nest.flatten(q.reparameterization_type)),
-      axis=())
-
-
-def kl_divergence_exact(q, r, w):  # pylint: disable=unused-argument
-  """Exact KL Divergence."""
-  return kl_lib.kl_divergence(q, r)
 
 
 def unpack_kernel_and_bias(weights):
@@ -82,36 +62,31 @@ class VariationalLayer(layers_lib.Layer):
       posterior,
       prior,
       activation_fn=None,
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
       posterior_value_fn=tfd.Distribution.sample,
       seed=None,
       dtype=tf.float32,
+      validate_args=False,
       name=None):
     """Base class for variational layers.
-
-    # mean ==> penalty_weight =          1 / train_size
-    # sum  ==> penalty_weight = batch_size / train_size
 
     Args:
       posterior: ...
       prior: ...
       activation_fn: ...
-      penalty_weight: ...
-      posterior_penalty_fn: ...
       posterior_value_fn: ...
       seed: ...
       dtype: ...
+      validate_args: ...
       name: Python `str` prepeneded to ops created by this object.
         Default value: `None` (i.e., `type(self).__name__`).
     """
-    super(VariationalLayer, self).__init__(name=name)
+    super(VariationalLayer, self).__init__(
+        validate_args=validate_args, name=name)
     self._posterior = posterior
     self._prior = prior
     self._activation_fn = activation_fn
-    self._penalty_weight = penalty_weight
-    self._posterior_penalty_fn = posterior_penalty_fn
     self._posterior_value_fn = posterior_value_fn
+    self._posterior_value = None
     self._seed = SeedStream(seed, salt=self.name)
     self._dtype = dtype
     tf.nest.assert_same_structure(prior.dtype, posterior.dtype,
@@ -134,30 +109,26 @@ class VariationalLayer(layers_lib.Layer):
     return self._activation_fn
 
   @property
-  def penalty_weight(self):
-    return self._penalty_weight
-
-  @property
-  def posterior_penalty_fn(self):
-    return self._posterior_penalty_fn
-
-  @property
   def posterior_value_fn(self):
     return self._posterior_value_fn
 
-  def eval(self, inputs, is_training=True, **kwargs):
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype, name='inputs')
-    w = self.posterior_value_fn(self.posterior, seed=self._seed())  # pylint: disable=not-callable
-    if is_training:
-      penalty = self.posterior_penalty_fn(self.posterior, self.prior, w)  # pylint: disable=not-callable
-      if penalty is not None and self.penalty_weight is not None:
-        penalty *= tf.cast(self.penalty_weight, dtype=penalty.dtype)
+  @property
+  def posterior_value(self):
+    return self._posterior_value
+
+  @posterior_value.setter
+  def posterior_value(self, value):
+    if value is None:
+      self._posterior_value = self.posterior_value_fn(
+          self.posterior, seed=self._seed())
     else:
-      penalty = None
-    outputs = self._eval(inputs, w, **kwargs)
-    self._set_extra_loss(penalty)
-    self._set_extra_result(w)
-    return outputs
+      self._posterior_value = value
+
+  def __call__(self, inputs, **kwargs):
+    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype, name='inputs')
+    self.posterior_value = self.posterior_value_fn(
+        self.posterior, seed=self._seed())  # pylint: disable=not-callable
+    return self._eval(inputs, self.posterior_value, **kwargs)
 
   def _eval(self, inputs, weights):
     raise NotImplementedError('Subclass failed to implement `_eval`.')
@@ -172,22 +143,20 @@ class VariationalReparameterizationKernelBiasLayer(VariationalLayer):
       prior,
       apply_kernel_fn,
       activation_fn=None,
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       seed=None,
       dtype=tf.float32,
+      validate_args=False,
       name=None):
     super(VariationalReparameterizationKernelBiasLayer, self).__init__(
         posterior,
         prior,
         activation_fn=activation_fn,
-        penalty_weight=penalty_weight,
-        posterior_penalty_fn=posterior_penalty_fn,
         posterior_value_fn=posterior_value_fn,
         seed=seed,
         dtype=dtype,
+        validate_args=validate_args,
         name=name)
     self._apply_kernel_fn = apply_kernel_fn
     self._unpack_weights_fn = unpack_weights_fn
@@ -217,22 +186,20 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
       prior,
       apply_kernel_fn,
       activation_fn=None,
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       seed=None,
       dtype=tf.float32,
+      validate_args=False,
       name=None):
     super(VariationalFlipoutKernelBiasLayer, self).__init__(
         posterior,
         prior,
         activation_fn=activation_fn,
-        penalty_weight=penalty_weight,
-        posterior_penalty_fn=posterior_penalty_fn,
         posterior_value_fn=posterior_value_fn,
         seed=seed,
         dtype=dtype,
+        validate_args=validate_args,
         name=name)
     self._apply_kernel_fn = apply_kernel_fn
     self._unpack_weights_fn = unpack_weights_fn
@@ -254,14 +221,14 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
       # sign_input_shape = ([batch_size] +
       #                     [1] * self._rank +
       #                     [self._input_channels])
-      y *= tfp_random.rademacher(prefer_static.shape(y),
+      y *= tfp_random.rademacher(ps.shape(y),
                                  dtype=y.dtype,
                                  seed=self._seed())
       kernel_perturb = normal_lib.Normal(loc=0., scale=kernel_scale)
       y = self._apply_kernel_fn(   # E.g., tf.matmul.
           y,
           kernel_perturb.sample(seed=self._seed()))
-      y *= tfp_random.rademacher(prefer_static.shape(y),
+      y *= tfp_random.rademacher(ps.shape(y),
                                  dtype=y.dtype,
                                  seed=self._seed())
       y += self._apply_kernel_fn(x, kernel_loc)

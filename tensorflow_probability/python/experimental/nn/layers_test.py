@@ -50,15 +50,13 @@ class AffineMeanFieldNormal(tfn.Layer):
   def bias(self):
     return self._bias
 
-  def eval(self, x, is_training=True):
+  def _eval(self, x, is_training=True):
     if (isinstance(x, tfd.Independent) and
         isinstance(x.distribution, tfd.Normal)):
       x = x.distribution.loc
     else:
       x = tf.convert_to_tensor(x, dtype_hint=tf.float32, name='x')
     y = self.bias + tf.matmul(x, self.kernel)
-    self._set_extra_loss(tf.norm(y, axis=-1))
-    self._set_extra_result(tf.shape(x))
     return tfd.Independent(tfd.Normal(loc=y, scale=1),
                            reinterpreted_batch_ndims=1)
 
@@ -99,21 +97,6 @@ class SequentialTest(test_util.TestCase):
     self.assertIsInstance(y, tfd.Independent)
     self.assertAllEqual((2, output_size), y.distribution.loc.shape)
 
-    extra_loss = [l.extra_loss for l in model.layers
-                  if getattr(l, 'extra_loss', None) is not None]
-    extra_result = [l.extra_result for l in model.layers
-                    if getattr(l, 'extra_result', None) is not None]
-
-    self.assertIsNone(model.extra_result)
-    self.assertAllEqual([(2,), (2,)], [x.shape for x in extra_loss])
-
-    extra_loss_, extra_result_, model_extra_loss_ = self.evaluate([
-        extra_loss, extra_result, model.extra_loss])
-    self.assertAllGreaterEqual(extra_loss_, 0.)
-    self.assertAllEqual([[2, 3], [2, 5]], extra_result_)
-    self.assertAllClose(sum(extra_loss_), model_extra_loss_,
-                        rtol=1e-3, atol=1e-3)
-
   def test_summary(self):
     model = tfn.Sequential([
         lambda x: tf.reshape(x, [-1, 3]),
@@ -127,23 +110,24 @@ class SequentialTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class LambdaTest(test_util.TestCase):
 
-  def test_basic(self):
+  def test_works_correctly(self):
     shift = tf.Variable(1.)
     scale = tfp.util.TransformedVariable(1., tfb.Exp())
     f = tfn.Lambda(
         eval_fn=lambda x: tfd.Normal(loc=x + shift, scale=scale),
-        extra_loss_fn=lambda x: tf.norm(x.loc),
         # `scale` will be tracked through the distribution but not `shift`.
         also_track=shift)
     x = tf.zeros([1, 2])
     y = f(x)
     self.assertIsInstance(y, tfd.Normal)
     self.assertLen(f.trainable_variables, 2)
-    if tf.executing_eagerly():
-      # We want to specifically check the values when in eager mode to ensure
-      # we're not leaking graph tensors. The precise value doesn't matter.
-      self.assertGreaterEqual(f.extra_loss, 0.)
-    self.assertIsNone(f.extra_result)
+
+
+@test_util.test_all_tf_execution_regimes
+class KernelBiasLayerTest(test_util.TestCase):
+
+  def test_works_correctly(self):
+    pass
 
 
 if __name__ == '__main__':

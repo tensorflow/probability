@@ -77,7 +77,7 @@ class BnnEndToEnd(object):
     def loss_fn():
       x = next(train_iter)
       nll = -tf.reduce_mean(bnn(x).log_prob(x), axis=-1)
-      kl = bnn.extra_loss / tf.cast(train_size, tf.float32)
+      kl = tfn.losses.compute_extra_loss(bnn) / tf.cast(train_size, tf.float32)
       loss = nll + kl
       return loss, (nll, kl)
     opt = tf.optimizers.Adam()
@@ -105,14 +105,14 @@ class ConvolutionTransposeVariationalReparameterizationTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     make_deconv = functools.partial(
         tfn.ConvolutionTransposeVariationalReparameterization,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv, make_deconv)
 
@@ -129,14 +129,14 @@ class ConvolutionTransposeVariationalFlipoutTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     make_deconv = functools.partial(
         tfn.ConvolutionTransposeVariationalFlipout,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv, make_deconv)
 

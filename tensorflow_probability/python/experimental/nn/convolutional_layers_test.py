@@ -55,14 +55,12 @@ class BnnEndToEnd(object):
     # 2  Specify Model
 
     scale = tfp.util.TransformedVariable(1., tfb.Softplus())
-    n = tf.cast(train_size, tf.float32)
     bnn = tfn.Sequential([
-        make_conv(evidence_shape[-1], 32, filter_shape=7, strides=2,
-                  penalty_weight=1. / n),      # [b, 14, 14, 32]
+        make_conv(  # [b, 14, 14, 32]
+            evidence_shape[-1], 32, filter_shape=7, strides=2),
         tfn.util.flatten_rightmost(ndims=3),    # [b, 14 * 14 * 32]
         tfn.AffineVariationalReparameterization(
-            14 * 14 * 32, np.prod(target_shape) - 1,
-            penalty_weight=1. / n),            # [b, 9]
+            14 * 14 * 32, np.prod(target_shape) - 1),   # [b, 9]
         tfn.Lambda(
             eval_fn=lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
                 tfd.Independent(tfd.Normal(loc, scale),
@@ -73,12 +71,12 @@ class BnnEndToEnd(object):
     self.evaluate([v.initializer for v in bnn.trainable_variables])
 
     # 3  Train.
-
+    n = tf.cast(train_size, tf.float32)
     train_iter = iter(train_dataset)
     def loss_fn():
       x, y = next(train_iter)
       nll = -tf.reduce_mean(bnn(x).log_prob(y), axis=-1)
-      kl = bnn.extra_loss  # Already normalized.
+      kl = tfn.losses.compute_extra_loss(bnn) / n
       return nll + kl, (nll, kl)
     opt = tf.optimizers.Adam()
     fit_op = tfn.util.make_fit_op(loss_fn, opt, bnn.trainable_variables)
@@ -143,7 +141,7 @@ class ConvolutionVariationalReparameterizationTest(
         tfn.ConvolutionVariationalReparameterization,
         rank=2,
         padding='same',
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv)
 
@@ -158,7 +156,7 @@ class ConvolutionVariationalFlipoutTest(test_util.TestCase, BnnEndToEnd):
         tfn.ConvolutionVariationalFlipout,
         rank=2,
         padding='same',
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv)
 

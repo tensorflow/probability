@@ -21,9 +21,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.experimental.nn import layers as layers_lib
-from tensorflow_probability.python.experimental.nn import util as nn_util_lib
 from tensorflow_probability.python.experimental.nn import variational_base as vi_lib
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.experimental.nn.util import convolution_util
+from tensorflow_probability.python.experimental.nn.util import kernel_bias as kernel_bias_lib
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
@@ -35,7 +36,6 @@ __all__ = [
 
 # The following aliases ensure docstrings read more succinctly.
 tfd = distribution_lib
-kl_divergence_monte_carlo = vi_lib.kl_divergence_monte_carlo
 unpack_kernel_and_bias = vi_lib.unpack_kernel_and_bias
 
 
@@ -92,13 +92,16 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       output_padding=None,  # keras::ConvTranspose::output_padding
+      method='auto',
       # Weights
-      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.initializers.zeros()
-      make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
+      kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
+      bias_initializer=None,    # tf.initializers.zeros()
+      make_kernel_bias_fn=kernel_bias_lib.make_kernel_bias,
       dtype=tf.float32,
+      index_dtype=tf.int32,
       # Misc
       activation_fn=None,
+      validate_args=False,
       name=None):
     """Constructs layer.
 
@@ -152,37 +155,48 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
         (default), the output shape is inferred.
         In Keras, this argument has the same name and semantics.
         Default value: `None` (i.e., inferred).
-      init_kernel_fn: ...
+      method: ...
+      kernel_initializer: ...
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
-      init_bias_fn: ...
+      bias_initializer: ...
         Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_kernel_bias_fn: ...
         Default value: `tfp.experimental.nn.util.make_kernel_bias`.
       dtype: ...
         Default value: `tf.float32`.
+      index_dtype: ...
       activation_fn: ...
         Default value: `None`.
+      validate_args: ...
       name: ...
         Default value: `None` (i.e., `'ConvolutionTranspose'`).
     """
-    filter_shape = nn_util_lib.prepare_tuple_argument(
-        filter_shape, rank, 'filter_shape')
-    kernel_shape = filter_shape + (output_size, input_size)  # Note transpose.
+    filter_shape = convolution_util.prepare_tuple_argument(
+        filter_shape, rank, 'filter_shape', validate_args)
+    kernel_shape = ps.concat(
+        [filter_shape, [output_size, input_size]], axis=0)  # Note transpose.
     batch_ndims = 0
     kernel, bias = make_kernel_bias_fn(
         kernel_shape, [output_size],
-        init_kernel_fn, init_bias_fn,
+        kernel_initializer, bias_initializer,
         batch_ndims, batch_ndims,
         dtype)
+
+    apply_kernel_fn = _get_convolution_transpose_fn(strides, method)(
+        filter_shape, strides, padding, rank=2, dilations=dilations,
+        dtype=index_dtype, validate_args=validate_args)
+
+    # TODO(emilyaf): Remove after kernel shape is updated.
+    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
+        x, tf.reshape(tf.transpose(k, perm=[0, 1, 3, 2]), [-1, output_size]))
     super(ConvolutionTranspose, self).__init__(
         kernel=kernel,
         bias=bias,
-        apply_kernel_fn=_make_convolution_transpose_fn(
-            rank, strides, padding, dilations,
-            filter_shape, output_size, output_padding),
+        apply_kernel_fn=temp_apply_kernel_fn,
         dtype=dtype,
         activation_fn=activation_fn,
+        validate_args=validate_args,
         name=name)
 
 
@@ -271,7 +285,7 @@ class ConvolutionTransposeVariationalReparameterization(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      init_kernel_fn=tf.initializers.he_uniform())
+      kernel_initializer=tf.initializers.he_uniform())
 
   BayesDeconv2D = functools.partial(
       tfn.ConvolutionTransposeVariationalReparameterization,
@@ -279,7 +293,7 @@ class ConvolutionTransposeVariationalReparameterization(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      init_kernel_fn=tf.initializers.he_uniform())
+      kernel_initializer=tf.initializers.he_uniform())
 
   scale = tfp.util.TransformedVariable(1., tfb.Softplus())
   bnn = tfn.Sequential([
@@ -343,20 +357,20 @@ class ConvolutionTransposeVariationalReparameterization(
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       output_padding=None,  # keras::ConvTranspose::output_padding
+      method='auto',
       # Weights
-      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.initializers.zeros()
-      make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
-      make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
+      kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
+      bias_initializer=None,    # tf.initializers.zeros()
+      make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
+      make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       dtype=tf.float32,
-      # Penalty.
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
+      index_dtype=tf.int32,
       # Misc
       activation_fn=None,
       seed=None,
+      validate_args=False,
       name=None):
     """Constructs layer.
 
@@ -410,10 +424,11 @@ class ConvolutionTransposeVariationalReparameterization(
         (default), the output shape is inferred.
         In Keras, this argument has the same name and semantics.
         Default value: `None` (i.e., inferred).
-      init_kernel_fn: ...
+      method: ...
+      kernel_initializer: ...
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
-      init_bias_fn: ...
+      bias_initializer: ...
         Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
@@ -427,43 +442,47 @@ class ConvolutionTransposeVariationalReparameterization(
         Default value: `unpack_kernel_and_bias`
       dtype: ...
         Default value: `tf.float32`.
-      penalty_weight: ...
-        Default value: `None` (i.e., weight is `1`).
-      posterior_penalty_fn: ...
-        Default value: `kl_divergence_monte_carlo`.
+      index_dtype: ...
       activation_fn: ...
         Default value: `None`.
       seed: ...
         Default value: `None` (i.e., no seed).
+      validate_args: ...
       name: ...
         Default value: `None` (i.e.,
         `'ConvolutionTransposeVariationalReparameterization'`).
     """
-    filter_shape = nn_util_lib.prepare_tuple_argument(
-        filter_shape, rank, 'filter_shape')
-    kernel_shape = filter_shape + (output_size, input_size)  # Note transpose.
+    filter_shape = convolution_util.prepare_tuple_argument(
+        filter_shape, rank, 'filter_shape', validate_args)
+    kernel_shape = ps.concat([filter_shape, [output_size, input_size]],
+                             axis=0)  # Note transpose.
     batch_ndims = 0
+
+    apply_kernel_fn = _get_convolution_transpose_fn(strides, method)(
+        filter_shape, strides, padding, rank=2, dilations=dilations,
+        dtype=index_dtype, validate_args=validate_args)
+
+    # TODO(emilyaf): Remove after kernel shape is updated.
+    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
+        x, tf.reshape(tf.transpose(k, perm=[0, 1, 3, 2]), [-1, output_size]))
     super(ConvolutionTransposeVariationalReparameterization, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         prior=make_prior_fn(
             kernel_shape, [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
-        apply_kernel_fn=_make_convolution_transpose_fn(
-            rank, strides, padding, dilations,
-            filter_shape, output_size, output_padding),
+        apply_kernel_fn=temp_apply_kernel_fn,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,
-        penalty_weight=penalty_weight,
-        posterior_penalty_fn=posterior_penalty_fn,
         activation_fn=activation_fn,
         seed=seed,
+        validate_args=validate_args,
         name=name)
 
 
@@ -520,14 +539,14 @@ class ConvolutionTransposeVariationalFlipout(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      init_kernel_fn=tf.initializers.he_uniform())
+      kernel_initializer=tf.initializers.he_uniform())
   BayesDeconv2D = functools.partial(
       tfn.ConvolutionTransposeVariationalFlipout,
       rank=2,
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      init_kernel_fn=tf.initializers.he_uniform())
+      kernel_initializer=tf.initializers.he_uniform())
   ```
 
   This example uses reparameterization gradients to minimize the
@@ -557,20 +576,20 @@ class ConvolutionTransposeVariationalFlipout(
                             # keras::Conv::data_format is not implemented
       dilations=1,          # keras::Conv::dilation_rate
       output_padding=None,  # keras::ConvTranspose::output_padding
+      method='auto',
       # Weights
-      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.initializers.zeros()
-      make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
-      make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
+      kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
+      bias_initializer=None,    # tf.initializers.zeros()
+      make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
+      make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       dtype=tf.float32,
-      # Penalty.
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
+      index_dtype=tf.int32,
       # Misc
       activation_fn=None,
       seed=None,
+      validate_args=False,
       name=None):
     """Constructs layer.
 
@@ -624,10 +643,11 @@ class ConvolutionTransposeVariationalFlipout(
         (default), the output shape is inferred.
         In Keras, this argument has the same name and semantics.
         Default value: `None` (i.e., inferred).
-      init_kernel_fn: ...
+      method: ...
+      kernel_initializer: ...
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
-      init_bias_fn: ...
+      bias_initializer: ...
         Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
@@ -641,134 +661,76 @@ class ConvolutionTransposeVariationalFlipout(
         Default value: `unpack_kernel_and_bias`
       dtype: ...
         Default value: `tf.float32`.
-      penalty_weight: ...
-        Default value: `None` (i.e., weight is `1`).
-      posterior_penalty_fn: ...
-        Default value: `kl_divergence_monte_carlo`.
+      index_dtype: ...
       activation_fn: ...
         Default value: `None`.
       seed: ...
         Default value: `None` (i.e., no seed).
+      validate_args: ...
       name: ...
         Default value: `None` (i.e.,
         `'ConvolutionTransposeVariationalFlipout'`).
     """
-    filter_shape = nn_util_lib.prepare_tuple_argument(
-        filter_shape, rank, 'filter_shape')
-    kernel_shape = filter_shape + (output_size, input_size)  # Note transpose.
+    filter_shape = convolution_util.prepare_tuple_argument(
+        filter_shape, rank, 'filter_shape', validate_args)
+    kernel_shape = ps.concat(
+        [filter_shape, [output_size, input_size]], axis=0)  # Note transpose.
     batch_ndims = 0
+
+    apply_kernel_fn = _get_convolution_transpose_fn(strides, method)(
+        filter_shape, strides, padding, rank=2, dilations=dilations,
+        dtype=index_dtype, validate_args=validate_args)
+
+    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
+        x, tf.reshape(tf.transpose(k, perm=[0, 1, 3, 2]), [-1, output_size]))
     super(ConvolutionTransposeVariationalFlipout, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         prior=make_prior_fn(
             kernel_shape, [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
-        apply_kernel_fn=_make_convolution_transpose_fn(
-            rank, strides, padding, dilations,
-            filter_shape, output_size, output_padding),
+        apply_kernel_fn=temp_apply_kernel_fn,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,
-        penalty_weight=penalty_weight,
-        posterior_penalty_fn=posterior_penalty_fn,
         activation_fn=activation_fn,
         seed=seed,
+        validate_args=validate_args,
         name=name)
 
 
-def _make_convolution_transpose_fn(rank, strides, padding, dilations,
-                                   filter_shape, output_size, output_padding):
-  """Helper to create tf convolution op."""
-  [
-      rank,
-      strides,
-      padding,
-      dilations,
-      data_format,
-  ] = nn_util_lib.prepare_conv_args(rank, strides, padding, dilations)
-  def op(x, kernel):
-    output_shape, strides_ = _get_output_shape(
-        rank, strides, padding, dilations,
-        prefer_static.shape(x), output_size, filter_shape, output_padding)
-    return tf.nn.conv_transpose(
-        x, kernel,
-        output_shape=output_shape,
-        strides=strides_,
-        padding=padding,
-        data_format=data_format,
-        dilations=dilations)
-  return lambda x, kernel: nn_util_lib.batchify_op(op, rank + 1, x, kernel)
+def _get_convolution_transpose_fn(strides, method):
+  """Selects which `convolution_transpose_fn_*` to use."""
+  strides_ = tf.nest.flatten(
+      tf.nest.map_structure(tf.get_static_value, strides))
+  cpu_method = 'subkernel_matrix'
+  if any(s is None for s in strides_) or len(set(strides_)) > 1:
+    if method == 'subkernel_matrix':
+      raise ValueError(
+          'Transpose convolution method `subkernel_matrix` requires '
+          'statically-known strides that are equal along each dimension.')
+    else:
+      cpu_method = 'subkernels'
 
+  # If the transposed convolution method is not provided, dispatch on GPU
+  # availability.
+  if method == 'auto':
+    if tf.constant([]).device.split(':')[-2].upper() == 'GPU':
+      method = 'dilation'  # faster on GPU
+    else:
+      method = cpu_method
 
-def _get_output_shape(rank, strides, padding, dilations,
-                      input_shape, output_size, filter_shape, output_padding):
-  """Compute the `output_shape` and `strides` arg used by `conv_transpose`."""
-  if output_padding is None:
-    output_padding = (None,) * rank
-  else:
-    output_padding = nn_util_lib.prepare_tuple_argument(
-        output_padding, rank, 'output_padding')
-    for stride, out_pad in zip(strides, output_padding):
-      if out_pad >= stride:
-        raise ValueError('Stride {} must be greater than output '
-                         'padding {}.'.format(strides, output_padding))
-  assert len(filter_shape) == rank
-  assert len(strides) == rank
-  assert len(output_padding) == rank
-  event_shape = []
-  for i in range(-rank, 0):
-    event_shape.append(_deconv_output_length(
-        input_shape[i - 1],
-        filter_shape[i],
-        padding=padding,
-        output_padding=output_padding[i],
-        stride=strides[i],
-        dilation=dilations[i]))
-  event_shape.append(output_size)
-  batch_shape = input_shape[:-rank-1]
-  output_shape = prefer_static.concat([batch_shape, event_shape], axis=0)
-  strides = (1,) + strides + (1,)
-  return output_shape, strides
-
-
-def _deconv_output_length(input_size, filter_size, padding, output_padding,
-                          stride, dilation):
-  """Determines output length of a transposed convolution given input length.
-
-  Args:
-    input_size: `int`.
-    filter_size: `int`.
-    padding: one of `"SAME"`, `"VALID"`, `"FULL"`.
-    output_padding: `int`, amount of padding along the output dimension. Can
-      be set to `None` in which case the output length is inferred.
-    stride: `int`.
-    dilation: `int`.
-
-  Returns:
-    output_length: The output length (`int`).
-  """
-  assert padding in {'SAME', 'VALID', 'FULL'}
-  if input_size is None:
-    return None
-  # Get the dilated kernel size
-  filter_size = filter_size + (filter_size - 1) * (dilation - 1)
-  # Infer length if output padding is None, else compute the exact length
-  if output_padding is None:
-    if padding == 'VALID':
-      return input_size * stride + max(filter_size - stride, 0)
-    elif padding == 'FULL':
-      return input_size * stride - (stride + filter_size - 2)
-    elif padding == 'SAME':
-      return input_size * stride
-  if padding == 'SAME':
-    pad = filter_size // 2
-  elif padding == 'VALID':
-    pad = 0
-  elif padding == 'FULL':
-    pad = filter_size - 1
-  return (input_size - 1) * stride + filter_size - 2 * pad + output_padding
+  if method == 'subkernels':
+    return convolution_util.make_convolution_transpose_fn_with_subkernels
+  elif method == 'dilation':
+    return convolution_util.make_convolution_transpose_fn_with_dilation
+  elif method == 'subkernel_matrix':
+    return convolution_util.make_convolution_transpose_fn_with_subkernels_matrix
+  raise ValueError(
+      'Argument `method` must be one of `auto`, `subkernels`, '
+      '`subkernels_matrix` or `dilation`. Saw: {}'.format(method))

@@ -303,7 +303,7 @@ def make_convolution_transpose_fn_with_dilation(
         dilations,
     ] = prepare_conv_args(
         filter_shape, rank=rank, strides=strides, padding=padding,
-        dilations=dilations, validate_args=validate_args)
+        dilations=dilations, is_transpose=True, validate_args=validate_args)
 
     sh, sw = strides
     fh, fw = filter_shape
@@ -396,7 +396,7 @@ def make_convolution_transpose_fn_with_subkernels_matrix(
         dilations,
     ] = prepare_conv_args(
         filter_shape, rank=rank, strides=strides, padding=padding,
-        dilations=dilations, validate_args=validate_args)
+        dilations=dilations, is_transpose=True, validate_args=validate_args)
 
     fh, fw = filter_shape
     dh, dw = dilations
@@ -584,7 +584,7 @@ def make_convolution_transpose_fn_with_subkernels(
         dilations,
     ] = prepare_conv_args(
         filter_shape, rank=rank, strides=strides, padding=padding,
-        dilations=dilations, validate_args=validate_args)
+        dilations=dilations, is_transpose=True, validate_args=validate_args)
 
     sh, sw = strides
     fh, fw = filter_shape
@@ -765,7 +765,7 @@ def _get_transpose_conv_dilated_padding(filter_dim, stride, dilation, padding):
   elif padding == 'SAME':
     tot_pad = tot_filter_dim + stride - 2
 
-  # TODO(emilyaf): Don't need to consider case where stride > kernel_dim, right?
+  # TODO(emilyaf): Support stride > kernel_dim.
   # if filter_dim > 1:
   pad_end = tot_pad // 2
   pad_start = tot_pad - pad_end - (stride - 1)  # implicit pad
@@ -841,9 +841,10 @@ def _deconv_output_length(input_size, filter_size, padding, output_padding,
 
 
 def prepare_conv_args(
-    filter_shape, rank, strides, padding, dilations, validate_args=False):
+    filter_shape, rank, strides, padding, dilations,
+    is_transpose=False, validate_args=False):
   """Sanitizes use provided input."""
-  padding = _validate_padding(padding)  # pylint: disable=protected-access
+  padding = _validate_padding(padding)
   try:
     rank = int(tf.get_static_value(rank))
   except TypeError:
@@ -856,14 +857,43 @@ def prepare_conv_args(
       validate_args=validate_args)
   strides = prepare_tuple_argument(
       strides, n=rank, arg_name='strides', validate_args=validate_args)
-  padding = utils._prepare_padding_argument(padding)  # pylint: disable=protected-access
+  padding = _prepare_padding_argument(padding)
   dilations = prepare_tuple_argument(
       dilations, n=rank, arg_name='dilations', validate_args=validate_args)
-  return filter_shape, rank, strides, padding, dilations
+
+  strides_ = [tf.get_static_value(s) for s in strides]
+  dilations_ = [tf.get_static_value(d) for d in dilations]
+  assertions = []
+  if is_transpose:
+    if (all(s is not None for s in strides_)
+        and all(d is not None for d in dilations_)):
+      if any(s > 1 for s in strides_) and any(d > 1 for d in dilations_):
+        raise NotImplementedError('At least one of `dilations` and `strides` '
+                                  'must equal `1` for each dimension. Saw: '
+                                  '`strides={}`, `dilations={}`'.format(
+                                      strides, dilations))
+    elif validate_args:
+      assertions.append(
+          assert_util.assert_equal(
+              tf.logical_or(
+                  tf.equal(tf.reduce_max(strides), 1),
+                  tf.equal(tf.reduce_max(dilations), 1)),
+              True,
+              message='At least one of `dilations` and `strides` must equal `1` '
+              'for each dimension.'))
+
+    # TODO(emilyaf): Remove this once strides > filter_dim is supported.
+    filter_shape_ = [tf.get_static_value(s) for s in filter_shape]
+    if any(s is not None and f is not None and s > f
+           for s, f in zip(strides_, filter_shape_)):
+      raise NotImplementedError('Stride must be less than or equal to the '
+                                'filter size along each dimension.')
+
+  with tf.control_dependencies(assertions):
+    return filter_shape, rank, strides, padding, dilations
 
 
-# TODO(emilyaf): Replace the version in `utils` with this.
-def prepare_tuple_argument(arg, n, arg_name, validate_args):
+def prepare_tuple_argument(arg, n, arg_name, validate_args=False):
   """Helper which processes `Tensor`s to tuples in standard form."""
   arg_size = ps.size(arg)
   arg_size_ = tf.get_static_value(arg_size)
@@ -884,6 +914,24 @@ def prepare_tuple_argument(arg, n, arg_name, validate_args):
     arg = ps.broadcast_to(arg, shape=[n])
     arg = ps.unstack(arg, num=n)
     return arg
+
+
+def _prepare_padding_argument(x):
+  """Helper which processes the padding argument."""
+  if not hasattr(x, 'upper'):
+    return tuple(x)
+  padding = x.upper()
+  if padding in {'CAUSAL', 'FULL'}:
+    raise NotImplementedError(
+        'Argument `padding` value "{}" currently not supported. If you '
+        'require this feature, please create an issue on '
+        '`https://github.com/tensorflow/probability` or email '
+        '`tfprobability@tensorflow.org`.'.format(padding))
+  valid_values = {'VALID', 'SAME'}
+  if padding not in valid_values:
+    raise ValueError('Argument `padding` must be convertible to a tuple '
+                     'or one of {}; saw: "{}".'.format(valid_values, padding))
+  return padding
 
 
 def _call_conv2d_transpose(x, kernel, filter_shape, strides, padding, dilations,

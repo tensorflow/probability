@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental.nn import initializers
+from tensorflow_probability.python.experimental.nn import losses
 from tensorflow_probability.python.experimental.nn import util
 from tensorflow_probability.python.experimental.nn.affine_layers import Affine
 from tensorflow_probability.python.experimental.nn.affine_layers import AffineVariationalFlipout
@@ -58,7 +59,8 @@ _allowed_symbols = [
     'Sequential',
     'VariationalLayer',
     'initializers',
-    'util',
+    'losses',
+    'util'
 ]
 
 
