@@ -82,6 +82,7 @@ multi_substrate_py_library(
     name = "batched_rejection_sampler",
     srcs = ["batched_rejection_sampler.py"],
     deps = [
+        ":broadcast_util",
         ":samplers",
         # numpy dep,  # For np.nan
         # tensorflow dep,
