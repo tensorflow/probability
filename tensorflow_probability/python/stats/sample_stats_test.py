@@ -424,6 +424,15 @@ class CovarianceTest(test_util.TestCase):
     # Test passes when this does not fail.
     tfp.stats.covariance(x)
 
+  def test_jit(self):
+    self.skip_if_no_xla()
+
+    @tf.function(jit_compile=True)
+    def cov(x):
+      return tfp.stats.covariance(x)
+
+    self.evaluate(cov(tf.random.normal([1000, 4], seed=test_util.test_seed())))
+
 
 @test_util.test_all_tf_execution_regimes
 class CorrelationTest(test_util.TestCase):

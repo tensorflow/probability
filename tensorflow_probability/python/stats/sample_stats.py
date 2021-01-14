@@ -393,12 +393,9 @@ def covariance(x,
       batch_axis = ps.setdiff1d(
           ps.range(0, ps.rank(x)), ps.concat((sample_axis, event_axis), 0))
 
-    event_axis = ps.cast(
-        event_axis, dtype=tf.int32)
-    sample_axis = ps.cast(
-        sample_axis, dtype=tf.int32)
-    batch_axis = ps.cast(
-        batch_axis, dtype=tf.int32)
+    event_axis = ps.cast(event_axis, dtype=tf.int32)
+    sample_axis = ps.cast(sample_axis, dtype=tf.int32)
+    batch_axis = ps.cast(batch_axis, dtype=tf.int32)
 
     # Permute x/y until shape = B + E + S
     perm_for_xy = ps.concat((batch_axis, event_axis, sample_axis), 0)
@@ -821,6 +818,6 @@ def _squeeze(x, axis):
   if axis is None:
     return tf.squeeze(x, axis=None)
   axis = ps.convert_to_shape_tensor(axis, name='axis', dtype=tf.int32)
-  axis = axis + ps.zeros([1], dtype=axis.dtype)  # Make axis at least 1d.
+  axis = _make_list_or_1d_tensor(axis)  # Ensure at least 1d.
   keep_axis = ps.setdiff1d(ps.range(0, ps.rank(x)), axis)
   return tf.reshape(x, ps.gather(ps.shape(x), keep_axis))
