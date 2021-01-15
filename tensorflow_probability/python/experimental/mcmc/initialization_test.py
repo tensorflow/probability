@@ -71,6 +71,47 @@ class InitializationTest(test_util.TestCase):
       self.assertAllFinite(samples)
       self.assertAllFinite(self.evaluate(model_dist.log_prob(samples)))
 
+  def testFindValidInitialPoints(self):
+    seed = test_util.test_seed(sampler_type='stateless')
+    model_dist = tfd.JointDistributionSequential([
+        tfd.Uniform(0., 1.),
+        tfd.HalfCauchy(0., 1.),
+        lambda sigma, mu: tfd.Normal(mu, sigma)])
+    # Intentionally bad bijectors lead to a ~25% chance to
+    # initialize in the valid region
+    bijectors = [tfb.Identity(), tfb.Identity(), tfb.Identity()]
+    init_dist = tfp.experimental.mcmc.init_near_unconstrained_zero(
+        model_dist, constraining_bijector=bijectors)
+    # We expect to be able to fix it with rejection sampling
+    init_states = tfp.experimental.mcmc.retry_init(
+        init_dist.sample,
+        model_dist.log_prob,
+        sample_shape=[20],
+        seed=seed)
+    for s in self.evaluate(init_states):
+      self.assertAllFinite(s)
+      self.assertEqual((20,), s.shape)
+    self.assertAllFinite(self.evaluate(model_dist.log_prob(init_states)))
+
+  def testFailToFindValidInitialPoints(self):
+    seed = test_util.test_seed(sampler_type='stateless')
+    model_dist = tfd.JointDistributionSequential([
+        tfd.Uniform(10., 11.),
+        tfd.HalfCauchy(10., 1.),
+        lambda sigma, mu: tfd.Normal(mu, sigma)])
+    # Intentionally bad bijectors lead to no chance to
+    # initialize in the valid region
+    bijectors = [tfb.Sigmoid(), tfb.Identity(), tfb.Identity()]
+    init_dist = tfp.experimental.mcmc.init_near_unconstrained_zero(
+        model_dist, constraining_bijector=bijectors)
+    # We expect bounded rejection sampling to give up with an error
+    with self.assertRaisesOpError(
+        'Failed to find acceptable initial states'):
+      self.evaluate(tfp.experimental.mcmc.retry_init(
+          init_dist.sample,
+          model_dist.log_prob,
+          seed=seed))
+
 
 if __name__ == '__main__':
   tf.test.main()

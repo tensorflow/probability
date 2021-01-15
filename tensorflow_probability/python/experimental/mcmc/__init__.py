@@ -27,6 +27,7 @@ from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_l
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptation
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptationResults
 from tensorflow_probability.python.experimental.mcmc.initialization import init_near_unconstrained_zero
+from tensorflow_probability.python.experimental.mcmc.initialization import retry_init
 from tensorflow_probability.python.experimental.mcmc.kernel_builder import KernelBuilder
 from tensorflow_probability.python.experimental.mcmc.kernel_outputs import KernelOutputs
 from tensorflow_probability.python.experimental.mcmc.nuts_autobatching import NoUTurnSampler
@@ -109,6 +110,7 @@ __all__ = [
     'resample_independent',
     'resample_stratified',
     'resample_systematic',
+    'retry_init',
     'sample_chain',
     'sample_chain_with_burnin',
     'sample_fold',

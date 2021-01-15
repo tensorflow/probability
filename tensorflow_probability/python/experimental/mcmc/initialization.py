@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 
 __all__ = [
     'init_near_unconstrained_zero',
@@ -127,3 +128,93 @@ def init_near_unconstrained_zero(
       tfd.JointDistributionSequential(tf.nest.flatten(terms)))
   return tfd.TransformedDistribution(
       unconstrained, bijector=constraining_bijector)
+
+
+def retry_init(proposal_fn, target_fn, *args, max_trials=50,
+               seed=None, name=None, **kwargs):
+  """Tries an MCMC initialization proposal until it gets a valid state.
+
+  In this case, "valid" is defined as the value of `target_fn` is
+  finite.  This corresponds to an MCMC workflow where `target_fn`
+  compute the log-probability one wants to sample from, in which case
+  "finite `target_fn`" means "finite and positive probability state".
+  If `target_fn` returns a Tensor of size greater than 1, the results
+  are assumed to be independent of each other, so that different batch
+  members can be accepted individually.
+
+  The method is bounded rejection sampling.  The bound serves to avoid
+  wasting computation on hopeless initialization procedures.  In
+  interactive MCMC, one would presumably rather come up with a better
+  initialization proposal than wait for an unbounded number of
+  attempts with a bad one.  If unbounded re-trials are desired,
+  set `max_trials` to `None`.
+
+  Note: XLA and @jax.jit do not support assertions, so this function
+  can return invalid states on those platforms without raising an
+  error (unless `max_trials` is set to `None`).
+
+  Args:
+    proposal_fn: A function accepting a `seed` keyword argument and no other
+      required arguments which generates proposed initial states.
+    target_fn: A function accepting the return value of `proposal_fn`
+      and returning a floating-point Tensor.
+    *args: Additional arguments passed to `proposal_fn`.
+    max_trials: Size-1 integer `Tensor` or None. Maximum number of
+      calls to `proposal_fn` to attempt.  If acceptable states are not
+      found in this many trials, `retry_init` signals an error.  If
+      `None`, there is no limit, and `retry_init` skips the control
+      flow cost of checking for success.
+    seed: Optional, a PRNG seed for reproducible sampling.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., 'mcmc_sample_chain').
+    **kwargs: Additional keyword arguments passed to `proposal_fn`.
+
+  Returns:
+    states: An acceptable result from `proposal_fn`.
+
+  #### Example
+
+  One popular MCMC initialization scheme is to start the chains near 0
+  in unconstrained space.  There are models where the unconstraining
+  transformation cannot exactly capture the space of valid states,
+  such that this initialization has some material but not overwhelming
+  chance of failure.  In this case, we can use `retry_init` to compensate.
+
+  ```python
+  @tfp.distributions.JointDistributionCoroutine
+  def model():
+    ...
+
+  raw_init_dist = tfp.experimental.mcmc.init_near_unconstrained_zero(model)
+  init_states = tfp.experimental.mcmc.retry_init(
+    proposal_fn=raw_init_dist.sample,
+    target_fn=model.log_prob,
+    sample_shape=[100],
+    seed=[4, 8])
+  states = tfp.mcmc.sample_chain(
+    current_state=init_states,
+    ...)
+  ```
+
+  """
+  def trial(seed):
+    values = proposal_fn(*args, seed=seed, **kwargs)
+    log_probs = target_fn(values)
+    success = tf.math.is_finite(log_probs)
+    return values, success
+  with tf.name_scope(name or 'mcmc_retry_init'):
+    values, successes, _ = brs.batched_las_vegas_algorithm(
+        trial, max_trials=max_trials, seed=seed)
+    if max_trials is None:
+      # We were authorized to compute until success, so no need to
+      # check for failure
+      return values
+    else:
+      num_states = tf.size(successes)
+      num_successes = tf.reduce_sum(tf.cast(successes, tf.int32))
+      msg = ('Failed to find acceptable initial states after {} trials;\n'
+             '{} of {} states have non-finite log probability').format(
+                 max_trials, num_states - num_successes, num_states)
+      with tf.control_dependencies([tf.debugging.assert_equal(
+          successes, tf.ones_like(successes), message=msg)]):
+        return tf.nest.map_structure(tf.identity, values)
