@@ -293,7 +293,8 @@ def _make_momentum_distribution(running_variance_parts, state_parts,
     running_variance_rank = ps.rank(variance_part)
     state_rank = ps.rank(state_part)
     # Pad dimensions and tile by multiplying by tf.ones to add a batch shape
-    ones = tf.ones(ps.shape(state_part)[:-(state_rank - running_variance_rank)])
+    ones = tf.ones(ps.shape(state_part)[:-(state_rank - running_variance_rank)],
+                   dtype=variance_part.dtype)
     ones = bu.left_justified_expand_dims_like(ones, state_part)
     variance_tiled = variance_part * ones
     reinterpreted_batch_ndims = state_rank - batch_ndims - 1
