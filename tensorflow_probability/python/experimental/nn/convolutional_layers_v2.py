@@ -180,27 +180,22 @@ class ConvolutionV2(layers_lib.KernelBiasLayer):
         filter_shape, rank=2, strides=strides, padding=padding,
         dilations=dilations, dtype=index_dtype, validate_args=validate_args)
 
-    kernel_shape = ps.concat([
-        batch_shape, filter_shape, [input_size, output_size]], axis=0)
+    kernel_shape = ps.concat(
+        [batch_shape, [ps.reduce_prod(filter_shape) * input_size, output_size]],
+        axis=0)
     bias_shape = ps.concat(
         [batch_shape, tf.ones(rank), [output_size]], axis=0)
-
     kernel, bias = make_kernel_bias_fn(
         kernel_shape, bias_shape,
         kernel_initializer, bias_initializer,
         batch_ndims, batch_ndims,
         dtype)
-    # TODO(emilyaf): Update make_kernel_bias_fn to output the right kernel shape
-    # and remove the following.
-    new_kernel_shape = ps.concat([batch_shape, [-1, output_size]], axis=0)
-    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
-        x, tf.reshape(k, new_kernel_shape))
 
     self._make_kernel_bias_fn = make_kernel_bias_fn  # For tracking.
     super(ConvolutionV2, self).__init__(
         kernel=kernel,
         bias=bias,
-        apply_kernel_fn=temp_apply_kernel_fn,
+        apply_kernel_fn=apply_kernel_fn,
         dtype=dtype,
         activation_fn=activation_fn,
         validate_args=validate_args,
@@ -444,7 +439,8 @@ class ConvolutionVariationalReparameterizationV2(
     filter_shape = convolution_util.prepare_tuple_argument(
         filter_shape, rank, arg_name='filter_shape',
         validate_args=validate_args)
-    kernel_shape = ps.concat([filter_shape, [input_size, output_size]], axis=0)
+    kernel_shape = ps.convert_to_shape_tensor(
+        [ps.reduce_prod(filter_shape) * input_size, output_size])
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
     self._make_prior_fn = make_prior_fn  # For variable tracking.
     batch_ndims = 0
@@ -453,9 +449,6 @@ class ConvolutionVariationalReparameterizationV2(
         filter_shape, rank=2, strides=strides, padding=padding,
         dilations=dilations, dtype=index_dtype,
         validate_args=validate_args)
-    # TODO(emilyaf): Update kernel shape and remove this.
-    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
-        x, tf.reshape(k, [-1, output_size]))
     super(ConvolutionVariationalReparameterizationV2, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
@@ -467,7 +460,7 @@ class ConvolutionVariationalReparameterizationV2(
             kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
-        apply_kernel_fn=temp_apply_kernel_fn,
+        apply_kernel_fn=apply_kernel_fn,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,
@@ -648,7 +641,8 @@ class ConvolutionVariationalFlipoutV2(vi_lib.VariationalFlipoutKernelBiasLayer):
         filter_shape, rank, arg_name='filter_shape',
         validate_args=validate_args)
 
-    kernel_shape = ps.concat([filter_shape, [input_size, output_size]], axis=0)
+    kernel_shape = ps.convert_to_shape_tensor(
+        [ps.reduce_prod(filter_shape) * input_size, output_size])
     self._make_posterior_fn = make_posterior_fn  # For variable tracking.
     self._make_prior_fn = make_prior_fn  # For variable tracking.
     batch_ndims = 0
@@ -657,9 +651,6 @@ class ConvolutionVariationalFlipoutV2(vi_lib.VariationalFlipoutKernelBiasLayer):
         filter_shape, rank=2, strides=strides, padding=padding,
         dilations=dilations, dtype=index_dtype,
         validate_args=validate_args)
-    # TODO(emilyaf): Update kernel shape and remove this.
-    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
-        x, tf.reshape(k, [-1, output_size]))
     super(ConvolutionVariationalFlipoutV2, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
@@ -671,7 +662,7 @@ class ConvolutionVariationalFlipoutV2(vi_lib.VariationalFlipoutKernelBiasLayer):
             kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
-        apply_kernel_fn=temp_apply_kernel_fn,
+        apply_kernel_fn=apply_kernel_fn,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,

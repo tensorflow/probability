@@ -174,8 +174,8 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
     """
     filter_shape = convolution_util.prepare_tuple_argument(
         filter_shape, rank, 'filter_shape', validate_args)
-    kernel_shape = ps.concat(
-        [filter_shape, [output_size, input_size]], axis=0)  # Note transpose.
+    kernel_shape = ps.convert_to_shape_tensor(
+        [ps.reduce_prod(filter_shape) * input_size, output_size])
     batch_ndims = 0
     kernel, bias = make_kernel_bias_fn(
         kernel_shape, [output_size],
@@ -187,13 +187,10 @@ class ConvolutionTranspose(layers_lib.KernelBiasLayer):
         filter_shape, strides, padding, rank=2, dilations=dilations,
         dtype=index_dtype, validate_args=validate_args)
 
-    # TODO(emilyaf): Remove after kernel shape is updated.
-    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
-        x, tf.reshape(tf.transpose(k, perm=[0, 1, 3, 2]), [-1, output_size]))
     super(ConvolutionTranspose, self).__init__(
         kernel=kernel,
         bias=bias,
-        apply_kernel_fn=temp_apply_kernel_fn,
+        apply_kernel_fn=apply_kernel_fn,
         dtype=dtype,
         activation_fn=activation_fn,
         validate_args=validate_args,
@@ -452,17 +449,14 @@ class ConvolutionTransposeVariationalReparameterization(
     """
     filter_shape = convolution_util.prepare_tuple_argument(
         filter_shape, rank, 'filter_shape', validate_args)
-    kernel_shape = ps.concat([filter_shape, [output_size, input_size]],
-                             axis=0)  # Note transpose.
+    kernel_shape = ps.convert_to_shape_tensor(
+        [ps.reduce_prod(filter_shape) * input_size, output_size])
     batch_ndims = 0
 
     apply_kernel_fn = _get_convolution_transpose_fn(strides, method)(
         filter_shape, strides, padding, rank=2, dilations=dilations,
         dtype=index_dtype, validate_args=validate_args)
 
-    # TODO(emilyaf): Remove after kernel shape is updated.
-    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
-        x, tf.reshape(tf.transpose(k, perm=[0, 1, 3, 2]), [-1, output_size]))
     super(ConvolutionTransposeVariationalReparameterization, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
@@ -474,7 +468,7 @@ class ConvolutionTransposeVariationalReparameterization(
             kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
-        apply_kernel_fn=temp_apply_kernel_fn,
+        apply_kernel_fn=apply_kernel_fn,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,
@@ -671,16 +665,13 @@ class ConvolutionTransposeVariationalFlipout(
     """
     filter_shape = convolution_util.prepare_tuple_argument(
         filter_shape, rank, 'filter_shape', validate_args)
-    kernel_shape = ps.concat(
-        [filter_shape, [output_size, input_size]], axis=0)  # Note transpose.
+    kernel_shape = ps.convert_to_shape_tensor(
+        [ps.reduce_prod(filter_shape) * input_size, output_size])
     batch_ndims = 0
 
     apply_kernel_fn = _get_convolution_transpose_fn(strides, method)(
         filter_shape, strides, padding, rank=2, dilations=dilations,
         dtype=index_dtype, validate_args=validate_args)
-
-    temp_apply_kernel_fn = lambda x, k: apply_kernel_fn(  # pylint: disable=g-long-lambda
-        x, tf.reshape(tf.transpose(k, perm=[0, 1, 3, 2]), [-1, output_size]))
     super(ConvolutionTransposeVariationalFlipout, self).__init__(
         posterior=make_posterior_fn(
             kernel_shape, [output_size],
@@ -692,7 +683,7 @@ class ConvolutionTransposeVariationalFlipout(
             kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
-        apply_kernel_fn=temp_apply_kernel_fn,
+        apply_kernel_fn=apply_kernel_fn,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,
