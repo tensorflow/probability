@@ -1795,6 +1795,40 @@ class NumpyTest(test_util.TestCase):
 
       check_consistency(tensorflow_function, numpy_function)
 
+  def test_can_flatten_linear_operators(self):
+    if NUMPY_MODE:
+      self.skipTest('Flattening not supported in JAX backend.')
+
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+
+    self.assertLen(
+        tree_util.tree_leaves(nptf.linalg.LinearOperatorIdentity(5)), 0)
+
+    linop = nptf.linalg.LinearOperatorDiag(nptf.ones(5))
+    self.assertLen(tree_util.tree_leaves(linop), 1)
+    self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5,))
+
+    linop = nptf.linalg.LinearOperatorLowerTriangular(nptf.eye(5))
+    self.assertLen(tree_util.tree_leaves(linop), 1)
+    self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5, 5))
+
+    linop = nptf.linalg.LinearOperatorFullMatrix(nptf.eye(5))
+    self.assertLen(tree_util.tree_leaves(linop), 1)
+    self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5, 5))
+
+    linop1 = nptf.linalg.LinearOperatorDiag(nptf.ones(3))
+    linop2 = nptf.linalg.LinearOperatorDiag(nptf.ones(4))
+    linop = nptf.linalg.LinearOperatorBlockDiag([linop1, linop2])
+    self.assertLen(tree_util.tree_leaves(linop), 2)
+    self.assertListEqual([a.shape for a in tree_util.tree_leaves(linop)],
+                         [(3,), (4,)])
+
+    linop1 = nptf.linalg.LinearOperatorFullMatrix(nptf.ones([4, 3]))
+    linop2 = nptf.linalg.LinearOperatorFullMatrix(nptf.ones([3, 2]))
+    linop = nptf.linalg.LinearOperatorComposition([linop1, linop2])
+    self.assertLen(tree_util.tree_leaves(linop), 2)
+    self.assertListEqual([a.shape for a in tree_util.tree_leaves(linop)],
+                         [(4, 3), (3, 2)])
 
 if __name__ == '__main__':
   tf.test.main()
