@@ -23,48 +23,33 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
-    name = "vi",
+    name = "util",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":surrogate_posteriors",
-        "//tensorflow_probability/python/experimental/vi/util",
+        ":trainable_linear_operators",
         "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
 py_library(
-    name = "surrogate_posteriors",
-    srcs = ["surrogate_posteriors.py"],
+    name = "trainable_linear_operators",
+    srcs = ["trainable_linear_operators.py"],
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
-        "//tensorflow_probability/python/bijectors:softplus",
-        "//tensorflow_probability/python/distributions:beta",
-        "//tensorflow_probability/python/distributions:independent",
-        "//tensorflow_probability/python/distributions:joint_distribution",
-        "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
-        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
-        "//tensorflow_probability/python/distributions:joint_distribution_util",
-        "//tensorflow_probability/python/distributions:normal",
-        "//tensorflow_probability/python/distributions:sample",
-        "//tensorflow_probability/python/distributions:transformed_distribution",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/util",
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:fill_scale_tril",
     ],
 )
 
 py_test(
-    name = "surrogate_posteriors_test",
-    size = "medium",
-    srcs = ["surrogate_posteriors_test.py"],
+    name = "trainable_linear_operators_test",
+    size = "small",
+    srcs = ["trainable_linear_operators_test.py"],
     python_version = "PY3",
-    shard_count = 4,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,

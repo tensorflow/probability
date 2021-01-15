@@ -14,18 +14,20 @@
 # ============================================================================
 """Experimental methods and objectives for variational inference."""
 
-from tensorflow_probability.python.experimental.vi import util
-from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_asvi_surrogate_posterior
-from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_factored_surrogate_posterior
-from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_trainable_location_scale_distribution
+from tensorflow_probability.python.experimental.vi.util.trainable_linear_operators import build_linear_operator_zeros
+from tensorflow_probability.python.experimental.vi.util.trainable_linear_operators import build_trainable_linear_operator_block
+from tensorflow_probability.python.experimental.vi.util.trainable_linear_operators import build_trainable_linear_operator_diag
+from tensorflow_probability.python.experimental.vi.util.trainable_linear_operators import build_trainable_linear_operator_full_matrix
+from tensorflow_probability.python.experimental.vi.util.trainable_linear_operators import build_trainable_linear_operator_tril
 from tensorflow_probability.python.internal import all_util
 
 
 _allowed_symbols = [
-    'build_factored_surrogate_posterior',
-    'build_trainable_location_scale_distribution',
-    'build_asvi_surrogate_posterior',
-    'util',
+    'build_linear_operator_zeros',
+    'build_trainable_linear_operator_block',
+    'build_trainable_linear_operator_diag',
+    'build_trainable_linear_operator_full_matrix',
+    'build_trainable_linear_operator_tril',
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
