@@ -328,9 +328,15 @@ class NoUTurnSampler(TransitionKernel):
     start_trajectory_seed, loop_seed = samplers.split_seed(seed)
 
     with tf.name_scope(self.name + '.one_step'):
-      unwrap_state_list = not tf.nest.is_nested(current_state)
-      if unwrap_state_list:
-        current_state = [current_state]
+      state_structure = current_state
+      current_state = tf.nest.flatten(current_state)
+      if (tf.nest.is_nested(state_structure)
+          and (not mcmc_util.is_list_like(state_structure)
+               or len(current_state) != len(state_structure))):
+        # TODO(b/170865194): Support dictionaries and other non-list-like state.
+        raise TypeError('NUTS does not currently support nested or '
+                        'non-list-like state structures (saw: {}).'.format(
+                            state_structure))
 
       current_target_log_prob = previous_kernel_results.target_log_prob
       [
@@ -432,10 +438,8 @@ class NoUTurnSampler(TransitionKernel):
           seed=seed,
       )
 
-      result_state = new_step_metastate.candidate_state.state
-      if unwrap_state_list:
-        result_state = result_state[0]
-
+      result_state = tf.nest.pack_sequence_as(
+          state_structure, new_step_metastate.candidate_state.state)
       return result_state, kernel_results
 
   def bootstrap_results(self, init_state):
