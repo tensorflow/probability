@@ -195,11 +195,9 @@ class AffineVariationalReparameterization(
                   activation_fn=tf.nn.leaky_relu),           # [b, 14, 14, 32]
       tfn.util.flatten_rightmost(ndims=3),                   # [b, 14 * 14 * 32]
       BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),  # [b, 9]
-      tfn.Lambda(
-          eval_fn=lambda loc: tfb.SoftmaxCentered()(
-              tfd.Independent(tfd.Normal(loc, scale),
-                              reinterpreted_batch_ndims=1)),
-          also_track=scale),                                 # [b, 10]
+      lambda loc: tfb.SoftmaxCentered()(
+          tfd.Independent(tfd.Normal(loc, scale),
+                          reinterpreted_batch_ndims=1))  # [b, 10]
   ], name='bayesian_neural_network')
 
   print(bnn.summary())
@@ -577,14 +575,17 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
   def unpack_weights_fn(self):
     return self._unpack_weights_fn
 
-  def _eval(self, x, weights):
+  def __call__(self, x):
+    x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
+    self._posterior_value = self.posterior_value_fn(
+        self.posterior, seed=self._seed())  # pylint: disable=not-callable
     kernel_dist, bias_dist = self.unpack_weights_fn(  # pylint: disable=not-callable
-        self.posterior.sample_distributions(value=weights)[0])
+        self.posterior.sample_distributions(value=self.posterior_value)[0])
     kernel_loc, kernel_scale = vi_lib.get_spherical_normal_loc_scale(
         kernel_dist)
     loc = tf.matmul(x, kernel_loc)
     scale = tf.sqrt(tf.matmul(tf.square(x), tf.square(kernel_scale)))
-    _, sampled_bias = self.unpack_weights_fn(weights)  # pylint: disable=not-callable
+    _, sampled_bias = self.unpack_weights_fn(self.posterior_value)  # pylint: disable=not-callable
     if sampled_bias is not None:
       try:
         bias_loc, bias_scale = vi_lib.get_spherical_normal_loc_scale(

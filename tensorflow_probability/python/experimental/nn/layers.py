@@ -26,7 +26,6 @@ from tensorflow_probability.python.internal import name_util
 
 
 __all__ = [
-    'Lambda',
     'Layer',
     'Sequential',
 ]
@@ -60,19 +59,6 @@ class Layer(tf.Module):
   def load(self, filename):
     return nn_util_lib.variables_load(filename, self.variables)
 
-  def __call__(self, inputs, **kwargs):
-    # TODO(emilyaf): Syntactic sugar to string together layers by calling one on
-    # the next, like bijectors. Decide whether to replicate this in the __call__
-    # methods of the layer subclasses. (For a string of multiple layers, this
-    # will return nested length-two Sequentials -- may need to flatten it.)
-    if callable(inputs):
-      return Sequential([inputs, self], **kwargs)
-    # TODO(emilyaf): Consider inspecting inputs instead of try_call.
-    y = self._eval(inputs, **kwargs)
-    # TODO(jvdillon): Consider adding provenance.
-    # y.__tfp_nn_provenance = self
-    return y
-
   def __repr__(self):
     return '<{}: name={}>'.format(type(self).__name__, self.name)
 
@@ -98,7 +84,9 @@ class Sequential(Layer):
   def layers(self):
     return self._layers
 
-  def _eval(self, inputs, **kwargs):
+  def __call__(self, inputs, **kwargs):
+    if callable(inputs):
+      return Sequential([inputs, self], **kwargs)
     x = inputs
     if self._trace:
       _trace(self, x, -1)
@@ -111,32 +99,6 @@ class Sequential(Layer):
   def __getitem__(self, i):
     r = Sequential(self.layers[i], name=self.name)
     r._also_track = self._also_track  # pylint: disable=protected-access
-    return r
-
-
-class Lambda(Layer):
-  """A `Layer` which can be defined inline."""
-
-  def __init__(self,
-               eval_fn=None,
-               also_track=None,
-               validate_args=False,
-               name=None):
-    if not callable(eval_fn):
-      raise tf.errors.InvalidArgumentError(
-          'Argument `eval_fn` must be `callable`.')
-    name = name or _try_get_name(eval_fn)
-    self._eval_fn = eval_fn
-    super(Lambda, self).__init__(
-        also_track=also_track, validate_args=validate_args, name=name)
-
-  def _eval(self, inputs, **kwargs):
-    if self._eval_fn is not None:
-      # r = self._eval_fn(inputs, **kwargs)
-      r = _try_call(self._eval_fn, [inputs], kwargs)
-    else:
-      r = inputs
-    self._last_call = r  # For variable tracking purposes.
     return r
 
 
@@ -175,7 +137,7 @@ class KernelBiasLayer(Layer):
   def activation_fn(self):
     return self._activation_fn
 
-  def _eval(self, x):
+  def __call__(self, x):
     x = tf.convert_to_tensor(x, dtype_hint=self.dtype, name='x')
     y = x
     if self.kernel is not None:

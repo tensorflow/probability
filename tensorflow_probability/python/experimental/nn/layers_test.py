@@ -50,7 +50,7 @@ class AffineMeanFieldNormal(tfn.Layer):
   def bias(self):
     return self._bias
 
-  def _eval(self, x, is_training=True):
+  def __call__(self, x):
     if (isinstance(x, tfd.Independent) and
         isinstance(x.distribution, tfd.Normal)):
       x = x.distribution.loc
@@ -105,22 +105,6 @@ class SequentialTest(test_util.TestCase):
     ])
     self.assertEqual('trainable size: 32  /  0.000 MiB  /  {float32: 32}',
                      model.summary().split('\n')[-1])
-
-
-@test_util.test_all_tf_execution_regimes
-class LambdaTest(test_util.TestCase):
-
-  def test_works_correctly(self):
-    shift = tf.Variable(1.)
-    scale = tfp.util.TransformedVariable(1., tfb.Exp())
-    f = tfn.Lambda(
-        eval_fn=lambda x: tfd.Normal(loc=x + shift, scale=scale),
-        # `scale` will be tracked through the distribution but not `shift`.
-        also_track=shift)
-    x = tf.zeros([1, 2])
-    y = f(x)
-    self.assertIsInstance(y, tfd.Normal)
-    self.assertLen(f.trainable_variables, 2)
 
 
 @test_util.test_all_tf_execution_regimes

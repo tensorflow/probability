@@ -305,11 +305,9 @@ class ConvolutionVariationalReparameterization(
                   activation_fn=tf.nn.leaky_relu),           # [b, 14, 14, 32]
       tfn.util.flatten_rightmost(ndims=3),                   # [b, 14 * 14 * 32]
       BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),  # [b, 9]
-      tfn.Lambda(
-          eval_fn=lambda loc: tfb.SoftmaxCentered()(
-              tfd.Independent(tfd.Normal(loc, scale),
-                              reinterpreted_batch_ndims=1)),
-          also_track=scale),                                 # [b, 10]
+      lambda loc: tfb.SoftmaxCentered()(
+          tfd.Independent(tfd.Normal(loc, scale),
+                          reinterpreted_batch_ndims=1)),  # [b, 10]
   ], name='bayesian_neural_network')
 
   print(bnn.summary())

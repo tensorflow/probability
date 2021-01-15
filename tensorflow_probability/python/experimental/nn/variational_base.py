@@ -116,23 +116,6 @@ class VariationalLayer(layers_lib.Layer):
   def posterior_value(self):
     return self._posterior_value
 
-  @posterior_value.setter
-  def posterior_value(self, value):
-    if value is None:
-      self._posterior_value = self.posterior_value_fn(
-          self.posterior, seed=self._seed())
-    else:
-      self._posterior_value = value
-
-  def __call__(self, inputs, **kwargs):
-    inputs = tf.convert_to_tensor(inputs, dtype=self.dtype, name='inputs')
-    self.posterior_value = self.posterior_value_fn(
-        self.posterior, seed=self._seed())  # pylint: disable=not-callable
-    return self._eval(inputs, self.posterior_value, **kwargs)
-
-  def _eval(self, inputs, weights):
-    raise NotImplementedError('Subclass failed to implement `_eval`.')
-
 
 class VariationalReparameterizationKernelBiasLayer(VariationalLayer):
   """Variational reparameterization linear layer."""
@@ -165,8 +148,11 @@ class VariationalReparameterizationKernelBiasLayer(VariationalLayer):
   def unpack_weights_fn(self):
     return self._unpack_weights_fn
 
-  def _eval(self, x, weights):
-    kernel, bias = self.unpack_weights_fn(weights)  # pylint: disable=not-callable
+  def __call__(self, x, **kwargs):
+    x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
+    self._posterior_value = self.posterior_value_fn(
+        self.posterior, seed=self._seed())  # pylint: disable=not-callable
+    kernel, bias = self.unpack_weights_fn(self.posterior_value)  # pylint: disable=not-callable
     y = x
     if kernel is not None:
       y = self._apply_kernel_fn(y, kernel)
@@ -208,13 +194,16 @@ class VariationalFlipoutKernelBiasLayer(VariationalLayer):
   def unpack_weights_fn(self):
     return self._unpack_weights_fn
 
-  def _eval(self, x, weights):
-    kernel, bias = self.unpack_weights_fn(weights)  # pylint: disable=not-callable
+  def __call__(self, x, **kwargs):
+    x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
+    self._posterior_value = self.posterior_value_fn(
+        self.posterior, seed=self._seed())  # pylint: disable=not-callable
+    kernel, bias = self.unpack_weights_fn(self.posterior_value)  # pylint: disable=not-callable
     y = x
 
     if kernel is not None:
       kernel_dist, _ = self.unpack_weights_fn(  # pylint: disable=not-callable
-          self.posterior.sample_distributions(value=weights)[0])
+          self.posterior.sample_distributions(value=self.posterior_value)[0])
       kernel_loc, kernel_scale = get_spherical_normal_loc_scale(kernel_dist)
 
       # batch_size = tf.shape(x)[0]

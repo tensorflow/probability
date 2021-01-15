@@ -308,11 +308,9 @@ class ConvolutionTransposeVariationalReparameterization(
       BayesDeconv2D(64, 32, filter_shape=4, strides=4,
                     activation_fn=tf.nn.leaky_relu),      # [2, 28, 28, 32]
       BayesConv2D(32, 1, filter_shape=2, strides=1),      # [2, 28, 28, 1]
-      tfn.Lambda(
-          eval_fn=lambda loc: (
-              tfd.Independent(tfb.Sigmoid()(tfd.Normal(loc, scale)),
-                              reinterpreted_batch_ndims=3)),
-          also_track=scale),                              # [b, 28, 28, 1]
+      lambda loc: (
+          tfd.Independent(tfb.Sigmoid()(tfd.Normal(loc, scale)),
+                          reinterpreted_batch_ndims=3)),  # [b, 28, 28, 1]
   ], name='bayesian_autoencoder')
 
   print(bnn.summary())

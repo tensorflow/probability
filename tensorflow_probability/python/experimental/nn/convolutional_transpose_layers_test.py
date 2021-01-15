@@ -67,9 +67,9 @@ class BnnEndToEnd(object):
                     padding='valid'),                        # [b, 7, 7, 64]
         make_deconv(64, 32, filter_shape=4, strides=4),      # [2, 28, 28, 32]
         make_conv(32, 1, filter_shape=2, strides=1),         # [2, 28, 28, 1]
-        tfn.Lambda(eval_fn=lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
+        lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
             tfb.Sigmoid()(tfd.Normal(loc, scale)),
-            reinterpreted_batch_ndims=3), also_track=scale),  # [b, 28, 28, 1]
+            reinterpreted_batch_ndims=3)  # [b, 28, 28, 1]
     ], name='bayesian_autoencoder')
 
     # 3  Train.

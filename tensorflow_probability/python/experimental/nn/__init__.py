@@ -33,7 +33,6 @@ from tensorflow_probability.python.experimental.nn.convolutional_layers_v2 impor
 from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTranspose
 from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalFlipout
 from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalReparameterization
-from tensorflow_probability.python.experimental.nn.layers import Lambda
 from tensorflow_probability.python.experimental.nn.layers import Layer
 from tensorflow_probability.python.experimental.nn.layers import Sequential
 from tensorflow_probability.python.experimental.nn.variational_base import VariationalLayer
@@ -54,7 +53,6 @@ _allowed_symbols = [
     'ConvolutionV2',
     'ConvolutionVariationalFlipoutV2',
     'ConvolutionVariationalReparameterizationV2',
-    'Lambda',
     'Layer',
     'Sequential',
     'VariationalLayer',
