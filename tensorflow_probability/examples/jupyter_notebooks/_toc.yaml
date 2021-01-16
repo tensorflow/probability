@@ -73,6 +73,8 @@ toc:
   path: /probability/examples/STS_approximate_inference_for_models_with_non_Gaussian_observations
 - title: Structural time series
   path: /probability/examples/Structural_Time_Series_Modeling_Case_Studies_Atmospheric_CO2_and_Electricity_Demand
+- title: Variational inference with multipart bijectors
+  path: /probability/examples/Variational_Inference_with_Multipart_Bijectors
 - title: Covariance estimation
   path: /probability/examples/TensorFlow_Probability_Case_Study_Covariance_Estimation
 - heading: "Releases"
