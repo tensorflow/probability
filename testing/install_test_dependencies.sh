@@ -91,7 +91,7 @@ find_good_tf_nightly_version_str() {
   PKG_NAME=$1
   # These are nightly builds we'd like to avoid for some reason; separated by
   # regex OR operator.
-  BAD_NIGHTLY_DATES="20200112\|20200113"
+  BAD_NIGHTLY_DATES="20200112\|20200113\|20210119"
   # This will fail to find version 'X" and log available version strings to
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
