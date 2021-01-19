@@ -22,8 +22,10 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvn_pfl
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import auto_composite_tensor
@@ -48,6 +50,11 @@ _CompositeMultivariateNormalPrecisionFactorLinearOperator = auto_composite_tenso
     omit_kwargs=('name',))
 _CompositeIndependent = auto_composite_tensor.auto_composite_tensor(
     independent.Independent, omit_kwargs=('name',))
+_CompositeReshape = auto_composite_tensor.auto_composite_tensor(
+    reshape.Reshape, omit_kwargs=('name',))
+_CompositeTransformedDistribution = auto_composite_tensor.auto_composite_tensor(
+    transformed_distribution.TransformedDistribution,
+    omit_kwargs=('name', 'kwargs_split_fn', 'parameters'))
 
 
 def hmc_like_momentum_distribution_setter_fn(kernel_results, new_distribution):
@@ -292,18 +299,26 @@ def _make_momentum_distribution(running_variance_parts, state_parts,
   for variance_part, state_part in zip(running_variance_parts, state_parts):
     running_variance_rank = ps.rank(variance_part)
     state_rank = ps.rank(state_part)
+    event_shape = ps.shape(state_part)[batch_ndims:]
+    nevt = ps.reduce_prod(event_shape)
     # Pad dimensions and tile by multiplying by tf.ones to add a batch shape
     ones = tf.ones(ps.shape(state_part)[:-(state_rank - running_variance_rank)],
                    dtype=variance_part.dtype)
     ones = bu.left_justified_expand_dims_like(ones, state_part)
-    variance_tiled = variance_part * ones
-    reinterpreted_batch_ndims = state_rank - batch_ndims - 1
+    variance_tiled = ones * variance_part
+    variance_flattened = tf.reshape(
+        variance_tiled,
+        ps.concat([ps.shape(variance_tiled)[:batch_ndims],
+                   [nevt]], axis=0))
 
     distributions.append(
-        _CompositeIndependent(
-            _CompositeMultivariateNormalPrecisionFactorLinearOperator(
-                precision_factor=_CompositeLinearOperatorDiag(
-                    tf.math.sqrt(variance_tiled)),
-                precision=_CompositeLinearOperatorDiag(variance_tiled)),
-            reinterpreted_batch_ndims=reinterpreted_batch_ndims))
+        _CompositeTransformedDistribution(
+            bijector=_CompositeReshape(
+                event_shape_out=event_shape, event_shape_in=[nevt]),
+            distribution=(
+                _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+                    precision_factor=_CompositeLinearOperatorDiag(
+                        tf.math.sqrt(variance_flattened)),
+                    precision=_CompositeLinearOperatorDiag(
+                        variance_flattened)))))
   return _CompositeJointDistributionSequential(distributions)

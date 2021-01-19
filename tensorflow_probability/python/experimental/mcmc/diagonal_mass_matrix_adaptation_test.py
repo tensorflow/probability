@@ -56,6 +56,10 @@ class DiagonalMassMatrixAdaptationShapesTest(test_util.TestCase):
        'state_part_shape': (2, 3, 4, 5, 6),
        'variance_part_shape': (4, 5, 6),
        'log_prob_shape': (2, 3, 4)},
+      {'testcase_name': '_batch_of_scalars',
+       'state_part_shape': (2, 3),
+       'variance_part_shape': (3,),
+       'log_prob_shape': (2, 3)},
   ])
   def testBatches(self, state_part_shape, variance_part_shape, log_prob_shape):
     dist = tfd.Independent(

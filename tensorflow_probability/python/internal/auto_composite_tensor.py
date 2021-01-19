@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import functools
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
@@ -53,13 +54,21 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
     keys = [k for k in keys if k in limit_to]
 
   kwargs = {}
+  not_found = object()
   for k in keys:
-    if hasattr(obj, k):
-      kwargs[k] = getattr(obj, k)
-    elif hasattr(obj, '_' + k):
-      kwargs[k] = getattr(obj, '_' + k)
-    elif hasattr(obj, 'parameters') and k in obj.parameters:
-      kwargs[k] = obj.parameters[k]
+
+    if k in prefer_static_value:
+      srcs = [
+          getattr(obj, 'parameters', {}).get(k, not_found),
+          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
+      ]
+    else:
+      srcs = [
+          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
+          getattr(obj, 'parameters', {}).get(k, not_found),
+      ]
+    if any(v is not not_found for v in srcs):
+      kwargs[k] = [v for v in srcs if v is not not_found][0]
     else:
       raise ValueError(
           f'Could not determine an appropriate value for field `{k}` in object '
@@ -68,9 +77,13 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
           ' 2. an attr called `_{k}`,\n'
           ' 3. an entry in `obj.parameters` with key "{k}".')
     if k in prefer_static_value and kwargs[k] is not None:
-      static_val = tf.get_static_value(kwargs[k])
-      if static_val is not None:
-        kwargs[k] = static_val
+      if tf.is_tensor(kwargs[k]):
+        static_val = tf.get_static_value(kwargs[k])
+        if static_val is not None:
+          kwargs[k] = static_val
+      if isinstance(kwargs[k], (np.ndarray, np.generic)):
+        # Generally, these are shapes or int.
+        kwargs[k] = kwargs[k].tolist()
   return kwargs
 
 
@@ -317,6 +330,9 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
       @property
       def value_type(self):
         return cls
+
+    _AlreadyCTTypeSpec.__name__ = f'{cls.__name__}_ACTTypeSpec'
+
     cls._type_spec = property(  # pylint: disable=protected-access
         lambda self: _AlreadyCTTypeSpec.from_instance(self, omit_kwargs))
     return cls
@@ -333,6 +349,8 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
     @property
     def value_type(self):
       return _registry[clsid]
+
+  _GeneratedCTTypeSpec.__name__ = f'{cls.__name__}_GCTTypeSpec'
 
   class _AutoCompositeTensor(cls, composite_tensor.CompositeTensor):
     """A per-`cls` subclass of `CompositeTensor`."""

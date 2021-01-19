@@ -257,6 +257,8 @@ class Reshape(bijector.Bijector):
         self._event_shape_in,
         self.validate_args)[0]
 
+  _composite_tensor_shape_params = ('event_shape_in', 'event_shape_out')
+
 
 def _replace_event_shape_in_shape_tensor(
     input_shape, event_shape_in, event_shape_out, validate_args):
