@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
 
@@ -144,6 +145,24 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
         arrs['sample_cov'],
         arrs['cov'],
         atol=5 * np.sqrt(2) * np.max(arrs['var']) / np.sqrt(n_samples))
+
+  def test_dynamic_shape(self):
+    x = tf.Variable(ps.ones([7, 3]), shape=[7, None])
+    self.evaluate(x.initializer)
+
+    # Check that the shape is actually `None`.
+    if not tf.executing_eagerly():
+      last_shape = x.shape[-1]
+      if last_shape is not None:  # This is a `tf.Dimension` in tf1.
+        last_shape = last_shape.value
+      self.assertIsNone(last_shape)
+    dynamic_dist = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        precision_factor=tf.linalg.LinearOperatorDiag(tf.ones_like(x)))
+    static_dist = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        precision_factor=tf.linalg.LinearOperatorDiag(tf.ones([7, 3])))
+    in_ = tf.zeros([7, 3])
+    self.assertAllClose(self.evaluate(dynamic_dist.log_prob(in_)),
+                        static_dist.log_prob(in_))
 
 
 if __name__ == '__main__':

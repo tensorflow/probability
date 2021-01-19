@@ -265,7 +265,8 @@ class MultivariateNormalPrecisionFactorLinearOperator(
     Returns:
       Floating point `Tensor` with batch shape.
     """
-    return (-0.5 * tf.cast(self.event_shape[-1], self.dtype) *
+    dim = self.precision_factor.domain_dimension_tensor()
+    return (-0.5 * ps.cast(dim, self.dtype) *
             np.log(2 * np.pi) +
             # Notice the sign on the LinearOperator.log_abs_determinant is
             # positive, since it is precision_factor not scale.
