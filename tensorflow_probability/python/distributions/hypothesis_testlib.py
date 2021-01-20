@@ -139,6 +139,7 @@ SPECIAL_DISTS = (
     'Independent',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
+    'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
     'Sample',  # (has strategy)
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
@@ -358,6 +359,16 @@ CONSTRAINTS = {
         fix_lkj,
     'LKJ':
         fix_lkj,
+    'MultivariateNormalDiagPlusLowRank.scale_diag':
+        # Ensure that the diagonal component is large enough to avoid being
+        # overwhelmed  by the (singular) low-rank perturbation.
+        tfp_hps.softplus_plus_eps(1. + 1e-6),
+    'MultivariateNormalDiagPlusLowRank.scale_perturb_diag':
+        tfp_hps.softplus_plus_eps(),
+    'MultivariateNormalDiagPlusLowRank.scale_perturb_factor':
+        # Prevent large low-rank perturbations from creating numerically
+        # singular matrices.
+        tf.math.tanh,
     'PERT':
         fix_pert,
     'Triangular':

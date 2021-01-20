@@ -19,9 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -272,6 +274,7 @@ class MultivariateNormalDiagPlusLowRank(
             is_self_adjoint=True,
             is_non_singular=True,
             is_square=True)
+
     super(MultivariateNormalDiagPlusLowRank, self).__init__(
         loc=loc,
         scale=scale,
@@ -279,3 +282,22 @@ class MultivariateNormalDiagPlusLowRank(
         allow_nan_stats=allow_nan_stats,
         name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(
+            event_ndims=1),
+        scale_diag=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        scale_perturb_factor=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+            is_preferred=False),
+        scale_perturb_diag=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            is_preferred=False,
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
