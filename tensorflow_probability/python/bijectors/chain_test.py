@@ -228,6 +228,18 @@ class ChainBijectorTest(test_util.TestCase):
         -np.log(6, dtype=np.float32) - np.sum(x),
         self.evaluate(chain.inverse_log_det_jacobian(y, event_ndims=1)))
 
+  def testEventNdimsIsOptional(self):
+    scale_diag = np.array([1., 2., 3.], dtype=np.float32)
+    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=scale_diag), tfb.Exp()])
+    x = [0., np.log(2., dtype=np.float32), np.log(3., dtype=np.float32)]
+    y = [1., 4., 9.]
+    self.assertAllClose(
+        np.log(6, dtype=np.float32) + np.sum(x),
+        self.evaluate(chain.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        -np.log(6, dtype=np.float32) - np.sum(x),
+        self.evaluate(chain.inverse_log_det_jacobian(y)))
+
   def testChainIldjWithPlaceholder(self):
     chain = tfb.Chain((tfb.Exp(), tfb.Exp()))
     samples = tf1.placeholder_with_default(

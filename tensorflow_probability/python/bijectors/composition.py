@@ -367,6 +367,14 @@ class Composition(bijector.Bijector):
           x, name='x', dtype_hint=dtype,
           dtype=None if bijector.SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
+      if event_ndims is None:
+        if self._has_static_min_event_ndims:
+          event_ndims = self.forward_min_event_ndims
+        else:
+          raise ValueError('Composition bijector with non-static '
+                           '`min_event_ndims` does not support '
+                           '`event_ndims=None`. Please pass a value '
+                           'for `event_ndims`.')
       event_ndims = nest_util.coerce_structure(
           self.forward_min_event_ndims, event_ndims)
       return self._forward_log_det_jacobian(x, event_ndims, **kwargs)
@@ -424,6 +432,14 @@ class Composition(bijector.Bijector):
           y, name='y', dtype_hint=dtype,
           dtype=None if bijector.SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
+      if event_ndims is None:
+        if self._has_static_min_event_ndims:
+          event_ndims = self.inverse_min_event_ndims
+        else:
+          raise ValueError('Composition bijector with non-static '
+                           '`min_event_ndims` does not support '
+                           '`event_ndims=None`. Please pass a value '
+                           'for `event_ndims`.')
       event_ndims = nest_util.coerce_structure(
           self.inverse_min_event_ndims, event_ndims)
       return self._inverse_log_det_jacobian(y, event_ndims, **kwargs)

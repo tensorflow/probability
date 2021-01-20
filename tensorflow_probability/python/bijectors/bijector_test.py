@@ -239,6 +239,25 @@ class ExpOnlyJacobian(tfb.Bijector):
     return tf.math.log(x)
 
 
+class VectorExpOnlyJacobian(tfb.Bijector):
+  """An Exp bijector that operates only on vector (or higher-order) events."""
+
+  def __init__(self):
+    parameters = dict(locals())
+    super(VectorExpOnlyJacobian, self).__init__(
+        validate_args=False,
+        is_constant_jacobian=False,
+        forward_min_event_ndims=1,
+        parameters=parameters,
+        name='vector_exp')
+
+  def _inverse_log_det_jacobian(self, y):
+    return -tf.reduce_sum(tf.math.log(y), axis=-1)
+
+  def _forward_log_det_jacobian(self, x):
+    return tf.reduce_sum(tf.math.log(x), axis=-1)
+
+
 class ConstantJacobian(tfb.Bijector):
   """Only used for jacobian calculations."""
 
@@ -512,6 +531,25 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
     self.assertAllClose(
         np.sum(np.log(x), axis=(-1, -2)),
         self.evaluate(bij.forward_log_det_jacobian(x, event_ndims=2)))
+
+  def testNoReductionWhenEventNdimsIsOmitted(self):
+    x = [[[1., 2.], [3., 4.]]]
+
+    bij = ExpOnlyJacobian()
+    self.assertAllClose(
+        np.log(x),
+        self.evaluate(bij.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        -np.log(x),
+        self.evaluate(bij.inverse_log_det_jacobian(x)))
+
+    bij = VectorExpOnlyJacobian()
+    self.assertAllClose(
+        np.sum(np.log(x), axis=-1),
+        self.evaluate(bij.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        np.sum(-np.log(x), axis=-1),
+        self.evaluate(bij.inverse_log_det_jacobian(x)))
 
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]

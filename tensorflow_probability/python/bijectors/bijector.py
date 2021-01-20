@@ -1084,6 +1084,9 @@ class Bijector(tf.Module):
           dtype=None if SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
 
+      if event_ndims is None:
+        event_ndims = self.forward_min_event_ndims
+
       reduce_shape, assertions = ldj_reduction_shape(
           nest.map_structure(ps.shape, y),
           event_ndims=nest_util.coerce_structure(
@@ -1122,7 +1125,7 @@ class Bijector(tf.Module):
 
   def inverse_log_det_jacobian(self,
                                y,
-                               event_ndims,
+                               event_ndims=None,
                                name='inverse_log_det_jacobian',
                                **kwargs):
     """Returns the (log o det o Jacobian o inverse)(y).
@@ -1135,15 +1138,21 @@ class Bijector(tf.Module):
     Args:
       y: `Tensor` (structure). The input to the 'inverse' Jacobian determinant
         evaluation.
-      event_ndims: Number of dimensions in the probabilistic events being
-        transformed. Must be greater than or equal to
-        `self.inverse_min_event_ndims`. The result is summed over the final
-        dimensions to produce a scalar Jacobian determinant for each event, i.e.
-        it has shape `rank(y) - event_ndims` dimensions.
+      event_ndims: Optional number of dimensions in the probabilistic events
+        being transformed; this must be greater than or equal to
+        `self.inverse_min_event_ndims`. If `event_ndims` is specified, the
+        log Jacobian determinant is summed over its final
+        `event_ndims - self.inverse_min_event_ndims` dimensions to produce a
+        scalar log-determinant for each event. Otherwise
+        (if `event_ndims` is `None`), no reduction is performed.
         Multipart bijectors require *structured* event_ndims, such that
         `rank(y[i]) - rank(event_ndims[i])` is the same for all elements `i` of
         the structured input. Furthermore, the first `event_ndims[i]` of each
         `x[i].shape` must be the same for all `i` (broadcasting is not allowed).
+        Multipart bijectors for which `self.has_static_min_event_ndims == False`
+        require `event_ndims` to be passed explicitly, and will raise a
+        `ValueError` if `event_ndims` is `None`.
+        Default value: `None` (equivalent to `self.inverse_min_event_ndims`).
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
@@ -1156,6 +1165,8 @@ class Bijector(tf.Module):
     Raises:
       TypeError: if `x`'s dtype is incompatible with the expected inverse-dtype.
       NotImplementedError: if `_inverse_log_det_jacobian` is not implemented.
+      ValueError: if `event_ndims` is `None` and
+        `self.has_static_min_event_ndims` is `False`.
     """
     return self._call_inverse_log_det_jacobian(y, event_ndims, name, **kwargs)
 
@@ -1197,6 +1208,9 @@ class Bijector(tf.Module):
           dtype=None if SKIP_DTYPE_CHECKS else dtype,
           allow_packing=True)
 
+      if event_ndims is None:
+        event_ndims = self.forward_min_event_ndims
+
       reduce_shape, assertions = ldj_reduction_shape(
           nest.map_structure(ps.shape, x),
           event_ndims=nest_util.coerce_structure(
@@ -1228,7 +1242,7 @@ class Bijector(tf.Module):
 
   def forward_log_det_jacobian(self,
                                x,
-                               event_ndims,
+                               event_ndims=None,
                                name='forward_log_det_jacobian',
                                **kwargs):
     """Returns both the forward_log_det_jacobian.
@@ -1236,15 +1250,21 @@ class Bijector(tf.Module):
     Args:
       x: `Tensor` (structure). The input to the 'forward' Jacobian determinant
         evaluation.
-      event_ndims: Number of dimensions in the probabilistic events being
-        transformed. Must be greater than or equal to
-        `self.forward_min_event_ndims`. The result is summed over the final
-        dimensions to produce a scalar Jacobian determinant for each event, i.e.
-        it has shape `rank(x) - event_ndims` dimensions.
+      event_ndims: Optional number of dimensions in the probabilistic events
+        being transformed; this must be greater than or equal to
+        `self.forward_min_event_ndims`. If `event_ndims` is specified, the
+        log Jacobian determinant is summed over its final
+        `event_ndims - self.forward_min_event_ndims` dimensions to produce a
+        scalar log-determinant for each event. Otherwise (if `event_ndims` is
+        `None`), no reduction is performed.
         Multipart bijectors require *structured* event_ndims, such that
         `rank(y[i]) - rank(event_ndims[i])` is the same for all elements `i` of
         the structured input. Furthermore, the first `event_ndims[i]` of each
         `x[i].shape` must be the same for all `i` (broadcasting is not allowed).
+        Multipart bijectors for which `self.has_static_min_event_ndims == False`
+        require `event_ndims` to be passed explicitly, and will raise a
+        `ValueError` if `event_ndims` is `None`.
+        Default value: `None` (equivalent to `self.forward_min_event_ndims`).
       name: The name to give this op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
@@ -1257,6 +1277,8 @@ class Bijector(tf.Module):
       NotImplementedError: if neither `_forward_log_det_jacobian`
         nor {`_inverse`, `_inverse_log_det_jacobian`} are implemented, or
         this is a non-injective bijector.
+      ValueError: if `event_ndims` is `None` and
+        `self.has_static_min_event_ndims` is `False`.
     """
     return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
