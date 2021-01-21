@@ -192,7 +192,7 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
   vex = tfd.VectorExponentialDiag(scale_diag=[1., 2.])
 
   # Compute the pdf of an`R^2` observation; return a scalar.
-  vex.prob([3., 4.]).eval()  # shape: []
+  vex.prob([3., 4.])  # shape: []
 
   # Initialize a 2-batch of 3-variate Vector Exponential's.
   loc = [[1., 2, 3],
@@ -205,7 +205,7 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[1.9, 2.2, 3.1],
        [10., 1.0, 9.0]]     # shape: [2, 3]
-  vex.prob(x).eval()    # shape: [2]
+  vex.prob(x)    # shape: [2]
   ```
 
   """

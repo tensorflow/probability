@@ -459,11 +459,11 @@ class Distribution(_BaseDistribution):
 
   # Will raise exception if ANY batch member has a < 1 or b < 1.
   dist = distributions.beta(a, b, allow_nan_stats=False)
-  mode = dist.mode().eval()
+  mode = dist.mode()
 
   # Will return NaN for batch members with either a < 1 or b < 1.
   dist = distributions.beta(a, b, allow_nan_stats=True)  # Default behavior
-  mode = dist.mode().eval()
+  mode = dist.mode()
   ```
 
   In all cases, an exception is raised if *invalid* parameters are passed, e.g.
@@ -472,7 +472,7 @@ class Distribution(_BaseDistribution):
   # Will raise an exception if any Op is run.
   negative_a = -1.0 * a  # beta distribution by definition has a > 0.
   dist = distributions.beta(negative_a, b, allow_nan_stats=True)
-  dist.mean().eval()
+  dist.mean()
   ```
 
   """

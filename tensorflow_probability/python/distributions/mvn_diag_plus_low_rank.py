@@ -126,7 +126,7 @@ class MultivariateNormalDiagPlusLowRank(
       scale_perturb_diag=m)
 
   # Evaluate this on an observation in `R^3`, returning a scalar.
-  mvn.prob([-1, 0, 1]).eval()  # shape: []
+  mvn.prob([-1, 0, 1])  # shape: []
 
   # Initialize a 2-batch of 3-variate Gaussians; `S = diag(d) + U @ U.T`.
   mu = [[1.,  2,  3],
@@ -145,7 +145,7 @@ class MultivariateNormalDiagPlusLowRank(
       scale_perturb_factor=U,
       scale_perturb_diag=m)
 
-  mvn.covariance().eval()   # shape: [2, 3, 3]
+  mvn.covariance()   # shape: [2, 3, 3]
   # ==> [[[  15.63   31.57    48.51]
   #       [  31.57   69.31   105.05]
   #       [  48.51  105.05   162.59]]
@@ -158,7 +158,7 @@ class MultivariateNormalDiagPlusLowRank(
   # return a length-2 vector.
   x = [[-0.9, 0, 0.1],
        [-10, 0, 9]]     # shape: [2, 3]
-  mvn.prob(x).eval()    # shape: [2]
+  mvn.prob(x)    # shape: [2]
   ```
 
   """

@@ -122,7 +122,7 @@ class VectorExponentialLinearOperator(
       scale=tf.linalg.LinearOperatorFullMatrix(mat))
 
   # Compute the pdf of an`R^2` observation; return a scalar.
-  vex.prob([1., 2.]).eval()  # shape: []
+  vex.prob([1., 2.])  # shape: []
 
   # Initialize a 2-batch of 3-variate Vector Exponential's.
   mu = [[1., 2, 3],
@@ -137,7 +137,7 @@ class VectorExponentialLinearOperator(
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[1.9, 2.2, 3.1],
        [10., 1.0, 9.0]]     # shape: [2, 3]
-  vex.prob(x).eval()    # shape: [2]
+  vex.prob(x)    # shape: [2]
   ```
 
   """

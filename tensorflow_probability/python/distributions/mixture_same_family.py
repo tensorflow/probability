@@ -78,7 +78,7 @@ class MixtureSameFamily(distribution.Distribution):
   # Plot PDF.
   x = np.linspace(-2., 3., int(1e4), dtype=np.float32)
   import matplotlib.pyplot as plt
-  plt.plot(x, gm.prob(x).eval());
+  plt.plot(x, gm.prob(x));
 
   ### Create a mixture of two Bivariate Gaussians:
 
@@ -104,7 +104,7 @@ class MixtureSameFamily(distribution.Distribution):
     grid = np.concatenate([gx.ravel()[None, :], gy.ravel()[None, :]], axis=0)
     return grid.T.reshape(x.size, y.size, 2)
   grid = meshgrid(np.linspace(-2, 2, 100, dtype=np.float32))
-  plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid).eval());
+  plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid));
 
   ```
 
