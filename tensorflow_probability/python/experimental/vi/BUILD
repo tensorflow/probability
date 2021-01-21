@@ -53,6 +53,7 @@ py_library(
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/util",
@@ -61,7 +62,7 @@ py_library(
 
 py_test(
     name = "surrogate_posteriors_test",
-    size = "medium",
+    size = "large",
     srcs = ["surrogate_posteriors_test.py"],
     python_version = "PY3",
     shard_count = 4,

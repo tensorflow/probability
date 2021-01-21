@@ -39,13 +39,13 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
-# pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import deprecation
-from tensorflow.python.util import nest
-# pylint: enable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
 
 Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
 
@@ -373,9 +373,10 @@ def _make_asvi_trainable_variables(prior,
           dtype=actual_dist.dtype)
 
       if isinstance(original_dist, sample.Sample):
-        posterior_batch_shape = ps.concat(
-            [actual_dist.batch_shape_tensor(), original_dist.sample_shape],
-            axis=0)
+        posterior_batch_shape = ps.concat([
+            actual_dist.batch_shape_tensor(),
+            distribution_util.expand_to_vector(original_dist.sample_shape)
+        ], axis=0)
       else:
         posterior_batch_shape = actual_dist.batch_shape_tensor()
 
