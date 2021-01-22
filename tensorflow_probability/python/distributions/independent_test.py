@@ -64,7 +64,7 @@ class IndependentDistributionTest(test_util.TestCase):
 
     expected_log_prob_x = sp_stats.norm(loc, scale).logpdf(x_).sum(-1)
     self.assertAllClose(
-        expected_log_prob_x, actual_log_prob_x, rtol=1e-5, atol=0.)
+        expected_log_prob_x, actual_log_prob_x, rtol=1e-5, atol=1e-6)
 
   def testSampleAndLogProbMultivariate(self):
     loc = np.float32([[-1., 1], [1, -1]])
@@ -143,10 +143,13 @@ class IndependentDistributionTest(test_util.TestCase):
         ind.mode(),
     ])
 
-    self.assertAllClose(sample_mean_, actual_mean_, rtol=0.02, atol=0.)
-    self.assertAllClose(sample_var_, actual_var_, rtol=0.04, atol=0.)
-    self.assertAllClose(sample_std_, actual_std_, rtol=0.02, atol=0.)
-    self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.01, atol=0.)
+    # Bounds chosen so that the probability of each sample mean/variance/stddev
+    # differing by more than the given tolerance is roughly 1e-6.
+    self.assertAllClose(sample_mean_, actual_mean_, rtol=0.049, atol=0.)
+    self.assertAllClose(sample_var_, actual_var_, rtol=0.07, atol=0.)
+    self.assertAllClose(sample_std_, actual_std_, rtol=0.035, atol=0.)
+
+    self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.015, atol=0.)
     self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
 
   def testEventNdimsIsStaticWhenPossible(self):
@@ -481,8 +484,10 @@ class IndependentDistributionTest(test_util.TestCase):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=8):
         getattr(dist, method)(np.zeros((4, 5, 2, 3)))
 
-  @test_util.jax_disable_test_missing_functionality(
-      'Shape sizes are statically known in JAX.')
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='NumpyVariable does not correctly handle unknown shapes. '
+      'And shape sizes are known statically in JAX.')
   def testChangingVariableShapes(self):
     if not tf.executing_eagerly():
       return
@@ -548,7 +553,7 @@ class IndependentDistributionTest(test_util.TestCase):
         d0_64.log_prob(tf.cast(x0, tf.float64)) -
         d1_64.log_prob(tf.cast(x1, tf.float64)),
         tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
-        rtol=0., atol=0.0075)
+        rtol=0., atol=0.01)
     # In contrast: the below fails consistently w/ errors around 0.5-1.0
     # self.assertAllClose(
     #     d0_64.log_prob(tf.cast(x0, tf.float64)) -
