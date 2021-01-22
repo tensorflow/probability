@@ -31,6 +31,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import instructions
 from tensorflow_probability.python.experimental.auto_batching import xla
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = ['TensorFlowBackend']
@@ -443,8 +444,10 @@ class TensorFlowBackend(object):
     Raises:
       ValueError: If dt1 and dt2 are not equal and both are non-`None`.
     """
-    if dt1 == dt2 or None in (dt1, dt2):
+    if None in (dt1, dt2):
       return dt1 or dt2
+    if tf.as_dtype(dt1) == tf.as_dtype(dt2):
+      return dtype_util.as_numpy_dtype(tf.as_dtype(dt1))
     raise ValueError('Mismatched dtypes {} vs {}'.format(dt1, dt2))
 
   def merge_shapes(self, s1, s2):
