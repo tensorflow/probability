@@ -594,31 +594,31 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      g = yield tfd.LogNormal(0., [1., 2.])
-      df = yield tfd.Exponential([1., 2.])
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.StudentT(df[:, tf.newaxis], loc, 1)
+      high = yield tfd.LogNormal(0., 1)
+      yield tfd.Uniform(low=[-1., -2.], high=high)
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.LogNormal(0., [1., 2.]),
-        tfd.Exponential([1., 2.]),
-        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
-        lambda loc, df: tfd.StudentT(df[:, tf.newaxis], loc, 1)
+        tfd.LogNormal(0., 1.),
+        lambda high: tfd.Uniform(low=[-1., -2.], high=high)
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.LogNormal(0., [1., 2.])),
-        ('df', tfd.Exponential([1., 2.])),
-        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
-        ('x', lambda loc, df: tfd.StudentT(df[:, tf.newaxis], loc, 1))))
+        ('high', tfd.LogNormal(0., 1.)),
+        ('x', lambda high: tfd.Uniform(low=[-1., -2.], high=high))))
 
-    joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
+    joint = jd_class(models[jd_class], validate_args=True)
     joint_bijector = joint.experimental_default_event_space_bijector()
-    x = self.evaluate(joint.sample(seed=test_util.test_seed()))
-    self.assertAllClose(
-        x,
-        self.evaluate(joint_bijector.forward(joint_bijector.inverse(x))))
+
+    y = self.evaluate(joint.sample([2, 3], seed=test_util.test_seed()))
+    x = joint_bijector.inverse(y)
+    self.assertAllClose(y, joint_bijector.forward(x))
+
+    event_ndims = tf.nest.pack_sequence_as(joint.dtype, [0, 1])
+    fldj = joint_bijector.forward_log_det_jacobian(x, event_ndims=event_ndims)
+    ildj = joint_bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)
+    self.assertAllEqual(fldj.shape, [2, 3])
+    self.assertAllClose(fldj, -ildj)
 
   def test_nested_joint_distributions(self):
     batch_shape = [2, 3]

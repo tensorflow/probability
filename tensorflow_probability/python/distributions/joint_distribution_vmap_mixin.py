@@ -209,3 +209,32 @@ class JointDistributionVmapMixin(object):
           validate_args=self.validate_args)
 
     return map_measure_fn(value)
+
+  def _default_event_space_bijector(self, *args, **kwargs):
+    bijector_class = joint_distribution_lib._DefaultJointBijector  # pylint: disable=protected-access
+    if self.use_vectorized_map:
+      bijector_class = _DefaultJointBijectorAutoBatched
+    if bool(args) or bool(kwargs):
+      return bijector_class(self.experimental_pin(*args, **kwargs))
+    return bijector_class(self)
+
+
+class _DefaultJointBijectorAutoBatched(
+    joint_distribution_lib._DefaultJointBijector):  # pylint: disable=protected-access
+  """Automatically vectorized support bijector for autobatched JDs."""
+
+  def __init__(self, *args, **kwargs):
+    super(_DefaultJointBijectorAutoBatched, self).__init__(*args, **kwargs)
+    self._forward = vectorization_util.make_rank_polymorphic(
+        self._forward, core_ndims=[self.forward_min_event_ndims])
+    self._inverse = vectorization_util.make_rank_polymorphic(
+        self._inverse, core_ndims=[self.inverse_min_event_ndims])
+    self._forward_log_det_jacobian = vectorization_util.make_rank_polymorphic(
+        self._forward_log_det_jacobian,
+        core_ndims=[self.forward_min_event_ndims,
+                    None])  # `event_ndims` arg is not batched.
+    self._inverse_log_det_jacobian = vectorization_util.make_rank_polymorphic(
+        self._inverse_log_det_jacobian,
+        core_ndims=[self.inverse_min_event_ndims,
+                    None])  # `event_ndims` arg is not batched.
+
