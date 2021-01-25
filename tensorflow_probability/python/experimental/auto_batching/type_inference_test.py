@@ -87,7 +87,10 @@ class TypeInferenceTest(test_util.TestCase):
           expected_prog.var_defs[v].tensors, type_.tensors,
           leaf_type=instructions.TensorType):
         if check_dtypes:
-          self.assertEqual(expected_type.dtype, got_type.dtype)
+          if expected_type.dtype in (np.bool, np.bool_):
+            self.assertIn(got_type.dtype, (np.bool, np.bool_))
+          else:
+            self.assertEqual(expected_type.dtype, got_type.dtype)
         self.assertEqual(expected_type.shape, got_type.shape)
 
   @parameterized.parameters(np.int32, np.int64, np.float32, np.float64)
