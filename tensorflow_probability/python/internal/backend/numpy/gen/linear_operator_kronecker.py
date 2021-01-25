@@ -74,10 +74,10 @@ def _rotate_last_dim(x, rotate_right=False):
   ndims = array_ops.rank(x)
   if rotate_right:
     transpose_perm = array_ops.concat(
-        [[ndims - 1], math_ops.range(0, ndims - 1)], axis=0)
+        [[ndims - 1], array_ops.range(0, ndims - 1)], axis=0)
   else:
     transpose_perm = array_ops.concat(
-        [math_ops.range(1, ndims), [0]], axis=0)
+        [array_ops.range(1, ndims), [0]], axis=0)
   return array_ops.transpose(x, transpose_perm)
 
 

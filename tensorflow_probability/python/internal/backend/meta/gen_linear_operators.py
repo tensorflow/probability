@@ -162,6 +162,7 @@ def gen_module(module_name):
                       'linalg_ops.triangular_solve')
   code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
+  code = code.replace('math_ops.range', 'array_ops.range')
   code = code.replace('ops.convert_to_tensor_v2_with_dispatch(',
                       'ops.convert_to_tensor(')
 
