@@ -140,11 +140,13 @@ XLA_LOGPROB_ATOL.update({
     'Beta': 1e-4,
     'BetaBinomial': 5e-6,
     'Binomial': 5e-6,
+    'Categorical': 5e-6,  # sparse_softmax_cross_entropy_with_logits
     'DeterminantalPointProcess': 1e-5,
     'DirichletMultinomial': 1e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
+    'FiniteDiscrete': 6e-6,  # sparse_softmax_cross_entropy_with_logits
     'HalfCauchy': 2e-6,
     'InverseGamma': 1e-4,
     'Kumaraswamy': 3e-6,
