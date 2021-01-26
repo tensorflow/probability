@@ -417,7 +417,7 @@ def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
 
 abs = utils.copy_docstring(  # pylint: disable=redefined-builtin
     'tf.math.abs',
-    lambda x, name=None: np.abs(x))
+    lambda x, name=None: np.abs(_convert_to_tensor(x)))
 
 accumulate_n = utils.copy_docstring(
     'tf.math.accumulate_n',

@@ -231,7 +231,8 @@ def _one_hot(  # pylint: disable=unused-argument
 
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
-  return np.ones_like(input, dtype=utils.numpy_dtype(dtype))
+  return np.ones_like(ops.convert_to_tensor(input),
+                      dtype=utils.numpy_dtype(dtype))
 
 
 # TODO(b/136555907): Add unit-test.
@@ -340,6 +341,9 @@ def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,r
 
 def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint: disable=unused-argument
   """Map tf.split -> np.split."""
+  if np.isscalar(num_or_size_splits):
+    return np.split(value, num_or_size_splits, axis)
+
   indices_or_sections = onp.array(num_or_size_splits)
   if indices_or_sections.ndim == 1:
     if any(idx == -1 for idx in indices_or_sections):

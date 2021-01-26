@@ -3542,8 +3542,6 @@ multi_substrate_py_test(
     name = "transformed_distribution_test",
     size = "medium",
     srcs = ["transformed_distribution_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
