@@ -52,30 +52,52 @@ def _common_dtype(dtypes, dtype_hint=None):
   return dtype
 
 
+def _call(obj, fns, *args, **kwargs):
+  for fn in fns:
+    call = getattr(obj, fn, None)
+    if call is not None:
+      return call(*args, **kwargs)
+  raise ValueError("Couldn't find any of {} in {}".format(fns, obj))
+
+
+def _sample(joint_dist, *args, **kwargs):
+  """Take samples regardless of joint distribution type."""
+  fns = ["sample", "sample_unpinned"]
+  return _call(joint_dist, fns, *args, **kwargs)
+
+
+def _log_prob(joint_dist, *args, **kwargs):
+  """Log prob regardless of joint distribution type."""
+  fns = ["log_prob", "unnormalized_log_prob"]
+  return _call(joint_dist, fns, *args, **kwargs)
+
+
 def _bfgs_minimize(
-    pinned_joint,
+    joint_dist,
     bijector,
     initial_values,
     initial_inverse_hessian_estimate,
     validate_convergence,
 ):
-  """Minimize `-pinned_joint.unnormalized_log_prob` using BFGS."""
+  """Minimize the -ve log prob of a joint distribution using BFGS."""
+
+  names = joint_dist._flat_resolve_names()
 
   def loss(unconstrained_values):
     constrained_values = bijector.forward(unconstrained_values)
-    return -pinned_joint.unnormalized_log_prob(constrained_values)
+    return -_log_prob(joint_dist, **dict(zip(names, constrained_values)))
 
   @tf.function(autograph=False)
   def loss_and_gradient(unconstrained_values):
     return value_and_gradient(loss, unconstrained_values)
 
-  dtype = _common_dtype(pinned_joint.dtype)
-  dim = bijector.inverse_event_shape(pinned_joint.event_shape)
+  dtype = _common_dtype(tf.nest.flatten(joint_dist.dtype))
+  dim = bijector.inverse_event_shape(tf.nest.flatten(joint_dist.event_shape))
 
   if initial_values is None:
-    initial_values = pinned_joint.sample_unpinned(10, seed=42)
+    initial_values = _sample(joint_dist, sample_shape=10, seed=(42, 666))
 
-  initial_position = bijector.inverse(initial_values)
+  initial_position = bijector.inverse(tf.nest.flatten(initial_values))
 
   if initial_inverse_hessian_estimate is None:
     initial_inverse_hessian_estimate = tf.linalg.diag(
@@ -85,8 +107,7 @@ def _bfgs_minimize(
       loss_and_gradient,
       initial_position=initial_position,
       initial_inverse_hessian_estimate=initial_inverse_hessian_estimate,
-      stopping_condition=bfgs_utils.converged_any,
-  )
+      stopping_condition=bfgs_utils.converged_any)
 
   if not validate_convergence:
     return bfgs_results
@@ -95,8 +116,7 @@ def _bfgs_minimize(
 
   assert_any_converged = tf.debugging.Assert(
         condition=bfgs_utils.converged_any(converged, failed),
-        data=bfgs_results,
-    )
+        data=bfgs_results)
 
   with tf.control_dependencies([assert_any_converged]):
     return bfgs_results
@@ -134,15 +154,16 @@ def laplace_approximation(
 
 """
 
-  pinned_joint = joint_dist.experimental_pin(data)
+  if data is not None:
+    joint_dist = joint_dist.experimental_pin(data)
 
   if bijectors is None:
-    pinned_bijector = pinned_joint.experimental_default_event_space_bijector()
-    bijectors = pinned_bijector.bijectors
+    joint_bijector = joint_dist.experimental_default_event_space_bijector()
+    bijectors = joint_bijector.bijectors
 
   unconstrained_shapes = [
       x.inverse_event_shape(y)
-      for x, y in zip(bijectors, pinned_joint.event_shape)
+      for x, y in zip(bijectors, tf.nest.flatten(joint_dist.event_shape))
   ]
 
   size_splits = [x.num_elements() for x in unconstrained_shapes]
@@ -151,22 +172,18 @@ def laplace_approximation(
   # distribution event shape is []
   reshapers = [
       reshape.Reshape(event_shape_out=x, event_shape_in=[x.num_elements()])
-      for x in unconstrained_shapes
-  ]
+      for x in unconstrained_shapes]
 
-  bijector = chain.Chain([
-      joint_map.JointMap(bijectors=bijectors),
-      joint_map.JointMap(bijectors=reshapers),
-      split.Split(num_or_size_splits=size_splits),
-  ])
+  bijector = chain.Chain([joint_map.JointMap(bijectors=bijectors),
+                          joint_map.JointMap(bijectors=reshapers),
+                          split.Split(num_or_size_splits=size_splits)])
 
   bfgs_results = _bfgs_minimize(
-      pinned_joint=pinned_joint,
+      joint_dist=joint_dist,
       bijector=bijector,
       initial_values=initial_values,
       initial_inverse_hessian_estimate=initial_inverse_hessian_estimate,
-      validate_convergence=validate_convergence,
-  )
+      validate_convergence=validate_convergence)
 
   # there is also the option of using multiple solutions and returning a batch
   # of distributions. For example we could use all the solutions which have

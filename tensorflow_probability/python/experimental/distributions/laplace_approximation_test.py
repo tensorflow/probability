@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -26,25 +27,58 @@ from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 tfde = tfp.experimental.distributions
 
+ATOL = 1e-4
 
 @test_util.test_graph_mode_only
 class LaplaceApproximationTest(test_util.TestCase):
 
-  def testJointDistributionCoroutineAutoBatched(self):
+  def testJointDistributionCoroutineAutoBatchedWithDefaultArgs(self):
     @tfd.JointDistributionCoroutineAutoBatched
     def joint_dist():
-      yield tfd.Normal(loc=1.0, scale=1.0, name="a")
-      yield tfd.Normal(loc=[2.0, 2.0], scale=2.0, name="b")
-      yield tfd.Gamma(concentration=[3.0, 3.0, 3.0], rate=10.0, name="c")
+      yield tfd.Normal(loc=1., scale=1.)
+      yield tfd.Normal(loc=[2., 2.], scale=2.)
+      yield tfd.Gamma(concentration=[3., 3., 3.], rate=10.)
 
-    # without conditioning
     approximation = tfde.laplace_approximation(joint_dist)
-    mode = approximation.bijector(approximation.distribution.mode())
+    mean = approximation.bijector(approximation.distribution.mean())
+    mean = self.evaluate(mean)
 
-    atol = 1e-4
-    self.assertAllClose(mode[0], 1.0, atol=atol)
-    self.assertAllClose(mode[1], [2.0, 2.0], atol=atol)
-    self.assertAllClose(mode[2], [0.2, 0.2, 0.2], atol=atol)
+    self.assertEqual(len(mean), 3)
+
+    self.assertAllClose(mean[0], 1., atol=ATOL)
+    self.assertAllClose(mean[1], [2., 2.], atol=ATOL)
+    self.assertAllClose(mean[2], [0.2, 0.2, 0.2], atol=ATOL)
+
+
+  def testJointDistributionNamedWithDefaultArgs(self):
+    joint_dist = tfd.JointDistributionNamed(dict(
+        a=tfd.Normal(loc=1.5, scale=2.),
+        b=lambda a: tfd.Normal(loc=a + 2.5, scale=3.),
+    ))
+
+    approximation = tfde.laplace_approximation(joint_dist)
+    mvn = approximation.distribution
+    mean, variance = self.evaluate([mvn.mean(), mvn.variance()])
+
+    self.assertAllClose(mean[0], 1.5, atol=ATOL)
+    self.assertAllClose(mean[1], 4., atol=ATOL)
+
+    self.assertAllClose(variance[0], 2.**2, atol=ATOL)
+    self.assertAllClose(variance[1], 2.**2 + 3.**2, atol=ATOL)
+
+
+  def testJointDistributionSequentialWithDefaultArgs(self):
+    joint_dist = tfd.JointDistributionSequential([
+        tfd.MultivariateNormalDiag(loc=0.123, scale_diag=[1., 2., 3.]),
+        tfd.StudentT(loc=2.5, scale=3., df=3.),
+    ])
+
+    approximation = tfde.laplace_approximation(joint_dist)
+    mean = approximation.bijector(approximation.distribution.mean())
+    mean = self.evaluate(mean)
+
+    self.assertAllClose(mean[0], np.full([3], 0.123), atol=ATOL)
+    self.assertAllClose(mean[1], 2.5, atol=ATOL)
 
 
 if __name__ == '__main__':

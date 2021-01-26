@@ -90,8 +90,6 @@ multi_substrate_py_test(
     name = "laplace_approximation_test",
     size = "large",
     srcs = ["laplace_approximation_test.py"],
-    jax_size = "large",
-    shard_count = 13,
     srcs_version = "PY3",
     deps = [
         # numpy dep,
