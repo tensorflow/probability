@@ -102,6 +102,8 @@ multi_substrate_py_library(
         ":logitnormal",
         ":loglogistic",
         ":lognormal",
+        ":matrix_normal_linear_operator",
+        ":matrix_t_linear_operator",
         ":mixture",
         ":mixture_same_family",
         ":moyal",
@@ -1254,6 +1256,43 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "matrix_normal_linear_operator",
+    srcs = ["matrix_normal_linear_operator.py"],
+    deps = [
+        ":mvn_linear_operator",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "matrix_t_linear_operator",
+    srcs = ["matrix_t_linear_operator.py"],
+    deps = [
+        ":distribution",
+        ":multivariate_student_t",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -3004,6 +3043,36 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "matrix_normal_linear_operator_test",
+    size = "medium",
+    srcs = ["matrix_normal_linear_operator_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "matrix_t_linear_operator_test",
+    size = "medium",
+    srcs = ["matrix_t_linear_operator_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

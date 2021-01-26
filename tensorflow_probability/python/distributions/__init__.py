@@ -80,6 +80,8 @@ from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.loglogistic import LogLogistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.logitnormal import LogitNormal
+from tensorflow_probability.python.distributions.matrix_normal_linear_operator import MatrixNormalLinearOperator
+from tensorflow_probability.python.distributions.matrix_t_linear_operator import MatrixTLinearOperator
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
 from tensorflow_probability.python.distributions.moyal import Moyal
@@ -233,6 +235,8 @@ __all__ = [
     'TruncatedCauchy',
     'TruncatedNormal',
     'Uniform',
+    'MatrixNormalLinearOperator',
+    'MatrixTLinearOperator',
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalLinearOperator',
