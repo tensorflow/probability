@@ -19,11 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.distributions.log_prob_ratio import log_prob_ratio
+from tensorflow_probability.python.experimental.distributions.laplace_approximation import laplace_approximation
 from tensorflow_probability.python.experimental.distributions.joint_distribution_pinned import JointDistributionPinned
 from tensorflow_probability.python.experimental.distributions.mvn_precision_factor_linop import MultivariateNormalPrecisionFactorLinearOperator
 
 
 __all__ = [
+    'laplace_approximation',
     'log_prob_ratio',
     'JointDistributionPinned',
     'MultivariateNormalPrecisionFactorLinearOperator',
