@@ -408,22 +408,17 @@ def _custom_gradient(f):
   if not JAX_MODE:
     # Numpy backend ignores custom gradients, so we do too.
     return lambda *args, **kwargs: f(*args, **kwargs)[0]
-  def f_(*args, **kwargs):
+
+  @jax.custom_gradient
+  @functools.wraps(f)
+  def wrapped(*args, **kwargs):
     value, vjp = f(*args, **kwargs)
     def vjp_(cts_out):
       cts_in = vjp(cts_out)
       if isinstance(cts_in, list):
         cts_in = tuple(cts_in)
-      elif not isinstance(cts_in, tuple):
-        cts_in = (cts_in,)
       return cts_in
     return value, vjp_
-  @jax.custom_transforms
-  @functools.wraps(f)
-  def wrapped(*args, **kwargs):
-    value, _ = f(*args, **kwargs)
-    return value
-  jax.defvjp_all(wrapped, f_)
   return wrapped
 
 custom_gradient = utils.copy_docstring(
