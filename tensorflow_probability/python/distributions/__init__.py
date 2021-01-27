@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions.bates import Bates
 from tensorflow_probability.python.distributions.bernoulli import Bernoulli
 from tensorflow_probability.python.distributions.beta import Beta
 from tensorflow_probability.python.distributions.beta_binomial import BetaBinomial
+from tensorflow_probability.python.distributions.beta_quotient import BetaQuotient
 from tensorflow_probability.python.distributions.binomial import Binomial
 from tensorflow_probability.python.distributions.blockwise import Blockwise
 from tensorflow_probability.python.distributions.categorical import Categorical
@@ -166,6 +167,7 @@ __all__ = [
     'Bernoulli',
     'Beta',
     'BetaBinomial',
+    'BetaQuotient',
     'Binomial',
     'Blockwise',
     'Categorical',

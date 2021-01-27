@@ -46,6 +46,7 @@ multi_substrate_py_library(
         ":bernoulli",
         ":beta",
         ":beta_binomial",
+        ":beta_quotient",
         ":binomial",
         ":blockwise",
         ":categorical",
@@ -254,6 +255,23 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "beta_quotient",
+    srcs = ["beta_quotient.py"],
+    deps = [
+        ":beta",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
@@ -2249,6 +2267,23 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["beta_binomial_test.py"],
     numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "beta_quotient_test",
+    size = "medium",
+    srcs = ["beta_quotient_test.py"],
+    jax_size = "large",
+    jax_tags = ["notap"],
+    shard_count = 3,
     deps = [
         # numpy dep,
         # tensorflow dep,

@@ -50,6 +50,7 @@ TF2_FRIENDLY_DISTS = (
     'Bernoulli',
     'Beta',
     'BetaBinomial',
+    'BetaQuotient',
     'Binomial',
     'Chi',
     'Chi2',
@@ -262,6 +263,14 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'concentration1':
         tfp_hps.softplus_plus_eps(),
+    'concentration0_numerator':
+        tfp_hps.softplus_plus_eps(),
+    'concentration1_numerator':
+        tfp_hps.softplus_plus_eps(1.),
+    'concentration0_denominator':
+        tfp_hps.softplus_plus_eps(),
+    'concentration1_denominator':
+        tfp_hps.softplus_plus_eps(1.),
     'covariance_matrix':
         tfp_hps.positive_definite,
     'df':
