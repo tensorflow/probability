@@ -77,6 +77,8 @@ class ShardedSample(sample_lib.Sample):
           name=name)
       self._parameters = parameters
 
+  is_sharded = True
+
   @property
   def sample_shape(self):
     sample_shape = ps.reshape(self._sample_shape, shape=[-1])
@@ -172,6 +174,8 @@ class ShardedIndependent(independent_lib.Independent):
           experimental_use_kahan_sum=experimental_use_kahan_sum,
           name=name)
       self._parameters = parameters
+
+  is_sharded = True
 
   @property
   def shard_axis_name(self):
