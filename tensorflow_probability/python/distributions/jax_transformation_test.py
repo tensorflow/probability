@@ -53,6 +53,7 @@ JIT_LOGPROB_BLOCKLIST = (
     'Bates',
     'Independent',  # http://b/164415821
     'MixtureSameFamily',  # http://b/164415821
+    'NegativeBinomial',  # http://b/170871051
     'Skellam',  # http://b/171079052
     'VonMisesFisher',  # http://b/171079052
 )
