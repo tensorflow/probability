@@ -58,6 +58,7 @@ JIT_LOGPROB_BLOCKLIST = (
 )
 
 VMAP_SAMPLE_BLOCKLIST = (
+    'NegativeBinomial',  # http://b/170871051
     'BatchReshape',  # Too slow: http://b/170871051
 )
 VMAP_LOGPROB_BLOCKLIST = (
