@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 from absl.testing import parameterized
 import numpy as np
 from scipy import special as scipy_special
@@ -167,6 +169,110 @@ class RoundExponentialBumpFunctionTest(test_util.TestCase):
 
     # Since x is outside the support, the gradient is zero.
     self.assertAllEqual(dy_dx_, np.zeros((6,)))
+
+
+class OwensTTest(test_util.TestCase):
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTOddEven(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        shape=[int(1e3)],
+        minval=0.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    h = tf.random.uniform(
+        shape=[int(1e3)],
+        minval=0.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    # OwensT(h, a) = OwensT(-h, a)
+    self.assertAllClose(
+        self.evaluate(tfp.math.owens_t(h, a)),
+        self.evaluate(tfp.math.owens_t(-h, a)),
+    )
+    # OwensT(h, a) = -OwensT(h, -a)
+    self.assertAllClose(
+        self.evaluate(tfp_math.owens_t(h, a)),
+        self.evaluate(-tfp_math.owens_t(h, -a)),
+    )
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTSmall(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=0.,
+        maxval=1.,
+        dtype=dtype,
+        seed=seed_stream())
+    h = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=0.,
+        maxval=1.,
+        dtype=dtype,
+        seed=seed_stream())
+    a_, h_, owens_t_ = self.evaluate([a, h, tfp.math.owens_t(h, a)])
+    self.assertAllClose(scipy_special.owens_t(h_, a_), owens_t_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTLarger(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=1.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    h = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=1.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    a_, h_, owens_t_ = self.evaluate([a, h, tfp.math.owens_t(h, a)])
+    self.assertAllClose(scipy_special.owens_t(h_, a_), owens_t_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTLarge(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=100.,
+        maxval=1000.,
+        dtype=dtype,
+        seed=seed_stream())
+    h = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=100.,
+        maxval=1000.,
+        dtype=dtype,
+        seed=seed_stream())
+    a_, h_, owens_t_ = self.evaluate([a, h, tfp.math.owens_t(h, a)])
+    self.assertAllClose(scipy_special.owens_t(h_, a_), owens_t_)
+
+  @test_util.numpy_disable_gradient_test
+  def testOwensTGradient(self):
+    h = tf.constant([0.01, 0.1, 0.5, 1., 10.])[..., tf.newaxis]
+    a = tf.constant([0.01, 0.1, 0.5, 1., 10.])
+
+    err = self.compute_max_gradient_error(
+        functools.partial(tfp.math.owens_t, h), [a])
+    self.assertLess(err, 2e-4)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.owens_t(x, a), [h])
+    self.assertLess(err, 2e-4)
+
+    err = self.compute_max_gradient_error(
+        functools.partial(tfp.math.owens_t, -h), [a])
+    self.assertLess(err, 2e-4)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.owens_t(x, -a), [h])
+    self.assertLess(err, 2e-4)
 
 
 class SpecialTest(test_util.TestCase):
