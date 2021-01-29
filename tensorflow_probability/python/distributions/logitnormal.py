@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -134,17 +135,31 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
       b2 = (np.pi / 8.) * tf.square(self.scale)
       return tf.math.sigmoid(self.loc * tf.math.rsqrt(1. + b2))
 
-  # TODO(b/143252788): Add `variance_approx` once owens_t is in TFP.
-  # def variance_approx(self, name='variance_approx'):  # Needs verification.
-  #   with self._name_and_control_scope(name):
-  #     m = tf.convert_to_tensor(self.loc)
-  #     b2 = (np.pi / 8.) * tf.square(self.scale)
-  #     a = m * tf.math.rsqrt(1. + b2)
-  #     return tf.math.sigmoid(a) * tf.math.sigmoid(-a) - 2. * owens_t(
-  #         np.sqrt(np.pi / 8.) * m, tf.math.rsqrt(1. + 2. * b2))
-  # def stddev_approx(self, name='stddev_approx'):
-  #   with tf.name_scope(name):
-  #     return tf.math.sqrt(self.variance_approx())
+  def variance_approx(self, name='variance_approx'):  # Needs verification.
+    """Approximate the variance of a LogitNormal.
+
+    Warning: accuracy is not guaranteed and can be large for small `loc` values.
+
+    The derivation follows a very similar rationale to `mean_approx`.
+
+    Args:
+      name: Python `str` prepended to names of ops created by this function.
+        Default value: `'variance_approx'`.
+
+    Returns:
+      variance_approx: An approximation of the variance of a LogitNormal.
+    """
+    with self._name_and_control_scope(name):
+      m = tf.convert_to_tensor(self.loc)
+      b2 = (np.pi / 8.) * tf.math.square(self.scale)
+      numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
+      a = m * tf.math.rsqrt(1. + b2)
+      return tf.math.sigmoid(a) * tf.math.sigmoid(-a) - 2. * tfp_math.owens_t(
+          numpy_dtype(np.sqrt(np.pi / 8.)) * m, tf.math.rsqrt(1. + 2. * b2))
+
+  def stddev_approx(self, name='stddev_approx'):
+    with tf.name_scope(name):
+      return tf.math.sqrt(self.variance_approx())
 
   def _default_event_space_bijector(self):
     return sigmoid_bijector.Sigmoid(validate_args=self.validate_args)
