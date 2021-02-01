@@ -40,6 +40,7 @@ from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentatio
 from tensorflow_probability.python.experimental.mcmc.particle_filter_augmentation import StateWithHistory
 from tensorflow_probability.python.experimental.mcmc.potential_scale_reduction_reducer import PotentialScaleReductionReducer
 from tensorflow_probability.python.experimental.mcmc.preconditioned_hmc import PreconditionedHamiltonianMonteCarlo
+from tensorflow_probability.python.experimental.mcmc.preconditioned_nuts import PreconditionedNoUTurnSampler
 from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import make_tqdm_progress_bar_fn
 from tensorflow_probability.python.experimental.mcmc.progress_bar_reducer import ProgressBarReducer
 from tensorflow_probability.python.experimental.mcmc.reducer import Reducer
@@ -74,6 +75,7 @@ __all__ = [
     'EllipticalSliceSampler',
     'ExpectationsReducer',
     'NoUTurnSampler',
+    'PreconditionedNoUTurnSampler',
     'PreconditionedHamiltonianMonteCarlo',
     'ProgressBarReducer',
     'SequentialMonteCarlo',

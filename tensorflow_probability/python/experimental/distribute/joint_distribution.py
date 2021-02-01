@@ -25,7 +25,6 @@ from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution as jd_lib
 
 from tensorflow_probability.python.experimental.distribute import distribute_lib
-from tensorflow_probability.python.experimental.distribute import sharded
 
 
 class JointDistributionDistributedMixin(object):
@@ -34,16 +33,14 @@ class JointDistributionDistributedMixin(object):
   def get_sharded_distributions(self):
     """Indicates for each part distribution whether or not it is sharded."""
     ds = self._get_single_sample_distributions()
-    return self._model_unflatten(
-        (isinstance(d, (sharded.ShardedIndependent, sharded.ShardedSample))
-         for d in ds))
+    return self._model_unflatten(getattr(d, 'is_sharded', False) for d in ds)
 
   @property
   def shard_axis_name(self):
     return self._parameters['shard_axis_name']
 
   def _map_measure_over_dists(self, attr, value):
-    """Overrides the default implementation to shard its log_prob calculation."""
+    """Override the default implementation to shard its log_prob calculation."""
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
     if attr == 'log_prob' and any(self.get_sharded_distributions()):

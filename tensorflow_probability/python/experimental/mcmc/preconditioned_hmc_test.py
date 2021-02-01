@@ -27,6 +27,7 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import unnest
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -378,6 +379,62 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
         asymptotic_step_size_rtol=(
             0.5 if precondition_scheme == 'no_preconditioner' else 0.25),
     )
+
+  def test_sets_kinetic_energy(self):
+    dist = tfd.MultivariateNormalDiag(scale_diag=tf.constant([0.1, 10.]))
+    step_size = 0.1
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        target_log_prob_fn=dist.log_prob,
+        step_size=step_size,
+        num_leapfrog_steps=1,
+        store_parameters_in_results=True)
+    init_state = tf.constant([0.1, 0.1])
+    kr = kernel.bootstrap_results(init_state)
+
+    # Manually set the momentum distribution.
+    kr = unnest.replace_innermost(kr, momentum_distribution=dist)
+
+    # Take one leapfrog step using the kernel.
+    _, nkr = kernel.one_step(init_state, kr, seed=test_util.test_seed())
+    # Need to evaluate here for consistency in graph mode.
+    (momentum_parts,
+     target_grad_parts,
+     proposed_state,
+     final_momentum,
+     target_log_prob,
+     grads_target_log_prob) = self.evaluate([
+         nkr.proposed_results.initial_momentum,
+         nkr.accepted_results.grads_target_log_prob,
+         nkr.proposed_state,
+         nkr.proposed_results.final_momentum,
+         nkr.proposed_results.target_log_prob,
+         nkr.proposed_results.grads_target_log_prob])
+
+    # Take one leapfrog step manually.
+    leapfrog = tfp.mcmc.internal.leapfrog_integrator.SimpleLeapfrogIntegrator(
+        target_fn=dist.log_prob,
+        step_sizes=[step_size],
+        num_steps=1)
+    # Again, need to evaluate here for graph mode consistency.
+    (next_momentum,
+     next_state,
+     next_target_log_prob,
+     grads_next_target_log_prob) = self.evaluate(leapfrog(
+         momentum_parts=momentum_parts,
+         state_parts=[init_state],
+         target=dist.log_prob(init_state),
+         target_grad_parts=target_grad_parts,
+         kinetic_energy_fn=lambda x: -dist.log_prob(x)))
+
+    # Verify resulting states are the same
+    self.assertAllClose(proposed_state,
+                        next_state[0])
+    self.assertAllClose(final_momentum,
+                        next_momentum)
+    self.assertAllClose(target_log_prob,
+                        next_target_log_prob)
+    self.assertAllClose(grads_target_log_prob,
+                        grads_next_target_log_prob)
 
 
 @test_util.test_all_tf_execution_regimes

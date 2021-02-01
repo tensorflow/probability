@@ -72,6 +72,7 @@ from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
 from tensorflow_probability.python.math.special import log_gamma_correction
 from tensorflow_probability.python.math.special import log_gamma_difference
+from tensorflow_probability.python.math.special import owens_t
 from tensorflow_probability.python.math.special import round_exponential_bump_function
 from tensorflow_probability.python.random import rademacher as random_rademacher
 from tensorflow_probability.python.random import rayleigh as random_rayleigh
@@ -123,6 +124,7 @@ _allowed_symbols = [
     'minimize',
     'MinimizeTraceableQuantities',
     'ode',
+    'owens_t',
     'pivoted_cholesky',
     'psd_kernels',
     'random_rademacher',

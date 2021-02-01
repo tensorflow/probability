@@ -100,7 +100,7 @@ def scan_associative(fn, elems, max_num_levels=48,
   on `Tensor`s or structures of `Tensor`s:
 
   ```python
-  associative_scan(fn, elems) = tf.stack([
+  scan_associative(fn, elems) = tf.stack([
     elems[0],
     fn(elems[0], elems[1]),
     fn(elems[0], fn(elems[1], elems[2])),
@@ -165,14 +165,14 @@ def scan_associative(fn, elems, max_num_levels=48,
 
   # Example 1: Partials sums of numbers.
 
-  tfp.math.associative_scan(operator.add, tf.range(0, 4))
+  tfp.math.scan_associative(operator.add, tf.range(0, 4))
   # ==> [ 0, 1, 3, 6]
 
   # Example 2: Partial products of random matrices.
 
   dist = tfp.distributions.Normal(loc=0., scale=1.)
   matrices = dist.sample(sample_shape=[100, 2, 2])
-  tfp.math.associative_scan(tf.matmul, matrices)
+  tfp.math.scan_associative(tf.matmul, matrices)
   ```
   """
 

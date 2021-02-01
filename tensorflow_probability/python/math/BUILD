@@ -213,9 +213,11 @@ multi_substrate_py_test(
     name = "hypergeometric_test",
     size = "medium",
     srcs = ["hypergeometric_test.py"],
+    jax_size = "large",
     shard_count = 3,
     deps = [
         # absl/testing:parameterized dep,
+        # mpmath dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

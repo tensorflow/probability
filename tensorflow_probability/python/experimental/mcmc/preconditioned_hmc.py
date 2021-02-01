@@ -287,13 +287,6 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
                                   momentum_distribution.log_prob)
       kinetic_energy_fn = lambda *args: -momentum_log_prob(*args)
 
-      # Let the integrator handle the case where no momentum distribution
-      # is provided
-      if self.momentum_distribution is None:
-        leapfrog_kinetic_energy_fn = None
-      else:
-        leapfrog_kinetic_energy_fn = kinetic_energy_fn
-
       integrator = leapfrog_impl.SimpleLeapfrogIntegrator(
           self.target_log_prob_fn, step_sizes, num_leapfrog_steps)
 
@@ -307,7 +300,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
           current_state_parts,
           target=current_target_log_prob,
           target_grad_parts=current_target_log_prob_grad_parts,
-          kinetic_energy_fn=leapfrog_kinetic_energy_fn)
+          kinetic_energy_fn=kinetic_energy_fn)
       if self.state_gradients_are_stopped:
         next_state_parts = [tf.stop_gradient(x) for x in next_state_parts]
 

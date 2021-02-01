@@ -42,6 +42,19 @@ class LogitNormalTest(test_util.TestCase):
         mean_sample, dist.mean_approx()])
     self.assertAllClose(mean_sample_, mean_approx_, atol=0.02, rtol=0.02)
 
+  def testLogitNormalVarianceApprox(self):
+    seed_stream = test_util.test_seed_stream()
+    loc = tf.random.uniform(shape=[30], seed=seed_stream())
+    scale = tf.random.uniform(
+        minval=0.1, maxval=5., shape=[30], seed=seed_stream())
+    dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
+    x = dist.sample(int(1e4), seed=test_util.test_seed())
+    variance_sample = tf.math.reduce_variance(x, axis=0)
+    [variance_sample_, variance_approx_] = self.evaluate([
+        variance_sample, dist.variance_approx()])
+    self.assertAllClose(
+        variance_sample_, variance_approx_, atol=0.02, rtol=0.03)
+
   def testLogitNormalLogitNormalKL(self):
     batch_size = 6
     mu_a = np.array([3.0] * batch_size)

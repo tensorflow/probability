@@ -101,6 +101,7 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
+    'BetaQuotient',
     'ExponentiallyModifiedGaussian',  # b/174778704
     'HalfStudentT',  # Numerical problem: b/149785284
     'Skellam',
@@ -119,6 +120,7 @@ VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
     'Beta': 1e-5,
     'BetaBinomial': 1e-5,
+    'BetaQuotient': 2e-5,
     'CholeskyLKJ': 1e-4,
     'GammaGamma': 2e-5,
     'LKJ': 1e-3,
@@ -139,12 +141,15 @@ XLA_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_ATOL.update({
     'Beta': 1e-4,
     'BetaBinomial': 5e-6,
+    'BetaQuotient': 1e-4,
     'Binomial': 5e-6,
+    'Categorical': 5e-6,  # sparse_softmax_cross_entropy_with_logits
     'DeterminantalPointProcess': 1e-5,
     'DirichletMultinomial': 1e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
+    'FiniteDiscrete': 6e-6,  # sparse_softmax_cross_entropy_with_logits
     'HalfCauchy': 2e-6,
     'InverseGamma': 1e-4,
     'Kumaraswamy': 3e-6,
@@ -158,6 +163,7 @@ XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_RTOL.update({
     'Beta': 5e-4,
     'BetaBinomial': 5e-4,
+    'BetaQuotient': 5e-4,
     'Binomial': 4e-6,
     'Categorical': 6e-6,
     'Chi': 2e-4,

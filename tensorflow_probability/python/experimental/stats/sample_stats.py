@@ -207,6 +207,14 @@ class RunningCovariance(auto_composite_tensor.AutoCompositeTensor):
       ddof = tf.convert_to_tensor(ddof, dtype_hint=self.num_samples.dtype)
       return self.sum_squared_residuals / (self.num_samples - ddof)
 
+  def __repr__(self):
+    return (
+        'RunningCovariance(\n'
+        f'    num_samples={self.num_samples!r},\n'
+        f'    mean={self.mean!r},\n'
+        f'    sum_sqared_residuals={self.sum_squared_residuals!r},\n'
+        f'    event_ndims={self.event_ndims!r})')
+
 
 def _default_covariance_event_ndims(event_ndims, shape):
   """Try to default `event_ndims` to 'full covariance' for the given `shape`."""
@@ -339,6 +347,13 @@ class RunningVariance(RunningCovariance):
                sum_squared_residuals=num_samples * variance,
                event_ndims=0)
 
+  def __repr__(self):
+    return (
+        'RunningVariance(\n'
+        f'    num_samples={self.num_samples!r},\n'
+        f'    mean={self.mean!r},\n'
+        f'    sum_sqared_residuals={self.sum_squared_residuals!r})')
+
 
 @auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
 class RunningMean(auto_composite_tensor.AutoCompositeTensor):
@@ -426,6 +441,11 @@ class RunningMean(auto_composite_tensor.AutoCompositeTensor):
     delta_mean = chunk_mean - self.mean
     new_mean = self.mean + chunk_n * delta_mean / new_n
     return RunningMean(new_n, new_mean)
+
+  def __repr__(self):
+    return ('RunningMean(\n'
+            f'    num_samples={self.num_samples!r},\n'
+            f'    mean={self.mean!r})')
 
 
 @auto_composite_tensor.auto_composite_tensor
@@ -573,6 +593,13 @@ class RunningCentralMoments(auto_composite_tensor.AutoCompositeTensor):
     desired_moment_indices = tf.convert_to_tensor(
         self.desired_moments, dtype=tf.int32) - 1
     return tf.gather(all_moments, desired_moment_indices)
+
+  def __repr__(self):
+    return (
+        'RunningCentralMoments('
+        f'    mean_state={self.mean_state!r},\n'
+        f'    exponentiated_residuals={self.exponentiated_residuals!r},\n'
+        f'    desired_moments={self.desired_moments!r})')
 
 
 def _n_choose_k(n, k):
@@ -722,3 +749,9 @@ class RunningPotentialScaleReduction(auto_composite_tensor.AutoCompositeTensor):
         self.chain_variances,
         check_types=False
     )
+
+  def __repr__(self):
+    return (
+        'RunningPotentialScaleReduction(\n'
+        f'    chain_variances={self.chain_variances!r},\n'
+        f'    independent_chain_ndims={self.independent_chain_ndims!r})')

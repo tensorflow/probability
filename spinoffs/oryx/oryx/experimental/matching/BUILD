@@ -1,4 +1,4 @@
-# Copyright 2020 The TensorFlow Probability Authors.
+# Copyright 2021 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+# Mini-library for pattern matching and term rewriting
 # [internal] load pytype.bzl (pytype_strict_library)
+# [internal] load strict.bzl
 
 licenses(["notice"])
 
@@ -20,13 +22,31 @@ package(default_visibility = ["//visibility:public"])
 
 # pytype_strict
 py_library(
-    name = "experimental",
+    name = "matching",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
+    deps = [":matcher"],
+)
+
+# pytype_strict
+py_library(
+    name = "matcher",
+    srcs = ["matcher.py"],
+    srcs_version = "PY3",
     deps = [
-        "//oryx/experimental/matching",
-        "//oryx/experimental/mcmc",
-        "//oryx/experimental/nn",
-        "//oryx/experimental/optimizers",
+        # dataclasses dep,
+    ],
+)
+
+# py_strict
+py_test(
+    name = "matcher_test",
+    srcs = ["matcher_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":matcher",
+        # absl/testing:absltest dep,
+        "//oryx/internal:test_util",
     ],
 )
