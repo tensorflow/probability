@@ -40,6 +40,9 @@
 # commands, telling pip to install the dependencies in the user install
 # directory.
 
+set -v  # print commands as they are executed
+set -e  # fail and exit on any command erroring
+
 # Get the absolute path to the directory containing this script.
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
