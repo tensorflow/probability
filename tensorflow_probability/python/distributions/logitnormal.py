@@ -48,7 +48,7 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
                name='LogitNormal'):
     """Construct a logit-normal distribution.
 
-    The LogititNormal distribution models positive-valued random variables whose
+    The LogitNormal distribution models random variables between 0 and 1 whose
     logit (i.e., sigmoid_inverse, i.e., `log(p) - log1p(-p)`) is normally
     distributed with mean `loc` and standard deviation `scale`. It is
     constructed as the sigmoid transformation, (i.e., `1 / (1 + exp(-x))`) of a

@@ -224,6 +224,13 @@ class GammaGamma(distribution.Distribution):
     log_unnormalized_prob = (tf.math.xlogy(concentration - 1., x) -
                              (concentration + mixing_concentration) *
                              tf.math.log(x + mixing_rate))
+    # The formula computes `nan` for `x == +inf`.  However, it shouldn't be too
+    # inaccurate for large finite `x`, because `x` only appears as `log(x)`, and
+    # `log` is effectively discountinuous at `+inf`.
+    log_unnormalized_prob = tf.where(
+        x >= np.inf,
+        tf.constant(-np.inf, dtype=log_unnormalized_prob.dtype),
+        log_unnormalized_prob)
 
     return log_unnormalized_prob - log_normalization
 

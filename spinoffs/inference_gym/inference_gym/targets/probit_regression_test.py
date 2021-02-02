@@ -109,6 +109,7 @@ class ProbitRegressionTest(test_util.InferenceGymTestCase,
         num_steps=4000,
         num_leapfrog_steps=15,
         step_size=0.03,
+        standard_deviation_fudge_atol=5e-4,  # b/179074257
     )
 
 

@@ -54,11 +54,40 @@ WORKING_PRECISION_TEST_BLOCK_LIST = (
 )
 
 
-NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST = (
-    'ContinuousBernoulli',  # b/169321398
+NO_NANS_TEST_BLOCK_LIST = (
+    'BetaQuotient',  # b/178925774
+    'Dirichlet',  # b/169689852
+    'ExpRelaxedOneHotCategorical',  # b/169663302
+    # Independent log_prob unavoidably emits `nan` if the underlying
+    # distribution yields a +inf on one sample and a -inf on another.
+    'Independent',
+    'InverseGaussian',  # TODO(axch): Fix numerics of 1 - sqrt(x + 1)
+    'LogitNormal',  # TODO(axch): Maybe nan problem hints at accuracy problem
+    # Mixtures of component distributions whose samples have different dtypes
+    # cannot pass validate_args.
+    'Mixture',
+    'MixtureSameFamily',  # b/169790025
+    'OneHotCategorical',  # b/169680869
+    # TODO(axch) Re-enable after CDFs of underlying distributions are tested
+    # for NaN production.
+    'QuantizedDistribution',
+    # Sample log_prob unavoidably emits `nan` if the underlying distribution
+    # yields a +inf on one sample and a -inf on another.  This can happen even
+    # with iid samples, if one sample is at a pole of the distribution, and the
+    # other is far enough into the tail to round to +inf.  Weibull with a low
+    # concentration is an example of a distribution that can produce this
+    # effect.
+    'Sample',
+    'TransformedDistribution',  # Bijectors may introduce nans
+    # TODO(axch): Fix numerics of _cauchy_cdf(x + delta) - _cauchy_cdf(x)
+    'TruncatedCauchy',
+    # TODO(axch): Edit C++ sampler to reject numerically out-of-bounds samples
+    'TruncatedNormal',
+)
+
+NANS_EVEN_IN_SAMPLE_LIST = (
     'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
     'TransformedDistribution',  # Bijectors may introduce nans
-    'Zipf',  # b/175929563 triggered by Zipf inside Independent
 )
 
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
@@ -160,7 +189,7 @@ class ReproducibilityTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class NoNansInSampleTest(test_util.TestCase):
+class NoNansTest(test_util.TestCase, dhps.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -169,45 +198,53 @@ class NoNansInSampleTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
-    if dist_name in NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST:
+    if dist_name in NO_NANS_TEST_BLOCK_LIST:
       self.skipTest('{} is blocked'.format(dist_name))
     def eligibility_filter(name):
-      return name not in NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST
+      return name not in NO_NANS_TEST_BLOCK_LIST
     dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
                                         eligibility_filter=eligibility_filter))
+    samples = self.check_samples_not_nan(dist)
+    self.assume_loc_scale_ok(dist)
+
+    hp.note('Testing on samples {}'.format(samples))
+    with tfp_hps.no_tf_rank_errors():
+      lp = self.evaluate(dist.log_prob(samples))
+    self.assertAllEqual(np.zeros_like(lp), np.isnan(lp))
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(NO_NANS_TEST_BLOCK_LIST)
+      if dname not in NANS_EVEN_IN_SAMPLE_LIST)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testSampleOnly(self, dist_name, data):
+    def eligibility_filter(name):
+      # We use this eligibility filter to focus the test's attention
+      # on sub-distributions that are not already tested by the sample
+      # and log_prob test.  However, we also include some relatively
+      # widely used distributions to make sure that at least one legal
+      # sub-distribution exists for every meta-distribution we may be
+      # testing.
+      return ((name in NO_NANS_TEST_BLOCK_LIST
+               or name in dhps.QUANTIZED_BASE_DISTS)
+              and name not in NANS_EVEN_IN_SAMPLE_LIST)
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        eligibility_filter=eligibility_filter))
+    self.check_samples_not_nan(dist)
+
+  def check_samples_not_nan(self, dist):
     hp.note('Trying distribution {}'.format(
         self.evaluate_dict(dist.parameters)))
     seed = test_util.test_seed(sampler_type='stateless')
     with tfp_hps.no_tf_rank_errors():
-      s1 = self.evaluate(dist.sample(20, seed=seed))
-    self.assertAllEqual(np.zeros_like(s1), np.isnan(s1))
+      samples = self.evaluate(dist.sample(20, seed=seed))
+    self.assertAllEqual(np.zeros_like(samples), np.isnan(samples))
+    return samples
 
 
 @test_util.test_all_tf_execution_regimes
-class EventSpaceBijectorsTest(test_util.TestCase):
-
-  def check_bad_loc_scale(self, dist):
-    if hasattr(dist, 'distribution'):
-      # BatchReshape, Independent, TransformedDistribution, and
-      # QuantizedDistribution
-      self.check_bad_loc_scale(dist.distribution)
-    if isinstance(dist, tfd.MixtureSameFamily):
-      self.check_bad_loc_scale(dist.mixture_distribution)
-      self.check_bad_loc_scale(dist.components_distribution)
-    if isinstance(dist, tfd.Mixture):
-      self.check_bad_loc_scale(dist.cat)
-      self.check_bad_loc_scale(dist.components)
-    if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
-      try:
-        loc_ = tf.convert_to_tensor(dist.loc)
-        scale_ = tf.convert_to_tensor(dist.scale)
-      except (ValueError, TypeError):
-        # If they're not Tensor-convertible, don't try to check them.  This is
-        # the case, in, for example, multivariate normal, where the scale is a
-        # `LinearOperator`.
-        return
-      loc, scale = self.evaluate([loc_, scale_])
-      hp.assume(np.all(np.abs(loc / scale) < 1e7))
+class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
 
   def check_event_space_bijector_constrains(self, dist, data):
     event_space_bijector = dist.experimental_default_event_space_bijector()
@@ -245,7 +282,7 @@ class EventSpaceBijectorsTest(test_util.TestCase):
     dist = data.draw(dhps.base_distributions(
         dist_name=dist_name, enable_vars=True))
     self.evaluate([var.initializer for var in dist.variables])
-    self.check_bad_loc_scale(dist)
+    self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
 
   # TODO(b/146572907): Fix `enable_vars` for metadistributions and
@@ -263,7 +300,7 @@ class EventSpaceBijectorsTest(test_util.TestCase):
         dist_name=dist_name, enable_vars=True,
         eligibility_filter=ok))
     self.evaluate([var.initializer for var in dist.variables])
-    self.check_bad_loc_scale(dist)
+    self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
 
 

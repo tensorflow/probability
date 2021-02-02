@@ -181,8 +181,8 @@ QUANTIZED_BASE_DISTS = (
 # TODO(b/128518790): Eliminate / minimize the fudge factors in here.
 
 
-def constrain_between_eps_and_one_minus_eps(eps=1e-6):
-  return lambda x: eps + (1 - 2 * eps) * tf.sigmoid(x)
+def constrain_between_eps_and_one_minus_eps(eps0=1e-6, eps1=1e-6):
+  return lambda x: eps0 + (1 - (eps0 + eps1)) * tf.sigmoid(x)
 
 
 def ensure_high_gt_low(low, high):
@@ -300,7 +300,9 @@ CONSTRAINTS = {
     'RelaxedCategorical.probs':
         tf.math.softmax,
     'Zipf.power':
-        tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
+        # Strictly > 1.  See also b/175929563 (rejection sampler
+        # iterates too much and emits `nan` for powers too close to 1).
+        tfp_hps.softplus_plus_eps(1 + 1e-4),
     'ContinuousBernoulli.probs':
         tf.sigmoid,
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
@@ -311,8 +313,12 @@ CONSTRAINTS = {
         constrain_between_eps_and_one_minus_eps(),
     'Binomial.probs':
         tf.sigmoid,
+    # Constrain probs away from 0 to avoid immense samples.
+    # See b/178842153.
+    'NegativeBinomial.logits':
+        lambda x: tf.minimum(x, 15.),
     'NegativeBinomial.probs':
-        tf.sigmoid,
+        constrain_between_eps_and_one_minus_eps(eps0=0., eps1=1e-6),
     'Bernoulli.probs':
         tf.sigmoid,
     'PlackettLuce.scores':
@@ -324,8 +330,10 @@ CONSTRAINTS = {
     'cutpoints':
         # Permit values that aren't too large
         lambda x: tfb.Ascending().forward(10 * tf.math.tanh(x)),
+    # Capping log_rate because of weird semantics of Poisson with very
+    # large rates (see b/178842153).
     'log_rate':
-        lambda x: tf.maximum(x, -16.),
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
     # Capping log_rate1 and log_rate2 to 15. This is because if both are large
     # (meaning the rates are `inf`), then the Skellam distribution is undefined.
     'log_rate1':
@@ -770,7 +778,7 @@ def base_distributions(draw,
       initialization in slicing_test.  If `False`, the returned parameters are
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn at the top level.
     params: An optional set of Distribution parameters. If params are not
       provided, Hypothesis will choose a set of parameters.
@@ -1492,3 +1500,47 @@ def distributions(draw,
         batch_shape, event_dim, enable_vars,
         eligibility_filter, validate_args))
   raise ValueError('Unknown Distribution name {}'.format(dist_name))
+
+
+class TestCase(object):
+  """Mixin for TestCase-type classes with Hypothesis-specific utilities."""
+
+  def assume_loc_scale_ok(self, dist):
+    """Hypothesis assumption that `dist` has reasonable a location and scale.
+
+    To wit, `hp.assume` that location / scale < 1e7.  Why this check?  Because
+    by assumption we tend to think of samples as being near the location, with
+    nearness determined by the scale.  If the scale is close to machine epsilon
+    near the location, then the distribution is close to being numerically
+    degenerate, and therefore not a good test case.
+
+    This assumption is currently only checked for (batch) scalar locations and
+    scales, and only if the distribution is parameterized with parameters named
+    `loc` and `scale`.
+
+    The assumption is applied recursively through meta distributions.
+
+    Args:
+      dist: TFP `Distribution` to check.
+    """
+    if hasattr(dist, 'distribution'):
+      # BatchReshape, Independent, TransformedDistribution, and
+      # QuantizedDistribution
+      self.assume_loc_scale_ok(dist.distribution)
+    if isinstance(dist, tfd.MixtureSameFamily):
+      self.assume_loc_scale_ok(dist.mixture_distribution)
+      self.assume_loc_scale_ok(dist.components_distribution)
+    if isinstance(dist, tfd.Mixture):
+      self.assume_loc_scale_ok(dist.cat)
+      self.assume_loc_scale_ok(dist.components)
+    if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
+      try:
+        loc_ = tf.convert_to_tensor(dist.loc)
+        scale_ = tf.convert_to_tensor(dist.scale)
+      except (ValueError, TypeError):
+        # If they're not Tensor-convertible, don't try to check them.  This is
+        # the case, in, for example, multivariate normal, where the scale is a
+        # `LinearOperator`.
+        return
+      loc, scale = self.evaluate([loc_, scale_])
+      hp.assume(np.all(np.abs(loc / scale) < 1e7))
