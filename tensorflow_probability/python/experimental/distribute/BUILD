@@ -69,6 +69,7 @@ multi_substrate_py_library(
         ":sharded",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:log_prob_ratio",
     ],
 )
 

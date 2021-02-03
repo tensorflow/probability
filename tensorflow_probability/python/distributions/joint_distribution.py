@@ -818,8 +818,8 @@ class _DefaultJointBijector(composition.Composition):
 @log_prob_ratio.RegisterLogProbRatio(JointDistribution)
 def _jd_log_prob_ratio(p, x, q, y):
   tf.nest.assert_same_structure(x, y)
-  ps, _ = p.sample_distributions(value=x)
-  qs, _ = q.sample_distributions(value=y)
+  ps, _ = p.sample_distributions(value=x, seed=dummy_seed())
+  qs, _ = q.sample_distributions(value=y, seed=dummy_seed())
   tf.nest.assert_same_structure(ps, qs)
   parts = []
   for p_, x_, q_, y_ in zip(ps, x, qs, y):

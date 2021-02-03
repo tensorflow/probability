@@ -23,6 +23,7 @@ import functools
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution as jd_lib
+from tensorflow_probability.python.distributions import log_prob_ratio
 
 from tensorflow_probability.python.experimental.distribute import distribute_lib
 
@@ -167,3 +168,37 @@ class JointDistributionCoroutine(JointDistributionDistributedMixin,
         validate_args=validate_args,
         name=name)
     self._parameters['shard_axis_name'] = shard_axis_name
+
+
+@log_prob_ratio.RegisterLogProbRatio(JointDistributionSequential)
+@log_prob_ratio.RegisterLogProbRatio(JointDistributionNamed)
+@log_prob_ratio.RegisterLogProbRatio(JointDistributionCoroutine)
+def _dist_jd_log_prob_ratio(p, x, q, y):
+  """Distributed log-prob ratio for JDs."""
+  tf.nest.assert_same_structure(x, y)
+  if p.shard_axis_name != q.shard_axis_name:
+    raise ValueError(
+        'p and q must have the same shard_axis_name. '
+        f'Saw: p: {p}, {p.shard_axis_name}, q: {q}, {q.shard_axis_name}')
+
+  def log_prob_ratio_parts_fn(x_y):
+    x = tf.nest.map_structure(lambda part: part[0], x_y)
+    y = tf.nest.map_structure(lambda part: part[1], x_y)
+    p_dists = p.sample_distributions(value=x, seed=jd_lib.dummy_seed())[0]
+    q_dists = q.sample_distributions(value=y, seed=jd_lib.dummy_seed())[0]
+    lp_diffs = tf.nest.map_structure(log_prob_ratio.log_prob_ratio, p_dists, x,
+                                     q_dists, y)
+    return lp_diffs
+
+  return tf.add_n(
+      tf.nest.flatten(
+          distribute_lib.make_sharded_log_prob_parts(
+              log_prob_ratio_parts_fn,
+              # Stack, because make_sharded_log_prob_parts expects
+              # inputs/outputs to be 1 to 1. TODO(b/175084455): revisit this
+              # after the distributed bijectors are done, as it is likely that
+              # make_sharded_log_prob_parts will be adjusted then to not have
+              # this limitation.
+              p.get_sharded_distributions(),
+              axis_name=p.shard_axis_name)(tf.nest.map_structure(
+                  lambda x, y: tf.stack([x, y], axis=0), x, y))))

@@ -29,6 +29,12 @@ from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 
 
+def true_log_prob_fn(w, x, data):
+  return (tfd.Normal(0., 1.).log_prob(w) +
+          tfd.Sample(tfd.Normal(w, 1.), (test_lib.NUM_DEVICES, 1)).log_prob(x) +
+          tfd.Independent(tfd.Normal(x, 1.), 2).log_prob(data))
+
+
 def make_jd_sequential(axis_name):
   return jd.JointDistributionSequential([
       tfd.Normal(0., 1.),
@@ -115,11 +121,6 @@ class JointDistributionTest(test_lib.DistributedTest):
     sample, log_prob, log_prob_grads = self.per_replica_to_tensor(
         (sample, log_prob, log_prob_grads))
 
-    def true_log_prob_fn(w, x, data):
-      return (tfd.Normal(0., 1.).log_prob(w) +
-              tfd.Sample(tfd.Normal(w, 1.), (4, 1)).log_prob(x) +
-              tfd.Independent(tfd.Normal(x, 1.), 2).log_prob(data))
-
     if isinstance(dist, jd.JointDistributionNamed):
       # N.B. the global RV 'w' gets replicated, so we grab any single replica's
       # result.
@@ -138,6 +139,51 @@ class JointDistributionTest(test_lib.DistributedTest):
         self.evaluate(log_prob), self.evaluate(tf.ones(4) * true_log_prob))
     self.assertAllCloseNested(
         self.evaluate(log_prob_grads), self.evaluate(true_log_prob_grads))
+
+  @parameterized.named_parameters(*distributions)
+  def test_jd_log_prob_ratio(self, dist_fn):
+    dist = dist_fn(self.axis_name)
+
+    def run(key):
+      sample = dist.sample(seed=key)
+      log_prob = dist.log_prob(sample)
+      return sample, log_prob
+
+    keys = tfp.random.split_seed(self.key, 2)
+    samples = []
+    log_probs = []
+    true_log_probs = []
+
+    for key in keys:
+      sample, log_prob = self.per_replica_to_tensor(
+          self.strategy_run(run, (key,), in_axes=None))
+
+      if isinstance(dist, jd.JointDistributionNamed):
+        # N.B. the global RV 'w' gets replicated, so we grab any single
+        # replica's result.
+        w, x, data = sample['w'][0], sample['x'], sample['data']
+      else:
+        w, x, data = sample[0][0], sample[1], sample[2]
+
+      true_log_prob = true_log_prob_fn(w, x, data)
+
+      samples.append(sample)
+      log_probs.append(log_prob[0])
+      true_log_probs.append(true_log_prob)
+
+    def run_diff(x, y):
+      return tfp.experimental.distributions.log_prob_ratio(dist, x, dist, y)
+
+    dist_lp_diff = self.per_replica_to_tensor(
+        self.strategy_run(
+            run_diff, tuple(tf.nest.map_structure(self.shard_values, samples))))
+
+    true_lp_diff = true_log_probs[0] - true_log_probs[1]
+    lp_diff = log_probs[0] - log_probs[1]
+
+    self.assertAllClose(self.evaluate(true_lp_diff), self.evaluate(lp_diff))
+    self.assertAllClose(
+        self.evaluate(true_lp_diff), self.evaluate(dist_lp_diff[0]))
 
 
 if __name__ == '__main__':
