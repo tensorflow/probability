@@ -33,7 +33,6 @@ from tensorflow_probability.python.internal import test_util
 tfn = tfp.experimental.nn
 
 
-# TODO(emilyaf): Test that gradients work.
 # pylint: disable=bad-whitespace
 _CONV_TEST_CASES = (
     # input dim         filter   c_out  strides    padding     dilations
@@ -204,6 +203,11 @@ class _BatchedConvTest(test_util.TestCase, _Common):
         channels_out=channels_out,
         dtype=self.dtype)
 
+    tf_kernel = tf.reshape(
+        k, shape=(filter_shape) + (input_shape[-1], channels_out))
+    y_expected = tf.nn.conv2d(
+        x, tf_kernel, strides=strides, padding=padding, dilations=dilations)
+
     conv_fn = tfn.util.make_convolution_fn(
         self.make_integer_input(filter_shape),
         rank=2,
@@ -211,12 +215,13 @@ class _BatchedConvTest(test_util.TestCase, _Common):
         padding=padding,
         dilations=self.make_integer_input(dilations),
         validate_args=True)
-    y_actual = conv_fn(x, k)
 
-    tf_kernel = tf.reshape(
-        k, shape=(filter_shape) + (input_shape[-1], channels_out))
-    y_expected = tf.nn.conv2d(
-        x, tf_kernel, strides=strides, padding=padding, dilations=dilations)
+    with tf.GradientTape() as tape:
+      tape.watch([x, k])
+      y_actual = conv_fn(x, k)
+    grad = tape.gradient(y_actual, [x, k])
+    self.assertAllNotNone(grad)
+
     [y_expected_, y_actual_] = self.evaluate([y_expected, y_actual])
     self.assertAllClose(y_expected_, y_actual_, rtol=1e-5, atol=0)
 
@@ -361,8 +366,7 @@ class _BatchedConvTransposeTest(test_util.TestCase, _Common):
         filter_shape=filter_shape,
         channels_out=channels_out,
         dtype=self.dtype)
-    conv_fn = self.make_conv_fn(filter_shape, strides, padding, dilations)
-    y_actual = conv_fn(x, k)
+
     output_shape, strides_ = convolution_util._get_output_shape(
         rank=2, strides=strides_tuple, padding=padding, dilations=dilations,
         input_shape=input_shape, output_size=channels_out,
@@ -388,6 +392,13 @@ class _BatchedConvTransposeTest(test_util.TestCase, _Common):
       y_expected = tf.nn.conv2d_transpose(
           x, tf_kernel, output_shape=output_shape,
           strides=strides_, padding=padding, dilations=dilations)
+
+    conv_fn = self.make_conv_fn(filter_shape, strides, padding, dilations)
+    with tf.GradientTape() as tape:
+      tape.watch([x, k])
+      y_actual = conv_fn(x, k)
+    grad = tape.gradient(y_actual, [x, k])
+    self.assertAllNotNone(grad)
 
     [y_expected_, y_actual_] = self.evaluate([y_expected, y_actual])
     self.assertAllClose(y_expected_, y_actual_, rtol=1e-5, atol=0)

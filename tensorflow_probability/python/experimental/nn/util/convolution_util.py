@@ -365,7 +365,7 @@ def make_convolution_transpose_fn_with_dilation(
                     dtype=input_dtype), y], axis=-3),
             shape=ps.concat([batch_shape, (xh * sh, xw * sw, c_in)], axis=0))
 
-        truncations = -ps.minimum(paddings, 0)
+        truncations = -ps.minimum(ps.cast(paddings, dtype=tf.int32), 0)
         truncate_start, truncate_end = ps.unstack(truncations, axis=1)
         x_truncate = tf.slice(
             x,
@@ -584,6 +584,9 @@ def make_convolution_transpose_fn_with_subkernels(
   """Like `tf.nn.conv2d` except applies batch of kernels to batch of `x`."""
   with tf.name_scope(name or 'make_convolution_transpose_fn_with_dilation'):
 
+    # Enable v2 control flow to avoid None gradients through TensorArray.
+    tf.compat.v1.enable_control_flow_v2()
+
     if tf.get_static_value(rank) != 2:
       raise NotImplementedError('Argument `rank` currently only supports `2`; '
                                 'saw "{}".'.format(rank))
@@ -622,8 +625,7 @@ def make_convolution_transpose_fn_with_subkernels(
           pos, ps.reverse(ps.reverse(nc, [0]), [1]))
       return i_ + 1, kernels_ind
 
-    kernels_ind = tf.TensorArray(dtype=dtype, infer_shape=False, size=1,
-                                 dynamic_size=True)
+    kernels_ind = tf.TensorArray(dtype=dtype, infer_shape=False, size=sh * sw)
 
     _, kernels_ind = tf.while_loop(
         lambda i, _: i < sh * sw,
@@ -713,8 +715,7 @@ def make_convolution_transpose_fn_with_subkernels(
               )
           return i + 1, outputs
 
-        outputs = tf.TensorArray(dtype=input_dtype, infer_shape=False, size=1,
-                                 dynamic_size=True)
+        outputs = tf.TensorArray(dtype=input_dtype, size=sh * sw)
 
         _, outputs = tf.while_loop(
             lambda i, _: i < sh * sw,
