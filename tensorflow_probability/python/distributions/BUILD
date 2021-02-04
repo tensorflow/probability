@@ -2888,6 +2888,7 @@ multi_substrate_py_test(
     srcs = ["joint_distribution_auto_batched_test.py"],
     numpy_tags = ["notap"],
     shard_count = 7,
+    tags = ["tf1-broken"],  # b/179305897
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -3004,7 +3005,7 @@ multi_substrate_py_test(
     jax_size = "large",
     numpy_tags = ["notap"],
     shard_count = 5,
-    tags = ["tf1-broken"],  # Test with `--define=tf-api-version=1` runs out of memory.
+    tags = ["tf1-broken"],  # Test with `--define=tf_api_version=1` runs out of memory.
     deps = [
         ":linear_gaussian_ssm",
         # numpy dep,

@@ -36,6 +36,7 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
+JAX_MODE = False
 Root = tfd.JointDistributionCoroutineAutoBatched.Root
 
 
@@ -663,6 +664,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     maybe_jit = lambda f: f
     if jit:
       self.skip_if_no_xla()
+      if not JAX_MODE and not tf.test.is_gpu_available():
+        self.skipTest('b/179303849')
       maybe_jit = tf.function(jit_compile=True)
 
     def make_models(dtype):

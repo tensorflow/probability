@@ -606,6 +606,7 @@ class GammaSamplingTest(test_util.TestCase):
 
   @test_util.jax_disable_test_missing_functionality('tf stateless_gamma')
   def testSampleCPU(self):
+    self.skipTest('b/179283344')
     with tf.device('CPU'):
       _, runtime = self.evaluate(
           gamma_lib.random_gamma_with_runtime(
