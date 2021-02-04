@@ -33,10 +33,8 @@ from tensorflow_probability.python.optimizer import bfgs
 
 def _common_dtype(dtypes, dtype_hint=None):
   """The `tf.Dtype` common to all elements in `dtypes`."""
-
   dtype = None
   seen = []
-
   for dt in dtypes:
     seen.append(dt)
     if dtype is None:
@@ -45,14 +43,13 @@ def _common_dtype(dtypes, dtype_hint=None):
       raise TypeError(
           "Found incompatible dtypes, {} and {}. Seen so far: {}".format(
               dtype, dt, seen))
-
   if dtype is None:
     return dtype_hint
-
   return dtype
 
 
 def _call(obj, fns, *args, **kwargs):
+  """attempt to call the first of `obj.fn` for `fn` in `fns`"""
   for fn in fns:
     call = getattr(obj, fn, None)
     if call is not None:
@@ -70,6 +67,12 @@ def _log_prob(joint_dist, *args, **kwargs):
   """Log prob regardless of joint distribution type."""
   fns = ["log_prob", "unnormalized_log_prob"]
   return _call(joint_dist, fns, *args, **kwargs)
+
+
+def _bfgs_dimension(joint_dist, bijector):
+  """The dimension which BFGS works on"""
+  flat_event_shape = tf.nest.flatten(joint_dist.event_shape)
+  return bijector.inverse_event_shape(flat_event_shape)[0]
 
 
 def _bfgs_minimize(
@@ -92,7 +95,6 @@ def _bfgs_minimize(
     return value_and_gradient(loss, unconstrained_values)
 
   dtype = _common_dtype(tf.nest.flatten(joint_dist.dtype))
-  dim = bijector.inverse_event_shape(tf.nest.flatten(joint_dist.event_shape))
 
   if initial_values is None:
     initial_values = _sample(joint_dist, sample_shape=10, seed=(42, 666))
@@ -100,8 +102,9 @@ def _bfgs_minimize(
   initial_position = bijector.inverse(tf.nest.flatten(initial_values))
 
   if initial_inverse_hessian_estimate is None:
+    dim = _bfgs_dimension(joint_dist, bijector)
     initial_inverse_hessian_estimate = tf.linalg.diag(
-        tf.constant(1e-3, dtype=dtype, shape=dim))
+        tf.constant(1e-3, dtype=dtype, shape=[dim]))
 
   bfgs_results = bfgs.minimize(
       loss_and_gradient,
@@ -122,10 +125,31 @@ def _bfgs_minimize(
     return bfgs_results
 
 
+def _transform_reshape_split_bijector(joint_dist, bijectors):
+  """A bijector from the BFGS compatible `Tensor` to joint dist event shape"""
+
+  unconstrained_shapes = [
+      x.inverse_event_shape(y)
+      for x, y in zip(bijectors, tf.nest.flatten(joint_dist.event_shape))
+  ]
+
+  # this reshaping is required as as split can produce a tensor of shape [1]
+  # when the distribution event shape is []
+  reshapers = [
+      reshape.Reshape(event_shape_out=x, event_shape_in=[x.num_elements()])
+      for x in unconstrained_shapes]
+
+  size_splits = [x.num_elements() for x in unconstrained_shapes]
+
+  return chain.Chain([joint_map.JointMap(bijectors=bijectors),
+                      joint_map.JointMap(bijectors=reshapers),
+                      split.Split(num_or_size_splits=size_splits)])
+
+
 def laplace_approximation(
     joint_dist,
-    bijectors=None,
     data=None,
+    bijectors=None,
     initial_values=None,
     initial_inverse_hessian_estimate=None,
     validate_convergence=True,
@@ -135,9 +159,9 @@ def laplace_approximation(
   Args:
     joint_dist:
 
-    bijectors:
-
     data:
+
+    bijectors:
 
     initial_values:
 
@@ -152,7 +176,7 @@ def laplace_approximation(
 
   #### References
 
-"""
+  """
 
   if data is not None:
     joint_dist = joint_dist.experimental_pin(data)
@@ -161,22 +185,7 @@ def laplace_approximation(
     joint_bijector = joint_dist.experimental_default_event_space_bijector()
     bijectors = joint_bijector.bijectors
 
-  unconstrained_shapes = [
-      x.inverse_event_shape(y)
-      for x, y in zip(bijectors, tf.nest.flatten(joint_dist.event_shape))
-  ]
-
-  size_splits = [x.num_elements() for x in unconstrained_shapes]
-
-  # this is required as as split can produce a tensor of shape [1] when the
-  # distribution event shape is []
-  reshapers = [
-      reshape.Reshape(event_shape_out=x, event_shape_in=[x.num_elements()])
-      for x in unconstrained_shapes]
-
-  bijector = chain.Chain([joint_map.JointMap(bijectors=bijectors),
-                          joint_map.JointMap(bijectors=reshapers),
-                          split.Split(num_or_size_splits=size_splits)])
+  bijector = _transform_reshape_split_bijector(joint_dist, bijectors)
 
   bfgs_results = _bfgs_minimize(
       joint_dist=joint_dist,
@@ -190,7 +199,7 @@ def laplace_approximation(
   # "converged" and the line search has not "failed"
   best_soln = tf.argmin(tf.reshape(bfgs_results.objective_value, [-1]))
 
-  dim = sum(size_splits)
+  dim = _bfgs_dimension(joint_dist, bijector)
 
   unconstrained_mean = tf.reshape(bfgs_results.position, [-1, dim])[best_soln]
 
