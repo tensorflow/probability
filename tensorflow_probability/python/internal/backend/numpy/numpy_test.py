@@ -538,7 +538,7 @@ def segment_ids(draw, n):
   while rsum < n:
     lengths.append(draw(hps.integers(1, n-rsum)))
     rsum += lengths[-1]
-  return np.repeat(np.arange(len(lengths)), lengths)
+  return np.repeat(np.arange(len(lengths)), np.array(lengths))
 
 
 @hps.composite
