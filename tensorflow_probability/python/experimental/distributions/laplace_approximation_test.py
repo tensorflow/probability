@@ -53,11 +53,11 @@ class LaplaceApproximationTest(test_util.TestCase):
     self.assertAllClose(c, [0.2, 0.2, 0.2], atol=ATOL)
 
   def testJointDistributionCoroutineWithData(self):
-    Root = tfd.JointDistributionCoroutine.Root
+    root = tfd.JointDistributionCoroutine.Root
 
     @tfd.JointDistributionCoroutine
     def joint_dist():
-      a = yield Root(tfd.Normal(loc=1., scale=1., name="a"))
+      a = yield root(tfd.Normal(loc=1., scale=1., name="a"))
       yield tfd.MultivariateNormalDiag(loc=a + [2., 2.], scale_diag=[2., 2.])
 
     approx = tfde.laplace_approximation(joint_dist, data={"a": 5.})
@@ -119,7 +119,7 @@ class LaplaceApproximationTest(test_util.TestCase):
     ])
 
     # check single sample case
-    approx = tfde.laplace_approximation(joint_dist, initial_values=[0.123, 2.42])
+    approx = tfde.laplace_approximation(joint_dist, initial_values=[0.12, 2.42])
     mean = approx.bijector(approx.distribution.mean())
     a, b = self.evaluate(mean)
 
