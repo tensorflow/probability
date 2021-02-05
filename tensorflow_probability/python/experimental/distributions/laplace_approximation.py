@@ -26,26 +26,10 @@ from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.math import value_and_gradient
 from tensorflow_probability.python.optimizer import bfgs_utils
 from tensorflow_probability.python.optimizer import bfgs
-
-
-def _common_dtype(dtypes, dtype_hint=None):
-  """The `tf.Dtype` common to all elements in `dtypes`."""
-  dtype = None
-  seen = []
-  for dt in dtypes:
-    seen.append(dt)
-    if dtype is None:
-      dtype = dt
-    elif dtype != dt:
-      raise TypeError(
-          "Found incompatible dtypes, {} and {}. Seen so far: {}".format(
-              dtype, dt, seen))
-  if dtype is None:
-    return dtype_hint
-  return dtype
 
 
 def _call(obj, fns, *args, **kwargs):
@@ -94,14 +78,14 @@ def _bfgs_minimize(
   def loss_and_gradient(unconstrained_values):
     return value_and_gradient(loss, unconstrained_values)
 
-  dtype = _common_dtype(tf.nest.flatten(joint_dist.dtype))
-
   if initial_values is None:
     initial_values = _sample(joint_dist, sample_shape=10, seed=(42, 666))
 
   initial_position = bijector.inverse(tf.nest.flatten(initial_values))
 
   if initial_inverse_hessian_estimate is None:
+    dtype = dtype_util.common_dtype(
+        joint_dist._get_single_sample_distributions())
     dim = _bfgs_dimension(joint_dist, bijector)
     initial_inverse_hessian_estimate = tf.linalg.diag(
         tf.constant(1e-3, dtype=dtype, shape=[dim]))
