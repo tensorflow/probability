@@ -66,7 +66,7 @@ def _bfgs_minimize(
     initial_inverse_hessian_estimate,
     validate_convergence,
 ):
-  """Minimize the -ve log prob of a joint distribution using BFGS."""
+  """Minimize the negative log prob of a joint distribution using BFGS."""
 
   names = joint_dist._flat_resolve_names()
 
