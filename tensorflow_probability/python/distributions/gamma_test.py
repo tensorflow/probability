@@ -651,6 +651,8 @@ class GammaSamplingTest(test_util.TestCase):
     self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
 
   def testSampleGammaLowConcentration(self):
+    if tf.test.is_gpu_available():
+      self.skipTest('b/179433753')
     concentration = np.linspace(0.1, 1., 10)
     rate = np.float64(1.)
     num_samples = int(1e5)
@@ -684,6 +686,8 @@ class GammaSamplingTest(test_util.TestCase):
         rtol=0.07)
 
   def testSampleGammaHighConcentration(self):
+    if tf.test.is_gpu_available():
+      self.skipTest('b/179433753')
     concentration = np.linspace(10., 20., 10)
     rate = np.float64(1.)
     num_samples = int(1e5)
@@ -718,6 +722,8 @@ class GammaSamplingTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testSampleGammaLogRateLogSpaceDerivatives(self):
+    if tf.test.is_gpu_available():
+      self.skipTest('b/179433753')
     conc = tf.constant(np.linspace(.8, 1.2, 5), tf.float64)
     rate = np.linspace(.5, 2, 5)
     np.random.shuffle(rate)
@@ -779,6 +785,8 @@ class GammaSamplingTest(test_util.TestCase):
     self.assertAllClose(dconc[1], dconc[3], rtol=0.06)
 
   def testSampleGammaLogSpace(self):
+    if tf.test.is_gpu_available():
+      self.skipTest('b/179433753')
     concentration = np.linspace(.1, 2., 10)
     rate = np.linspace(.5, 2, 10)
     np.random.shuffle(rate)
