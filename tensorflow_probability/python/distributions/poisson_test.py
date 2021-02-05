@@ -444,8 +444,6 @@ class PoissonSamplingTest(test_util.TestCase):
 
   def testSamplePoissonLowRates(self):
     # Low log rate (< log(10.)) samples would use Knuth's algorithm.
-    if tf.test.is_gpu_available():
-      self.skipTest('b/179433753')
     rate = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5]
     log_rate = np.log(rate)
     num_samples = int(1e5)
@@ -480,8 +478,6 @@ class PoissonSamplingTest(test_util.TestCase):
 
   def testSamplePoissonHighRates(self):
     # High rate (>= log(10.)) samples would use rejection sampling.
-    if tf.test.is_gpu_available():
-      self.skipTest('b/179433753')
     rate = [10., 10.5, 11., 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5]
     log_rate = np.log(rate)
     num_samples = int(1e5)
@@ -515,8 +511,6 @@ class PoissonSamplingTest(test_util.TestCase):
         rtol=0.05)
 
   def testSamplePoissonLowAndHighRates(self):
-    if tf.test.is_gpu_available():
-      self.skipTest('b/179433753')
     rate = [1., 3., 5., 6., 7., 10., 13.0, 14., 15., 18.]
     log_rate = np.log(rate)
     num_samples = int(1e5)
