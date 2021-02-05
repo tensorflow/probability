@@ -122,6 +122,29 @@ class RunningCovariance(auto_composite_tensor.AutoCompositeTensor):
         name=name,
     )
 
+  @classmethod
+  def from_example(cls, example, event_ndims=None, name='RunningCovariance'):
+    """Starts a `RunningCovariance` from an example.
+
+    Args:
+      example: A `Tensor`.  The `RunningCovariance` will accept samples
+        of the same dtype and broadcast-compatible shape as the example.
+      event_ndims:  Number of dimensions that specify the event shape, from
+        the inner-most dimensions.  Specifying `None` returns all cross
+        product terms (no batching) and is the default.
+      name: Python `str` name prefixed to Ops created by this class.
+
+    Returns:
+      cov: An empty `RunningCovariance`, ready for incoming samples.  Note
+        that by convention, the supplied example is used only for
+        initialization, but not counted as a sample.
+
+    Raises:
+      ValueError: if `event_ndims` is greater than the rank of the example.
+    """
+    return cls.from_shape(
+        ps.shape(example), example.dtype, event_ndims=event_ndims, name=name)
+
   def update(self, new_sample, axis=None):
     """Update the `RunningCovariance` with a new sample.
 
@@ -310,6 +333,21 @@ class RunningVariance(RunningCovariance):
     """
     return super().from_shape(shape, dtype, event_ndims=0)
 
+  @classmethod
+  def from_example(cls, example):
+    """Starts a `RunningVariance` from an example.
+
+    Args:
+      example: A `Tensor`.  The `RunningVariance` will accept samples
+        of the same dtype and broadcast-compatible shape as the example.
+
+    Returns:
+      var: An empty `RunningVariance`, ready for incoming samples.  Note
+        that by convention, the supplied example is used only for
+        initialization, but not counted as a sample.
+    """
+    return super().from_example(example, event_ndims=0)
+
   def variance(self, ddof=0):
     """Returns the variance accumulated so far.
 
@@ -396,12 +434,27 @@ class RunningMean(auto_composite_tensor.AutoCompositeTensor):
         floating-point division.
 
     Returns:
-      state: `RunningMeanState` representing a stream of no inputs.
+      state: `RunningMean` representing a stream of no inputs.
     """
     dtype = _float_dtype_like(dtype)
     return cls(
         num_samples=tf.zeros((), dtype=dtype),
         mean=tf.zeros(shape, dtype))
+
+  @classmethod
+  def from_example(cls, example):
+    """Initialize an empty `RunningMean`.
+
+    Args:
+      example: A `Tensor`.  The `RunningMean` will accept samples
+        of the same dtype and broadcast-compatible shape as the example.
+
+    Returns:
+      state: `RunningMean` representing a stream of no inputs.  Note
+        that by convention, the supplied example is used only for
+        initialization, but not counted as a sample.
+    """
+    return cls.from_shape(ps.shape(example), example.dtype)
 
   def update(self, new_sample, axis=None):
     """Update the `RunningMean` with a new sample.
@@ -522,6 +575,24 @@ class RunningCentralMoments(auto_composite_tensor.AutoCompositeTensor):
         exponentiated_residuals=tf.zeros(
             ps.concat([(max_moment - 1,), shape], axis=0), dtype),
         desired_moments=desired_moments)
+
+  @classmethod
+  def from_example(cls, example, moment):
+    """Initialize an empty `RunningCentralMoments`.
+
+    Args:
+      example: A `Tensor`.  The `RunningCentralMoments` will accept
+        samples of the same dtype and broadcast-compatible shape as
+        the example.
+      moment: Integer or iterable of integers that represent the
+        desired moments to return.
+
+    Returns:
+      state: `RunningCentralMoments` representing a stream of no
+        inputs.  Note that by convention, the supplied example is used
+        only for initialization, but not counted as a sample.
+    """
+    return cls.from_shape(ps.shape(example), moment, example.dtype)
 
   def update(self, new_sample):
     """Update with a new sample.
@@ -687,6 +758,28 @@ class RunningPotentialScaleReduction(auto_composite_tensor.AutoCompositeTensor):
         dtype,
         check_types=False)
     return cls(chain_variances, independent_chain_ndims)
+
+  @classmethod
+  def from_example(cls, example, independent_chain_ndims=1):
+    """Starts an empty `RunningPotentialScaleReduction` from metadata.
+
+    Args:
+      example: A `Tensor`.  The `RunningPotentialScaleReduction` will
+        accept samples of the same dtype and broadcast-compatible
+        shape as the example.
+      independent_chain_ndims: Integer or Integer type `Tensor` with value
+        `>= 1` giving the number of leading dimensions holding independent
+        chain results to be tested for convergence. Using a collection
+        implies that future samples will mimic that exact structure.
+
+    Returns:
+      state: `RunningPotentialScaleReduction` representing a stream of
+        no inputs.  Note that by convention, the supplied example is
+        used only for initialization, but not counted as a sample.
+    """
+    return cls.from_shape(
+        shape=ps.shape(example), dtype=example.dtype,
+        independent_chain_ndims=independent_chain_ndims)
 
   def update(self, new_sample):
     """Update the `RunningPotentialScaleReduction` with a new sample.
