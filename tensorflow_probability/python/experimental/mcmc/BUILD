@@ -242,10 +242,10 @@ py_library(
 
 py_test(
     name = "pnuts_test",
-    size = "large",
-    timeout = "long",
+    size = "medium",
     srcs = ["pnuts_test.py"],
     python_version = "PY3",
+    shard_count = 10,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
