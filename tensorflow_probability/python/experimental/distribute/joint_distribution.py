@@ -23,7 +23,7 @@ import functools
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution as jd_lib
-from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
 
 from tensorflow_probability.python.experimental.distribute import distribute_lib
 
@@ -170,9 +170,9 @@ class JointDistributionCoroutine(JointDistributionDistributedMixin,
     self._parameters['shard_axis_name'] = shard_axis_name
 
 
-@log_prob_ratio.RegisterLogProbRatio(JointDistributionSequential)
-@log_prob_ratio.RegisterLogProbRatio(JointDistributionNamed)
-@log_prob_ratio.RegisterLogProbRatio(JointDistributionCoroutine)
+@lp_ratio.RegisterLogProbRatio(JointDistributionSequential)
+@lp_ratio.RegisterLogProbRatio(JointDistributionNamed)
+@lp_ratio.RegisterLogProbRatio(JointDistributionCoroutine)
 def _dist_jd_log_prob_ratio(p, x, q, y):
   """Distributed log-prob ratio for JDs."""
   tf.nest.assert_same_structure(x, y)
@@ -181,14 +181,22 @@ def _dist_jd_log_prob_ratio(p, x, q, y):
         'p and q must have the same shard_axis_name. '
         f'Saw: p: {p}, {p.shard_axis_name}, q: {q}, {q.shard_axis_name}')
 
+  is_sharded = p.get_sharded_distributions()
+  if is_sharded != q.get_sharded_distributions():
+    raise ValueError(
+        'p and q must use the same sharding. '
+        f'Saw: p: {p}, {is_sharded}, q: {q}, {q.get_sharded_distributions()}')
+
   def log_prob_ratio_parts_fn(x_y):
     x = tf.nest.map_structure(lambda part: part[0], x_y)
     y = tf.nest.map_structure(lambda part: part[1], x_y)
     p_dists = p.sample_distributions(value=x, seed=jd_lib.dummy_seed())[0]
     q_dists = q.sample_distributions(value=y, seed=jd_lib.dummy_seed())[0]
-    lp_diffs = tf.nest.map_structure(log_prob_ratio.log_prob_ratio, p_dists, x,
-                                     q_dists, y)
-    return lp_diffs
+    # Ensure sharded distributions defer reductions.
+    kwds = lambda s: {'reduce_over_shards': False} if s else {}
+    return tf.nest.map_structure(
+        lambda p, x, q, y, s: lp_ratio.log_prob_ratio(p, x, q, y, **kwds(s)),
+        p_dists, x, q_dists, y, is_sharded)
 
   return tf.add_n(
       tf.nest.flatten(

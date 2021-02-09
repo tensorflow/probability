@@ -23,6 +23,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import independent as independent_lib
+from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.distributions import sample as sample_lib
 from tensorflow_probability.python.experimental.distribute import distribute_lib
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -127,6 +128,18 @@ class ShardedSample(sample_lib.Sample):
         is_init=is_init)
 
 
+@log_prob_ratio.RegisterLogProbRatio(ShardedSample)
+def _sharded_sample_log_prob_ratio(p, x, q, y, reduce_over_shards=True):
+  """Distributed log-prob ratio for ShardedSample."""
+  if p.shard_axis_name != q.shard_axis_name:
+    raise ValueError(
+        f'Mismatched axis names "{p.shard_axis_name}" vs "{q.shard_axis_name}"')
+  underlying = sample_lib._sample_log_prob_ratio(p, x, q, y)  # pylint: disable=protected-access
+  if reduce_over_shards:
+    return distribute_lib.psum(underlying, axis_name=p.shard_axis_name)
+  return underlying
+
+
 class ShardedIndependent(independent_lib.Independent):
   """A version of `tfd.Independent` that folds device id into its randomness."""
 
@@ -205,3 +218,15 @@ class ShardedIndependent(independent_lib.Independent):
       return []
     return super(ShardedIndependent, self)._parameter_control_dependencies(
         is_init=is_init)
+
+
+@log_prob_ratio.RegisterLogProbRatio(ShardedIndependent)
+def _sharded_independent_log_prob_ratio(p, x, q, y, reduce_over_shards=True):
+  """Distributed log-prob ratio for ShardedIndependent."""
+  if p.shard_axis_name != q.shard_axis_name:
+    raise ValueError(
+        f'Mismatched axis names "{p.shard_axis_name}" vs "{q.shard_axis_name}"')
+  underlying = independent_lib._independent_log_prob_ratio(p, x, q, y)  # pylint: disable=protected-access
+  if reduce_over_shards:
+    return distribute_lib.psum(underlying, axis_name=p.shard_axis_name)
+  return underlying

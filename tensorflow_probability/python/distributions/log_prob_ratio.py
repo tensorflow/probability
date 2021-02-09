@@ -30,7 +30,7 @@ __all__ = [
 _log_prob_ratio_registry = {}
 
 
-def log_prob_ratio(p, x, q, y):
+def log_prob_ratio(p, x, q, y, **kwargs):
   """Computes `p.log_prob(x) - q.log_prob(y)`, numerically stably.
 
   Args:
@@ -38,6 +38,7 @@ def log_prob_ratio(p, x, q, y):
     x: A tensor from the support of `p`.
     q: A distribution instance in the same family as `p`, with matching shape.
     y: A tensor from the support of `q`.
+    **kwargs: Passed to the distribution's `log_prob_ratio` implementation.
 
   Returns:
     lp_ratio: `log (p(x) / q(y)) = p.log_prob(x) - q.log_prob(y)`. In some cases
@@ -47,7 +48,7 @@ def log_prob_ratio(p, x, q, y):
   assert type(p) == type(q)  # pylint: disable=unidiomatic-typecheck
   for cls in inspect.getmro(type(p)):
     if cls in _log_prob_ratio_registry:
-      return _log_prob_ratio_registry[cls](p, x, q, y)
+      return _log_prob_ratio_registry[cls](p, x, q, y, **kwargs)
   return p.log_prob(x) - q.log_prob(y)
 
 

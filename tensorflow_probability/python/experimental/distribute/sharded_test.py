@@ -24,6 +24,8 @@ from tensorflow_probability.python.experimental.distribute import sharded
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
+tfde = tfp.experimental.distributions
+tfp_dist = tfp.experimental.distribute
 
 
 @test_util.test_all_tf_execution_regimes
@@ -86,6 +88,57 @@ class ShardedDistributionTest(test_lib.DistributedTest):
 
     self.evaluate(
         self.per_replica_to_tensor(self.strategy_run(lp_grad, (samps,))))
+
+  def test_log_prob_ratio_sample(self):
+    dist = tfd.Sample(tfd.Normal(0., 1.), 8)
+
+    x0 = 0.
+    x1 = 1.
+
+    oracle_value = tfde.log_prob_ratio(dist, x0, dist, x1)
+
+    dist_sharded = tfp_dist.ShardedSample(
+        tfd.Normal(0., 1.), 8, shard_axis_name=self.axis_name)
+    @tf.function
+    def test():
+      return (tfde.log_prob_ratio(dist_sharded, x0, dist_sharded, x1),
+              dist_sharded.log_prob(x0) - dist_sharded.log_prob(x1))
+
+    lp1, lp2 = self.strategy_run(test, in_axes=None)
+    sharded_ratio = self.per_replica_to_tensor(lp1)
+    sharded_subtraction = self.per_replica_to_tensor(lp2)
+
+    self.assertAllClose(oracle_value + tf.zeros_like(sharded_ratio),
+                        sharded_ratio)
+    self.assertAllClose(oracle_value + tf.zeros_like(sharded_subtraction),
+                        sharded_subtraction)
+
+  def test_log_prob_ratio_independent(self):
+    dist = tfd.Independent(tfd.Normal(tf.zeros([2 * test_lib.NUM_DEVICES]), 1.),
+                           reinterpreted_batch_ndims=1)
+
+    x0 = 0.
+    x1 = 1.
+
+    oracle_value = tfde.log_prob_ratio(dist, x0, dist, x1)
+
+    dist_sharded = tfp_dist.ShardedIndependent(
+        tfd.Normal(tf.zeros([2]), 1.),
+        reinterpreted_batch_ndims=1,
+        shard_axis_name=self.axis_name)
+    @tf.function
+    def test():
+      return (tfde.log_prob_ratio(dist_sharded, x0, dist_sharded, x1),
+              dist_sharded.log_prob(x0) - dist_sharded.log_prob(x1))
+
+    lp1, lp2 = self.strategy_run(test, in_axes=None)
+    sharded_ratio = self.per_replica_to_tensor(lp1)
+    sharded_subtraction = self.per_replica_to_tensor(lp2)
+
+    self.assertAllClose(oracle_value + tf.zeros_like(sharded_ratio),
+                        sharded_ratio)
+    self.assertAllClose(oracle_value + tf.zeros_like(sharded_subtraction),
+                        sharded_subtraction)
 
 
 if __name__ == '__main__':

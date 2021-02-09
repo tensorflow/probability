@@ -57,7 +57,7 @@ class DistributedTest(test_util.TestCase):
     return tf.nest.map_structure(
         lambda per_replica: tf.stack(per_replica.values, axis=axis), value)
 
-  def strategy_run(self, f, args, in_axes=0):
+  def strategy_run(self, f, args=(), in_axes=0):
     if JAX_MODE:
       if in_axes is None:
         return jax.pmap(
