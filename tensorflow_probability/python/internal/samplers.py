@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import hashlib
+import warnings
 
 # Dependency imports
 
@@ -70,6 +71,13 @@ def sanitize_seed(seed, salt=None, name=None):
       if JAX_MODE:
         raise ValueError(
             'TFP-on-JAX requires a `jax.random.PRNGKey` `seed` arg.')
+      elif (tf.distribute.get_replica_context() is not None and
+            tf.distribute.get_replica_context().num_replicas_in_sync > 1):
+        warnings.warn(
+            'Using stateful random seeds in replicated context can yield '
+            'unreproducible results. For more details, see '
+            'https://github.com/tensorflow/probability/blob/master/PRNGS.md')
+
       # TODO(b/147874898): Deprecate `int` seeds, migrate ints to stateless?
       if salt is not None:
         # Prefer to incorporate salt as a constant.

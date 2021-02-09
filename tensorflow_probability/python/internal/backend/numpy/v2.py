@@ -118,11 +118,30 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
   return transform
 
 
+class _SingleReplicaContext(object):
+  """Dummy replica context for numpy."""
+
+  @property
+  def replica_id_in_sync_group(self):
+    if JAX_MODE:
+      raise NotImplementedError
+    return 0
+
+  @property
+  def num_replicas_in_sync(self):
+    if JAX_MODE:
+      raise NotImplementedError
+    return 1
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
 compat = collections.namedtuple('compat', 'dimension_value')(
     lambda dim: None if dim is None else int(dim))
+
+distribute = collections.namedtuple('distribute', 'get_replica_context')(
+    _SingleReplicaContext)
 
 function = utils.copy_docstring(
     'tf.function',
