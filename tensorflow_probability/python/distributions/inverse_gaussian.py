@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
@@ -171,11 +172,33 @@ class InverseGaussian(distribution.Distribution):
         shape, seed=chi2_seed, dtype=self.dtype))
     sampled_uniform = samplers.uniform(
         shape, seed=unif_seed, dtype=self.dtype)
-    sampled = (
-        loc + tf.square(loc) * sampled_chi2 / (2. * concentration) -
-        loc / (2. * concentration) *
-        tf.sqrt(4. * loc * concentration * sampled_chi2 +
-                tf.square(loc * sampled_chi2)))
+    # Wikipedia defines an intermediate x with the formula
+    #   x = loc + loc ** 2 * y / (2 * conc)
+    #       - loc / (2 * conc) * sqrt(4 * loc * conc * y + loc ** 2 * y ** 2)
+    # where y ~ N(0, 1)**2 (sampled_chi2 above) and conc is the concentration.
+    # Let us write
+    #   w = loc * y / (2 * conc)
+    # Then we can extract the common factor in the last two terms to obtain
+    #   x = loc + loc * w * (1 - sqrt(2 / w + 1))
+    # Now we see that the Wikipedia formula suffers from catastrphic
+    # cancellation for large w (e.g., if conc << loc).
+    #
+    # Fortunately, we can fix this by multiplying both sides
+    # by 1 + sqrt(2 / w + 1).  We get
+    #   x * (1 + sqrt(2 / w + 1)) =
+    #     = loc * (1 + sqrt(2 / w + 1)) + loc * w * (1 - (2 / w + 1))
+    #     = loc * (sqrt(2 / w + 1) - 1)
+    # The term sqrt(2 / w + 1) + 1 no longer presents numerical
+    # difficulties for large w, and sqrt(2 / w + 1) - 1 is just
+    # sqrt1pm1(2 / w), which we know how to compute accurately.
+    # This just leaves the matter of small w, where 2 / w may
+    # overflow.  In the limit a w -> 0, x -> loc, so we just mask
+    # that case.
+    sqrt1pm1_arg = 4 * concentration / (loc * sampled_chi2)  # 2 / w above
+    safe_sqrt1pm1_arg = tf.where(sqrt1pm1_arg < np.inf, sqrt1pm1_arg, 1.0)
+    denominator = 1.0 + tf.sqrt(safe_sqrt1pm1_arg + 1.0)
+    ratio = tfp_math.sqrt1pm1(safe_sqrt1pm1_arg) / denominator
+    sampled = loc * tf.where(sqrt1pm1_arg < np.inf, ratio, 1.0)  # x above
     return tf.where(sampled_uniform <= loc / (loc + sampled),
                     sampled, tf.square(loc) / sampled)
 

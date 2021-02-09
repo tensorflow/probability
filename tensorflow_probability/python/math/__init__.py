@@ -41,6 +41,7 @@ from tensorflow_probability.python.math.generic import smootherstep
 from tensorflow_probability.python.math.generic import soft_sorting_matrix
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.generic import softplus_inverse
+from tensorflow_probability.python.math.generic import sqrt1pm1
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
@@ -141,6 +142,7 @@ _allowed_symbols = [
     'softplus_inverse',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
+    'sqrt1pm1',
     'value_and_gradient',
 ]
 

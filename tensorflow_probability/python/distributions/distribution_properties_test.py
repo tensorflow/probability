@@ -61,7 +61,6 @@ NO_NANS_TEST_BLOCK_LIST = (
     # Independent log_prob unavoidably emits `nan` if the underlying
     # distribution yields a +inf on one sample and a -inf on another.
     'Independent',
-    'InverseGaussian',  # TODO(axch): Fix numerics of 1 - sqrt(x + 1)
     'LogitNormal',  # TODO(axch): Maybe nan problem hints at accuracy problem
     # Mixtures of component distributions whose samples have different dtypes
     # cannot pass validate_args.
