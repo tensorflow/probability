@@ -59,7 +59,7 @@ class ExpGamma(distribution.Distribution):
   `tfb.Log()(tfd.Gamma(..))`):
 
   ```none
-  pdf(x; alpha, beta > 0) = exp(x)**(alpha - 1) exp(-exp(x) beta) / Z + x
+  pdf(x; alpha, beta > 0) = exp(x)**(alpha) exp(-exp(x) beta) / Z
   Z = Gamma(alpha) beta**(-alpha)
   ```
 
@@ -302,7 +302,7 @@ class ExpInverseGamma(transformed_distribution.TransformedDistribution):
   The probability density function (pdf) is very similar to ExpGamma,
 
   ```none
-  pdf(x; alpha, beta > 0) = exp(-x)**(alpha - 1) exp(-exp(-x) beta) / Z - x
+  pdf(x; alpha, beta > 0) = exp(-x)**(alpha) exp(-exp(-x) beta) / Z
   Z = Gamma(alpha) beta**(-alpha)
   ```
 
