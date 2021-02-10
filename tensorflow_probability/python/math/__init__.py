@@ -68,6 +68,8 @@ from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import erfcinv
+from tensorflow_probability.python.math.special import igammacinv
+from tensorflow_probability.python.math.special import igammainv
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
@@ -100,6 +102,8 @@ _allowed_symbols = [
     'dense_to_sparse',
     'diag_jacobian',
     'erfcinv',
+    'igammacinv',
+    'igammainv',
     'find_root_chandrupatla',
     'find_root_secant',
     'fill_triangular',

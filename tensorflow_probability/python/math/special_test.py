@@ -171,6 +171,108 @@ class RoundExponentialBumpFunctionTest(test_util.TestCase):
     self.assertAllEqual(dy_dx_, np.zeros((6,)))
 
 
+class IgammainvTest(test_util.TestCase):
+
+  def test_igammainv_bounds(self):
+    a = [-1., -4., 0.1, 2.]
+    p = [0.2, 0.3, -1., 10.]
+    # Out of bounds.
+    self.assertAllClose(
+        np.full_like(a, np.nan), tfp.math.igammainv(a, p))
+    self.assertAllClose(
+        np.full_like(a, np.nan), tfp.math.igammacinv(a, p))
+
+    a = np.random.uniform(1., 5., size=4)
+
+    self.assertAllClose(np.zeros_like(a), tfp.math.igammainv(a, 0.))
+    self.assertAllClose(np.zeros_like(a), tfp.math.igammacinv(a, 1.))
+
+    self.assertAllClose(
+        np.full_like(a, np.inf), tfp.math.igammainv(a, 1.))
+    self.assertAllClose(
+        np.full_like(a, np.inf), tfp.math.igammacinv(a, 0.))
+    self.assertTrue(
+        np.isnan(self.evaluate(tfp.math.igammainv(np.nan, np.nan))))
+    self.assertTrue(
+        np.isnan(self.evaluate(tfp.math.igammacinv(np.nan, np.nan))))
+
+  @parameterized.parameters((np.float32, 1.5e-4), (np.float64, 1e-6))
+  def test_igammainv_inverse_small_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammainv, a, p = self.evaluate([tfp.math.igammainv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 1.5e-4), (np.float64, 1e-6))
+  def test_igammacinv_inverse_small_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammacinv, a, p = self.evaluate([tfp.math.igammacinv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 1e-4), (np.float64, 1e-6))
+  def test_igammainv_inverse_medium_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 1., 100., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammainv, a, p = self.evaluate([tfp.math.igammainv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 1e-4), (np.float64, 1e-6))
+  def test_igammacinv_inverse_medium_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 1., 100., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammacinv, a, p = self.evaluate([tfp.math.igammacinv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 3e-4), (np.float64, 1e-6))
+  def test_igammainv_inverse_large_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        [int(1e4)], 100., 10000., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammainv, a, p = self.evaluate([tfp.math.igammainv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 3e-4), (np.float64, 1e-6))
+  def test_igammacinv_inverse_large_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        [int(1e4)], 100., 10000., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammacinv, a, p = self.evaluate([tfp.math.igammacinv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
+
+  @test_util.numpy_disable_gradient_test
+  def testIgammainvGradient(self):
+    a = np.logspace(-2., 2., 11)[..., np.newaxis]
+    # Avoid the end points where the gradient can veer off to infinity.
+    p = np.linspace(0.1, 0.7, 23)
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammainv(a, x), [p], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammainv(x, p), [a], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+  @test_util.numpy_disable_gradient_test
+  def testIgammacinvGradient(self):
+    a = np.logspace(-2., 2., 11)[..., np.newaxis]
+    # Avoid the end points where the gradient can veer off to infinity.
+    p = np.linspace(0.1, 0.7, 23)
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammacinv(a, x), [p], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammacinv(x, p), [a], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+
 class OwensTTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)

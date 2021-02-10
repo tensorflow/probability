@@ -30,6 +30,8 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'erfcinv',
+    'igammainv',
+    'igammacinv',
     'round_exponential_bump_function',
     'lambertw',
     'lambertw_winitzki_approx',
@@ -57,6 +59,419 @@ def erfcinv(z, name=None):
   with tf.name_scope(name or 'erfcinv'):
     z = tf.convert_to_tensor(z)
     return -tf.math.ndtri(0.5 * z) * np.sqrt(0.5)
+
+
+# Implementation of Inverse Incomplete Gamma based on
+# A. Didonato and A. Morris,
+# Computation of the Incomplete Gamma Function Ratios and their Inverse
+# https://dl.acm.org/doi/10.1145/22721.23109
+
+
+def _didonato_eq_twenty_three(log_b, v, a):
+  return -log_b + tf.math.xlogy(a - 1., v) - tf.math.log1p((1. - a) / (1. + v))
+
+
+def _didonato_eq_thirty_two(p, q):
+  """Compute Equation 32 from Didonato's paper."""
+  dtype = dtype_util.common_dtype([p, q], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  numerator_coeffs = [
+      0.213623493715853, 4.28342155967104, 11.6616720288968, 3.31125922108741]
+  numerator_coeffs = [numpy_dtype(c) for c in numerator_coeffs]
+  denominator_coeffs = [
+      0.36117081018842e-1, 1.27364489782223, 6.40691597760039,
+      6.61053765625462, 1.]
+  denominator_coeffs = [numpy_dtype(c) for c in denominator_coeffs]
+  t = tf.where(
+      p < 0.5,
+      tf.math.sqrt(-2 * tf.math.log(p)),
+      tf.math.sqrt(-2. * tf.math.log(q)))
+  result = (t - tf.math.polyval(numerator_coeffs, t) / tf.math.polyval(
+      denominator_coeffs, t))
+  return tf.where(p < 0.5, -result, result)
+
+
+def _didonato_eq_thirty_four(a, x):
+  """Compute Equation 34 from Didonato's paper."""
+  # This function computes `S_n` in equation thirty four.
+  dtype = dtype_util.common_dtype([a, x], tf.float32)
+
+  # TODO(b/178793508): Change this tolerance to be dtype dependent.
+  tolerance = 1e-4
+
+  def _taylor_series(should_stop, index, partial, series_sum):
+    partial = partial * x / (a + index)
+    series_sum = tf.where(should_stop, series_sum, series_sum + partial)
+    # TODO(b/178793508): Change the number of iterations to be dtype dependent.
+    should_stop = (partial < tolerance) | (index > 100)
+    return should_stop, index + 1, partial, series_sum
+
+  _, _, _, series_sum = tf.while_loop(
+      cond=lambda stop, *_: tf.reduce_any(~stop),
+      body=_taylor_series,
+      loop_vars=(
+          tf.zeros_like(a + x, dtype=tf.bool),
+          tf.cast(1., dtype=dtype),
+          tf.ones_like(a + x, dtype=dtype),
+          tf.ones_like(a + x, dtype=dtype)))
+  return series_sum
+
+
+def _didonato_eq_twenty_five(a, y):
+  """Compute Equation 25 from Didonato's paper."""
+  c1 = tf.math.xlogy(a - 1., y)
+  c1_sq = tf.math.square(c1)
+  c1_cub = c1_sq * c1
+  c1_fourth = tf.math.square(c1_sq)
+  a_sq = tf.math.square(a)
+  a_cub = a_sq * a
+  c2 = (a - 1.) * (1. + c1)
+  c3 = (a - 1.) * ((3. * a - 5.) / 2. + c1 * (a - 2. - c1 / 2.))
+  c4 = (a - 1.) * (
+      (c1_cub / 3.) - (3. * a - 5.) * c1_sq / 2. +
+      (a_sq - 6. * a + 7.) * c1 + (11. * a_sq - 46. * a + 47.) / 6.)
+  c5 = ((a - 1.) * (-c1_fourth / 4. +
+                    (11. * a - 17.) * c1_cub / 6 +
+                    (-3. * a_sq + 13. * a - 13.) * c1_sq +
+                    (2. * a_cub - 25. * a_sq + 72. * a - 61.) * c1 / 2. +
+                    (25. * a_cub - 195. * a_sq + 477 * a - 379) / 12.))
+  return y + c1 + (((c5 / y + c4) / y + c3 / y) + c2) / y
+
+
+def _inverse_igamma_initial_approx(a, p, q, use_p_for_logq=True):
+  """Compute an initial guess for `igammainv(a, p)`.
+
+  Compute an initial estimate of `igammainv(a, p)`. This will be further
+  refined by Newton-Halley iterations.
+
+  Args:
+    a: A positive `float` `Tensor`. Must be broadcastable with `p`.
+    p: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`. This is `1 - q`.
+    q: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`. This is `1 - p`.
+    use_p_for_logq: `bool` describing whether to compute
+      `log(q)` by using `log(1 - p)` or `log(q)`.
+      Default value: `True`.
+
+  Returns:
+    igamma_approx: Approximation to `igammainv(a, p)`.
+  """
+
+  dtype = dtype_util.common_dtype([a, p, q], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  a = tf.convert_to_tensor(a, dtype=dtype)
+  p = tf.convert_to_tensor(p, dtype=dtype)
+  q = tf.convert_to_tensor(q, dtype=dtype)
+
+  lgamma_a = tf.math.lgamma(a)
+
+  # This ensures that computing log(1 - p) avoids roundoff errors. This is
+  # needed since igammacinv and igammainv both use this codepath,
+  if use_p_for_logq:
+    log_q = tf.math.log1p(-p)
+  else:
+    log_q = tf.math.log(q)
+
+  log_b = log_q + lgamma_a
+
+  result = _didonato_eq_twenty_five(a, -log_b)
+
+  # The code below is for when a < 1.
+
+  v = -log_b - (1. - a) * tf.math.log(-log_b)
+  v_sq = tf.math.square(v)
+
+  # This is Equation 24.
+  result = tf.where(
+      log_b > np.log(0.01),
+      -log_b - (1. - a) * tf.math.log(v) - tf.math.log(
+          (v_sq + 2. * (3. - a) * v + (2. - a) * (3 - a)) /
+          (v_sq + (5. - a) * v + 2.)),
+      result)
+
+  result = tf.where(
+      log_b >= np.log(0.15),
+      _didonato_eq_twenty_three(log_b, v, a),
+      result)
+
+  t = tf.math.exp(-np.euler_gamma - tf.math.exp(log_b))
+  u = t * tf.math.exp(t)
+  result = tf.where(
+      (a < 0.3) & (log_b >= np.log(0.35)),
+      t * tf.math.exp(u),
+      result)
+
+  # These are hand tuned constants to compute (p * Gamma(a + 1)) ** (1 / a)
+  # TODO(b/178793508): Change these bounds / computation to be dtype dependent.
+  # This is Equation 21.
+  u = tf.where((tf.math.exp(log_b) * q > 1e-8) & (q > 1e-5),
+               tf.math.pow(p * tf.math.exp(lgamma_a) * a,
+                           tf.math.reciprocal(a)),
+               # When (1 - p) * Gamma(a) or (1 - p) is small,
+               # we can taylor expand Gamma(a + 1) ** 1 / a to get
+               # exp(-euler_gamma for the zeroth order term.
+               # Also p ** 1 / a = exp(log(p) / a) = exp(log(1 - q) / a)
+               # ~= exp(-q / a) resulting in the following expression.
+               tf.math.exp((-q / a) - np.euler_gamma))
+
+  result = tf.where(
+      (log_b > np.log(0.6)) | ((log_b >= np.log(0.45)) & (a >= 0.3)),
+      u / (1. - (u / (a + 1.))),
+      result)
+
+  # The code below is for when a < 1.
+
+  sqrt_a = tf.math.sqrt(a)
+  s = _didonato_eq_thirty_two(p, q)
+  s_sq = tf.math.square(s)
+  s_cub = s_sq * s
+  s_fourth = tf.math.square(s_sq)
+  s_fifth = s_fourth * s
+
+  # This is the Cornish-Fisher 6 term expansion for x (by viewing igammainv as
+  # the quantile function for the Gamma distribution). This is equation (31).
+  w = a + s * sqrt_a + (s_sq - 1.) / 3.
+  w = w + (s_cub - 7. * s) / (36. * sqrt_a)
+  w = w - (3. * s_fourth + 7. * s_sq - 16.) / (810 * a)
+  w = w + (9. * s_fifth + 256. * s_cub - 433. * s) / (38880 * a * sqrt_a)
+
+  # The code below is for when a > 1. and p > 0.5.
+  d = tf.math.maximum(numpy_dtype(2.), a * (a - 1.))
+  result_a_large_p_large = tf.where(
+      log_b <= -d * np.log(10.),
+      _didonato_eq_twenty_five(a, -log_b),
+      _didonato_eq_twenty_three(
+          log_b, _didonato_eq_twenty_three(log_b, w, a), a))
+  result_a_large_p_large = tf.where(w < 3. * a, w, result_a_large_p_large)
+  # TODO(b/178793508): Change these bounds / computation to be dtype dependent.
+  result_a_large_p_large = tf.where(
+      (a >= 500.) & (tf.math.abs(1. - w / a) < 1e-6),
+      w, result_a_large_p_large)
+
+  # The code below is for when a > 1. and p <= 0.5.
+  z = w
+  v = tf.math.log(p) + tf.math.lgamma(a + 1.)
+
+  # The code below follows Equation 35 which involves multiple evaluations of
+  # F_i.
+  modified_z = tf.math.exp((v + w) / a)
+  for _ in range(2):
+    s = tf.math.log1p(
+        modified_z / (a + 1.) * (
+            1. + modified_z / (a + 2.)))
+    modified_z = tf.math.exp(
+        (v + modified_z - s) / a)
+
+  s = tf.math.log1p(
+      modified_z / (a + 1.) * (1. + modified_z / (a + 2.) * (
+          1. + modified_z / (a + 3.))))
+  modified_z = tf.math.exp((v + modified_z - s) / a)
+  z = tf.where(w <= 0.15 * (a + 1.), modified_z, z)
+
+  ls = tf.math.log(_didonato_eq_thirty_four(a, z))
+  medium_z = tf.math.exp((v + z - ls) / a)
+  result_a_large_p_small = tf.where(
+      (z <= 0.01 * (a + 1.)) | (z > 0.7 * (a + 1.)),
+      z,
+      medium_z * (
+          1. - (
+              a * tf.math.log(medium_z) - medium_z - v + ls) / (a - medium_z)))
+
+  result_a_large = tf.where(
+      p <= 0.5, result_a_large_p_small, result_a_large_p_large)
+  result = tf.where(a < 1., result, result_a_large)
+
+  # This ensures that computing log(1 - p) avoids roundoff errors. This is
+  # needed since igammacinv and igammainv both use this codepath,
+  # switching p and q.
+  result = tf.where(tf.math.equal(a, 1.), -log_q, result)
+  return result
+
+
+def _shared_igammainv_computation(a, p, is_igammainv=True):
+  """Shared computation for the igammainv/igammacinv."""
+
+  dtype = dtype_util.common_dtype([a, p], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+
+  if is_igammainv:
+    q = 1. - p
+  else:
+    q = p
+    p = 1. - q
+
+  x = _inverse_igamma_initial_approx(a, p, q, use_p_for_logq=is_igammainv)
+
+  # Run 3 steps of Newton-Halley method.
+  for _ in range(3):
+    factorial = tf.math.exp(a * tf.math.log(x) - x - tf.math.lgamma(a))
+
+    f_over_der = tf.where(
+        ((p <= 0.9) & is_igammainv) | ((q > 0.9) & (not is_igammainv)),
+        (tf.math.igamma(a, x) - p) * x / factorial,
+        -(tf.math.igammac(a, x) - q) * x / factorial)
+    second_der_over_der = -1. + (a - 1.) / x
+    modified_x = tf.where(
+        tf.math.is_inf(second_der_over_der),
+        # Use Newton's method if the second derivative is not available.
+        x - f_over_der,
+        # Use Halley's method otherwise. Halley's method is:
+        # x_{n+1} = x_n - f(x_n) / f'(x_n) * (
+        #    1 - f(x_n) / f'(x_n) * 0.5 f''(x_n) / f'(x_n))
+        x - f_over_der / (1. - 0.5 * f_over_der * second_der_over_der))
+    x = tf.where(tf.math.equal(factorial, 0.), x, modified_x)
+  x = tf.where((a < 0.) | (p < 0.) | (p > 1.), numpy_dtype(np.nan), x)
+  x = tf.where(tf.math.equal(p, 0.), numpy_dtype(0.), x)
+  x = tf.where(tf.math.equal(p, 1.), numpy_dtype(np.inf), x)
+
+  return x
+
+
+def _igammainv_fwd(a, p):
+  """Compute output, aux (collaborates with _igammainv_bwd)."""
+  output = _shared_igammainv_computation(a, p, is_igammainv=True)
+  return output, (a, p, output)
+
+
+def _igammainv_partials(a, x):
+  """Compute partial derivatives of `igammainv(a, x)`."""
+  # Partials for igamma.
+  igamma_partial_a = tf.raw_ops.IgammaGradA(a=a, x=x)
+  igamma_partial_x = tf.math.exp(
+      -x + tf.math.xlogy(a - 1., x) - tf.math.lgamma(a))
+
+  # Use the fact that igamma and igammainv are inverses of each other to compute
+  # the gradients.
+  igammainv_partial_a = -igamma_partial_a / igamma_partial_x
+  igammainv_partial_x = tf.math.reciprocal(igamma_partial_x)
+  return igammainv_partial_a, igammainv_partial_x
+
+
+def _igammainv_bwd(aux, g):
+  """Reverse mode impl for igammainv."""
+  a, p, x = aux
+  # Use the fact that igamma and igammainv are inverses to compute the gradient.
+  pa, pp = _igammainv_partials(a, x)
+  return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
+
+
+def _igammainv_jvp(primals, tangents):
+  """Computes JVP for igammainv (supports JAX custom derivative)."""
+  a, p = primals
+  da, dp = tangents
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(da),
+                                         prefer_static.shape(dp))
+  da = tf.broadcast_to(da, bc_shp)
+  dp = tf.broadcast_to(dp, bc_shp)
+
+  x = _shared_igammainv_computation(a, p, is_igammainv=True)
+  pa, pp = _igammainv_partials(a, x)
+
+  return x, pa * da + pp * dp
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_igammainv_fwd,
+    vjp_bwd=_igammainv_bwd,
+    jvp_fn=_igammainv_jvp)
+def _igammainv_custom_gradient(a, p):
+  return _shared_igammainv_computation(a, p, is_igammainv=True)
+
+
+def igammainv(a, p, name=None):
+  """Computes the inverse to `tf.math.igamma` with respect to `p`.
+
+  This function is defined as the solution `x` to the equation
+  `p = tf.math.igamma(a, x)`.
+
+  # References
+  [1] A. Didonato and A. Morris,
+      Computation of the Incomplete Gamma Function Ratios and their Inverse
+      https://dl.acm.org/doi/10.1145/22721.23109
+
+  Args:
+    a: A positive `float` `Tensor`. Must be broadcastable with `p`.
+    p: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    igammainv: igammainv(a, p). Has same type as `a`.
+  """
+  with tf.name_scope(name or 'igammainv'):
+    dtype = dtype_util.common_dtype([a, p], tf.float32)
+    a = tf.convert_to_tensor(a, dtype=dtype)
+    p = tf.convert_to_tensor(p, dtype=dtype)
+    return _igammainv_custom_gradient(a, p)
+
+
+def _igammacinv_fwd(a, p):
+  """Compute output, aux (collaborates with _igammacinv_bwd)."""
+  output = _shared_igammainv_computation(a, p, is_igammainv=False)
+  return output, (a, p, output)
+
+
+def _igammacinv_bwd(aux, g):
+  """Reverse mode impl for igammacinv."""
+  a, p, x = aux
+  pa, pp = _igammainv_partials(a, x)
+  pp = -pp
+  return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
+
+
+def _igammacinv_jvp(primals, tangents):
+  """Computes JVP for igammacinv (supports JAX custom derivative)."""
+  a, p = primals
+  da, dp = tangents
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(da),
+                                         prefer_static.shape(dp))
+  da = tf.broadcast_to(da, bc_shp)
+  dp = tf.broadcast_to(dp, bc_shp)
+
+  x = _shared_igammainv_computation(a, p, is_igammainv=False)
+  pa, pp = _igammainv_partials(a, x)
+  pp = -pp
+
+  return x, pa * da + pp * dp
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_igammacinv_fwd,
+    vjp_bwd=_igammacinv_bwd,
+    jvp_fn=_igammacinv_jvp)
+def _igammacinv_custom_gradient(a, p):
+  return _shared_igammainv_computation(a, p, is_igammainv=False)
+
+
+def igammacinv(a, p, name=None):
+  """Computes the inverse to `tf.math.igammac` with respect to `p`.
+
+  This function is defined as the solution `x` to the equation
+  `p = tf.math.igammac(a, x)`.
+
+  # References
+  [1] A. Didonato and A. Morris,
+      Computation of the Incomplete Gamma Function Ratios and their Inverse
+      https://dl.acm.org/doi/10.1145/22721.23109
+
+  Args:
+    a: A positive `float` `Tensor`. Must be broadcastable with `p`.
+    p: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    igammacinv: igammacinv(a, p). Has same type as `a`.
+  """
+
+  with tf.name_scope(name or 'igammacinv'):
+    dtype = dtype_util.common_dtype([a, p], tf.float32)
+    a = tf.convert_to_tensor(a, dtype=dtype)
+    p = tf.convert_to_tensor(p, dtype=dtype)
+    return _igammacinv_custom_gradient(a, p)
 
 
 def round_exponential_bump_function(x, name=None):
