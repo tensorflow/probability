@@ -47,6 +47,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
+from tensorflow_probability.python.random import random_ops
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -106,16 +107,6 @@ class _ClipByValue(bijector_lib.Bijector):
   def _forward_log_det_jacobian(self, x):
     # We deliberately ignore the clipping operation.
     return tf.zeros([], dtype=dtype_util.base_dtype(x.dtype))
-
-
-def _uniform_unit_norm(dimension, shape, dtype, seed):
-  """Returns a batch of points chosen uniformly from the unit hypersphere."""
-  # This works because the Gaussian distribution is spherically symmetric.
-  # raw shape: shape + [dimension]
-  raw = samplers.normal(
-      shape=ps.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
-  unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
-  return unit_norm
 
 
 def _replicate(n, tensor):
@@ -215,8 +206,10 @@ def sample_lkj(
       distance = tf.sqrt(norm)[..., tf.newaxis]
       # direction is u in reference [1].
       # direction shape: B + [n]
-      direction = _uniform_unit_norm(
-          n, concentration_shape, concentration.dtype,
+      direction = random_ops.spherical_uniform(
+          shape=concentration_shape,
+          dimension=n,
+          dtype=concentration.dtype,
           seed=seeds.pop())
       # raw_correlation is w in reference [1].
       raw_correlation = distance * direction  # shape: B + [n]
