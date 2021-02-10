@@ -281,7 +281,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     parameterized by an amplitude and length_scale:
 
     ```none
-    exp_quad(x, x') := amplitude * exp(||x - x'||**2 / length_scale**2)
+    exp_quad(x, x') := amplitude ** 2 * exp(||x - x'||**2 / length_scale**2)
     ```
 
     The batch_shape of such a kernel is derived from broadcasting the shapes of
