@@ -83,7 +83,7 @@ class Weibull(transformed_distribution.TransformedDistribution):
   Example of initialization of a 3-batch of distributions with varying scales
   and concentrations.
 
-    ```python
+  ```python
   tfd = tfp.distributions
 
   # Define a 3-batch of Weibull distributions.
