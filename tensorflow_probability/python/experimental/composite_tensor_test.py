@@ -93,10 +93,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     # pylint: enable=g-error-prone-assert-raises
 
   def test_basics_assertfails(self):
-    dist = normal_composite(0, 1, validate_args=True)
+    dist = normal_composite(0., 1., validate_args=True)
     flat = tf.nest.flatten(dist, expand_composites=True)
-    flat[1] = tf.constant(-1.)
-    with self.assertRaisesOpError('`scale` must be positive'):
+    flat[1] = tf.constant(2)
+    with self.assertRaises(TypeError):
       unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
       self.evaluate(unflat.log_prob(.5))
 
@@ -140,7 +140,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
       def __init__(self):
         self.loc = tf.Variable([0., 1.])
-        self.scale_adj = tf.Variable(0.)
+        self.scale_adj = tf.Variable([0.], shape=[None])
 
       @tf.function(input_signature=(normal_composite(0, [1, 2])._type_spec,))
       def make_dist(self, d):
@@ -161,11 +161,11 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.evaluate(m2.loc.assign(m2.loc + 2))
     self.evaluate(m2.make_dist(d).sample())
 
-    self.evaluate(m2.scale_adj.assign(-30.))
+    self.evaluate(m2.scale_adj.assign([1., 2., 3.]))
     tf.saved_model.save(m2, os.path.join(path, 'saved_model2'))
     m3 = tf.saved_model.load(os.path.join(path, 'saved_model2'))
     self.evaluate([v.initializer for v in (m3.loc, m3.scale_adj)])
-    with self.assertRaisesOpError('Argument `scale` must be positive'):
+    with self.assertRaisesOpError('compatible shape'):
       self.evaluate(m3.make_dist(d).sample())
 
   def test_import_uncached_class(self):
