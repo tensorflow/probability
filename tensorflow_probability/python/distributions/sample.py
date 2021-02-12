@@ -304,8 +304,11 @@ class Sample(distribution_lib.Distribution):
     # TODO(b/170405182): In scenarios where we can statically prove that it has
     #   no batch part, avoid the transposes by directly using
     #   `self.distribution.experimental_default_event_space_bijector()`.
+    bijector = self.distribution.experimental_default_event_space_bijector()
+    if bijector is None:
+      return None
     return _DefaultSampleBijector(self.distribution, self.sample_shape,
-                                  self._sum_fn())
+                                  self._sum_fn(), bijector=bijector)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
