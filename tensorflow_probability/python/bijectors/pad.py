@@ -242,7 +242,7 @@ class Pad(bijector.Bijector):
 
   def _inverse_event_shape(self, output_shape):
     input_shape = self._forward_event_shape(output_shape, is_inverse=True)
-    if any(s < 0 for s in input_shape):
+    if input_shape is not None and any(s < 0 for s in input_shape):
       raise ValueError('Invalid inverse shape; {}'.format(input_shape))
     return input_shape
 
