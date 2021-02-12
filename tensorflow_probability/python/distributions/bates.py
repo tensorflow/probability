@@ -117,10 +117,10 @@ class Bates(distribution.Distribution):
   Compute some values for the pdf.
 
   ```python
-  dist.probs(50.)    # shape: [3]
+  dist.prob(50.)    # shape: [3]
   x = [[50., 50., 50.],
        [5., 10., 20.]]      # shape: [2, 3]
-  dist.probs(x)      # shape: [2]
+  dist.prob(x)      # shape: [2, 3]
   ```
   """
 
