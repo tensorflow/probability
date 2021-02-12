@@ -41,6 +41,7 @@ multi_substrate_py_library(
     ],
     deps = [
         ":autoregressive",
+        ":batch_concat",
         ":batch_reshape",
         ":bates",
         ":bernoulli",
@@ -3963,5 +3964,36 @@ py_binary(
         # absl:app dep,
         # absl/logging dep,
         "//tensorflow_probability/python/distributions:hypothesis_testlib",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "batch_concat_test",
+    srcs = ["batch_concat_test.py"],
+    jax_size = "large",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":batch_concat",
+        ":distributions",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "batch_concat",
+    srcs = ["batch_concat.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
