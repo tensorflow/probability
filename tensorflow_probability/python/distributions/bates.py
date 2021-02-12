@@ -489,6 +489,9 @@ def _segmented_range(limits):
   Returns:
     segments: 1D `Tensor` of segment ranges.
   """
+  # To cope with [0]-shaped limits, which disagrees with the sensibilities of
+  # tf.repeat, we left-pad, then slice the output.
+  limits = tf.pad(limits, [[1, 0]], constant_values=0)
   return (tf.range(tf.reduce_sum(limits)) -
           tf.repeat(tf.concat([[0], tf.cumsum(limits[:-1])], axis=0), limits))
 

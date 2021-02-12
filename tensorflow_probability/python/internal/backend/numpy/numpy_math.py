@@ -191,11 +191,12 @@ def _astuple(x):
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
               dtype=np.int32, name=None):  # pylint: disable=unused-argument
   """Counts number of occurences of each value in `arr`."""
+  # TODO(https://github.com/google/jax/issues/5719): Use np.bincount directly?
   if not JAX_MODE:
     return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
 
   dtype = utils.numpy_dtype(dtype)
-  num_buckets = np.max(arr) + 1
+  num_buckets = (np.max(arr) + 1) if np.size(arr) else 0
   if minlength is not None and maxlength is not None and minlength == maxlength:
     # In the case where we can use minlength directly, this helps avoids the
     # use of an abstract value, which prevents JAX JIT.
@@ -342,8 +343,8 @@ def _segment_sum(data, segment_ids, name=None):  # pylint: disable=unused-argume
 
 
 def _segment_mean(data, segment_ids, name=None):
-  sm = _segment_sum(data, segment_ids, name=name)
-  denom = np.bincount(segment_ids - segment_ids[0])
+  sm = segment_sum(data, segment_ids, name=name)
+  denom = bincount(segment_ids - segment_ids[:1])
   return sm / denom.reshape(denom.shape + (1,) * (data.ndim - 1))
 
 
