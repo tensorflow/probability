@@ -140,6 +140,28 @@ class _GeneralizedNormalTest(object):
     expected_cdf = sp_stats.gennorm(power, loc=mu, scale=sigma).cdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-5)
 
+  def testGeneralizedNormalSF(self):
+    batch_size = 50
+    mu = self._rng.randn(batch_size)
+    sigma = self._rng.rand(batch_size) + 1.
+    power = self._rng.rand(batch_size) + 1.
+    x = np.linspace(-8., 8., batch_size).astype(np.float64)
+
+    gnormal = tfd.GeneralizedNormal(loc=self.make_input(mu),
+                                    scale=self.make_input(sigma),
+                                    power=self.make_input(power),
+                                    validate_args=True)
+    sf = gnormal.survival_function(x)
+    self.assertAllEqual(
+        self.evaluate(gnormal.batch_shape_tensor()), sf.shape)
+    self.assertAllEqual(
+        self.evaluate(gnormal.batch_shape_tensor()),
+        self.evaluate(sf).shape)
+    self.assertAllEqual(gnormal.batch_shape, sf.shape)
+    self.assertAllEqual(gnormal.batch_shape, self.evaluate(sf).shape)
+    expected_sf = sp_stats.gennorm(power, loc=mu, scale=sigma).sf(x)
+    self.assertAllClose(expected_sf, self.evaluate(sf), atol=0, rtol=1e-5)
+
   def testGeneralizedNormalLogCDF(self):
     if self.dtype is np.float32:
       self.skipTest('32-bit precision not sufficient for LogCDF')
@@ -190,13 +212,13 @@ class _GeneralizedNormalTest(object):
   @test_util.numpy_disable_gradient_test
   def testFiniteGradientAtDifficultPoints(self):
     def make_fn(dtype, attr):
-      x = np.array([-100., -20., -5., 5., 20., 100.]).astype(dtype)
+      x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
       return lambda m, s, p: getattr(  # pylint: disable=g-long-lambda
           tfd.GeneralizedNormal(loc=m, scale=s, power=p, validate_args=True),
           attr)(x)
 
     # TODO(b/157524947): add 'log_cdf', currently fails at -100, -20, in fp32.
-    for attr in ['log_prob', 'prob', 'cdf']:
+    for attr in ['log_prob', 'prob', 'cdf', 'survival_function']:
       value, grads = self.evaluate(tfp.math.value_and_gradient(
           make_fn(self.dtype, attr),
           [tf.constant(0, self.dtype),  # mu

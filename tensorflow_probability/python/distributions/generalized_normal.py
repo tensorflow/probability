@@ -207,32 +207,32 @@ class GeneralizedNormal(distribution.Distribution):
     log_unnormalized = -tf.pow(tf.abs(x - loc) / scale, power)
     return log_unnormalized - log_normalization
 
-  def _cdf(self, x):
-    loc = tf.convert_to_tensor(self.loc)
+  def _cdf_zero_mean(self, x):
     scale = tf.convert_to_tensor(self.scale)
     power = tf.convert_to_tensor(self.power)
-    ipower = tf.math.reciprocal(power)
-    half = tf.constant(0.5, dtype=self.dtype)  # 0.5 is fp64 in numpy
+    zero = tf.constant(0., dtype=self.dtype)
+    half = tf.constant(0.5, dtype=self.dtype)
+    one = tf.constant(1., dtype=self.dtype)
+    # Double tf.where to avoid incorrect gradient at x == 0.
+    x_is_zero = tf.equal(x, zero)
+    safe_x = tf.where(x_is_zero, one, x)
+    half_gamma = half * tf.math.igammac(
+        tf.math.reciprocal(power),
+        tf.pow(tf.abs(safe_x) / scale, power))
+    return tf.where(
+        x_is_zero,
+        half,
+        tf.where(x > zero, one - half_gamma, half_gamma),
+    )
 
-    # For the CDF computation, we need to use a double-where a la:
-    # https://github.com/tensorflow/probability/blob/master/discussion/where-nan.pdf
-    # to avoid NaN gradients. This comes from computing (loc - x) ** power when
-    # x > loc. If power is a not an even integer, then this value is not defined
-    # or is negative, both of which are not valid values for `igamma`.
+  def _cdf(self, x):
+    loc = tf.convert_to_tensor(self.loc)
+    return self._cdf_zero_mean(x - loc)
 
-    loc_stop_grad = tf.stop_gradient(loc)
-    # Use values that are right below loc and above loc. At loc, this will
-    # result in `gamma|igamma(c)(1. / power, 0.)`. This has an undefined
-    # gradient at 0.
-    safe_x_lt_loc = tf.where(x > loc_stop_grad, loc_stop_grad - half, x)
-    safe_x_gt_loc = tf.where(x < loc_stop_grad, loc_stop_grad + half, x)
-    cdf = tf.where(
-        x < loc,
-        half * tf.math.igammac(
-            ipower, tf.pow((loc - safe_x_lt_loc) / scale, power)),
-        half + half * tf.math.igamma(
-            ipower, tf.pow((safe_x_gt_loc - loc) / scale, power)))
-    return cdf
+  def _survival_function(self, x):
+    loc = tf.convert_to_tensor(self.loc)
+    # sf(x) = cdf(-x) for loc == 0, because distribution is symmetric.
+    return self._cdf_zero_mean(loc - x)
 
   def _quantile(self, p):
     loc = tf.convert_to_tensor(self.loc)
