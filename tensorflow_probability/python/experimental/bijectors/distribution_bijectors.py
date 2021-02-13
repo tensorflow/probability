@@ -35,6 +35,19 @@ from tensorflow_probability.python.internal import callable_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
+# TODO(b/180017733): Remove these exceptions when second derivatives for
+# IgammaGradA are supported.
+QUANTILE_SECOND_DERIVATIVE_IS_BROKEN = [
+    'Chi',
+    'Chi2',
+    'ExpGamma',
+    'ExpInverseGamma',
+    'Gamma',
+    'GeneralizedNormal',
+    'InverseGamma',
+]
+
+
 # pylint: disable=g-long-lambda,protected-access
 preconditioning_bijector_fns = {
     deterministic.Deterministic: (
@@ -215,12 +228,13 @@ def make_distribution_bijector(distribution, name='make_distribution_bijector'):
       implements_cdf = True
     except NotImplementedError:
       pass
-    try:
-      callable_util.get_output_spec(distribution.quantile, input_spec)
-      implements_quantile = True
-    except NotImplementedError:
-      pass
-
+    if type(distribution).__name__ not in QUANTILE_SECOND_DERIVATIVE_IS_BROKEN:
+      print(type(distribution).__name__)
+      try:
+        callable_util.get_output_spec(distribution.quantile, input_spec)
+        implements_quantile = True
+      except NotImplementedError:
+        pass
     if implements_cdf and implements_quantile:
       # This path will only trigger for scalar distributions, since multivariate
       # distributions have non-invertible CDF and so cannot define a `quantile`.

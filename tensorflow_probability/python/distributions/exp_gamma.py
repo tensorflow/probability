@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
@@ -257,6 +258,12 @@ class ExpGamma(distribution.Distribution):
     else:
       y = tf.math.exp(x) * self.rate
     return tf.math.igamma(self.concentration, y)
+
+  def _quantile(self, p):
+    y = tfp_math.igammainv(self.concentration, p)
+    if self.rate is None:
+      return tf.math.log(y) - self.log_rate
+    return tf.math.log(y / self.rate)
 
   def _mean(self):
     return tf.math.digamma(self.concentration) - self._log_rate_parameter()

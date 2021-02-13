@@ -24,6 +24,7 @@ import functools
 import numpy as np
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
@@ -232,6 +233,19 @@ class GeneralizedNormal(distribution.Distribution):
         half + half * tf.math.igamma(
             ipower, tf.pow((safe_x_gt_loc - loc) / scale, power)))
     return cdf
+
+  def _quantile(self, p):
+    loc = tf.convert_to_tensor(self.loc)
+    scale = tf.convert_to_tensor(self.scale)
+    power = tf.convert_to_tensor(self.power)
+    ipower = tf.math.reciprocal(power)
+    quantile = tf.where(
+        p < 0.5,
+        loc - tf.math.pow(
+            tfp_math.igammacinv(ipower, 2. * p), ipower) * scale,
+        loc + tf.math.pow(
+            tfp_math.igammainv(ipower, 2. * p - 1.), ipower) * scale)
+    return quantile
 
   def _entropy(self):
     scale = tf.convert_to_tensor(self.scale)

@@ -165,6 +165,28 @@ class _GeneralizedNormalTest(object):
     expected_cdf = sp_stats.gennorm(power, loc=mu, scale=sigma).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-3)
 
+  def testGeneralizedNormalQuantile(self):
+    batch_size = 50
+    mu = self._rng.randn(batch_size)
+    sigma = self._rng.rand(batch_size) + 1.
+    power = self._rng.rand(batch_size) + 1.
+    p = np.linspace(0., 1., batch_size).astype(np.float64)
+    gnormal = tfd.GeneralizedNormal(loc=self.make_input(mu),
+                                    scale=self.make_input(sigma),
+                                    power=self.make_input(power),
+                                    validate_args=True)
+    quantile = gnormal.quantile(p)
+    self.assertAllEqual(
+        self.evaluate(gnormal.batch_shape_tensor()), quantile.shape)
+    self.assertAllEqual(
+        self.evaluate(gnormal.batch_shape_tensor()),
+        self.evaluate(quantile).shape)
+    self.assertAllEqual(gnormal.batch_shape, quantile.shape)
+    self.assertAllEqual(gnormal.batch_shape, self.evaluate(quantile).shape)
+    expected_quantile = sp_stats.gennorm(power, loc=mu, scale=sigma).ppf(p)
+    self.assertAllClose(
+        expected_quantile, self.evaluate(quantile), atol=0, rtol=1e-4)
+
   @test_util.numpy_disable_gradient_test
   def testFiniteGradientAtDifficultPoints(self):
     def make_fn(dtype, attr):
