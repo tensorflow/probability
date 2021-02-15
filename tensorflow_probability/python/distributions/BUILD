@@ -133,6 +133,7 @@ multi_substrate_py_library(
         ":relaxed_bernoulli",
         ":relaxed_onehot_categorical",
         ":sample",
+        ":sigmoid_beta",
         ":sinh_arcsinh",
         ":skellam",
         ":spherical_uniform",
@@ -1812,6 +1813,22 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sigmoid_beta",
+    srcs = ["sigmoid_beta.py"],
+    deps = [
+        ":gamma",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -3715,6 +3732,27 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "sigmoid_beta_test",
+    size = "medium",
+    srcs = ["sigmoid_beta_test.py"],
+    jax_size = "large",
+    numpy_tags = ["notap"],
+    shard_count = 2,
+    deps = [
+        ":sigmoid_beta",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
