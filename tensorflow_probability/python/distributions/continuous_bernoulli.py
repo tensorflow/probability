@@ -416,12 +416,16 @@ class ContinuousBernoulli(distribution.Distribution):
     # since the numerator tends to s, we can reformulate the s > 0 case
     # as a offset from 1, which is more accurate.  Coincidentally,
     # this eliminates a ratio of infinities problem when `s == +inf`.
+
+    safe_negative_logits = tf.where(logits < 0., logits, -1.)
+    safe_positive_logits = tf.where(logits > 0., logits, 1.)
     result = tf.where(
         logits > 0.,
         1. + tfp_math.log_add_exp(
-            logp + tfp_math.log1mexp(logits),
-            tf.math.negative(logits)) / logits,
-        tf.math.log1p(tf.math.expm1(logits) * p) / logits)
+            logp + tfp_math.log1mexp(safe_positive_logits),
+            tf.math.negative(safe_positive_logits)) / safe_positive_logits,
+        tf.math.log1p(
+            tf.math.expm1(safe_negative_logits) * p) / safe_negative_logits)
 
     # When logits is zero, we can simplify
     # log(1 + (e^s - 1) * p) / s ~= log(1 + s * p) / s ~= s * p / s = p

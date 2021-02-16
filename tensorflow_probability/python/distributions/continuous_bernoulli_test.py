@@ -448,6 +448,14 @@ class ContinuousBernoulliTest(test_util.TestCase):
             dist.quantile(np.array(
                 [[0., 0.1, 0.3, 0.9, 1.]], dtype=np.float32))))
 
+  @test_util.numpy_disable_gradient_test
+  def testQuantileGradsAreNotNaN(self):
+    probs = tf.constant([0.2, 0.6])
+    x = np.linspace(0.1, 0.9, 20)[..., np.newaxis].astype(np.float32)
+    _, grad_prob = tfp.math.value_and_gradient(
+        lambda x: tfd.ContinuousBernoulli(probs=probs).quantile(x), x)
+    self.assertAllNotNan(self.evaluate(grad_prob))
+
   def testSampleAtExtremesIsNotNaN(self):
     prob = [[0.], [1.]]
     dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)

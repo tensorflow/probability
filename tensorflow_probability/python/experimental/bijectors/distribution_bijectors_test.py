@@ -34,7 +34,6 @@ tfd = tfp.distributions
 
 PRECONDITIONING_FAILS_DISTS = (
     'Bates',  # CDF seems pretty crazy.
-    'ContinuousBernoulli',  # Sigmoid doesn't work too well (b/178017349)
     'Deterministic',  # Inverse image is the empty set.
     'ExpRelaxedOneHotCategorical',  #  Bijector ldj error (maybe b/175354524).
     'GammaGamma',  #  Incorrect log prob (maybe b/175354524).
