@@ -94,7 +94,6 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'DirichletMultinomial',  # Times out. (b/164143676)
     'Multinomial',  # TensorListConcatV2 fallback broken: b/166658748
-    'PlackettLuce',  # No converter for TopKV2
     'Skellam',
     # 'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
@@ -103,11 +102,8 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'BetaQuotient',
     'ExponentiallyModifiedGaussian',  # b/174778704
-    'HalfStudentT',  # Numerical problem: b/149785284
     'Skellam',
-    'StudentT',  # Numerical problem: b/149785284
     'TruncatedNormal',  # Numerical problem: b/150811273
-    'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
                 # ill-conditioned for reasons unrelated to pfor.
     'WishartTriL',  # Same as Wishart.
