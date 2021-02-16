@@ -152,9 +152,12 @@ class RegisterKL(object):
 
   Usage:
 
+  ```python
   @distributions.RegisterKL(distributions.Normal, distributions.Normal)
   def _kl_normal_mvn(norm_a, norm_b):
     # Return KL(norm_a || norm_b)
+  ```
+
   """
 
   def __init__(self, dist_cls_a, dist_cls_b):
