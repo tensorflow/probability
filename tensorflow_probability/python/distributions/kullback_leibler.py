@@ -86,12 +86,15 @@ def kl_divergence(distribution_a, distribution_b,
     NotImplementedError: If no KL method is defined for distribution types
       of `distribution_a` and `distribution_b`.
   """
-  kl_fn = _registered_kl(type(distribution_a), type(distribution_b))
+  # NOTE: We use `d.__class__` instead of `type(d)` for objects that override
+  # their `__class__` attribute.
+  kl_fn = _registered_kl(distribution_a.__class__, distribution_b.__class__)
   if kl_fn is None:
     raise NotImplementedError(
         "No KL(distribution_a || distribution_b) registered for distribution_a "
         "type {} and distribution_b type {}".format(
-            type(distribution_a).__name__, type(distribution_b).__name__))
+            distribution_a.__class__.__name__,
+            distribution_b.__class__.__name__))
 
   name = name or "KullbackLeibler"
   with tf.name_scope(name):

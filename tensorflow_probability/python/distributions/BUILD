@@ -2867,6 +2867,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:test_util",
+        # wrapt dep,
     ],
 )
 
