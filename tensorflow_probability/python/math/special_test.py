@@ -437,6 +437,136 @@ class SpecialTest(test_util.TestCase):
     # Check that erfc(erfcinv(x)) = x.
     self.assertAllClose(x_prime, x, rtol=1e-6)
 
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxSmall(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=0.,
+        maxval=1.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxMedium(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=1.,
+        maxval=20.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxLarge(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=20.,
+        maxval=100.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxSmallNegative(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-1.,
+        maxval=0.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxMediumNegative(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-20.,
+        maxval=-1.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_, rtol=4e-6)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxLargeNegative(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-100.,
+        maxval=-20.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @test_util.numpy_disable_gradient_test
+  def testErfcxGradient(self):
+    x = np.linspace(-1., 3., 20).astype(np.float32)
+    err = self.compute_max_gradient_error(tfp.math.erfcx, [x])
+    self.assertLess(err, 2.1e-4)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLogErfc(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-3.,
+        maxval=3.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, logerfc_ = self.evaluate([x, tfp.math.logerfc(x)])
+    self.assertAllClose(np.log(scipy_special.erfc(x_)), logerfc_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  @test_util.numpy_disable_gradient_test
+  def testLogErfcValueAndGradientNoNaN(self, dtype):
+    x = tf.constant(np.logspace(1., 10., 40), dtype=dtype)
+    logerfc_, grad_logerfc_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfc, x))
+    self.assertAllNotNan(logerfc_)
+    self.assertAllNotNan(grad_logerfc_)
+
+    logerfc_, grad_logerfc_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfc, -x))
+    self.assertAllNotNan(logerfc_)
+    self.assertAllNotNan(grad_logerfc_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLogErfcx(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-3.,
+        maxval=3.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, logerfcx_ = self.evaluate([x, tfp.math.logerfcx(x)])
+    self.assertAllClose(np.log(scipy_special.erfcx(x_)), logerfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  @test_util.numpy_disable_gradient_test
+  def testLogErfcxValueAndGradientNoNaN(self, dtype):
+    x = tf.constant(np.logspace(1., 10., 40), dtype=dtype)
+    logerfcx_, grad_logerfcx_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfcx, x))
+    self.assertAllNotNan(logerfcx_)
+    self.assertAllNotNan(grad_logerfcx_)
+
+    logerfcx_, grad_logerfcx_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfcx, -x))
+    self.assertAllNotNan(logerfcx_)
+    self.assertAllNotNan(grad_logerfcx_)
+
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
   # for a list of special values and known identities.
   @parameterized.named_parameters(

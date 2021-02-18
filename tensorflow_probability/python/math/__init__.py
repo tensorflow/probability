@@ -69,6 +69,7 @@ from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import dawsn
 from tensorflow_probability.python.math.special import erfcinv
+from tensorflow_probability.python.math.special import erfcx
 from tensorflow_probability.python.math.special import igammacinv
 from tensorflow_probability.python.math.special import igammainv
 from tensorflow_probability.python.math.special import lambertw
@@ -76,6 +77,8 @@ from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
 from tensorflow_probability.python.math.special import log_gamma_correction
 from tensorflow_probability.python.math.special import log_gamma_difference
+from tensorflow_probability.python.math.special import logerfc
+from tensorflow_probability.python.math.special import logerfcx
 from tensorflow_probability.python.math.special import owens_t
 from tensorflow_probability.python.math.special import round_exponential_bump_function
 from tensorflow_probability.python.random import rademacher as random_rademacher
@@ -104,6 +107,7 @@ _allowed_symbols = [
     'dense_to_sparse',
     'diag_jacobian',
     'erfcinv',
+    'erfcx',
     'igammacinv',
     'igammainv',
     'find_root_chandrupatla',
@@ -122,6 +126,8 @@ _allowed_symbols = [
     'log_combinations',
     'log_cosh',
     'log_cumsum_exp',
+    'logerfc',
+    'logerfcx',
     'log_gamma_correction',
     'log_gamma_difference',
     'log_sub_exp',
