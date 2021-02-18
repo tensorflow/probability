@@ -25,7 +25,7 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -71,7 +71,7 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(LogitNormal, self).__init__(
-          distribution=normal.Normal(loc=loc, scale=scale),
+          distribution=normal_lib.Normal(loc=loc, scale=scale),
           bijector=sigmoid_bijector.Sigmoid(),
           validate_args=validate_args,
           parameters=parameters,
@@ -97,32 +97,32 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
     """Distribution parameter for the pre-transformed standard deviation."""
     return self.distribution.scale
 
+  def mean_log_prob_approx(self, y=None, name='mean_log_prob_approx'):
+    """Approximates `E_Normal(m,s)[ Bernoulli(sigmoid(X)).log_prob(Y) ]`.
+
+    Warning: usual numerical guarantees are not offered for this function as it
+    attempts to strike a balance between computational cost, implementation
+    simplicity and numerical accuracy.
+
+    Args:
+      y: The events over which to compute the Bernoulli log prob.
+        Default value: `None` (i.e., `1`).
+      name: Python `str` prepended to names of ops created by this function.
+        Default value: `'mean_log_prob_approx'`.
+
+    Returns:
+      mean_log_prob_approx: An approximation of the mean of the Bernoulli
+        likelihood.
+    """
+    with self._name_and_control_scope(name):
+      return approx_expected_log_prob_sigmoid(self.loc, self.scale, y)
+
   def mean_approx(self, name='mean_approx'):
     """Approximate the mean of a LogitNormal.
 
-    Warning: accuracy is not guaranteed and can be large for small `loc` values.
-
-    This calculation is `sigmoid(loc / sqrt(1 + np.pi / 8 * scale**2.))`
-    and based on the idea that [sigmoid(x) approximately equals
-    normal(0,1).cdf(sqrt(pi / 8) * x)](
-    https://en.wikipedia.org/wiki/Logit#Comparison_with_probit).
-
-    Derivation:
-
-    ```None
-    int[ sigmoid(x) phi(x; m, s), x]
-    ~= int[ Phi(sqrt(pi / 8) x) phi(x; m, s), x]
-     = Phi(sqrt(pi / 8) m / sqrt(1 + pi / 8 s**2))
-    ~= sigmoid(m / sqrt(1 + pi/8 s**2))
-    ```
-    where the third line comes from [this table](
-    https://en.wikipedia.org/wiki/List_of_integrals_of_Gaussian_functions)
-    or using the [difference of two independent standard Normals](
-    https://math.stackexchange.com/a/1800648).
-
-    See [this note](
-    https://threeplusone.com/pubs/on_logistic_normal.pdf) for additional
-    references.
+    Warning: usual numerical guarantees are not offered for this function as it
+    attempts to strike a balance between computational cost, implementation
+    simplicity and numerical accuracy.
 
     Args:
       name: Python `str` prepended to names of ops created by this function.
@@ -132,15 +132,14 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
       mean_approx: An approximation of the mean of a LogitNormal.
     """
     with self._name_and_control_scope(name):
-      b2 = (np.pi / 8.) * tf.square(self.scale)
-      return tf.math.sigmoid(self.loc * tf.math.rsqrt(1. + b2))
+      return approx_expected_sigmoid(self.loc, self.scale)
 
-  def variance_approx(self, name='variance_approx'):  # Needs verification.
+  def variance_approx(self, name='variance_approx'):
     """Approximate the variance of a LogitNormal.
 
-    Warning: accuracy is not guaranteed and can be large for small `loc` values.
-
-    The derivation follows a very similar rationale to `mean_approx`.
+    Warning: usual numerical guarantees are not offered for this function as it
+    attempts to strike a balance between computational cost, implementation
+    simplicity and numerical accuracy.
 
     Args:
       name: Python `str` prepended to names of ops created by this function.
@@ -150,15 +149,23 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
       variance_approx: An approximation of the variance of a LogitNormal.
     """
     with self._name_and_control_scope(name):
-      m = tf.convert_to_tensor(self.loc)
-      b2 = (np.pi / 8.) * tf.math.square(self.scale)
-      numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
-      a = m * tf.math.rsqrt(1. + b2)
-      return tf.math.sigmoid(a) * tf.math.sigmoid(-a) - 2. * tfp_math.owens_t(
-          numpy_dtype(np.sqrt(np.pi / 8.)) * m, tf.math.rsqrt(1. + 2. * b2))
+      return approx_var_sigmoid(self.loc, self.scale)
 
   def stddev_approx(self, name='stddev_approx'):
-    with tf.name_scope(name):
+    """Approximate the stdandard deviation of a LogitNormal.
+
+    Warning: usual numerical guarantees are not offered for this function as it
+    attempts to strike a balance between computational cost, implementation
+    simplicity and numerical accuracy.
+
+    Args:
+      name: Python `str` prepended to names of ops created by this function.
+        Default value: `'stddev_approx'`.
+
+    Returns:
+      stddev_approx: An approximation of the variance of a LogitNormal.
+    """
+    with self._name_and_control_scope(name):
       return tf.math.sqrt(self.variance_approx())
 
   def _default_event_space_bijector(self):
@@ -196,3 +203,105 @@ def _kl_logitnormal_logitnormal(a, b, name=None):
       a.distribution,
       b.distribution,
       name=(name or 'kl_logitnormal_logitnormal'))
+
+
+# TODO(jvdillon): Submit an ArXiv whitepaper which explains the following magic
+# (or better, see if we can find it published somewhere).
+
+DEFAULT_ALPHA_ = (
+    np.array([1.], np.float64),
+    np.array([0.56503847370701580, 0.43496152629298430], np.float64),
+    np.array([0.58313582494960810, 0.25578908169973547, 0.16107509335065637],
+             np.float64),
+)
+
+
+DEFAULT_C_ = (
+    np.array([1.6989831990656630], np.float64),
+    np.array([1.3020384430143920, 2.2974030643118337], np.float64),
+    np.array([1.7350019936800363, 1.1044586742992297, 2.7501402258610304],
+             np.float64),
+)
+
+
+DEFAULT_ORDER = 2
+DEFAULT_ALPHA = DEFAULT_ALPHA_[DEFAULT_ORDER - 1]
+DEFAULT_C = DEFAULT_C_[DEFAULT_ORDER - 1]
+
+
+def _prepare_args(m, s, alpha, c):
+  dtype = dtype_util.common_dtype([m, s], dtype_hint=tf.float32)
+  m = tf.convert_to_tensor(m, dtype, name='m')
+  s = tf.convert_to_tensor(s, dtype, name='s')
+  c = tf.cast(c, dtype=dtype, name='c')
+  alpha = tf.cast(alpha, dtype=dtype, name='alpha')
+  return m, s, alpha, c
+
+
+def _get_cdf_pdf(c):
+  dtype = dtype_util.as_numpy_dtype(c.dtype)
+  d = normal_lib.Normal(dtype(0), 1)
+  return d.cdf, d.prob
+  # Could also try back-substituting the approximation, i.e.,
+  # return lambda x: tf.math.sigmoid(c * x), d.prob
+
+
+def _common(m, s, alpha, c):
+  m, s, alpha, c = _prepare_args(m, s, alpha, c)
+  m_ = m[..., tf.newaxis]
+  s_ = s[..., tf.newaxis]
+  one_over_rho = tf.math.rsqrt(c**2 + s_**2)
+  m_over_rho = m_ * one_over_rho
+  cdf, pdf = _get_cdf_pdf(c)
+  return alpha, m_over_rho, cdf, pdf, one_over_rho, m_, s_, c
+
+
+def approx_expected_log_prob_sigmoid(
+    m, s, y=None, alpha=DEFAULT_ALPHA, c=DEFAULT_C, name=None):
+  """Approximates `E_{N(m,s)}[Bernoulli(sigmoid(X)).log_prob(Y)]`."""
+  with tf.name_scope(name or 'approx_expected_log_prob_sigmoid'):
+    m, s, alpha, c = _prepare_args(m, s, alpha, c)
+    ym = m if y is None else tf.cast(y, m.dtype, name='y') * m
+    return ym - approx_expected_softplus(m, s, alpha, c)
+
+
+def approx_expected_softplus(m, s, alpha=DEFAULT_ALPHA, c=DEFAULT_C, name=None):
+  """Approximates `E_{N(m,s)}[softplus(X)]`."""
+  with tf.name_scope(name or 'approx_expected_softplus'):
+    alpha, m_over_rho, cdf, pdf, one_over_rho, m_, s_, c = _common(
+        m, s, alpha, c)
+    return tf.math.reduce_sum(
+        alpha * (
+            (c**2 + s_**2) * one_over_rho * pdf(m_over_rho) +
+            m_ * cdf(m_over_rho)),
+        axis=-1)
+
+
+def approx_expected_sigmoid(m, s, alpha=DEFAULT_ALPHA, c=DEFAULT_C, name=None):
+  """Approximates `E_{N(m,s)}[sigmoid(X)]`."""
+  with tf.name_scope(name or 'approx_expected_sigmoid'):
+    alpha, m_over_rho, cdf = _common(m, s, alpha, c)[:3]
+    return tf.math.reduce_sum(alpha * cdf(m_over_rho), axis=-1)
+
+
+def approx_var_sigmoid(m, s, alpha=DEFAULT_ALPHA, c=DEFAULT_C, name=None):
+  """Approxmates `Var_{N(m,s)}[sigmoid(X)]`."""
+  # TODO(jvdillon): See if we can rederive things so we can avoid catastrophic
+  # cancellation which might be present in the following calculation. One idea
+  # might be to apply the law of total variance by leveraging the fact that each
+  # of the calculations below are subdivided into three segments.
+  with tf.name_scope(name or 'approx_var_sigmoid'):
+    alpha, m_over_rho, cdf, _, _, _, s_, c = _common(m, s, alpha, c)
+    c2 = c**2
+    c2s2_ = c2 * s_**2
+    c2_over_big_rho_ = c2[:, tf.newaxis] * tf.math.rsqrt(
+        c2[tf.newaxis, :] * c2[:, tf.newaxis] +
+        c2s2_[..., tf.newaxis, :] +
+        c2s2_[..., :, tf.newaxis])
+    m_over_rho_ = m_over_rho[..., tf.newaxis]
+    b = 0.5 * cdf(m_over_rho_) - tfp_math.owens_t(m_over_rho_, c2_over_big_rho_)
+    bt = tf.linalg.matrix_transpose(b)
+    mom2 = tf.math.reduce_sum(
+        alpha[tf.newaxis, :] * alpha[:, tf.newaxis] * (b + bt),
+        axis=[-2, -1])
+    return mom2 - approx_expected_sigmoid(m, s, alpha, c)**2.
