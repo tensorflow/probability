@@ -1405,6 +1405,7 @@ def _owens_t_custom_gradient(h, a):
 
 
 def owens_t(h, a, name=None):
+  # pylint: disable=line-too-long
   """Computes Owen's T function of `h` and `a` element-wise.
 
   Owen's T function is defined as the combined probability of the event `X > h`
@@ -1415,12 +1416,39 @@ def owens_t(h, a, name=None):
   `exp(-0.5 * h ** 2 * (1 + x ** 2)) / (1 + x ** 2)` from `0` to `a`.
   `h` and `a` can be any real number
 
-  The Owen's T implementation below is based on [1]
+  The Owen's T implementation below is based on
+  ([Patefield and Tandy, 2000][1]).
 
+  The Owen's T function has several notable properties which
+  we list here for convenience. ([Owen, 1980][2], page 414)
 
-  # References
-  [1] Patefield M., Tandy D., Fast and Accurate Calcuation of Owen's T-Function
-      Journal of Statistical Software http://www.jstatsoft.org/v05/i05/paper
+  - P2.1  `T( h, 0)   =  0`
+  - P2.2  `T( 0, a)   =  arctan(a) / (2 pi)`
+  - P2.3  `T( h, 1)   =  Phi(h) (1 - Phi(h)) / 2`
+  - P2.4  `T( h, inf) =  (1 - Phi(|h|)) / 2`
+  - P2.5  `T(-h, a)   =  T(h, a)`
+  - P2.6  `T( h,-a)   = -T(h, a)`
+  - P2.7  `T( h, a) + T(a h, 1 / a) = Phi(h)/2 + Phi(ah)/2 - Phi(h) Phi(ah) - [a<0]/2`
+  - P2.8  `T( h, a)   =  arctan(a)/(2 pi) - 1/(2 pi) int_0^h int_0^{ax}` exp(-(x**2 + y**2)/2) dy dx`
+  - P2.9  `T( h, a)   =  arctan(a)/(2 pi) - int_0**h phi(x) Phi(a x) dx + Phi(h)/2 - 1/4`
+
+  `[a<0]` uses Iverson bracket notation, i.e., `[a<0] = {1 if a<0 and 0 otherwise`.
+
+  Let us also define P2.10 as:
+  - P2.10  `T(inf, a) = 0`
+  - Proof
+
+    Note that result #10,010.6 ([Owen, 1980][2], pg 403) states that:
+    `int_0^inf phi(x) Phi(a+bx) dx = Phi(a/rho)/2 + T(a/rho,b) where rho = sqrt(1+b**2).`
+    Using `a=0`, this result is:
+    `int_0^inf phi(x) Phi(bx) dx = 1/4 + T(0,b) = 1/4 + arctan(b) / (2 pi)`
+    Combining this with P2.9 implies
+    ```none
+    T(inf, a)
+     =  arctan(a)/(2 pi) - [ 1/4 + arctan(a) / (2 pi)]  + Phi(inf)/2 - 1/4
+     = -1/4 + 1/2 -1/4 = 0.
+    ```
+    QED
 
   Args:
     h: A `float` `Tensor` defined as in `P({X > h, 0 < Y < a X})`. Must be
@@ -1428,11 +1456,22 @@ def owens_t(h, a, name=None):
     a: A `float` `Tensor` defined as in `P({X > h, 0 < Y < a X})`. Must be
        broadcastable with `h`.
     name: A name for the operation (optional).
+
   Returns:
     owens_t: A `Tensor` with the same type as `h` and `a`,
+
+  #### References
+
+  [1]: Patefield, Mike, and D. A. V. I. D. Tandy. "Fast and accurate calculation
+       of Owen’s T function." Journal of Statistical Software 5.5 (2000): 1-25.
+       http://www.jstatsoft.org/v05/i05/paper
+  [2]: Owen, Donald Bruce. "A table of normal integrals: A table."
+       Communications in Statistics-Simulation and Computation 9.4 (1980):
+       389-419.
   """
+  # pylint: enable=line-too-long
   with tf.name_scope(name or 'owens_t'):
     dtype = dtype_util.common_dtype([h, a], tf.float32)
-    h = tf.convert_to_tensor(h, dtype=dtype)
-    a = tf.convert_to_tensor(a, dtype=dtype)
+    h = tf.convert_to_tensor(h, dtype=dtype, name='h')
+    a = tf.convert_to_tensor(a, dtype=dtype, name='a')
     return _owens_t_custom_gradient(h, a)
