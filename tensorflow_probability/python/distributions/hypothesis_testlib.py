@@ -104,6 +104,7 @@ TF2_FRIENDLY_DISTS = (
     'ProbitBernoulli',
     'RelaxedBernoulli',
     'ExpRelaxedOneHotCategorical',
+    'SigmoidBeta',
     # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
     'Skellam',
     'SphericalUniform',

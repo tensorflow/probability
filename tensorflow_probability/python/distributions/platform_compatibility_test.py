@@ -152,6 +152,7 @@ XLA_LOGPROB_ATOL.update({
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
     'PowerSpherical': 2e-5,
+    'SigmoidBeta': 5e-4,
     'Skellam': 1e-4
 })
 
@@ -184,6 +185,7 @@ XLA_LOGPROB_RTOL.update({
     'Poisson': 3e-2,  # TODO(b/159999573)
     'PowerSpherical': .003,
     'RelaxedBernoulli': 3e-3,
+    'SigmoidBeta': 5e-4,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,
