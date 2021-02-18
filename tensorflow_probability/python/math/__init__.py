@@ -67,6 +67,7 @@ from tensorflow_probability.python.math.root_search import find_root_secant
 from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
+from tensorflow_probability.python.math.special import dawsn
 from tensorflow_probability.python.math.special import erfcinv
 from tensorflow_probability.python.math.special import igammacinv
 from tensorflow_probability.python.math.special import igammainv
@@ -99,6 +100,7 @@ _allowed_symbols = [
     'cholesky_update',
     'clip_by_value_preserve_gradient',
     'custom_gradient',
+    'dawsn',
     'dense_to_sparse',
     'diag_jacobian',
     'erfcinv',

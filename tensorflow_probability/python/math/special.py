@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
+    'dawsn',
     'erfcinv',
     'igammainv',
     'igammacinv',
@@ -40,6 +41,159 @@ __all__ = [
     'lbeta',
     'owens_t',
 ]
+
+
+def _dawsn_naive(x):
+  """Returns the Dawson Integral computed at x elementwise."""
+  dtype = dtype_util.common_dtype([x], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  x = tf.convert_to_tensor(x, dtype=dtype)
+
+  n1 = [
+      1.13681498971755972054E-11,
+      8.49262267667473811108E-10,
+      1.94434204175553054283E-8,
+      9.53151741254484363489E-7,
+      3.07828309874913200438E-6,
+      3.52513368520288738649E-4,
+      -8.50149846724410912031E-4,
+      4.22618223005546594270E-2,
+      -9.17480371773452345351E-2,
+      9.99999999999999994612E-1]
+
+  d1 = [
+      2.40372073066762605484E-11,
+      1.48864681368493396752E-9,
+      5.21265281010541664570E-8,
+      1.27258478273186970203E-6,
+      2.32490249820789513991E-5,
+      3.25524741826057911661E-4,
+      3.48805814657162590916E-3,
+      2.79448531198828973716E-2,
+      1.58874241960120565368E-1,
+      5.74918629489320327824E-1,
+      1.00000000000000000539E0]
+
+  n2 = [
+      5.08955156417900903354E-1,
+      -2.44754418142697847934E-1,
+      9.41512335303534411857E-2,
+      -2.18711255142039025206E-2,
+      3.66207612329569181322E-3,
+      -4.23209114460388756528E-4,
+      3.59641304793896631888E-5,
+      -2.14640351719968974225E-6,
+      9.10010780076391431042E-8,
+      -2.40274520828250956942E-9,
+      3.59233385440928410398E-11]
+
+  d2 = [
+      1.00000000000000000000E0,
+      -6.31839869873368190192E-1,
+      2.36706788228248691528E-1,
+      -5.31806367003223277662E-2,
+      8.48041718586295374409E-3,
+      -9.47996768486665330168E-4,
+      7.81025592944552338085E-5,
+      -4.55875153252442634831E-6,
+      1.89100358111421846170E-7,
+      -4.91324691331920606875E-9,
+      7.18466403235734541950E-11]
+
+  n3 = [
+      -5.90592860534773254987E-1,
+      6.29235242724368800674E-1,
+      -1.72858975380388136411E-1,
+      1.64837047825189632310E-2,
+      -4.86827613020462700845E-4]
+
+  d3 = [
+      1.00000000000000000000E0,
+      -2.69820057197544900361E0,
+      1.73270799045947845857E0,
+      -3.93708582281939493482E-1,
+      3.44278924041233391079E-2,
+      -9.73655226040941223894E-4]
+
+  n1, d1, n2, d2, n3, d3 = [
+      [numpy_dtype(c) for c in lst] for lst in (n1, d1, n2, d2, n3, d3)]
+
+  abs_x = tf.math.abs(x)
+
+  result_small = abs_x * tf.math.polyval(
+      n1, tf.math.square(x)) / tf.math.polyval(d1, tf.math.square(x))
+  result_small = tf.math.sign(x) * result_small
+
+  inv_xsq = tf.math.reciprocal(tf.math.square(x))
+  result_medium = tf.math.reciprocal(abs_x) + inv_xsq * (
+      tf.math.polyval(n2, inv_xsq) / (abs_x * tf.math.polyval(d2, inv_xsq)))
+  result_medium = 0.5 * tf.math.sign(x) * result_medium
+
+  result_very_large = 0.5 * tf.math.sign(x) * tf.math.reciprocal(abs_x)
+
+  result_large = tf.math.reciprocal(abs_x) + inv_xsq * (
+      tf.math.polyval(n3, inv_xsq) / (abs_x * tf.math.polyval(d3, inv_xsq)))
+  result_large = 0.5 * tf.math.sign(x) * result_large
+
+  return tf.where(
+      abs_x < 3.25,
+      result_small,
+      tf.where(
+          abs_x < 6.25,
+          result_medium,
+          tf.where(
+              abs_x > 1e9,
+              result_very_large,
+              result_large)))
+
+
+def _dawsn_fwd(x):
+  """Compute output, aux (collaborates with _igammainv_bwd)."""
+  output = _dawsn_naive(x)
+  return output, (x, output)
+
+
+def _dawsn_bwd(aux, g):
+  """Reverse mode impl for igammainv."""
+  x, y = aux
+  return g * (1. - 2 * x * y)
+
+
+def _dawsn_jvp(primals, tangents):
+  """Computes JVP for igammainv (supports JAX custom derivative)."""
+  x, = primals
+  dx, = tangents
+
+  y = _dawsn_naive(x)
+  return y, dx * (1. - 2 * x * y)
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_dawsn_fwd,
+    vjp_bwd=_dawsn_bwd,
+    jvp_fn=_dawsn_jvp)
+def _dawsn_custom_gradient(x):
+  return _dawsn_naive(x)
+
+
+def dawsn(x, name=None):
+  """Computes Dawson's integral element-wise.
+
+  Dawson's integral is defined as `exp(-x**2) * int_0^x exp(t**2)`
+  with the domain of definition all real numbers.
+
+  This implementation is based on the Cephes math library.
+
+  Args:
+    x: A Tensor with type `float32` or `float64`.
+    name: A name for the operation (optional).
+
+  Returns:
+    dawsn: dawsn evaluated at `x`. A Tensor with the same shape and same
+      dtype as `x`.
+  """
+  with tf.name_scope(name or 'dawsn'):
+    return _dawsn_custom_gradient(x)
 
 
 def erfcinv(z, name=None):
