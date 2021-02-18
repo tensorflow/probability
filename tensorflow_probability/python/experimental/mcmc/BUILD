@@ -58,6 +58,7 @@ multi_substrate_py_library(
         ":sample_fold",
         ":thinning_kernel",
         ":tracing_reducer",
+        ":windowed_sampling",
         ":with_reductions",
     ],
     deps = [
@@ -86,6 +87,7 @@ multi_substrate_py_library(
         ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
+        ":windowed_sampling",
         ":with_reductions",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:all_util",
@@ -923,6 +925,43 @@ multi_substrate_py_test(
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "windowed_sampling",
+    srcs = ["windowed_sampling.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":diagonal_mass_matrix_adaptation",
+        ":preconditioned_hmc",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:joint_map",
+        "//tensorflow_probability/python/bijectors:reshape",
+        "//tensorflow_probability/python/bijectors:split",
+        "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:sample",
+    ],
+)
+
+py_test(
+    name = "windowed_sampling_test",
+    size = "large",
+    srcs = ["windowed_sampling_test.py"],
+    python_version = "PY3",
+    shard_count = 5,
+    srcs_version = "PY3",
+    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
