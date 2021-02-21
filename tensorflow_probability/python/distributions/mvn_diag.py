@@ -149,7 +149,7 @@ class MultivariateNormalDiag(
 
   @deprecation.deprecated_args(
       '2020-01-01',
-      '`scale_identity_multiplier` is deprecated; please combine it with '
+      '`scale_identity_multiplier` is deprecated; please combine it into '
       '`scale_diag` directly instead.',
       'scale_identity_multiplier')
   def __init__(self,
