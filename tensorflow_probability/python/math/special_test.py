@@ -495,7 +495,7 @@ class SpecialTest(test_util.TestCase):
         seed=test_util.test_seed())
 
     x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
-    self.assertAllClose(scipy_special.erfcx(x_), erfcx_, rtol=4e-6)
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_, rtol=4.5e-6)
 
   @parameterized.parameters(tf.float32, tf.float64)
   def testErfcxLargeNegative(self, dtype):
