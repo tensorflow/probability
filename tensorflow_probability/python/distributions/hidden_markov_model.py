@@ -42,10 +42,9 @@ __all__ = [
 class HiddenMarkovModel(distribution.Distribution):
   """Hidden Markov model distribution.
 
-  The `HiddenMarkovModel` distribution implements a (batch of) hidden
+  The `HiddenMarkovModel` distribution implements a (batch of) discrete hidden
   Markov models where the initial states, transition probabilities
   and observed states are all given by user-provided distributions.
-  This model assumes that the transition matrices are fixed over time.
 
   In this model, there is a sequence of integer-valued hidden states:
   `z[0], z[1], ..., z[num_steps - 1]` and a sequence of observed states:
