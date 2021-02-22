@@ -51,7 +51,7 @@ Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
 
 _NON_STATISTICAL_PARAMS = [
     'name', 'validate_args', 'allow_nan_stats', 'experimental_use_kahan_sum',
-    'reinterpreted_batch_ndims'
+    'reinterpreted_batch_ndims', 'dtype'
 ]
 _NON_TRAINABLE_PARAMS = ['low', 'high']
 
@@ -403,7 +403,7 @@ def _make_asvi_trainable_variables(prior,
                   bijector.inverse_event_shape_tensor(
                       actual_event_shape)
               ], axis=0),
-              dtype=actual_dist.dtype)
+              dtype=tf.convert_to_tensor(value).dtype)
 
           prior_weight = tfp_util.TransformedVariable(
               initial_prior_weight * unconstrained_ones,

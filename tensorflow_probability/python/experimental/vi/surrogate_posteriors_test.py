@@ -319,6 +319,13 @@ class _TrainableASVISurrogate(object):
     self.assertLen(surrogate_posterior.trainable_variables,
                    expected_num_trainable_vars)
 
+    # Test that the sample shape is correct
+    three_posterior_samples = surrogate_posterior.sample(3)
+    three_prior_samples = prior_dist.sample(3)
+    self.assertAllEqualNested(
+        [s.shape for s in tf.nest.flatten(three_prior_samples)],
+        [s.shape for s in tf.nest.flatten(three_posterior_samples)])
+
     # Test that gradients are available wrt the variational parameters.
     posterior_sample = surrogate_posterior.sample()
     with tf.GradientTape() as tape:
@@ -326,13 +333,6 @@ class _TrainableASVISurrogate(object):
     grad = tape.gradient(posterior_logprob,
                          surrogate_posterior.trainable_variables)
     self.assertTrue(all(g is not None for g in grad))
-
-    # Test that the sample shape is correct
-    three_posterior_samples = surrogate_posterior.sample(3)
-    three_prior_samples = prior_dist.sample(3)
-    self.assertAllEqualNested(
-        [s.shape for s in tf.nest.flatten(three_prior_samples)],
-        [s.shape for s in tf.nest.flatten(three_posterior_samples)])
 
   def test_make_asvi_trainable_variables(self):
     prior_dist = self.make_prior_dist()
@@ -487,6 +487,20 @@ class ASVISurrogatePosteriorTestHalfNormal(test_util.TestCase,
       innovation_noise = 1.
       yield tfd.HalfNormal(
           scale=innovation_noise, validate_args=True, allow_nan_stats=False)
+
+    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
+
+
+@test_util.test_all_tf_execution_regimes
+class ASVISurrogatePosteriorTestDiscreteLatent(
+    test_util.TestCase, _TrainableASVISurrogate):
+
+  def make_prior_dist(self):
+
+    def _prior_model_fn():
+      a = yield tfd.Bernoulli(logits=0.5, name='a')
+      yield tfd.Normal(loc=2. * tf.cast(a, tf.float32) - 1.,
+                       scale=1., name='b')
 
     return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
 
