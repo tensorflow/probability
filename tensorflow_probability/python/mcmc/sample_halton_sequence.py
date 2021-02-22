@@ -370,7 +370,7 @@ def _primes_less_than(n):
   small_primes = np.array((2, 3, 5))
   if n <= 6:
     return small_primes[small_primes < n]
-  sieve = np.ones(n // 3 + (n % 6 == 2), dtype=np.bool)
+  sieve = np.ones(n // 3 + (n % 6 == 2), dtype=np.bool_)
   sieve[0] = False
   m = int(n ** 0.5) // 3 + 1
   for i in range(m):

@@ -470,7 +470,7 @@ def _make_evolve_trajectory(value_and_gradients_fn, max_depth,
     point_type, _, _, _, _ = args
     return (point_type, point_type, point_type,
             ab.TensorType(np.int64, ()), ab.TensorType(np.int64, ()),
-            ab.TensorType(np.bool, ()))
+            ab.TensorType(np.bool_, ()))
 
   @ctx.batch(type_inference=_build_tree_type)
   def _build_tree(current, direction, depth, step_size, log_slice_sample):

@@ -138,7 +138,7 @@ def is_bool(dtype):
   if hasattr(dtype, 'is_bool'):
     return dtype.is_bool
   # We use `kind` because:
-  # np.issubdtype(np.uint8, np.bool) == True.
+  # np.issubdtype(np.uint8, np.bool_) == True.
   return np.dtype(dtype).kind == 'b'
 
 

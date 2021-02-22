@@ -40,7 +40,7 @@ class _MissingValuesUtilityTests(test_util.TestCase):
 
     mean, variance = missing_values_util.moments_of_masked_time_series(
         self._build_tensor(series),
-        broadcast_mask=self._build_tensor(mask, dtype=np.bool))
+        broadcast_mask=self._build_tensor(mask, dtype=np.bool_))
 
     mean_, variance_ = self.evaluate((mean, variance))
     self.assertAllClose(mean_, expected_mean)
@@ -58,7 +58,7 @@ class _MissingValuesUtilityTests(test_util.TestCase):
 
     initial_values = missing_values_util.initial_value_of_masked_time_series(
         self._build_tensor(series),
-        broadcast_mask=self._build_tensor(mask, dtype=np.bool))
+        broadcast_mask=self._build_tensor(mask, dtype=np.bool_))
 
     self.assertAllClose(self.evaluate(initial_values), expected_initial_values)
 

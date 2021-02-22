@@ -63,7 +63,7 @@ class KumaraswamyTest(test_util.TestCase):
         concentration1=1., concentration0=concentration0)
     ildj = self.evaluate(
         bijector.inverse_log_det_jacobian(0., event_ndims=0))
-    self.assertAllEqual(np.ones_like(ildj, dtype=np.bool), np.isfinite(ildj))
+    self.assertAllEqual(np.ones_like(ildj, dtype=np.bool_), np.isfinite(ildj))
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(

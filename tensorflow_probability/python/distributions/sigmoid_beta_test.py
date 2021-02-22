@@ -136,7 +136,7 @@ class SigmoidBetaTest(test_util.TestCase):
   def testSampleWithPartiallyDefinedShapeEndingInOne(self):
     b = [[0.01, 0.1, 1., 2], [5., 10., 2., 3]]
     pdf = self.evaluate(tfd.SigmoidBeta(1., b, validate_args=True).prob(0.))
-    self.assertAllEqual(np.ones_like(pdf, dtype=np.bool), np.isfinite(pdf))
+    self.assertAllEqual(np.ones_like(pdf, dtype=np.bool_), np.isfinite(pdf))
 
   def testIsFiniteLargeX(self):
     a = tf.constant(1.0)

@@ -257,7 +257,7 @@ class _DppTest(test_util.TestCase):
       binary = bin(i)[2:]
       subset = [0] * n_points
       subset[-len(binary):] = [int(c) for c in binary]
-      mask = np.array(subset, np.bool)
+      mask = np.array(subset, np.bool_)
       submatrix = true_kernel[mask][:, mask]
       expected = (tf.linalg.logdet(submatrix) -
                   tf.linalg.logdet(true_kernel +

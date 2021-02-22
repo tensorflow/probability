@@ -101,9 +101,9 @@ class ExpectationTest(tfp_test_util.TestCase):
     self.assertAllClose(efx_true_, efx_reparam_, rtol=0.005, atol=0.)
     self.assertAllClose(efx_true_, efx_score_, rtol=0.005, atol=0.)
 
-    self.assertAllEqual(np.ones_like(efx_true_grad_, dtype=np.bool),
+    self.assertAllEqual(np.ones_like(efx_true_grad_, dtype=np.bool_),
                         np.isfinite(efx_reparam_grad_))
-    self.assertAllEqual(np.ones_like(efx_true_grad_, dtype=np.bool),
+    self.assertAllEqual(np.ones_like(efx_true_grad_, dtype=np.bool_),
                         np.isfinite(efx_score_grad_))
 
     self.assertAllClose(efx_true_grad_, efx_reparam_grad_,

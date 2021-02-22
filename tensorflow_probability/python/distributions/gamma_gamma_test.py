@@ -108,7 +108,7 @@ class GammaGammaTest(test_util.TestCase):
         validate_args=True)
     log_pdf = self.evaluate(gg.log_prob(0.))
     self.assertAllEqual(
-        np.ones_like(log_pdf, dtype=np.bool), np.isfinite(log_pdf))
+        np.ones_like(log_pdf, dtype=np.bool_), np.isfinite(log_pdf))
 
     gg = tfd.GammaGamma(
         concentration=2.,

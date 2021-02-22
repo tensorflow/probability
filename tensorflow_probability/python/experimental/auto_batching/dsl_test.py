@@ -68,7 +68,7 @@ def even_odd_program():
   ab = dsl.ProgramBuilder()
 
   def pred_type(_):
-    return instructions.TensorType(np.bool, ())
+    return instructions.TensorType(np.bool_, ())
 
   odd = ab.declare_function('odd', type_inference=pred_type)
 
@@ -158,7 +158,7 @@ class AutoBatchingTest(test_util.TestCase):
     for inputs, outputs in ([5], [False]), ([5, 6, 8, 9],
                                             [False, True, True, False]):
       inputs = np.array(inputs, dtype=np.int64)
-      outputs = np.array(outputs, dtype=np.bool)
+      outputs = np.array(outputs, dtype=np.bool_)
       prog = even_odd_program()
       # print(prog)
       typed = type_inference.infer_types(prog, [inputs], NP_BACKEND)

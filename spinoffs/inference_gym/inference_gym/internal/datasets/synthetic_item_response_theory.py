@@ -33,7 +33,7 @@ student_ids = np.arange(400)
 question_ids = np.arange(100)
 
 student_ids, question_ids = np.meshgrid(student_ids, question_ids)
-mask = rng.binomial(1, 0.75, size=student_ids.shape).astype(np.bool)
+mask = rng.binomial(1, 0.75, size=student_ids.shape).astype(np.bool_)
 
 student_ids = student_ids[mask]
 question_ids = question_ids[mask]

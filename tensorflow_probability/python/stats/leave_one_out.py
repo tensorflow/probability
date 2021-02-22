@@ -194,7 +194,7 @@ def _log_loosum_exp_impl(logx, axis, keepdims, compute_mean):
     if axis is not None:
       x = np.array(axis)
       axis = (tf.convert_to_tensor(axis, name='axis', dtype_hint=tf.int32)
-              if x.dtype is np.object else x.astype(np.int32))
+              if x.dtype is np.object_ else x.astype(np.int32))
 
     log_sum_x = tf.reduce_logsumexp(logx, axis=axis, keepdims=True)
 

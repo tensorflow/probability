@@ -60,14 +60,14 @@ class StatisticalTestingTest(test_util.TestCase):
         detectable_discrepancies_, false_pass_rates, false_fail_rates):
       below_threshold = discrepancies <= thresholds
       self.assertAllEqual(
-          np.ones_like(below_threshold, np.bool), below_threshold,
+          np.ones_like(below_threshold, np.bool_), below_threshold,
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
       # Could probably bring this factor of 2 down by cleverly allocating
       # envelopes in the one-sample min_num_samples computations.
       bound_tight = thresholds <= discrepancies * 2
       self.assertAllEqual(
-          np.ones_like(bound_tight, np.bool), bound_tight,
+          np.ones_like(bound_tight, np.bool_), bound_tight,
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
 
@@ -294,12 +294,12 @@ class StatisticalTestingTest(test_util.TestCase):
         detectable_discrepancies_, false_pass_rates, false_fail_rates):
       below_threshold = discrepancies <= thresholds
       self.assertAllEqual(
-          np.ones_like(below_threshold, np.bool), below_threshold,
+          np.ones_like(below_threshold, np.bool_), below_threshold,
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
       bound_tight = thresholds <= discrepancies * 2
       self.assertAllEqual(
-          np.ones_like(bound_tight, np.bool), bound_tight,
+          np.ones_like(bound_tight, np.bool_), bound_tight,
           msg='false_pass_rate({}), false_fail_rate({})'.format(
               false_pass_rate, false_fail_rate))
 

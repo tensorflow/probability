@@ -252,7 +252,7 @@ class ItemResponseTheory(bayesian_model.BayesianModel):
     # tensor-valued datasets. Blocked by JAX/Numpy not implementing scatter_nd.
     dense_y = np.zeros([self._num_students, self._num_questions], np.float32)
     dense_y[student_ids, question_ids] = correct
-    y_mask = np.zeros(dense_y.shape, np.bool)
+    y_mask = np.zeros(dense_y.shape, np.bool_)
     y_mask[student_ids, question_ids] = True
     return dense_y, y_mask
 

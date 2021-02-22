@@ -178,10 +178,10 @@ class NdtrGradientTest(test_util.TestCase):
   _error64 = ErrorSpec(rtol=1e-7, atol=0)
 
   def assert_all_true(self, v):
-    self.assertAllEqual(np.ones_like(v, dtype=np.bool), v)
+    self.assertAllEqual(np.ones_like(v, dtype=np.bool_), v)
 
   def assert_all_false(self, v):
-    self.assertAllEqual(np.zeros_like(v, dtype=np.bool), v)
+    self.assertAllEqual(np.zeros_like(v, dtype=np.bool_), v)
 
   def _test_grad_finite(self, dtype):
     x = tf.constant([-100., 0., 100.], dtype=dtype)
@@ -261,7 +261,7 @@ class LogCDFLaplaceTest(test_util.TestCase):
   CUTOFF_FLOAT32_UPPER = np.log(1. / (2. * np.finfo(np.float32).eps)) - 1.
 
   def assertAllTrue(self, x):
-    self.assertAllEqual(np.ones_like(x, dtype=np.bool), x)
+    self.assertAllEqual(np.ones_like(x, dtype=np.bool_), x)
 
   def _test_grid_log(self, dtype, scipy_dtype, grid_spec, error_spec):
     grid = _make_grid(dtype, grid_spec)

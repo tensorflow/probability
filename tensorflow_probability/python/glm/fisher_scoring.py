@@ -248,7 +248,7 @@ def fit(
         cond=lambda is_converged, *args: tf.logical_not(is_converged),
         body=_body,
         loop_vars=[
-            tf.zeros([], np.bool),   # is_converged
+            tf.zeros([], np.bool_),   # is_converged
             tf.zeros([], np.int32),  # iter_
             model_coefficients_start,
             predicted_linear_response_start,

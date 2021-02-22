@@ -78,7 +78,7 @@ def single_if_program():
   # pylint: disable=bad-whitespace
   single_if_vars = {
       "input"               : instructions.single_type(np.int64, ()),
-      "cond"                : instructions.single_type(np.bool,  ()),
+      "cond"                : instructions.single_type(np.bool_,  ()),
       "answer"              : instructions.single_type(np.int64, ()),
   }
 
@@ -219,7 +219,7 @@ def fibonacci_program():
   # pylint: disable=bad-whitespace
   fibonacci_vars = {
       "n"                   : instructions.single_type(np.int64, ()),
-      "cond"                : instructions.single_type(np.bool,  ()),
+      "cond"                : instructions.single_type(np.bool_,  ()),
       "nm1"                 : instructions.single_type(np.int64, ()),
       "fibm1"               : instructions.single_type(np.int64, ()),
       "nm2"                 : instructions.single_type(np.int64, ()),
@@ -250,7 +250,7 @@ def is_even_function_calls(include_types=True, dtype=np.int64):
     program: Full-powered `instructions.Program` that computes is_even(n).
   """
   def pred_type(t):
-    return instructions.TensorType(np.bool, t[0].shape)
+    return instructions.TensorType(np.bool_, t[0].shape)
   # Forward declaration of is_odd.
   is_odd_func = instructions.Function(None, ["n"], "ans", pred_type)
 
@@ -326,9 +326,9 @@ def is_even_function_calls(include_types=True, dtype=np.int64):
   is_even_vars = {
       "n"                   : instructions.single_type(dtype, ()),
       "n1"                  : instructions.single_type(dtype, ()),
-      "cond"                : instructions.single_type(np.bool, ()),
+      "cond"                : instructions.single_type(np.bool_, ()),
       "nm1"                 : instructions.single_type(dtype, ()),
-      "ans"                 : instructions.single_type(np.bool, ()),
+      "ans"                 : instructions.single_type(np.bool_, ()),
   }
   if not include_types:
     _strip_types(is_even_vars)
@@ -406,7 +406,7 @@ def fibonacci_function_calls(include_types=True, dtype=np.int64):
   fibonacci_vars = {
       "n"                   : instructions.single_type(dtype, ()),
       "n1"                  : instructions.single_type(dtype, ()),
-      "cond"                : instructions.single_type(np.bool, ()),
+      "cond"                : instructions.single_type(np.bool_, ()),
       "nm1"                 : instructions.single_type(dtype, ()),
       "fibm1"               : instructions.single_type(dtype, ()),
       "nm2"                 : instructions.single_type(dtype, ()),
@@ -578,8 +578,8 @@ def pea_nuts_program(latent_shape, choose_depth, step_state):
   # pylint: disable=bad-whitespace
   pea_nuts_vars = {
       "count"            : instructions.single_type(np.int64, ()),
-      "cond"             : instructions.single_type(np.bool,  ()),
-      "cond1"            : instructions.single_type(np.bool,  ()),
+      "cond"             : instructions.single_type(np.bool_,  ()),
+      "cond1"            : instructions.single_type(np.bool_,  ()),
       "ctm1"             : instructions.single_type(np.int64, ()),
       "depth"            : instructions.single_type(np.int64, ()),
       "dm1"              : instructions.single_type(np.int64, ()),

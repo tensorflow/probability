@@ -79,7 +79,7 @@ as_dtype = utils.copy_docstring(
 
 real_dtype = lambda dtype: np.real(np.zeros((0,), dtype=as_dtype(dtype))).dtype
 
-bool = np.bool  # pylint: disable=redefined-builtin
+bool = np.bool_  # pylint: disable=redefined-builtin
 
 complex = utils.copy_docstring('tf.complex', _complex)  # pylint: disable=redefined-builtin
 
@@ -109,7 +109,7 @@ int64 = np.int64
 int8 = np.int8
 
 # Handle version drift between internal/external/jax numpy.
-string = getattr(np, 'str', getattr(np, 'string', None))
+string = getattr(np, 'str_', getattr(np, 'string', None))
 
 uint16 = np.uint16
 

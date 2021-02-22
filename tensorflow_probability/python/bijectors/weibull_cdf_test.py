@@ -59,7 +59,7 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     scale = np.logspace(0.1, 10., num=20).astype(np.float32)
     bijector = tfb.WeibullCDF(scale, concentration=1.)
     fldj = self.evaluate(bijector.forward_log_det_jacobian(0., event_ndims=0))
-    self.assertAllEqual(np.ones_like(fldj, dtype=np.bool), np.isfinite(fldj))
+    self.assertAllEqual(np.ones_like(fldj, dtype=np.bool_), np.isfinite(fldj))
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(

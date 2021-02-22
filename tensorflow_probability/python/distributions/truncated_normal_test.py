@@ -66,12 +66,12 @@ class _TruncatedNormalTestCase(test_util.TestCase):
 
   def assertAllGreaterEqual(self, a, b):
     comparison = a >= b
-    all_true = np.ones_like(comparison, dtype=np.bool)
+    all_true = np.ones_like(comparison, dtype=np.bool_)
     self.assertAllEqual(comparison, all_true)
 
   def assertAllLessEqual(self, a, b):
     comparison = a <= b
-    all_true = np.ones_like(comparison, dtype=np.bool)
+    all_true = np.ones_like(comparison, dtype=np.bool_)
     self.assertAllEqual(comparison, all_true)
 
   def assertEmpiricalDistributionsEqual(self, sample_a, sample_b, rtol=1e-6,

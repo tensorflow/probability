@@ -303,7 +303,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     _, gradients = self.evaluate(tfp.math.value_and_gradient(
         self_kl_divergence, loc))
     self.assertAllEqual(
-        np.ones_like(gradients, dtype=np.bool),
+        np.ones_like(gradients, dtype=np.bool_),
         np.isfinite(gradients))
 
   def testProbForLargeDimIsNotNan(self):

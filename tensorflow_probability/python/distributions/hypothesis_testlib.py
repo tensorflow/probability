@@ -1331,7 +1331,7 @@ def masked_distributions(draw,
   validity_mask = draw(
       tfp_hps.maybe_variable(
           tfp_hps.constrained_tensors(
-              lambda x: x, mask_shape.as_list(), np.bool),
+              lambda x: x, mask_shape.as_list(), np.bool_),
           enable_vars=enable_vars,
           name='validity_mask'))
 

@@ -209,13 +209,13 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
   def assertAllTrue(self, a):
     """Assert that all entries in a boolean `Tensor` are True."""
     a_ = self._GetNdArray(a)
-    all_true = np.ones_like(a_, dtype=np.bool)
+    all_true = np.ones_like(a_, dtype=np.bool_)
     self.assertAllEqual(all_true, a_)
 
   def assertAllFalse(self, a):
     """Assert that all entries in a boolean `Tensor` are False."""
     a_ = self._GetNdArray(a)
-    all_false = np.zeros_like(a_, dtype=np.bool)
+    all_false = np.zeros_like(a_, dtype=np.bool_)
     self.assertAllEqual(all_false, a_)
 
   def assertAllFinite(self, a):
@@ -225,7 +225,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       a: A `Tensor` whose entries are checked for finiteness.
     """
     is_finite = np.isfinite(self._GetNdArray(a))
-    all_true = np.ones_like(is_finite, dtype=np.bool)
+    all_true = np.ones_like(is_finite, dtype=np.bool_)
     self.assertAllEqual(all_true, is_finite)
 
   def assertAllPositiveInf(self, a):
@@ -235,7 +235,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       a: A `Tensor` whose entries must be verified as positive infinity.
     """
     is_positive_inf = np.isposinf(self._GetNdArray(a))
-    all_true = np.ones_like(is_positive_inf, dtype=np.bool)
+    all_true = np.ones_like(is_positive_inf, dtype=np.bool_)
     self.assertAllEqual(all_true, is_positive_inf)
 
   def assertAllNegativeInf(self, a):
@@ -245,7 +245,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       a: A `Tensor` whose entries must be verified as negative infinity.
     """
     is_negative_inf = np.isneginf(self._GetNdArray(a))
-    all_true = np.ones_like(is_negative_inf, dtype=np.bool)
+    all_true = np.ones_like(is_negative_inf, dtype=np.bool_)
     self.assertAllEqual(all_true, is_negative_inf)
 
   def assertNotAllZero(self, a):
@@ -263,7 +263,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       a: A `Tensor` whose entries must be verified as not NaN.
     """
     is_not_nan = ~np.isnan(self._GetNdArray(a))
-    all_true = np.ones_like(is_not_nan, dtype=np.bool)
+    all_true = np.ones_like(is_not_nan, dtype=np.bool_)
     self.assertAllEqual(all_true, is_not_nan)
 
   def assertAllNan(self, a):
@@ -273,7 +273,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       a: A `Tensor` whose entries must be verified as NaN.
     """
     is_nan = np.isnan(self._GetNdArray(a))
-    all_true = np.ones_like(is_nan, dtype=np.bool)
+    all_true = np.ones_like(is_nan, dtype=np.bool_)
     self.assertAllEqual(all_true, is_nan)
 
   def assertAllNotNone(self, a):

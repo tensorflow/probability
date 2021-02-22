@@ -35,8 +35,8 @@ from tensorflow_probability.python.internal import test_util
 
 # TODO(b/127689162): Restore testing complex dtypes.
 
-# TF_NP_DTYPES = [np.float32, np.float64, np.int32, np.complex64, np.bool]
-TF_NP_DTYPES = [np.float32, np.float64, np.int32, np.bool]
+# TF_NP_DTYPES = [np.float32, np.float64, np.int32, np.complex64, np.bool_]
+TF_NP_DTYPES = [np.float32, np.float64, np.int32, np.bool_]
 TF_BACKEND = tf_backend.TensorFlowBackend()
 
 
@@ -77,7 +77,7 @@ class TFVariableTest(test_util.TestCase, backend_test.VariableTestCase):
     value_shape = data.draw(hpnp.array_shapes(min_dims=1))
     batch_size = value_shape[0]
     dtype = data.draw(hps.one_of(*map(hps.just, TF_NP_DTYPES)))
-    masks = hpnp.arrays(dtype=np.bool, shape=[batch_size])
+    masks = hpnp.arrays(dtype=np.bool_, shape=[batch_size])
     values = hpnp.arrays(dtype, value_shape)
     init_val = data.draw(values)
     ops = data.draw(
@@ -100,7 +100,7 @@ class TFVariableTest(test_util.TestCase, backend_test.VariableTestCase):
     TF_BACKEND.run_on_dummies(f, arg_types)
 
   def testDtypeMergingBoolsDoesntRaise(self):
-    TF_BACKEND.merge_dtypes(np.bool, np.bool_)
+    TF_BACKEND.merge_dtypes(np.bool_, np.bool_)
 
 
 if __name__ == '__main__':

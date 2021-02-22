@@ -262,7 +262,7 @@ class NegativeBinomialTest(test_util.TestCase):
     [sample_mean_, sample_var_,
      sample_min_] = self.evaluate([sample_mean, sample_var, sample_min])
     self.assertAllEqual(
-        np.ones(sample_min_.shape, dtype=np.bool), sample_min_ >= 0.0)
+        np.ones(sample_min_.shape, dtype=np.bool_), sample_min_ >= 0.0)
     for i in range(2):
       self.assertAllClose(
           sample_mean_[i],
@@ -283,7 +283,7 @@ class NegativeBinomialTest(test_util.TestCase):
         total_count=total_count, logits=logits, validate_args=True)
     log_prob_ = self.evaluate(nb.log_prob(x))
     self.assertAllEqual(
-        np.ones_like(log_prob_, dtype=np.bool), np.isfinite(log_prob_))
+        np.ones_like(log_prob_, dtype=np.bool_), np.isfinite(log_prob_))
 
   def testLogProbUnderflow(self):
     logits = np.float32([-90, -100, -110])
@@ -293,7 +293,7 @@ class NegativeBinomialTest(test_util.TestCase):
         total_count=total_count, logits=logits, validate_args=True)
     log_prob_ = self.evaluate(nb.log_prob(x))
     self.assertAllEqual(
-        np.ones_like(log_prob_, dtype=np.bool), np.isfinite(log_prob_))
+        np.ones_like(log_prob_, dtype=np.bool_), np.isfinite(log_prob_))
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
