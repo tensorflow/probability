@@ -186,10 +186,6 @@ install_python_packages() {
   # Install additional TFP dependencies.
   python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
 
-  # Upgrade numpy to the latest to address issues that happen when testing with
-  # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
-  python -m pip install -U $PIP_FLAGS numpy
-
   # Print out all versions, as an FYI in the logs.
   python --version
   python -m pip --version
