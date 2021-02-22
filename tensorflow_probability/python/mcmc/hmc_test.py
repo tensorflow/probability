@@ -176,9 +176,9 @@ class HMCTest(test_util.TestCase):
         1, 'Estimated E[x, exp(x)]: {}\t{}'.format(actual_x, actual_exp_x))
     self.assertAllClose(actual_x, expected_x_, atol=.045, rtol=0.)
     self.assertAllClose(actual_exp_x, expected_exp_x, atol=.02, rtol=0.)
-    self.assertAllEqual(np.ones_like(acceptance_probs, np.bool),
+    self.assertAllEqual(np.ones_like(acceptance_probs, np.bool_),
                         acceptance_probs > 0.5)
-    self.assertAllEqual(np.ones_like(acceptance_probs, np.bool),
+    self.assertAllEqual(np.ones_like(acceptance_probs, np.bool_),
                         acceptance_probs <= 1.)
 
   def _chain_gets_correct_expectations_wrapper(self, independent_chain_ndims):
@@ -732,7 +732,7 @@ class _LogCorrectionTest(object):
 
     # Ensure gradient is finite.
     self.assertAllEqual(
-        np.ones_like(actual_grads_target_log_prob_, dtype=np.bool),
+        np.ones_like(actual_grads_target_log_prob_, dtype=np.bool_),
         np.isfinite(actual_grads_target_log_prob_))
 
   def testHandlesNanFromKinetic(self):
@@ -763,12 +763,12 @@ class _LogCorrectionTest(object):
 
     # Ensure gradient is finite.
     g = grads_[0].reshape([len(x), len(x)])[:, 0]
-    self.assertAllEqual(np.ones_like(g, dtype=np.bool), np.isfinite(g))
+    self.assertAllEqual(np.ones_like(g, dtype=np.bool_), np.isfinite(g))
 
     # The remaining gradients are nan because the momentum was itself nan or
     # inf.
     g = grads_[0].reshape([len(x), len(x)])[:, 1:]
-    self.assertAllEqual(np.ones_like(g, dtype=np.bool), np.isnan(g))
+    self.assertAllEqual(np.ones_like(g, dtype=np.bool_), np.isnan(g))
 
 
 @test_util.test_all_tf_execution_regimes

@@ -219,7 +219,7 @@ class _StsTestHarness(object):
     observed_time_series = np.array(
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
     observation_mask = np.array(
-        [False, False, True, False, True, True, False, True]).astype(np.bool)
+        [False, False, True, False, True, True, False, True]).astype(np.bool_)
     masked_time_series = tfp.sts.MaskedTimeSeries(observed_time_series,
                                                   is_missing=observation_mask)
 

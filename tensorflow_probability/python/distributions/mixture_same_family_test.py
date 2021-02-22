@@ -74,7 +74,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     self.assertAllEqual([4, 5, 2], self._shape(x))
     self.assertAllEqual([4, 5, 2], self._shape(log_prob_x))
     self.assertAllEqual(
-        np.ones_like(x_, dtype=np.bool), np.logical_or(x_ == 0., x_ == 1.))
+        np.ones_like(x_, dtype=np.bool_), np.logical_or(x_ == 0., x_ == 1.))
 
   def testSampleAndLogProbMultivariateShapes(self):
     gm = self._build_mvndiag_mixture(

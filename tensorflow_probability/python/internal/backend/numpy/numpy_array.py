@@ -278,7 +278,7 @@ def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument
   return tensor
 
 
-def _sequence_mask(lengths, maxlen=None, dtype=np.bool, name=None):  # pylint: disable=unused-argument
+def _sequence_mask(lengths, maxlen=None, dtype=np.bool_, name=None):  # pylint: disable=unused-argument
   lengths = np.array(lengths, dtype=np.int32)
   if maxlen is None:
     maxlen = np.max(lengths).astype(lengths.dtype)

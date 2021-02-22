@@ -87,8 +87,8 @@ class TypeInferenceTest(test_util.TestCase):
           expected_prog.var_defs[v].tensors, type_.tensors,
           leaf_type=instructions.TensorType):
         if check_dtypes:
-          if expected_type.dtype in (np.bool, np.bool_):
-            self.assertIn(got_type.dtype, (np.bool, np.bool_))
+          if expected_type.dtype in (np.bool_, np.bool_):
+            self.assertIn(got_type.dtype, (np.bool_, np.bool_))
           else:
             self.assertEqual(expected_type.dtype, got_type.dtype)
         self.assertEqual(expected_type.shape, got_type.shape)
@@ -173,7 +173,7 @@ class TypeInferenceTest(test_util.TestCase):
     for inputs, outputs in [([1], [False]),
                             ([5, 6, 0, 3], [False, True, True, False])]:
       inputs = np.array(inputs, dtype=dtype)
-      outputs = np.array(outputs, dtype=np.bool)
+      outputs = np.array(outputs, dtype=np.bool_)
       tf1.logging.debug('np.even {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       prog = test_programs.is_even_function_calls(include_types=False)
@@ -195,7 +195,7 @@ class TypeInferenceTest(test_util.TestCase):
     for inputs, outputs in [([1], [False]),
                             ([5, 6, 0, 3], [False, True, True, False])]:
       inputs = np.array(inputs, dtype=dtype)
-      outputs = np.array(outputs, dtype=np.bool)
+      outputs = np.array(outputs, dtype=np.bool_)
       tf1.logging.debug('tf.even {} {} {}'.format(
           dtype, inputs.shape, outputs.shape))
       inputs_t = tf.constant(inputs, dtype=dtype)

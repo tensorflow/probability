@@ -518,7 +518,7 @@ def _is_tensor_like(param):
   elif isinstance(param, tf.Variable):
     return False
   else:
-    return np.array(param).dtype != np.object
+    return np.array(param).dtype != np.object_
 
 
 def warn_if_parameters_are_not_simple_tensors(params_dict):

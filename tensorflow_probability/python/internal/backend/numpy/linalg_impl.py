@@ -278,7 +278,7 @@ def _qr(input, full_matrices=False, name=None):  # pylint: disable=redefined-bui
 def _set_diag(input, diagonal, name=None, k=0, align='RIGHT_LEFT'):  # pylint: disable=unused-argument,redefined-builtin
   if k != 0 or align != 'RIGHT_LEFT':
     raise NotImplementedError('set_diag not implemented for k != 0')
-  return np.where(np.eye(diagonal.shape[-1], dtype=np.bool),
+  return np.where(np.eye(diagonal.shape[-1], dtype=np.bool_),
                   diagonal[..., np.newaxis, :],
                   input)
 

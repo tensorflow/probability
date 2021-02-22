@@ -611,8 +611,8 @@ class AffineBijectorTest(test_util.TestCase):
           run(bijector.forward_log_det_jacobian, x, event_ndims=1))
 
   def _testScaledIdentityComplexAdjoint(self, is_dynamic):
-    shift_ = np.array(-0.5, dtype=np.complex)
-    scale_ = np.array(4 + 2j, dtype=np.complex)
+    shift_ = np.array(-0.5, dtype=np.complex128)
+    scale_ = np.array(4 + 2j, dtype=np.complex128)
     shift = tf1.placeholder_with_default(
         shift_, shape=None if is_dynamic else [])
     scale = tf1.placeholder_with_default(
@@ -622,7 +622,7 @@ class AffineBijectorTest(test_util.TestCase):
         scale_identity_multiplier=scale,
         adjoint=True,
         validate_args=True)
-    z = np.array([1., 2, 3], dtype=np.complex)
+    z = np.array([1., 2, 3], dtype=np.complex128)
     y = bijector.forward(z)
     x = bijector.inverse(z)
     inv_fwd_z = bijector.inverse(tf.identity(y))

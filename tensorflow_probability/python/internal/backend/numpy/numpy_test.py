@@ -166,7 +166,7 @@ def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
       elements = integers()
     elif dtype in (np.complex64, np.complex128):
       elements = complex_numbers()
-    elif dtype == np.bool:
+    elif dtype == np.bool_:
       elements = hps.booleans()
     else:
       raise ValueError('Unexpected dtype: {}'.format(dtype))
@@ -314,7 +314,7 @@ def where_params(draw, version=2):
     x_shape, y_shape = shape, shape
   else:
     raise ValueError('unexpected tf.where version {}'.format(version))
-  condition = draw(single_arrays(shape=hps.just(cond_shape), dtype=np.bool))
+  condition = draw(single_arrays(shape=hps.just(cond_shape), dtype=np.bool_))
   x = draw(single_arrays(shape=hps.just(x_shape)))
   y = draw(single_arrays(shape=hps.just(y_shape), dtype=x.dtype))
   return condition, x, y
@@ -942,7 +942,7 @@ NUMPY_TEST_CASES = [
             array_axis_tuples(
                 single_arrays(
                     shape=shapes(min_dims=1),
-                    dtype=np.bool,
+                    dtype=np.bool_,
                     elements=hps.booleans()),
                 allow_multi_axis=True)
         ],
@@ -952,7 +952,7 @@ NUMPY_TEST_CASES = [
             array_axis_tuples(
                 single_arrays(
                     shape=shapes(min_dims=1),
-                    dtype=np.bool,
+                    dtype=np.bool_,
                     elements=hps.booleans()))
         ],
         xla_const_args=(1,)),
@@ -1129,7 +1129,7 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.log_sigmoid',
              [single_arrays(elements=floats(min_value=-100.))]),
     TestCase('math.logical_not',
-             [single_arrays(dtype=np.bool, elements=hps.booleans())]),
+             [single_arrays(dtype=np.bool_, elements=hps.booleans())]),
     TestCase('math.ndtri', [single_arrays(elements=floats(0., 1.))]),
     TestCase('math.negative', [single_arrays()]),
     TestCase('math.reciprocal', [single_arrays()]),
@@ -1167,11 +1167,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.less', [n_same_shape(n=2)]),
     TestCase('math.less_equal', [n_same_shape(n=2)]),
     TestCase('math.logical_and',
-             [n_same_shape(n=2, dtype=np.bool, elements=hps.booleans())]),
+             [n_same_shape(n=2, dtype=np.bool_, elements=hps.booleans())]),
     TestCase('math.logical_or',
-             [n_same_shape(n=2, dtype=np.bool, elements=hps.booleans())]),
+             [n_same_shape(n=2, dtype=np.bool_, elements=hps.booleans())]),
     TestCase('math.logical_xor',
-             [n_same_shape(n=2, dtype=np.bool, elements=hps.booleans())]),
+             [n_same_shape(n=2, dtype=np.bool_, elements=hps.booleans())]),
     TestCase('math.maximum', [n_same_shape(n=2)]),
     TestCase('math.minimum', [n_same_shape(n=2)]),
     TestCase('math.multiply', [n_same_shape(n=2)]),

@@ -208,7 +208,7 @@ class _HMCTests(object):
     observed_time_series = tfp.sts.MaskedTimeSeries(
         self._build_tensor(observed_time_series_),
         is_missing=self._build_tensor([False, True, False, False, True],
-                                      dtype=np.bool))
+                                      dtype=np.bool_))
 
     model = self._build_model(observed_time_series)
     samples, kernel_results = tfp.sts.fit_with_hmc(

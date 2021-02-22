@@ -76,7 +76,7 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
         # Use static args for callables and for bools, which will sometimes
         # be used in a `if` block and fail if they are tracers.
         return (arg is not None and
-                (callable(arg) or np.asarray(arg).dtype == np.bool))
+                (callable(arg) or np.asarray(arg).dtype == np.bool_))
 
       def jit_decorator(f):
         cache = {}

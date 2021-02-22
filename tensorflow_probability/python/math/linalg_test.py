@@ -274,7 +274,7 @@ class _PivotedCholesky(test_util.TestCase):
       ])
       self.assertAllEqual([2, dim, rank], pchol_shp)
       self.assertAllEqual(
-          np.ones([2, rank], dtype=np.bool), zeros_per_col >= np.arange(rank))
+          np.ones([2, rank], dtype=np.bool_), zeros_per_col >= np.arange(rank))
       self.assertAllLessEqual(diag_diff - diag_diff_prev,
                               np.finfo(self.dtype).resolution)
       self.assertAllLessEqual(diff_norm - diff_norm_prev,

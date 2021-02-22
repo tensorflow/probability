@@ -242,7 +242,7 @@ class _ForecastTest(object):
     observed_time_series_[is_missing_] = np.nan
     observed_time_series = tfp.sts.MaskedTimeSeries(
         self._build_tensor(observed_time_series_),
-        is_missing=self._build_tensor(is_missing_, dtype=np.bool))
+        is_missing=self._build_tensor(is_missing_, dtype=np.bool_))
 
     model = self._build_model(observed_time_series)
     prior_samples = [param.prior.sample(num_param_samples)

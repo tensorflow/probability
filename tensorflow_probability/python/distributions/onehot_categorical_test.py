@@ -160,7 +160,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     dist = tfd.OneHotCategorical(logits=logits, validate_args=True)
     np_sample = self.evaluate(dist.sample(seed=test_util.test_seed()))
     np_prob = self.evaluate(dist.prob(np_sample))
-    expected_prob = prob[np_sample.astype(np.bool)]
+    expected_prob = prob[np_sample.astype(np.bool_)]
     self.assertAllClose(expected_prob, np_prob.flatten())
 
   def testEventSizeOfOne(self):
