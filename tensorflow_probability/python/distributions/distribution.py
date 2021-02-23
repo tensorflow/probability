@@ -322,7 +322,8 @@ class _DistributionMeta(abc.ABCMeta):
       return
     def flatten(dist):
       param_names = set(dist._composite_tensor_nonshape_params)  # pylint: disable=protected-access
-      components = {param_name: value for param_name, value
+      components = {param_name: getattr(
+          dist, param_name, value) for param_name, value
                     in dist.parameters.items() if param_name in param_names}
       metadata = {param_name: value for param_name, value
                   in dist.parameters.items() if param_name not in param_names}
@@ -330,6 +331,16 @@ class _DistributionMeta(abc.ABCMeta):
         keys, values = zip(*sorted(components.items()))
       else:
         keys, values = (), ()
+      # Mimics the logic in `tfp.experimental.composite_tensor` where we
+      # aggressively try to convert arguments into Tensors.
+      def _maybe_convert_to_tensor(value, name):
+        try:
+          value = tf.convert_to_tensor(value, name=name)
+        except (ValueError, TypeError, AssertionError):
+          pass
+        return value
+      values = tuple([_maybe_convert_to_tensor(value, name) for value, name,
+                      in zip(values, keys)])
       return values, (keys, metadata)
     def unflatten(info, xs):
       keys, metadata = info
