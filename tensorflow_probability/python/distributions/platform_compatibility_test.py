@@ -148,7 +148,7 @@ XLA_LOGPROB_ATOL.update({
     'FiniteDiscrete': 6e-6,  # sparse_softmax_cross_entropy_with_logits
     'HalfCauchy': 2e-6,
     'InverseGamma': 1e-4,
-    'Kumaraswamy': 2e-5,
+    'Kumaraswamy': 4e-5,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
     'PowerSpherical': 2e-5,
