@@ -478,7 +478,7 @@ def windowed_adaptive_hmc(n_draws,
   # Hamiltonian Monte Carlo.” arXiv [stat.CO]. arXiv.
   # http://arxiv.org/abs/1905.09813.
   init_step_size = tf.cast(
-      1. / ps.shape(initial_transformed_position)[-1] ** 0.25, tf.float32)
+      ps.shape(initial_transformed_position)[-1], tf.float32) ** -0.25
 
   all_draws = []
   all_traces = []
