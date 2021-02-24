@@ -40,6 +40,7 @@ PRECONDITIONING_FAILS_DISTS = (
     'GeneralizedNormal',  # CDF gradient incorrect at 0.
     'HalfStudentT',  # Uses StudentT CDF.
     'Laplace',  # CDF gradient incorrect at 0.
+    'SigmoidBeta',  # inverse CDF numerical precision issues for large x
     'StudentT',  # CDF gradient incorrect at 0 (and unstable near zero).
     'TruncatedCauchy',  # b/175630511
     'TruncatedNormal',  # b/175630511

@@ -111,6 +111,7 @@ from tensorflow_probability.python.distributions.relaxed_bernoulli import Relaxe
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.sample import Sample
+from tensorflow_probability.python.distributions.sigmoid_beta import SigmoidBeta
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.skellam import Skellam
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
@@ -228,6 +229,7 @@ __all__ = [
     'PoissonLogNormalQuadratureCompound',
     'ProbitBernoulli',
     'Sample',
+    'SigmoidBeta',
     'SinhArcsinh',
     'Skellam',
     'SphericalUniform',
