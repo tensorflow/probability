@@ -78,8 +78,6 @@ NO_NANS_TEST_BLOCK_LIST = (
     # effect.
     'Sample',
     'TransformedDistribution',  # Bijectors may introduce nans
-    # TODO(axch): Fix numerics of _cauchy_cdf(x + delta) - _cauchy_cdf(x)
-    'TruncatedCauchy',
     # TODO(axch): Edit C++ sampler to reject numerically out-of-bounds samples
     'TruncatedNormal',
 )

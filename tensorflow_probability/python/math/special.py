@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
+    'atan_difference',
     'dawsn',
     'erfcinv',
     'erfcx',
@@ -44,6 +45,48 @@ __all__ = [
     'lbeta',
     'owens_t',
 ]
+
+
+def atan_difference(x, y, name=None):
+  """Difference of arctan(x) and arctan(y).
+
+  Computes arctan(x) - arctan(y) avoiding catastrophic cancellation. This is
+  by resorting to the identity:
+
+  ```none
+  arctan(x) - arctan(y) = arctan((x - y) / (1 + x * y)) +
+                          pi * sign(x) * 1_{x * y < -1)
+  ```
+
+  where `1_A` is the indicator function on the set `A`.
+
+  For a derivation of this fact, see [1].
+
+
+  #### References
+  [1] De Stefano, Sum of Arctangents
+      https://sites.google.com/site/micdestefano/mathematics/trigonometry/sum-of-arctangents
+
+  Args:
+    x: Floating-point Tensor. Should be broadcastable with `y`.
+    y: Floating-point Tensor. Should be broadcastable with `x`.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    z: Tensor of same shape and dtype as `x` and `y`.
+  """
+  with tf.name_scope(name or 'atan_difference'):
+    dtype = dtype_util.common_dtype([x, y], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    y = tf.convert_to_tensor(y, dtype=dtype)
+
+    difference = tf.math.atan((x - y) / (1 + x * y))
+    difference = difference + tf.where(
+        x * y < - 1., np.pi * tf.math.sign(x), 0.)
+    difference = tf.where(
+        tf.math.equal(x * y, -1.), np.pi * tf.math.sign(x) / 2., difference)
+
+    return difference
 
 
 def _dawsn_naive(x):

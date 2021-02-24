@@ -62,8 +62,6 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'Poisson',
     # TODO(b/137956955): Add support for hypothesis testing
     'SinhArcsinh',
-    # TruncatedCauchy has log_probs that are very far off.
-    'TruncatedCauchy',
     # TODO(b/159997353): StatelessTruncatedNormal missing in XLA.
     'TruncatedNormal',
     'Weibull',
@@ -186,6 +184,7 @@ XLA_LOGPROB_RTOL.update({
     'PowerSpherical': .003,
     'RelaxedBernoulli': 3e-3,
     'SigmoidBeta': 5e-4,
+    'TruncatedCauchy': 2e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,

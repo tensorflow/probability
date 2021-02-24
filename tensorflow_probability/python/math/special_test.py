@@ -422,6 +422,67 @@ class OwensTTest(test_util.TestCase):
 
 class SpecialTest(test_util.TestCase):
 
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceSmall(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-10.,
+        maxval=10.,
+        dtype=dtype,
+        seed=seed_stream())
+    y = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-10.,
+        maxval=10.,
+        dtype=dtype,
+        seed=seed_stream())
+
+    x_, y_, atan_diff_ = self.evaluate([x, y, tfp.math.atan_difference(x, y)])
+    self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceLarge(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-100.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    y = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-100.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+
+    x_, y_, atan_diff_ = self.evaluate([x, y, tfp.math.atan_difference(x, y)])
+    self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceCloseInputs(self, dtype):
+    y = np.linspace(1e4, 1e5, 100).astype(dtype)
+    x = y + 1.
+
+    atan_diff_ = self.evaluate(tfp.math.atan_difference(x, y))
+    # Ensure there isn't cancellation for large values.
+    self.assertAllGreater(atan_diff_, 0.)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceProductIsNegativeOne(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-10.,
+        maxval=10.,
+        dtype=dtype,
+        seed=seed_stream())
+    y = -tf.math.reciprocal(x)
+
+    x_, y_, atan_diff_ = self.evaluate([x, y, tfp.math.atan_difference(x, y)])
+    self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
+
   def testErfcinv(self):
     x = tf.random.uniform(
         shape=[int(1e5)],
