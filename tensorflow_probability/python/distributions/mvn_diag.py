@@ -288,3 +288,6 @@ class MultivariateNormalDiag(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
             is_preferred=False))
     # pylint: enable=g-long-lambda
+
+  _composite_tensor_nonshape_params = (
+      'loc', 'scale_diag', 'scale_identity_multiplier')

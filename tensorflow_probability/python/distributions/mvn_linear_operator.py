@@ -319,6 +319,8 @@ class MultivariateNormalLinearOperator(
     # Nothing to do here.
     return []
 
+  _composite_tensor_nonshape_params = ('loc', 'scale')
+
 
 @kullback_leibler.RegisterKL(MultivariateNormalLinearOperator,
                              MultivariateNormalLinearOperator)

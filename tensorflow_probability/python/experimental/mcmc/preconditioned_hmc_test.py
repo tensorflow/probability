@@ -29,6 +29,9 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import unnest
 
+JAX_MODE = False
+
+
 tfb = tfp.bijectors
 tfd = tfp.distributions
 tfde = tfp.experimental.distributions
@@ -63,6 +66,8 @@ RunHMCResults = collections.namedtuple('RunHMCResults', [
 
 def _make_composite_tensor(dist):
   """Wrapper to make distributions of linear operators composite."""
+  if JAX_MODE:
+    return dist
   if dist is None:
     return dist
   composite_dist = tfp.experimental.auto_composite_tensor(dist.__class__,
@@ -77,6 +82,12 @@ def _make_composite_tensor(dist):
       p[k] = composite_linop(**p[k].parameters)
   ac_dist = composite_dist(**p)
   return ac_dist
+
+
+def as_composite(obj):
+  if JAX_MODE:
+    return obj
+  return tfp.experimental.as_composite(obj)
 
 
 @test_util.test_graph_and_eager_modes
@@ -151,6 +162,8 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
       # Internal to the sampler, these scales are being used (implicitly).
       internal_scales = tf.ones(dims)
     elif precondition_scheme == 'sqrtm':
+      if JAX_MODE:
+        self.skipTest('`sqrtm` is not yet implemented in JAX.')
       momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           # The symmetric square root is a perfectly valid "factor".
           precision_factor=tf.linalg.LinearOperatorFullMatrix(
@@ -212,7 +225,8 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
       """Do a run, return RunHMCResults."""
       states, trace = tfp.mcmc.sample_chain(
           num_results,
-          current_state=tf.identity(target_mvn.sample(seed=0)),
+          current_state=tf.identity(target_mvn.sample(
+              seed=test_util.test_seed())),
           kernel=hmc_kernel,
           num_burnin_steps=num_adaptation_steps,
           seed=test_util.test_seed(),
@@ -447,7 +461,7 @@ class PreconditionedHMCTest(test_util.TestCase):
     if use_default:
       momentum_distribution = None
     else:
-      momentum_distribution = tfp.experimental.as_composite(
+      momentum_distribution = as_composite(
           tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
     kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
         lambda x: -x**2, step_size=.5, num_leapfrog_steps=2,
@@ -455,14 +469,14 @@ class PreconditionedHMCTest(test_util.TestCase):
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
   # TODO(b/175787154): Enable this test
   def DISABLED_test_f64_multichain(self, use_default):
     if use_default:
       momentum_distribution = None
     else:
-      momentum_distribution = tfp.experimental.as_composite(
+      momentum_distribution = as_composite(
           tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
     kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
         lambda x: -x**2, step_size=.5, num_leapfrog_steps=2,
@@ -471,7 +485,7 @@ class PreconditionedHMCTest(test_util.TestCase):
     nchains = 7
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([nchains], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
   def test_diag(self, use_default):
     """Test that a diagonal multivariate normal can be effectively sampled from.

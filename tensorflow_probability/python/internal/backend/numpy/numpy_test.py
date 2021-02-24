@@ -663,6 +663,13 @@ def _qr_post_process(qr):
   return np.matmul(qr.q, qr.r), np.float32(qr.q.shape), np.float32(qr.r.shape)
 
 
+def _eig_post_process(vals):
+  if not isinstance(vals, tuple):
+    return np.sort(vals, axis=-1)
+  e, v = vals
+  return np.einsum('...ab,...b,...bc->...ac', v, e, v.swapaxes(-1, -2))
+
+
 # __Currently untested:__
 # broadcast_dynamic_shape
 # broadcast_static_shape
@@ -798,6 +805,13 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
+    TestCase('linalg.eig', [pd_matrices()], post_processor=_eig_post_process,
+             xla_disabled=True),
+    TestCase('linalg.eigh', [pd_matrices()], post_processor=_eig_post_process),
+    TestCase('linalg.eigvals', [pd_matrices()],
+             post_processor=_eig_post_process, xla_disabled=True),
+    TestCase('linalg.eigvalsh', [pd_matrices()],
+             post_processor=_eig_post_process),
     TestCase('linalg.det', [nonsingular_matrices()],
              xla_disabled=True),  # TODO(b/162937268): missing kernel.
 
