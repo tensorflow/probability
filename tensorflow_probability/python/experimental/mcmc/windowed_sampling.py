@@ -29,6 +29,7 @@ from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.experimental.mcmc import diagonal_mass_matrix_adaptation as dmma
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
+from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts as pnuts
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -37,7 +38,7 @@ from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import sample
 
-__all__ = ['windowed_adaptive_hmc']
+__all__ = ['windowed_adaptive_hmc', 'windowed_adaptive_nuts']
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
@@ -46,8 +47,50 @@ warnings.filterwarnings(
     append=True)  # Don't override user-set filters.
 
 
-def _default_trace_fn(state, bijector, is_adapting, pkr):
-  """Trace function for `sample_model` providing standard diagnostics.
+def _default_nuts_trace_fn(state, bijector, is_adapting, pkr):
+  """Trace function for `windowed_adaptive_nuts` providing standard diagnostics.
+
+  Specifically, these match up with a number of diagnostics used by ArviZ [1],
+  to make diagnostics and analysis easier. The names used follow those used in
+  TensorFlow Probability, and will need to be mapped to those used in the ArviZ
+  schema.
+
+  References:
+    [1]: Kumar, R., Carroll, C., Hartikainen, A., & Martin, O. (2019). ArviZ a
+    unified library for exploratory analysis of Bayesian models in Python.
+    Journal of Open Source Software, 4(33), 1143.
+
+  Args:
+   state: tf.Tensor
+     Current sampler state, flattened and unconstrained.
+   bijector: tfb.Bijector
+     This can be used to untransform the shape to something with the same shape
+     as will be returned.
+   is_adapting: bool
+     Whether this is an adapting step, or may be treated as a valid MCMC draw.
+   pkr: UncalibratedPreconditionedHamiltonianMonteCarloKernelResults
+     Kernel results from this iteration.
+
+  Returns:
+    dict with sampler statistics.
+  """
+  del state, bijector  # Unused
+
+  energy_diff = unnest.get_innermost(pkr, 'log_accept_ratio')
+  return {
+      'step_size': unnest.get_innermost(pkr, 'step_size'),
+      'tune': is_adapting,
+      'target_log_prob': unnest.get_innermost(pkr, 'target_log_prob'),
+      'diverging': unnest.get_innermost(pkr, 'has_divergence'),
+      'accept_ratio': tf.minimum(1., tf.exp(energy_diff)),
+      'variance_scaling':
+          unnest.get_innermost(pkr, 'momentum_distribution').variance(),
+      'n_steps': unnest.get_innermost(pkr, 'leapfrogs_taken'),
+      'is_accepted': unnest.get_innermost(pkr, 'is_accepted')}
+
+
+def _default_hmc_trace_fn(state, bijector, is_adapting, pkr):
+  """Trace function for `windowed_adaptive_hmc` providing standard diagnostics.
 
   Specifically, these match up with a number of diagnostics used by ArviZ [1],
   to make diagnostics and analysis easier. The names used follow those used in
@@ -179,71 +222,55 @@ def _setup_mcmc(model, n_chains, seed, **pins):
   return target_log_prob_fn, initial_transformed_position, bijector
 
 
-def _make_base_kernel(*, target_log_prob_fn, step_size, num_leapfrog_steps,
-                      momentum_distribution):
-  return phmc.PreconditionedHamiltonianMonteCarlo(
-      target_log_prob_fn,
-      step_size=step_size,
-      num_leapfrog_steps=num_leapfrog_steps,
-      momentum_distribution=momentum_distribution,
-      store_parameters_in_results=True)
+def _make_base_kernel(*, kind, proposal_kernel_kwargs):
+  """Construct internal sampling kernel."""
+  if kind == 'nuts':
+    return pnuts.PreconditionedNoUTurnSampler(**proposal_kernel_kwargs)
+  elif kind == 'hmc':
+    return phmc.PreconditionedHamiltonianMonteCarlo(**proposal_kernel_kwargs)
+  else:
+    raise TypeError(
+        '`kind` must be "nuts" or "hmc" (got {kind})'.format(kind=kind))
 
 
 def make_fast_adapt_kernel(*,
-                           target_log_prob_fn,
-                           initial_step_size,
-                           num_leapfrog_steps,
-                           num_adaptation_steps,
-                           target_accept_prob,
-                           momentum_distribution):
+                           kind,
+                           proposal_kernel_kwargs,
+                           dual_averaging_kwargs):
   return dassa.DualAveragingStepSizeAdaptation(
       _make_base_kernel(
-          target_log_prob_fn=target_log_prob_fn,
-          step_size=initial_step_size,
-          num_leapfrog_steps=num_leapfrog_steps,
-          momentum_distribution=momentum_distribution),
-      shrinkage_target=initial_step_size,
-      num_adaptation_steps=num_adaptation_steps,
-      target_accept_prob=target_accept_prob)
+          kind=kind, proposal_kernel_kwargs=proposal_kernel_kwargs),
+      **dual_averaging_kwargs)
 
 
 def make_slow_adapt_kernel(*,
-                           target_log_prob_fn,
-                           initial_running_variance,
-                           initial_step_size,
-                           num_leapfrog_steps,
-                           num_adaptation_steps,
-                           target_accept_prob):
+                           kind,
+                           proposal_kernel_kwargs,
+                           dual_averaging_kwargs,
+                           initial_running_variance):
   return dmma.DiagonalMassMatrixAdaptation(
       make_fast_adapt_kernel(
-          target_log_prob_fn=target_log_prob_fn,
-          initial_step_size=initial_step_size,
-          num_leapfrog_steps=num_leapfrog_steps,
-          num_adaptation_steps=num_adaptation_steps,
-          target_accept_prob=target_accept_prob,
-          momentum_distribution=None),
+          kind=kind,
+          proposal_kernel_kwargs=proposal_kernel_kwargs,
+          dual_averaging_kwargs=dual_averaging_kwargs),
       initial_running_variance=initial_running_variance)
 
 
 def _fast_window(*,
-                 target_log_prob_fn,
-                 num_leapfrog_steps,
+                 kind,
+                 proposal_kernel_kwargs,
+                 dual_averaging_kwargs,
                  num_draws,
                  initial_position,
-                 initial_step_size,
-                 target_accept_prob,
                  bijector,
-                 momentum_distribution,
                  trace_fn,
                  seed):
   """Sample using just step size adaptation."""
+  dual_averaging_kwargs.update({'num_adaptation_steps': num_draws})
   kernel = make_fast_adapt_kernel(
-      target_log_prob_fn=target_log_prob_fn,
-      initial_step_size=initial_step_size,
-      num_leapfrog_steps=num_leapfrog_steps,
-      num_adaptation_steps=num_draws,
-      target_accept_prob=target_accept_prob,
-      momentum_distribution=momentum_distribution)
+      kind=kind,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      dual_averaging_kwargs=dual_averaging_kwargs)
   with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     draws, trace, fkr = sample.sample_chain(
@@ -275,24 +302,22 @@ def _fast_window(*,
 
 # TODO(b/180601951): Decorate this and `_fast_window` with tf.function
 def _slow_window(*,
-                 target_log_prob_fn,
-                 num_leapfrog_steps,
+                 kind,
+                 proposal_kernel_kwargs,
+                 dual_averaging_kwargs,
                  num_draws,
                  initial_position,
                  initial_running_variance,
-                 initial_step_size,
-                 target_accept_prob,
                  bijector,
                  trace_fn,
                  seed):
   """Sample using both step size and mass matrix adaptation."""
+  dual_averaging_kwargs.setdefault('num_adaptation_steps', num_draws)
   kernel = make_slow_adapt_kernel(
-      target_log_prob_fn=target_log_prob_fn,
-      initial_running_variance=initial_running_variance,
-      initial_step_size=initial_step_size,
-      num_leapfrog_steps=num_leapfrog_steps,
-      num_adaptation_steps=num_draws,
-      target_accept_prob=target_accept_prob)
+      kind=kind,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      dual_averaging_kwargs=dual_averaging_kwargs,
+      initial_running_variance=initial_running_variance)
   with warnings.catch_warnings():
     warnings.simplefilter('ignore')
 
@@ -327,22 +352,18 @@ def _slow_window(*,
 
 
 def _do_sampling(*,
-                 target_log_prob_fn,
-                 num_leapfrog_steps,
+                 kind,
+                 proposal_kernel_kwargs,
                  num_draws,
                  initial_position,
-                 step_size,
-                 momentum_distribution,
                  trace_fn,
                  bijector,
                  return_final_kernel_results,
                  seed):
   """Sample from base HMC kernel."""
   kernel = _make_base_kernel(
-      target_log_prob_fn=target_log_prob_fn,
-      step_size=step_size,
-      num_leapfrog_steps=num_leapfrog_steps,
-      momentum_distribution=momentum_distribution)
+      kind=kind,
+      proposal_kernel_kwargs=proposal_kernel_kwargs)
   return sample.sample_chain(
       num_draws,
       initial_position,
@@ -395,37 +416,52 @@ def _init_momentum(initial_transformed_position):
       batch_ndims=1)
 
 
-def windowed_adaptive_hmc(n_draws,
-                          joint_dist,
-                          *,
-                          num_leapfrog_steps,
-                          n_chains=64,
-                          num_adaptation_steps=525,
-                          target_accept_prob=0.75,
-                          trace_fn=_default_trace_fn,
-                          return_final_kernel_results=False,
-                          discard_tuning=True,
-                          seed=None,
-                          **pins):
-  """Adapt and sample from a joint distribution, conditioned on pins.
+def windowed_adaptive_nuts(n_draws,
+                           joint_dist,
+                           *,
+                           n_chains=64,
+                           num_adaptation_steps=525,
+                           dual_averaging_kwargs=None,
+                           max_tree_depth=10,
+                           max_energy_diff=500.,
+                           unrolled_leapfrog_steps=1,
+                           parallel_iterations=10,
+                           trace_fn=_default_nuts_trace_fn,
+                           return_final_kernel_results=False,
+                           discard_tuning=True,
+                           seed=None,
+                           **pins):
+  """Adapt and sample from a joint distribution using NUTS, conditioned on pins.
 
-  This uses Hamiltonian Monte Carlo to do the sampling. Step size is tuned using
-  a dual-averaging adaptation, and the kernel is conditioned using a diagonal
-  mass matrix, which is estimated using expanding windows.
+  Step size is tuned using a dual-averaging adaptation, and the kernel is
+  conditioned using a diagonal mass matrix, which is estimated using expanding
+  windows.
 
   Args:
     n_draws: int
       Number of draws after adaptation.
     joint_dist: `tfd.JointDistribution`
       A joint distribution to sample from.
-    num_leapfrog_steps: int
-      Number of leapfrog steps to use for the Hamiltonian Monte Carlo step.
     n_chains: int
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
       Number of draws used to adapt step size and
-    target_accept_prob: float
-      Target acceptance rate for the step size adaptation.
+    dual_averaging_kwargs: Optional dict
+      Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
+      By default, a `target_accept_prob` of 0.85 is set, and the class defaults
+      are used otherwise.
+    max_tree_depth: Maximum depth of the tree implicitly built by NUTS. The
+      maximum number of leapfrog steps is bounded by `2**max_tree_depth` i.e.
+      the number of nodes in a binary tree `max_tree_depth` nodes deep. The
+      default setting of 10 takes up to 1024 leapfrog steps.
+    max_energy_diff: Scalar threshold of energy differences at each leapfrog,
+      divergence samples are defined as leapfrog steps that exceed this
+      threshold. Default to 1000.
+    unrolled_leapfrog_steps: The number of leapfrogs to unroll per tree
+      expansion step. Applies a direct linear multipler to the maximum
+      trajectory length implied by max_tree_depth. Defaults to 1.
+    parallel_iterations: The number of iterations allowed to run in parallel.
+      It must be a positive integer. See `tf.while_loop` for more details.
     trace_fn: Optional callable
       The trace function should accept the arguments
       `(state, bijector, is_adapting, phmc_kernel_results)`,  where the `state`
@@ -455,14 +491,132 @@ def windowed_adaptive_hmc(n_draws,
     `True`, the tensors in `draws` and `trace` will have length `n_draws`,
     otherwise, they will have length `n_draws + num_adaptation_steps`.
   """
+  if dual_averaging_kwargs is None:
+    dual_averaging_kwargs = {}
+  dual_averaging_kwargs.setdefault('target_accept_prob', 0.85)
+  proposal_kernel_kwargs = {
+      'max_tree_depth': max_tree_depth,
+      'max_energy_diff': max_energy_diff,
+      'unrolled_leapfrog_steps': unrolled_leapfrog_steps,
+      'parallel_iterations': parallel_iterations}
+  return _windowed_adaptive_impl(
+      n_draws=n_draws,
+      joint_dist=joint_dist,
+      kind='nuts',
+      n_chains=n_chains,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      num_adaptation_steps=num_adaptation_steps,
+      dual_averaging_kwargs=dual_averaging_kwargs,
+      trace_fn=trace_fn,
+      return_final_kernel_results=return_final_kernel_results,
+      discard_tuning=discard_tuning,
+      seed=seed,
+      **pins)
+
+
+def windowed_adaptive_hmc(n_draws,
+                          joint_dist,
+                          *,
+                          num_leapfrog_steps,
+                          n_chains=64,
+                          num_adaptation_steps=525,
+                          dual_averaging_kwargs=None,
+                          trace_fn=_default_hmc_trace_fn,
+                          return_final_kernel_results=False,
+                          discard_tuning=True,
+                          seed=None,
+                          **pins):
+  """Adapt and sample from a joint distribution, conditioned on pins.
+
+  This uses Hamiltonian Monte Carlo to do the sampling. Step size is tuned using
+  a dual-averaging adaptation, and the kernel is conditioned using a diagonal
+  mass matrix, which is estimated using expanding windows.
+
+  Args:
+    n_draws: int
+      Number of draws after adaptation.
+    joint_dist: `tfd.JointDistribution`
+      A joint distribution to sample from.
+    num_leapfrog_steps: int
+      Number of leapfrog steps to use for the Hamiltonian Monte Carlo step.
+    n_chains: int
+      Number of independent chains to run MCMC with.
+    num_adaptation_steps: int
+      Number of draws used to adapt step size and
+    dual_averaging_kwargs: Optional dict
+      Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
+      By default, a `target_accept_prob` of 0.75 is set, and the class defaults
+      are used otherwise.
+    trace_fn: Optional callable
+      The trace function should accept the arguments
+      `(state, bijector, is_adapting, phmc_kernel_results)`,  where the `state`
+      is an unconstrained, flattened float tensor, `bijector` is the
+      `tfb.Bijector` that is used for unconstraining and flattening,
+      `is_adapting` is a boolean to mark whether the draw is from an adaptation
+      step, and `phmc_kernel_results` is the
+      `UncalibratedPreconditionedHamiltonianMonteCarloKernelResults` from the
+      `PreconditionedHamiltonianMonteCarlo` kernel. Note that
+      `bijector.inverse(state)` will provide access to the current draw in the
+      untransformed space, using the structure of the provided `joint_dist`.
+    return_final_kernel_results: If `True`, then the final kernel results are
+      returned alongside the chain state and the trace specified by the
+      `trace_fn`.
+    discard_tuning: bool
+      Whether to return tuning traces and draws.
+    seed: Optional, a seed for reproducible sampling.
+    **pins:
+      These are used to condition the provided joint distribution, and are
+      passed directly to `joint_dist.experimental_pin(**pins)`.
+  Returns:
+    A single structure of draws is returned in case the trace_fn is `None`, and
+    `return_final_kernel_results` is `False`. If there is a trace function,
+    the return value is a tuple, with the trace second. If the
+    `return_final_kernel_results` is `True`, the return value is a tuple of
+    length 3, with final kernel results returned last. If `discard_tuning` is
+    `True`, the tensors in `draws` and `trace` will have length `n_draws`,
+    otherwise, they will have length `n_draws + num_adaptation_steps`.
+  """
+  if dual_averaging_kwargs is None:
+    dual_averaging_kwargs = {}
+  dual_averaging_kwargs.setdefault('target_accept_prob', 0.75)
+  proposal_kernel_kwargs = {
+      'num_leapfrog_steps': num_leapfrog_steps,
+      'store_parameters_in_results': True}
+  return _windowed_adaptive_impl(
+      n_draws=n_draws,
+      joint_dist=joint_dist,
+      kind='hmc',
+      n_chains=n_chains,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      num_adaptation_steps=num_adaptation_steps,
+      dual_averaging_kwargs=dual_averaging_kwargs,
+      trace_fn=trace_fn,
+      return_final_kernel_results=return_final_kernel_results,
+      discard_tuning=discard_tuning,
+      seed=seed,
+      **pins)
+
+
+def _windowed_adaptive_impl(n_draws,
+                            joint_dist,
+                            *,
+                            kind,
+                            n_chains,
+                            proposal_kernel_kwargs,
+                            num_adaptation_steps,
+                            dual_averaging_kwargs,
+                            trace_fn,
+                            return_final_kernel_results,
+                            discard_tuning,
+                            seed,
+                            **pins):
+  """Runs windowed sampling using either HMC or NUTS as internal sampler."""
   if trace_fn is None:
     trace_fn = lambda *args: ()
     no_trace = True
   else:
     no_trace = False
 
-  num_leapfrog_steps = tf.convert_to_tensor(num_leapfrog_steps)
-  target_accept_prob = tf.convert_to_tensor(target_accept_prob)
   num_adaptation_steps = tf.convert_to_tensor(num_adaptation_steps)
 
   setup_seed, init_seed, seed = samplers.split_seed(
@@ -482,61 +636,64 @@ def windowed_adaptive_hmc(n_draws,
 
   all_draws = []
   all_traces = []
+  proposal_kernel_kwargs.update({
+      'target_log_prob_fn': target_log_prob_fn,
+      'step_size': tf.fill([n_chains, 1], init_step_size),
+      'momentum_distribution': _init_momentum(initial_transformed_position),
+  })
   draws, trace, step_size, running_variance = _fast_window(
-      target_log_prob_fn=target_log_prob_fn,
-      num_leapfrog_steps=num_leapfrog_steps,
+      kind=kind,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      dual_averaging_kwargs=dual_averaging_kwargs,
       num_draws=first_window_size,
       initial_position=initial_transformed_position,
-      initial_step_size=tf.fill([n_chains, 1], init_step_size),
-      target_accept_prob=target_accept_prob,
-      momentum_distribution=_init_momentum(initial_transformed_position),
       bijector=bijector,
       trace_fn=trace_fn,
       seed=init_seed)
+  proposal_kernel_kwargs.update({'step_size': step_size})
+
   all_draws.append(draws)
   all_traces.append(trace)
-
   *slow_seeds, seed = samplers.split_seed(seed, n=5)
   for idx, slow_seed in enumerate(slow_seeds):
     window_size = slow_window_size * (2**idx)
 
     # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
     draws, trace, step_size, running_variance, momentum_distribution = _slow_window(
-        target_log_prob_fn=target_log_prob_fn,
-        num_leapfrog_steps=num_leapfrog_steps,
+        kind=kind,
+        proposal_kernel_kwargs=proposal_kernel_kwargs,
+        dual_averaging_kwargs=dual_averaging_kwargs,
         num_draws=window_size,
         initial_position=draws[-1],
         initial_running_variance=running_variance,
-        initial_step_size=step_size,
-        target_accept_prob=target_accept_prob,
         bijector=bijector,
         trace_fn=trace_fn,
         seed=slow_seed)
     all_draws.append(draws)
     all_traces.append(trace)
+    proposal_kernel_kwargs.update(
+        {'step_size': step_size,
+         'momentum_distribution': momentum_distribution})
 
   fast_seed, sample_seed = samplers.split_seed(seed)
   draws, trace, step_size, running_variance = _fast_window(
-      target_log_prob_fn=target_log_prob_fn,
-      num_leapfrog_steps=num_leapfrog_steps,
+      kind=kind,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      dual_averaging_kwargs=dual_averaging_kwargs,
       num_draws=last_window_size,
       initial_position=draws[-1],
-      initial_step_size=step_size,
-      target_accept_prob=target_accept_prob,
-      momentum_distribution=momentum_distribution,
       bijector=bijector,
       trace_fn=trace_fn,
       seed=fast_seed)
+  proposal_kernel_kwargs.update({'step_size': step_size})
   all_draws.append(draws)
   all_traces.append(trace)
 
   ret = _do_sampling(
-      target_log_prob_fn=target_log_prob_fn,
-      num_leapfrog_steps=num_leapfrog_steps,
+      kind=kind,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
       num_draws=n_draws,
       initial_position=draws[-1],
-      step_size=step_size,
-      momentum_distribution=momentum_distribution,
       bijector=bijector,
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,

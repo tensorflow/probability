@@ -171,7 +171,7 @@ class WindowedSamplingTest(test_util.TestCase):
       dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
       [eight_schools_coroutine, eight_schools_named, eight_schools_sequential,
        eight_schools_nested])
-  def test_samples(self, model_fn):
+  def test_hmc_samples(self, model_fn):
     model = model_fn()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
@@ -188,6 +188,28 @@ class WindowedSamplingTest(test_util.TestCase):
         tf.nest.map_structure(tf.reduce_max,
                               tfp.mcmc.potential_scale_reduction(flat_draws)))
     self.assertLess(self.evaluate(max_scale_reduction), 1.35)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
+      [eight_schools_coroutine, eight_schools_named, eight_schools_sequential,
+       eight_schools_nested])
+  def test_nuts_samples(self, model_fn):
+    model = model_fn()
+    pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
+
+    @tf.function
+    def do_sample():
+      return tfp.experimental.mcmc.windowed_adaptive_nuts(
+          200, model, max_tree_depth=5, seed=test_util.test_seed(),
+          **pins)
+
+    draws, _ = do_sample()
+    flat_draws = tf.nest.flatten(
+        model.experimental_pin(**pins)._model_flatten(draws))
+    max_scale_reduction = tf.reduce_max(
+        tf.nest.map_structure(tf.reduce_max,
+                              tfp.mcmc.potential_scale_reduction(flat_draws)))
+    self.assertLess(self.evaluate(max_scale_reduction), 1.05)
 
   @parameterized.named_parameters(
       dict(testcase_name=f'_{num_draws}', num_draws=num_draws) for num_draws in
@@ -207,7 +229,7 @@ class WindowedSamplingTest(test_util.TestCase):
       self.assertEqual(first_window, 75)
       self.assertEqual(last_window, 75)
 
-  def test_fitting_gaussian(self):
+  def test_hmc_fitting_gaussian(self):
     # See docstring to _gen_gaussian_updating_example
     x_dim = 3
     y_dim = 12
@@ -235,6 +257,35 @@ class WindowedSamplingTest(test_util.TestCase):
       return final_scaling, true_var
     final_scaling, true_var = do_sample()
     self.assertAllClose(true_var, final_scaling, rtol=0.1)
+
+  def test_nuts_fitting_gaussian(self):
+    # See docstring to _gen_gaussian_updating_example
+    x_dim = 3
+    y_dim = 12
+
+    stream = test_util.test_seed_stream()
+
+    # Compute everything in a function so it is consistent in graph mode
+    @tf.function
+    def do_sample():
+      jd_model, true_var = _gen_gaussian_updating_example(
+          x_dim, y_dim, stream())
+      y_val = jd_model.sample(seed=stream()).y
+      _, trace = tfp.experimental.mcmc.windowed_adaptive_nuts(
+          1,
+          jd_model,
+          num_adaptation_steps=525,
+          max_tree_depth=5,
+          discard_tuning=False,
+          y=y_val,
+          seed=stream())
+
+      # Get the final scaling used for the mass matrix - this is a measure
+      # of how well the windowed adaptation recovered the true variance
+      final_scaling = 1. / trace['variance_scaling'][0][-1, 0, :]
+      return final_scaling, true_var
+    final_scaling, true_var = do_sample()
+    self.assertAllClose(true_var, final_scaling, rtol=0.05)
 
 
 if __name__ == '__main__':
