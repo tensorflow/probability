@@ -185,7 +185,8 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
       if all([grad is None for grad in tf.nest.flatten(total_grad)]):
         return None
       return tf.add_n(
-          [v for v in tf.nest.flatten(total_grad) if v is not None])
+          [v for v in tf.nest.flatten(total_grad)
+           if tfp_custom_gradient.is_valid_gradient(v)])
 
     out = tf.nest.map_structure(value_grad, value, is_sharded, local_grads)
     return (out,)

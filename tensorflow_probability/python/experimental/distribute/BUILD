@@ -45,6 +45,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
