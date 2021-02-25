@@ -181,7 +181,8 @@ class JointDistributionTest(test_lib.DistributedTest):
     true_lp_diff = true_log_probs[0] - true_log_probs[1]
     lp_diff = log_probs[0] - log_probs[1]
 
-    self.assertAllClose(self.evaluate(true_lp_diff), self.evaluate(lp_diff))
+    self.assertAllClose(self.evaluate(true_lp_diff), self.evaluate(lp_diff),
+                        rtol=2e-6)  # relaxed tol for fp32 in JAX
     self.assertAllClose(
         self.evaluate(true_lp_diff), self.evaluate(dist_lp_diff[0]))
 
