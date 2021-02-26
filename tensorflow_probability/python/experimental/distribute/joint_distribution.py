@@ -103,6 +103,8 @@ class JointDistributionSequential(JointDistributionDistributedMixin,
         model, validate_args=validate_args, name=name)
     self._parameters['shard_axis_name'] = shard_axis_name
 
+  _composite_tensor_nonshape_params = ('model',)
+
 
 class JointDistributionNamed(JointDistributionDistributedMixin,
                              distribution_lib.JointDistributionNamed):
@@ -130,6 +132,8 @@ class JointDistributionNamed(JointDistributionDistributedMixin,
     super(JointDistributionNamed,
           self).__init__(model, validate_args, name or 'JointDistributionNamed')
     self._parameters['shard_axis_name'] = shard_axis_name
+
+  _composite_tensor_nonshape_params = ('model',)
 
 
 class JointDistributionCoroutine(JointDistributionDistributedMixin,
