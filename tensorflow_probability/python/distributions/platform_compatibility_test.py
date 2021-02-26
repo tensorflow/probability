@@ -66,8 +66,6 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'TruncatedNormal',
     'Weibull',
     'WishartTriL',  # log_probs are very far off.
-    # TODO(b/159997700) No XLA Zeta
-    'Zipf',
 ])
 
 NO_SAMPLE_PARAM_GRADS = {
@@ -178,7 +176,6 @@ XLA_LOGPROB_RTOL.update({
     'LKJ': .07,
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
-    'Pareto': 2e-2,  # TODO(b/159997708)
     'PERT': 5e-4,
     'Poisson': 3e-2,  # TODO(b/159999573)
     'PowerSpherical': .003,

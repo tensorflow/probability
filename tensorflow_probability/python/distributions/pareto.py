@@ -161,9 +161,11 @@ class Pareto(distribution.Distribution):
     ] if self.validate_args else []):
 
       def log_prob_on_support(z):
-        return (tf.math.log(concentration) +
-                concentration * tf.math.log(scale) -
-                (concentration + 1.) * tf.math.log(z))
+        # This can also be written as log(c) + c * log(s) - (c + 1) * log(z).
+        # However, when c >> 1 and s and z are of the same magnitude, this can
+        # lead to loss of precision (log(c) vs. log(c) - log(z)).
+        return (tf.math.log(concentration / z) +
+                concentration * tf.math.log(scale / z))
 
       return self._extend_support(
           x, scale, log_prob_on_support, alt=-np.inf)
