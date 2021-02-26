@@ -167,7 +167,8 @@ class TruncatedCauchyTest(test_util.TestCase):
     tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
     samples_, variance_ = self.evaluate([
         tc.sample(int(1e6), seed=seed_stream()), tc.variance()])
-    self.assertAllClose(variance_, np.var(samples_, axis=0), rtol=0.15)
+    self.assertAllClose(
+        variance_, np.var(samples_, axis=0), rtol=0.1, atol=0.1)
 
   def testNegativeScaleFails(self):
     with self.assertRaisesOpError('`scale` must be positive'):
