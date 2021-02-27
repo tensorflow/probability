@@ -34,6 +34,7 @@ py_library(
         ":distribution_layer",
         ":initializers",
         ":masked_autoregressive",
+        ":monte_carlo_dropout",
         ":util",
         ":variable_input",
     ],
@@ -211,6 +212,29 @@ py_test(
     name = "masked_autoregressive_test",
     size = "small",
     srcs = ["masked_autoregressive_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "monte_carlo_dropout",
+    srcs = ["monte_carlo_dropout.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "monte_carlo_dropout_test",
+    size = "small",
+    srcs = ["monte_carlo_dropout_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [

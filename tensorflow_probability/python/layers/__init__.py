@@ -44,6 +44,7 @@ from tensorflow_probability.python.layers.distribution_layer import OneHotCatego
 from tensorflow_probability.python.layers.distribution_layer import VariationalGaussianProcess
 from tensorflow_probability.python.layers.initializers import BlockwiseInitializer
 from tensorflow_probability.python.layers.masked_autoregressive import AutoregressiveTransform
+from tensorflow_probability.python.layers.monte_carlo_dropout import MonteCarloDropout
 from tensorflow_probability.python.layers.util import default_loc_scale_fn
 from tensorflow_probability.python.layers.util import default_mean_field_normal_fn
 from tensorflow_probability.python.layers.util import default_multivariate_normal_fn
@@ -73,6 +74,7 @@ _allowed_symbols = [
     'MixtureLogistic',
     'MixtureNormal',
     'MixtureSameFamily',
+    'MonteCarloDropout',
     'MultivariateNormalTriL',
     'OneHotCategorical',
     'VariableLayer',
